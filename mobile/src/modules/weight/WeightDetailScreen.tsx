@@ -1,17 +1,27 @@
-// WeightDetailScreen — first real product slice.
-// Lets the user log a new weight entry and view past entries (newest first).
+// WeightDetailScreen — polished MVP for the Weight Tracking experience.
 //
-// Auth: backend currently uses a fixed dev-user. When real JWT auth lands
-// (M2), the apiClient will start sending the Bearer token automatically;
-// this screen needs no changes.
+// Layout (top → bottom):
+//   1. Brand header: small logo + screen title
+//   2. Current-weight hero card: latest value (display size), unit,
+//      formatted date, and a trend pill vs the previous entry
+//   3. Chart card: 30-day window with actual line + dashed 7-day moving
+//      average overlay, drawn with `react-native-svg`
+//   4. Quick-add row: numeric input, kg/lbs segmented toggle, Save button
+//   5. Entries list (scrollable, newest first) with date + value + delete
+//
+// Auth: backend uses a fixed dev-user. When real JWT auth lands the
+// apiClient will start sending the Bearer token; this screen needs no
+// changes.
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
+  Dimensions,
   Keyboard,
   RefreshControl,
+  SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -19,17 +29,57 @@ import {
   View,
 } from 'react-native';
 
-import { addWeight, deleteWeight, listWeights } from '../../services/weightsService';
-import type { WeightEntry } from '@fittrack/shared';
+import {
+  addWeight,
+  deleteWeight,
+  listWeights,
+} from '../../services/weightsService';
+import type { WeightEntry, WeightUnit } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { Logo } from '../../shared/components/Logo';
+import { TrendPill } from '../../shared/components/TrendPill';
+import { WeightChart } from '../../shared/components/WeightChart';
+
+const UNITS: WeightUnit[] = ['kg', 'lbs'];
+
+function formatLongDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+function formatShortDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+  });
+}
 
 export default function WeightDetailScreen() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [input, setInput] = useState('');
+  const [unit, setUnit] = useState<WeightUnit>('kg');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Ref tracks the latest entries so the optimistic-delete rollback can
+  // restore them without making `onDelete` depend on `entries` state.
+  const entriesRef = useRef<WeightEntry[]>(entries);
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
 
   const load = useCallback(async () => {
     try {
@@ -66,7 +116,7 @@ export default function WeightDetailScreen() {
     Keyboard.dismiss();
     setSaving(true);
     try {
-      const created = await addWeight({ value, unit: 'kg' });
+      const created = await addWeight({ value, unit });
       setEntries((prev) => [created, ...prev]);
       setInput('');
     } catch (e) {
@@ -75,175 +125,395 @@ export default function WeightDetailScreen() {
     } finally {
       setSaving(false);
     }
-  }, [input]);
+  }, [input, unit]);
 
   const onDelete = useCallback((entry: WeightEntry) => {
     Alert.alert(
       'Delete entry?',
-      `${entry.date} — ${entry.value.toFixed(1)} ${entry.unit}`,
+      `${formatShortDate(entry.date)} — ${entry.value.toFixed(1)} ${entry.unit}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            // Optimistic removal; restore on failure.
-            const previous = entries;
+            const previous = entriesRef.current;
             setEntries((prev) => prev.filter((e) => e.id !== entry.id));
             try {
               await deleteWeight(entry.id);
             } catch (e) {
               setEntries(previous);
-              const message = e instanceof Error ? e.message : 'Failed to delete entry';
+              const message =
+                e instanceof Error ? e.message : 'Failed to delete entry';
               Alert.alert('Delete failed', message);
             }
           },
         },
       ],
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries]);
+  }, []);
+
+  const latest = entries[0];
+  const previous = entries[1];
+
+  const chartWidth = useMemo(
+    () => Dimensions.get('window').width - spacing.lg * 2 - spacing.md * 2,
+    [],
+  );
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Weight Tracking</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+          />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Logo size={36} style={styles.headerLogo} />
+          <View>
+            <Text style={styles.headerTitle}>Weight</Text>
+            <Text style={styles.headerSubtitle}>Track. Trend. Progress.</Text>
+          </View>
+        </View>
 
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="78.5"
-          placeholderTextColor={colors.textDisabled}
-          keyboardType="decimal-pad"
-          editable={!saving}
-        />
-        <Text style={styles.unit}>kg</Text>
-        <TouchableOpacity
-          style={[styles.button, (saving || !input) && styles.buttonDisabled]}
-          onPress={onSave}
-          disabled={saving || !input}
-        >
-          <Text style={styles.buttonLabel}>{saving ? 'Saving…' : 'Save'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      {loading ? (
-        <ActivityIndicator style={styles.loader} color={colors.primary} />
-      ) : (
-        <FlatList
-          data={entries}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={entries.length === 0 ? styles.emptyContainer : styles.listContent}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No entries yet. Log your first weight above.</Text>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.entryRow}>
-              <Text style={styles.entryDate}>{item.date}</Text>
-              <View style={styles.entryRight}>
-                <Text style={styles.entryValue}>
-                  {item.value.toFixed(1)} {item.unit}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => onDelete(item)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Delete entry from ${item.date}`}
-                >
-                  <Text style={styles.deleteLabel}>Delete</Text>
-                </TouchableOpacity>
-              </View>
+        {loading ? (
+          <ActivityIndicator
+            color={colors.primary}
+            style={styles.initialLoader}
+            size="large"
+          />
+        ) : (
+          <>
+            {/* Hero card */}
+            <View style={styles.heroCard}>
+              <Text style={styles.eyebrow}>Latest</Text>
+              {latest ? (
+                <>
+                  <View style={styles.valueRow}>
+                    <Text style={styles.valueText}>{latest.value.toFixed(1)}</Text>
+                    <Text style={styles.unitText}>{latest.unit}</Text>
+                  </View>
+                  <Text style={styles.dateText}>{formatLongDate(latest.date)}</Text>
+                  <View style={styles.pillRow}>
+                    <TrendPill latest={latest} previous={previous} />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.placeholderHero}>—</Text>
+                  <Text style={styles.dateText}>
+                    Add your first weight below to start tracking.
+                  </Text>
+                </>
+              )}
             </View>
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
-      )}
-    </View>
+
+            {/* Chart card */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitleInline}>Trend</Text>
+                <Text style={styles.cardCaption}>Last 30 days · 7-day avg</Text>
+              </View>
+              <WeightChart
+                entries={entries}
+                width={chartWidth}
+                height={220}
+                windowDays={30}
+              />
+            </View>
+
+            {/* Quick add */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Log entry</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder="78.5"
+                  placeholderTextColor={colors.textDisabled}
+                  keyboardType="decimal-pad"
+                  editable={!saving}
+                />
+                <View style={styles.unitSegment}>
+                  {UNITS.map((u) => {
+                    const active = u === unit;
+                    return (
+                      <TouchableOpacity
+                        key={u}
+                        onPress={() => setUnit(u)}
+                        style={[
+                          styles.unitOption,
+                          active && styles.unitOptionActive,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <Text
+                          style={[
+                            styles.unitOptionLabel,
+                            active && styles.unitOptionLabelActive,
+                          ]}
+                        >
+                          {u}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  (saving || !input) && styles.saveButtonDisabled,
+                ]}
+                onPress={onSave}
+                disabled={saving || !input}
+                accessibilityRole="button"
+              >
+                <Text style={styles.saveButtonLabel}>
+                  {saving ? 'Saving…' : 'Save weight'}
+                </Text>
+              </TouchableOpacity>
+              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            </View>
+
+            {/* Entries list */}
+            <View style={styles.listSection}>
+              <Text style={styles.sectionLabel}>History</Text>
+              {entries.length === 0 ? (
+                <Text style={styles.emptyText}>
+                  No entries yet. Log your first weight above.
+                </Text>
+              ) : (
+                entries.map((item) => (
+                  <View key={item.id} style={styles.entryCard}>
+                    <View>
+                      <Text style={styles.entryDate}>
+                        {formatShortDate(item.date)}
+                      </Text>
+                      <Text style={styles.entryYear}>{item.date.slice(0, 4)}</Text>
+                    </View>
+                    <View style={styles.entryRight}>
+                      <Text style={styles.entryValue}>
+                        {item.value.toFixed(1)}
+                        <Text style={styles.entryUnit}> {item.unit}</Text>
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => onDelete(item)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete entry from ${item.date}`}
+                        style={styles.deleteButton}
+                      >
+                        <Text style={styles.deleteLabel}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: colors.background,
-    padding: spacing.md,
   },
-  title: {
-    ...typography.h2,
+  content: {
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  headerLogo: {
+    marginRight: spacing.md,
+  },
+  headerTitle: {
+    ...typography.h1,
     color: colors.text,
-    marginBottom: spacing.md,
+  },
+  headerSubtitle: {
+    ...typography.caption,
+    color: colors.primaryBright,
+    textTransform: 'uppercase',
+  },
+  initialLoader: {
+    marginTop: spacing.xxl,
+  },
+  heroCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  eyebrow: {
+    ...typography.overline,
+    color: colors.primaryBright,
+    marginBottom: spacing.sm,
+  },
+  valueRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  valueText: {
+    ...typography.display,
+    color: colors.text,
+  },
+  unitText: {
+    ...typography.h2,
+    color: colors.textSecondary,
+    marginLeft: spacing.sm,
+    marginBottom: 6,
+  },
+  placeholderHero: {
+    ...typography.display,
+    color: colors.textMuted,
+  },
+  dateText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+  },
+  pillRow: {
+    marginTop: spacing.md,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: spacing.sm,
+  },
+  cardTitleInline: {
+    ...typography.h3,
+    color: colors.text,
+  },
+  cardTitle: {
+    ...typography.h3,
+    color: colors.text,
+    marginBottom: spacing.sm,
+  },
+  cardCaption: {
+    ...typography.caption,
+    color: colors.textMuted,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.xs,
     marginBottom: spacing.md,
   },
   input: {
     flex: 1,
-    ...typography.body1,
+    ...typography.h2,
     color: colors.text,
     paddingVertical: spacing.sm,
   },
-  unit: {
-    ...typography.body2,
-    color: colors.textSecondary,
-    marginRight: spacing.md,
-  },
-  button: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+  unitSegment: {
+    flexDirection: 'row',
+    backgroundColor: colors.background,
     borderRadius: radius.md,
+    padding: 3,
   },
-  buttonDisabled: {
-    backgroundColor: colors.textDisabled,
+  unitOption: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
   },
-  buttonLabel: {
+  unitOptionActive: {
+    backgroundColor: colors.primary,
+  },
+  unitOptionLabel: {
     ...typography.button,
+    color: colors.textSecondary,
+  },
+  unitOptionLabelActive: {
     color: colors.white,
   },
-  error: {
-    ...typography.body2,
-    color: colors.error,
-    marginBottom: spacing.sm,
-  },
-  loader: {
-    marginTop: spacing.lg,
-  },
-  listContent: {
-    paddingBottom: spacing.lg,
-  },
-  emptyContainer: {
-    flexGrow: 1,
+  saveButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  saveButtonLabel: {
+    ...typography.button,
+    color: colors.white,
+    fontSize: 16,
+  },
+  errorText: {
+    ...typography.body2,
+    color: colors.negative,
+    marginTop: spacing.sm,
+  },
+  listSection: {
+    marginTop: spacing.xs,
+  },
+  sectionLabel: {
+    ...typography.overline,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.xs,
   },
   emptyText: {
     ...typography.body2,
     color: colors.textSecondary,
     textAlign: 'center',
-    paddingHorizontal: spacing.lg,
+    padding: spacing.lg,
   },
-  entryRow: {
+  entryCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.sm,
   },
   entryDate: {
     ...typography.body1,
     color: colors.text,
+    fontWeight: '600',
+  },
+  entryYear: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 2,
   },
   entryRight: {
     flexDirection: 'row',
@@ -251,16 +521,23 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   entryValue: {
-    ...typography.body1,
-    color: colors.primary,
-    fontWeight: '600',
+    ...typography.h3,
+    color: colors.primaryBright,
+    fontWeight: '700',
+  },
+  entryUnit: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    fontWeight: '400',
+  },
+  deleteButton: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   deleteLabel: {
-    ...typography.body2,
-    color: colors.error,
-    fontWeight: '600',
-  },
-  separator: {
-    height: spacing.sm,
+    ...typography.caption,
+    color: colors.negative,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
 });

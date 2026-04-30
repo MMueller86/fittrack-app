@@ -1,28 +1,76 @@
-// Design tokens: colors, typography, spacing.
+// Design tokens — colors, typography, spacing, radius.
+//
+// Derived from `docs/app_logo.png`: deep black background, vibrant green
+// primary (apple + EKG line), white text, silver/grey accents. We keep
+// one dark palette for the MVP; a light theme can be layered later.
 
-export const colors = {
-  primary: '#2E7D32',       // green 800
-  primaryLight: '#60AD5E',
-  primaryDark: '#005005',
-  accent: '#FF8F00',        // amber 800
-  background: '#F5F5F5',
-  surface: '#FFFFFF',
-  error: '#C62828',
-  text: '#212121',
-  textSecondary: '#757575',
-  textDisabled: '#BDBDBD',
-  divider: '#E0E0E0',
+const palette = {
+  black: '#0B0F0C',
+  surface: '#141A15',
+  surfaceElevated: '#1B231D',
+  surfaceMuted: '#212B23',
+  border: '#2A352C',
+
+  primaryDark: '#3F7A2E',
+  primary: '#67B23E',
+  primaryBright: '#8FD157',
+  primarySoft: 'rgba(103, 178, 62, 0.18)',
+
+  textPrimary: '#F2F4F1',
+  textSecondary: '#A6B0A4',
+  textMuted: '#6E776C',
+  textDisabled: '#4A5249',
+
+  positive: '#67B23E', // weight loss reads as "good" — reuse primary green
+  negative: '#E26B6B',
+  neutral: '#A6B0A4',
+
   white: '#FFFFFF',
 } as const;
 
+export const colors = {
+  background: palette.black,
+  surface: palette.surface,
+  surfaceElevated: palette.surfaceElevated,
+  surfaceMuted: palette.surfaceMuted,
+  border: palette.border,
+
+  primary: palette.primary,
+  primaryDark: palette.primaryDark,
+  primaryBright: palette.primaryBright,
+  primarySoft: palette.primarySoft,
+
+  text: palette.textPrimary,
+  textSecondary: palette.textSecondary,
+  textMuted: palette.textMuted,
+  textDisabled: palette.textDisabled,
+
+  positive: palette.positive,
+  negative: palette.negative,
+  neutral: palette.neutral,
+
+  divider: palette.border,
+  white: palette.white,
+
+  chart: {
+    line: palette.primaryBright,
+    average: '#8FA9CB',
+    grid: palette.border,
+    gradientFrom: 'rgba(143, 209, 87, 0.35)',
+    gradientTo: 'rgba(143, 209, 87, 0)',
+  },
+} as const;
+
 export const typography = {
-  h1: { fontSize: 28, fontWeight: '700' as const, letterSpacing: 0 },
-  h2: { fontSize: 22, fontWeight: '700' as const, letterSpacing: 0 },
+  display: { fontSize: 44, fontWeight: '800' as const, letterSpacing: -1 },
+  h1: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.3 },
+  h2: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.2 },
   h3: { fontSize: 18, fontWeight: '600' as const, letterSpacing: 0 },
   body1: { fontSize: 16, fontWeight: '400' as const },
   body2: { fontSize: 14, fontWeight: '400' as const },
-  caption: { fontSize: 12, fontWeight: '400' as const },
-  button: { fontSize: 16, fontWeight: '600' as const, letterSpacing: 0.5 },
+  caption: { fontSize: 12, fontWeight: '500' as const, letterSpacing: 0.4 },
+  overline: { fontSize: 11, fontWeight: '700' as const, letterSpacing: 1.2 },
+  button: { fontSize: 15, fontWeight: '600' as const, letterSpacing: 0.4 },
 } as const;
 
 export const spacing = {
@@ -35,9 +83,10 @@ export const spacing = {
 } as const;
 
 export const radius = {
-  sm: 4,
-  md: 8,
-  lg: 16,
+  sm: 6,
+  md: 12,
+  lg: 18,
+  xl: 24,
   full: 9999,
 } as const;
 
