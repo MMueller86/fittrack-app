@@ -9,7 +9,9 @@
 
 import { CosmosClient, Container, Database } from '@azure/cosmos';
 
-const DATABASE_ID = process.env.COSMOS_DATABASE_ID ?? 'fittrack-db';
+function getDatabaseId(): string {
+  return process.env.COSMOS_DATABASE_ID ?? 'fittrack-db';
+}
 
 const CONTAINER_DEFS = [
   { id: 'users', partitionKey: '/id' },
@@ -55,7 +57,7 @@ export async function getCosmos(): Promise<CosmosContext> {
       key: process.env.COSMOS_KEY!,
     });
 
-    const { database } = await client.databases.createIfNotExists({ id: DATABASE_ID });
+    const { database } = await client.databases.createIfNotExists({ id: getDatabaseId() });
 
     const containers = {} as Record<ContainerName, Container>;
     for (const def of CONTAINER_DEFS) {
@@ -71,4 +73,14 @@ export async function getCosmos(): Promise<CosmosContext> {
   })();
 
   return initPromise;
+}
+
+/**
+ * Test-only: drop the cached Cosmos context so the next `getCosmos()` call
+ * reads the current env vars again. Used by contract tests that point the
+ * client at a fresh isolated database per run.
+ */
+export function __resetCosmosForTests(): void {
+  cached = undefined;
+  initPromise = undefined;
 }

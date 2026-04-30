@@ -1,0 +1,114 @@
+name: CI
+
+# Two-tier test strategy:
+#   Tier 1 (unit-tests)     — fast, offline, no Docker, no Azure.
+#   Tier 2 (contract-tests) — runs CosmosWeightsRepository against the
+#                             Azure Cosmos DB Linux Emulator (vNext preview)
+#                             provided as a service container. Never against
+#                             real Azure Cosmos DB.
+#
+# Contract tests depend on unit tests passing first to fail fast on cheap
+# checks before spinning up the emulator.
+#
+# This workflow is CI only — no deploy steps.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs of the same branch / PR to save runner minutes.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Tier 1 — Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          # `cache: npm` reads the root `package-lock.json` (npm workspaces)
+          # and restores `~/.npm` keyed on its hash.
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck (all workspaces)
+        run: npm run typecheck
+
+      - name: Run backend unit tests
+        run: npm test --workspace=backend
+
+  contract-tests:
+    name: Tier 2 — Cosmos contract tests
+    needs: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # GitHub Actions service container.
+    # `vnext-preview` is the Linux variant — boots in <30 s and works on
+    # Linux runners. The legacy Windows emulator is NOT compatible with
+    # `runs-on: ubuntu-latest`.
+    services:
+      cosmos:
+        image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+        ports:
+          - 8081:8081
+
+    env:
+      # Pin the contract tests at the local emulator. These vars are only
+      # used by `backend/src/test-utils/cosmosEmulator.ts`, which also
+      # hard-codes the well-known emulator key as a defence-in-depth
+      # against accidental real-Azure runs.
+      COSMOS_ENDPOINT: https://localhost:8081
+      # Self-signed cert from the emulator — relax verification for the
+      # test process only.
+      NODE_TLS_REJECT_UNAUTHORIZED: '0'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Wait for Cosmos Emulator to become ready
+        # The service container starts in parallel with `npm ci`; it usually
+        # is ready by the time we get here, but we still probe explicitly so
+        # that failures show up here instead of inside Vitest.
+        run: |
+          set -euo pipefail
+          for i in {1..60}; do
+            if curl --insecure --silent --fail --max-time 3 \
+                 https://localhost:8081/_explorer/emulator.pem > /dev/null; then
+              echo "Cosmos Emulator is ready."
+              exit 0
+            fi
+            echo "Waiting for Cosmos Emulator... ($i/60)"
+            sleep 2
+          done
+          echo "::error::Cosmos Emulator did not become ready in time."
+          docker ps -a
+          exit 1
+
+      - name: Run backend contract tests
+        run: npm run test:contract --workspace=backend

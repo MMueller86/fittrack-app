@@ -116,13 +116,85 @@ These tests do **not** call:
 - Azure OpenAI
 - Anything in `local.settings.json`
 
-### Tier 2 — Cosmos contract tests (Emulator) — coming next
+### Tier 2 — Cosmos contract tests (Emulator)
 
-Runs the real `CosmosWeightsRepository` against the Cosmos DB Linux
-Emulator in Docker. Catches SQL-dialect bugs (reserved words, missing
-composite indexes) that unit tests with mocks cannot find. Excluded from
-`npm test` and run via `npm run test:contract` (TODO — see test plan in
-chat history). Never points at real Azure Cosmos DB.
+Runs the real `CosmosWeightsRepository` against the Cosmos DB **Linux
+Emulator**. Catches SQL-dialect bugs (reserved keywords like `value`,
+missing composite indexes for `ORDER BY`, partition-key behaviour) that
+unit tests with mocks cannot find. **Never** points at real Azure Cosmos
+DB — the endpoint is hard-coded to `https://localhost:8081` with the
+well-known emulator master key.
+
+#### Where these tests run
+
+| Where | Status | How |
+|---|---|---|
+| **GitHub Actions CI** | ✅ Required, runs on every push & PR | The workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) starts the emulator as a service container and runs `npm run test:contract` after Tier 1 passes. No setup needed locally to benefit from this. |
+| **Local — Docker / Podman / Rancher** | Optional | See "Run locally" below. |
+| **Local — without a container runtime** | Skipped | `npm run test:contract` fails fast with a friendly error pointing to this section. Tier 1 (`npm test`) remains fully offline. |
+
+#### Why a real emulator is needed
+
+`@azure/cosmos` translates the SQL we write into HTTP calls Cosmos
+serves. Mocks would just let us assert the strings we already wrote.
+Only a real Cosmos endpoint can tell us:
+
+- `SELECT c.value FROM c` is invalid (`value` is a reserved keyword)
+- `ORDER BY c.date DESC, c.createdAt DESC` requires a composite index
+- `container.item(id, partitionKey).delete()` returns `404` (not throws)
+  when the document is missing
+- A wrong partition key can never delete another user's row
+
+We hit all of these during manual smoke testing. Contract tests guarantee
+they cannot regress.
+
+#### Run locally (optional)
+
+Prerequisite: a container runtime. Any of these works — the helper
+scripts and CI both target the same Linux image
+(`mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview`):
+
+- **Docker Desktop** (default in the helper script)
+- **Podman Desktop** — `podman` is Docker-CLI compatible
+- **Rancher Desktop** — ships with a `docker` shim, helper script works
+  unchanged
+
+```powershell
+# 1. start the emulator (idempotent — safe to run repeatedly)
+cd backend
+npm run emulator:start
+
+# 2. run only the contract tests
+npm run test:contract
+
+# 3. stop + remove the emulator container when done
+npm run emulator:stop
+```
+
+If you don't have a container runtime, just skip Tier 2 locally — CI
+covers it on every push.
+
+#### What is covered today
+
+- `add` round-trips an entry through real Cosmos
+- `list` returns empty array, ordered (newest first), partitioned per user
+- Regression: `SELECT *` survives the `value`-reserved-word bug
+- `delete` returns `true` for existing, `false` (404) for missing
+- `delete` respects partition key — a wrong `userId` cannot delete another
+  user's row
+
+#### Files
+
+- [`vitest.contract.config.mts`](./vitest.contract.config.mts) — separate
+  Vitest config; **not** part of `npm test`
+- [`scripts/start-cosmos-emulator.ps1`](./scripts/start-cosmos-emulator.ps1) —
+  pulls and runs the emulator image
+- [`src/test-utils/cosmosEmulator.ts`](./src/test-utils/cosmosEmulator.ts) —
+  per-run isolated database (`fittrack-test-<random>`), creates all six
+  containers with the same partition keys as `infra/modules/cosmos.bicep`
+- [`src/lib/repositories/cosmosWeightsRepository.contract.test.ts`](./src/lib/repositories/cosmosWeightsRepository.contract.test.ts)
+- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — CI workflow
+  with both tiers
 
 ### Troubleshooting
 
@@ -131,4 +203,7 @@ chat history). Never points at real Azure Cosmos DB.
 | `WARNING: Failed to detect the Azure Functions runtime ... test mode` while running tests | Expected. `@azure/functions` v4 detects no host and skips `app.http()` registration. Tests call the exported handler functions directly. |
 | `Cannot find module './cosmosWeightsRepository'` | Means tests are still on the old `require()`-based factory. Pull latest. |
 | Vitest can't resolve `@fittrack/shared` | The alias in `vitest.config.mts` must mirror `tsconfig.json` paths. |
+| `Cosmos DB Emulator is not reachable at https://localhost:8081` from `npm run test:contract` | No container runtime running. Either start the emulator (`npm run emulator:start`) or skip Tier 2 locally — CI covers it. |
+| `unable to verify the first certificate` from Cosmos client | The emulator uses a self-signed cert. Contract tests set `NODE_TLS_REJECT_UNAUTHORIZED=0` automatically; this only affects the test process. |
+| Contract tests time out on first run | First-time image pull (~1 GB) plus emulator boot. Increase `testTimeout` in `vitest.contract.config.mts` if needed. |
 
