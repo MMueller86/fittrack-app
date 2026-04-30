@@ -25,12 +25,15 @@ import { randomUUID } from 'node:crypto';
 // Never works against real Azure Cosmos DB.
 export const EMULATOR_KEY =
   'C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==';
-// Use 127.0.0.1 instead of `localhost`. Node's fetch (undici) tries IPv6
-// (`::1`) first when given `localhost`, but the emulator container only
-// binds 0.0.0.0:8081 → IPv4. Forcing IPv4 here avoids `fetch failed`
-// errors that look like the emulator is down when it isn't.
+// The vnext-preview Linux emulator listens on plain HTTP (the rust_gateway
+// boot log says: "server up with protocol http on 0.0.0.0:8081"). The
+// legacy Windows emulator used HTTPS with a self-signed cert; do NOT copy
+// `https://` from older docs or you'll get ERR_SSL_WRONG_VERSION_NUMBER.
+//
+// Use 127.0.0.1 (not `localhost`) so Node's fetch / undici doesn't resolve
+// to ::1 and miss the IPv4-only port binding.
 export const EMULATOR_ENDPOINT =
-  process.env.COSMOS_ENDPOINT ?? 'https://127.0.0.1:8081';
+  process.env.COSMOS_ENDPOINT ?? 'http://127.0.0.1:8081';
 
 export interface EmulatorContext {
   client: CosmosClient;

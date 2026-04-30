@@ -13,7 +13,8 @@
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-const ENDPOINT = process.env.COSMOS_ENDPOINT ?? 'https://127.0.0.1:8081';
+// vnext-preview Linux emulator listens on plain HTTP. See cosmosEmulator.ts.
+const ENDPOINT = process.env.COSMOS_ENDPOINT ?? 'http://127.0.0.1:8081';
 const MAX_ATTEMPTS = 90;
 const DELAY_MS = 2_000;
 

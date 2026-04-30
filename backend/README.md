@@ -122,7 +122,7 @@ Runs the real `CosmosWeightsRepository` against the Cosmos DB **Linux
 Emulator**. Catches SQL-dialect bugs (reserved keywords like `value`,
 missing composite indexes for `ORDER BY`, partition-key behaviour) that
 unit tests with mocks cannot find. **Never** points at real Azure Cosmos
-DB — the endpoint is hard-coded to `https://localhost:8081` with the
+DB — the endpoint is hard-coded to `http://127.0.0.1:8081` with the
 well-known emulator master key.
 
 #### Where these tests run
@@ -203,7 +203,7 @@ covers it on every push.
 | `WARNING: Failed to detect the Azure Functions runtime ... test mode` while running tests | Expected. `@azure/functions` v4 detects no host and skips `app.http()` registration. Tests call the exported handler functions directly. |
 | `Cannot find module './cosmosWeightsRepository'` | Means tests are still on the old `require()`-based factory. Pull latest. |
 | Vitest can't resolve `@fittrack/shared` | The alias in `vitest.config.mts` must mirror `tsconfig.json` paths. |
-| `Cosmos DB Emulator is not reachable at https://localhost:8081` from `npm run test:contract` | No container runtime running. Either start the emulator (`npm run emulator:start`) or skip Tier 2 locally — CI covers it. |
-| `unable to verify the first certificate` from Cosmos client | The emulator uses a self-signed cert. Contract tests set `NODE_TLS_REJECT_UNAUTHORIZED=0` automatically; this only affects the test process. |
+| `Cosmos DB Emulator is not reachable at http://127.0.0.1:8081` from `npm run test:contract` | No container runtime running. Either start the emulator (`npm run emulator:start`) or skip Tier 2 locally — CI covers it. |
+| `ERR_SSL_WRONG_VERSION_NUMBER` connecting to the emulator | The vnext-preview emulator listens on plain HTTP, not HTTPS. Make sure `COSMOS_ENDPOINT` starts with `http://`, not `https://`. |
 | Contract tests time out on first run | First-time image pull (~1 GB) plus emulator boot. Increase `testTimeout` in `vitest.contract.config.mts` if needed. |
 

@@ -74,12 +74,10 @@ jobs:
       # hard-codes the well-known emulator key as a defence-in-depth
       # against accidental real-Azure runs.
       #
-      # Use 127.0.0.1 (not `localhost`) so Node's fetch / undici doesn't
-      # resolve to ::1 and miss the IPv4-only emulator binding.
-      COSMOS_ENDPOINT: https://127.0.0.1:8081
-      # Self-signed cert from the emulator — relax verification for the
-      # test process only.
-      NODE_TLS_REJECT_UNAUTHORIZED: '0'
+      # The vnext-preview Linux emulator listens on PLAIN HTTP (not HTTPS).
+      # See its boot log: `server up with protocol http on 0.0.0.0:8081`.
+      # 127.0.0.1 (not `localhost`) avoids Node/undici resolving to ::1.
+      COSMOS_ENDPOINT: http://127.0.0.1:8081
 
     steps:
       - name: Checkout
