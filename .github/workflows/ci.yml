@@ -92,22 +92,35 @@ jobs:
         run: npm ci
 
       - name: Wait for Cosmos Emulator to become ready
-        # The service container starts in parallel with `npm ci`; it usually
-        # is ready by the time we get here, but we still probe explicitly so
-        # that failures show up here instead of inside Vitest.
+        # The vnext-preview Linux emulator doesn't expose
+        # `/_explorer/emulator.pem` (that path only exists on the legacy
+        # Windows emulator). We probe the TLS account-info endpoint
+        # instead, which is what the Cosmos SDK hits on first connect.
+        # `--insecure` because the emulator uses a self-signed cert.
         run: |
-          set -euo pipefail
-          for i in {1..60}; do
-            if curl --insecure --silent --fail --max-time 3 \
-                 https://localhost:8081/_explorer/emulator.pem > /dev/null; then
-              echo "Cosmos Emulator is ready."
+          set -uo pipefail
+          for i in {1..90}; do
+            # Account info endpoint requires the master key. A 200 means
+            # the emulator's data plane is up. Anything else (connection
+            # refused, TLS handshake error, 503) means keep waiting.
+            status=$(curl --insecure --silent --output /dev/null \
+                          --write-out '%{http_code}' --max-time 3 \
+                          -H "Authorization: type=master&ver=1.0&sig=" \
+                          https://localhost:8081/ || echo "000")
+            if [ "$status" != "000" ] && [ "$status" != "503" ]; then
+              echo "Cosmos Emulator responded with HTTP $status — ready."
               exit 0
             fi
-            echo "Waiting for Cosmos Emulator... ($i/60)"
+            echo "Waiting for Cosmos Emulator... ($i/90, last status=$status)"
             sleep 2
           done
           echo "::error::Cosmos Emulator did not become ready in time."
           docker ps -a
+          echo "----- Emulator container logs (last 200 lines) -----"
+          container_id=$(docker ps -a --filter "ancestor=mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview" --format '{{.ID}}' | head -n1)
+          if [ -n "$container_id" ]; then
+            docker logs --tail 200 "$container_id" || true
+          fi
           exit 1
 
       - name: Run backend contract tests
