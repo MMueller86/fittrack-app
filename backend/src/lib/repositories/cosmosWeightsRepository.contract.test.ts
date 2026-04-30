@@ -23,7 +23,7 @@ import {
 import { __resetCosmosForTests } from '../cosmos';
 import { CosmosWeightsRepository } from './cosmosWeightsRepository';
 
-let ctx: EmulatorContext;
+let ctx: EmulatorContext | undefined;
 let repo: CosmosWeightsRepository;
 
 beforeAll(async () => {

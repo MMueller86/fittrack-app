@@ -73,7 +73,10 @@ jobs:
       # used by `backend/src/test-utils/cosmosEmulator.ts`, which also
       # hard-codes the well-known emulator key as a defence-in-depth
       # against accidental real-Azure runs.
-      COSMOS_ENDPOINT: https://localhost:8081
+      #
+      # Use 127.0.0.1 (not `localhost`) so Node's fetch / undici doesn't
+      # resolve to ::1 and miss the IPv4-only emulator binding.
+      COSMOS_ENDPOINT: https://127.0.0.1:8081
       # Self-signed cert from the emulator — relax verification for the
       # test process only.
       NODE_TLS_REJECT_UNAUTHORIZED: '0'
@@ -106,7 +109,7 @@ jobs:
             status=$(curl --insecure --silent --output /dev/null \
                           --write-out '%{http_code}' --max-time 3 \
                           -H "Authorization: type=master&ver=1.0&sig=" \
-                          https://localhost:8081/ || echo "000")
+                          https://127.0.0.1:8081/ || echo "000")
             if [ "$status" != "000" ] && [ "$status" != "503" ]; then
               echo "Cosmos Emulator responded with HTTP $status — ready."
               exit 0

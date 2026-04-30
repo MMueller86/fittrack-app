@@ -25,7 +25,12 @@ import { randomUUID } from 'node:crypto';
 // Never works against real Azure Cosmos DB.
 export const EMULATOR_KEY =
   'C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==';
-export const EMULATOR_ENDPOINT = 'https://localhost:8081';
+// Use 127.0.0.1 instead of `localhost`. Node's fetch (undici) tries IPv6
+// (`::1`) first when given `localhost`, but the emulator container only
+// binds 0.0.0.0:8081 → IPv4. Forcing IPv4 here avoids `fetch failed`
+// errors that look like the emulator is down when it isn't.
+export const EMULATOR_ENDPOINT =
+  process.env.COSMOS_ENDPOINT ?? 'https://127.0.0.1:8081';
 
 export interface EmulatorContext {
   client: CosmosClient;
@@ -83,7 +88,8 @@ export async function createTestDatabase(databaseId: string): Promise<EmulatorCo
   return { client, database, databaseId };
 }
 
-export async function destroyTestDatabase(ctx: EmulatorContext): Promise<void> {
+export async function destroyTestDatabase(ctx: EmulatorContext | undefined): Promise<void> {
+  if (!ctx) return;
   try {
     await ctx.database.delete();
   } catch {
