@@ -164,3 +164,25 @@ describe('DELETE /api/weights/:id', () => {
     expect(res.jsonBody).toEqual({ error: 'Missing id' });
   });
 });
+
+describe('handler error boundary', () => {
+  // The real in-memory repository never throws on the happy path. We
+  // force a throw via vi.spyOn to prove that `withHandler` converts a
+  // crashed repo call into a generic 500 instead of letting the host
+  // expose stack traces or crash the worker.
+  it('returns 500 when the repository throws unexpectedly', async () => {
+    const repoModule = await import('../lib/repositories/weightsRepository');
+    const repo = repoModule.getWeightsRepository();
+    const spy = vi
+      .spyOn(repo, 'list')
+      .mockRejectedValueOnce(new Error('cosmos: connection reset'));
+
+    try {
+      const res = await listWeightsHandler(makeRequest(), makeContext());
+      expect(res.status).toBe(500);
+      expect(res.jsonBody).toEqual({ error: 'Internal server error' });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

@@ -26,7 +26,6 @@ export class CosmosWeightsRepository implements WeightsRepository {
       if (a.date !== b.date) return a.date < b.date ? 1 : -1;
       return (a.createdAt ?? '') < (b.createdAt ?? '') ? 1 : -1;
     });
-    return resources;
   }
 
   async add(entry: WeightEntry): Promise<WeightEntry> {

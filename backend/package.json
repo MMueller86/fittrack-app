@@ -18,12 +18,9 @@
     "@azure/cosmos": "^4.1.1",
     "@azure/functions": "^4.5.0",
     "@azure/storage-blob": "^12.25.0",
-    "google-auth-library": "^9.15.0",
-    "jsonwebtoken": "^9.0.2",
-    "openai": "^4.85.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^20.17.0",
     "typescript": "^5.8.0",
     "vitest": "^2.1.9"

@@ -4,7 +4,23 @@
 
 import axios from 'axios';
 
-const BASE_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://localhost:7071/api';
+// `EXPO_PUBLIC_API_URL` MUST be set in .env / EAS build profile.
+// Examples:
+//   .env (local dev)        EXPO_PUBLIC_API_URL=http://10.0.2.2:7071/api
+//   .env (LAN device)       EXPO_PUBLIC_API_URL=http://10.5.21.134:7071/api
+//   eas.json (production)   EXPO_PUBLIC_API_URL=https://api.fittrack.app/api
+//
+// We deliberately do NOT default to `http://localhost:7071/api`. A silent
+// localhost fallback in a production build would either fail mysteriously
+// or, worse, hit attacker infrastructure on a shared network. Failing
+// loudly at startup is the right trade-off.
+const BASE_URL = process.env['EXPO_PUBLIC_API_URL'];
+if (!BASE_URL) {
+  throw new Error(
+    'EXPO_PUBLIC_API_URL is not set. Configure it in mobile/.env (dev) or ' +
+      'in your EAS build profile (production). See mobile/README.md.',
+  );
+}
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

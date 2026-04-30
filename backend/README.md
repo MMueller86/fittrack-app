@@ -2,6 +2,39 @@
 
 Azure Functions v4 backend for FitTrack. TypeScript, Node 20 LTS, Consumption Plan.
 
+## Implementation status
+
+| Milestone | Scope | Status |
+|---|---|---|
+| **M1** | Weight tracking (`GET\|POST\|DELETE /api/weights`), health check, dev-user auth stub, Cosmos persistence, contract tests | ✅ Implemented |
+| M2 | Real auth: Google ID token → JWT, `jwtMiddleware`, `/api/auth/google\|refresh\|logout`, profile + onboarding | ⏳ Stubs only (501) |
+| M3 | Nutrition targets, diary, reusable items | ⏳ Stubs only (501) |
+| M4 | Recipes (CRUD + image upload) | ⏳ Stubs only (501) |
+| M5 | AI workflows (Azure OpenAI), dashboard aggregation | ⏳ Stubs only (501) |
+
+All routes documented below that are not in M1 currently return
+`501 Not Implemented`. Their paths and shapes are provisional.
+
+## Auth (M1)
+
+**There is no real authentication yet.** [`src/lib/auth.ts`](./src/lib/auth.ts)
+exposes a `requireUser()` helper that returns a fixed dev user id
+(`'dev-user'`) for every request, regardless of any `Authorization`
+header.
+
+Consequences:
+
+- The backend is **not safe to expose publicly** in this state — anyone
+  who reaches the endpoint reads/writes the same `dev-user` data.
+- The deployed Azure Function App is gated by Functions auth keys at the
+  HTTP trigger level (per-route `authLevel`), but for M1 all weights
+  routes use `authLevel: 'anonymous'` and rely on "only I know the URL".
+- Multi-tenant isolation arrives with **M2** when JWT validation
+  replaces the stub. Until then, do not invite other users.
+
+When M2 lands, JWT middleware will be applied to every route except
+`/api/auth/google`, `/api/auth/refresh`, and `/api/health`.
+
 ## Structure
 
 ```
@@ -65,7 +98,10 @@ func --version   # should be 4.x
 
 ## Key Rules
 
-- JWT middleware must be applied to every route except `/api/auth/google`, `/api/auth/refresh`, `/api/health`
+- **M1:** weights routes are `authLevel: 'anonymous'` and use the
+  `requireUser()` dev stub. Do not deploy publicly without M2 auth.
+- **From M2:** JWT middleware must be applied to every route except
+  `/api/auth/google`, `/api/auth/refresh`, `/api/health`.
 - No Azure OpenAI keys or calls in `mobile/` — all AI goes through this backend
 - All AI endpoints return a preview payload only — caller must POST to a save endpoint after user confirmation
 - `local.settings.json` is gitignored — use the `.template` file as reference
@@ -76,10 +112,11 @@ func --version   # should be 4.x
 |---|---|
 | `@azure/functions` v4 | Azure Functions v4 programming model |
 | `@azure/cosmos` | Cosmos DB client |
-| `@azure/storage-blob` | Blob Storage client (recipe images) |
-| `google-auth-library` | Google ID token validation |
-| `jsonwebtoken` | Access/refresh token signing |
-| `openai` | Azure OpenAI client |
+| `@azure/storage-blob` | Blob Storage client (recipe images, M4) |
+
+When M2/M5 lands, `google-auth-library`, `jsonwebtoken`, and `openai`
+will be added back. They were removed in M1 because no source file
+imports them yet.
 
 ## Testing
 
