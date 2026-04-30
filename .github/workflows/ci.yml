@@ -26,6 +26,14 @@ concurrency:
 permissions:
   contents: read
 
+# Opt JavaScript actions (checkout, setup-node, ...) into the Node 24
+# runtime ahead of GitHub's June 2 2026 default switch. Suppresses the
+# "Node.js 20 actions are deprecated" warning. Only affects the runtime
+# the *action wrappers* execute under — the Node version we install for
+# our own tests is controlled by `actions/setup-node` below.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   unit-tests:
     name: Tier 1 — Unit tests
