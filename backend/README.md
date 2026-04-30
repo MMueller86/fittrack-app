@@ -80,3 +80,55 @@ func --version   # should be 4.x
 | `google-auth-library` | Google ID token validation |
 | `jsonwebtoken` | Access/refresh token signing |
 | `openai` | Azure OpenAI client |
+
+## Testing
+
+The backend uses a two-tier test strategy. Both tiers run **without** any
+real Azure resources, so unit tests stay fast and CI-friendly while
+contract tests still surface Cosmos-specific bugs (reserved keywords,
+indexing requirements) before deployment.
+
+### Tier 1 — Unit tests (Vitest)
+
+Fast, in-process, no I/O. Validators, HTTP handlers (with the in-memory
+repository), auth stub, and the repository factory.
+
+```powershell
+cd backend
+npm test          # one-shot
+npm run test:watch  # re-run on save
+```
+
+What is covered today:
+
+- Weight input validation (value range, unit, ISO date including rollover
+  rejection like `2026-02-30`)
+- `GET /api/weights` shape + ordering
+- `POST /api/weights` happy path + every 400 path
+- `DELETE /api/weights/:id` 204 / 404 / 400
+- `requireUser()` returns the dev user while the auth stub is active
+- Repository factory selects in-memory vs. Cosmos based on env vars
+
+These tests do **not** call:
+
+- Azure Functions runtime (`func start` is not required)
+- Azure Cosmos DB (real or emulator)
+- Azure OpenAI
+- Anything in `local.settings.json`
+
+### Tier 2 — Cosmos contract tests (Emulator) — coming next
+
+Runs the real `CosmosWeightsRepository` against the Cosmos DB Linux
+Emulator in Docker. Catches SQL-dialect bugs (reserved words, missing
+composite indexes) that unit tests with mocks cannot find. Excluded from
+`npm test` and run via `npm run test:contract` (TODO — see test plan in
+chat history). Never points at real Azure Cosmos DB.
+
+### Troubleshooting
+
+| Symptom | Cause / Fix |
+|---|---|
+| `WARNING: Failed to detect the Azure Functions runtime ... test mode` while running tests | Expected. `@azure/functions` v4 detects no host and skips `app.http()` registration. Tests call the exported handler functions directly. |
+| `Cannot find module './cosmosWeightsRepository'` | Means tests are still on the old `require()`-based factory. Pull latest. |
+| Vitest can't resolve `@fittrack/shared` | The alias in `vitest.config.mts` must mirror `tsconfig.json` paths. |
+

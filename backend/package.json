@@ -7,12 +7,14 @@
     "build": "tsc --project tsconfig.json",
     "build:watch": "tsc --project tsconfig.json --watch",
     "start": "func start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@azure/cosmos": "^4.1.1",
-    "@azure/storage-blob": "^12.25.0",
     "@azure/functions": "^4.5.0",
+    "@azure/storage-blob": "^12.25.0",
     "google-auth-library": "^9.15.0",
     "jsonwebtoken": "^9.0.2",
     "openai": "^4.85.0"
@@ -20,6 +22,7 @@
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^20.17.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.8.0",
+    "vitest": "^2.1.9"
   }
 }

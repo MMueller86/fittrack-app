@@ -10,6 +10,7 @@
 
 import type { WeightEntry } from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
+import { CosmosWeightsRepository } from './cosmosWeightsRepository';
 
 export interface WeightsRepository {
   list(userId: string): Promise<WeightEntry[]>;
@@ -50,14 +51,18 @@ let singleton: WeightsRepository | undefined;
 
 export function getWeightsRepository(): WeightsRepository {
   if (!singleton) {
-    if (isCosmosConfigured()) {
-      // Lazy require to avoid loading Cosmos client when not configured.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { CosmosWeightsRepository } = require('./cosmosWeightsRepository') as typeof import('./cosmosWeightsRepository');
-      singleton = new CosmosWeightsRepository();
-    } else {
-      singleton = new InMemoryWeightsRepository();
-    }
+    singleton = isCosmosConfigured()
+      ? new CosmosWeightsRepository()
+      : new InMemoryWeightsRepository();
   }
   return singleton;
+}
+
+/**
+ * Test-only: clear the cached singleton so a subsequent `getWeightsRepository()`
+ * call re-evaluates env vars and picks a fresh repository. Do not call this
+ * from production code.
+ */
+export function __resetWeightsRepositoryForTests(): void {
+  singleton = undefined;
 }
