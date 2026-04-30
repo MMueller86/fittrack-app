@@ -95,36 +95,24 @@ jobs:
         run: npm ci
 
       - name: Wait for Cosmos Emulator to become ready
-        # The vnext-preview Linux emulator doesn't expose
-        # `/_explorer/emulator.pem` (that path only exists on the legacy
-        # Windows emulator). We probe the TLS account-info endpoint
-        # instead, which is what the Cosmos SDK hits on first connect.
-        # `--insecure` because the emulator uses a self-signed cert.
+        # Probes the emulator with the SAME network stack the tests use
+        # (Node + undici fetch). A curl-based probe gave us false positives
+        # because curl's TLS layer differs from Node's. If this script
+        # exits 0, the Cosmos SDK will also be able to connect.
+        run: node backend/scripts/wait-for-cosmos.mjs
+
+      - name: Dump emulator logs on failure
+        if: failure()
         run: |
-          set -uo pipefail
-          for i in {1..90}; do
-            # Account info endpoint requires the master key. A 200 means
-            # the emulator's data plane is up. Anything else (connection
-            # refused, TLS handshake error, 503) means keep waiting.
-            status=$(curl --insecure --silent --output /dev/null \
-                          --write-out '%{http_code}' --max-time 3 \
-                          -H "Authorization: type=master&ver=1.0&sig=" \
-                          https://127.0.0.1:8081/ || echo "000")
-            if [ "$status" != "000" ] && [ "$status" != "503" ]; then
-              echo "Cosmos Emulator responded with HTTP $status — ready."
-              exit 0
-            fi
-            echo "Waiting for Cosmos Emulator... ($i/90, last status=$status)"
-            sleep 2
-          done
-          echo "::error::Cosmos Emulator did not become ready in time."
+          echo "----- docker ps -a -----"
           docker ps -a
-          echo "----- Emulator container logs (last 200 lines) -----"
           container_id=$(docker ps -a --filter "ancestor=mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview" --format '{{.ID}}' | head -n1)
           if [ -n "$container_id" ]; then
-            docker logs --tail 200 "$container_id" || true
+            echo "----- docker logs (last 300 lines) -----"
+            docker logs --tail 300 "$container_id" || true
+            echo "----- docker inspect (network) -----"
+            docker inspect "$container_id" --format '{{json .NetworkSettings}}' || true
           fi
-          exit 1
 
       - name: Run backend contract tests
         run: npm run test:contract --workspace=backend
