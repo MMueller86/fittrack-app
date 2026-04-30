@@ -76,11 +76,15 @@ Expected containers:
 ## Environment Naming Guidance
 
 Use a development-first naming convention, for example:
-- Resource group: rg-fittrack-dev
+- Resource group: `rg-Michael-Mueller` (existing — must be reused, not recreated)
 - Function App: func-fittrack-dev
 - Cosmos DB account: cosmos-fittrack-dev
 - Storage account: stfittrackdev
 - Azure OpenAI resource: oai-fittrack-dev
+
+The location of all newly created resources is inherited from the existing
+resource group (`resourceGroup().location` in Bicep), so they are co-located
+with `rg-Michael-Mueller`.
 
 If a different project name is chosen, apply the same pattern consistently.
 

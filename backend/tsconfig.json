@@ -5,13 +5,14 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "..",
     "sourceMap": true,
+    "baseUrl": ".",
     "paths": {
       "@fittrack/shared": ["../shared/index.ts"],
       "@fittrack/shared/*": ["../shared/*"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../shared/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

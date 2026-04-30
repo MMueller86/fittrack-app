@@ -2,6 +2,17 @@
 
 Bicep Infrastructure-as-Code for all FitTrack Azure resources.
 
+## Target Resource Group
+
+All resources are deployed into the **existing** resource group:
+
+```
+rg-Michael-Mueller
+```
+
+Do **not** create a new resource group. The location of every resource is
+inherited from this RG via `resourceGroup().location` in `main.bicep`.
+
 ## Resources Managed Here
 
 | Resource | Name | Module |
@@ -14,27 +25,31 @@ Bicep Infrastructure-as-Code for all FitTrack Azure resources.
 ## NOT Managed Here
 
 - Azure OpenAI resource — already deployed (`oai-fittrack-dev`, `gpt4o-mini`)
-- Resource group — created once manually or via `az group create`
+- Resource group — pre-existing (`rg-Michael-Mueller`)
 - Key Vault — out of MVP scope
 
 ## Deploy (M1)
 
-```bash
-# Create resource group (one-time)
-az group create --name rg-fittrack-dev --location westeurope
+```powershell
+# Verify the resource group exists and check its location (one-time check)
+az group show --name rg-Michael-Mueller --query "{name:name, location:location}" -o table
 
-# Deploy all resources
-az deployment group create \
-  --resource-group rg-fittrack-dev \
-  --template-file infra/main.bicep \
+# Deploy all resources into the existing RG.
+# Location is inherited from the RG — no need to pass it.
+az deployment group create `
+  --resource-group rg-Michael-Mueller `
+  --template-file infra/main.bicep `
   --parameters infra/parameters/dev.bicepparam
 ```
+
+If you ever need to override the inherited location, edit
+`infra/parameters/dev.bicepparam` and uncomment the `param location = '...'` line.
 
 ## Naming Convention
 
 | Resource | Dev Name |
 |---|---|
-| Resource Group | `rg-fittrack-dev` |
+| Resource Group | `rg-Michael-Mueller` (existing) |
 | Cosmos DB Account | `cosmos-fittrack-dev` |
 | Storage Account | `stfittrackdev` |
 | Function App | `func-fittrack-dev` |
