@@ -1,14 +1,16 @@
 import { app } from '@azure/functions';
 
-// POST /api/ai/analyze-meal-item
-// Accepts { text: string } — e.g. "100g chicken breast"
-// Returns macro preview. Caller saves after explicit user confirmation.
-// No generic AI chat. Backend-only OpenAI access.
-// Implemented in M4
+// POST /api/ai/meal-analyze
+// Accepts { text: string } — e.g. "2 slices whole grain toast with butter"
+// Returns a stub response. Real AI analysis planned for a future milestone.
+// The endpoint exists now so the mobile UI can call it without 404.
 
 app.http('ai-analyze-meal-item', {
   methods: ['POST'],
   authLevel: 'anonymous',
-  route: 'ai/analyze-meal-item',
-  handler: async () => ({ status: 501, jsonBody: { message: 'Not implemented — M4' } }),
+  route: 'ai/meal-analyze',
+  handler: async () => ({
+    status: 200,
+    jsonBody: { message: 'Not supported yet' },
+  }),
 });
