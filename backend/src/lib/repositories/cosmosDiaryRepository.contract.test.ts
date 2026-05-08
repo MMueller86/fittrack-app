@@ -89,7 +89,7 @@ describe('CosmosDiaryRepository (contract)', () => {
   it('addItem appends item and persists it', async () => {
     const meal = await repo.createMeal(makeMealInput());
     const updated = await repo.addItem(USER_A, meal.id, {
-      name: 'Egg', calories: 90, proteinG: 6, carbsG: 0, fatG: 6, fiberG: 0,
+      name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
     });
     expect(updated.items).toHaveLength(1);
     expect(updated.items[0].name).toBe('Egg');
@@ -102,7 +102,7 @@ describe('CosmosDiaryRepository (contract)', () => {
   it('deleteItem removes item and persists the change', async () => {
     const meal = await repo.createMeal(makeMealInput());
     const withItem = await repo.addItem(USER_A, meal.id, {
-      name: 'Bread', calories: 80, proteinG: 3, carbsG: 15, fatG: 1, fiberG: 1,
+      name: 'Bread', calories: 80, protein: 3, carbs: 15, fat: 1, fiber: 1,
     });
     const itemId = withItem.items[0].id;
     const after = await repo.deleteItem(USER_A, meal.id, itemId);

@@ -5,7 +5,8 @@
   "workspaces": [
     "mobile",
     "backend",
-    "shared"
+    "shared",
+    "tools/off-import"
   ],
   "engines": {
     "node": ">=20.0.0",
@@ -13,6 +14,14 @@
   },
   "scripts": {
     "build:backend": "npm run build --workspace=backend",
-    "typecheck": "npm run typecheck --workspace=backend --workspace=shared --workspace=mobile"
+    "build:verify:backend": "npm run build:verify --workspace=backend",
+    "typecheck": "npm run typecheck --workspace=backend --workspace=shared --workspace=mobile",
+    "test:shared": "npm run test --workspace=shared",
+    "test:backend": "npm run test --workspace=backend",
+    "test:mobile": "npm run test --workspace=mobile",
+    "test": "npm run test:shared ; npm run test:backend ; npm run test:mobile",
+    "analyze:off": "npm run analyze:off:tsx --workspace=@fittrack/off-import",
+    "export:off": "npm run export:off --workspace=@fittrack/off-import",
+    "import:cosmos": "npm run import:cosmos --workspace=@fittrack/off-import"
   }
 }

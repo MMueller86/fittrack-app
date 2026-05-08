@@ -3,7 +3,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('./cosmosReusableItemsRepository', () => ({
   CosmosReusableItemsRepository: class {
     async search() { return []; }
-    async create(i: unknown) { return { id: 'mock-id', usageCount: 0, createdAt: new Date().toISOString(), ...i as object }; }
+    async create(i: unknown) {
+      const input = i as { userId: string; name: string; nutritionBasis: string; isComplete: boolean; sourceType: string };
+      return {
+        id: 'mock-id',
+        userId: input.userId,
+        name: input.name,
+        nutritionBasis: input.nutritionBasis,
+        isComplete: input.isComplete,
+        sourceType: input.sourceType,
+        usageCount: 0,
+        createdAt: new Date().toISOString(),
+      };
+    }
   },
 }));
 
@@ -50,7 +62,9 @@ describe('InMemoryReusableItemsRepository (via factory)', () => {
   it('create returns item with correct fields', async () => {
     const repo = getReusableItemsRepository();
     const item = await repo.create({
-      userId: 'u', name: 'Oats', calories: 300, proteinG: 10, carbsG: 55, fatG: 5, fiberG: 4,
+      userId: 'u', name: 'Oats', nutritionBasis: 'perPortion',
+      portion: { label: '1 serving', nutrition: { calories: 300, protein: 10, carbs: 55, fat: 5, fiber: 4 } },
+      isComplete: true, sourceType: 'manual',
     });
     expect(item.id).toBeTruthy();
     expect(item.name).toBe('Oats');
@@ -59,9 +73,9 @@ describe('InMemoryReusableItemsRepository (via factory)', () => {
 
   it('search returns items that start with query (case-insensitive)', async () => {
     const repo = getReusableItemsRepository();
-    await repo.create({ userId: 'u', name: 'Oats', calories: 300, proteinG: 10, carbsG: 55, fatG: 5, fiberG: 4 });
-    await repo.create({ userId: 'u', name: 'Orange Juice', calories: 110, proteinG: 1, carbsG: 26, fatG: 0, fiberG: 0 });
-    await repo.create({ userId: 'u', name: 'Apple', calories: 80, proteinG: 0, carbsG: 21, fatG: 0, fiberG: 3 });
+    await repo.create({ userId: 'u', name: 'Oats', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
+    await repo.create({ userId: 'u', name: 'Orange Juice', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
+    await repo.create({ userId: 'u', name: 'Apple', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
     const results = await repo.search('u', 'o');
     expect(results.map((r) => r.name)).toEqual(expect.arrayContaining(['Oats', 'Orange Juice']));
     expect(results.find((r) => r.name === 'Apple')).toBeUndefined();
@@ -69,15 +83,15 @@ describe('InMemoryReusableItemsRepository (via factory)', () => {
 
   it('search with empty query returns all items (up to 20)', async () => {
     const repo = getReusableItemsRepository();
-    await repo.create({ userId: 'u', name: 'Item A', calories: 100, proteinG: 5, carbsG: 10, fatG: 2, fiberG: 1 });
-    await repo.create({ userId: 'u', name: 'Item B', calories: 200, proteinG: 8, carbsG: 20, fatG: 4, fiberG: 2 });
+    await repo.create({ userId: 'u', name: 'Item A', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
+    await repo.create({ userId: 'u', name: 'Item B', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
     const results = await repo.search('u', '');
     expect(results).toHaveLength(2);
   });
 
   it('isolates items per user', async () => {
     const repo = getReusableItemsRepository();
-    await repo.create({ userId: 'user-A', name: 'Bread', calories: 80, proteinG: 3, carbsG: 15, fatG: 1, fiberG: 1 });
+    await repo.create({ userId: 'user-A', name: 'Bread', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
     expect(await repo.search('user-B', '')).toHaveLength(0);
   });
 });

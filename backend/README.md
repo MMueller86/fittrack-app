@@ -49,13 +49,38 @@ src/
 │   ├── reusableItems.ts  GET|POST /api/reusable-items
 │   ├── recipes.ts     CRUD /api/recipes | image upload | ai-analyze
 │   ├── ai.ts          POST /api/ai/analyze-meal-item
-│   └── dashboard.ts   GET /api/dashboard/today
+│   ├── dashboard.ts   GET /api/dashboard/today
+│   ├── foodSearch.ts  GET /api/food-search?query= (library + catalog fan-out)
+│   └── foodProducts.ts  GET /api/food-products/search?q= | /api/food-products/{id}
 └── lib/
-    ├── cosmos.ts      CosmosClient singleton + 6 container refs
+    ├── cosmos.ts      CosmosClient singleton + 7 container refs (incl. foodProducts)
     ├── openai.ts      AzureOpenAI client + prompt builders (3 workflows)
     ├── storage.ts     BlobServiceClient + upload helper
-    └── auth.ts        googleValidator, jwtMiddleware, tokenService
+    ├── auth.ts        googleValidator, jwtMiddleware, tokenService
+    └── repositories/
+        ├── foodProductRepository.ts        Interface + in-memory impl + factory
+        └── cosmosFoodProductRepository.ts  Cosmos-backed impl
 ```
+
+## Food Product Catalog Import
+
+The internal food product catalog is populated from an Open Food Facts MongoDB export via the `tools/off-import` CLI tool. This is an offline, one-time (or periodic) operation — the backend itself never calls OFF at runtime.
+
+```powershell
+# From the workspace root — dry-run (no writes, validates JSON only):
+cd "tools/off-import"
+npx tsx import-to-cosmos.ts --dry-run
+
+# Import first 500 products (useful for local dev without a full dataset):
+npx tsx import-to-cosmos.ts --limit=500
+
+# Full import:
+npx tsx import-to-cosmos.ts
+```
+
+Requires `COSMOS_ENDPOINT` and `COSMOS_KEY` in your environment (or in `backend/local.settings.json`). The tool is idempotent — re-running updates existing documents while preserving `manualKeywords` and `negativeKeywords`.
+
+**Local dev without Cosmos:** The `FoodProductRepository` factory falls back to an in-memory empty stub when `COSMOS_ENDPOINT` / `COSMOS_KEY` are not set. Food catalog search returns no results, but the rest of the app works normally.
 
 ## Prerequisites
 

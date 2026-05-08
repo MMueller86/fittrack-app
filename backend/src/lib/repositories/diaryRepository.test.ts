@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 // Stub the Cosmos repositories so unit tests run without a DB connection.
 vi.mock('./cosmosDiaryRepository', () => ({
   CosmosDiaryRepository: class {
-    async getDay() { return { meals: [], summary: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 } }; }
+    async getDay() { return { meals: [], summary: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 } }; }
     async createMeal(i: { userId: string; date: string; type: string; name: string }) {
       return { id: 'mock-id', items: [], createdAt: new Date().toISOString(), ...i };
     }
@@ -58,7 +58,7 @@ describe('getDiaryRepository (factory)', () => {
 describe('computeSummary', () => {
   it('returns zero summary for empty meals array', () => {
     const s = computeSummary([]);
-    expect(s).toEqual({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 });
+    expect(s).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
   });
 
   it('sums macros across all meals and items', () => {
@@ -67,25 +67,25 @@ describe('computeSummary', () => {
         id: 'm1', userId: 'u', date: '2026-05-04', type: 'breakfast', name: 'Breakfast',
         createdAt: '', items: [
           { id: 'i1', name: 'Oats', sourceType: 'manual', quantity: 1, unit: 'serving',
-            macros: { calories: 300, proteinG: 10, carbsG: 50, fatG: 5, fiberG: 4 } },
+            macros: { calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4 } },
         ],
       },
       {
         id: 'm2', userId: 'u', date: '2026-05-04', type: 'lunch', name: 'Lunch',
         createdAt: '', items: [
           { id: 'i2', name: 'Chicken', sourceType: 'manual', quantity: 1, unit: 'serving',
-            macros: { calories: 250, proteinG: 40, carbsG: 0, fatG: 6, fiberG: 0 } },
+            macros: { calories: 250, protein: 40, carbs: 0, fat: 6, fiber: 0 } },
           { id: 'i3', name: 'Rice', sourceType: 'manual', quantity: 1, unit: 'serving',
-            macros: { calories: 200, proteinG: 4, carbsG: 45, fatG: 0.5, fiberG: 1 } },
+            macros: { calories: 200, protein: 4, carbs: 45, fat: 0.5, fiber: 1 } },
         ],
       },
     ];
     const s = computeSummary(meals);
     expect(s.calories).toBe(750);
-    expect(s.proteinG).toBe(54);
-    expect(s.carbsG).toBe(95);
-    expect(s.fatG).toBe(11.5);
-    expect(s.fiberG).toBe(5);
+    expect(s.protein).toBe(54);
+    expect(s.carbs).toBe(95);
+    expect(s.fat).toBe(11.5);
+    expect(s.fiber).toBe(5);
   });
 
   it('rounds to 1 decimal to avoid floating-point noise', () => {
@@ -94,16 +94,16 @@ describe('computeSummary', () => {
         id: 'm1', userId: 'u', date: '2026-05-04', type: 'snack', name: 'Snack',
         createdAt: '', items: [
           { id: 'i1', name: 'A', sourceType: 'manual', quantity: 1, unit: 'serving',
-            macros: { calories: 100.123, proteinG: 10.456, carbsG: 20.789, fatG: 5.111, fiberG: 2.999 } },
+            macros: { calories: 100.123, protein: 10.456, carbs: 20.789, fat: 5.111, fiber: 2.999 } },
         ],
       },
     ];
     const s = computeSummary(meals);
     expect(s.calories).toBe(100.1);
-    expect(s.proteinG).toBe(10.5);
-    expect(s.carbsG).toBe(20.8);
-    expect(s.fatG).toBe(5.1);
-    expect(s.fiberG).toBe(3);
+    expect(s.protein).toBe(10.5);
+    expect(s.carbs).toBe(20.8);
+    expect(s.fat).toBe(5.1);
+    expect(s.fiber).toBe(3);
   });
 });
 
@@ -140,7 +140,7 @@ describe('InMemoryDiaryRepository (via factory)', () => {
     const repo = getDiaryRepository();
     const meal = await repo.createMeal({ userId: 'u', date: '2026-05-04', type: 'breakfast', name: 'B' });
     const updated = await repo.addItem('u', meal.id, {
-      name: 'Egg', calories: 90, proteinG: 6, carbsG: 0, fatG: 6, fiberG: 0,
+      name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
     });
     expect(updated.items).toHaveLength(1);
     expect(updated.items[0].name).toBe('Egg');
@@ -152,7 +152,7 @@ describe('InMemoryDiaryRepository (via factory)', () => {
     const repo = getDiaryRepository();
     const meal = await repo.createMeal({ userId: 'u', date: '2026-05-04', type: 'lunch', name: 'L' });
     const withItem = await repo.addItem('u', meal.id, {
-      name: 'Bread', calories: 80, proteinG: 3, carbsG: 15, fatG: 1, fiberG: 1,
+      name: 'Bread', calories: 80, protein: 3, carbs: 15, fat: 1, fiber: 1,
     });
     const itemId = withItem.items[0].id;
     const after = await repo.deleteItem('u', meal.id, itemId);

@@ -12,6 +12,7 @@ import DiaryScreen from '../../modules/nutrition/DiaryScreen';
 import RecipeListScreen from '../../modules/recipes/RecipeListScreen';
 import ProfileScreen from '../../modules/profile/ProfileScreen';
 import { colors } from '../theme';
+import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon } from '../../assets/icons/TabIcons';
 
 // React Navigation needs a theme that matches our dark palette so that
 // transient surfaces (e.g. screen background flashes between renders)
@@ -75,10 +76,26 @@ export function RootNavigator() {
           headerShown: false,
         }}
       >
-        <Tab.Screen name="Home" component={HomeStackNavigator} />
-        <Tab.Screen name="Nutrition" component={DiaryScreen} />
-        <Tab.Screen name="Recipes" component={RecipeListScreen} />
-        <Tab.Screen name="Profile" component={ProfileScreen} />
+        <Tab.Screen
+          name="Home"
+          component={HomeStackNavigator}
+          options={{ tabBarIcon: ({ color, size }) => <HomeIcon color={color} size={size} /> }}
+        />
+        <Tab.Screen
+          name="Nutrition"
+          component={DiaryScreen}
+          options={{ tabBarIcon: ({ color, size }) => <NutritionIcon color={color} size={size} /> }}
+        />
+        <Tab.Screen
+          name="Recipes"
+          component={RecipeListScreen}
+          options={{ tabBarIcon: ({ color, size }) => <RecipesIcon color={color} size={size} /> }}
+        />
+        <Tab.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{ tabBarIcon: ({ color, size }) => <ProfileIcon color={color} size={size} /> }}
+        />
       </Tab.Navigator>
     </NavigationContainer>
   );

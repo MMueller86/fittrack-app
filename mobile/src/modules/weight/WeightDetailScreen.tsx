@@ -36,6 +36,8 @@ import {
 } from '../../services/weightsService';
 import type { WeightEntry, WeightUnit } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { formatApiError } from '../../shared/api/apiError';
+import { ErrorBanner } from '../../shared/components/ErrorBanner';
 import { Logo } from '../../shared/components/Logo';
 import { TrendPill } from '../../shared/components/TrendPill';
 import { WeightChart } from '../../shared/components/WeightChart';
@@ -87,8 +89,7 @@ export default function WeightDetailScreen() {
       const data = await listWeights();
       setEntries(data);
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to load entries';
-      setError(message);
+      setError(formatApiError(e, 'Failed to load entries'));
     }
   }, []);
 
@@ -120,8 +121,7 @@ export default function WeightDetailScreen() {
       setEntries((prev) => [created, ...prev]);
       setInput('');
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to save entry';
-      Alert.alert('Save failed', message);
+      Alert.alert('Save failed', formatApiError(e, 'Failed to save entry'));
     } finally {
       setSaving(false);
     }
@@ -143,9 +143,7 @@ export default function WeightDetailScreen() {
               await deleteWeight(entry.id);
             } catch (e) {
               setEntries(previous);
-              const message =
-                e instanceof Error ? e.message : 'Failed to delete entry';
-              Alert.alert('Delete failed', message);
+              Alert.alert('Delete failed', formatApiError(e, 'Failed to delete entry'));
             }
           },
         },
@@ -182,6 +180,10 @@ export default function WeightDetailScreen() {
             <Text style={styles.headerSubtitle}>Track. Trend. Progress.</Text>
           </View>
         </View>
+
+        {error ? (
+          <ErrorBanner error={error} onRetry={load} />
+        ) : null}
 
         {loading ? (
           <ActivityIndicator
@@ -282,7 +284,7 @@ export default function WeightDetailScreen() {
                   {saving ? 'Saving…' : 'Save weight'}
                 </Text>
               </TouchableOpacity>
-              {error ? <Text style={styles.errorText}>{error}</Text> : null}
+              {/* Error shown as top-level banner above — kept here for inline save errors */}
             </View>
 
             {/* Entries list */}

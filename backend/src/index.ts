@@ -13,6 +13,8 @@ import './functions/reusableItems';
 import './functions/recipes';
 import './functions/ai';
 import './functions/dashboard';
+import './functions/foodSearch';
+import './functions/foodProducts';
 
 // Health check — used in M1 verification
 app.http('health', {

@@ -17,10 +17,10 @@ const positiveNumber = z.coerce.number().refine(
 const CreateReusableItemSchema = z.object({
   name: z.string().trim().min(1).max(200),
   calories: positiveNumber,
-  proteinG: positiveNumber,
-  carbsG: positiveNumber,
-  fatG: positiveNumber,
-  fiberG: positiveNumber,
+  protein: positiveNumber,
+  carbs: positiveNumber,
+  fat: positiveNumber,
+  fiber: positiveNumber,
 });
 
 export const searchReusableItemsHandler = withHandler(
@@ -42,7 +42,23 @@ export const createReusableItemHandler = withHandler(
     const parsed = await parseBody(request, CreateReusableItemSchema);
     if (!parsed.ok) return parsed.response;
 
-    const item = await getReusableItemsRepository().create({ userId, ...parsed.data });
+    const item = await getReusableItemsRepository().create({
+      userId,
+      name: parsed.data.name,
+      nutritionBasis: 'perPortion',
+      portion: {
+        label: '1 serving',
+        nutrition: {
+          calories: parsed.data.calories,
+          protein: parsed.data.protein,
+          carbs: parsed.data.carbs,
+          fat: parsed.data.fat,
+          fiber: parsed.data.fiber,
+        },
+      },
+      isComplete: true,
+      sourceType: 'manual',
+    });
     logEvent(ctx, 'info', 'reusableItems.created', { userId, itemId: item.id });
     return { status: 201, jsonBody: { item } };
   },

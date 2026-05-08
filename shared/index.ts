@@ -8,3 +8,5 @@ export * from './types/nutrition';
 export * from './types/diary';
 export * from './types/recipes';
 export * from './types/weights';
+export * from './types/foodProduct';
+export * from './lib/nutritionCalculator';

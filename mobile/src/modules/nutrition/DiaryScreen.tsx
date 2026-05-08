@@ -18,7 +18,7 @@ import { diaryApi } from '../../shared/api/diaryApi';
 import AddItemModal from './AddItemModal';
 
 // --- Mock nutrition target (until the NutritionTargets feature is live) ---
-const MOCK_TARGET = { calories: 2400, proteinG: 170, carbsG: 230, fatG: 80, fiberG: 30 };
+const MOCK_TARGET = { calories: 2400, protein: 170, carbs: 230, fat: 80, fiber: 30 };
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const MEAL_LABELS: Record<MealType, string> = {
@@ -116,10 +116,10 @@ function SummaryCard({ summary }: { summary: DiaryDayResponse['summary'] }) {
       </View>
       {/* Macros */}
       <View style={styles.macroSection}>
-        <MacroBar label="Protein" value={summary.proteinG} target={MOCK_TARGET.proteinG} color="#3B82F6" />
-        <MacroBar label="Carbs" value={summary.carbsG} target={MOCK_TARGET.carbsG} color={colors.primary} />
-        <MacroBar label="Fat" value={summary.fatG} target={MOCK_TARGET.fatG} color="#F59E0B" />
-        <MacroBar label="Fiber" value={summary.fiberG} target={MOCK_TARGET.fiberG} color="#8B5CF6" />
+        <MacroBar label="Protein" value={summary.protein} target={MOCK_TARGET.protein} color="#3B82F6" />
+        <MacroBar label="Carbs" value={summary.carbs} target={MOCK_TARGET.carbs} color={colors.primary} />
+        <MacroBar label="Fat" value={summary.fat} target={MOCK_TARGET.fat} color="#F59E0B" />
+        <MacroBar label="Fiber" value={summary.fiber} target={MOCK_TARGET.fiber} color="#8B5CF6" />
       </View>
     </View>
   );
@@ -169,8 +169,11 @@ function MealCard({
           <View style={{ flex: 1 }}>
             <Text style={styles.itemName}>{item.name}</Text>
             <Text style={styles.itemMacros}>
-              {Math.round(item.macros.calories)} kcal · {Math.round(item.macros.proteinG)}g P ·{' '}
-              {Math.round(item.macros.carbsG)}g C · {Math.round(item.macros.fatG)}g F
+              {item.unit === 'portion'
+                ? `${item.quantity} Portion${item.quantity !== 1 ? 'en' : ''}`
+                : `${Math.round(item.quantity)} g`}
+              {' · '}{Math.round(item.macros.calories)} kcal · {Math.round(item.macros.protein)}g P ·{' '}
+              {Math.round(item.macros.carbs)}g C · {Math.round(item.macros.fat)}g F
             </Text>
           </View>
           <TouchableOpacity

@@ -4,12 +4,13 @@ import { z } from 'zod';
 import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
+import { calculate, NutritionCalculationError } from '../lib/nutritionCalculator';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 
 // GET    /api/diary?date=YYYY-MM-DD             — meals + day summary
 // POST   /api/diary/meals                        — create meal
 // DELETE /api/diary/meals/:id                    — delete meal + items
-// POST   /api/diary/meals/:id/items              — add item
+// POST   /api/diary/meals/:id/items              — add item (flat macros OR quantityMode+source)
 // DELETE /api/diary/meals/:id/items/:itemId      — remove item
 
 const isoDate = z
@@ -35,16 +36,52 @@ const positiveNumber = z.coerce.number().refine(
   { message: 'must be a non-negative number' },
 );
 
-const AddItemSchema = z.object({
-  name: z.string().trim().min(1).max(200),
+const NutritionValuesSchema = z.object({
   calories: positiveNumber,
-  proteinG: positiveNumber,
-  carbsG: positiveNumber,
-  fatG: positiveNumber,
-  fiberG: positiveNumber,
-  quantity: z.coerce.number().positive().optional(),
-  unit: z.string().trim().max(50).optional(),
+  protein: positiveNumber,
+  carbs: positiveNumber,
+  fat: positiveNumber,
+  fiber: positiveNumber.optional(),
 });
+
+// Two accepted shapes for addItem:
+// 1. Flat macros (manual entry): { name, calories, protein, carbs, fat, fiber }
+// 2. Calculated (from search): { name, quantityMode, quantity, nutritionPer100g?, portionNutrition? }
+// 3. Product input (mobile product picker): { productId, productName, inputMode, inputAmount, amountGrams, calculatedNutrition }
+const AddItemSchema = z
+  .object({
+    // --- Name: either explicit (manual/calculated) or derived from productName ---
+    name: z.string().trim().min(1).max(200).optional(),
+    unit: z.string().trim().max(50).optional(),
+    // Flat macros (optional for backward compat — required if no quantityMode/calculatedNutrition)
+    calories: positiveNumber.optional(),
+    protein: positiveNumber.optional(),
+    carbs: positiveNumber.optional(),
+    fat: positiveNumber.optional(),
+    fiber: positiveNumber.optional(),
+    // Calculated path (legacy)
+    quantityMode: z.enum(['grams', 'portions']).optional(),
+    quantity: z.coerce.number().positive().optional(),
+    nutritionPer100g: NutritionValuesSchema.optional(),
+    portionNutrition: NutritionValuesSchema.optional(),
+    // Product input path (mobile product picker)
+    productId: z.string().trim().min(1).optional(),
+    productName: z.string().trim().min(1).max(200).optional(),
+    inputMode: z.enum(['grams', 'portion']).optional(),
+    inputAmount: z.coerce.number().positive().optional(),
+    amountGrams: z.coerce.number().positive().optional(),
+    calculatedNutrition: NutritionValuesSchema.optional(),
+  })
+  .refine(
+    (d) => {
+      const hasFlat = d.calories != null && d.protein != null && d.carbs != null && d.fat != null;
+      const hasCalculated = d.quantityMode != null && d.quantity != null;
+      const hasProduct = d.productName != null && d.amountGrams != null && d.calculatedNutrition != null;
+      const hasName = d.name != null || d.productName != null;
+      return hasName && (hasFlat || hasCalculated || hasProduct);
+    },
+    { message: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided' },
+  );
 
 // GET /api/diary?date=YYYY-MM-DD
 export const getDiaryHandler = withHandler(
@@ -108,8 +145,53 @@ export const addItemHandler = withHandler(
     const parsed = await parseBody(request, AddItemSchema);
     if (!parsed.ok) return parsed.response;
 
+    const d = parsed.data;
+
+    // Resolve the display name: explicit > productName
+    const itemName = d.name ?? d.productName!;
+
+    // Resolve macros: product path > calculated path > flat macros
+    let macros: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+    if (d.amountGrams != null && d.calculatedNutrition != null) {
+      // Product input — nutrition already calculated on the client from nutritionPer100g
+      macros = {
+        calories: d.calculatedNutrition.calories,
+        protein: d.calculatedNutrition.protein,
+        carbs: d.calculatedNutrition.carbs,
+        fat: d.calculatedNutrition.fat,
+        fiber: d.calculatedNutrition.fiber ?? 0,
+      };
+    } else if (d.quantityMode != null && d.quantity != null) {
+      try {
+        macros = calculate({
+          quantityMode: d.quantityMode,
+          quantity: d.quantity,
+          nutritionPer100g: d.nutritionPer100g,
+          portionNutrition: d.portionNutrition,
+        });
+      } catch (e) {
+        if (e instanceof NutritionCalculationError) {
+          return { status: 422, jsonBody: { error: e.message } };
+        }
+        throw e;
+      }
+    } else {
+      macros = {
+        calories: d.calories!,
+        protein: d.protein!,
+        carbs: d.carbs!,
+        fat: d.fat!,
+        fiber: d.fiber ?? 0,
+      };
+    }
+
     try {
-      const meal = await getDiaryRepository().addItem(userId, mealId, parsed.data);
+      const meal = await getDiaryRepository().addItem(userId, mealId, {
+        name: itemName,
+        ...macros,
+        quantity: d.inputMode === 'portion' ? d.inputAmount! : (d.amountGrams ?? d.quantity ?? 1),
+        unit: d.inputMode === 'portion' ? 'portion' : d.quantityMode === 'portions' ? 'portion' : 'g',
+      });
       logEvent(ctx, 'info', 'diary.item.added', { userId, mealId });
       return { status: 201, jsonBody: { meal } };
     } catch (e) {

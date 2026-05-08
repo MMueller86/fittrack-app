@@ -1,12 +1,12 @@
 // AddItemModal — 3-mode item picker for the Nutrition Diary.
 //
 // Mode A: AI Input — describe meal in natural language, call /api/ai/meal-analyze
-// Mode B: Search   — autocomplete from reusable items (/api/reusable-items?query=)
+// Mode B: Search   — unified search via /api/food-search (user library + Open Food Facts)
 // Mode C: Manual   — form input for all macro fields
 //
 // The modal is a full-screen React Native Modal (no extra dependencies).
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,11 +22,14 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import type { ReusableItem } from '@fittrack/shared';
+import type { FoodSearchResult } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { formatApiError } from '../../shared/api/apiError';
+import { ErrorBanner } from '../../shared/components/ErrorBanner';
 import { diaryApi } from '../../shared/api/diaryApi';
+import { calculateNutrition } from './nutritionUtils';
 import { reusableItemsApi } from '../../shared/api/reusableItemsApi';
-import { aiApi } from '../../shared/api/aiApi';
+import { foodApi } from '../../shared/api/foodApi';
 
 type Mode = 'ai' | 'search' | 'manual';
 
@@ -45,75 +48,191 @@ const MODES: { id: Mode; label: string }[] = [
 ];
 
 // --- Mode A: AI Input ---
-function AiMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }) {
-  const [text, setText] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
+function AiMode(_props: { mealId: string; onSaved: () => void }) {
+  return (
+    <View style={[modeStyles.container, aiStyles.wrapper]}>
+      <Text style={aiStyles.icon}>✨</Text>
+      <Text style={aiStyles.title}>Not Supported Yet</Text>
+      <Text style={aiStyles.subtitle}>
+        AI-basierte Mahlzeitenerkennung ist in einer zukünftigen Version verfügbar.
+      </Text>
+    </View>
+  );
+}
 
-  const handleAnalyze = async () => {
-    if (!text.trim()) return;
-    Keyboard.dismiss();
-    setLoading(true);
-    setResult(null);
+// --- QuantitySelector — step shown after selecting a food item ---
+interface QuantitySelectorProps {
+  item: FoodSearchResult;
+  mealId: string;
+  onSaved: () => void;
+  onBack: () => void;
+}
+
+function PreviewValue({ label, value, unit }: { label: string; value: number; unit: string }) {
+  return (
+    <View style={qsStyles.previewItem}>
+      <Text style={qsStyles.previewValue}>{value}</Text>
+      <Text style={qsStyles.previewUnit}>{unit}</Text>
+      <Text style={qsStyles.previewLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function QuantitySelector({ item, mealId, onSaved, onBack }: QuantitySelectorProps) {
+  const hasPortions = !!item.portion?.weightGrams;
+  const hasPer100g = item.nutritionPer100g != null;
+
+  type QMode = 'grams' | 'portion';
+  const [qMode, setQMode] = useState<QMode>(hasPortions ? 'portion' : 'grams');
+  const [qValue, setQValue] = useState(hasPortions ? '1' : '100');
+  const [saving, setSaving] = useState(false);
+
+  const parsedValue = Number(qValue);
+  const isValid = Number.isFinite(parsedValue) && parsedValue > 0;
+
+  const preview = useMemo(() => {
+    if (!hasPer100g || !isValid || !item.nutritionPer100g) return null;
     try {
-      const res = await aiApi.analyzeMeal(text.trim());
-      setResult(res.message);
+      return calculateNutrition(
+        qMode,
+        parsedValue,
+        item.nutritionPer100g,
+        item.portion?.weightGrams,
+      );
     } catch {
-      setResult('Could not reach the AI service. Please try again.');
+      return null;
+    }
+  }, [qMode, parsedValue, item.nutritionPer100g, item.portion?.weightGrams, hasPer100g, isValid]);
+
+  const handleAdd = async () => {
+    if (!isValid || !preview) return;
+    setSaving(true);
+    try {
+      await diaryApi.addItem(mealId, {
+        productId: item.id,
+        productName: item.name,
+        inputMode: qMode,
+        inputAmount: parsedValue,
+        amountGrams: preview.amountGrams,
+        calculatedNutrition: preview.calculatedNutrition,
+      });
+      onSaved();
+    } catch (e) {
+      Alert.alert('Fehler', formatApiError(e, 'Eintrag konnte nicht gespeichert werden.'));
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  const weightGrams = item.portion?.weightGrams;
+
   return (
-    <View style={modeStyles.container}>
-      <Text style={modeStyles.hint}>Describe your meal in plain language</Text>
-      <Text style={modeStyles.example}>e.g. "2 slices whole grain toast with butter and cheese"</Text>
-      <TextInput
-        style={modeStyles.textArea}
-        placeholder="Describe your meal..."
-        placeholderTextColor={colors.textMuted}
-        value={text}
-        onChangeText={setText}
-        multiline
-        numberOfLines={3}
-        textAlignVertical="top"
-      />
-      <TouchableOpacity
-        style={[modeStyles.primaryBtn, (!text.trim() || loading) && modeStyles.btnDisabled]}
-        onPress={handleAnalyze}
-        disabled={!text.trim() || loading}
-      >
-        {loading ? (
-          <ActivityIndicator size="small" color={colors.background} />
-        ) : (
-          <Text style={modeStyles.primaryBtnText}>Analyze with AI</Text>
-        )}
+    <ScrollView
+      style={modeStyles.container}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <TouchableOpacity onPress={onBack} style={qsStyles.backRow}>
+        <Text style={qsStyles.backText}>← Zurück</Text>
       </TouchableOpacity>
-      {result !== null && (
-        <View style={modeStyles.resultBox}>
-          <Text style={modeStyles.resultText}>{result}</Text>
+
+      <Text style={qsStyles.itemName}>{item.name}</Text>
+      {item.brand ? <Text style={qsStyles.brandText}>{item.brand}</Text> : null}
+
+      {/* Segmented control — only when portion.weightGrams exists */}
+      {hasPortions && (
+        <View style={qsStyles.segmentedControl}>
+          <TouchableOpacity
+            style={[qsStyles.segment, qMode === 'grams' && qsStyles.segmentActive]}
+            onPress={() => { setQMode('grams'); setQValue('100'); }}
+          >
+            <Text style={[qsStyles.segmentText, qMode === 'grams' && qsStyles.segmentTextActive]}>Gramm</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[qsStyles.segment, qMode === 'portion' && qsStyles.segmentActive]}
+            onPress={() => { setQMode('portion'); setQValue('1'); }}
+          >
+            <Text style={[qsStyles.segmentText, qMode === 'portion' && qsStyles.segmentTextActive]}>Portion</Text>
+          </TouchableOpacity>
         </View>
       )}
-    </View>
+
+      {/* Amount input */}
+      <View style={qsStyles.inputBlock}>
+        <Text style={qsStyles.inputLabel}>
+          {qMode === 'grams' ? 'Menge in g' : 'Anzahl Portionen'}
+        </Text>
+        <TextInput
+          style={qsStyles.qInput}
+          value={qValue}
+          onChangeText={setQValue}
+          keyboardType="decimal-pad"
+          selectTextOnFocus
+          autoFocus
+        />
+        {qMode === 'portion' && weightGrams != null && (
+          <Text style={qsStyles.portionHint}>1 Portion = {weightGrams} g</Text>
+        )}
+      </View>
+
+      {/* Live preview */}
+      {preview && (
+        <View style={qsStyles.preview}>
+          <Text style={qsStyles.previewTitle}>
+            Nährwerte ({Math.round(preview.amountGrams)} g)
+          </Text>
+          <View style={qsStyles.previewRow}>
+            <PreviewValue label="Kalorien" value={preview.calculatedNutrition.calories} unit="kcal" />
+            <PreviewValue label="Protein" value={preview.calculatedNutrition.protein} unit="g" />
+            <PreviewValue label="Kohlenhydr." value={preview.calculatedNutrition.carbs} unit="g" />
+            <PreviewValue label="Fett" value={preview.calculatedNutrition.fat} unit="g" />
+            {preview.calculatedNutrition.fiber != null && (
+              <PreviewValue label="Ballaststoffe" value={preview.calculatedNutrition.fiber} unit="g" />
+            )}
+          </View>
+        </View>
+      )}
+
+      {!hasPer100g && (
+        <Text style={qsStyles.hintText}>
+          Keine Nährwertdaten verfügbar — manuelle Eingabe empfohlen.
+        </Text>
+      )}
+
+      <TouchableOpacity
+        style={[modeStyles.primaryBtn, (!isValid || saving || !hasPer100g) && modeStyles.btnDisabled]}
+        onPress={handleAdd}
+        disabled={!isValid || saving || !hasPer100g}
+      >
+        {saving ? (
+          <ActivityIndicator size="small" color={colors.background} />
+        ) : (
+          <Text style={modeStyles.primaryBtnText}>Zur Mahlzeit hinzufügen</Text>
+        )}
+      </TouchableOpacity>
+      <View style={{ height: spacing.lg }} />
+    </ScrollView>
   );
 }
 
 // --- Mode B: Search ---
 function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }) {
   const [query, setQuery] = useState('');
-  const [items, setItems] = useState<ReusableItem[]>([]);
+  const [results, setResults] = useState<FoodSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [selected, setSelected] = useState<FoodSearchResult | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doSearch = useCallback(async (q: string) => {
     setLoading(true);
+    setSearchError(null);
     try {
-      const res = await reusableItemsApi.search(q);
-      setItems(res.items);
-    } catch {
-      setItems([]);
+      const res = await foodApi.search(q);
+      setResults(res.results);
+    } catch (e) {
+      setResults([]);
+      setSearchError(formatApiError(e, 'Search failed'));
     } finally {
       setLoading(false);
     }
@@ -127,30 +246,23 @@ function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
     };
   }, [query, doSearch]);
 
-  const handleSelect = async (item: ReusableItem) => {
-    setSaving(item.id);
-    try {
-      await diaryApi.addItem(mealId, {
-        name: item.name,
-        calories: item.calories,
-        proteinG: item.proteinG,
-        carbsG: item.carbsG,
-        fatG: item.fatG,
-        fiberG: item.fiberG,
-      });
-      onSaved();
-    } catch {
-      Alert.alert('Error', 'Could not add item');
-    } finally {
-      setSaving(null);
-    }
-  };
+  // If user selected an item, show quantity selector
+  if (selected) {
+    return (
+      <QuantitySelector
+        item={selected}
+        mealId={mealId}
+        onSaved={onSaved}
+        onBack={() => setSelected(null)}
+      />
+    );
+  }
 
   return (
     <View style={modeStyles.container}>
       <TextInput
         style={modeStyles.input}
-        placeholder="Search food..."
+        placeholder="Search food (library + Open Food Facts)..."
         placeholderTextColor={colors.textMuted}
         value={query}
         onChangeText={setQuery}
@@ -159,31 +271,38 @@ function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
       />
       {loading ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
-      ) : items.length === 0 ? (
+      ) : searchError ? (
+        <ErrorBanner
+          error={searchError}
+          onRetry={() => doSearch(query)}
+        />
+      ) : results.length === 0 ? (
         <Text style={modeStyles.emptyText}>
-          {query.trim() ? 'No results found.' : 'Start typing to search your food library.'}
+          {query.trim() ? 'No results found.' : 'Start typing to search food...'}
         </Text>
       ) : (
         <ScrollView style={modeStyles.resultList} keyboardShouldPersistTaps="handled">
-          {items.map((item) => (
+          {results.map((item) => (
             <TouchableOpacity
-              key={item.id}
-              style={modeStyles.searchItem}
-              onPress={() => handleSelect(item)}
-              disabled={saving === item.id}
+              key={`${item.source}-${item.id}`}
+              style={[modeStyles.searchItem, !item.isComplete && srStyles.incompleteItem]}
+              onPress={() => setSelected(item)}
             >
               <View style={{ flex: 1 }}>
-                <Text style={modeStyles.searchItemName}>{item.name}</Text>
-                <Text style={modeStyles.searchItemMacros}>
-                  {Math.round(item.calories)} kcal · {Math.round(item.proteinG)}g P ·{' '}
-                  {Math.round(item.carbsG)}g C · {Math.round(item.fatG)}g F
-                </Text>
+                <View style={srStyles.nameRow}>
+                  <Text style={modeStyles.searchItemName}>{item.name}</Text>
+                  <Text style={srStyles.sourceBadge}>
+                    {item.source === 'library' ? '📚' : '🌍'}
+                  </Text>
+                  {!item.isComplete && <Text style={srStyles.warningBadge}>⚠️</Text>}
+                </View>
+                {item.brand ? <Text style={srStyles.brandText}>{item.brand}</Text> : null}
+                <Text style={modeStyles.searchItemMacros}>{item.displayLabel}</Text>
+                {!item.isComplete && (
+                  <Text style={srStyles.incompleteHint}>Incomplete data — tap to add manually</Text>
+                )}
               </View>
-              {saving === item.id ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Text style={modeStyles.addIcon}>+</Text>
-              )}
+              <Text style={modeStyles.addIcon}>›</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -193,7 +312,7 @@ function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
 }
 
 // --- Mode C: Manual ---
-const EMPTY_FORM = { name: '', calories: '', proteinG: '', carbsG: '', fatG: '', fiberG: '' };
+const EMPTY_FORM = { name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '' };
 
 function ManualMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }) {
   const [form, setForm] = useState(EMPTY_FORM);
@@ -204,7 +323,7 @@ function ManualMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
 
   const isValid =
     form.name.trim().length > 0 &&
-    ['calories', 'proteinG', 'carbsG', 'fatG', 'fiberG'].every((k) => {
+    ['calories', 'protein', 'carbs', 'fat', 'fiber'].every((k) => {
       const v = Number((form as Record<string, string>)[k]);
       return Number.isFinite(v) && v >= 0;
     });
@@ -215,10 +334,10 @@ function ManualMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
     const macros = {
       name: form.name.trim(),
       calories: Number(form.calories),
-      proteinG: Number(form.proteinG),
-      carbsG: Number(form.carbsG),
-      fatG: Number(form.fatG),
-      fiberG: Number(form.fiberG),
+      protein: Number(form.protein),
+      carbs: Number(form.carbs),
+      fat: Number(form.fat),
+      fiber: Number(form.fiber),
     };
     try {
       await diaryApi.addItem(mealId, macros);
@@ -226,8 +345,8 @@ function ManualMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
       reusableItemsApi.create(macros).catch(() => undefined);
       setForm(EMPTY_FORM);
       onSaved();
-    } catch {
-      Alert.alert('Error', 'Could not save item');
+    } catch (e) {
+      Alert.alert('Error', formatApiError(e, 'Could not save item'));
     } finally {
       setSaving(false);
     }
@@ -264,10 +383,10 @@ function ManualMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
         />
       </View>
       {numInput('Calories', 'calories', 'kcal')}
-      {numInput('Protein', 'proteinG')}
-      {numInput('Carbs', 'carbsG')}
-      {numInput('Fat', 'fatG')}
-      {numInput('Fiber', 'fiberG')}
+      {numInput('Protein', 'protein')}
+      {numInput('Carbs', 'carbs')}
+      {numInput('Fat', 'fat')}
+      {numInput('Fiber', 'fiber')}
       <TouchableOpacity
         style={[modeStyles.primaryBtn, (!isValid || saving) && modeStyles.btnDisabled, { marginTop: spacing.md }]}
         onPress={handleSave}
@@ -446,3 +565,83 @@ const modeStyles = StyleSheet.create({
     minWidth: 90,
   },
 });
+
+// --- AI placeholder styles ---
+const aiStyles = StyleSheet.create({
+  wrapper: { alignItems: 'center', justifyContent: 'center', paddingTop: spacing.xxl },
+  icon: { fontSize: 40, marginBottom: spacing.md },
+  title: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
+  subtitle: { ...typography.body2, color: colors.textMuted, textAlign: 'center', paddingHorizontal: spacing.lg },
+});
+
+// --- QuantitySelector styles ---
+const qsStyles = StyleSheet.create({
+  backRow: { marginBottom: spacing.sm },
+  backText: { ...typography.body2, color: colors.primary },
+  itemName: { ...typography.h3, color: colors.text, marginBottom: 2 },
+  brandText: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
+  // Segmented control
+  segmentedControl: {
+    flexDirection: 'row',
+    marginVertical: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  segmentActive: { backgroundColor: colors.primary },
+  segmentText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
+  segmentTextActive: { color: colors.background },
+  // Input block
+  inputBlock: { marginVertical: spacing.sm },
+  inputLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs },
+  qInput: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    color: colors.text,
+    padding: spacing.sm,
+    ...typography.h3,
+    textAlign: 'center',
+  },
+  portionHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    textAlign: 'center',
+  },
+  hintText: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md },
+  // Live preview
+  preview: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginVertical: spacing.md,
+  },
+  previewTitle: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.sm },
+  previewRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  previewItem: { alignItems: 'center', minWidth: 56 },
+  previewValue: { ...typography.body1, color: colors.text, fontWeight: '700' },
+  previewUnit: { ...typography.caption, color: colors.textMuted },
+  previewLabel: { ...typography.caption, color: colors.textSecondary, marginTop: 1 },
+});
+
+// --- Search result list styles ---
+const srStyles = StyleSheet.create({
+  incompleteItem: { opacity: 0.8, borderLeftWidth: 3, borderLeftColor: '#F59E0B', paddingLeft: spacing.xs },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  sourceBadge: { fontSize: 12 },
+  warningBadge: { fontSize: 12 },
+  brandText: { ...typography.caption, color: colors.textMuted, marginTop: 1 },
+  incompleteHint: { ...typography.caption, color: '#F59E0B', marginTop: 2 },
+});
+

@@ -2,7 +2,47 @@
 // Uses the shared apiClient (auth interceptors, base URL).
 
 import { apiClient } from './client';
-import type { DiaryDayResponse, MealType, Meal } from '@fittrack/shared';
+import type { DiaryDayResponse, MealType, Meal, NutritionValues } from '@fittrack/shared';
+
+export type QuantityMode = 'grams' | 'portions';
+
+export interface AddItemFlatInput {
+  name: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  quantity?: number;
+  unit?: string;
+}
+
+export interface AddItemCalculatedInput {
+  name: string;
+  quantityMode: QuantityMode;
+  quantity: number;
+  unit?: string;
+  nutritionPer100g?: NutritionValues;
+  portionNutrition?: NutritionValues;
+}
+
+/** New product-based input — client pre-computes amountGrams and nutrition. */
+export interface AddItemProductInput {
+  productId: string;
+  productName: string;
+  inputMode: 'grams' | 'portion';
+  inputAmount: number;
+  amountGrams: number;
+  calculatedNutrition: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber?: number;
+  };
+}
+
+export type AddItemInput = AddItemFlatInput | AddItemCalculatedInput | AddItemProductInput;
 
 export const diaryApi = {
   /** GET /api/diary?date=YYYY-MM-DD */
@@ -20,20 +60,8 @@ export const diaryApi = {
     return apiClient.delete(`/diary/meals/${mealId}`).then(() => undefined);
   },
 
-  /** POST /api/diary/meals/:id/items */
-  addItem(
-    mealId: string,
-    item: {
-      name: string;
-      calories: number;
-      proteinG: number;
-      carbsG: number;
-      fatG: number;
-      fiberG: number;
-      quantity?: number;
-      unit?: string;
-    },
-  ): Promise<{ meal: Meal }> {
+  /** POST /api/diary/meals/:id/items — accepts flat macros or quantityMode+source */
+  addItem(mealId: string, item: AddItemInput): Promise<{ meal: Meal }> {
     return apiClient.post<{ meal: Meal }>(`/diary/meals/${mealId}/items`, item).then((r) => r.data);
   },
 

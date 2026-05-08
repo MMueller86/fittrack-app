@@ -5,18 +5,27 @@
 // embedded in a Meal document).
 
 import { randomUUID } from 'node:crypto';
-import type { ReusableItem } from '@fittrack/shared';
+import type {
+  ReusableItem,
+  NutritionBasis,
+  NutritionValues,
+  PortionInfo,
+  ReusableItemSourceType,
+  OFFSourceRef,
+} from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosReusableItemsRepository } from './cosmosReusableItemsRepository';
 
 export interface CreateReusableItemInput {
   userId: string;
   name: string;
-  calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
-  fiberG: number;
+  brand?: string;
+  nutritionBasis: NutritionBasis;
+  nutritionPer100g?: NutritionValues;
+  portion?: PortionInfo;
+  isComplete: boolean;
+  sourceType: ReusableItemSourceType;
+  sourceRef?: OFFSourceRef;
 }
 
 export interface ReusableItemsRepository {
@@ -41,11 +50,13 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
       id: randomUUID(),
       userId: input.userId,
       name: input.name,
-      calories: input.calories,
-      proteinG: input.proteinG,
-      carbsG: input.carbsG,
-      fatG: input.fatG,
-      fiberG: input.fiberG,
+      brand: input.brand,
+      nutritionBasis: input.nutritionBasis,
+      nutritionPer100g: input.nutritionPer100g,
+      portion: input.portion,
+      isComplete: input.isComplete,
+      sourceType: input.sourceType,
+      sourceRef: input.sourceRef,
       usageCount: 0,
       createdAt: new Date().toISOString(),
     };
@@ -70,3 +81,4 @@ export function getReusableItemsRepository(): ReusableItemsRepository {
 export function __resetReusableItemsRepositoryForTests(): void {
   singleton = undefined;
 }
+

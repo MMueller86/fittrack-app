@@ -22,20 +22,20 @@ export interface CreateMealInput {
 export interface AddItemInput {
   name: string;
   calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
-  fiberG: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
   quantity?: number;
   unit?: string;
 }
 
 export interface DaySummary {
   calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
-  fiberG: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
 }
 
 export interface DiaryDayResult {
@@ -52,22 +52,22 @@ export interface DiaryRepository {
 }
 
 export function computeSummary(meals: Meal[]): DaySummary {
-  const summary: DaySummary = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0 };
+  const summary: DaySummary = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   for (const meal of meals) {
     for (const item of meal.items) {
       summary.calories += item.macros.calories;
-      summary.proteinG += item.macros.proteinG;
-      summary.carbsG += item.macros.carbsG;
-      summary.fatG += item.macros.fatG;
-      summary.fiberG += item.macros.fiberG;
+      summary.protein += item.macros.protein;
+      summary.carbs += item.macros.carbs;
+      summary.fat += item.macros.fat;
+      summary.fiber += item.macros.fiber;
     }
   }
   // Round to 1 decimal to avoid floating-point noise in responses.
   summary.calories = Math.round(summary.calories * 10) / 10;
-  summary.proteinG = Math.round(summary.proteinG * 10) / 10;
-  summary.carbsG   = Math.round(summary.carbsG * 10) / 10;
-  summary.fatG     = Math.round(summary.fatG * 10) / 10;
-  summary.fiberG   = Math.round(summary.fiberG * 10) / 10;
+  summary.protein = Math.round(summary.protein * 10) / 10;
+  summary.carbs   = Math.round(summary.carbs * 10) / 10;
+  summary.fat     = Math.round(summary.fat * 10) / 10;
+  summary.fiber   = Math.round(summary.fiber * 10) / 10;
   return summary;
 }
 
@@ -113,10 +113,10 @@ class InMemoryDiaryRepository implements DiaryRepository {
         unit: input.unit ?? 'serving',
         macros: {
           calories: input.calories,
-          proteinG: input.proteinG,
-          carbsG: input.carbsG,
-          fatG: input.fatG,
-          fiberG: input.fiberG,
+          protein: input.protein,
+          carbs: input.carbs,
+          fat: input.fat,
+          fiber: input.fiber,
         },
       };
       meal.items.push(item);

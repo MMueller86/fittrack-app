@@ -1,0 +1,22 @@
+{
+  "name": "@fittrack/off-import",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open Food Facts import & analysis tools",
+  "scripts": {
+    "create:indexes": "tsx create-indexes.ts",
+    "analyze:off": "tsx analyze-off-dump.ts",
+    "analyze:off:tsx": "tsx analyze-off-dump.ts",
+    "export:off": "tsx export-food-products.ts",
+    "import:cosmos": "tsx import-to-cosmos.ts"
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.1.1",
+    "mongodb": "^6.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  }
+}

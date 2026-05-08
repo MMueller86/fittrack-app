@@ -64,10 +64,10 @@ export class CosmosDiaryRepository implements DiaryRepository {
       unit: input.unit ?? 'serving',
       macros: {
         calories: input.calories,
-        proteinG: input.proteinG,
-        carbsG: input.carbsG,
-        fatG: input.fatG,
-        fiberG: input.fiberG,
+        protein: input.protein,
+        carbs: input.carbs,
+        fat: input.fat,
+        fiber: input.fiber,
       },
     };
     existing.items = [...(existing.items ?? []), newItem];

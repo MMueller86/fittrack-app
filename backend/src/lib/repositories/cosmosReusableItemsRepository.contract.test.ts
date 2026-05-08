@@ -56,7 +56,9 @@ describe('CosmosReusableItemsRepository (contract)', () => {
 
   it('create stores and returns the item', async () => {
     const item = await repo.create({
-      userId: USER_A, name: 'Oats', calories: 300, proteinG: 10, carbsG: 55, fatG: 5, fiberG: 4,
+      userId: USER_A, name: 'Oats', nutritionBasis: 'perPortion',
+      portion: { label: '1 serving', nutrition: { calories: 300, protein: 10, carbs: 55, fat: 5, fiber: 4 } },
+      isComplete: true, sourceType: 'manual',
     });
     expect(item.id).toBeTruthy();
     expect(item.name).toBe('Oats');
@@ -64,16 +66,16 @@ describe('CosmosReusableItemsRepository (contract)', () => {
   });
 
   it('search with empty query returns created items', async () => {
-    await repo.create({ userId: USER_A, name: 'Apple', calories: 80, proteinG: 0, carbsG: 21, fatG: 0, fiberG: 3 });
-    await repo.create({ userId: USER_A, name: 'Banana', calories: 90, proteinG: 1, carbsG: 23, fatG: 0, fiberG: 3 });
+    await repo.create({ userId: USER_A, name: 'Apple', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
+    await repo.create({ userId: USER_A, name: 'Banana', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
     const results = await repo.search(USER_A, '');
     expect(results).toHaveLength(2);
   });
 
   it('search filters by startsWith query (case-insensitive)', async () => {
-    await repo.create({ userId: USER_A, name: 'Oats', calories: 300, proteinG: 10, carbsG: 55, fatG: 5, fiberG: 4 });
-    await repo.create({ userId: USER_A, name: 'Orange Juice', calories: 110, proteinG: 1, carbsG: 26, fatG: 0, fiberG: 0 });
-    await repo.create({ userId: USER_A, name: 'Apple', calories: 80, proteinG: 0, carbsG: 21, fatG: 0, fiberG: 3 });
+    await repo.create({ userId: USER_A, name: 'Oats', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
+    await repo.create({ userId: USER_A, name: 'Orange Juice', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
+    await repo.create({ userId: USER_A, name: 'Apple', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
 
     const results = await repo.search(USER_A, 'o');
     const names = results.map((r) => r.name);
@@ -83,7 +85,7 @@ describe('CosmosReusableItemsRepository (contract)', () => {
   });
 
   it('isolates items per userId', async () => {
-    await repo.create({ userId: USER_A, name: 'Bread', calories: 80, proteinG: 3, carbsG: 15, fatG: 1, fiberG: 1 });
+    await repo.create({ userId: USER_A, name: 'Bread', nutritionBasis: 'perPortion', isComplete: true, sourceType: 'manual' });
     expect(await repo.search(USER_B, '')).toHaveLength(0);
   });
 });

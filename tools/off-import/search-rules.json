@@ -1,0 +1,14 @@
+{
+  "rules": [
+    {
+      "query": "ei",
+      "boostKeywords": ["ei", "eier", "spiegelei", "ruehrei", "huhnerei"],
+      "demoteKeywords": ["eis", "eistee", "eiscreme"]
+    },
+    {
+      "query": "milch",
+      "boostKeywords": ["milch", "vollmilch", "magermilch"],
+      "demoteKeywords": ["milchschokolade"]
+    }
+  ]
+}
