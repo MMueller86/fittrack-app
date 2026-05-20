@@ -14,7 +14,22 @@ const positiveNumber = z.coerce.number().refine(
   { message: 'must be a non-negative number' },
 );
 
-const CreateReusableItemSchema = z.object({
+const NutritionPer100gSchema = z.object({
+  calories: positiveNumber,
+  protein: positiveNumber,
+  carbs: positiveNumber,
+  fat: positiveNumber,
+  fiber: positiveNumber.optional(),
+  salt: positiveNumber.optional(),
+});
+
+const PortionSchema = z.object({
+  label: z.string().trim().min(1).max(100),
+  weightGrams: z.coerce.number().positive(),
+});
+
+// Manual entry (flat macros, per-portion)
+const ManualCreateSchema = z.object({
   name: z.string().trim().min(1).max(200),
   calories: positiveNumber,
   protein: positiveNumber,
@@ -22,6 +37,19 @@ const CreateReusableItemSchema = z.object({
   fat: positiveNumber,
   fiber: positiveNumber,
 });
+
+// AI-estimated entry (nutritionPer100g-based)
+const AiCreateSchema = z.object({
+  sourceType: z.literal('ai'),
+  name: z.string().trim().min(1).max(200),
+  nutritionPer100g: NutritionPer100gSchema,
+  portion: PortionSchema.optional(),
+  aiConfidence: z.number().min(0).max(1).optional(),
+  aiWarnings: z.array(z.string()).optional(),
+  searchTerms: z.array(z.string().toLowerCase()).optional(),
+});
+
+const CreateReusableItemSchema = z.union([AiCreateSchema, ManualCreateSchema]);
 
 export const searchReusableItemsHandler = withHandler(
   'reusableItems.search',
@@ -42,23 +70,52 @@ export const createReusableItemHandler = withHandler(
     const parsed = await parseBody(request, CreateReusableItemSchema);
     if (!parsed.ok) return parsed.response;
 
-    const item = await getReusableItemsRepository().create({
-      userId,
-      name: parsed.data.name,
-      nutritionBasis: 'perPortion',
-      portion: {
-        label: '1 serving',
-        nutrition: {
-          calories: parsed.data.calories,
-          protein: parsed.data.protein,
-          carbs: parsed.data.carbs,
-          fat: parsed.data.fat,
-          fiber: parsed.data.fiber,
+    const d = parsed.data;
+    let item;
+
+    if ('sourceType' in d) {
+      // AI-estimated product — store nutritionPer100g as primary source
+      item = await getReusableItemsRepository().create({
+        userId,
+        name: d.name,
+        nutritionBasis: d.portion ? 'both' : 'per100g',
+        nutritionPer100g: {
+          calories: d.nutritionPer100g.calories,
+          protein: d.nutritionPer100g.protein,
+          carbs: d.nutritionPer100g.carbs,
+          fat: d.nutritionPer100g.fat,
+          ...(d.nutritionPer100g.fiber != null && { fiber: d.nutritionPer100g.fiber }),
         },
-      },
-      isComplete: true,
-      sourceType: 'manual',
-    });
+        portion: d.portion
+          ? { label: d.portion.label, weightGrams: d.portion.weightGrams }
+          : undefined,
+        isComplete: true,
+        sourceType: 'ai',
+        aiConfidence: d.aiConfidence,
+        aiWarnings: d.aiWarnings,
+        searchTerms: d.searchTerms,
+      });
+    } else {
+      // Manual flat macros — per-portion entry
+      item = await getReusableItemsRepository().create({
+        userId,
+        name: d.name,
+        nutritionBasis: 'perPortion',
+        portion: {
+          label: '1 serving',
+          nutrition: {
+            calories: d.calories,
+            protein: d.protein,
+            carbs: d.carbs,
+            fat: d.fat,
+            fiber: d.fiber,
+          },
+        },
+        isComplete: true,
+        sourceType: 'manual',
+      });
+    }
+
     logEvent(ctx, 'info', 'reusableItems.created', { userId, itemId: item.id });
     return { status: 201, jsonBody: { item } };
   },

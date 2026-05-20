@@ -31,6 +31,10 @@ import { calculateNutrition } from './nutritionUtils';
 import { reusableItemsApi } from '../../shared/api/reusableItemsApi';
 import { foodApi } from '../../shared/api/foodApi';
 
+import { aiApi } from '../../shared/api/aiApi';
+import type { MealParserPreviewResponse } from '../../shared/api/aiApi';
+import MealParserReviewScreen from './MealParserReviewScreen';
+
 type Mode = 'ai' | 'search' | 'manual';
 
 interface Props {
@@ -48,14 +52,76 @@ const MODES: { id: Mode; label: string }[] = [
 ];
 
 // --- Mode A: AI Input ---
-function AiMode(_props: { mealId: string; onSaved: () => void }) {
+interface AiModeProps {
+  mealId: string;
+  onSaved: () => void;
+}
+
+function AiMode({ mealId, onSaved }: AiModeProps) {
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<MealParserPreviewResponse | null>(null);
+
+  async function handleAnalyze() {
+    if (text.trim().length < 3) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await aiApi.previewMeal(text.trim());
+      setPreview(result);
+    } catch (e) {
+      setError(formatApiError(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleReviewSaved() {
+    setPreview(null);
+    setText('');
+    onSaved();
+  }
+
   return (
     <View style={[modeStyles.container, aiStyles.wrapper]}>
-      <Text style={aiStyles.icon}>✨</Text>
-      <Text style={aiStyles.title}>Not Supported Yet</Text>
+      <Text style={aiStyles.title}>✨ KI-Mahlzeitenerkennung</Text>
       <Text style={aiStyles.subtitle}>
-        AI-basierte Mahlzeitenerkennung ist in einer zukünftigen Version verfügbar.
+        Beschreibe deine Mahlzeit in eigenen Worten, z.B. „200g Hähnchenbrust mit 150g Reis"
       </Text>
+      <TextInput
+        style={aiStyles.input}
+        placeholder="Mahlzeit beschreiben…"
+        placeholderTextColor={colors.textMuted}
+        value={text}
+        onChangeText={setText}
+        multiline
+        numberOfLines={3}
+        returnKeyType="done"
+      />
+      {error && <ErrorBanner error={error} />}
+      <TouchableOpacity
+        style={[aiStyles.analyzeBtn, (loading || text.trim().length < 3) && aiStyles.analyzeBtnDisabled]}
+        onPress={handleAnalyze}
+        disabled={loading || text.trim().length < 3}
+      >
+        {loading ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <Text style={aiStyles.analyzeBtnText}>Analysieren</Text>
+        )}
+      </TouchableOpacity>
+
+      {preview && (
+        <MealParserReviewScreen
+          visible
+          mealId={mealId}
+          items={preview.items}
+          warnings={preview.warnings}
+          onClose={() => setPreview(null)}
+          onSaved={handleReviewSaved}
+        />
+      )}
     </View>
   );
 }
@@ -568,10 +634,26 @@ const modeStyles = StyleSheet.create({
 
 // --- AI placeholder styles ---
 const aiStyles = StyleSheet.create({
-  wrapper: { alignItems: 'center', justifyContent: 'center', paddingTop: spacing.xxl },
-  icon: { fontSize: 40, marginBottom: spacing.md },
-  title: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
-  subtitle: { ...typography.body2, color: colors.textMuted, textAlign: 'center', paddingHorizontal: spacing.lg },
+  wrapper: { gap: spacing.md, paddingTop: spacing.md },
+  title: { ...typography.h3, color: colors.text },
+  subtitle: { ...typography.body2, color: colors.textMuted },
+  input: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    color: colors.text,
+    ...typography.body,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  analyzeBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  analyzeBtnDisabled: { opacity: 0.4 },
+  analyzeBtnText: { ...typography.body, color: colors.white, fontWeight: '700' },
 });
 
 // --- QuantitySelector styles ---

@@ -17,9 +17,9 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
         'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20';
       parameters = [{ name: '@userId', value: userId }];
     } else {
-      // Case-insensitive startsWith via LOWER + STARTSWITH
+      // Case-insensitive prefix match on name OR any searchTerms element
       cosmosQuery =
-        'SELECT * FROM c WHERE c.userId = @userId AND STARTSWITH(LOWER(c.name), @q) ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20';
+        'SELECT * FROM c WHERE c.userId = @userId AND (STARTSWITH(LOWER(c.name), @q) OR EXISTS(SELECT VALUE t FROM t IN c.searchTerms WHERE STARTSWITH(t, @q))) ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20';
       parameters = [
         { name: '@userId', value: userId },
         { name: '@q', value: query.toLowerCase() },
@@ -47,6 +47,9 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
       sourceRef: input.sourceRef,
       usageCount: 0,
       createdAt: new Date().toISOString(),
+      ...(input.aiConfidence != null && { aiConfidence: input.aiConfidence }),
+      ...(input.aiWarnings != null && { aiWarnings: input.aiWarnings }),
+      ...(input.searchTerms != null && input.searchTerms.length > 0 && { searchTerms: input.searchTerms }),
     };
     const { resource } = await containers.reusableMealItems.items.create<ReusableItem>(item);
     return resource ?? item;

@@ -15,6 +15,7 @@ export interface AddItemFlatInput {
   fiber: number;
   quantity?: number;
   unit?: string;
+  isAiEstimate?: boolean;
 }
 
 export interface AddItemCalculatedInput {
@@ -40,6 +41,7 @@ export interface AddItemProductInput {
     fat: number;
     fiber?: number;
   };
+  isAiEstimate?: boolean;
 }
 
 export type AddItemInput = AddItemFlatInput | AddItemCalculatedInput | AddItemProductInput;

@@ -40,6 +40,8 @@ function reusableItemToSearchResult(item: ReusableItem): FoodSearchResult {
     portion: item.portion,
     isComplete: item.isComplete,
     sourceRef: item.sourceRef,
+    ...(item.sourceType === 'ai' && { isAiEstimate: true }),
+    ...(item.sourceType === 'ai' && item.aiConfidence != null && { aiConfidence: item.aiConfidence }),
   };
 }
 

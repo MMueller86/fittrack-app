@@ -71,6 +71,8 @@ const AddItemSchema = z
     inputAmount: z.coerce.number().positive().optional(),
     amountGrams: z.coerce.number().positive().optional(),
     calculatedNutrition: NutritionValuesSchema.optional(),
+    // AI estimate flag
+    isAiEstimate: z.boolean().optional(),
   })
   .refine(
     (d) => {
@@ -190,7 +192,8 @@ export const addItemHandler = withHandler(
         name: itemName,
         ...macros,
         quantity: d.inputMode === 'portion' ? d.inputAmount! : (d.amountGrams ?? d.quantity ?? 1),
-        unit: d.inputMode === 'portion' ? 'portion' : d.quantityMode === 'portions' ? 'portion' : 'g',
+        unit: d.inputMode === 'portion' ? 'portion' : d.quantityMode === 'portions' ? 'portion' : (d.unit ?? 'g'),
+        ...(d.isAiEstimate ? { isAiEstimate: true } : {}),
       });
       logEvent(ctx, 'info', 'diary.item.added', { userId, mealId });
       return { status: 201, jsonBody: { meal } };

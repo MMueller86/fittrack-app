@@ -27,5 +27,5 @@ param projectName = 'fittrack'
 // param uniqueSuffix = 'mm0001'
 
 // Public (non-secret) Azure OpenAI settings can live here.
-param azureOpenAiApiVersion = '2024-02-01'
-param azureOpenAiDeploymentName = 'gpt4o-mini'
+param azureOpenAiApiVersion = '2024-08-01-preview'
+param azureOpenAiDeploymentName = 'gpt-4o-mini'

@@ -26,6 +26,12 @@ export interface CreateReusableItemInput {
   isComplete: boolean;
   sourceType: ReusableItemSourceType;
   sourceRef?: OFFSourceRef;
+  /** AI confidence 0.0–1.0; only set when sourceType === 'ai' */
+  aiConfidence?: number;
+  /** AI-generated warnings stored for traceability; only set when sourceType === 'ai' */
+  aiWarnings?: string[];
+  /** Lowercase search keywords for improved discoverability */
+  searchTerms?: string[];
 }
 
 export interface ReusableItemsRepository {
@@ -41,7 +47,10 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
     if (!query.trim()) return items.slice(0, 20);
     const q = query.toLowerCase();
     return items
-      .filter((i) => i.name.toLowerCase().startsWith(q))
+      .filter((i) =>
+        i.name.toLowerCase().startsWith(q) ||
+        (i.searchTerms ?? []).some((t) => t.startsWith(q)),
+      )
       .slice(0, 20);
   }
 
@@ -59,6 +68,9 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
       sourceRef: input.sourceRef,
       usageCount: 0,
       createdAt: new Date().toISOString(),
+      ...(input.aiConfidence != null && { aiConfidence: input.aiConfidence }),
+      ...(input.aiWarnings != null && { aiWarnings: input.aiWarnings }),
+      ...(input.searchTerms != null && input.searchTerms.length > 0 && { searchTerms: input.searchTerms }),
     };
     const list = this.itemsByUser.get(input.userId) ?? [];
     list.push(item);
@@ -80,5 +92,9 @@ export function getReusableItemsRepository(): ReusableItemsRepository {
 
 export function __resetReusableItemsRepositoryForTests(): void {
   singleton = undefined;
+}
+
+export function _setReusableItemsRepository(repo: ReusableItemsRepository): void {
+  singleton = repo;
 }
 

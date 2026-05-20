@@ -167,7 +167,10 @@ function MealCard({
       {meal.items.map((item) => (
         <View key={item.id} style={styles.itemRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.itemName}>{item.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.itemName}>{item.name}</Text>
+              {item.isAiEstimate && <Text style={{ fontSize: 12 }}>✨</Text>}
+            </View>
             <Text style={styles.itemMacros}>
               {item.unit === 'portion'
                 ? `${item.quantity} Portion${item.quantity !== 1 ? 'en' : ''}`

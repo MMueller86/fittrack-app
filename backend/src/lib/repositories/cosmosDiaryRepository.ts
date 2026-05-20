@@ -60,6 +60,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
       id: randomUUID(),
       name: input.name,
       sourceType: 'manual',
+      ...(input.isAiEstimate ? { isAiEstimate: true } : {}),
       quantity: input.quantity ?? 1,
       unit: input.unit ?? 'serving',
       macros: {
