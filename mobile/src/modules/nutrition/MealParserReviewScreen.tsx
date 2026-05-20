@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.h3, color: colors.text },
   cancelBtn: { width: 80 },
-  cancelBtnText: { ...typography.body, color: colors.textSecondary },
+  cancelBtnText: { ...typography.body1, color: colors.textSecondary },
   body: { padding: spacing.md, gap: spacing.md },
   warningBanner: {
     backgroundColor: `${colors.negative}22`,
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   saveBtnDisabled: { opacity: 0.4 },
-  saveBtnText: { ...typography.body, color: colors.white, fontWeight: '700' },
+  saveBtnText: { ...typography.body1, color: colors.white, fontWeight: '700' },
 });
 
 const cardStyles = StyleSheet.create({
@@ -611,11 +611,11 @@ const cardStyles = StyleSheet.create({
   },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   rawText: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic' },
-  displayName: { ...typography.body, color: colors.text, fontWeight: '600' },
+  displayName: { ...typography.body1, color: colors.text, fontWeight: '600' },
   badge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm },
   badgeText: { ...typography.caption, fontWeight: '600' },
   selected: { gap: spacing.xs },
-  selectedName: { ...typography.body, color: colors.text },
+  selectedName: { ...typography.body1, color: colors.text },
   selectedBrand: { ...typography.caption, color: colors.textMuted },
   selectedLabel: { ...typography.caption, color: colors.textSecondary },
   // Gramm / Portion segmented control
@@ -645,10 +645,10 @@ const cardStyles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
     textAlign: 'right',
   },
-  amountUnit: { ...typography.body, color: colors.textSecondary },
+  amountUnit: { ...typography.body1, color: colors.textSecondary },
   portionHint: { ...typography.caption, color: colors.textMuted },
   // Nutrition preview row
   nutritionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
@@ -671,7 +671,7 @@ const cardStyles = StyleSheet.create({
     borderBottomColor: colors.border,
     gap: spacing.sm,
   },
-  candidateName: { ...typography.body, color: colors.text },
+  candidateName: { ...typography.body1, color: colors.text },
   candidateBrand: { ...typography.caption, color: colors.textMuted },
   candidateLabel: { ...typography.caption, color: colors.textSecondary },
   searchRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
@@ -682,7 +682,7 @@ const cardStyles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
   },
   searchBtn: {
     backgroundColor: colors.surfaceMuted,
@@ -690,7 +690,7 @@ const cardStyles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     justifyContent: 'center',
   },
-  searchBtnText: { ...typography.body, color: colors.primary },
+  searchBtnText: { ...typography.body1, color: colors.primary },
   aiEstimateBtn: {
     paddingVertical: spacing.sm,
     alignItems: 'center',

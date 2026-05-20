@@ -647,7 +647,7 @@ const aiStyles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.sm,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
     minHeight: 80,
     textAlignVertical: 'top',
   },
@@ -658,7 +658,7 @@ const aiStyles = StyleSheet.create({
     alignItems: 'center',
   },
   analyzeBtnDisabled: { opacity: 0.4 },
-  analyzeBtnText: { ...typography.body, color: colors.white, fontWeight: '700' },
+  analyzeBtnText: { ...typography.body1, color: colors.white, fontWeight: '700' },
 });
 
 // --- QuantitySelector styles ---

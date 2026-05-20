@@ -535,7 +535,7 @@ const styles = StyleSheet.create({
   },
   title: { ...typography.h3, color: colors.text },
   cancelBtn: { width: 80 },
-  cancelBtnText: { ...typography.body, color: colors.textSecondary },
+  cancelBtnText: { ...typography.body1, color: colors.textSecondary },
   body: { padding: spacing.md, gap: spacing.md },
   confidenceBanner: {
     borderWidth: 1,
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.xs,
   },
-  confidenceLabel: { ...typography.body, color: colors.text },
+  confidenceLabel: { ...typography.body1, color: colors.text },
   confidenceValue: { fontWeight: '700' },
   confidenceHint: { ...typography.caption, color: colors.textMuted },
   sourceProductText: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic', marginTop: 2 },
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     padding: spacing.sm,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
   },
   reEstimateBtn: {
     flexDirection: 'row',
@@ -592,20 +592,20 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: 'center',
   },
-  primaryBtnText: { ...typography.body, color: colors.white, fontWeight: '700' },
+  primaryBtnText: { ...typography.body1, color: colors.white, fontWeight: '700' },
   secondaryBtn: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
     padding: spacing.md,
     alignItems: 'center',
   },
-  secondaryBtnText: { ...typography.body, color: colors.textSecondary },
+  secondaryBtnText: { ...typography.body1, color: colors.textSecondary },
   btnDisabled: { opacity: 0.4 },
 });
 
 const fieldStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  label: { ...typography.body, color: colors.textSecondary, flex: 1 },
+  label: { ...typography.body1, color: colors.textSecondary, flex: 1 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   input: {
     width: 80,
@@ -614,7 +614,7 @@ const fieldStyles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
     textAlign: 'right',
   },
   unit: { ...typography.caption, color: colors.textMuted, width: 36 },
@@ -632,7 +632,7 @@ const tableStyles = StyleSheet.create({
   valueCol: { flex: 1.5, alignItems: 'flex-end' },
   headerText: { ...typography.caption, color: colors.textMuted, fontWeight: '700', textAlign: 'right' },
   portionGramsHint: { fontSize: 10, color: colors.textMuted, textAlign: 'right' },
-  labelText: { ...typography.body, color: colors.text },
+  labelText: { ...typography.body1, color: colors.text },
   unitMuted: { ...typography.caption, color: colors.textMuted },
   cellInput: {
     backgroundColor: colors.surfaceMuted,
@@ -640,11 +640,11 @@ const tableStyles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
     textAlign: 'right',
     minWidth: 72,
   },
-  portionValue: { ...typography.body, color: colors.textSecondary, textAlign: 'right' },
+  portionValue: { ...typography.body1, color: colors.textSecondary, textAlign: 'right' },
 });
 
 // ---------------------------------------------------------------------------
@@ -653,7 +653,7 @@ const tableStyles = StyleSheet.create({
 
 const portionStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  label: { ...typography.body, color: colors.textSecondary, flex: 1 },
+  label: { ...typography.body1, color: colors.textSecondary, flex: 1 },
   inputWrap: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   input: {
     width: 80,
@@ -662,7 +662,7 @@ const portionStyles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
     textAlign: 'right',
   },
   unit: { ...typography.caption, color: colors.textMuted, width: 36 },
@@ -696,10 +696,10 @@ const amountStyles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     color: colors.text,
-    ...typography.body,
+    ...typography.body1,
     textAlign: 'right',
   },
-  unit: { ...typography.body, color: colors.textSecondary },
+  unit: { ...typography.body1, color: colors.textSecondary },
   hint: { ...typography.caption, color: colors.textMuted },
 });
 
