@@ -68,6 +68,17 @@ describe('withHandler', () => {
     const res = await wrapped(makeRequest(), makeContext());
     expect(res.status).toBe(500);
   });
+
+  it('returns 401 when handler throws UnauthorizedError', async () => {
+    const { UnauthorizedError } = await import('./auth');
+    const wrapped = withHandler('test.unauth', async () => {
+      throw new UnauthorizedError('Token expired');
+    });
+
+    const res = await wrapped(makeRequest(), makeContext());
+    expect(res.status).toBe(401);
+    expect(res.jsonBody).toEqual({ error: 'Token expired' });
+  });
 });
 
 describe('parseBody', () => {

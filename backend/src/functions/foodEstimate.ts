@@ -11,6 +11,7 @@ import { estimateFood } from '../lib/openai';
 import { validateNutritionEstimate } from '../lib/nutritionValidator';
 import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
+import { enforceQuota, trackUsage } from '../lib/quota';
 import type { AiFoodEstimatePreview } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,11 @@ const FoodEstimateSchema = z.object({
 export const foodEstimatePreviewHandler = withHandler(
   'ai.food-estimate.preview',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    requireUser(request); // validates auth token; throws 401 if missing
+    const userContext = requireUser(request);
+
+    // Quota enforcement — check before expensive AI call
+    const quotaBlock = await enforceQuota(userContext, 'food-estimate');
+    if (quotaBlock) return quotaBlock;
 
     const parsed = await parseBody(request, FoodEstimateSchema);
     if (!parsed.ok) return parsed.response;
@@ -93,6 +98,9 @@ export const foodEstimatePreviewHandler = withHandler(
       confidence: Math.min(1, Math.max(0, estimate.confidence)),
       warnings: allWarnings,
     };
+
+    // Track usage AFTER successful AI call
+    await trackUsage(userContext, 'food-estimate');
 
     return { status: 200, jsonBody: preview };
   },

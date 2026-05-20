@@ -25,6 +25,7 @@ import {
 import type { FoodSearchResult } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
+import { isQuotaExceededError } from '../../shared/api/client';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { calculateNutrition } from './nutritionUtils';
@@ -71,7 +72,11 @@ function AiMode({ mealId, onSaved }: AiModeProps) {
       const result = await aiApi.previewMeal(text.trim());
       setPreview(result);
     } catch (e) {
-      setError(formatApiError(e));
+      if (isQuotaExceededError(e)) {
+        setError('Deine kostenlosen KI-Analysen für diesen Monat sind aufgebraucht. Das Kontingent wird am Monatsanfang zurückgesetzt.');
+      } else {
+        setError(formatApiError(e));
+      }
     } finally {
       setLoading(false);
     }

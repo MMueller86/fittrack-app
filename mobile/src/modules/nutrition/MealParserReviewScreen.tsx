@@ -22,6 +22,7 @@ import { NutritionCalculationError } from './nutritionUtils';
 import type { AiFoodEstimatePreview, FoodSearchResult } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
+import { isQuotaExceededError } from '../../shared/api/client';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { foodApi } from '../../shared/api/foodApi';
@@ -402,7 +403,11 @@ export default function MealParserReviewScreen({ visible, mealId, items, warning
       });
       setPendingEstimate({ item: previewItem, preview });
     } catch (e) {
-      setError(formatApiError(e));
+      if (isQuotaExceededError(e)) {
+        setError('Deine kostenlosen KI-Schätzungen für diesen Monat sind aufgebraucht. Das Kontingent wird am Monatsanfang zurückgesetzt.');
+      } else {
+        setError(formatApiError(e));
+      }
     } finally {
       setEstimatingFor(null);
     }

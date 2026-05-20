@@ -22,6 +22,8 @@ const CONTAINER_DEFS = [
   { id: 'recipes', partitionKey: '/userId' },
   // Internal food product catalog — partition key is /id (product id = barcode-based)
   { id: 'foodProducts', partitionKey: '/id' },
+  // AI usage counters — one document per user/feature/period
+  { id: 'aiUsage', partitionKey: '/userId' },
 ] as const;
 
 export type ContainerName = (typeof CONTAINER_DEFS)[number]['id'];

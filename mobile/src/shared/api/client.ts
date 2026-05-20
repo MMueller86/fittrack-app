@@ -34,11 +34,47 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor — handle 401 with silent refresh (M2).
+// Response interceptor — handle 401 with silent refresh (M2) and 429 quota exceeded.
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // 429 — AI quota exceeded
+    if (axios.isAxiosError(error) && error.response?.status === 429) {
+      const body = error.response.data;
+      if (body?.error === 'quota_exceeded') {
+        // Attach structured quota info to the error for UI consumption
+        (error as QuotaAxiosError).quotaExceeded = {
+          feature: body.feature,
+          used: body.used,
+          limit: body.limit,
+          resetsAt: body.resetsAt,
+        };
+      }
+    }
     // 401 handling and token refresh implemented in M2.
     return Promise.reject(error);
   },
 );
+
+// ---------------------------------------------------------------------------
+// Quota error typing for consumers
+// ---------------------------------------------------------------------------
+
+export interface QuotaInfo {
+  feature: string;
+  used: number;
+  limit: number;
+  resetsAt: string;
+}
+
+export interface QuotaAxiosError {
+  quotaExceeded?: QuotaInfo;
+}
+
+export function isQuotaExceededError(error: unknown): error is QuotaAxiosError & Error {
+  return (
+    axios.isAxiosError(error) &&
+    error.response?.status === 429 &&
+    (error as QuotaAxiosError).quotaExceeded != null
+  );
+}

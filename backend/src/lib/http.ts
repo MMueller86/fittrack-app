@@ -20,6 +20,7 @@ import type {
 } from '@azure/functions';
 import { z, type ZodSchema } from 'zod';
 
+import { UnauthorizedError } from './auth';
 import { logEvent } from './log';
 
 export type Handler = (
@@ -56,6 +57,17 @@ export function withHandler(name: string, fn: Handler): Handler {
       });
       return response;
     } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        logEvent(ctx, 'info', 'handler.unauthorized', {
+          handler: name,
+          method: request.method,
+          duration_ms: Date.now() - started,
+        });
+        return {
+          status: 401,
+          jsonBody: { error: err.message },
+        };
+      }
       const message = err instanceof Error ? err.message : String(err);
       const stack = err instanceof Error ? err.stack : undefined;
       logEvent(ctx, 'error', 'handler.error', {

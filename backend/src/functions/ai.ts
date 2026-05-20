@@ -5,6 +5,7 @@ import { getFoodProductRepository } from '../lib/repositories/foodProductReposit
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { requireUser } from '../lib/auth';
 import { withHandler } from '../lib/http';
+import { enforceQuota, trackUsage } from '../lib/quota';
 import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
@@ -117,7 +118,12 @@ const PreviewBodySchema = z.object({
 export const mealParserPreviewHandler = withHandler(
   'ai.meal-parser.preview',
   async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const userContext = requireUser(request);
+    const { userId } = userContext;
+
+    // Quota enforcement — check before expensive AI call
+    const quotaBlock = await enforceQuota(userContext, 'meal-parser');
+    if (quotaBlock) return quotaBlock;
 
     const body = await request.json();
     const parsed = PreviewBodySchema.safeParse(body);
@@ -137,6 +143,9 @@ export const mealParserPreviewHandler = withHandler(
       const msg = e instanceof Error ? e.message : String(e);
       return { status: 502, jsonBody: { error: `AI parsing failed: ${msg}` } };
     }
+
+    // Track usage AFTER successful AI call
+    await trackUsage(userContext, 'meal-parser');
 
     // 2. For each parsed item: search user library + catalog, merge, classify
     const items = await Promise.all(

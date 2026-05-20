@@ -1,4 +1,4 @@
-// Cosmos DB account (Serverless), database, and the 6 containers from data_model.md.
+// Cosmos DB account (Serverless), database, and containers.
 // Partition keys:
 //   users               /id
 //   nutritionProfiles   /userId
@@ -6,6 +6,7 @@
 //   nutritionDiaryMeals /userId
 //   reusableMealItems   /userId
 //   recipes             /userId
+//   aiUsage             /userId
 
 targetScope = 'resourceGroup'
 
@@ -68,6 +69,7 @@ var containerDefs = [
   { name: 'nutritionDiaryMeals', partitionKey: '/userId' }
   { name: 'reusableMealItems', partitionKey: '/userId' }
   { name: 'recipes', partitionKey: '/userId' }
+  { name: 'aiUsage', partitionKey: '/userId' }
 ]
 
 resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = [for c in containerDefs: {
