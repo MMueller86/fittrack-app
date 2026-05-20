@@ -80,6 +80,7 @@ export async function createTestDatabase(databaseId: string): Promise<EmulatorCo
     { id: 'reusableMealItems', partitionKey: '/userId' },
     { id: 'recipes', partitionKey: '/userId' },
     { id: 'foodProducts', partitionKey: '/id' },
+    { id: 'aiUsage', partitionKey: '/userId' },
   ] as const;
 
   for (const def of containerDefs) {
