@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 vi.mock('../lib/repositories/reusableItemsRepository');
 vi.mock('../lib/repositories/foodProductRepository');
 vi.mock('../lib/auth', () => ({
-  requireUser: () => ({ userId: 'test-user' }),
+  requireUser: async () => ({ userId: 'test-user', tier: 'free' }),
 }));
 
 import { foodSearchHandler } from './foodSearch';

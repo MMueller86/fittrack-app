@@ -118,7 +118,7 @@ const PreviewBodySchema = z.object({
 export const mealParserPreviewHandler = withHandler(
   'ai.meal-parser.preview',
   async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const userContext = requireUser(request);
+    const userContext = await requireUser(request);
     const { userId } = userContext;
 
     // Quota enforcement — check before expensive AI call

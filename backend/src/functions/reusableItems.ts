@@ -54,7 +54,7 @@ const CreateReusableItemSchema = z.union([AiCreateSchema, ManualCreateSchema]);
 export const searchReusableItemsHandler = withHandler(
   'reusableItems.search',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const query = request.query.get('query') ?? '';
     const repo = getReusableItemsRepository();
     const items = await repo.search(userId, query);
@@ -66,7 +66,7 @@ export const searchReusableItemsHandler = withHandler(
 export const createReusableItemHandler = withHandler(
   'reusableItems.create',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const parsed = await parseBody(request, CreateReusableItemSchema);
     if (!parsed.ok) return parsed.response;
 

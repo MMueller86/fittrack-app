@@ -89,7 +89,7 @@ const AddItemSchema = z
 export const getDiaryHandler = withHandler(
   'diary.get',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const date = request.query.get('date');
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return { status: 400, jsonBody: { error: 'Query param "date" must be YYYY-MM-DD' } };
@@ -105,7 +105,7 @@ export const getDiaryHandler = withHandler(
 export const createMealHandler = withHandler(
   'diary.meals.create',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const parsed = await parseBody(request, CreateMealSchema);
     if (!parsed.ok) return parsed.response;
 
@@ -125,7 +125,7 @@ export const createMealHandler = withHandler(
 export const deleteMealHandler = withHandler(
   'diary.meals.delete',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const mealId = request.params['id'];
     if (!mealId) return { status: 400, jsonBody: { error: 'Missing meal id' } };
 
@@ -140,7 +140,7 @@ export const deleteMealHandler = withHandler(
 export const addItemHandler = withHandler(
   'diary.items.add',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const mealId = request.params['id'];
     if (!mealId) return { status: 400, jsonBody: { error: 'Missing meal id' } };
 
@@ -209,7 +209,7 @@ export const addItemHandler = withHandler(
 export const deleteItemHandler = withHandler(
   'diary.items.delete',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const mealId = request.params['id'];
     const itemId = request.params['itemId'];
     if (!mealId || !itemId) return { status: 400, jsonBody: { error: 'Missing meal or item id' } };

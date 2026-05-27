@@ -17,7 +17,7 @@ import { getFoodProductRepository } from '../lib/repositories/foodProductReposit
 export const foodProductSearchHandler = withHandler(
   'food-products.search',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const q = request.query.get('q') ?? '';
 
     if (q.trim().length < 2) {
@@ -39,7 +39,7 @@ export const foodProductSearchHandler = withHandler(
 export const foodProductGetHandler = withHandler(
   'food-products.get',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const id = request.params['id'];
 
     if (!id) {

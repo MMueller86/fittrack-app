@@ -5,18 +5,15 @@
 // group via `resourceGroup().location` in main.bicep. To override, uncomment
 // the `location` line below.
 //
-// Secrets (Azure OpenAI key, JWT secrets, Google client id) MUST NOT be
-// committed. Pass them at deploy time with `--parameters` overrides, e.g.:
+// Secrets (Azure OpenAI key) MUST NOT be committed. Pass them at deploy time
+// with `--parameters` overrides, e.g.:
 //
 //   az deployment group create `
 //     --resource-group rg-Michael-Mueller `
 //     --template-file infra/main.bicep `
 //     --parameters infra/parameters/dev.bicepparam `
 //     --parameters azureOpenAiEndpoint=https://oai-fittrack-dev.openai.azure.com/ `
-//     --parameters azureOpenAiApiKey=$env:AZURE_OPENAI_API_KEY `
-//     --parameters jwtSecret=$env:JWT_SECRET `
-//     --parameters jwtRefreshSecret=$env:JWT_REFRESH_SECRET `
-//     --parameters googleClientId=$env:GOOGLE_CLIENT_ID
+//     --parameters azureOpenAiApiKey=$env:AZURE_OPENAI_API_KEY
 
 using '../main.bicep'
 
@@ -29,3 +26,8 @@ param projectName = 'fittrack'
 // Public (non-secret) Azure OpenAI settings can live here.
 param azureOpenAiApiVersion = '2024-08-01-preview'
 param azureOpenAiDeploymentName = 'gpt-4o-mini'
+
+// Entra External ID auth (all public values — no secrets)
+param authIssuer = 'https://997c7414-a6e0-47fa-9f5f-de98ea6c426e.ciamlogin.com/997c7414-a6e0-47fa-9f5f-de98ea6c426e/v2.0'
+param authAudience = 'api://ce439bd5-864f-46cb-ae77-518d3cba368b'
+param authJwksUri = 'https://michaelmuellertestapp.ciamlogin.com/997c7414-a6e0-47fa-9f5f-de98ea6c426e/discovery/v2.0/keys'

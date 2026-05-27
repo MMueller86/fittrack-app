@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 
 import { addItemHandler, createMealHandler } from './diary';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
-import { makeContext, makeRequest } from '../test-utils/http';
+import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
 
 // Unit tests for POST /api/diary/meals/:id/items
 //
@@ -11,6 +11,14 @@ import { makeContext, makeRequest } from '../test-utils/http';
 
 const originalEnv = { ...process.env };
 
+beforeAll(async () => {
+  await setupTestAuth();
+});
+
+afterAll(() => {
+  teardownTestAuth();
+});
+
 beforeEach(() => {
   delete process.env.COSMOS_ENDPOINT;
   delete process.env.COSMOS_KEY;
@@ -18,14 +26,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  process.env = { ...originalEnv };
+  Object.assign(process.env, originalEnv);
   __resetDiaryRepositoryForTests();
 });
 
 /** Create a meal and return its id. */
 async function createMeal(): Promise<string> {
   const res = await createMealHandler(
-    makeRequest({ body: { date: '2026-05-08', type: 'breakfast' } }),
+    await makeAuthRequest({ body: { date: '2026-05-08', type: 'breakfast' } }),
     makeContext(),
   );
   const body = res.jsonBody as { meal: { id: string } };
@@ -36,11 +44,11 @@ async function createMeal(): Promise<string> {
 // Product input (productId + productName + pre-calculated nutrition)
 // ---------------------------------------------------------------------------
 
-describe('POST /api/diary/meals/:id/items — product input', () => {
+describe('POST /api/diary/meals/:id/items â€” product input', () => {
   it('accepts productName + productId + calculatedNutrition and returns 201', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: { id: mealId },
         body: {
           productId: 'openFoodFacts:abc123',
@@ -61,7 +69,7 @@ describe('POST /api/diary/meals/:id/items — product input', () => {
   it('returns 400 when neither name nor productName is provided', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: { id: mealId },
         body: {
           productId: 'openFoodFacts:abc123',
@@ -79,7 +87,7 @@ describe('POST /api/diary/meals/:id/items — product input', () => {
   it('stores inputAmount as quantity (not amountGrams) when inputMode is portion', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: { id: mealId },
         body: {
           productId: 'openFoodFacts:abc123',
@@ -101,7 +109,7 @@ describe('POST /api/diary/meals/:id/items — product input', () => {
   it('stores amountGrams as quantity when inputMode is grams', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: { id: mealId },
         body: {
           productId: 'openFoodFacts:abc123',
@@ -122,30 +130,30 @@ describe('POST /api/diary/meals/:id/items — product input', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Flat macros input (manual mode — existing behaviour)
+// Flat macros input (manual mode â€” existing behaviour)
 // ---------------------------------------------------------------------------
 
-describe('POST /api/diary/meals/:id/items — flat macros input', () => {
+describe('POST /api/diary/meals/:id/items â€” flat macros input', () => {
   it('accepts flat macros and returns 201', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: { id: mealId },
-        body: { name: 'Rührei', calories: 180, protein: 14, carbs: 2, fat: 12, fiber: 0 },
+        body: { name: 'RÃ¼hrei', calories: 180, protein: 14, carbs: 2, fat: 12, fiber: 0 },
       }),
       makeContext(),
     );
     expect(res.status).toBe(201);
     const body = res.jsonBody as { meal: { items: { name: string }[] } };
-    expect(body.meal.items[0]!.name).toBe('Rührei');
+    expect(body.meal.items[0]!.name).toBe('RÃ¼hrei');
   });
 
   it('returns 400 when calories is missing', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: { id: mealId },
-        body: { name: 'Rührei', protein: 14, carbs: 2, fat: 12 },
+        body: { name: 'RÃ¼hrei', protein: 14, carbs: 2, fat: 12 },
       }),
       makeContext(),
     );
@@ -154,14 +162,14 @@ describe('POST /api/diary/meals/:id/items — flat macros input', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Calculated input (quantityMode — existing behaviour)
+// Calculated input (quantityMode â€” existing behaviour)
 // ---------------------------------------------------------------------------
 
-describe('POST /api/diary/meals/:id/items — quantityMode input', () => {
+describe('POST /api/diary/meals/:id/items â€” quantityMode input', () => {
   it('accepts quantityMode=grams + nutritionPer100g and returns 201', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: { id: mealId },
         body: {
           name: 'Haferflocken',
@@ -177,7 +185,7 @@ describe('POST /api/diary/meals/:id/items — quantityMode input', () => {
 
   it('returns 400 when mealId is missing', async () => {
     const res = await addItemHandler(
-      makeRequest({
+      await makeAuthRequest({
         params: {},
         body: { name: 'x', calories: 100, protein: 5, carbs: 10, fat: 3, fiber: 0 },
       }),

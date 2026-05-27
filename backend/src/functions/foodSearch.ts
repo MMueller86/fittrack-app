@@ -49,7 +49,7 @@ function reusableItemToSearchResult(item: ReusableItem): FoodSearchResult {
 export const foodSearchHandler = withHandler(
   'food.search',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const query = request.query.get('query') ?? '';
 
     // Fan-out: user library + internal product catalog in parallel

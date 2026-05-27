@@ -45,17 +45,17 @@ param azureOpenAiApiVersion string = '2024-02-01'
 @description('Azure OpenAI deployment name.')
 param azureOpenAiDeploymentName string = 'gpt4o-mini'
 
-// --- Auth secrets (used in M2) ---
-@description('JWT signing secret for access tokens.')
-@secure()
-param jwtSecret string = ''
+// --- Entra External ID Auth ---
+@description('Auth mode: dev or entra.')
 
-@description('JWT signing secret for refresh tokens.')
-@secure()
-param jwtRefreshSecret string = ''
+@description('Entra JWT issuer URL (from OIDC discovery).')
+param authIssuer string = ''
 
-@description('Google OAuth client id used to validate ID tokens.')
-param googleClientId string = ''
+@description('Expected audience in access_token (Application ID URI).')
+param authAudience string = ''
+
+@description('JWKS URI for JWT signature verification.')
+param authJwksUri string = ''
 
 @description('Tags applied to the resources.')
 param tags object = {}
@@ -166,16 +166,16 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           value: azureOpenAiDeploymentName
         }
         {
-          name: 'JWT_SECRET'
-          value: jwtSecret
+          name: 'AUTH_ISSUER'
+          value: authIssuer
         }
         {
-          name: 'JWT_REFRESH_SECRET'
-          value: jwtRefreshSecret
+          name: 'AUTH_AUDIENCE'
+          value: authAudience
         }
         {
-          name: 'GOOGLE_CLIENT_ID'
-          value: googleClientId
+          name: 'AUTH_JWKS_URI'
+          value: authJwksUri
         }
       ]
     }

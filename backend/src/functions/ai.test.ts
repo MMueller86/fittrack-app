@@ -1,4 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+
+vi.mock('../lib/quota', () => ({
+  enforceQuota: vi.fn().mockResolvedValue(null),
+  trackUsage: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { classifyItem, resolveAmountGrams, mealParserPreviewHandler } from './ai';
 import type { AiParsedItem } from '../lib/openai';
@@ -8,7 +13,15 @@ import { _setReusableItemsRepository, __resetReusableItemsRepositoryForTests } f
 import type { FoodProductRepository } from '../lib/repositories/foodProductRepository';
 import type { ReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
-import { makeRequest, makeContext } from '../test-utils/http';
+import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
+
+beforeAll(async () => {
+  await setupTestAuth();
+});
+
+afterAll(() => {
+  teardownTestAuth();
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -126,9 +139,10 @@ describe('resolveAmountGrams', () => {
 // (no real OpenAI, no Cosmos — both mocked)
 // ---------------------------------------------------------------------------
 
-const originalEnv = { ...process.env };
+let originalEnv: Record<string, string | undefined>;
 
 beforeEach(() => {
+  if (!originalEnv) originalEnv = { ...process.env };
   delete process.env.COSMOS_ENDPOINT;
   delete process.env.COSMOS_KEY;
   _resetFoodProductRepository();
@@ -136,7 +150,13 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  const authIssuer = process.env['AUTH_ISSUER'];
+  const authAudience = process.env['AUTH_AUDIENCE'];
+  const authJwks = process.env['AUTH_JWKS_URI'];
   process.env = { ...originalEnv };
+  process.env['AUTH_ISSUER'] = authIssuer;
+  process.env['AUTH_AUDIENCE'] = authAudience;
+  process.env['AUTH_JWKS_URI'] = authJwks;
   __setOpenAiClientForTests(null);
   _resetFoodProductRepository();
   __resetReusableItemsRepositoryForTests();
@@ -174,7 +194,7 @@ describe('POST /api/ai/meal-parser/preview', () => {
     mockOpenAiClient([]);
     mockFoodRepo([]);
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: {} }),
+      await makeAuthRequest({ body: {} }),
       makeContext(),
     );
     expect(res.status).toBe(400);
@@ -184,7 +204,7 @@ describe('POST /api/ai/meal-parser/preview', () => {
     mockOpenAiClient([]);
     mockFoodRepo([]);
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: '' } }),
+      await makeAuthRequest({ body: { text: '' } }),
       makeContext(),
     );
     expect(res.status).toBe(400);
@@ -195,7 +215,7 @@ describe('POST /api/ai/meal-parser/preview', () => {
     mockFoodRepo([makeCandidate('prod:1', 'Hähnchenbrust')]);
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: '200g Hähnchenbrust' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: '200g Hähnchenbrust' } }),
       makeContext(),
     );
     expect(res.status).toBe(200);
@@ -211,7 +231,7 @@ describe('POST /api/ai/meal-parser/preview', () => {
     mockFoodRepo([]);
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: 'Exotische Frucht' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: 'Exotische Frucht' } }),
       makeContext(),
     );
     const body = res.jsonBody as { items: { status: string }[]; warnings: string[] };
@@ -224,7 +244,7 @@ describe('POST /api/ai/meal-parser/preview', () => {
     mockFoodRepo([makeCandidate('a', 'Vollmilch'), makeCandidate('b', 'Halbfettmilch')]);
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: 'Milch' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: 'Milch' } }),
       makeContext(),
     );
     const body = res.jsonBody as { items: { status: string }[] };
@@ -238,7 +258,7 @@ describe('POST /api/ai/meal-parser/preview', () => {
     mockFoodRepo([makeCandidate('p', 'Hähnchenbrust')]);
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: '200g Hähnchenbrust' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: '200g Hähnchenbrust' } }),
       makeContext(),
     );
     const body = res.jsonBody as Record<string, unknown>;
@@ -286,7 +306,7 @@ describe('mealParserPreviewHandler — user library integration (regression)', (
     mockFoodRepo([]);
 
     await mealParserPreviewHandler(
-      makeRequest({ body: { text: '2 Scheiben Sandwich Vollkorntoast' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: '2 Scheiben Sandwich Vollkorntoast' } }),
       makeContext(),
     );
 
@@ -311,7 +331,7 @@ describe('mealParserPreviewHandler — user library integration (regression)', (
     mockFoodRepo([]);
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: 'Vollkorntoast' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: 'Vollkorntoast' } }),
       makeContext(),
     );
     const body = res.jsonBody as { items: { status: string; selectedProductId: string }[] };
@@ -326,7 +346,7 @@ describe('mealParserPreviewHandler — user library integration (regression)', (
     mockFoodRepo([makeCandidate('cat-1', 'Vollkornbrot')]);
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: 'Vollkorntoast' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: 'Vollkorntoast' } }),
       makeContext(),
     );
     const body = res.jsonBody as { items: { candidates: FoodSearchResult[] }[] };
@@ -341,7 +361,7 @@ describe('mealParserPreviewHandler — user library integration (regression)', (
     mockFoodRepo([makeCandidate('cat-1', 'Vollkorntoast')]); // same name as library item
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: 'Vollkorntoast' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: 'Vollkorntoast' } }),
       makeContext(),
     );
     const body = res.jsonBody as { items: { candidates: FoodSearchResult[] }[] };
@@ -358,7 +378,7 @@ describe('mealParserPreviewHandler — user library integration (regression)', (
     mockFoodRepo([], catalogSearchSpy);
 
     await mealParserPreviewHandler(
-      makeRequest({ body: { text: '150g Hähnchenbrust' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: '150g Hähnchenbrust' } }),
       makeContext(),
     );
 
@@ -376,7 +396,7 @@ describe('mealParserPreviewHandler — user library integration (regression)', (
     mockFoodRepo([makeCandidate('cat-1', 'Hähnchenbrust')]);
 
     const res = await mealParserPreviewHandler(
-      makeRequest({ body: { text: 'Hähnchen' }, headers: { authorization: 'Bearer test-jwt' } }),
+      await makeAuthRequest({ body: { text: 'Hähnchen' } }),
       makeContext(),
     );
     const body = res.jsonBody as { items: { candidates: FoodSearchResult[] }[] };

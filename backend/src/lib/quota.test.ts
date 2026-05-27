@@ -20,8 +20,8 @@ vi.mock('./repositories/aiUsageRepository', () => {
 const { __mockRepo: mockRepo } = await import('./repositories/aiUsageRepository') as any;
 
 describe('enforceQuota', () => {
-  const freeUser: UserContext = { userId: 'user-1', tier: 'free', source: 'dev' };
-  const internalUser: UserContext = { userId: 'dev-user', tier: 'internal', source: 'dev' };
+  const freeUser: UserContext = { userId: 'user-1', tier: 'free' };
+  const premiumUser: UserContext = { userId: 'premium-user', tier: 'premium' };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,13 +67,13 @@ describe('enforceQuota', () => {
       feature: 'meal-parser', period: '2026-05',
     });
 
-    await enforceQuota(internalUser, 'meal-parser');
-    expect(mockRepo.checkQuota).toHaveBeenCalledWith('dev-user', 'meal-parser', 'internal');
+    await enforceQuota(premiumUser, 'meal-parser');
+    expect(mockRepo.checkQuota).toHaveBeenCalledWith('premium-user', 'meal-parser', 'premium');
   });
 });
 
 describe('trackUsage', () => {
-  const freeUser: UserContext = { userId: 'user-1', tier: 'free', source: 'dev' };
+  const freeUser: UserContext = { userId: 'user-1', tier: 'free' };
 
   beforeEach(() => {
     vi.clearAllMocks();

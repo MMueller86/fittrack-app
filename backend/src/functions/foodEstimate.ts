@@ -30,7 +30,7 @@ const FoodEstimateSchema = z.object({
 export const foodEstimatePreviewHandler = withHandler(
   'ai.food-estimate.preview',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const userContext = requireUser(request);
+    const userContext = await requireUser(request);
 
     // Quota enforcement — check before expensive AI call
     const quotaBlock = await enforceQuota(userContext, 'food-estimate');

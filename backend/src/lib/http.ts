@@ -58,10 +58,11 @@ export function withHandler(name: string, fn: Handler): Handler {
       return response;
     } catch (err) {
       if (err instanceof UnauthorizedError) {
-        logEvent(ctx, 'info', 'handler.unauthorized', {
+        logEvent(ctx, 'warn', 'handler.unauthorized', {
           handler: name,
           method: request.method,
           duration_ms: Date.now() - started,
+          reason: err.message,
         });
         return {
           status: 401,

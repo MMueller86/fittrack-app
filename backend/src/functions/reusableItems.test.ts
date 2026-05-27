@@ -1,11 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+﻿import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 
 import { createReusableItemHandler, searchReusableItemsHandler } from './reusableItems';
 import { __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
-import { makeRequest, makeContext } from '../test-utils/http';
+import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth, signTestToken } from '../test-utils/http';
 
-const AUTH = { authorization: 'Bearer test' };
 const ctx = makeContext();
+
+beforeAll(async () => {
+  await setupTestAuth();
+});
+
+afterAll(() => {
+  teardownTestAuth();
+});
 
 beforeEach(() => {
   __resetReusableItemsRepositoryForTests();
@@ -17,45 +24,41 @@ beforeEach(() => {
 
 describe('POST /api/reusable-items — validation', () => {
   it('returns 400 when body is missing entirely', async () => {
-    const req = makeRequest({ headers: AUTH });
+    const req = await makeAuthRequest({});
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
   });
 
   it('returns 400 when name is missing (manual)', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { calories: 100, protein: 10, carbs: 10, fat: 5, fiber: 2 },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
   });
 
   it('returns 400 when calories is missing (manual)', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Apple', protein: 10, carbs: 10, fat: 5, fiber: 2 },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
   });
 
   it('returns 400 when name is missing (AI path)', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: {
         sourceType: 'ai',
         nutritionPer100g: { calories: 100, protein: 10, carbs: 10, fat: 5 },
       },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
   });
 
   it('returns 400 when nutritionPer100g is missing (AI path)', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { sourceType: 'ai', name: 'Apple' },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
@@ -68,9 +71,8 @@ describe('POST /api/reusable-items — validation', () => {
 
 describe('POST /api/reusable-items — manual create', () => {
   it('returns 201 and the created item', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Banana', calories: 89, protein: 1.1, carbs: 23, fat: 0.3, fiber: 2.6 },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(201);
@@ -80,9 +82,8 @@ describe('POST /api/reusable-items — manual create', () => {
   });
 
   it('stores nutrition as perPortion basis', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Oat', calories: 370, protein: 13, carbs: 60, fat: 6.5, fiber: 10 },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(201);
@@ -94,9 +95,8 @@ describe('POST /api/reusable-items — manual create', () => {
 
   it('creates item without sourceType field (defaults to manual)', async () => {
     // Existing clients that don't send sourceType must still work
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Egg', calories: 155, protein: 13, carbs: 1.1, fat: 11, fiber: 0 },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(201);
@@ -111,14 +111,13 @@ describe('POST /api/reusable-items — manual create', () => {
 
 describe('POST /api/reusable-items — AI create', () => {
   it('returns 201 with AI source type', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: {
         sourceType: 'ai',
         name: 'Hähnchenbrust',
         nutritionPer100g: { calories: 165, protein: 31, carbs: 0, fat: 3.6 },
         aiConfidence: 0.85,
       },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(201);
@@ -128,13 +127,12 @@ describe('POST /api/reusable-items — AI create', () => {
   });
 
   it('stores nutritionPer100g and basis per100g when no portion given', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: {
         sourceType: 'ai',
         name: 'Tofu',
         nutritionPer100g: { calories: 76, protein: 8, carbs: 1.9, fat: 4.8 },
       },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(201);
@@ -145,7 +143,7 @@ describe('POST /api/reusable-items — AI create', () => {
   });
 
   it('stores both basis when portion is provided', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: {
         sourceType: 'ai',
         name: 'Avocado',
@@ -154,7 +152,6 @@ describe('POST /api/reusable-items — AI create', () => {
         aiConfidence: 0.7,
         aiWarnings: ['Schätzung basiert auf mittlerer Größe'],
       },
-      headers: AUTH,
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(201);
@@ -170,15 +167,23 @@ describe('POST /api/reusable-items — AI create', () => {
 
 describe('GET /api/reusable-items — search', () => {
   async function createItem(name: string) {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name, calories: 100, protein: 5, carbs: 10, fat: 3, fiber: 1 },
-      headers: AUTH,
     });
     await createReusableItemHandler(req, ctx);
   }
 
+  async function makeSearchRequest(query: string) {
+    const token = await signTestToken();
+    return {
+      params: {},
+      headers: { get: (name: string) => (name.toLowerCase() === 'authorization' ? `Bearer ${token}` : null) },
+      query: { get: () => query },
+    } as unknown as Parameters<typeof searchReusableItemsHandler>[0];
+  }
+
   it('returns empty list for fresh user', async () => {
-    const req = { params: {}, headers: { get: () => 'Bearer test' }, query: { get: () => '' } } as unknown as Parameters<typeof searchReusableItemsHandler>[0];
+    const req = await makeSearchRequest('');
     const res = await searchReusableItemsHandler(req, ctx);
     expect(res.status).toBe(200);
     const { items } = res.jsonBody as { items: unknown[] };
@@ -190,7 +195,7 @@ describe('GET /api/reusable-items — search', () => {
     await createItem('Aprikose');
     await createItem('Banane');
 
-    const req = { params: {}, headers: { get: () => 'Bearer test' }, query: { get: () => 'Ap' } } as unknown as Parameters<typeof searchReusableItemsHandler>[0];
+    const req = await makeSearchRequest('Ap');
     const res = await searchReusableItemsHandler(req, ctx);
     expect(res.status).toBe(200);
     const { items } = res.jsonBody as { items: { name: string }[] };

@@ -2,11 +2,16 @@
   "expo": {
     "name": "FitTrack",
     "slug": "fittrack",
+    "owner": "michi01mueller",
+    "scheme": "fittrack",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/app_logo.png",
     "userInterfaceStyle": "dark",
-    "platforms": ["android", "ios"],
+    "platforms": [
+      "android",
+      "ios"
+    ],
     "splash": {
       "image": "./assets/app_logo.png",
       "resizeMode": "contain",
@@ -23,6 +28,15 @@
       "bundleIdentifier": "com.fittrack.app",
       "supportsTablet": false
     },
-    "newArchEnabled": true
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-web-browser",
+      "expo-dev-client"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "cda0994d-6f68-4394-b82b-7a70600974c6"
+      }
+    }
   }
 }

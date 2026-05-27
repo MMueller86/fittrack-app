@@ -1,9 +1,17 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 
 import { foodEstimatePreviewHandler } from './foodEstimate';
 import { __setOpenAiClientForTests } from '../lib/openai';
 import type { AiFoodEstimate } from '../lib/openai';
-import { makeRequest, makeContext } from '../test-utils/http';
+import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
+
+beforeAll(async () => {
+  await setupTestAuth();
+});
+
+afterAll(() => {
+  teardownTestAuth();
+});
 
 // ---------------------------------------------------------------------------
 // Mock OpenAI client factory
@@ -54,36 +62,32 @@ afterEach(() => {
 
 describe('POST /api/ai/food-estimate/preview — input validation', () => {
   it('returns 400 when name is missing', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: {},
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(400);
   });
 
   it('returns 400 when name is empty string', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: '' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(400);
   });
 
   it('returns 400 when name exceeds 200 chars', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'A'.repeat(201) },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(400);
   });
 
   it('returns 400 when contextText exceeds 500 chars', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Hähnchenbrust', contextText: 'X'.repeat(501) },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(400);
@@ -96,9 +100,8 @@ describe('POST /api/ai/food-estimate/preview — input validation', () => {
 
 describe('POST /api/ai/food-estimate/preview — success', () => {
   it('returns 200 with estimate for a valid food name', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Hähnchenbrust' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(200);
@@ -109,9 +112,8 @@ describe('POST /api/ai/food-estimate/preview — success', () => {
   });
 
   it('includes estimated portion when AI provides one', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Hähnchenbrust' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     const body = res.jsonBody as Record<string, unknown>;
@@ -119,9 +121,8 @@ describe('POST /api/ai/food-estimate/preview — success', () => {
   });
 
   it('returns 200 with contextText included in AI call', async () => {
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Toast', contextText: 'Vollkorn Toast mit Butter' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(200);
@@ -139,9 +140,8 @@ describe('POST /api/ai/food-estimate/preview — success', () => {
     };
     __setOpenAiClientForTests(makeOpenAiMock(estimateWithWarning) as any);
 
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Hähnchenbrust' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(200);
@@ -156,9 +156,8 @@ describe('POST /api/ai/food-estimate/preview — success', () => {
     const overConfident: AiFoodEstimate = { ...CHICKEN_ESTIMATE, confidence: 1.5 };
     __setOpenAiClientForTests(makeOpenAiMock(overConfident) as any);
 
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Hähnchenbrust' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     const body = res.jsonBody as Record<string, unknown>;
@@ -168,9 +167,8 @@ describe('POST /api/ai/food-estimate/preview — success', () => {
   it('does NOT persist anything to the diary', async () => {
     // This is a preview-only endpoint — no addItem / createMeal calls should happen.
     // We verify by checking only that it returns 200 (no side-effect mocks needed).
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Hähnchenbrust' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(200);
@@ -193,9 +191,8 @@ describe('POST /api/ai/food-estimate/preview — validator rejection', () => {
     };
     __setOpenAiClientForTests(makeOpenAiMock(hallucinated) as any);
 
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'Hähnchenbrust' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(422);
@@ -217,9 +214,8 @@ describe('POST /api/ai/food-estimate/preview — validator rejection', () => {
     };
     __setOpenAiClientForTests(makeOpenAiMock(hallucinated) as any);
 
-    const req = makeRequest({
+    const req = await makeAuthRequest({
       body: { name: 'UnmöglichesLebensmittel' },
-      headers: { authorization: 'Bearer test' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
     expect(res.status).toBe(422);

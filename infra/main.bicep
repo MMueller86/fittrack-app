@@ -54,16 +54,15 @@ param azureOpenAiApiVersion string = '2024-02-01'
 @description('Azure OpenAI deployment name.')
 param azureOpenAiDeploymentName string = 'gpt4o-mini'
 
-@description('JWT signing secret for access tokens (M2).')
-@secure()
-param jwtSecret string = ''
+// --- Entra External ID Auth ---
+@description('Entra JWT issuer URL (from OIDC discovery).')
+param authIssuer string = ''
 
-@description('JWT signing secret for refresh tokens (M2).')
-@secure()
-param jwtRefreshSecret string = ''
+@description('Expected audience in access_token (Application ID URI).')
+param authAudience string = ''
 
-@description('Google OAuth client id used to validate ID tokens (M2).')
-param googleClientId string = ''
+@description('JWKS URI for JWT signature verification.')
+param authJwksUri string = ''
 
 // --- Naming ---
 
@@ -131,9 +130,9 @@ module functionApp 'modules/functionapp.bicep' = {
     azureOpenAiApiKey: azureOpenAiApiKey
     azureOpenAiApiVersion: azureOpenAiApiVersion
     azureOpenAiDeploymentName: azureOpenAiDeploymentName
-    jwtSecret: jwtSecret
-    jwtRefreshSecret: jwtRefreshSecret
-    googleClientId: googleClientId
+    authIssuer: authIssuer
+    authAudience: authAudience
+    authJwksUri: authJwksUri
     tags: commonTags
   }
 }

@@ -65,7 +65,7 @@ const AddWeightBodySchema = z.object({
 export const listWeightsHandler = withHandler(
   'weights.list',
   async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const repo = getWeightsRepository();
     const entries = await repo.list(userId);
     return { status: 200, jsonBody: { entries } };
@@ -75,7 +75,7 @@ export const listWeightsHandler = withHandler(
 export const addWeightHandler = withHandler(
   'weights.add',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
 
     const parsed = await parseBody(request, AddWeightBodySchema);
     if (!parsed.ok) return parsed.response;
@@ -106,7 +106,7 @@ export const addWeightHandler = withHandler(
 export const deleteWeightHandler = withHandler(
   'weights.delete',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = requireUser(request);
+    const { userId } = await requireUser(request);
     const id = request.params.id;
     if (!id) {
       return { status: 400, jsonBody: { error: 'Missing id' } };
