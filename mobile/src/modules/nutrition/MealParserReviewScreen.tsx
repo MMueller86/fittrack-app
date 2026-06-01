@@ -68,9 +68,10 @@ interface ItemCardProps {
   onUpdateAmount: (item: MealParserPreviewItem, mode: 'grams' | 'portion', amount: number) => void;
   onRequestEstimate: (item: MealParserPreviewItem) => void;
   estimating: boolean;
+  onRemove: () => void;
 }
 
-function ItemCard({ resolved, onSelectProduct, onUpdateAmount, onRequestEstimate, estimating }: ItemCardProps) {
+function ItemCard({ resolved, onSelectProduct, onUpdateAmount, onRequestEstimate, estimating, onRemove }: ItemCardProps) {
   const { previewItem, selectedProduct, inputMode, inputAmount } = resolved;
   const [showCandidates, setShowCandidates] = useState(previewItem.status === 'needsSelection');
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,14 +90,10 @@ function ItemCard({ resolved, onSelectProduct, onUpdateAmount, onRequestEstimate
     if (newId !== prevProductRef.current) {
       prevProductRef.current = newId;
       if (selectedProduct) {
+        // Prefer portion mode whenever the product has serving data (#3).
         const defaultMode: 'grams' | 'portion' =
-          selectedProduct.portion?.weightGrams != null && previewItem.inputMode === 'portion'
-            ? 'portion'
-            : 'grams';
-        const defaultAmount =
-          defaultMode === 'portion'
-            ? (previewItem.inputAmount ?? 1)
-            : (previewItem.inputMode === 'grams' ? (previewItem.inputAmount ?? 100) : 100);
+          selectedProduct.portion?.weightGrams != null ? 'portion' : 'grams';
+        const defaultAmount = defaultMode === 'portion' ? 1 : 100;
         setLocalMode(defaultMode);
         setLocalAmount(String(defaultAmount));
         onUpdateAmount(previewItem, defaultMode, defaultAmount);
@@ -190,6 +187,13 @@ function ItemCard({ resolved, onSelectProduct, onUpdateAmount, onRequestEstimate
         <View style={[cardStyles.badge, { backgroundColor: `${statusColor}22` }]}>
           <Text style={[cardStyles.badgeText, { color: statusColor }]}>{statusLabel}</Text>
         </View>
+        <TouchableOpacity
+          onPress={onRemove}
+          style={cardStyles.removeBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={cardStyles.removeBtnText}>✕</Text>
+        </TouchableOpacity>
       </View>
 
       {/* AI-saved summary — shown instead of product/candidates when savedViaAi */}
@@ -199,9 +203,10 @@ function ItemCard({ resolved, onSelectProduct, onUpdateAmount, onRequestEstimate
           <View style={cardStyles.nutritionRow}>
             <Text style={cardStyles.nutritionChip}>
               {resolved.aiSavedData.quantity}{' '}
-              {resolved.aiSavedData.unit === 'portion'
-                ? `Portion${resolved.aiSavedData.quantity !== 1 ? 'en' : ''}${resolved.aiSavedData.portionWeightGrams ? ` (${Math.round(resolved.aiSavedData.quantity * resolved.aiSavedData.portionWeightGrams)} g)` : ''}`
-                : 'g'}
+              {resolved.aiSavedData.unit}
+              {resolved.aiSavedData.portionWeightGrams != null
+                ? ` (${Math.round(resolved.aiSavedData.quantity * resolved.aiSavedData.portionWeightGrams)} g)`
+                : ''}
               {' · '}{Math.round(resolved.aiSavedData.calories)} kcal
             </Text>
             <Text style={cardStyles.nutritionChip}>P {resolved.aiSavedData.protein.toFixed(1)} g</Text>
@@ -376,9 +381,15 @@ export default function MealParserReviewScreen({ visible, mealId, items, warning
   }, [items]);
 
   function handleSelectProduct(previewItem: MealParserPreviewItem, product: FoodSearchResult) {
+    // Default to portion mode when the product carries serving data (#3).
+    const defaultMode: 'grams' | 'portion' =
+      product.portion?.weightGrams != null ? 'portion' : 'grams';
+    const defaultAmount = defaultMode === 'portion' ? 1 : 100;
     setResolved((prev) =>
       prev.map((r) =>
-        r.previewItem.rawText === previewItem.rawText ? { ...r, selectedProduct: product } : r,
+        r.previewItem.rawText === previewItem.rawText
+          ? { ...r, selectedProduct: product, inputMode: defaultMode, inputAmount: defaultAmount }
+          : r,
       ),
     );
   }
@@ -391,6 +402,17 @@ export default function MealParserReviewScreen({ visible, mealId, items, warning
           : r,
       ),
     );
+  }
+
+  function handleRemoveItem(index: number) {
+    setResolved((prev) => {
+      const removed = prev[index];
+      // Cancel any in-flight estimate for the item being removed.
+      if (removed && estimatingFor === removed.previewItem.rawText) {
+        setEstimatingFor(null);
+      }
+      return prev.filter((_, i) => i !== index);
+    });
   }
 
   async function handleRequestEstimate(previewItem: MealParserPreviewItem) {
@@ -431,7 +453,7 @@ export default function MealParserReviewScreen({ visible, mealId, items, warning
   }
 
   const allResolved = useMemo(
-    () => resolved.every((r) => r.selectedProduct != null || r.savedViaAi === true),
+    () => resolved.length > 0 && resolved.every((r) => r.selectedProduct != null || r.savedViaAi === true),
     [resolved],
   );
 
@@ -518,16 +540,24 @@ export default function MealParserReviewScreen({ visible, mealId, items, warning
           ))}
 
           {/* Item cards */}
-          {resolved.map((r, i) => (
-            <ItemCard
-              key={i}
-              resolved={r}
-              onSelectProduct={handleSelectProduct}
-              onUpdateAmount={handleUpdateAmount}
-              onRequestEstimate={handleRequestEstimate}
-              estimating={estimatingFor === r.previewItem.rawText}
-            />
-          ))}
+          {resolved.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyStateText}>Alle Einträge entfernt.</Text>
+              <Text style={styles.emptyStateSubtext}>Schließe diesen Dialog, um fortzufahren.</Text>
+            </View>
+          ) : (
+            resolved.map((r, i) => (
+              <ItemCard
+                key={i}
+                resolved={r}
+                onSelectProduct={handleSelectProduct}
+                onUpdateAmount={handleUpdateAmount}
+                onRequestEstimate={handleRequestEstimate}
+                estimating={estimatingFor === r.previewItem.rawText}
+                onRemove={() => handleRemoveItem(i)}
+              />
+            ))
+          )}
 
           {/* Error */}
           {error && <ErrorBanner error={error} />}
@@ -598,6 +628,9 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { ...typography.body1, color: colors.white, fontWeight: '700' },
+  emptyState: { alignItems: 'center', paddingVertical: spacing.lg, gap: spacing.xs },
+  emptyStateText: { ...typography.body1, color: colors.text },
+  emptyStateSubtext: { ...typography.caption, color: colors.textMuted },
 });
 
 const cardStyles = StyleSheet.create({
@@ -701,4 +734,6 @@ const cardStyles = StyleSheet.create({
   },
   aiEstimateBtnActive: { opacity: 0.5 },
   aiEstimateBtnText: { ...typography.caption, color: colors.primary },
+  removeBtn: { padding: 2, marginLeft: spacing.xs },
+  removeBtnText: { ...typography.body1, color: colors.textMuted },
 });

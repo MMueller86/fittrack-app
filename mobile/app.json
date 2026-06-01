@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.fittrack.app",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/app_logo.png",
         "backgroundColor": "#0B0F0C"

@@ -23,6 +23,7 @@ import Svg, {
 
 import { colors, spacing, typography } from '../../app/theme';
 import type { WeightEntry } from '@fittrack/shared';
+import { computeChartBounds } from './weightChartUtils';
 
 interface WeightChartProps {
   entries: WeightEntry[]; // any order — we sort internally
@@ -85,10 +86,7 @@ export function WeightChart({
 
   const minRaw = Math.min(...values, ...avg);
   const maxRaw = Math.max(...values, ...avg);
-  // Pad the range so the line never hugs the edges.
-  const range = Math.max(maxRaw - minRaw, 0.4);
-  const min = minRaw - range * 0.1;
-  const max = maxRaw + range * 0.1;
+  const { yMin: min, yMax: max, ticks } = computeChartBounds(minRaw, maxRaw);
 
   const innerW = width - PADDING.left - PADDING.right;
   const innerH = height - PADDING.top - PADDING.bottom;
@@ -119,9 +117,6 @@ export function WeightChart({
     `M ${actualPoints[0].x} ${PADDING.top + innerH} ` +
     actualPoints.map((p) => `L ${p.x} ${p.y}`).join(' ') +
     ` L ${actualPoints[actualPoints.length - 1].x} ${PADDING.top + innerH} Z`;
-
-  // Y-axis ticks: min, mid, max.
-  const ticks = [max, (max + min) / 2, min];
 
   // X-axis labels: first, middle, last entry. Dedupe so we never render
   // two labels with the same key when there are ≤ 2 data points.

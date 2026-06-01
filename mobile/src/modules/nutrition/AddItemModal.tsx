@@ -22,7 +22,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import type { FoodSearchResult } from '@fittrack/shared';
+import type { AiFoodEstimatePreview, FoodSearchResult } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
 import { isQuotaExceededError } from '../../shared/api/client';
@@ -35,6 +35,7 @@ import { foodApi } from '../../shared/api/foodApi';
 import { aiApi } from '../../shared/api/aiApi';
 import type { MealParserPreviewResponse } from '../../shared/api/aiApi';
 import MealParserReviewScreen from './MealParserReviewScreen';
+import FoodEstimateReviewScreen from './FoodEstimateReviewScreen';
 import LabelScanReviewScreen from './LabelScanReviewScreen';
 import type { NutritionLabelScanResult } from '@fittrack/shared';
 import * as ImagePicker from 'expo-image-picker';
@@ -416,6 +417,28 @@ function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [selected, setSelected] = useState<FoodSearchResult | null>(null);
+
+  // AI estimation from empty-results state
+  const [estimating, setEstimating] = useState(false);
+  const [estimateError, setEstimateError] = useState<string | null>(null);
+  const [estimatePreview, setEstimatePreview] = useState<AiFoodEstimatePreview | null>(null);
+
+  async function handleEstimateFood() {
+    setEstimating(true);
+    setEstimateError(null);
+    try {
+      const preview = await aiApi.estimateFood({ name: query.trim() });
+      setEstimatePreview(preview);
+    } catch (e) {
+      if (isQuotaExceededError(e)) {
+        setEstimateError('Deine kostenlosen KI-Schätzungen für diesen Monat sind aufgebraucht. Das Kontingent wird am Monatsanfang zurückgesetzt.');
+      } else {
+        setEstimateError(formatApiError(e));
+      }
+    } finally {
+      setEstimating(false);
+    }
+  }
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doSearch = useCallback(async (q: string) => {
@@ -471,9 +494,26 @@ function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
           onRetry={() => doSearch(query)}
         />
       ) : results.length === 0 ? (
-        <Text style={modeStyles.emptyText}>
-          {query.trim() ? 'No results found.' : 'Start typing to search food...'}
-        </Text>
+        query.trim() ? (
+          <View style={modeStyles.emptyAiState}>
+            <Text style={modeStyles.emptyAiTitle}>Kein Ergebnis für »{query}«</Text>
+            <Text style={modeStyles.emptyAiSubtext}>Lass die KI die Nährwerte schätzen.</Text>
+            {estimateError && <ErrorBanner error={estimateError} />}
+            <TouchableOpacity
+              style={[modeStyles.aiEstimateBtn, estimating && modeStyles.aiEstimateBtnDisabled]}
+              onPress={handleEstimateFood}
+              disabled={estimating}
+            >
+              {estimating ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={modeStyles.aiEstimateBtnText}>✨ Mit KI schätzen</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={modeStyles.emptyText}>Start typing to search food...</Text>
+        )
       ) : (
         <ScrollView style={modeStyles.resultList} keyboardShouldPersistTaps="handled">
           {results.map((item) => (
@@ -500,6 +540,18 @@ function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
             </TouchableOpacity>
           ))}
         </ScrollView>
+      )}
+      {estimatePreview && (
+        <FoodEstimateReviewScreen
+          visible
+          mealId={mealId}
+          estimate={estimatePreview}
+          onClose={() => setEstimatePreview(null)}
+          onSaved={() => {
+            setEstimatePreview(null);
+            onSaved();
+          }}
+        />
       )}
     </View>
   );
@@ -729,6 +781,24 @@ const modeStyles = StyleSheet.create({
   },
   resultText: { ...typography.body2, color: colors.text },
   emptyText: { ...typography.body2, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
+  emptyAiState: {
+    alignItems: 'center',
+    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  emptyAiTitle: { ...typography.body1, color: colors.text, fontWeight: '600', textAlign: 'center' },
+  emptyAiSubtext: { ...typography.body2, color: colors.textMuted, textAlign: 'center' },
+  aiEstimateBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  aiEstimateBtnDisabled: { opacity: 0.5 },
+  aiEstimateBtnText: { ...typography.body1, color: colors.white, fontWeight: '700' },
   resultList: { flex: 1 },
   searchItem: {
     flexDirection: 'row',

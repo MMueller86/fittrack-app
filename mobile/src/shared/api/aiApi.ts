@@ -38,14 +38,14 @@ export const aiApi = {
   /** POST /api/ai/meal-parser/preview — parse free-text meal and match against internal DB */
   previewMeal(text: string): Promise<MealParserPreviewResponse> {
     return apiClient
-      .post<MealParserPreviewResponse>('/ai/meal-parser/preview', { text })
+      .post<MealParserPreviewResponse>('/ai/meal-parser/preview', { text }, { timeout: 60_000 })
       .then((r) => r.data);
   },
 
   /** POST /api/ai/food-estimate/preview — estimate nutrition for an unmatched food item */
   estimateFood(input: { name: string; contextText?: string }): Promise<AiFoodEstimatePreview> {
     return apiClient
-      .post<AiFoodEstimatePreview>('/ai/food-estimate/preview', input)
+      .post<AiFoodEstimatePreview>('/ai/food-estimate/preview', input, { timeout: 60_000 })
       .then((r) => r.data);
   },
 

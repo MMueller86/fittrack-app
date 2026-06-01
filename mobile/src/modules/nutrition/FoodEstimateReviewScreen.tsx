@@ -41,7 +41,7 @@ import { aiApi } from '../../shared/api/aiApi';
 export interface AiSavedData {
   displayName: string;
   quantity: number;
-  unit: 'g' | 'portion';
+  unit: string; // cosmetic label stored in the diary entry
   portionWeightGrams?: number;
   calories: number;
   protein: number;
@@ -112,6 +112,19 @@ export default function FoodEstimateReviewScreen({ visible, mealId, estimate, on
       setAmount('100');
     }
   }, [hasPortion]);
+
+  // Display unit — cosmetic label stored in the diary entry. Independent of
+  // amountMode so users can log "250 ml" while calculation stays gram-based.
+  const [displayUnit, setDisplayUnit] = useState<string>(() => {
+    if (estimate.estimatedPortion != null) {
+      // Extract unit part from label, e.g. "1 Scheibe" → "Scheibe"
+      const parts = (estimate.estimatedPortion.label ?? '').trim().split(' ');
+      return parts.length > 1 ? parts.slice(1).join(' ') : 'Portion';
+    }
+    return 'g';
+  });
+  const [showCustomUnitInput, setShowCustomUnitInput] = useState(false);
+  const [customUnitText, setCustomUnitText] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -240,7 +253,7 @@ export default function FoodEstimateReviewScreen({ visible, mealId, estimate, on
       onSaved({
         displayName: name.trim(),
         quantity: parsedAmount,
-        unit: amountMode === 'portion' ? 'portion' : 'g',
+        unit: displayUnit,
         portionWeightGrams: hasPortion ? parsedPortionGrams : undefined,
         calories: macros.calories,
         protein: macros.protein,
@@ -269,13 +282,13 @@ export default function FoodEstimateReviewScreen({ visible, mealId, estimate, on
         fat: macros.fat,
         fiber: macros.fiber,
         quantity: parsedAmount,
-        unit: amountMode === 'portion' ? 'portion' : 'g',
+        unit: displayUnit,
         isAiEstimate: true,
       });
       onSaved({
         displayName: name.trim(),
         quantity: parsedAmount,
-        unit: amountMode === 'portion' ? 'portion' : 'g',
+        unit: displayUnit,
         portionWeightGrams: hasPortion ? parsedPortionGrams : undefined,
         calories: macros.calories,
         protein: macros.protein,
@@ -480,13 +493,50 @@ export default function FoodEstimateReviewScreen({ visible, mealId, estimate, on
                 keyboardType="decimal-pad"
                 selectTextOnFocus
               />
-              <Text style={amountStyles.unit}>
-                {amountMode === 'portion' ? 'Portion(en)' : 'g'}
-              </Text>
+              <Text style={amountStyles.unit}>{displayUnit}</Text>
               {amountMode === 'portion' && hasPortion && Number.isFinite(parsedAmount) && parsedAmount > 0 && (
                 <Text style={amountStyles.hint}>= {Math.round(parsedAmount * parsedPortionGrams)} g</Text>
               )}
             </View>
+
+            {/* Unit picker — cosmetic label only, does not change nutrition calculation */}
+            <View style={unitPickerStyles.row}>
+              {['g', 'ml', 'Stück', 'Scheibe', 'Portion'].map((u) => (
+                <TouchableOpacity
+                  key={u}
+                  style={[unitPickerStyles.chip, displayUnit === u && unitPickerStyles.chipActive]}
+                  onPress={() => { setDisplayUnit(u); setShowCustomUnitInput(false); }}
+                >
+                  <Text style={[unitPickerStyles.chipText, displayUnit === u && unitPickerStyles.chipTextActive]}>
+                    {u}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[unitPickerStyles.chip, showCustomUnitInput && unitPickerStyles.chipActive]}
+                onPress={() => setShowCustomUnitInput((v) => !v)}
+              >
+                <Text style={[unitPickerStyles.chipText, showCustomUnitInput && unitPickerStyles.chipTextActive]}>
+                  Andere…
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {showCustomUnitInput && (
+              <TextInput
+                style={unitPickerStyles.customInput}
+                placeholder="Einheit eingeben…"
+                placeholderTextColor={colors.textMuted}
+                value={customUnitText}
+                onChangeText={(t) => {
+                  setCustomUnitText(t);
+                  if (t.trim()) setDisplayUnit(t.trim());
+                }}
+                returnKeyType="done"
+              />
+            )}
+            <Text style={unitPickerStyles.hint}>
+              Einheit ist nur ein Label – Berechnung basiert auf Gramm.
+            </Text>
           </View>
 
           {/* Error */}
@@ -701,5 +751,34 @@ const amountStyles = StyleSheet.create({
   },
   unit: { ...typography.body1, color: colors.textSecondary },
   hint: { ...typography.caption, color: colors.textMuted },
+});
+
+// ---------------------------------------------------------------------------
+// Unit picker styles
+// ---------------------------------------------------------------------------
+
+const unitPickerStyles = StyleSheet.create({
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs },
+  chip: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+  },
+  chipActive: { borderColor: colors.primary, backgroundColor: `${colors.primary}18` },
+  chipText: { ...typography.caption, color: colors.textSecondary },
+  chipTextActive: { color: colors.primary, fontWeight: '700' },
+  customInput: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    color: colors.text,
+    ...typography.body1,
+    marginTop: spacing.xs,
+  },
+  hint: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic', marginTop: spacing.xs },
 });
 
