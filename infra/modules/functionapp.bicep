@@ -57,6 +57,14 @@ param authAudience string = ''
 @description('JWKS URI for JWT signature verification.')
 param authJwksUri string = ''
 
+// --- Azure Document Intelligence ---
+@description('Azure Document Intelligence endpoint URL.')
+param azureDocIntelligenceEndpoint string = ''
+
+@description('Azure Document Intelligence API key.')
+@secure()
+param azureDocIntelligenceKey string = ''
+
 @description('Tags applied to the resources.')
 param tags object = {}
 
@@ -176,6 +184,14 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'AUTH_JWKS_URI'
           value: authJwksUri
+        }
+        {
+          name: 'AZURE_DI_ENDPOINT'
+          value: azureDocIntelligenceEndpoint
+        }
+        {
+          name: 'AZURE_DI_KEY'
+          value: azureDocIntelligenceKey
         }
       ]
     }

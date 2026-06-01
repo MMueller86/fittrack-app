@@ -8,20 +8,24 @@ import type { AiFeature, UserTier } from '@fittrack/shared';
 export interface TierLimits {
   'meal-parser': number;
   'food-estimate': number;
+  'label-scan': number;
 }
 
 const TIER_LIMITS: Record<UserTier, TierLimits> = {
   free: {
     'meal-parser': 50,
     'food-estimate': 30,
+    'label-scan': 30,
   },
   premium: {
     'meal-parser': 500,
     'food-estimate': 300,
+    'label-scan': 300,
   },
   internal: {
     'meal-parser': Infinity,
     'food-estimate': Infinity,
+    'label-scan': Infinity,
   },
 };
 

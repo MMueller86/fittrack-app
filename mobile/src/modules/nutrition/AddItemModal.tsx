@@ -35,8 +35,11 @@ import { foodApi } from '../../shared/api/foodApi';
 import { aiApi } from '../../shared/api/aiApi';
 import type { MealParserPreviewResponse } from '../../shared/api/aiApi';
 import MealParserReviewScreen from './MealParserReviewScreen';
+import LabelScanReviewScreen from './LabelScanReviewScreen';
+import type { NutritionLabelScanResult } from '@fittrack/shared';
+import * as ImagePicker from 'expo-image-picker';
 
-type Mode = 'ai' | 'search' | 'manual';
+type Mode = 'ai' | 'search' | 'manual' | 'scan';
 
 interface Props {
   visible: boolean;
@@ -48,6 +51,7 @@ interface Props {
 
 const MODES: { id: Mode; label: string }[] = [
   { id: 'ai', label: '✨ AI' },
+  { id: 'scan', label: '📷 Scan' },
   { id: 'search', label: '🔍 Search' },
   { id: 'manual', label: '✏️ Manual' },
 ];
@@ -286,6 +290,125 @@ function QuantitySelector({ item, mealId, onSaved, onBack }: QuantitySelectorPro
   );
 }
 
+// --- Mode D: Scan (Label OCR) ---
+function ScanMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [scanResult, setScanResult] = useState<NutritionLabelScanResult | null>(null);
+
+  async function handlePickImage(source: 'camera' | 'gallery') {
+    setError(null);
+    setLoading(true);
+
+    try {
+      let result: ImagePicker.ImagePickerResult;
+
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          setError('Kamera-Berechtigung benötigt');
+          setLoading(false);
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'],
+          quality: 1.0,         // maximum quality — no JPEG artifacts on small label text
+          allowsEditing: true,  // user can crop to the label area
+        });
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          setError('Galerie-Berechtigung benötigt');
+          setLoading(false);
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'],
+          quality: 1.0,         // maximum quality — no JPEG artifacts on small label text
+          allowsEditing: true,  // user can crop to the label area
+        });
+      }
+
+      if (result.canceled || !result.assets?.[0]) {
+        setLoading(false);
+        return;
+      }
+
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+      const scanResponse = await aiApi.scanLabel(asset.uri, mimeType as 'image/jpeg' | 'image/png');
+      setScanResult(scanResponse);
+    } catch (e) {
+      if (isQuotaExceededError(e)) {
+        setError('Deine kostenlosen Label-Scans für diesen Monat sind aufgebraucht.');
+      } else {
+        setError(formatApiError(e, 'Scan fehlgeschlagen'));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleReviewSaved() {
+    setScanResult(null);
+    onSaved();
+  }
+
+  return (
+    <View style={[modeStyles.container, scanStyles.wrapper]}>
+      <Text style={scanStyles.title}>📷 Nährwert-Label scannen</Text>
+      <Text style={scanStyles.subtitle}>
+        Fotografiere das Nährwert-Label auf der Verpackung oder wähle ein Foto aus der Galerie.
+      </Text>
+
+      {error && <ErrorBanner error={error} />}
+
+      {loading ? (
+        <View style={scanStyles.loadingBox}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={scanStyles.loadingText}>Label wird analysiert…</Text>
+        </View>
+      ) : (
+        <View style={scanStyles.buttonRow}>
+          <TouchableOpacity style={scanStyles.pickBtn} onPress={() => handlePickImage('camera')}>
+            <Text style={scanStyles.pickBtnText}>📷 Kamera</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={scanStyles.pickBtn} onPress={() => handlePickImage('gallery')}>
+            <Text style={scanStyles.pickBtnText}>🖼️ Galerie</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {scanResult && (
+        <LabelScanReviewScreen
+          visible
+          mealId={mealId}
+          scanResult={scanResult}
+          onClose={() => setScanResult(null)}
+          onSaved={handleReviewSaved}
+        />
+      )}
+    </View>
+  );
+}
+
+const scanStyles = StyleSheet.create({
+  wrapper: { paddingTop: spacing.md },
+  title: { ...typography.h3, marginBottom: spacing.xs },
+  subtitle: { ...typography.body1, color: colors.textMuted, marginBottom: spacing.md },
+  loadingBox: { alignItems: 'center', paddingVertical: spacing.xl },
+  loadingText: { ...typography.body1, color: colors.textMuted, marginTop: spacing.sm },
+  buttonRow: { flexDirection: 'row', gap: spacing.md },
+  pickBtn: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  pickBtnText: { ...typography.body1, color: colors.white, fontWeight: '600' },
+});
+
 // --- Mode B: Search ---
 function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }) {
   const [query, setQuery] = useState('');
@@ -519,6 +642,7 @@ export default function AddItemModal({ visible, mealId, mealName, onClose, onSav
             {/* Mode content */}
             <View style={shellStyles.content}>
               {mode === 'ai' && <AiMode mealId={mealId} onSaved={onSaved} />}
+              {mode === 'scan' && <ScanMode mealId={mealId} onSaved={onSaved} />}
               {mode === 'search' && <SearchMode mealId={mealId} onSaved={onSaved} />}
               {mode === 'manual' && <ManualMode mealId={mealId} onSaved={onSaved} />}
             </View>

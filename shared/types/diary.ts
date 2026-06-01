@@ -65,7 +65,7 @@ export interface DiaryDayResponse {
 
 // --- ReusableItem — extended model with Open Food Facts support ---
 
-export type ReusableItemSourceType = 'manual' | 'openFoodFacts' | 'ai';
+export type ReusableItemSourceType = 'manual' | 'openFoodFacts' | 'ai' | 'label-scan';
 export type NutritionBasis = 'per100g' | 'perPortion' | 'both';
 
 export interface OFFSourceRef {
@@ -147,5 +147,35 @@ export interface AiFoodEstimatePreview {
   /** 0.0 (very uncertain) – 1.0 (highly confident) */
   confidence: number;
   warnings: string[];
+}
+
+// --- Nutrition Label Scan — response shape for POST /api/ai/label-scan ---
+
+export interface NutritionLabelScanNutrition {
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  sugar: number | null;
+  fat: number | null;
+  saturatedFat: number | null;
+  fiber: number | null;
+  salt: number | null;
+}
+
+export interface NutritionLabelScanServingSize {
+  label: string;
+  weightGrams: number;
+}
+
+export interface NutritionLabelScanResult {
+  productName: string | null;
+  brand: string | null;
+  baseUnit: '100g' | '100ml' | 'serving';
+  servingSize: NutritionLabelScanServingSize | null;
+  nutrition: NutritionLabelScanNutrition;
+  ocrConfidence: number;
+  aiConfidence: number;
+  warnings: string[];
+  rawOcrText: string;
 }
 

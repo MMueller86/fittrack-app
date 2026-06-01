@@ -12,7 +12,7 @@ export interface CreateManualItemInput {
 }
 
 export interface CreateAiItemInput {
-  sourceType: 'ai';
+  sourceType: 'ai' | 'label-scan';
   name: string;
   nutritionPer100g: NutritionValues & { fiber?: number; salt?: number };
   portion?: { label: string; weightGrams: number };

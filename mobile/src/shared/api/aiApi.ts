@@ -1,9 +1,9 @@
-// AI API — meal parser + food nutrition estimator
+// AI API — meal parser + food nutrition estimator + label scan
 import { apiClient } from './client';
-import type { FoodSearchResult, AiFoodEstimatePreview } from '@fittrack/shared';
+import type { FoodSearchResult, AiFoodEstimatePreview, NutritionLabelScanResult } from '@fittrack/shared';
 
 // Re-export for convenience so callers don't need to import from @fittrack/shared directly
-export type { AiFoodEstimatePreview };
+export type { AiFoodEstimatePreview, NutritionLabelScanResult };
 
 // ---------------------------------------------------------------------------
 // Types — mirror backend MealParserPreviewItem
@@ -46,6 +46,23 @@ export const aiApi = {
   estimateFood(input: { name: string; contextText?: string }): Promise<AiFoodEstimatePreview> {
     return apiClient
       .post<AiFoodEstimatePreview>('/ai/food-estimate/preview', input)
+      .then((r) => r.data);
+  },
+
+  /** POST /api/ai/label-scan — OCR + AI parse a nutrition label image */
+  scanLabel(imageUri: string, mimeType: 'image/jpeg' | 'image/png'): Promise<NutritionLabelScanResult> {
+    const formData = new FormData();
+    formData.append('image', {
+      uri: imageUri,
+      type: mimeType,
+      name: `label.${mimeType === 'image/png' ? 'png' : 'jpg'}`,
+    } as unknown as Blob);
+
+    return apiClient
+      .post<NutritionLabelScanResult>('/ai/label-scan', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60_000, // OCR + AI can take 20-30s
+      })
       .then((r) => r.data);
   },
 };

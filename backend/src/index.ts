@@ -13,6 +13,7 @@ import './functions/reusableItems';
 import './functions/recipes';
 import './functions/ai';
 import './functions/foodEstimate';
+import './functions/labelScan';
 import './functions/dashboard';
 import './functions/foodSearch';
 import './functions/foodProducts';

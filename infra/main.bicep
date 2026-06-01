@@ -74,6 +74,7 @@ var functionAppName = 'func-${namePrefix}-${uniqueSuffix}'
 var planName = 'asp-${namePrefix}'
 var appInsightsName = 'appi-${namePrefix}'
 var logAnalyticsName = 'log-${namePrefix}'
+var documentIntelligenceName = toLower('di-${namePrefix}-${uniqueSuffix}')
 
 var commonTags = {
   project: projectName
@@ -112,6 +113,16 @@ module monitoring 'modules/appinsights.bicep' = {
   }
 }
 
+module documentIntelligence 'modules/documentintelligence.bicep' = {
+  name: 'documentintelligence-deploy'
+  params: {
+    location: location
+    accountName: documentIntelligenceName
+    sku: 'F0'
+    tags: commonTags
+  }
+}
+
 // Read the Cosmos primary key from the deployed account (kept inside the
 // template — never written to outputs).
 
@@ -130,6 +141,8 @@ module functionApp 'modules/functionapp.bicep' = {
     azureOpenAiApiKey: azureOpenAiApiKey
     azureOpenAiApiVersion: azureOpenAiApiVersion
     azureOpenAiDeploymentName: azureOpenAiDeploymentName
+    azureDocIntelligenceEndpoint: documentIntelligence.outputs.endpoint
+    azureDocIntelligenceKey: documentIntelligence.outputs.primaryKey
     authIssuer: authIssuer
     authAudience: authAudience
     authJwksUri: authJwksUri

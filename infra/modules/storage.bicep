@@ -1,6 +1,7 @@
 // Storage Account (Standard_LRS) with:
 //   - AzureWebJobsStorage support for the Function App (default endpoints)
 //   - Blob container `recipe-images` for backend-proxied recipe images
+//   - Blob container `label-scans` for temporary OCR image storage (7-day TTL)
 //
 // Backend proxies all Blob access; no SAS tokens are exposed to mobile.
 
@@ -57,6 +58,44 @@ resource recipeImages 'Microsoft.Storage/storageAccounts/blobServices/containers
   name: recipeImagesContainerName
   properties: {
     publicAccess: 'None'
+  }
+}
+
+resource labelScans 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobServices
+  name: 'label-scans'
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+// Lifecycle policy: auto-delete label-scan blobs after 7 days.
+resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+  parent: storage
+  name: 'default'
+  properties: {
+    policy: {
+      rules: [
+        {
+          name: 'delete-label-scans-after-7-days'
+          enabled: true
+          type: 'Lifecycle'
+          definition: {
+            filters: {
+              blobTypes: ['blockBlob']
+              prefixMatch: ['label-scans/']
+            }
+            actions: {
+              baseBlob: {
+                delete: {
+                  daysAfterCreationGreaterThan: 7
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
   }
 }
 

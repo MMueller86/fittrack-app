@@ -38,9 +38,9 @@ const ManualCreateSchema = z.object({
   fiber: positiveNumber,
 });
 
-// AI-estimated entry (nutritionPer100g-based)
+// AI-estimated entry (nutritionPer100g-based) — covers both AI estimates and label scans
 const AiCreateSchema = z.object({
-  sourceType: z.literal('ai'),
+  sourceType: z.enum(['ai', 'label-scan']),
   name: z.string().trim().min(1).max(200),
   nutritionPer100g: NutritionPer100gSchema,
   portion: PortionSchema.optional(),
@@ -90,7 +90,7 @@ export const createReusableItemHandler = withHandler(
           ? { label: d.portion.label, weightGrams: d.portion.weightGrams }
           : undefined,
         isComplete: true,
-        sourceType: 'ai',
+        sourceType: d.sourceType,
         aiConfidence: d.aiConfidence,
         aiWarnings: d.aiWarnings,
         searchTerms: d.searchTerms,
