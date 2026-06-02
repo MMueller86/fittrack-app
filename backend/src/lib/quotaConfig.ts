@@ -9,6 +9,7 @@ export interface TierLimits {
   'meal-parser': number;
   'food-estimate': number;
   'label-scan': number;
+  'meal-estimate': number;
 }
 
 const TIER_LIMITS: Record<UserTier, TierLimits> = {
@@ -16,16 +17,19 @@ const TIER_LIMITS: Record<UserTier, TierLimits> = {
     'meal-parser': 50,
     'food-estimate': 30,
     'label-scan': 30,
+    'meal-estimate': 30,
   },
   premium: {
     'meal-parser': 500,
     'food-estimate': 300,
     'label-scan': 300,
+    'meal-estimate': 300,
   },
   internal: {
     'meal-parser': Infinity,
     'food-estimate': Infinity,
     'label-scan': Infinity,
+    'meal-estimate': Infinity,
   },
 };
 

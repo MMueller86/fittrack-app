@@ -5,7 +5,7 @@ vi.mock('../lib/quota', () => ({
   trackUsage: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { classifyItem, resolveAmountGrams, mealParserPreviewHandler } from './ai';
+import { classifyItem, resolveAmountGrams, mealParserPreviewHandler, mealEstimatePreviewHandler } from './ai';
 import type { AiParsedItem } from '../lib/openai';
 import { __setOpenAiClientForTests } from '../lib/openai';
 import { _setFoodProductRepository, _resetFoodProductRepository } from '../lib/repositories/foodProductRepository';
@@ -437,5 +437,131 @@ describe('classifyItem — searchTerms matching', () => {
     const result = classifyItem(makeParsed({ displayName: 'Vollkorntoast' }), candidates, [libItem]);
     expect(result.status).toBe('matched');
     expect(result.selectedProductId).toBe('lib-1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mealEstimatePreviewHandler — unit tests for the Fast Path endpoint
+// ---------------------------------------------------------------------------
+
+/** Build a fake OpenAI client that returns a preset meal estimate. */
+function mockMealEstimateClient(estimate: {
+  mealName: string;
+  mealEstimate: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+  components: string[];
+  contextDetected: string | null;
+  portionConfidence: 'high' | 'medium' | 'low';
+  assumptions: string[];
+  warnings: string[];
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fakeClient: any = {
+    chat: {
+      completions: {
+        create: vi.fn().mockResolvedValue({
+          choices: [{ message: { content: JSON.stringify(estimate) } }],
+        }),
+      },
+    },
+  };
+  __setOpenAiClientForTests(fakeClient);
+}
+
+const VALID_ESTIMATE = {
+  mealName: 'Schnitzel mit Pommes und Mayo',
+  mealEstimate: { calories: 1150, protein: 42, carbs: 105, fat: 58, fiber: 8 },
+  components: ['Schnitzel', 'Pommes', 'Mayo'],
+  contextDetected: null,
+  portionConfidence: 'medium' as const,
+  assumptions: ['Standardportion angenommen'],
+  warnings: [],
+};
+
+describe('POST /api/ai/meal-estimate/preview', () => {
+  it('returns 400 when text is missing', async () => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: {} }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when text is empty string', async () => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: '' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 200 with correct structure for a valid text request', async () => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Schnitzel mit Pommes und Mayo' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as typeof VALID_ESTIMATE & { photoUsed: boolean };
+    expect(body.mealName).toBe('Schnitzel mit Pommes und Mayo');
+    expect(body.mealEstimate.calories).toBe(1150);
+    expect(body.components).toEqual(['Schnitzel', 'Pommes', 'Mayo']);
+    expect(body.contextDetected).toBeNull();
+    expect(body.portionConfidence).toBe('medium');
+    expect(body.photoUsed).toBe(false);
+    expect(body.assumptions).toEqual(['Standardportion angenommen']);
+  });
+
+  it('returns contextDetected when context is found in text', async () => {
+    mockMealEstimateClient({
+      ...VALID_ESTIMATE,
+      contextDetected: 'Imbiss',
+      mealEstimate: { calories: 1150, protein: 42, carbs: 105, fat: 58, fiber: 8 },
+      assumptions: ['Große Imbiss-Portion angenommen'],
+    });
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Schnitzel mit Pommes vom Imbiss' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { contextDetected: string };
+    expect(body.contextDetected).toBe('Imbiss');
+  });
+
+  it('returns 422 when AI returns implausibly low calories', async () => {
+    mockMealEstimateClient({
+      ...VALID_ESTIMATE,
+      mealEstimate: { calories: 10, protein: 1, carbs: 1, fat: 0, fiber: 0 },
+    });
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Schnitzel mit Pommes' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it('returns 422 when AI returns calories over 3000', async () => {
+    mockMealEstimateClient({
+      ...VALID_ESTIMATE,
+      mealEstimate: { calories: 9999, protein: 100, carbs: 200, fat: 100, fiber: 10 },
+    });
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Riesiges Mahl' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(422);
+  });
+
+  it('does not persist any data (preview only)', async () => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Schnitzel mit Pommes' } }),
+      makeContext(),
+    );
+    const body = res.jsonBody as Record<string, unknown>;
+    expect(body).not.toHaveProperty('meal');
+    expect(body).not.toHaveProperty('item');
+    expect(body).toHaveProperty('mealEstimate');
   });
 });

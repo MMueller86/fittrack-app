@@ -25,9 +25,10 @@ targetScope = 'resourceGroup'
 @description('Azure region for all resources. Defaults to the resource group location.')
 param location string = resourceGroup().location
 
-@description('Environment name used in resource naming (dev, staging, prod).')
+@description('Environment name used in resource naming (dev, alpha, staging, prod).')
 @allowed([
   'dev'
+  'alpha'
   'staging'
   'prod'
 ])
@@ -53,6 +54,17 @@ param azureOpenAiApiVersion string = '2024-02-01'
 
 @description('Azure OpenAI deployment name.')
 param azureOpenAiDeploymentName string = 'gpt4o-mini'
+
+@description('Document Intelligence pricing tier (F0 = free/dev, S0 = standard/alpha+prod).')
+@allowed(['F0', 'S0'])
+param documentIntelligenceSku string = 'F0'
+
+@description('External Document Intelligence endpoint. If set, skips deploying a new DI resource and reuses this one (e.g. share the dev instance with alpha).')
+param azureDocIntelligenceEndpoint string = ''
+
+@description('External Document Intelligence key. Required when azureDocIntelligenceEndpoint is set.')
+@secure()
+param azureDocIntelligenceKey string = ''
 
 // --- Entra External ID Auth ---
 @description('Entra JWT issuer URL (from OIDC discovery).')
@@ -113,15 +125,27 @@ module monitoring 'modules/appinsights.bicep' = {
   }
 }
 
-module documentIntelligence 'modules/documentintelligence.bicep' = {
+// Deploy Document Intelligence only when no external endpoint is provided.
+// Set azureDocIntelligenceEndpoint to reuse an existing instance (e.g. share dev DI with alpha).
+var deployDi = azureDocIntelligenceEndpoint == ''
+
+module documentIntelligence 'modules/documentintelligence.bicep' = if (deployDi) {
   name: 'documentintelligence-deploy'
   params: {
     location: location
     accountName: documentIntelligenceName
-    sku: 'F0'
+    sku: documentIntelligenceSku
     tags: commonTags
   }
 }
+
+// Resolve DI endpoint/key: use external values when provided, otherwise use the deployed module.
+// The #disable-next-line suppresses BCP318 (null-check on conditional module output) which
+// is safe here because the ternary condition mirrors the module deployment condition exactly.
+#disable-next-line BCP318
+var resolvedDiEndpoint = deployDi ? documentIntelligence.outputs.endpoint : azureDocIntelligenceEndpoint
+#disable-next-line BCP318
+var resolvedDiKey = deployDi ? documentIntelligence.outputs.primaryKey : azureDocIntelligenceKey
 
 // Read the Cosmos primary key from the deployed account (kept inside the
 // template — never written to outputs).
@@ -141,8 +165,8 @@ module functionApp 'modules/functionapp.bicep' = {
     azureOpenAiApiKey: azureOpenAiApiKey
     azureOpenAiApiVersion: azureOpenAiApiVersion
     azureOpenAiDeploymentName: azureOpenAiDeploymentName
-    azureDocIntelligenceEndpoint: documentIntelligence.outputs.endpoint
-    azureDocIntelligenceKey: documentIntelligence.outputs.primaryKey
+    azureDocIntelligenceEndpoint: resolvedDiEndpoint
+    azureDocIntelligenceKey: resolvedDiKey
     authIssuer: authIssuer
     authAudience: authAudience
     authJwksUri: authJwksUri

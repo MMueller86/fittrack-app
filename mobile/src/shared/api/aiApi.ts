@@ -1,9 +1,9 @@
-// AI API — meal parser + food nutrition estimator + label scan
+// AI API — meal parser + food nutrition estimator + label scan + meal estimate
 import { apiClient } from './client';
-import type { FoodSearchResult, AiFoodEstimatePreview, NutritionLabelScanResult } from '@fittrack/shared';
+import type { FoodSearchResult, AiFoodEstimatePreview, NutritionLabelScanResult, AiMealEstimatePreview } from '@fittrack/shared';
 
 // Re-export for convenience so callers don't need to import from @fittrack/shared directly
-export type { AiFoodEstimatePreview, NutritionLabelScanResult };
+export type { AiFoodEstimatePreview, NutritionLabelScanResult, AiMealEstimatePreview };
 
 // ---------------------------------------------------------------------------
 // Types — mirror backend MealParserPreviewItem
@@ -35,10 +35,14 @@ export interface MealParserPreviewResponse {
 // ---------------------------------------------------------------------------
 
 export const aiApi = {
-  /** POST /api/ai/meal-parser/preview — parse free-text meal and match against internal DB */
-  previewMeal(text: string): Promise<MealParserPreviewResponse> {
+  /**
+   * POST /api/ai/meal-parser/preview — parse free-text meal and match against internal DB.
+   * @param text     Food items as free text or comma-separated list.
+   * @param context  Optional eating context (e.g. "Bäcker") — improves portion estimation.
+   */
+  previewMeal(text: string, context?: string): Promise<MealParserPreviewResponse> {
     return apiClient
-      .post<MealParserPreviewResponse>('/ai/meal-parser/preview', { text }, { timeout: 60_000 })
+      .post<MealParserPreviewResponse>('/ai/meal-parser/preview', { text, context }, { timeout: 60_000 })
       .then((r) => r.data);
   },
 
@@ -63,6 +67,37 @@ export const aiApi = {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60_000, // OCR + AI can take 20-30s
       })
+      .then((r) => r.data);
+  },
+
+  /**
+   * POST /api/ai/meal-estimate/preview
+   * Fast Path: estimate total meal nutrition + components in a single AI call.
+   * When imageUri is provided, the request is sent as multipart/form-data
+   * including the photo so the AI can use it to improve portion estimation.
+   */
+  estimateMeal(
+    text: string,
+    imageUri?: string,
+    imageMimeType?: 'image/jpeg' | 'image/png',
+  ): Promise<AiMealEstimatePreview> {
+    if (imageUri && imageMimeType) {
+      const formData = new FormData();
+      formData.append('text', text);
+      formData.append('image', {
+        uri: imageUri,
+        type: imageMimeType,
+        name: `meal.${imageMimeType === 'image/png' ? 'png' : 'jpg'}`,
+      } as unknown as Blob);
+      return apiClient
+        .post<AiMealEstimatePreview>('/ai/meal-estimate/preview', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 60_000,
+        })
+        .then((r) => r.data);
+    }
+    return apiClient
+      .post<AiMealEstimatePreview>('/ai/meal-estimate/preview', { text }, { timeout: 60_000 })
       .then((r) => r.data);
   },
 };

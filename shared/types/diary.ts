@@ -1,7 +1,7 @@
 // Diary types
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
-export type MealItemSourceType = 'manual' | 'reusableItem' | 'openFoodFacts' | 'ai';
+export type MealItemSourceType = 'manual' | 'reusableItem' | 'openFoodFacts' | 'ai' | 'ai-meal-estimate';
 
 // --- Nutrition value containers ---
 
@@ -38,6 +38,16 @@ export interface MealItem {
   macros: MealItemMacros; // snapshot at time of logging
   /** True when macros were estimated by AI and not sourced from a verified product */
   isAiEstimate?: boolean;
+  /** Detected sub-components of an ai-meal-estimate entry (e.g. ["Schnitzel", "Pommes", "Mayo"]) */
+  aiMealEstimateComponents?: string[];
+  /** Detected eating context (e.g. "Imbiss", "Kantine") — influences portion assumptions */
+  aiMealEstimateContext?: string;
+  /** AI confidence level for the overall meal estimate */
+  aiMealEstimateConfidence?: 'high' | 'medium' | 'low';
+  /** Plain-language assumptions the AI made when no explicit context was provided */
+  aiMealEstimateAssumptions?: string[];
+  /** True if a photo was used to improve the estimate */
+  aiMealEstimatePhotoUsed?: boolean;
 }
 
 export interface Meal {

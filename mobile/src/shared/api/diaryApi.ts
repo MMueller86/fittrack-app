@@ -29,7 +29,7 @@ export interface AddItemCalculatedInput {
 
 /** New product-based input — client pre-computes amountGrams and nutrition. */
 export interface AddItemProductInput {
-  productId: string;
+  productId?: string;
   productName: string;
   inputMode: 'grams' | 'portion';
   inputAmount: number;
@@ -41,7 +41,14 @@ export interface AddItemProductInput {
     fat: number;
     fiber?: number;
   };
+  unit?: string;
   isAiEstimate?: boolean;
+  sourceType?: string;
+  aiMealEstimateComponents?: string[];
+  aiMealEstimateContext?: string;
+  aiMealEstimateConfidence?: 'high' | 'medium' | 'low';
+  aiMealEstimateAssumptions?: string[];
+  aiMealEstimatePhotoUsed?: boolean;
 }
 
 export type AddItemInput = AddItemFlatInput | AddItemCalculatedInput | AddItemProductInput;

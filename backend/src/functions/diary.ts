@@ -48,6 +48,7 @@ const NutritionValuesSchema = z.object({
 // 1. Flat macros (manual entry): { name, calories, protein, carbs, fat, fiber }
 // 2. Calculated (from search): { name, quantityMode, quantity, nutritionPer100g?, portionNutrition? }
 // 3. Product input (mobile product picker): { productId, productName, inputMode, inputAmount, amountGrams, calculatedNutrition }
+// 4. AI meal estimate (fast path): { name, calories, protein, carbs, fat, fiber, sourceType: 'ai-meal-estimate', aiMealEstimate* }
 const AddItemSchema = z
   .object({
     // --- Name: either explicit (manual/calculated) or derived from productName ---
@@ -73,6 +74,13 @@ const AddItemSchema = z
     calculatedNutrition: NutritionValuesSchema.optional(),
     // AI estimate flag
     isAiEstimate: z.boolean().optional(),
+    // AI meal estimate metadata (fast path, sourceType === 'ai-meal-estimate')
+    sourceType: z.enum(['manual', 'reusableItem', 'openFoodFacts', 'ai', 'ai-meal-estimate']).optional(),
+    aiMealEstimateComponents: z.array(z.string()).optional(),
+    aiMealEstimateContext: z.string().trim().max(100).optional(),
+    aiMealEstimateConfidence: z.enum(['high', 'medium', 'low']).optional(),
+    aiMealEstimateAssumptions: z.array(z.string()).optional(),
+    aiMealEstimatePhotoUsed: z.boolean().optional(),
   })
   .refine(
     (d) => {
@@ -194,6 +202,12 @@ export const addItemHandler = withHandler(
         quantity: d.inputMode === 'portion' ? d.inputAmount! : (d.amountGrams ?? d.quantity ?? 1),
         unit: d.inputMode === 'portion' ? 'portion' : d.quantityMode === 'portions' ? 'portion' : (d.unit ?? 'g'),
         ...(d.isAiEstimate ? { isAiEstimate: true } : {}),
+        ...(d.sourceType === 'ai-meal-estimate' ? { sourceType: 'ai-meal-estimate' } : {}),
+        ...(d.aiMealEstimateComponents ? { aiMealEstimateComponents: d.aiMealEstimateComponents } : {}),
+        ...(d.aiMealEstimateContext ? { aiMealEstimateContext: d.aiMealEstimateContext } : {}),
+        ...(d.aiMealEstimateConfidence ? { aiMealEstimateConfidence: d.aiMealEstimateConfidence } : {}),
+        ...(d.aiMealEstimateAssumptions ? { aiMealEstimateAssumptions: d.aiMealEstimateAssumptions } : {}),
+        ...(d.aiMealEstimatePhotoUsed ? { aiMealEstimatePhotoUsed: d.aiMealEstimatePhotoUsed } : {}),
       });
       logEvent(ctx, 'info', 'diary.item.added', { userId, mealId });
       return { status: 201, jsonBody: { meal } };

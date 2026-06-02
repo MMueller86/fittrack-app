@@ -22,7 +22,8 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import type { AiFoodEstimatePreview, FoodSearchResult } from '@fittrack/shared';
+import type { AiFoodEstimatePreview, FoodSearchResult, AiMealEstimatePreview } from '@fittrack/shared';
+import type { MealParserPreviewItem } from '../../shared/api/aiApi';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
 import { isQuotaExceededError } from '../../shared/api/client';
@@ -33,10 +34,11 @@ import { reusableItemsApi } from '../../shared/api/reusableItemsApi';
 import { foodApi } from '../../shared/api/foodApi';
 
 import { aiApi } from '../../shared/api/aiApi';
-import type { MealParserPreviewResponse } from '../../shared/api/aiApi';
+
 import MealParserReviewScreen from './MealParserReviewScreen';
 import FoodEstimateReviewScreen from './FoodEstimateReviewScreen';
 import LabelScanReviewScreen from './LabelScanReviewScreen';
+import MealEstimateReviewScreen from './MealEstimateReviewScreen';
 import type { NutritionLabelScanResult } from '@fittrack/shared';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -57,7 +59,7 @@ const MODES: { id: Mode; label: string }[] = [
   { id: 'manual', label: '✏️ Manual' },
 ];
 
-// --- Mode A: AI Input ---
+// --- Mode A: AI Input (Fast Path + optional Precision Path) ---
 interface AiModeProps {
   mealId: string;
   onSaved: () => void;
@@ -67,15 +69,43 @@ function AiMode({ mealId, onSaved }: AiModeProps) {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<MealParserPreviewResponse | null>(null);
+
+  // Fast Path state
+  const [mealEstimate, setMealEstimate] = useState<AiMealEstimatePreview | null>(null);
+  const [mealPhoto, setMealPhoto] = useState<{ uri: string; mimeType: 'image/jpeg' | 'image/png' } | null>(null);
+
+  // Precision Path state (loaded on-demand via onRefine)
+  const [parserItems, setParserItems] = useState<MealParserPreviewItem[] | null>(null);
+
+  async function handlePickPhoto(source: 'camera' | 'gallery') {
+    setError(null);
+    try {
+      let result: ImagePicker.ImagePickerResult;
+      if (source === 'camera') {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) { setError('Kamera-Berechtigung benötigt'); return; }
+        result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7, allowsEditing: true });
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) { setError('Galerie-Berechtigung benötigt'); return; }
+        result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.7, allowsEditing: true });
+      }
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
+      setMealPhoto({ uri: asset.uri, mimeType });
+    } catch (e) {
+      setError(formatApiError(e, 'Foto konnte nicht geladen werden'));
+    }
+  }
 
   async function handleAnalyze() {
     if (text.trim().length < 3) return;
     setLoading(true);
     setError(null);
     try {
-      const result = await aiApi.previewMeal(text.trim());
-      setPreview(result);
+      const result = await aiApi.estimateMeal(text.trim(), mealPhoto?.uri, mealPhoto?.mimeType);
+      setMealEstimate(result);
     } catch (e) {
       if (isQuotaExceededError(e)) {
         setError('Deine kostenlosen KI-Analysen für diesen Monat sind aufgebraucht. Das Kontingent wird am Monatsanfang zurückgesetzt.');
@@ -87,17 +117,31 @@ function AiMode({ mealId, onSaved }: AiModeProps) {
     }
   }
 
-  function handleReviewSaved() {
-    setPreview(null);
+  function handleEstimateSaved() {
+    setMealEstimate(null);
     setText('');
+    setMealPhoto(null);
+    onSaved();
+  }
+
+  function handleRefine(items: MealParserPreviewItem[]) {
+    // Transition from Fast Path → Precision Path
+    setMealEstimate(null);
+    setParserItems(items);
+  }
+
+  function handleParserSaved() {
+    setParserItems(null);
+    setText('');
+    setMealPhoto(null);
     onSaved();
   }
 
   return (
     <View style={[modeStyles.container, aiStyles.wrapper]}>
-      <Text style={aiStyles.title}>✨ KI-Mahlzeitenerkennung</Text>
+      <Text style={aiStyles.title}>✨ KI-Mahlzeitschätzung</Text>
       <Text style={aiStyles.subtitle}>
-        Beschreibe deine Mahlzeit in eigenen Worten, z.B. „200g Hähnchenbrust mit 150g Reis"
+        Beschreibe deine Mahlzeit in eigenen Worten, z.B. „Schnitzel mit Pommes und Cola"
       </Text>
       <TextInput
         style={aiStyles.input}
@@ -109,7 +153,33 @@ function AiMode({ mealId, onSaved }: AiModeProps) {
         numberOfLines={3}
         returnKeyType="done"
       />
+
+      {/* Photo picker */}
+      <View style={aiStyles.photoRow}>
+        {mealPhoto ? (
+          <View style={aiStyles.photoThumb}>
+            {/* eslint-disable-next-line @typescript-eslint/no-require-imports */}
+            <View style={aiStyles.photoIndicator}>
+              <Text style={aiStyles.photoIndicatorText}>📷 Foto hinzugefügt</Text>
+              <TouchableOpacity onPress={() => setMealPhoto(null)} style={aiStyles.removePhotoBtn}>
+                <Text style={aiStyles.removePhotoBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <>
+            <TouchableOpacity style={aiStyles.photoBtn} onPress={() => handlePickPhoto('camera')}>
+              <Text style={aiStyles.photoBtnText}>📷 Kamera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={aiStyles.photoBtn} onPress={() => handlePickPhoto('gallery')}>
+              <Text style={aiStyles.photoBtnText}>🖼️ Galerie</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+
       {error && <ErrorBanner error={error} />}
+
       <TouchableOpacity
         style={[aiStyles.analyzeBtn, (loading || text.trim().length < 3) && aiStyles.analyzeBtnDisabled]}
         onPress={handleAnalyze}
@@ -122,16 +192,31 @@ function AiMode({ mealId, onSaved }: AiModeProps) {
         )}
       </TouchableOpacity>
 
-      {preview && (
+      {/* Fast Path review screen */}
+      {mealEstimate ? (
+        <MealEstimateReviewScreen
+          visible
+          mealId={mealId}
+          originalText={text.trim()}
+          estimate={mealEstimate}
+          imageUri={mealPhoto?.uri}
+          onClose={() => setMealEstimate(null)}
+          onSaved={handleEstimateSaved}
+          onRefine={handleRefine}
+        />
+      ) : null}
+
+      {/* Precision Path review screen (after "Schätzung verfeinern") */}
+      {parserItems ? (
         <MealParserReviewScreen
           visible
           mealId={mealId}
-          items={preview.items}
-          warnings={preview.warnings}
-          onClose={() => setPreview(null)}
-          onSaved={handleReviewSaved}
+          items={parserItems}
+          warnings={[]}
+          onClose={() => setParserItems(null)}
+          onSaved={handleParserSaved}
         />
-      )}
+      ) : null}
     </View>
   );
 }
@@ -845,6 +930,30 @@ const aiStyles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+  photoRow: { flexDirection: 'row', gap: spacing.sm },
+  photoBtn: {
+    flex: 1,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  photoBtnText: { ...typography.caption, color: colors.textSecondary },
+  photoThumb: { flex: 1 },
+  photoIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  photoIndicatorText: { ...typography.caption, color: colors.primary },
+  removePhotoBtn: { paddingLeft: spacing.sm },
+  removePhotoBtnText: { ...typography.caption, color: colors.textSecondary, fontWeight: '700' },
   analyzeBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,

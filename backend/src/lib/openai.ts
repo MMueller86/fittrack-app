@@ -88,16 +88,23 @@ Rules:
 /**
  * Parse a free-text meal description into structured items via Azure OpenAI.
  * Uses Structured Outputs for guaranteed schema compliance.
+ * @param text  The food items to parse (free text or comma-separated component list).
+ * @param context  Optional eating context (e.g. "Bäcker", "Restaurant") — used to improve
+ *                 portion estimation; it is NOT treated as a food item.
  */
-export async function parseMeal(text: string): Promise<AiParsedItem[]> {
+export async function parseMeal(text: string, context?: string): Promise<AiParsedItem[]> {
   const client = getClient();
   const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+
+  const userContent = context
+    ? `Kontext: Diese Mahlzeit wurde in folgendem Umfeld verzehrt: ${context}.\nNutze diesen Kontext zur Portionsschätzung, aber behandle den Kontext NICHT als eigenständigen Lebensmittel-Eintrag.\n\n${text}`
+    : text;
 
   const response = await client.chat.completions.create({
     model: deployment,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: text },
+      { role: 'user', content: userContent },
     ],
     response_format: {
       type: 'json_schema',
@@ -277,4 +284,150 @@ export async function estimateFood(input: {
   if (!raw) throw new Error('Empty response from Azure OpenAI');
 
   return JSON.parse(raw) as AiFoodEstimate;
+}
+
+// ---------------------------------------------------------------------------
+// Meal estimator (Fast Path — overall meal nutrition + components)
+// ---------------------------------------------------------------------------
+
+/** AI-estimated overall meal nutrition. Values represent the complete meal, NOT per 100g. */
+export interface AiMealEstimate {
+  mealName: string;
+  mealEstimate: {
+    calories: number;
+    protein: number;
+    carbs: number;
+    fat: number;
+    fiber: number;
+  };
+  components: string[];
+  contextDetected: string | null;
+  portionConfidence: 'high' | 'medium' | 'low';
+  assumptions: string[];
+  warnings: string[];
+}
+
+const MEAL_ESTIMATE_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    mealName: { type: 'string' as const },
+    mealEstimate: {
+      type: 'object' as const,
+      properties: {
+        calories: { type: 'number' as const },
+        protein: { type: 'number' as const },
+        carbs: { type: 'number' as const },
+        fat: { type: 'number' as const },
+        fiber: { type: 'number' as const },
+      },
+      required: ['calories', 'protein', 'carbs', 'fat', 'fiber'],
+      additionalProperties: false,
+    },
+    components: { type: 'array' as const, items: { type: 'string' as const } },
+    contextDetected: { type: ['string', 'null'] as const },
+    portionConfidence: { type: 'string' as const, enum: ['high', 'medium', 'low'] },
+    assumptions: { type: 'array' as const, items: { type: 'string' as const } },
+    warnings: { type: 'array' as const, items: { type: 'string' as const } },
+  },
+  required: ['mealName', 'mealEstimate', 'components', 'contextDetected', 'portionConfidence', 'assumptions', 'warnings'],
+  additionalProperties: false,
+};
+
+const MEAL_ESTIMATE_SYSTEM_PROMPT = `Du bist ein KI-Ernährungsassistent für eine deutsche Ernährungs-App.
+Der Nutzer beschreibt eine Mahlzeit in freiem Text, z.B. "Schnitzel mit Pommes und Mayo" oder "Pizza Salami im Restaurant".
+
+## Deine Aufgabe
+
+Schätze die **Gesamtnährwerte der beschriebenen Mahlzeit als eine Portion** (NICHT per 100g).
+Erkenne gleichzeitig die Einzelbestandteile und eventuelle Kontextinformationen.
+
+## Kontext-Erkennung
+
+Suche im Text nach Hinweisen auf den Verzehrsort oder die Zubereitungsart:
+- Imbiss / Imbissbude / Schnellimbiss → größere, fettigere Portionen
+- Kantine / Mensa → mittlere Portionen, übliche Betriebsverpflegung
+- Restaurant / Gasthaus / Bistro → typische Restaurantportionen
+- Fast Food → Standardportionen der Fast-Food-Kette
+- Wenn kein Kontext erkennbar: durchschnittliche Haushalt- oder Restaurantportion annehmen
+
+Setze "contextDetected" auf den erkannten Ort (z.B. "Imbiss", "Kantine", "Restaurant") oder null.
+
+## Portionsschätzung
+
+Schätze eine realistische Gesamtportion für die beschriebene Mahlzeit:
+- Schnitzel mit Pommes (ohne Kontext): ca. 550-650 kcal
+- Schnitzel mit Pommes (Imbiss): ca. 950-1200 kcal
+- Pizza Salami (Restaurant, ganze Pizza): ca. 800-1100 kcal
+- Currywurst mit Pommes (Imbiss): ca. 800-1000 kcal
+- Burger-Menü (Fast Food): ca. 900-1200 kcal
+
+## Portionssicherheit (portionConfidence)
+- "high": Standard-Mahlzeit, gut definierte Portion (z.B. "1 Glas Milch 200ml", "2 Scheiben Toast")
+- "medium": Typische Mahlzeit, Portion plausibel schätzbar (z.B. "Schnitzel mit Pommes")
+- "low": Unklare Menge, sehr ambige Beschreibung oder unbekanntes Gericht
+
+## Annahmen (assumptions)
+Nenne in "assumptions" die wichtigsten Portionsannahmen auf Deutsch, z.B.:
+- "Typische Imbiss-Portion angenommen (ca. 380g Schnitzel + Pommes)"
+- "Standard-Restaurantportion für Pizza (ca. 400g)"
+Maximal 3 Annahmen, jede kurz und präzise.
+
+## Regeln
+- Alle Nährwerte müssen ≥ 0 sein
+- Gesamtkalorien sollten zwischen 50 und 3000 kcal liegen
+- components: Liste der erkannten Bestandteile als kurze deutsche Begriffe (ohne Mengenangaben), z.B. ["Schnitzel", "Pommes", "Mayo"]
+- mealName: normalisierter deutscher Name der Mahlzeit
+- Antworte NUR mit dem strukturierten JSON-Output, keine Erklärungen`;
+
+/**
+ * Estimate the total nutrition of a described meal via Azure OpenAI.
+ * Optionally accepts a base64-encoded image to improve accuracy.
+ * Returns overall meal macros (NOT per 100g) plus component list and context.
+ */
+export async function estimateMeal(input: {
+  text: string;
+  imageBase64?: string;
+  imageMimeType?: 'image/jpeg' | 'image/png';
+}): Promise<AiMealEstimate> {
+  const client = getClient();
+  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+
+  type ContentPart =
+    | { type: 'text'; text: string }
+    | { type: 'image_url'; image_url: { url: string; detail: 'low' | 'high' | 'auto' } };
+
+  const userContent: ContentPart[] = [{ type: 'text', text: input.text }];
+
+  if (input.imageBase64 && input.imageMimeType) {
+    userContent.push({
+      type: 'image_url',
+      image_url: {
+        url: `data:${input.imageMimeType};base64,${input.imageBase64}`,
+        detail: 'low', // 'low' is sufficient for portion estimation; saves tokens
+      },
+    });
+  }
+
+  const response = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      { role: 'system', content: MEAL_ESTIMATE_SYSTEM_PROMPT },
+      { role: 'user', content: userContent },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'meal_estimate',
+        strict: true,
+        schema: MEAL_ESTIMATE_SCHEMA,
+      },
+    },
+    temperature: 0,
+    max_tokens: 512,
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI');
+
+  return JSON.parse(raw) as AiMealEstimate;
 }

@@ -46,8 +46,6 @@ param azureOpenAiApiVersion string = '2024-02-01'
 param azureOpenAiDeploymentName string = 'gpt4o-mini'
 
 // --- Entra External ID Auth ---
-@description('Auth mode: dev or entra.')
-
 @description('Entra JWT issuer URL (from OIDC discovery).')
 param authIssuer string = ''
 
@@ -106,9 +104,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       minTlsVersion: '1.2'
       use32BitWorkerProcess: false
       cors: {
-        allowedOrigins: [
-          '*'
-        ]
+        allowedOrigins: []
         supportCredentials: false
       }
       appSettings: [

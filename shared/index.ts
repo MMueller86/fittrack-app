@@ -6,6 +6,7 @@ export * from './types/auth';
 export * from './types/profile';
 export * from './types/nutrition';
 export * from './types/diary';
+export * from './types/aiMealEstimate';
 export * from './types/recipes';
 export * from './types/weights';
 export * from './types/foodProduct';

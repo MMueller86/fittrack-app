@@ -178,6 +178,16 @@ function MealCard({
               {' · '}{Math.round(item.macros.calories)} kcal · {Math.round(item.macros.protein)}g P ·{' '}
               {Math.round(item.macros.carbs)}g C · {Math.round(item.macros.fat)}g F
             </Text>
+            {item.sourceType === 'ai-meal-estimate' && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <Text style={styles.aiEstimateBadge}>
+                  {item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '🤖 KI-Schätzung'}
+                </Text>
+                <TouchableOpacity onPress={() => onAddItem(meal.id, meal.name)}>
+                  <Text style={styles.refineLink}>Verfeinern</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           <TouchableOpacity
             onPress={() => onDeleteItem(meal.id, item.id, item.name)}
@@ -492,6 +502,8 @@ const styles = StyleSheet.create({
   itemName: { ...typography.body2, color: colors.text },
   itemMacros: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   deleteItemText: { ...typography.body2, color: colors.textMuted, paddingLeft: spacing.sm },
+  aiEstimateBadge: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic' },
+  refineLink: { ...typography.caption, color: colors.primary, fontWeight: '600' },
   emptyItems: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic', marginTop: spacing.xs },
 
   // Add meal section

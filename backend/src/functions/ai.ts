@@ -1,12 +1,12 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import { parseMeal, type AiParsedItem } from '../lib/openai';
+import { parseMeal, estimateMeal, type AiParsedItem } from '../lib/openai';
 import { getFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { requireUser } from '../lib/auth';
 import { withHandler } from '../lib/http';
 import { enforceQuota, trackUsage } from '../lib/quota';
-import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
+import type { FoodSearchResult, ReusableItem, AiMealEstimatePreview } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -113,6 +113,8 @@ export function resolveAmountGrams(parsed: AiParsedItem): number | null {
 
 const PreviewBodySchema = z.object({
   text: z.string().min(1, 'text must not be empty').max(500, 'text must be at most 500 characters'),
+  /** Optional eating context (e.g. "Bäcker", "Restaurant") forwarded to the AI prompt. */
+  context: z.string().max(200).optional(),
 });
 
 export const mealParserPreviewHandler = withHandler(
@@ -131,14 +133,14 @@ export const mealParserPreviewHandler = withHandler(
       return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
     }
 
-    const { text } = parsed.data;
+    const { text, context } = parsed.data;
     const catalogRepo = getFoodProductRepository();
     const libraryRepo = getReusableItemsRepository();
 
     // 1. AI parsing
     let aiItems: AiParsedItem[];
     try {
-      aiItems = await parseMeal(text);
+      aiItems = await parseMeal(text, context);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       return { status: 502, jsonBody: { error: `AI parsing failed: ${msg}` } };
@@ -237,6 +239,159 @@ app.http('ai-meal-parser-preview', {
   authLevel: 'anonymous',
   route: 'ai/meal-parser/preview',
   handler: mealParserPreviewHandler,
+});
+
+// ---------------------------------------------------------------------------
+// Meal estimate endpoint — Fast Path: whole-meal nutrition + components in one call
+// ---------------------------------------------------------------------------
+
+const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4 MB
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+
+/**
+ * Validate meal estimate absolute macros (total meal, NOT per 100g).
+ * Different bounds than per-100g food validator.
+ */
+function validateMealEstimate(macros: {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+}): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  const { calories, protein, carbs, fat, fiber } = macros;
+
+  for (const [label, val] of [
+    ['calories', calories],
+    ['protein', protein],
+    ['carbs', carbs],
+    ['fat', fat],
+    ['fiber', fiber],
+  ] as [string, number][]) {
+    if (!Number.isFinite(val) || val < 0) {
+      errors.push(`${label} muss eine nicht-negative Zahl sein (erhalten: ${val})`);
+    }
+  }
+  if (Number.isFinite(calories) && calories < 50) {
+    errors.push(`Mahlzeit mit ${calories} kcal ist unplausibel gering`);
+  }
+  if (Number.isFinite(calories) && calories > 3000) {
+    errors.push(`Mahlzeit mit ${calories} kcal übersteigt das Maximum von 3000 kcal`);
+  }
+  return { valid: errors.length === 0, errors };
+}
+
+export const mealEstimatePreviewHandler = withHandler(
+  'ai.meal-estimate.preview',
+  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const userContext = await requireUser(request);
+
+    // Quota enforcement — check before expensive AI call
+    const quotaBlock = await enforceQuota(userContext, 'meal-estimate');
+    if (quotaBlock) return quotaBlock;
+
+    let text: string;
+    let imageBase64: string | undefined;
+    let imageMimeType: 'image/jpeg' | 'image/png' | undefined;
+
+    const contentType = request.headers.get('content-type') ?? '';
+
+    if (contentType.includes('multipart/form-data')) {
+      // Multipart: text + optional image
+      const formData = await request.formData();
+      const textField = formData.get('text');
+      if (!textField || typeof textField !== 'string') {
+        return { status: 400, jsonBody: { error: 'Pflichtfeld "text" fehlt im Formular' } };
+      }
+      text = textField.trim();
+
+      const imageField = formData.get('image');
+      if (imageField && imageField instanceof Blob) {
+        const mimeType = imageField.type;
+        if (!ALLOWED_IMAGE_TYPES.includes(mimeType)) {
+          return {
+            status: 400,
+            jsonBody: { error: `Nicht unterstützter Bildtyp: ${mimeType}. Erlaubt: ${ALLOWED_IMAGE_TYPES.join(', ')}` },
+          };
+        }
+        const arrayBuffer = await imageField.arrayBuffer();
+        if (arrayBuffer.byteLength > MAX_IMAGE_SIZE) {
+          return { status: 400, jsonBody: { error: 'Bild überschreitet die maximale Größe von 4 MB' } };
+        }
+        imageBase64 = Buffer.from(arrayBuffer).toString('base64');
+        imageMimeType = mimeType as 'image/jpeg' | 'image/png';
+      }
+    } else {
+      // JSON: text only
+      const body = await request.json() as unknown;
+      const schema = z.object({
+        text: z.string().trim().min(1, 'text ist erforderlich').max(500, 'text darf maximal 500 Zeichen lang sein'),
+      });
+      const parsed = schema.safeParse(body);
+      if (!parsed.success) {
+        return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Ungültige Anfrage' } };
+      }
+      text = parsed.data.text;
+    }
+
+    if (text.length < 1) {
+      return { status: 400, jsonBody: { error: 'text ist erforderlich' } };
+    }
+    if (text.length > 500) {
+      return { status: 400, jsonBody: { error: 'text darf maximal 500 Zeichen lang sein' } };
+    }
+
+    // Call Azure OpenAI
+    let estimate;
+    try {
+      estimate = await estimateMeal({ text, imageBase64, imageMimeType });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { status: 502, jsonBody: { error: `KI-Schätzung fehlgeschlagen: ${msg}` } };
+    }
+
+    // Track usage AFTER successful AI call
+    await trackUsage(userContext, 'meal-estimate');
+
+    // Server-side plausibility validation
+    const validation = validateMealEstimate(estimate.mealEstimate);
+    if (!validation.valid) {
+      return {
+        status: 422,
+        jsonBody: {
+          error: 'KI-Schätzung hat Plausibilitätsprüfung nicht bestanden',
+          details: validation.errors,
+        },
+      };
+    }
+
+    const preview: AiMealEstimatePreview = {
+      mealName: estimate.mealName,
+      mealEstimate: {
+        calories: estimate.mealEstimate.calories,
+        protein: estimate.mealEstimate.protein,
+        carbs: estimate.mealEstimate.carbs,
+        fat: estimate.mealEstimate.fat,
+        fiber: estimate.mealEstimate.fiber,
+      },
+      components: estimate.components,
+      contextDetected: estimate.contextDetected,
+      portionConfidence: estimate.portionConfidence,
+      photoUsed: imageBase64 != null,
+      assumptions: estimate.assumptions,
+      warnings: estimate.warnings,
+    };
+
+    return { status: 200, jsonBody: preview };
+  },
+);
+
+app.http('ai-meal-estimate-preview', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'ai/meal-estimate/preview',
+  handler: mealEstimatePreviewHandler,
 });
 
 // ---------------------------------------------------------------------------
