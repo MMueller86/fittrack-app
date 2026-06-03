@@ -396,9 +396,16 @@ const styles = StyleSheet.create({
   // Meal card
   mealCard: {
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   mealHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   mealIcon: { fontSize: 20, marginRight: spacing.sm },

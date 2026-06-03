@@ -47,6 +47,8 @@ export interface UserProfile {
   goal: GoalType;
   /** null for maintain and recomposition */
   goalIntensity: GoalIntensity | null;
+  /** Optional display name chosen by the user. Falls back to "Sportler" when absent. */
+  displayName?: string;
   targets: ProfileTargets;
   calculationMeta: CalculationMeta;
   createdAt: string;
@@ -67,4 +69,6 @@ export interface ProfileInput {
   sports: Sport[];
   goal: GoalType;
   goalIntensity: GoalIntensity | null;
+  /** Optional display name chosen by the user. */
+  displayName?: string;
 }

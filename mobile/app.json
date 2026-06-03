@@ -6,14 +6,14 @@
     "scheme": "fittrack",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/app_logo.png",
+    "icon": "./assets/brand/fittrack_app_icon_master_v1.png",
     "userInterfaceStyle": "dark",
     "platforms": [
       "android",
       "ios"
     ],
     "splash": {
-      "image": "./assets/app_logo.png",
+      "image": "./assets/brand/fittrack_splash_logo_master_v1.png",
       "resizeMode": "contain",
       "backgroundColor": "#0B0F0C"
     },
@@ -21,7 +21,7 @@
       "package": "com.fittrack.app",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/app_logo.png",
+        "foregroundImage": "./assets/brand/fittrack_app_icon_master_v1.png",
         "backgroundColor": "#0B0F0C"
       }
     },

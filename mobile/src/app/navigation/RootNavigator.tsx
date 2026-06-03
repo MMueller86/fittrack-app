@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import HomeScreen from '../../modules/home/HomeScreen';
 import WeightDetailScreen from '../../modules/weight/WeightDetailScreen';
@@ -15,7 +16,7 @@ import RecipeCreateScreen from '../../modules/recipes/RecipeCreateScreen';
 import RecipeWizardScreen from '../../modules/recipes/RecipeWizardScreen';
 import ProfileScreen from '../../modules/profile/ProfileScreen';
 import ProfileEditScreen from '../../modules/profile/ProfileEditScreen';
-import ProfileWizardScreen from '../../modules/profile/ProfileWizardScreen';
+import ProfileWizardScreen, { SKIP_WIZARD_KEY } from '../../modules/profile/ProfileWizardScreen';
 import type { UserProfile } from '@fittrack/shared';
 import { colors } from '../theme';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, WeightIcon } from '../../assets/icons/TabIcons';
@@ -120,11 +121,16 @@ export function RootNavigator() {
   const [showWizard, setShowWizard] = useState(false);
 
   useEffect(() => {
-    profileApi.getMe().then(({ profile }) => {
-      if (!profile) setShowWizard(true);
-    }).catch(() => {
-      // Network error — don't block the user, they can set up later
-    });
+    (async () => {
+      try {
+        const skipped = await AsyncStorage.getItem(SKIP_WIZARD_KEY);
+        if (skipped === '1') return; // user permanently opted out
+        const { profile } = await profileApi.getMe();
+        if (!profile) setShowWizard(true);
+      } catch {
+        // Network error — don't block the user, they can set up later
+      }
+    })();
   }, []);
 
   if (showWizard) {

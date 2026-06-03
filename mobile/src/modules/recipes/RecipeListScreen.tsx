@@ -68,10 +68,17 @@ const THUMB = 64;
 const cardStyles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
   thumbnail: {

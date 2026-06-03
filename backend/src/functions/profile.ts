@@ -33,6 +33,7 @@ const ProfileInputSchema = z.object({
   ])),
   goal: z.enum(['lose_weight', 'maintain', 'gain_muscle', 'recomposition']),
   goalIntensity: z.enum(['gentle', 'moderate', 'aggressive']).nullable(),
+  displayName: z.string().max(50).optional(),
 }).refine(
   (d) => d.stepsPerDay != null || d.activityLevel != null,
   { message: 'Either stepsPerDay or activityLevel must be provided', path: ['stepsPerDay'] },
@@ -65,6 +66,7 @@ async function buildAndSaveProfile(
     sports: input.sports,
     goal: input.goal,
     goalIntensity: input.goalIntensity,
+    ...(input.displayName !== undefined && { displayName: input.displayName }),
     targets,
     calculationMeta: meta,
     createdAt: existingCreatedAt ?? now,

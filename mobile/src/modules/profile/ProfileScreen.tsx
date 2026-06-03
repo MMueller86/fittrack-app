@@ -17,6 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { UserProfile, ProfileTargets, Gender, ActivityLevel, GoalType } from '@fittrack/shared';
 import { profileApi } from '../../shared/api/profileApi';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import ProfileWizardScreen from './ProfileWizardScreen';
 import type { ProfileStackParamList } from '../../app/navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
@@ -89,6 +90,7 @@ export default function ProfileScreen({ navigation }: Props) {
   const [targets, setTargets] = useState<ProfileTargets | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -126,6 +128,17 @@ export default function ProfileScreen({ navigation }: Props) {
     );
   }
 
+  // --- Wizard ---
+  if (showWizard) {
+    return (
+      <ProfileWizardScreen
+        isNewProfile={true}
+        onComplete={() => { setShowWizard(false); setLoading(true); load(); }}
+        onDismiss={() => { setShowWizard(false); }}
+      />
+    );
+  }
+
   // --- Kein Profil ---
   if (!profile) {
     return (
@@ -135,10 +148,10 @@ export default function ProfileScreen({ navigation }: Props) {
           <Text style={styles.emptyBody}>Richte dein Profil ein, damit FitTrack deine Ziele berechnen kann.</Text>
           <TouchableOpacity
             style={styles.primaryButton}
-            onPress={() => navigation.navigate('ProfileEdit', { profile: null })}
+            onPress={() => setShowWizard(true)}
             activeOpacity={0.8}
           >
-            <Text style={styles.primaryButtonText}>Profil anlegen</Text>
+            <Text style={styles.primaryButtonText}>Profil einrichten →</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -248,11 +261,16 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardTitle: { ...typography.overline, color: colors.textMuted, marginBottom: spacing.sm, textTransform: 'uppercase' },
 
@@ -270,11 +288,16 @@ const styles = StyleSheet.create({
 
   macroCard: {
     backgroundColor: colors.surface,
-    borderRadius: radius.md,
+    borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
   },
   macroTitle: { ...typography.body1, color: colors.text, fontWeight: '600', marginBottom: spacing.sm },
   macroRow: { flexDirection: 'row', justifyContent: 'space-around' },
@@ -293,6 +316,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     alignItems: 'center',
   },
-  primaryButtonText: { ...typography.button, color: colors.background },
+  primaryButtonText: { ...typography.button, color: colors.white },
 });
 

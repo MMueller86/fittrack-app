@@ -1,4 +1,4 @@
-﻿// LabelScanReviewScreen â€” shows OCR + AI parsed nutrition label results for user review
+﻿// LabelScanReviewScreen – shows OCR + AI parsed nutrition label results for user review
 // before saving as a reusable custom product.
 //
 // Rendered as a full-screen Modal (nested inside AddItemModal scan mode).
@@ -7,8 +7,8 @@
 //   1. Scanned label data is shown with all editable fields
 //   2. OCR + AI confidence and warnings displayed prominently
 //   3. User can:
-//      A. "Als Produkt speichern + hinzufÃ¼gen" â†’ creates ReusableItem (sourceType: 'label-scan') â†’ diary entry
-//      B. "Einmalig hinzufÃ¼gen" â†’ flat macros directly to diary
+//      A. "Als Produkt speichern + hinzufügen" → creates ReusableItem (sourceType: 'label-scan') → diary entry
+//      B. "Einmalig hinzufügen" → flat macros directly to diary
 //   4. "Abbrechen" dismisses without saving
 
 import React, { useState, useMemo } from 'react';
@@ -68,7 +68,11 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
 
   // Editable fields
   const [name, setName] = useState(
-    [scanResult.brand, scanResult.productName].filter(Boolean).join(' â€” ') || 'Gescanntes Produkt',
+    [scanResult.brand, scanResult.productName].filter(Boolean).join(' – ') || 'Gescanntes Produkt',
+  );
+  const [portionLabel, setPortionLabel] = useState(scanResult.servingSize?.label ?? '');
+  const [portionGrams, setPortionGrams] = useState(
+    scanResult.servingSize?.weightGrams != null ? String(scanResult.servingSize.weightGrams) : '',
   );
   const [calories, setCalories] = useState(String(n.calories ?? 0));
   const [protein, setProtein] = useState(String(n.protein ?? 0));
@@ -101,23 +105,25 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
           ...(fiber ? { fiber: num(fiber) } : {}),
           ...(salt ? { salt: num(salt) } : {}),
         },
-        portion: scanResult.servingSize
-          ? { label: scanResult.servingSize.label, weightGrams: scanResult.servingSize.weightGrams }
+        portion: num(portionGrams) > 0
+          ? { label: portionLabel || `${num(portionGrams)} g`, weightGrams: num(portionGrams) }
           : undefined,
       });
 
-      // Add to diary as 100g entry
+      // Add to diary using portion size if available, otherwise 100g
+      const grams = num(portionGrams) > 0 ? num(portionGrams) : 100;
+      const scale = grams / 100;
       await diaryApi.addItem(mealId, {
         productId: result.item.id,
         productName: result.item.name,
         inputMode: 'grams',
-        inputAmount: 100,
-        amountGrams: 100,
+        inputAmount: grams,
+        amountGrams: grams,
         calculatedNutrition: {
-          calories: num(calories),
-          protein: num(protein),
-          carbs: num(carbs),
-          fat: num(fat),
+          calories: Math.round(num(calories) * scale),
+          protein: Math.round(num(protein) * scale * 10) / 10,
+          carbs: Math.round(num(carbs) * scale * 10) / 10,
+          fat: Math.round(num(fat) * scale * 10) / 10,
         },
       });
 
@@ -134,17 +140,19 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
     setSaving(true);
     setError(null);
     try {
+      const grams = num(portionGrams) > 0 ? num(portionGrams) : 100;
+      const scale = grams / 100;
       await diaryApi.addItem(mealId, {
         name: name.trim() || 'Gescanntes Produkt',
-        calories: num(calories),
-        protein: num(protein),
-        carbs: num(carbs),
-        fat: num(fat),
-        fiber: num(fiber || '0'),
+        calories: Math.round(num(calories) * scale),
+        protein: Math.round(num(protein) * scale * 10) / 10,
+        carbs: Math.round(num(carbs) * scale * 10) / 10,
+        fat: Math.round(num(fat) * scale * 10) / 10,
+        fiber: Math.round(num(fiber || '0') * scale * 10) / 10,
       });
       onSaved();
     } catch (e) {
-      setError(formatApiError(e, 'HinzufÃ¼gen fehlgeschlagen'));
+      setError(formatApiError(e, 'Hinzufügen fehlgeschlagen'));
     } finally {
       setSaving(false);
     }
@@ -161,7 +169,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.cancelText}>Abbrechen</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>ðŸ“· Scan-Ergebnis</Text>
+          <Text style={styles.headerTitle}>📷 Scan-Ergebnis</Text>
           <View style={{ width: 80 }} />
         </View>
 
@@ -184,7 +192,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
           {scanResult.warnings.length > 0 && (
             <View style={styles.warningsBox}>
               {scanResult.warnings.map((w, i) => (
-                <Text key={i} style={styles.warningText}>âš ï¸ {w}</Text>
+                <Text key={i} style={styles.warningText}>⚠️ {w}</Text>
               ))}
             </View>
           )}
@@ -194,7 +202,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
           <TextInput style={styles.input} value={name} onChangeText={setName} />
 
           {/* Nutrition fields */}
-          <Text style={styles.sectionTitle}>NÃ¤hrwerte pro 100{scanResult.baseUnit === '100ml' ? 'ml' : 'g'}</Text>
+          <Text style={styles.sectionTitle}>Nährwerte pro 100{scanResult.baseUnit === '100ml' ? 'ml' : 'g'}</Text>
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
@@ -224,7 +232,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
               <TextInput style={styles.input} value={fat} onChangeText={setFat} keyboardType="decimal-pad" />
             </View>
             <View style={styles.fieldCol}>
-              <Text style={styles.fieldLabel}>davon gesÃ¤ttigt (g)</Text>
+              <Text style={styles.fieldLabel}>davon gesättigt (g)</Text>
               <TextInput style={styles.input} value={saturatedFat} onChangeText={setSaturatedFat} keyboardType="decimal-pad" />
             </View>
           </View>
@@ -240,13 +248,35 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
             </View>
           </View>
 
-          {/* Serving size info */}
-          {scanResult.servingSize && (
-            <View style={styles.servingBox}>
-              <Text style={styles.servingText}>
-                Portion: {scanResult.servingSize.label} ({scanResult.servingSize.weightGrams} g)
-              </Text>
+          {/* Portion size — editable, pre-filled from scan if detected */}
+          <Text style={styles.sectionTitle}>Portionsgröße</Text>
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldCol}>
+              <Text style={styles.fieldLabel}>Bezeichnung (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={portionLabel}
+                onChangeText={setPortionLabel}
+                placeholder="z.B. 1 Riegel"
+                placeholderTextColor={colors.textMuted}
+              />
             </View>
+            <View style={styles.fieldCol}>
+              <Text style={styles.fieldLabel}>Gewicht (g)</Text>
+              <TextInput
+                style={styles.input}
+                value={portionGrams}
+                onChangeText={setPortionGrams}
+                keyboardType="decimal-pad"
+                placeholder="z.B. 30"
+                placeholderTextColor={colors.textMuted}
+              />
+            </View>
+          </View>
+          {num(portionGrams) > 0 && (
+            <Text style={styles.portionHint}>
+              Eintrag wird für {portionGrams} g berechnet
+            </Text>
           )}
 
           {error && <ErrorBanner error={error} />}
@@ -260,7 +290,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
             {saving ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={styles.primaryBtnText}>Als Produkt speichern + hinzufÃ¼gen</Text>
+              <Text style={styles.primaryBtnText}>Als Produkt speichern + hinzufügen</Text>
             )}
           </TouchableOpacity>
 
@@ -269,7 +299,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
             onPress={handleAddOnce}
             disabled={saving}
           >
-            <Text style={styles.secondaryBtnText}>Einmalig hinzufÃ¼gen</Text>
+            <Text style={styles.secondaryBtnText}>Einmalig hinzufügen</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -352,4 +382,5 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: { ...typography.body1, color: colors.primary },
   btnDisabled: { opacity: 0.5 },
+  portionHint: { ...typography.caption, color: colors.primary, marginBottom: spacing.sm },
 });

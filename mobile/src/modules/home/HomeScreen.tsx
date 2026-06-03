@@ -6,6 +6,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
+  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -19,7 +20,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { HomeStackParamList, RootTabParamList } from '../../app/navigation/RootNavigator';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { Logo } from '../../shared/components/Logo';
+import { BrandAsset } from '../../shared/components/BrandAsset';
 import { WeightChart } from '../../shared/components/WeightChart';
 import { TrendPill } from '../../shared/components/TrendPill';
 import { MacroSummaryCard } from '../../shared/components/MacroSummaryCard';
@@ -33,12 +34,20 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
 const TODAY = new Date().toISOString().split('T')[0];
 
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 11) return 'Guten Morgen';
+  if (h < 17) return 'Guten Tag';
+  return 'Guten Abend';
+}
+
 export default function HomeScreen({ navigation }: Props) {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [todayDiary, setTodayDiary] = useState<DiaryDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
+  const [displayName, setDisplayName] = useState<string | undefined>(undefined);
 
   const { dayType, targets, setTargets, setDayType } = useDayTypeStore();
 
@@ -52,6 +61,7 @@ export default function HomeScreen({ navigation }: Props) {
       setEntries(weightData);
       if (profileData.targets) setTargets(profileData.targets);
       if (profileData.profile?.targetWeightKg) setTargetWeightKg(profileData.profile.targetWeightKg);
+      if (profileData.profile?.displayName) setDisplayName(profileData.profile.displayName);
       setTodayDiary(diaryData);
     } catch {
       setEntries([]);
@@ -94,36 +104,76 @@ export default function HomeScreen({ navigation }: Props) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        <View style={styles.brand}>
-          <Logo size={120} />
-          <Text style={styles.welcome}>Welcome back</Text>
-          <Text style={styles.tagline}>Ernährung. Training. Fortschritt.</Text>
+        {/* ── Hero Header ── */}
+        <View style={styles.hero}>
+          {/* Top row: brand + personal weight KPI */}
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroWordmarkRow}>
+              <BrandAsset name="header_symbol" width={52} height={52} />
+              <Text style={styles.heroAppName}><Text>Fit</Text><Text style={{ color: colors.primary }}>Track</Text></Text>
+            </View>
+            {latest && (
+              <TouchableOpacity style={styles.heroKpi} onPress={() => navToTab('Weight')} activeOpacity={0.7}>
+                <Text style={styles.heroKpiValue}>{latest.value.toFixed(1)}</Text>
+                <Text style={styles.heroKpiUnit}>kg</Text>
+                {previous ? (
+                  <Text style={[
+                    styles.heroKpiDelta,
+                    latest.value <= previous.value ? styles.heroKpiGood : styles.heroKpiBad,
+                  ]}>
+                    {latest.value < previous.value ? '↓' : latest.value > previous.value ? '↑' : '→'}{' '}
+                    {Math.abs(latest.value - previous.value).toFixed(1)}
+                  </Text>
+                ) : null}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Greeting */}
+          <Text style={styles.heroGreeting}>
+            {getGreeting()},{' '}
+            <Text style={styles.heroName}>{displayName ?? 'Sportler'}</Text>
+          </Text>
+
+          {/* Day-Type Toggle — integrated into hero */}
+          <View style={styles.heroToggleRow}>
+            {(['rest', 'training'] as const).map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.heroToggleBtn, dayType === t && styles.heroToggleBtnActive]}
+                onPress={() => setDayType(t)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.heroToggleText, dayType === t && styles.heroToggleTextActive]}>
+                  {t === 'rest' ? '🛌 Ruhetag' : '💪 Trainingstag'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        {/* Day-Type Toggle (kompakt) */}
-        <View style={styles.toggleRow}>
-          <TouchableOpacity
-            style={[styles.toggleBtn, dayType === 'rest' && styles.toggleBtnActive]}
-            onPress={() => setDayType('rest')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.toggleText, dayType === 'rest' && styles.toggleTextActive]}>
-              🛌 Ruhetag
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleBtn, dayType === 'training' && styles.toggleBtnActive]}
-            onPress={() => setDayType('training')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.toggleText, dayType === 'training' && styles.toggleTextActive]}>
-              💪 Trainingstag
-            </Text>
-          </TouchableOpacity>
+        {/* ── Quick Actions ── */}
+        <View style={styles.quickActions}>
+          {[
+            { icon: '📷', label: 'Scan', tab: 'Nutrition' as const },
+            { icon: '➕', label: 'Essen', tab: 'Nutrition' as const },
+            { icon: '⚖', label: 'Gewicht', tab: 'Weight' as const },
+            { icon: '🍽', label: 'Rezept', tab: 'Recipes' as const },
+          ].map((action) => (
+            <TouchableOpacity
+              key={action.tab + action.icon}
+              style={styles.quickAction}
+              onPress={() => navToTab(action.tab)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.quickActionIcon}>{action.icon}</Text>
+              <Text style={styles.quickActionLabel}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Macro-Fortschritt für heute — tippbar → Nutrition Tab */}
-        <TouchableOpacity activeOpacity={0.85} onPress={() => navToTab('Nutrition')}>
+        {/* ── Macro-Fortschritt — tippbar → Nutrition Tab ── */}
+        <TouchableOpacity activeOpacity={0.85} onPress={() => navToTab('Nutrition')} style={{ paddingHorizontal: spacing.md }}>
           {todayDiary && todayTargets ? (
             <MacroSummaryCard summary={todayDiary.summary} target={todayTargets} />
           ) : todayTargets ? (
@@ -134,16 +184,26 @@ export default function HomeScreen({ navigation }: Props) {
           ) : null}
         </TouchableOpacity>
 
-        {/* Gewicht — tippbar → Gewicht Tab */}
+        {/* ── Gewicht — tippbar → Gewicht Tab ── */}
         <TouchableOpacity style={styles.weightCard} activeOpacity={0.85} onPress={() => navToTab('Weight')}>
           <View style={styles.weightCardHeader}>
-            <Text style={styles.weightEyebrow}>Gewicht</Text>
-            <View style={styles.weightCardRight}>
-              {latest && (
+            <View style={styles.weightCardLeft}>
+              <Text style={styles.weightEyebrow}>GEWICHT</Text>
+              {latest ? (
                 <>
-                  <TrendPill latest={latest} previous={previous} />
-                  <Text style={styles.weightValue}>{latest.value.toFixed(1)} kg</Text>
+                  <View style={styles.weightValueRow}>
+                    <Text style={styles.weightValueLarge}>{latest.value.toFixed(1)}</Text>
+                    <Text style={styles.weightUnit}>kg</Text>
+                  </View>
+                  {targetWeightKg ? (
+                    <Text style={styles.weightGoalText}>Ziel {targetWeightKg.toFixed(1)} kg</Text>
+                  ) : null}
                 </>
+              ) : null}
+            </View>
+            <View style={styles.weightCardRight}>
+              {latest && previous && (
+                <TrendPill latest={latest} previous={previous} />
               )}
               <Text style={styles.weightChevron}>›</Text>
             </View>
@@ -176,52 +236,121 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  content: { padding: spacing.md, paddingBottom: spacing.xxl },
+  content: { paddingBottom: spacing.xxl },
 
-  brand: { alignItems: 'center', marginBottom: spacing.lg },
-  welcome: { ...typography.h1, color: colors.text, marginTop: spacing.sm },
-  tagline: { ...typography.caption, color: colors.primaryBright, marginTop: spacing.xs, textTransform: 'uppercase' },
-
-  // Kompakter Toggle
-  toggleRow: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 3,
-    marginBottom: spacing.md,
-    alignSelf: 'center',
+  // ── Hero Header ──
+  // Asset renders directly on background — no container box.
+  // Spacing and typography carry the premium feel.
+  hero: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
   },
-  toggleBtn: {
-    paddingVertical: 6,
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  heroWordmarkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  heroAppName: {
+    fontSize: 22,
+    fontWeight: '700' as const,
+    color: colors.text,
+    letterSpacing: 1.5,
+  },
+  heroKpi: { alignItems: 'flex-end' },
+  heroKpiValue: { fontSize: 24, fontWeight: '800' as const, color: colors.text, lineHeight: 28 },
+  heroKpiUnit: { ...typography.caption, color: colors.textSecondary },
+  heroKpiDelta: { fontSize: 11, fontWeight: '600' as const, marginTop: 2 },
+  heroKpiGood: { color: colors.primary },
+  heroKpiBad: { color: colors.negative },
+  heroGreeting: {
+    ...typography.h2,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  heroName: {
+    ...typography.h2,
+    color: colors.text,
+  },
+  heroToggleRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.full,
+    padding: 3,
+    marginTop: spacing.md,
+    alignSelf: 'stretch',
+  },
+  heroToggleBtn: {
+    flex: 1,
+    paddingVertical: 7,
     paddingHorizontal: spacing.md,
     borderRadius: radius.full,
+    alignItems: 'center',
   },
-  toggleBtnActive: {
-    backgroundColor: colors.primary,
-  },
-  toggleText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
-  toggleTextActive: { color: colors.background },
+  heroToggleBtnActive: { backgroundColor: colors.primary },
+  heroToggleText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' as const },
+  heroToggleTextActive: { color: colors.background },
 
-  weightCard: {
+  // ── Quick Actions ──
+  quickActions: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  quickAction: {
+    flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  quickActionIcon: { fontSize: 28 },
+  quickActionLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+
+  // ── Weight Card ──
+  weightCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.md,
+    marginHorizontal: spacing.md,
     marginTop: spacing.sm,
     overflow: 'hidden',
+    // Subtle elevation
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 3,
   },
   weightCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: spacing.sm,
   },
-  weightEyebrow: { ...typography.overline, color: colors.primaryBright },
-  weightCardRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  weightValue: { ...typography.h3, color: colors.text },
+  weightCardLeft: { flex: 1 },
+  weightEyebrow: { ...typography.overline, color: colors.primaryBright, marginBottom: spacing.xs },
+  weightValueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
+  weightValueLarge: { fontSize: 40, fontWeight: '800' as const, color: colors.text, lineHeight: 44 },
+  weightUnit: { ...typography.h3, color: colors.textSecondary },
+  weightGoalText: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  weightCardRight: { flexDirection: 'column', alignItems: 'flex-end', gap: spacing.xs },
   weightChevron: { fontSize: 22, color: colors.textMuted, fontWeight: '600' },
   weightEmpty: { paddingVertical: spacing.lg, alignItems: 'center' },
   weightEmptyText: { ...typography.body2, color: colors.textSecondary, textAlign: 'center' },

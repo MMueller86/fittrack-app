@@ -2,7 +2,7 @@
 // Wird aus ProfileScreen via Navigation aufgerufen und erhält das aktuelle Profil als Parameter.
 // Speichert via PUT /api/profile (updateProfile).
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,6 +26,7 @@ import type {
   UserProfile,
 } from '@fittrack/shared';
 import { profileApi } from '../../shared/api/profileApi';
+import { listWeights } from '../../services/weightsService';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import type { ProfileStackParamList } from '../../app/navigation/RootNavigator';
 
@@ -91,6 +92,7 @@ const DURATION_OPTIONS = [30, 60, 90, 120, 150];
 // ---------------------------------------------------------------------------
 
 interface FormState {
+  displayName: string;
   gender: Gender | null;
   age: string;
   heightCm: string;
@@ -110,6 +112,7 @@ interface FormState {
 function profileToForm(p: UserProfile | null): FormState {
   if (!p) {
     return {
+      displayName: '',
       gender: null, age: '', heightCm: '', weightKg: '', targetWeightKg: '',
       stepsPreset: null, stepsPerDay: '', stepsUnknown: false, activityLevel: null,
       trainingFrequencyPerWeek: 0, trainingDurationMinutes: 60,
@@ -119,6 +122,7 @@ function profileToForm(p: UserProfile | null): FormState {
   const preset = p.stepsPerDay != null && STEP_PRESETS.includes(p.stepsPerDay) ? p.stepsPerDay : null;
   const customSteps = p.stepsPerDay != null && !STEP_PRESETS.includes(p.stepsPerDay) ? String(p.stepsPerDay) : '';
   return {
+    displayName: p.displayName ?? '',
     gender: p.gender,
     age: String(p.age),
     heightCm: String(p.heightCm),
@@ -202,6 +206,21 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
   const [form, setForm] = useState<FormState>(() => profileToForm(existing));
   const [loading, setLoading] = useState(false);
 
+  // Pre-fill current weight from diary when creating a new profile
+  useEffect(() => {
+    if (!isNew) return;
+    listWeights().then((entries) => {
+      if (entries.length === 0) return;
+      const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+      const latest = sorted[0];
+      const diffDays = (Date.now() - new Date(latest.date).getTime()) / (1000 * 60 * 60 * 24);
+      if (diffDays <= 7) {
+        const value = latest.unit === 'lbs' ? +(latest.value * 0.453592).toFixed(1) : latest.value;
+        setForm((prev) => ({ ...prev, weightKg: String(value) }));
+      }
+    }).catch(() => { /* silently ignore */ });
+  }, [isNew]);
+
   function update(patch: Partial<FormState>) {
     setForm((prev) => ({ ...prev, ...patch }));
   }
@@ -237,6 +256,7 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
       sports: form.sports,
       goal: form.goal,
       goalIntensity: form.goalIntensity,
+      ...(form.displayName.trim() ? { displayName: form.displayName.trim() } : {}),
     };
     setLoading(true);
     try {
@@ -313,6 +333,21 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
             {(['male', 'female', 'other'] as Gender[]).map((g) => (
               <ChipButton key={g} label={GENDER_LABELS[g]} selected={form.gender === g} onPress={() => update({ gender: g })} />
             ))}
+          </View>
+
+          <View style={styles.fieldRow}>
+            <FieldLabel>Wie möchtest du genannt werden? (optional)</FieldLabel>
+            <View style={styles.inputWithUnit}>
+              <TextInput
+                style={styles.textInput}
+                value={form.displayName}
+                onChangeText={(v) => update({ displayName: v })}
+                placeholder="z.B. Michael"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+                maxLength={50}
+              />
+            </View>
           </View>
 
           <NumericField label="Alter" value={form.age} onChangeText={(v) => update({ age: v })} unit="Jahre" />

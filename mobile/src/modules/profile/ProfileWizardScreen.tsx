@@ -24,6 +24,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type {
   Gender,
@@ -36,7 +37,9 @@ import type {
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { profileApi, type CalculatePreviewResponse } from '../../shared/api/profileApi';
 import { listWeights } from '../../services/weightsService';
-import { Logo } from '../../shared/components/Logo';
+import { BrandAsset } from '../../shared/components/BrandAsset';
+
+export const SKIP_WIZARD_KEY = 'fittrack:skip_wizard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +49,7 @@ type Step = 0 | 1 | 2 | 3 | 4 | 5;
 
 interface WizardState {
   // Step 1 — Basisdaten
+  displayName: string;
   gender: Gender | null;
   age: string;
   heightCm: string;
@@ -66,6 +70,7 @@ interface WizardState {
 }
 
 const INITIAL_STATE: WizardState = {
+  displayName: '',
   gender: null,
   age: '',
   heightCm: '',
@@ -188,6 +193,7 @@ function buildProfileInput(s: WizardState): ProfileInput | null {
     sports: s.sports,
     goal: s.goal,
     goalIntensity: s.goalIntensity,
+    ...(s.displayName?.trim() ? { displayName: s.displayName.trim() } : {}),
   };
 }
 
@@ -497,22 +503,59 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
   // ---------------------------------------------------------------------------
 
   function renderStep0() {
+    function handleSkip() {
+      Alert.alert(
+        'Profil überspringen?',
+        'Ohne Profil können Kalorien- und Makroziele nicht berechnet werden. Du kannst das Profil jederzeit unter „Profil" einrichten.',
+        [
+          { text: 'Abbrechen', style: 'cancel' },
+          {
+            text: 'Überspringen',
+            style: 'destructive',
+            onPress: async () => {
+              await AsyncStorage.setItem(SKIP_WIZARD_KEY, '1');
+              onDismiss();
+            },
+          },
+        ],
+      );
+    }
+
     return (
-      <View style={styles.welcomeContainer}>
-        <Logo size={100} style={styles.welcomeLogo} />
-        <Text style={styles.welcomeTitle}>Willkommen bei FitTrack</Text>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.welcomeContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <BrandAsset name="splash_logo" width={130} height={130} style={styles.welcomeLogo} />
+        <Text style={styles.welcomeEyebrow}>⚡ In unter einer Minute zu deinem persönlichen Ziel.</Text>
+        <Text style={styles.welcomeTitle}>
+          {'Willkommen bei Fit'}<Text style={{ color: colors.primary }}>Track</Text>
+        </Text>
         <Text style={styles.welcomeBody}>
           Damit FitTrack deine Kalorien- und Makroziele individuell berechnen kann, brauchen wir ein paar Angaben zu dir.
-          {'\n\n'}
-          Deine Daten sind sicher und werden ausschließlich für deine persönliche Zielberechnung verwendet – niemals weitergegeben.
         </Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => setStep(1)} activeOpacity={0.8}>
-          <Text style={styles.primaryButtonText}>Profil anlegen</Text>
+        <View style={styles.benefitList}>
+          {[
+            '✓  Erreiche dein persönliches Zielgewicht',
+            '✓  Behalte deine Fortschritte im Blick',
+            '✓  Erhalte passende Kalorien- und Makroziele',
+            '✓  Nutze intelligente Ernährungsvorschläge',
+          ].map((item) => (
+            <Text key={item} style={styles.benefitItem}>{item}</Text>
+          ))}
+        </View>
+        <View style={styles.trustSection}>
+          <Text style={styles.trustTitle}>🔒 Deine Daten bleiben privat</Text>
+          <Text style={styles.trustBody}>Keine Werbung. Keine Weitergabe. Jederzeit änderbar.</Text>
+        </View>
+        <TouchableOpacity style={[styles.primaryButton, styles.welcomePrimaryBtn]} onPress={() => setStep(1)} activeOpacity={0.8}>
+          <Text style={styles.primaryButtonText}>Profil einrichten →</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.ghostButton} onPress={onDismiss} activeOpacity={0.7}>
-          <Text style={styles.ghostButtonText}>Später</Text>
+        <TouchableOpacity style={styles.ghostButton} onPress={handleSkip} activeOpacity={0.7}>
+          <Text style={styles.ghostButtonText}>Zunächst ohne Profil starten</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -532,6 +575,21 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
               onPress={() => update({ gender: g })}
             />
           ))}
+        </View>
+
+        <View style={styles.inputRow}>
+          <Text style={styles.inputLabel}>Wie möchtest du genannt werden? (optional)</Text>
+          <View style={styles.inputWithUnit}>
+            <TextInput
+              style={styles.textInput}
+              value={state.displayName}
+              onChangeText={(v) => update({ displayName: v })}
+              placeholder="z.B. Michael"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="words"
+              maxLength={50}
+            />
+          </View>
         </View>
 
         <NumericInput label="Alter" value={state.age} onChangeText={(v) => update({ age: v })} unit="Jahre" />
@@ -841,15 +899,26 @@ const styles = StyleSheet.create({
 
   // Welcome screen
   welcomeContainer: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xxl ?? spacing.xl,
+    paddingTop: spacing.xxl,
+    paddingBottom: spacing.lg,
+  },
+  welcomePrimaryBtn: {
+    flex: 0,
+    alignSelf: 'stretch',
   },
   welcomeLogo: {
-    marginBottom: spacing.xl,
-    borderRadius: radius.md,
+    marginBottom: spacing.lg,
+  },
+  welcomeEyebrow: {
+    ...typography.caption,
+    color: colors.primaryBright,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    letterSpacing: 0.2,
   },
   welcomeTitle: {
     ...typography.h1,
@@ -858,11 +927,38 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   welcomeBody: {
-    ...typography.body1,
+    ...typography.body2,
     color: colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: spacing.xl,
+    lineHeight: 20,
+    marginBottom: spacing.lg,
+  },
+  benefitList: {
+    alignSelf: 'stretch',
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  benefitItem: {
+    ...typography.body2,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  trustSection: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  trustTitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontWeight: '600' as const,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  trustBody: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   ghostButton: {
     paddingVertical: spacing.md,
@@ -871,8 +967,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   ghostButtonText: {
-    ...typography.body1,
-    color: colors.textSecondary,
+    ...typography.body2,
+    color: colors.textMuted,
   },
 
   // Wizard header
