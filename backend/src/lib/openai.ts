@@ -431,3 +431,107 @@ export async function estimateMeal(input: {
 
   return JSON.parse(raw) as AiMealEstimate;
 }
+
+// ---------------------------------------------------------------------------
+// Recipe text analyzer
+// ---------------------------------------------------------------------------
+
+/**
+ * Raw recipe data extracted by the AI from free-text input.
+ * ingredientLines are passed to parseMeal() afterward for catalog matching.
+ */
+export interface AiRecipeRaw {
+  suggestedName: string;
+  description: string;
+  suggestedPortions: number;
+  tags: string[];
+  ingredientLines: string[];
+  steps: Array<{
+    order: number;
+    title: string | null;
+    description: string;
+  }>;
+}
+
+const RECIPE_ANALYZE_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    suggestedName: { type: 'string' as const },
+    description: { type: 'string' as const },
+    suggestedPortions: { type: 'number' as const },
+    tags: { type: 'array' as const, items: { type: 'string' as const } },
+    ingredientLines: { type: 'array' as const, items: { type: 'string' as const } },
+    steps: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          order: { type: 'number' as const },
+          title: { type: ['string', 'null'] as const },
+          description: { type: 'string' as const },
+        },
+        required: ['order', 'title', 'description'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['suggestedName', 'description', 'suggestedPortions', 'tags', 'ingredientLines', 'steps'],
+  additionalProperties: false,
+};
+
+const RECIPE_ANALYZE_SYSTEM_PROMPT = `Du bist ein Rezept-Assistent für eine deutsche Ernährungs-App.
+Der Nutzer gibt ein Rezept in freiem Text ein — mit möglichen Tippfehlern, Stichpunkten oder unvollständigen Sätzen.
+Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahieren und zu formulieren.
+
+## Ausgabefelder
+
+**suggestedName**: Ein prägnanter, ansprechender Rezeptname auf Deutsch. Falls der Nutzer einen Namen angegeben hat, verwende diesen (korrigiert). Ansonsten leite einen passenden Namen aus den Zutaten/Zubereitung ab.
+
+**description**: Ein einleitender Beschreibungstext in 2-4 Sätzen. Beschreibe das Gericht, seinen Charakter und Geschmack. Schreibe in natürlichem, einladendem Deutsch — kein Marketing-Sprech.
+
+**suggestedPortions**: Anzahl der Portionen als Zahl. Falls der Nutzer eine Anzahl nennt, übernehme diese. Ansonsten schätze eine sinnvolle Portionsgröße (Standard: 4 für Hauptgerichte, 12 für Backwaren wie Muffins/Plätzchen, 1 für Single-Portionen).
+
+**tags**: 2-5 passende deutsche Schlagwörter, z.B. "Vegetarisch", "Schnell", "Backen", "Familienrezept", "Glutenfrei", "Vegan". Nur wenn wirklich zutreffend.
+
+**ingredientLines**: Jede Zutat als eigene Zeile im Format "Menge Einheit Zutat", z.B. "300g Hähnchenbrust", "2 EL Olivenöl", "1 Zwiebel". Behalte die Original-Mengenangaben, korrigiere nur Tippfehler. Wenn keine Menge angegeben ist, schätze eine sinnvolle Menge für die angegebenen Portionen.
+
+**steps**: Die Zubereitungsschritte als geordnete Liste. Schreibe jeden Schritt als vollständigen, klaren Satz oder kurzen Absatz auf Deutsch. Konvertiere Stichpunkte in lesbare Anleitungen. Schätze bei Bedarf realistische Zeitangaben (durationMinutes). title ist ein optionaler kurzer Überschrift pro Schritt (z.B. "Teig vorbereiten", "Anbraten"), null wenn kein sinnvoller Titel passt.
+
+## Regeln
+- Korrigiere Rechtschreibfehler und Grammatik
+- Formuliere Schritte in aktivem, imperativen Stil ("Zwiebeln würfeln und in Öl anbraten.")
+- Erfinde keine Zutaten oder Schritte, die der Nutzer nicht erwähnt hat
+- suggestedPortions muss eine positive Zahl > 0 sein
+- Antworte NUR mit dem strukturierten JSON-Output`;
+
+/**
+ * Analyze a free-text recipe description via Azure OpenAI.
+ * Returns structured recipe metadata + raw ingredient lines for further catalog matching.
+ */
+export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
+  const client = getClient();
+  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+
+  const response = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      { role: 'system', content: RECIPE_ANALYZE_SYSTEM_PROMPT },
+      { role: 'user', content: text },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'recipe_analyze',
+        strict: true,
+        schema: RECIPE_ANALYZE_SCHEMA,
+      },
+    },
+    temperature: 0.2,
+    max_tokens: 2048,
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI');
+
+  return JSON.parse(raw) as AiRecipeRaw;
+}

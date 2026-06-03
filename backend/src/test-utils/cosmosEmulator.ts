@@ -72,21 +72,39 @@ export async function createTestDatabase(databaseId: string): Promise<EmulatorCo
   const { database } = await client.databases.createIfNotExists({ id: databaseId });
 
   // Same partition keys as production; keeps contract tests honest.
-  const containerDefs = [
+  const containerDefs: Array<{ id: string; partitionKey: string; compositeIndexes?: object[][] }> = [
     { id: 'users', partitionKey: '/id' },
     { id: 'nutritionProfiles', partitionKey: '/userId' },
     { id: 'weights', partitionKey: '/userId' },
     { id: 'nutritionDiaryMeals', partitionKey: '/userId' },
     { id: 'reusableMealItems', partitionKey: '/userId' },
-    { id: 'recipes', partitionKey: '/userId' },
+    {
+      id: 'recipes',
+      partitionKey: '/userId',
+      compositeIndexes: [
+        [
+          { path: '/lastUsedAt', order: 'descending' },
+          { path: '/updatedAt', order: 'descending' },
+        ],
+      ],
+    },
     { id: 'foodProducts', partitionKey: '/id' },
     { id: 'aiUsage', partitionKey: '/userId' },
-  ] as const;
+  ];
 
   for (const def of containerDefs) {
     await database.containers.createIfNotExists({
       id: def.id,
       partitionKey: { paths: [def.partitionKey], kind: 'Hash' },
+      indexingPolicy: def.compositeIndexes
+        ? {
+            indexingMode: 'consistent',
+            automatic: true,
+            includedPaths: [{ path: '/*' }],
+            excludedPaths: [{ path: '/"_etag"/?' }],
+            compositeIndexes: def.compositeIndexes,
+          }
+        : undefined,
     });
   }
 

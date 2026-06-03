@@ -75,7 +75,7 @@ const AddItemSchema = z
     // AI estimate flag
     isAiEstimate: z.boolean().optional(),
     // AI meal estimate metadata (fast path, sourceType === 'ai-meal-estimate')
-    sourceType: z.enum(['manual', 'reusableItem', 'openFoodFacts', 'ai', 'ai-meal-estimate']).optional(),
+    sourceType: z.enum(['manual', 'reusableItem', 'openFoodFacts', 'ai', 'ai-meal-estimate', 'recipe']).optional(),
     aiMealEstimateComponents: z.array(z.string()).optional(),
     aiMealEstimateContext: z.string().trim().max(100).optional(),
     aiMealEstimateConfidence: z.enum(['high', 'medium', 'low']).optional(),

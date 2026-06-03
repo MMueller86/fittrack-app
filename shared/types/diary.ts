@@ -1,7 +1,7 @@
 // Diary types
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
-export type MealItemSourceType = 'manual' | 'reusableItem' | 'openFoodFacts' | 'ai' | 'ai-meal-estimate';
+export type MealItemSourceType = 'manual' | 'reusableItem' | 'openFoodFacts' | 'ai' | 'ai-meal-estimate' | 'recipe';
 
 // --- Nutrition value containers ---
 
@@ -48,6 +48,10 @@ export interface MealItem {
   aiMealEstimateAssumptions?: string[];
   /** True if a photo was used to improve the estimate */
   aiMealEstimatePhotoUsed?: boolean;
+  /** ID of the source recipe when sourceType === 'recipe' */
+  recipeId?: string;
+  /** Number of portions logged (may be fractional, e.g. 0.5) */
+  recipePortions?: number;
 }
 
 export interface Meal {

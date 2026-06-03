@@ -29,6 +29,11 @@ export interface AddItemInput {
   quantity?: number;
   unit?: string;
   isAiEstimate?: boolean;
+  sourceType?: import('@fittrack/shared').MealItemSourceType;
+  /** ID of the source recipe when sourceType === 'recipe' */
+  recipeId?: string;
+  /** Number of portions logged */
+  recipePortions?: number;
 }
 
 export interface DaySummary {
@@ -109,8 +114,10 @@ class InMemoryDiaryRepository implements DiaryRepository {
       const item: MealItem = {
         id: randomUUID(),
         name: input.name,
-        sourceType: 'manual',
+        sourceType: input.sourceType ?? 'manual',
         ...(input.isAiEstimate ? { isAiEstimate: true } : {}),
+        ...(input.recipeId ? { recipeId: input.recipeId } : {}),
+        ...(input.recipePortions != null ? { recipePortions: input.recipePortions } : {}),
         quantity: input.quantity ?? 1,
         unit: input.unit ?? 'serving',
         macros: {

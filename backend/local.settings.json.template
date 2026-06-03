@@ -13,6 +13,7 @@
     "AZURE_OPENAI_DEPLOYMENT_NAME": "gpt-4o-mini",
     "AUTH_ISSUER": "",
     "AUTH_AUDIENCE": "",
-    "AUTH_JWKS_URI": ""
+    "AUTH_JWKS_URI": "",
+    "INTERNAL_USER_IDS": ""
   }
 }

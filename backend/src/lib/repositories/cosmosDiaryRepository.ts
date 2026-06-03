@@ -59,8 +59,10 @@ export class CosmosDiaryRepository implements DiaryRepository {
     const newItem: MealItem = {
       id: randomUUID(),
       name: input.name,
-      sourceType: 'manual',
+      sourceType: input.sourceType ?? 'manual',
       ...(input.isAiEstimate ? { isAiEstimate: true } : {}),
+      ...(input.recipeId ? { recipeId: input.recipeId } : {}),
+      ...(input.recipePortions != null ? { recipePortions: input.recipePortions } : {}),
       quantity: input.quantity ?? 1,
       unit: input.unit ?? 'serving',
       macros: {

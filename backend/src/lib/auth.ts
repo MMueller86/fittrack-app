@@ -15,7 +15,7 @@ import type { JWTPayload } from 'jose';
 // Types
 // ---------------------------------------------------------------------------
 
-export type UserTier = 'free' | 'premium';
+export type UserTier = 'free' | 'premium' | 'internal';
 
 export interface UserContext {
   userId: string;
@@ -136,7 +136,15 @@ async function getUserContext(request: HttpRequest): Promise<UserContext> {
     throw new UnauthorizedError('Token missing sub claim');
   }
 
-  return { userId, tier: 'free' };
+  // Allow specific user IDs to be granted 'internal' tier (unlimited quota).
+  // Set INTERNAL_USER_IDS as a comma-separated list in local.settings.json or Azure config.
+  const internalIds = (process.env['INTERNAL_USER_IDS'] ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const tier: UserTier = internalIds.includes(userId) ? 'internal' : 'free';
+
+  return { userId, tier };
 }
 
 /**

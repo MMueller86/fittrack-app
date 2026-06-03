@@ -12,3 +12,4 @@ export * from './types/weights';
 export * from './types/foodProduct';
 export * from './types/quota';
 export * from './lib/nutritionCalculator';
+export * from './lib/recipeCalculator';

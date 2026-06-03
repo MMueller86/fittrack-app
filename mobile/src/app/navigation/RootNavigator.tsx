@@ -10,6 +10,9 @@ import HomeScreen from '../../modules/home/HomeScreen';
 import WeightDetailScreen from '../../modules/weight/WeightDetailScreen';
 import DiaryScreen from '../../modules/nutrition/DiaryScreen';
 import RecipeListScreen from '../../modules/recipes/RecipeListScreen';
+import RecipeDetailScreen from '../../modules/recipes/RecipeDetailScreen';
+import RecipeCreateScreen from '../../modules/recipes/RecipeCreateScreen';
+import RecipeWizardScreen from '../../modules/recipes/RecipeWizardScreen';
 import ProfileScreen from '../../modules/profile/ProfileScreen';
 import { colors } from '../theme';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon } from '../../assets/icons/TabIcons';
@@ -52,6 +55,32 @@ function HomeStackNavigator() {
   );
 }
 
+// --- Recipe stack ---
+export type RecipeStackParamList = {
+  RecipeList: undefined;
+  RecipeDetail: { id: string };
+  RecipeCreate: { editId?: string };
+  RecipeWizard: undefined;
+};
+
+const RecipeStack = createNativeStackNavigator<RecipeStackParamList>();
+
+function RecipeStackNavigator() {
+  return (
+    <RecipeStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <RecipeStack.Screen name="RecipeList" component={RecipeListScreen} />
+      <RecipeStack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
+      <RecipeStack.Screen name="RecipeCreate" component={RecipeCreateScreen} />
+      <RecipeStack.Screen name="RecipeWizard" component={RecipeWizardScreen} />
+    </RecipeStack.Navigator>
+  );
+}
+
 // --- Bottom tabs ---
 export type RootTabParamList = {
   Home: undefined;
@@ -88,7 +117,7 @@ export function RootNavigator() {
         />
         <Tab.Screen
           name="Recipes"
-          component={RecipeListScreen}
+          component={RecipeStackNavigator}
           options={{ tabBarIcon: ({ color, size }) => <RecipesIcon color={color} size={size} /> }}
         />
         <Tab.Screen

@@ -91,6 +91,12 @@ resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containe
         excludedPaths: [
           { path: '/"_etag"/?' }
         ]
+        compositeIndexes: c.name == 'recipes' ? [
+          [
+            { path: '/lastUsedAt', order: 'descending' }
+            { path: '/updatedAt', order: 'descending' }
+          ]
+        ] : []
       }
     }
   }

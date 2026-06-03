@@ -5,7 +5,7 @@
   "main": "dist/backend/src/index.js",
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "build:verify": "tsc --project tsconfig.json && node -e \"require('./dist/backend/src/index.js')\"",
+    "build:verify": "tsc --project tsconfig.json && node scripts/verify-build.mjs",
     "build:watch": "tsc --project tsconfig.json --watch",
     "start": "func start",
     "typecheck": "tsc --noEmit",

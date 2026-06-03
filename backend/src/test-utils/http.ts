@@ -81,6 +81,7 @@ export interface FakeRequestInit {
   rawBody?: string; // when provided, body is ignored — used for invalid-JSON tests
   params?: Record<string, string>;
   headers?: Record<string, string>;
+  formData?: FormData;
 }
 
 export function makeRequest(init: FakeRequestInit = {}): HttpRequest {
@@ -88,6 +89,7 @@ export function makeRequest(init: FakeRequestInit = {}): HttpRequest {
   const headers = init.headers ?? {};
   const rawBody = init.rawBody;
   const body = init.body;
+  const fakeFormData = init.formData;
 
   return {
     params,
@@ -103,6 +105,10 @@ export function makeRequest(init: FakeRequestInit = {}): HttpRequest {
         throw new SyntaxError('No body');
       }
       return body;
+    },
+    formData: async () => {
+      if (!fakeFormData) throw new Error('No formData provided to makeRequest');
+      return fakeFormData;
     },
     // Lazily reject any other property access so tests fail loudly instead
     // of silently passing on undefined behaviour.
@@ -121,9 +127,9 @@ export async function makeAuthRequest(init: FakeRequestInit = {}): Promise<HttpR
 
 export function makeContext(): InvocationContext {
   return {
-    log: () => {},
-    error: () => {},
-    warn: () => {},
+    log: (...args: unknown[]) => console.log('[ctx.log]', ...args),
+    error: (...args: unknown[]) => console.error('[ctx.error]', ...args),
+    warn: (...args: unknown[]) => console.warn('[ctx.warn]', ...args),
     info: () => {},
     debug: () => {},
     trace: () => {},

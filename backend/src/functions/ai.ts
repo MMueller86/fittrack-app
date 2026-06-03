@@ -1,6 +1,6 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import { parseMeal, estimateMeal, type AiParsedItem } from '../lib/openai';
+import { parseMeal, estimateMeal, type AiParsedItem, analyzeRecipeText, type AiRecipeRaw } from '../lib/openai';
 import { getFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { requireUser } from '../lib/auth';
@@ -117,6 +117,83 @@ const PreviewBodySchema = z.object({
   context: z.string().max(200).optional(),
 });
 
+// ---------------------------------------------------------------------------
+// Shared helper — resolve AI-parsed items against catalog + user library
+// Used by both mealParserPreviewHandler and recipeAnalyzeHandler
+// ---------------------------------------------------------------------------
+
+export async function resolveIngredients(userId: string, aiItems: AiParsedItem[]): Promise<MealParserPreviewItem[]> {
+  const catalogRepo = getFoodProductRepository();
+  const libraryRepo = getReusableItemsRepository();
+
+  return Promise.all(
+    aiItems.map(async (aiItem): Promise<MealParserPreviewItem> => {
+      // Split displayName into significant words (3+ chars) for multi-word library search
+      const searchWords = [
+        ...new Set(
+          aiItem.displayName
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w) => w.length >= 3),
+        ),
+      ];
+
+      const [libraryItemSets, catalogResults] = await Promise.all([
+        Promise.all(searchWords.map((word) => libraryRepo.search(userId, word))),
+        catalogRepo.search(aiItem.displayName, 5),
+      ]);
+
+      // Merge library results from all word-searches, deduplicated by id
+      const seenLibIds = new Set<string>();
+      const libraryItems: ReusableItem[] = [];
+      for (const resultSet of libraryItemSets) {
+        for (const item of resultSet) {
+          if (!seenLibIds.has(item.id)) {
+            seenLibIds.add(item.id);
+            libraryItems.push(item);
+          }
+        }
+      }
+
+      // Map library items to FoodSearchResult — library comes first
+      const libraryResults: FoodSearchResult[] = libraryItems.map((li) => ({
+        id: li.id,
+        source: 'library' as const,
+        name: li.name,
+        brand: li.brand,
+        displayLabel: li.nutritionPer100g
+          ? `100g · ${Math.round(li.nutritionPer100g.calories)} kcal`
+          : li.portion?.nutrition
+            ? `${li.portion.label} · ${Math.round(li.portion.nutrition.calories)} kcal`
+            : 'Keine Nährwerte',
+        nutritionBasis: li.nutritionBasis,
+        nutritionPer100g: li.nutritionPer100g,
+        portion: li.portion,
+        isComplete: li.isComplete,
+        sourceRef: li.sourceRef,
+        ...(li.sourceType === 'ai' && { isAiEstimate: true }),
+        ...(li.sourceType === 'ai' && li.aiConfidence != null && { aiConfidence: li.aiConfidence }),
+      }));
+
+      // De-duplicate: skip catalog entries whose name already in library
+      const libraryNames = new Set(libraryResults.map((r) => r.name.toLowerCase()));
+      const dedupedCatalog = catalogResults.filter((r) => !libraryNames.has(r.name.toLowerCase()));
+
+      const candidates = [...libraryResults, ...dedupedCatalog];
+      const classification = classifyItem(aiItem, candidates, libraryItems);
+      return {
+        rawText: aiItem.rawText,
+        displayName: aiItem.displayName,
+        inputMode: aiItem.inputMode,
+        inputAmount: aiItem.inputAmount,
+        amountGrams: resolveAmountGrams(aiItem),
+        candidates,
+        ...classification,
+      };
+    }),
+  );
+}
+
 export const mealParserPreviewHandler = withHandler(
   'ai.meal-parser.preview',
   async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
@@ -134,8 +211,6 @@ export const mealParserPreviewHandler = withHandler(
     }
 
     const { text, context } = parsed.data;
-    const catalogRepo = getFoodProductRepository();
-    const libraryRepo = getReusableItemsRepository();
 
     // 1. AI parsing
     let aiItems: AiParsedItem[];
@@ -149,77 +224,8 @@ export const mealParserPreviewHandler = withHandler(
     // Track usage AFTER successful AI call
     await trackUsage(userContext, 'meal-parser');
 
-    // 2. For each parsed item: search user library + catalog, merge, classify
-    const items = await Promise.all(
-      aiItems.map(async (aiItem): Promise<MealParserPreviewItem> => {
-        // Split displayName into significant words (3+ chars) to handle multi-word queries.
-        // The library search uses STARTSWITH on each stored term — so a query of
-        // "Sandwich Vollkorntoast" would never match a stored searchTerm "vollkorntoast"
-        // because STARTSWITH("vollkorntoast", "sandwich vollkorntoast") is false.
-        // Searching each word individually ("sandwich", "vollkorntoast") fixes this.
-        const searchWords = [
-          ...new Set(
-            aiItem.displayName
-              .toLowerCase()
-              .split(/\s+/)
-              .filter((w) => w.length >= 3),
-          ),
-        ];
-
-        const [libraryItemSets, catalogResults] = await Promise.all([
-          Promise.all(searchWords.map((word) => libraryRepo.search(userId, word))),
-          catalogRepo.search(aiItem.displayName, 5),
-        ]);
-
-        // Merge library results from all word-searches, deduplicated by id
-        const seenLibIds = new Set<string>();
-        const libraryItems: ReusableItem[] = [];
-        for (const resultSet of libraryItemSets) {
-          for (const item of resultSet) {
-            if (!seenLibIds.has(item.id)) {
-              seenLibIds.add(item.id);
-              libraryItems.push(item);
-            }
-          }
-        }
-
-        // Map library items to FoodSearchResult — library comes first
-        const libraryResults: FoodSearchResult[] = libraryItems.map((li) => ({
-          id: li.id,
-          source: 'library' as const,
-          name: li.name,
-          brand: li.brand,
-          displayLabel: li.nutritionPer100g
-            ? `100g · ${Math.round(li.nutritionPer100g.calories)} kcal`
-            : li.portion?.nutrition
-              ? `${li.portion.label} · ${Math.round(li.portion.nutrition.calories)} kcal`
-              : 'Keine Nährwerte',
-          nutritionBasis: li.nutritionBasis,
-          nutritionPer100g: li.nutritionPer100g,
-          portion: li.portion,
-          isComplete: li.isComplete,
-          sourceRef: li.sourceRef,
-          ...(li.sourceType === 'ai' && { isAiEstimate: true }),
-          ...(li.sourceType === 'ai' && li.aiConfidence != null && { aiConfidence: li.aiConfidence }),
-        }));
-
-        // De-duplicate: skip catalog entries whose name already in library
-        const libraryNames = new Set(libraryResults.map((r) => r.name.toLowerCase()));
-        const dedupedCatalog = catalogResults.filter((r) => !libraryNames.has(r.name.toLowerCase()));
-
-        const candidates = [...libraryResults, ...dedupedCatalog];
-        const classification = classifyItem(aiItem, candidates, libraryItems);
-        return {
-          rawText: aiItem.rawText,
-          displayName: aiItem.displayName,
-          inputMode: aiItem.inputMode,
-          inputAmount: aiItem.inputAmount,
-          amountGrams: resolveAmountGrams(aiItem),
-          candidates,
-          ...classification,
-        };
-      }),
-    );
+    // 2. Resolve each item against catalog + library
+    const items = await resolveIngredients(userId, aiItems);
 
     const globalWarnings: string[] = [];
     const unmatchedCount = items.filter((i) => i.status === 'unmatched').length;
@@ -406,5 +412,108 @@ app.http('ai-analyze-meal-item', {
     status: 501,
     jsonBody: { message: 'Replaced by POST /api/ai/meal-parser/preview' },
   }),
+});
+
+// ---------------------------------------------------------------------------
+// Recipe analyzer — freetext → name + description + steps + ingredients (resolved)
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge AiParsedItems that refer to the same ingredient (case-insensitive display name).
+ * Amounts are summed so the user sees a single entry per ingredient instead of one per step.
+ */
+function bundleAiItems(items: AiParsedItem[]): AiParsedItem[] {
+  const map = new Map<string, AiParsedItem>();
+  for (const item of items) {
+    const key = item.displayName.toLowerCase().trim();
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, { ...item });
+    } else {
+      // Sum amounts when both sides have a value
+      const summedAmount =
+        existing.inputAmount != null && item.inputAmount != null
+          ? existing.inputAmount + item.inputAmount
+          : (existing.inputAmount ?? item.inputAmount);
+      map.set(key, { ...existing, inputAmount: summedAmount });
+    }
+  }
+  return Array.from(map.values());
+}
+
+export interface AiRecipeAnalysisResponse {
+  suggestedName: string;
+  description: string;
+  suggestedPortions: number;
+  tags: string[];
+  steps: AiRecipeRaw['steps'];
+  ingredients: MealParserPreviewItem[];
+}
+
+const RecipeAnalyzeBodySchema = z.object({
+  text: z.string().min(10, 'Bitte beschreibe das Rezept mit mindestens 10 Zeichen.').max(5000, 'Text darf maximal 5000 Zeichen lang sein.'),
+});
+
+export const recipeAnalyzeHandler = withHandler(
+  'ai.recipe-analyze',
+  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const userContext = await requireUser(request);
+    const { userId } = userContext;
+
+    const quotaBlock = await enforceQuota(userContext, 'recipe-analyze');
+    if (quotaBlock) return quotaBlock;
+
+    const body = await request.json();
+    const parsed = RecipeAnalyzeBodySchema.safeParse(body);
+    if (!parsed.success) {
+      return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
+    }
+
+    const { text } = parsed.data;
+
+    // 1. Extract recipe structure via AI
+    let recipeRaw: AiRecipeRaw;
+    try {
+      recipeRaw = await analyzeRecipeText(text);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${msg}` } };
+    }
+
+    // Track usage after successful AI call
+    await trackUsage(userContext, 'recipe-analyze');
+
+    // 2. Parse ingredient lines via parseMeal, bundle duplicates, then resolve against catalog + library
+    let ingredients: MealParserPreviewItem[] = [];
+    if (recipeRaw.ingredientLines.length > 0) {
+      const joinedIngredients = recipeRaw.ingredientLines.join(', ');
+      let aiItems: AiParsedItem[];
+      try {
+        aiItems = await parseMeal(joinedIngredients);
+      } catch {
+        aiItems = [];
+      }
+      const bundledItems = bundleAiItems(aiItems);
+      ingredients = await resolveIngredients(userId, bundledItems);
+    }
+
+    const response: AiRecipeAnalysisResponse = {
+      suggestedName: recipeRaw.suggestedName,
+      description: recipeRaw.description,
+      suggestedPortions: recipeRaw.suggestedPortions,
+      tags: recipeRaw.tags,
+      steps: recipeRaw.steps,
+      ingredients,
+    };
+
+    return { status: 200, jsonBody: response };
+  },
+);
+
+app.http('recipe-analyze', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'ai/recipe-analyze',
+  handler: recipeAnalyzeHandler,
 });
 

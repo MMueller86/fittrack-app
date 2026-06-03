@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import type { AiRecipeRaw } from '../lib/openai';
 
 vi.mock('../lib/quota', () => ({
   enforceQuota: vi.fn().mockResolvedValue(null),
   trackUsage: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { classifyItem, resolveAmountGrams, mealParserPreviewHandler, mealEstimatePreviewHandler } from './ai';
+import { classifyItem, resolveAmountGrams, mealParserPreviewHandler, mealEstimatePreviewHandler, recipeAnalyzeHandler } from './ai';
 import type { AiParsedItem } from '../lib/openai';
 import { __setOpenAiClientForTests } from '../lib/openai';
 import { _setFoodProductRepository, _resetFoodProductRepository } from '../lib/repositories/foodProductRepository';
@@ -563,5 +564,139 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     expect(body).not.toHaveProperty('meal');
     expect(body).not.toHaveProperty('item');
     expect(body).toHaveProperty('mealEstimate');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recipeAnalyzeHandler — unit tests
+// ---------------------------------------------------------------------------
+
+function mockRecipeAnalyzeClient(recipe: AiRecipeRaw, ingredientItems?: AiParsedItem[]) {
+  // recipeAnalyzeHandler makes TWO OpenAI calls:
+  // 1. analyzeRecipeText → returns AiRecipeRaw
+  // 2. parseMeal (for ingredientLines) → returns { items: AiParsedItem[] }
+  const parsedIngredients: AiParsedItem[] = ingredientItems ??
+    recipe.ingredientLines.map((line) => ({
+      rawText: line,
+      displayName: line.replace(/^\d+\s*\w*\s+/, '').trim(),
+      inputMode: 'grams' as const,
+      inputAmount: 100,
+    }));
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const fakeClient: any = {
+    chat: {
+      completions: {
+        create: vi.fn()
+          .mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify(recipe) } }],
+          })
+          .mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({ items: parsedIngredients }) } }],
+          }),
+      },
+    },
+  };
+  __setOpenAiClientForTests(fakeClient);
+}
+
+const VALID_RECIPE_RAW: AiRecipeRaw = {
+  suggestedName: 'Hähnchenpfanne',
+  description: 'Eine einfache Hähnchenpfanne mit Gemüse.',
+  suggestedPortions: 4,
+  tags: ['Schnell', 'Familienrezept'],
+  ingredientLines: ['300g Hähnchenbrust', '1 Zwiebel'],
+  steps: [
+    { order: 1, title: 'Vorbereitung', description: 'Hähnchenbrust in Würfel schneiden.' },
+    { order: 2, title: null, description: 'Zwiebel anbraten.' },
+  ],
+};
+
+describe('POST /api/ai/recipe-analyze', () => {
+  it('returns 400 when text is missing', async () => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    mockFoodRepo([]);
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: {} }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when text is too short (< 10 chars)', async () => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    mockFoodRepo([]);
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Kurz' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 200 with correct structure for a valid request', async () => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    mockFoodRepo([makeCandidate('prod:1', 'Hähnchenbrust')]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Hähnchenpfanne mit 300g Hähnchenbrust und einer Zwiebel' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as typeof VALID_RECIPE_RAW & { ingredients: unknown[] };
+    expect(body.suggestedName).toBe('Hähnchenpfanne');
+    expect(body.description).toBe('Eine einfache Hähnchenpfanne mit Gemüse.');
+    expect(body.suggestedPortions).toBe(4);
+    expect(body.tags).toEqual(['Schnell', 'Familienrezept']);
+    expect(body.steps).toHaveLength(2);
+    expect(body.ingredients).toHaveLength(2);
+  });
+
+  it('returns matched ingredient when catalog has a strong match', async () => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    mockFoodRepo([makeCandidate('prod:1', 'Hähnchenbrust')]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Hähnchenpfanne mit 300g Hähnchenbrust und einer Zwiebel' } }),
+      makeContext(),
+    );
+    const body = res.jsonBody as { ingredients: { status: string; selectedProductId: string }[] };
+    const chicken = body.ingredients.find((i) => i.selectedProductId === 'prod:1');
+    expect(chicken).toBeDefined();
+    expect(chicken!.status).toBe('matched');
+  });
+
+  it('returns unmatched ingredient when catalog has no results', async () => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Hähnchenpfanne mit 300g Hähnchenbrust' } }),
+      makeContext(),
+    );
+    const body = res.jsonBody as { ingredients: { status: string }[] };
+    expect(body.ingredients.every((i) => i.status === 'unmatched')).toBe(true);
+  });
+
+  it('returns empty ingredients array when AI extracts no ingredient lines', async () => {
+    // When ingredientLines is empty, parseMeal is not called → only one OpenAI call needed
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({ ...VALID_RECIPE_RAW, ingredientLines: [] }) } }],
+          }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Ein Rezept ohne Zutaten' } }),
+      makeContext(),
+    );
+    const body = res.jsonBody as { ingredients: unknown[] };
+    expect(body.ingredients).toHaveLength(0);
   });
 });

@@ -31,6 +31,25 @@ export interface MealParserPreviewResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Types — mirror backend AiRecipeAnalysisResponse
+// ---------------------------------------------------------------------------
+
+export interface AiRecipeStep {
+  order: number;
+  title: string | null;
+  description: string;
+}
+
+export interface AiRecipeAnalysis {
+  suggestedName: string;
+  description: string;
+  suggestedPortions: number;
+  tags: string[];
+  steps: AiRecipeStep[];
+  ingredients: MealParserPreviewItem[];
+}
+
+// ---------------------------------------------------------------------------
 // API
 // ---------------------------------------------------------------------------
 
@@ -98,6 +117,13 @@ export const aiApi = {
     }
     return apiClient
       .post<AiMealEstimatePreview>('/ai/meal-estimate/preview', { text }, { timeout: 60_000 })
+      .then((r) => r.data);
+  },
+
+  /** POST /api/ai/recipe-analyze — parse freetext recipe into name, description, steps, and resolved ingredients */
+  analyzeRecipe(text: string): Promise<AiRecipeAnalysis> {
+    return apiClient
+      .post<AiRecipeAnalysis>('/ai/recipe-analyze', { text }, { timeout: 90_000 })
       .then((r) => r.data);
   },
 };

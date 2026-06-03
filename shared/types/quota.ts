@@ -1,6 +1,6 @@
 // AI usage tracking and quota types.
 
-export type AiFeature = 'meal-parser' | 'food-estimate' | 'label-scan' | 'meal-estimate';
+export type AiFeature = 'meal-parser' | 'food-estimate' | 'label-scan' | 'meal-estimate' | 'recipe-analyze';
 export type UserTier = 'free' | 'premium' | 'internal';
 
 /** Persisted in Cosmos `aiUsage` container. One document per user/feature/period. */

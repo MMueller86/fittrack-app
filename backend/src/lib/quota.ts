@@ -24,6 +24,10 @@ export async function enforceQuota(
     return null;
   }
 
+  console.warn(
+    `[quota] Quota exceeded: userId=${user.userId} feature=${feature} tier=${user.tier} used=${result.used} limit=${result.limit}`,
+  );
+
   const body: QuotaExceededResponse = {
     error: 'quota_exceeded',
     feature,
