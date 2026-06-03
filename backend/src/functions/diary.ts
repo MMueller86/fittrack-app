@@ -6,8 +6,10 @@ import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { calculate, NutritionCalculationError } from '../lib/nutritionCalculator';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
+import { getDayMetaRepository } from '../lib/repositories/dayMetaRepository';
 
-// GET    /api/diary?date=YYYY-MM-DD             — meals + day summary
+// GET    /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
+// PUT    /api/diary/{date}/day-type             — set rest/training day type
 // POST   /api/diary/meals                        — create meal
 // DELETE /api/diary/meals/:id                    — delete meal + items
 // POST   /api/diary/meals/:id/items              — add item (flat macros OR quantityMode+source)
@@ -102,10 +104,36 @@ export const getDiaryHandler = withHandler(
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return { status: 400, jsonBody: { error: 'Query param "date" must be YYYY-MM-DD' } };
     }
-    const repo = getDiaryRepository();
-    const result = await repo.getDay(userId, date);
+    const [result, dayMeta] = await Promise.all([
+      getDiaryRepository().getDay(userId, date),
+      getDayMetaRepository().get(userId, date),
+    ]);
     logEvent(ctx, 'info', 'diary.get', { userId, date, mealCount: result.meals.length });
-    return { status: 200, jsonBody: result };
+    return {
+      status: 200,
+      jsonBody: {
+        ...result,
+        dayType: dayMeta?.dayType ?? null,
+      },
+    };
+  },
+);
+
+// PUT /api/diary/{date}/day-type
+export const setDayTypeHandler = withHandler(
+  'diary.dayType.set',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const date = request.params.date;
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return { status: 400, jsonBody: { error: 'Route param "date" must be YYYY-MM-DD' } };
+    }
+    const parsed = await parseBody(request, z.object({ dayType: z.enum(['rest', 'training']) }));
+    if (!parsed.ok) return parsed.response;
+
+    const dayMeta = await getDayMetaRepository().upsert(userId, date, parsed.data.dayType);
+    logEvent(ctx, 'info', 'diary.dayType.set', { userId, date, dayType: parsed.data.dayType });
+    return { status: 200, jsonBody: { dayMeta } };
   },
 );
 
@@ -242,6 +270,13 @@ app.http('diary-get', {
   authLevel: 'anonymous',
   route: 'diary',
   handler: getDiaryHandler,
+});
+
+app.http('diary-day-type-set', {
+  methods: ['PUT'],
+  authLevel: 'anonymous',
+  route: 'diary/{date}/day-type',
+  handler: setDayTypeHandler,
 });
 
 app.http('diary-meals-create', {

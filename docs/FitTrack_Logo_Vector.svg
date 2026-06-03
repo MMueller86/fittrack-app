@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1280" viewBox="0 0 1280 1280">
+<defs>
+<radialGradient id="bg" cx="50%" cy="40%" r="60%">
+<stop offset="0%" stop-color="#111"/>
+<stop offset="100%" stop-color="#000"/>
+</radialGradient>
+
+<linearGradient id="apple" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#C4E34A"/>
+<stop offset="45%" stop-color="#A8D33E"/>
+<stop offset="100%" stop-color="#6CAB2F"/>
+</linearGradient>
+
+<linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#FFFFFF"/>
+<stop offset="40%" stop-color="#F3F3F3"/>
+<stop offset="100%" stop-color="#A8ADB2"/>
+</linearGradient>
+
+<linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+<stop offset="0%" stop-color="#F6F6F6"/>
+<stop offset="50%" stop-color="#B5D63A"/>
+<stop offset="100%" stop-color="#F6F6F6"/>
+</linearGradient>
+</defs>
+
+<rect width="1280" height="1280" fill="url(#bg)"/>
+
+<!-- Apple -->
+<g stroke="url(#apple)" fill="none" stroke-width="28">
+<path d="M420 550 C405 430 485 355 585 392 C620 405 650 405 690 385 C785 340 875 420 850 550"/>
+<path d="M440 610 C470 700 530 760 600 735 C620 728 630 710 640 710 C650 710 660 728 680 735 C750 760 810 700 840 610"/>
+</g>
+
+<!-- Leaves -->
+<path d="M520 200 C520 280 560 340 620 360 C630 280 590 220 520 200Z" fill="url(#apple)"/>
+<path d="M800 245 C720 240 670 295 650 360 C730 345 780 305 800 245Z" fill="url(#apple)"/>
+
+<!-- Barbell -->
+<g fill="url(#metal)">
+<rect x="250" y="560" width="40" height="30" rx="4"/>
+<rect x="300" y="520" width="22" height="110" rx="8"/>
+<rect x="330" y="475" width="34" height="200" rx="8"/>
+<rect x="372" y="455" width="42" height="240" rx="8"/>
+
+<rect x="990" y="560" width="40" height="30" rx="4"/>
+<rect x="958" y="520" width="22" height="110" rx="8"/>
+<rect x="916" y="475" width="34" height="200" rx="8"/>
+<rect x="866" y="455" width="42" height="240" rx="8"/>
+</g>
+
+<path d="M395 575 H535 L555 540 L590 645 L625 450 L660 635 L700 540 L725 575 H885"
+stroke="url(#bar)" stroke-width="22" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+<!-- FitTrack -->
+<text x="250" y="930" font-family="Arial, Helvetica, sans-serif" font-size="190" font-weight="700" fill="url(#metal)">Fit</text>
+<text x="540" y="930" font-family="Arial, Helvetica, sans-serif" font-size="190" font-weight="700" fill="url(#apple)">Track</text>
+
+<!-- Tagline -->
+<rect x="60" y="1028" width="150" height="5" fill="#A8D33E"/>
+<rect x="1070" y="1028" width="150" height="5" fill="#A8D33E"/>
+
+<text x="240" y="1042" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#F2F2F2" letter-spacing="4">
+ERNÄHRUNG. TRAINING. FORTSCHRITT.
+</text>
+</svg>

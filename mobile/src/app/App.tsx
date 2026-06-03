@@ -4,11 +4,13 @@
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { RootNavigator } from './navigation';
 import LoginScreen from '../modules/auth/LoginScreen';
 import { useAuthStore } from '../modules/auth/useAuthStore';
 import { colors } from './theme';
+import ErrorBoundary from './ErrorBoundary';
 
 export default function App() {
   const { isAuthenticated, initialize, login } = useAuthStore();
@@ -20,29 +22,37 @@ export default function App() {
   // Loading state — checking stored tokens
   if (isAuthenticated === null) {
     return (
-      <View style={styles.loading}>
-        <StatusBar style="light" />
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <ErrorBoundary>
+        <SafeAreaProvider>
+          <View style={styles.loading}>
+            <StatusBar style="light" />
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        </SafeAreaProvider>
+      </ErrorBoundary>
     );
   }
 
   // Unauthenticated — show login
   if (!isAuthenticated) {
     return (
-      <>
-        <StatusBar style="light" />
-        <LoginScreen onLoginSuccess={login} />
-      </>
+      <ErrorBoundary>
+        <SafeAreaProvider>
+          <StatusBar style="light" />
+          <LoginScreen onLoginSuccess={login} />
+        </SafeAreaProvider>
+      </ErrorBoundary>
     );
   }
 
   // Authenticated — show main app
   return (
-    <>
-      <StatusBar style="light" />
-      <RootNavigator />
-    </>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <RootNavigator />
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

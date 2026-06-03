@@ -72,9 +72,24 @@ export interface DaySummary {
   fiber: number;
 }
 
+export type DayType = 'rest' | 'training';
+
+/** Persisted per-day metadata document (id: "day:YYYY-MM-DD", _docType: "dayMeta"). */
+export interface DayMeta {
+  /** Format: "day:{date}", e.g. "day:2026-06-03" */
+  id: string;
+  userId: string;
+  /** ISO date string YYYY-MM-DD */
+  date: string;
+  dayType: DayType;
+  updatedAt: string;
+  _docType: 'dayMeta';
+}
+
 export interface DiaryDayResponse {
   meals: Meal[];
   summary: DaySummary;
+  dayType?: DayType;
 }
 
 // --- ReusableItem — extended model with Open Food Facts support ---

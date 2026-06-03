@@ -20,7 +20,6 @@ import {
   Dimensions,
   Keyboard,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +27,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   addWeight,
@@ -41,6 +41,7 @@ import { ErrorBanner } from '../../shared/components/ErrorBanner';
 import { Logo } from '../../shared/components/Logo';
 import { TrendPill } from '../../shared/components/TrendPill';
 import { WeightChart } from '../../shared/components/WeightChart';
+import { profileApi } from '../../shared/api/profileApi';
 
 const UNITS: WeightUnit[] = ['kg', 'lbs'];
 
@@ -75,6 +76,7 @@ export default function WeightDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
 
   // Ref tracks the latest entries so the optimistic-delete rollback can
   // restore them without making `onDelete` depend on `entries` state.
@@ -86,8 +88,11 @@ export default function WeightDetailScreen() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const data = await listWeights();
+      const [data, profileData] = await Promise.all([listWeights(), profileApi.getMe()]);
       setEntries(data);
+      if (profileData.profile?.targetWeightKg) {
+        setTargetWeightKg(profileData.profile.targetWeightKg);
+      }
     } catch (e) {
       setError(formatApiError(e, 'Failed to load entries'));
     }
@@ -228,6 +233,7 @@ export default function WeightDetailScreen() {
                 width={chartWidth}
                 height={220}
                 windowDays={30}
+                targetWeightKg={targetWeightKg}
               />
             </View>
 

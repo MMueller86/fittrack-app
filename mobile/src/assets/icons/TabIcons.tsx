@@ -29,12 +29,23 @@ export function NutritionIcon({ color, size = 24 }: IconProps) {
 }
 
 export function WeightIcon({ color, size = 24 }: IconProps) {
+  // Classic balance scale (Waage)
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Rect x="4" y="4" width="16" height="16" rx="4" stroke={color} strokeWidth="2" />
-      <Path d="M8.5 10.5C9.2 8.8 10.4 8 12 8C13.6 8 14.8 8.8 15.5 10.5" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M12 8L13.8 11.2" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M8 16H16" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {/* Vertical stand */}
+      <Path d="M12 6V18" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {/* Base */}
+      <Path d="M8 18H16" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {/* Horizontal beam */}
+      <Path d="M4 9H20" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {/* Pivot dot */}
+      <Circle cx="12" cy="6" r="1.5" fill={color} />
+      {/* Left chain + pan */}
+      <Path d="M4 9V14" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Path d="M2 14H6" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      {/* Right chain + pan (slightly longer = natural tilt) */}
+      <Path d="M20 9V15.5" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <Path d="M18 15.5H22" stroke={color} strokeWidth="2" strokeLinecap="round" />
     </Svg>
   );
 }

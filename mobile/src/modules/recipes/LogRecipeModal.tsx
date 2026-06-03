@@ -3,7 +3,6 @@ import React, { useEffect, useState } from 'react';
 import {
   Alert,
   Modal,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +10,7 @@ import {
   View,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { DiaryDayResponse, MealType, Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';

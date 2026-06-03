@@ -16,6 +16,7 @@ function getDatabaseId(): string {
 const CONTAINER_DEFS = [
   { id: 'users', partitionKey: '/id' },
   { id: 'nutritionProfiles', partitionKey: '/userId' },
+  { id: 'profiles', partitionKey: '/userId' },
   { id: 'weights', partitionKey: '/userId' },
   { id: 'nutritionDiaryMeals', partitionKey: '/userId' },
   { id: 'reusableMealItems', partitionKey: '/userId' },

@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
@@ -12,6 +11,7 @@ import {
   View,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { randomUUID } from 'expo-crypto';
 import type { AiFoodEstimateNutrition, FoodSearchResult, RecipeIngredient } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';

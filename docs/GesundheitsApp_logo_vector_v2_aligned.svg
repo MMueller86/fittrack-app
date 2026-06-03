@@ -1,0 +1,127 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1280" viewBox="0 0 1280 1280">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="42%" r="52%">
+      <stop offset="0%" stop-color="#121212"/>
+      <stop offset="60%" stop-color="#050607"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+
+    <linearGradient id="greenApple" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c8ee4f"/>
+      <stop offset="45%" stop-color="#8bd13d"/>
+      <stop offset="100%" stop-color="#4d972a"/>
+    </linearGradient>
+
+    <linearGradient id="greenText" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c4eb44"/>
+      <stop offset="52%" stop-color="#8ccc35"/>
+      <stop offset="100%" stop-color="#4e9b29"/>
+    </linearGradient>
+
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="35%" stop-color="#f6f6f6"/>
+      <stop offset="72%" stop-color="#cfd3d5"/>
+      <stop offset="100%" stop-color="#92989b"/>
+    </linearGradient>
+
+    <linearGradient id="barFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#f8f9f8"/>
+      <stop offset="34%" stop-color="#f8f9f8"/>
+      <stop offset="50%" stop-color="#92d944"/>
+      <stop offset="66%" stop-color="#f8f9f8"/>
+      <stop offset="100%" stop-color="#f8f9f8"/>
+    </linearGradient>
+
+    <filter id="softGlow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="textShadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#000000" flood-opacity="0.75"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="1280" fill="url(#bgGlow)"/>
+
+  <!-- Logo symbol: centred on x=640 like the original -->
+  <g filter="url(#softGlow)">
+    <path d="M421 552
+             C410 500 421 448 456 410
+             C488 375 540 365 589 389
+             C617 403 636 406 662 389
+             C714 357 785 371 824 421
+             C853 458 860 508 846 552"
+          fill="none" stroke="url(#greenApple)" stroke-width="27" stroke-linecap="butt"/>
+
+    <path d="M439 604
+             C456 667 501 728 566 724
+             C600 722 607 697 639 710
+             C670 697 677 722 712 724
+             C777 727 824 668 841 604"
+          fill="none" stroke="url(#greenApple)" stroke-width="27" stroke-linecap="butt"/>
+
+    <path d="M641 364
+             C641 278 580 209 524 200
+             C518 282 544 338 623 364
+             C632 366 637 366 641 364Z"
+          fill="url(#greenApple)" stroke="#bde94a" stroke-width="3"/>
+    <path d="M645 363
+             C662 293 722 238 802 244
+             C788 309 738 345 666 358
+             C655 360 649 361 645 363Z"
+          fill="url(#greenApple)" stroke="#bde94a" stroke-width="3"/>
+    <path d="M629 374 C632 326 610 289 590 269 C623 292 648 325 641 376"
+          fill="none" stroke="#050505" stroke-width="10" stroke-linecap="round"/>
+    <path d="M648 373 C664 333 700 301 735 288 C694 309 661 337 653 379"
+          fill="none" stroke="#050505" stroke-width="10" stroke-linecap="round"/>
+
+    <path d="M383 575 H540 L568 531 L604 650 L640 451 L676 640 L712 535 L742 574 H897"
+          fill="none" stroke="url(#barFade)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <path d="M531 575 H540 L568 531 L604 650 L640 451 L676 640 L712 535 L742 574 H771"
+          fill="none" stroke="url(#greenApple)" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <rect x="231" y="566" width="39" height="31" rx="6" fill="url(#metal)"/>
+    <rect x="280" y="527" width="24" height="111" rx="10" fill="url(#metal)"/>
+    <rect x="313" y="484" width="32" height="197" rx="11" fill="url(#metal)"/>
+    <rect x="353" y="464" width="39" height="237" rx="9" fill="url(#metal)"/>
+
+    <rect x="1010" y="566" width="39" height="31" rx="6" fill="url(#metal)"/>
+    <rect x="977" y="527" width="24" height="111" rx="10" fill="url(#metal)"/>
+    <rect x="935" y="484" width="32" height="197" rx="11" fill="url(#metal)"/>
+    <rect x="888" y="464" width="39" height="237" rx="9" fill="url(#metal)"/>
+  </g>
+
+  <!-- Wordmark corrected:
+       Gesamtbreite und Abstand orientieren sich am Original.
+       textLength verhindert Überlappung unabhängig vom lokal verfügbaren Font. -->
+  <g filter="url(#textShadow)"
+     font-family="'Arial Narrow','Roboto Condensed','Helvetica Neue Condensed','Liberation Sans Narrow',Arial,sans-serif"
+     font-weight="800">
+    <text x="118" y="927" font-size="118" letter-spacing="21"
+          textLength="805" lengthAdjust="spacingAndGlyphs"
+          fill="url(#metal)">GESUNDHEITS</text>
+    <text x="980" y="927" font-size="118" letter-spacing="7"
+          textLength="186" lengthAdjust="spacingAndGlyphs"
+          fill="url(#greenText)">APP</text>
+  </g>
+
+  <!-- Tagline corrected: rechts mehr Luft zur Linie, komplett mittig unter Wortmarke -->
+  <g font-family="'Arial Narrow','Roboto Condensed','Helvetica Neue Condensed','Liberation Sans Narrow',Arial,sans-serif"
+     font-weight="800" font-size="32" letter-spacing="10" filter="url(#textShadow)">
+    <rect x="122" y="987" width="141" height="5" fill="url(#greenText)"/>
+    <rect x="1050" y="987" width="110" height="5" fill="url(#greenText)"/>
+
+    <text x="292" y="1001" textLength="207" lengthAdjust="spacingAndGlyphs" fill="#f7f7f7">ERNÄHRUNG</text>
+    <circle cx="520" cy="989" r="3.2" fill="#91d83f"/>
+    <text x="550" y="1001" textLength="175" lengthAdjust="spacingAndGlyphs" fill="#f7f7f7">TRAINING</text>
+    <circle cx="747" cy="989" r="3.2" fill="#91d83f"/>
+    <text x="777" y="1001" textLength="238" lengthAdjust="spacingAndGlyphs" fill="#f7f7f7">FORTSCHRITT</text>
+    <circle cx="1030" cy="989" r="3.2" fill="#91d83f"/>
+  </g>
+</svg>

@@ -5,20 +5,19 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { DiaryDayResponse, Meal, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { diaryApi } from '../../shared/api/diaryApi';
+import { MacroSummaryCard } from '../../shared/components/MacroSummaryCard';
+import { useDayTypeStore } from './useDayTypeStore';
 import AddItemModal from './AddItemModal';
-
-// --- Mock nutrition target (until the NutritionTargets feature is live) ---
-const MOCK_TARGET = { calories: 2400, protein: 170, carbs: 230, fat: 80, fiber: 30 };
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 const MEAL_LABELS: Record<MealType, string> = {
@@ -60,71 +59,6 @@ function clamp(value: number, max: number): number {
 
 // --- Sub-components ---
 
-function MacroBar({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
-  const pct = clamp(value, target);
-  return (
-    <View style={macroStyles.row}>
-      <Text style={macroStyles.label}>{label}</Text>
-      <View style={macroStyles.track}>
-        <View style={[macroStyles.fill, { width: `${Math.round(pct * 100)}%`, backgroundColor: color }]} />
-      </View>
-      <Text style={macroStyles.value}>{Math.round(value)}g</Text>
-    </View>
-  );
-}
-
-const macroStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  label: { ...typography.caption, color: colors.textSecondary, width: 56 },
-  track: {
-    flex: 1,
-    height: 6,
-    backgroundColor: colors.border,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginHorizontal: spacing.sm,
-  },
-  fill: { height: '100%', borderRadius: 3 },
-  value: { ...typography.caption, color: colors.text, width: 44, textAlign: 'right' },
-});
-
-function SummaryCard({ summary }: { summary: DiaryDayResponse['summary'] }) {
-  const calPct = clamp(summary.calories, MOCK_TARGET.calories);
-  return (
-    <View style={styles.card}>
-      {/* Calories hero */}
-      <View style={styles.caloriesRow}>
-        <View>
-          <Text style={styles.calorieValue}>{Math.round(summary.calories)}</Text>
-          <Text style={styles.calorieLabel}>kcal consumed</Text>
-        </View>
-        <View style={styles.calorieRight}>
-          <Text style={styles.calorieTarget}>/{MOCK_TARGET.calories}</Text>
-          <Text style={styles.calorieRemaining}>
-            {Math.max(0, MOCK_TARGET.calories - Math.round(summary.calories))} left
-          </Text>
-        </View>
-      </View>
-      {/* Calorie progress bar */}
-      <View style={styles.calTrack}>
-        <View
-          style={[
-            styles.calFill,
-            { width: `${Math.round(calPct * 100)}%`, backgroundColor: calPct >= 1 ? colors.negative : colors.primary },
-          ]}
-        />
-      </View>
-      {/* Macros */}
-      <View style={styles.macroSection}>
-        <MacroBar label="Protein" value={summary.protein} target={MOCK_TARGET.protein} color="#3B82F6" />
-        <MacroBar label="Carbs" value={summary.carbs} target={MOCK_TARGET.carbs} color={colors.primary} />
-        <MacroBar label="Fat" value={summary.fat} target={MOCK_TARGET.fat} color="#F59E0B" />
-        <MacroBar label="Fiber" value={summary.fiber} target={MOCK_TARGET.fiber} color="#8B5CF6" />
-      </View>
-    </View>
-  );
-}
-
 function MealCard({
   meal,
   onAddItem,
@@ -136,7 +70,7 @@ function MealCard({
   onDeleteItem: (mealId: string, itemId: string, name: string) => void;
   onDeleteMeal: (meal: Meal) => void;
 }) {
-  const totalCal = meal.items.reduce((s, i) => s + i.macros.calories, 0);
+  const totalCal = (meal.items ?? []).reduce((s, i) => s + i.macros.calories, 0);
   return (
     <View style={styles.mealCard}>
       {/* Meal header */}
@@ -144,7 +78,7 @@ function MealCard({
         <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.mealName}>{meal.name}</Text>
-          {meal.items.length > 0 && (
+          {(meal.items ?? []).length > 0 && (
             <Text style={styles.mealCal}>{Math.round(totalCal)} kcal</Text>
           )}
         </View>
@@ -164,7 +98,7 @@ function MealCard({
         </TouchableOpacity>
       </View>
       {/* Items */}
-      {meal.items.map((item) => (
+      {(meal.items ?? []).map((item) => (
         <View key={item.id} style={styles.itemRow}>
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -197,7 +131,7 @@ function MealCard({
           </TouchableOpacity>
         </View>
       ))}
-      {meal.items.length === 0 && (
+      {(meal.items ?? []).length === 0 && (
         <Text style={styles.emptyItems}>No items yet — tap + Add</Text>
       )}
     </View>
@@ -212,6 +146,9 @@ export default function DiaryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { dayType, targets } = useDayTypeStore();
+  const todayTargets = targets ? (dayType === 'training' ? targets.trainingDay : targets.restDay) : null;
 
   // AddItem modal state
   const [modalVisible, setModalVisible] = useState(false);
@@ -329,7 +266,7 @@ export default function DiaryScreen() {
   const missingTypes = MEAL_ORDER.filter((t) => !existingTypes.has(t));
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Nutrition Diary</Text>
@@ -365,7 +302,15 @@ export default function DiaryScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Summary card */}
-          {data && <SummaryCard summary={data.summary} />}
+          {data && todayTargets && (
+            <MacroSummaryCard summary={data.summary} target={todayTargets} />
+          )}
+          {data && !todayTargets && (
+            <MacroSummaryCard
+              summary={data.summary}
+              target={{ calories: 2000, proteinG: 150, carbsG: 200, fatG: 70, fiberG: 25 }}
+            />
+          )}
 
           {/* Meals */}
           {orderedMeals.map((meal) => (
@@ -447,29 +392,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   retryBtnText: { ...typography.button, color: colors.primary },
-
-  // Summary card
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  caloriesRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm },
-  calorieValue: { fontSize: 48, fontWeight: '800', color: colors.text, lineHeight: 52 },
-  calorieLabel: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  calorieRight: { alignItems: 'flex-end', paddingTop: 8 },
-  calorieTarget: { ...typography.body2, color: colors.textSecondary },
-  calorieRemaining: { ...typography.caption, color: colors.primary, marginTop: 2 },
-  calTrack: {
-    height: 8,
-    backgroundColor: colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-  },
-  calFill: { height: '100%', borderRadius: 4 },
-  macroSection: { gap: 2 },
 
   // Meal card
   mealCard: {

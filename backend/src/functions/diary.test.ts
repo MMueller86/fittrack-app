@@ -1,7 +1,7 @@
 ﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 
 import { addItemHandler, createMealHandler } from './diary';
-import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
+import { __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
 
 // Unit tests for POST /api/diary/meals/:id/items
@@ -192,5 +192,51 @@ describe('POST /api/diary/meals/:id/items â€” quantityMode input', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeSummary — Robustheit
+// ---------------------------------------------------------------------------
+
+describe('computeSummary', () => {
+  it('gibt Nullwerte zurück wenn keine Meals vorhanden', () => {
+    const result = computeSummary([]);
+    expect(result).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
+  });
+
+  it('wirft nicht wenn meal.items undefined ist (Altdaten aus Cosmos)', () => {
+    const malformed = [{ id: '1', items: undefined }] as unknown as import('@fittrack/shared').Meal[];
+    expect(() => computeSummary(malformed)).not.toThrow();
+    expect(computeSummary(malformed)).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
+  });
+
+  it('wirft nicht wenn meal.items null ist', () => {
+    const malformed = [{ id: '1', items: null }] as unknown as import('@fittrack/shared').Meal[];
+    expect(() => computeSummary(malformed)).not.toThrow();
+  });
+
+  it('summiert Makros korrekt über mehrere Meals', () => {
+    const meals = [
+      {
+        id: '1',
+        items: [
+          { macros: { calories: 300, protein: 20, carbs: 40, fat: 8, fiber: 3 } },
+          { macros: { calories: 100, protein: 5, carbs: 15, fat: 2, fiber: 1 } },
+        ],
+      },
+      {
+        id: '2',
+        items: [
+          { macros: { calories: 200, protein: 10, carbs: 25, fat: 5, fiber: 2 } },
+        ],
+      },
+    ] as unknown as import('@fittrack/shared').Meal[];
+    const result = computeSummary(meals);
+    expect(result.calories).toBe(600);
+    expect(result.protein).toBe(35);
+    expect(result.carbs).toBe(80);
+    expect(result.fat).toBe(15);
+    expect(result.fiber).toBe(6);
   });
 });

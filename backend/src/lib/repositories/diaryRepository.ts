@@ -60,7 +60,7 @@ export interface DiaryRepository {
 export function computeSummary(meals: Meal[]): DaySummary {
   const summary: DaySummary = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   for (const meal of meals) {
-    for (const item of meal.items) {
+    for (const item of (meal.items ?? [])) {
       summary.calories += item.macros.calories;
       summary.protein += item.macros.protein;
       summary.carbs += item.macros.carbs;

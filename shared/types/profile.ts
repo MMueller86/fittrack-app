@@ -1,23 +1,70 @@
-// Profile and onboarding types — stub
-// Will be populated in M2 (Auth + Onboarding milestone)
+import type { ProfileTargets, CalculationMeta } from './nutrition';
 
-export type ActivityLevel = 'sedentary' | 'lightly_active' | 'moderately_active' | 'very_active' | 'extra_active';
-export type Goal = 'lose' | 'maintain' | 'gain';
-export type Sex = 'male' | 'female';
+export type Gender = 'male' | 'female' | 'other';
+
+export type ActivityLevel =
+  | 'sedentary'
+  | 'light'
+  | 'active'
+  | 'very_active';
+
+export type Sport =
+  | 'strength'
+  | 'bouldering'
+  | 'running'
+  | 'cycling'
+  | 'swimming'
+  | 'hiking'
+  | 'teamsport'
+  | 'other';
+
+export type GoalType =
+  | 'lose_weight'
+  | 'maintain'
+  | 'gain_muscle'
+  | 'recomposition';
+
+export type GoalIntensity = 'gentle' | 'moderate' | 'aggressive';
 
 export interface UserProfile {
-  id: string;
-  email: string;
-  displayName: string;
-  onboardingComplete: boolean;
-  createdAt: string;
-}
-
-export interface OnboardingInput {
+  /** Fixed doc id — always "profile" */
+  id: 'profile';
+  userId: string;
+  gender: Gender;
   age: number;
-  sex: Sex;
   heightCm: number;
   weightKg: number;
-  activityLevel: ActivityLevel;
-  goal: Goal;
+  /** Required: used for weight chart target line and distance indicator */
+  targetWeightKg: number;
+  /** Average daily steps excluding training. null when activityLevel fallback is used. */
+  stepsPerDay: number | null;
+  /** Used when stepsPerDay is null */
+  activityLevel: ActivityLevel | null;
+  trainingFrequencyPerWeek: number;
+  /** 0 when trainingFrequencyPerWeek === 0 */
+  trainingDurationMinutes: number;
+  sports: Sport[];
+  goal: GoalType;
+  /** null for maintain and recomposition */
+  goalIntensity: GoalIntensity | null;
+  targets: ProfileTargets;
+  calculationMeta: CalculationMeta;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Input shape for POST /profile and PUT /profile */
+export interface ProfileInput {
+  gender: Gender;
+  age: number;
+  heightCm: number;
+  weightKg: number;
+  targetWeightKg: number;
+  stepsPerDay: number | null;
+  activityLevel: ActivityLevel | null;
+  trainingFrequencyPerWeek: number;
+  trainingDurationMinutes: number;
+  sports: Sport[];
+  goal: GoalType;
+  goalIntensity: GoalIntensity | null;
 }

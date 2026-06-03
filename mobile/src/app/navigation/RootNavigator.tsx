@@ -1,7 +1,7 @@
 // RootNavigator — bottom tab shell with Home stack.
-// Auth/Onboarding stacks will wrap this in M2.
+// On first launch (no profile): shows ProfileWizardScreen as a modal.
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -14,8 +14,12 @@ import RecipeDetailScreen from '../../modules/recipes/RecipeDetailScreen';
 import RecipeCreateScreen from '../../modules/recipes/RecipeCreateScreen';
 import RecipeWizardScreen from '../../modules/recipes/RecipeWizardScreen';
 import ProfileScreen from '../../modules/profile/ProfileScreen';
+import ProfileEditScreen from '../../modules/profile/ProfileEditScreen';
+import ProfileWizardScreen from '../../modules/profile/ProfileWizardScreen';
+import type { UserProfile } from '@fittrack/shared';
 import { colors } from '../theme';
-import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon } from '../../assets/icons/TabIcons';
+import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, WeightIcon } from '../../assets/icons/TabIcons';
+import { profileApi } from '../../shared/api/profileApi';
 
 // React Navigation needs a theme that matches our dark palette so that
 // transient surfaces (e.g. screen background flashes between renders)
@@ -33,10 +37,9 @@ const navigationTheme = {
   },
 };
 
-// --- Home stack (Home + Weight detail) ---
+// --- Home stack ---
 export type HomeStackParamList = {
   HomeMain: undefined;
-  WeightDetail: undefined;
 };
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -50,8 +53,29 @@ function HomeStackNavigator() {
       }}
     >
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
-      <HomeStack.Screen name="WeightDetail" component={WeightDetailScreen} />
     </HomeStack.Navigator>
+  );
+}
+
+// --- Profile stack ---
+export type ProfileStackParamList = {
+  ProfileMain: undefined;
+  ProfileEdit: { profile: UserProfile | null };
+};
+
+const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
+
+function ProfileStackNavigator() {
+  return (
+    <ProfileStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
+      <ProfileStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+    </ProfileStack.Navigator>
   );
 }
 
@@ -86,12 +110,35 @@ export type RootTabParamList = {
   Home: undefined;
   Nutrition: undefined;
   Recipes: undefined;
+  Weight: undefined;
   Profile: undefined;
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export function RootNavigator() {
+  const [showWizard, setShowWizard] = useState(false);
+
+  useEffect(() => {
+    profileApi.getMe().then(({ profile }) => {
+      if (!profile) setShowWizard(true);
+    }).catch(() => {
+      // Network error — don't block the user, they can set up later
+    });
+  }, []);
+
+  if (showWizard) {
+    return (
+      <NavigationContainer theme={navigationTheme}>
+        <ProfileWizardScreen
+          onComplete={() => setShowWizard(false)}
+          onDismiss={() => setShowWizard(false)}
+          isNewProfile={true}
+        />
+      </NavigationContainer>
+    );
+  }
+
   return (
     <NavigationContainer theme={navigationTheme}>
       <Tab.Navigator
@@ -121,8 +168,16 @@ export function RootNavigator() {
           options={{ tabBarIcon: ({ color, size }) => <RecipesIcon color={color} size={size} /> }}
         />
         <Tab.Screen
+          name="Weight"
+          component={WeightDetailScreen}
+          options={{
+            tabBarLabel: 'Gewicht',
+            tabBarIcon: ({ color, size }) => <WeightIcon color={color} size={size} />,
+          }}
+        />
+        <Tab.Screen
           name="Profile"
-          component={ProfileScreen}
+          component={ProfileStackNavigator}
           options={{ tabBarIcon: ({ color, size }) => <ProfileIcon color={color} size={size} /> }}
         />
       </Tab.Navigator>
