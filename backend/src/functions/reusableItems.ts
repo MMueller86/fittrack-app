@@ -38,9 +38,9 @@ const ManualCreateSchema = z.object({
   fiber: positiveNumber,
 });
 
-// AI-estimated entry (nutritionPer100g-based) — covers both AI estimates and label scans
+// AI-estimated entry (nutritionPer100g-based) — covers AI estimates, label scans and manual per-100g entries
 const AiCreateSchema = z.object({
-  sourceType: z.enum(['ai', 'label-scan']),
+  sourceType: z.enum(['ai', 'label-scan', 'manual']),
   name: z.string().trim().min(1).max(200),
   nutritionPer100g: NutritionPer100gSchema,
   portion: PortionSchema.optional(),

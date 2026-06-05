@@ -7,6 +7,7 @@
 // The modal is a full-screen React Native Modal (no extra dependencies).
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
   Alert,
@@ -56,7 +57,7 @@ const MODES: { id: Mode; label: string }[] = [
   { id: 'ai', label: '✨ AI' },
   { id: 'scan', label: '📷 Scan' },
   { id: 'search', label: '🔍 Search' },
-  { id: 'manual', label: '✏️ Manual' },
+  { id: 'manual', label: '✏️ Manuell' },
 ];
 
 // --- Mode A: AI Input (Fast Path + optional Precision Path) ---
@@ -642,100 +643,249 @@ function SearchMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
   );
 }
 
-// --- Mode C: Manual ---
-const EMPTY_FORM = { name: '', calories: '', protein: '', carbs: '', fat: '', fiber: '' };
+// ---------------------------------------------------------------------------
+// Shared helper (used by ManualMode save handlers)
+// ---------------------------------------------------------------------------
+function parseNum(s: string): number {
+  const n = parseFloat(s.replace(',', '.'));
+  return Number.isFinite(n) ? n : 0;
+}
 
+// --- Mode C: Manual (inline form — same fields + save logic as LabelScanReviewScreen) ---
 function ManualMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }) {
-  const [form, setForm] = useState(EMPTY_FORM);
+  const insets = useSafeAreaInsets();
+
+  const [name, setName] = useState('');
+  const [portionLabel, setPortionLabel] = useState('');
+  const [portionGrams, setPortionGrams] = useState('');
+  const [calories, setCalories] = useState('0');
+  const [protein, setProtein] = useState('0');
+  const [carbs, setCarbs] = useState('0');
+  const [fat, setFat] = useState('0');
+  const [fiber, setFiber] = useState('');
+  const [salt, setSalt] = useState('');
+  const [sugar, setSugar] = useState('');
+  const [saturatedFat, setSaturatedFat] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const set = (field: keyof typeof EMPTY_FORM) => (value: string) =>
-    setForm((f) => ({ ...f, [field]: value }));
-
-  const isValid =
-    form.name.trim().length > 0 &&
-    ['calories', 'protein', 'carbs', 'fat', 'fiber'].every((k) => {
-      const v = Number((form as Record<string, string>)[k]);
-      return Number.isFinite(v) && v >= 0;
-    });
-
-  const handleSave = async () => {
-    if (!isValid) return;
-    setSaving(true);
-    const macros = {
-      name: form.name.trim(),
-      calories: Number(form.calories),
-      protein: Number(form.protein),
-      carbs: Number(form.carbs),
-      fat: Number(form.fat),
-      fiber: Number(form.fiber),
-    };
+  async function handleSaveAsProduct() {
+    setSaving(true); setError(null);
     try {
-      await diaryApi.addItem(mealId, macros);
-      // Save to reusable library (fire-and-forget — don't block the UI if it fails)
-      reusableItemsApi.create(macros).catch(() => undefined);
-      setForm(EMPTY_FORM);
+      const result = await reusableItemsApi.create({
+        name: name.trim() || 'Neues Produkt',
+        sourceType: 'manual',
+        nutritionPer100g: {
+          calories: parseNum(calories),
+          protein: parseNum(protein),
+          carbs: parseNum(carbs),
+          fat: parseNum(fat),
+          ...(fiber ? { fiber: parseNum(fiber) } : {}),
+          ...(salt ? { salt: parseNum(salt) } : {}),
+        },
+        portion: parseNum(portionGrams) > 0
+          ? { label: portionLabel || `${parseNum(portionGrams)} g`, weightGrams: parseNum(portionGrams) }
+          : undefined,
+      });
+      const grams = parseNum(portionGrams) > 0 ? parseNum(portionGrams) : 100;
+      const scale = grams / 100;
+      await diaryApi.addItem(mealId, {
+        productId: result.item.id,
+        productName: result.item.name ?? 'Neues Produkt',
+        inputMode: 'grams',
+        inputAmount: grams,
+        amountGrams: grams,
+        calculatedNutrition: {
+          calories: Math.round(parseNum(calories) * scale),
+          protein: Math.round(parseNum(protein) * scale * 10) / 10,
+          carbs: Math.round(parseNum(carbs) * scale * 10) / 10,
+          fat: Math.round(parseNum(fat) * scale * 10) / 10,
+        },
+      });
       onSaved();
     } catch (e) {
-      Alert.alert('Error', formatApiError(e, 'Could not save item'));
-    } finally {
-      setSaving(false);
-    }
-  };
+      console.error('[ManualMode] handleSaveAsProduct failed:', e);
+      setError(formatApiError(e, 'Speichern fehlgeschlagen'));
+    } finally { setSaving(false); }
+  }
 
-  const numInput = (label: string, field: keyof typeof EMPTY_FORM, unit = 'g') => (
-    <View style={modeStyles.fieldRow} key={field}>
-      <Text style={modeStyles.fieldLabel}>
-        {label} <Text style={modeStyles.fieldUnit}>({unit})</Text>
-      </Text>
-      <TextInput
-        style={modeStyles.fieldInput}
-        value={(form as Record<string, string>)[field]}
-        onChangeText={set(field)}
-        placeholder="0"
-        placeholderTextColor={colors.textMuted}
-        keyboardType="decimal-pad"
-        returnKeyType="next"
-      />
-    </View>
-  );
+  async function handleAddOnce() {
+    setSaving(true); setError(null);
+    try {
+      const grams = parseNum(portionGrams) > 0 ? parseNum(portionGrams) : 100;
+      const scale = grams / 100;
+      await diaryApi.addItem(mealId, {
+        name: name.trim() || 'Neues Produkt',
+        calories: Math.round(parseNum(calories) * scale),
+        protein: Math.round(parseNum(protein) * scale * 10) / 10,
+        carbs: Math.round(parseNum(carbs) * scale * 10) / 10,
+        fat: Math.round(parseNum(fat) * scale * 10) / 10,
+        fiber: Math.round(parseNum(fiber || '0') * scale * 10) / 10,
+      });
+      onSaved();
+    } catch (e) {
+      console.error('[ManualMode] handleAddOnce failed:', e);
+      setError(formatApiError(e, 'Hinzufügen fehlgeschlagen'));
+    } finally { setSaving(false); }
+  }
 
   return (
-    <ScrollView style={modeStyles.container} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View style={modeStyles.fieldRow}>
-        <Text style={modeStyles.fieldLabel}>Name</Text>
-        <TextInput
-          style={[modeStyles.fieldInput, { flex: 1.6 }]}
-          value={form.name}
-          onChangeText={set('name')}
-          placeholder="Food name"
-          placeholderTextColor={colors.textMuted}
-          returnKeyType="next"
-        />
+    <ScrollView
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={[manualStyles.container, { paddingBottom: insets.bottom + spacing.xl }]}
+    >
+      {/* Produktname */}
+      <Text style={manualStyles.fieldLabel}>Produktname</Text>
+      <TextInput
+        style={manualStyles.input}
+        value={name}
+        onChangeText={setName}
+        placeholder="z.B. Vollkornbrot"
+        placeholderTextColor={colors.textMuted}
+      />
+
+      {/* Nährwerte */}
+      <Text style={manualStyles.sectionTitle}>Nährwerte pro 100g</Text>
+
+      <View style={manualStyles.fieldRow}>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Kalorien (kcal)</Text>
+          <TextInput style={manualStyles.input} value={calories} onChangeText={setCalories} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Protein (g)</Text>
+          <TextInput style={manualStyles.input} value={protein} onChangeText={setProtein} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
       </View>
-      {numInput('Calories', 'calories', 'kcal')}
-      {numInput('Protein', 'protein')}
-      {numInput('Carbs', 'carbs')}
-      {numInput('Fat', 'fat')}
-      {numInput('Fiber', 'fiber')}
+
+      <View style={manualStyles.fieldRow}>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Kohlenhydrate (g)</Text>
+          <TextInput style={manualStyles.input} value={carbs} onChangeText={setCarbs} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>davon Zucker (g)</Text>
+          <TextInput style={manualStyles.input} value={sugar} onChangeText={setSugar} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
+      </View>
+
+      <View style={manualStyles.fieldRow}>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Fett (g)</Text>
+          <TextInput style={manualStyles.input} value={fat} onChangeText={setFat} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>davon gesättigt (g)</Text>
+          <TextInput style={manualStyles.input} value={saturatedFat} onChangeText={setSaturatedFat} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
+      </View>
+
+      <View style={manualStyles.fieldRow}>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Ballaststoffe (g)</Text>
+          <TextInput style={manualStyles.input} value={fiber} onChangeText={setFiber} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Salz (g)</Text>
+          <TextInput style={manualStyles.input} value={salt} onChangeText={setSalt} keyboardType="decimal-pad" selectTextOnFocus />
+        </View>
+      </View>
+
+      {/* Portionsgröße */}
+      <Text style={manualStyles.sectionTitle}>Portionsgröße</Text>
+      <View style={manualStyles.fieldRow}>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Bezeichnung (optional)</Text>
+          <TextInput
+            style={manualStyles.input}
+            value={portionLabel}
+            onChangeText={setPortionLabel}
+            placeholder="z.B. 1 Riegel"
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
+        <View style={manualStyles.fieldCol}>
+          <Text style={manualStyles.fieldLabel}>Gewicht (g)</Text>
+          <TextInput
+            style={manualStyles.input}
+            value={portionGrams}
+            onChangeText={setPortionGrams}
+            keyboardType="decimal-pad"
+            placeholder="z.B. 30"
+            placeholderTextColor={colors.textMuted}
+          />
+        </View>
+      </View>
+      {parseNum(portionGrams) > 0 && (
+        <Text style={manualStyles.portionHint}>Eintrag wird für {portionGrams} g berechnet</Text>
+      )}
+
+      {error && <ErrorBanner error={error} />}
+
       <TouchableOpacity
-        style={[modeStyles.primaryBtn, (!isValid || saving) && modeStyles.btnDisabled, { marginTop: spacing.md }]}
-        onPress={handleSave}
-        disabled={!isValid || saving}
+        style={[manualStyles.primaryBtn, saving && manualStyles.btnDisabled]}
+        onPress={handleSaveAsProduct}
+        disabled={saving}
       >
-        {saving ? (
-          <ActivityIndicator size="small" color={colors.background} />
-        ) : (
-          <Text style={modeStyles.primaryBtnText}>Save Item</Text>
-        )}
+        {saving
+          ? <ActivityIndicator color={colors.white} />
+          : <Text style={manualStyles.primaryBtnText}>Als Produkt speichern + hinzufügen</Text>
+        }
       </TouchableOpacity>
-      <View style={{ height: spacing.lg }} />
+
+      <TouchableOpacity
+        style={[manualStyles.secondaryBtn, saving && manualStyles.btnDisabled]}
+        onPress={handleAddOnce}
+        disabled={saving}
+      >
+        <Text style={manualStyles.secondaryBtnText}>Einmalig hinzufügen</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
+const manualStyles = StyleSheet.create({
+  container: {},  // padding comes from shellStyles.content
+  sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.md, marginBottom: spacing.sm },
+  fieldLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: 4 },
+  input: {
+    ...typography.body1,
+    color: colors.text,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  fieldRow: { flexDirection: 'row', gap: spacing.sm },
+  fieldCol: { flex: 1 },
+  portionHint: { ...typography.caption, color: colors.primary, marginBottom: spacing.sm },
+  primaryBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  primaryBtnText: { ...typography.body1, color: colors.white, fontWeight: '600' },
+  secondaryBtn: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  secondaryBtnText: { ...typography.body1, color: colors.primary },
+  btnDisabled: { opacity: 0.5 },
+});
+
 // --- Modal shell ---
 export default function AddItemModal({ visible, mealId, mealName, onClose, onSaved }: Props) {
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('search');
 
   useEffect(() => {
@@ -750,11 +900,11 @@ export default function AddItemModal({ visible, mealId, mealName, onClose, onSav
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={shellStyles.container}>
-            {/* Header */}
-            <View style={shellStyles.header}>
+            {/* Header — respects Safe Area (notch, status bar) */}
+            <View style={[shellStyles.header, { paddingTop: Math.max(spacing.lg, insets.top) }]}>
               <View>
-                <Text style={shellStyles.title}>Add Item</Text>
-                <Text style={shellStyles.subtitle}>to {mealName}</Text>
+                <Text style={shellStyles.title}>Eintrag hinzufügen</Text>
+                <Text style={shellStyles.subtitle}>zu {mealName}</Text>
               </View>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Text style={shellStyles.closeBtn}>✕</Text>
@@ -776,7 +926,7 @@ export default function AddItemModal({ visible, mealId, mealName, onClose, onSav
               ))}
             </View>
 
-            {/* Mode content */}
+            {/* Mode content — all modes render inline under the tabs */}
             <View style={shellStyles.content}>
               {mode === 'ai' && <AiMode mealId={mealId} onSaved={onSaved} />}
               {mode === 'scan' && <ScanMode mealId={mealId} onSaved={onSaved} />}
@@ -796,8 +946,9 @@ const shellStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    padding: spacing.md,
-    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    // paddingTop is set dynamically via insets in JSX
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
@@ -895,25 +1046,6 @@ const modeStyles = StyleSheet.create({
   searchItemName: { ...typography.body2, color: colors.text },
   searchItemMacros: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   addIcon: { ...typography.h2, color: colors.primary, paddingLeft: spacing.sm },
-  fieldRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  fieldLabel: { ...typography.body2, color: colors.text, flex: 1 },
-  fieldUnit: { color: colors.textMuted, fontSize: 11 },
-  fieldInput: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.text,
-    padding: spacing.sm,
-    ...typography.body2,
-    textAlign: 'right',
-    minWidth: 90,
-  },
 });
 
 // --- AI placeholder styles ---

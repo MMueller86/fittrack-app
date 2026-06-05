@@ -8,6 +8,7 @@
 //   recipes             /userId
 //   aiUsage             /userId
 //   profiles            /userId
+//   foodProducts        /id
 
 targetScope = 'resourceGroup'
 
@@ -72,6 +73,7 @@ var containerDefs = [
   { name: 'recipes', partitionKey: '/userId' }
   { name: 'aiUsage', partitionKey: '/userId' }
   { name: 'profiles', partitionKey: '/userId' }
+  { name: 'foodProducts', partitionKey: '/id' }
 ]
 
 resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = [for c in containerDefs: {

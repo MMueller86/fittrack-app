@@ -162,6 +162,102 @@ describe('POST /api/reusable-items — AI create', () => {
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/reusable-items — label-scan path
+// ---------------------------------------------------------------------------
+
+describe('POST /api/reusable-items — label-scan create', () => {
+  it('returns 201 with label-scan source type and per100g basis', async () => {
+    const req = await makeAuthRequest({
+      body: {
+        sourceType: 'label-scan',
+        name: 'Vollmilch 3,5%',
+        nutritionPer100g: { calories: 64, protein: 3.4, carbs: 4.8, fat: 3.5 },
+      },
+    });
+    const res = await createReusableItemHandler(req, ctx);
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: Record<string, unknown> };
+    expect(item['sourceType']).toBe('label-scan');
+    expect(item['nutritionBasis']).toBe('per100g');
+  });
+
+  it('returns 201 with label-scan and portion — basis becomes both', async () => {
+    const req = await makeAuthRequest({
+      body: {
+        sourceType: 'label-scan',
+        name: 'Schokoriegel',
+        nutritionPer100g: { calories: 480, protein: 5, carbs: 65, fat: 22, fiber: 3, salt: 0.3 },
+        portion: { label: '1 Riegel', weightGrams: 45 },
+      },
+    });
+    const res = await createReusableItemHandler(req, ctx);
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: Record<string, unknown> };
+    expect(item['sourceType']).toBe('label-scan');
+    expect(item['nutritionBasis']).toBe('both');
+    const portion = item['portion'] as { label: string; weightGrams: number };
+    expect(portion.label).toBe('1 Riegel');
+    expect(portion.weightGrams).toBe(45);
+  });
+
+  it('returns 400 when sourceType is label-scan but nutritionPer100g is missing', async () => {
+    const req = await makeAuthRequest({
+      body: { sourceType: 'label-scan', name: 'Schokoriegel' },
+    });
+    const res = await createReusableItemHandler(req, ctx);
+    expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/reusable-items — manual per-100g path (sourceType: 'manual')
+// ---------------------------------------------------------------------------
+
+describe('POST /api/reusable-items — manual per-100g create', () => {
+  it('returns 201 with manual sourceType and nutritionPer100g', async () => {
+    const req = await makeAuthRequest({
+      body: {
+        sourceType: 'manual',
+        name: 'Selbst eingegebenes Produkt',
+        nutritionPer100g: { calories: 250, protein: 12, carbs: 30, fat: 8 },
+      },
+    });
+    const res = await createReusableItemHandler(req, ctx);
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: Record<string, unknown> };
+    expect(item['sourceType']).toBe('manual');
+    expect(item['nutritionBasis']).toBe('per100g');
+  });
+
+  it('returns 201 with manual + portion — basis becomes both', async () => {
+    const req = await makeAuthRequest({
+      body: {
+        sourceType: 'manual',
+        name: 'Hausgemachtes Granola',
+        nutritionPer100g: { calories: 420, protein: 10, carbs: 55, fat: 18, fiber: 6 },
+        portion: { label: '1 Portion', weightGrams: 60 },
+      },
+    });
+    const res = await createReusableItemHandler(req, ctx);
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: Record<string, unknown> };
+    expect(item['sourceType']).toBe('manual');
+    expect(item['nutritionBasis']).toBe('both');
+    const n100 = item['nutritionPer100g'] as { calories: number; fiber: number };
+    expect(n100.calories).toBe(420);
+    expect(n100.fiber).toBe(6);
+  });
+
+  it('returns 400 when sourceType is manual but nutritionPer100g is missing', async () => {
+    const req = await makeAuthRequest({
+      body: { sourceType: 'manual', name: 'Produkt ohne Nährwerte' },
+    });
+    const res = await createReusableItemHandler(req, ctx);
+    expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/reusable-items?query= — search
 // ---------------------------------------------------------------------------
 

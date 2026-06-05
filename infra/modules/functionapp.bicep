@@ -189,6 +189,16 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'AZURE_DI_KEY'
           value: azureDocIntelligenceKey
         }
+        // Linux native modules: let Oryx rebuild npm packages on the Linux host.
+        // Required for packages with native binaries (e.g. sharp) deployed from Windows.
+        {
+          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
+          value: 'true'
+        }
+        {
+          name: 'ENABLE_ORYX_BUILD'
+          value: 'true'
+        }
       ]
     }
   }

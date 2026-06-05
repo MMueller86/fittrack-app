@@ -25,6 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NutritionLabelScanResult } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
@@ -39,7 +40,10 @@ import { reusableItemsApi } from '../../shared/api/reusableItemsApi';
 interface Props {
   visible: boolean;
   mealId: string;
-  scanResult: NutritionLabelScanResult;
+  /** Vorausgefüllte Scan-Daten — fehlen bei manueller Eingabe (isManual=true) */
+  scanResult?: NutritionLabelScanResult;
+  /** true = manuelle Eingabe (leere Felder, kein OCR/KI-Badge, anderer Titel) */
+  isManual?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -63,31 +67,33 @@ function num(s: string): number {
 // Main screen
 // ---------------------------------------------------------------------------
 
-export default function LabelScanReviewScreen({ visible, mealId, scanResult, onClose, onSaved }: Props) {
-  const n = scanResult.nutrition;
+export default function LabelScanReviewScreen({ visible, mealId, scanResult, isManual = false, onClose, onSaved }: Props) {
+  const insets = useSafeAreaInsets();
+  const n = scanResult?.nutrition;
+  const fallbackName = isManual ? '' : 'Gescanntes Produkt';
 
-  // Editable fields
+  // Editable fields — pre-filled from scan data when available, empty for manual entry
   const [name, setName] = useState(
-    [scanResult.brand, scanResult.productName].filter(Boolean).join(' – ') || 'Gescanntes Produkt',
+    isManual ? '' : ([scanResult?.brand, scanResult?.productName].filter(Boolean).join(' – ') || 'Gescanntes Produkt'),
   );
-  const [portionLabel, setPortionLabel] = useState(scanResult.servingSize?.label ?? '');
+  const [portionLabel, setPortionLabel] = useState(scanResult?.servingSize?.label ?? '');
   const [portionGrams, setPortionGrams] = useState(
-    scanResult.servingSize?.weightGrams != null ? String(scanResult.servingSize.weightGrams) : '',
+    scanResult?.servingSize?.weightGrams != null ? String(scanResult.servingSize.weightGrams) : '',
   );
-  const [calories, setCalories] = useState(String(n.calories ?? 0));
-  const [protein, setProtein] = useState(String(n.protein ?? 0));
-  const [carbs, setCarbs] = useState(String(n.carbs ?? 0));
-  const [fat, setFat] = useState(String(n.fat ?? 0));
-  const [fiber, setFiber] = useState(String(n.fiber ?? ''));
-  const [salt, setSalt] = useState(String(n.salt ?? ''));
-  const [sugar, setSugar] = useState(String(n.sugar ?? ''));
-  const [saturatedFat, setSaturatedFat] = useState(String(n.saturatedFat ?? ''));
+  const [calories, setCalories] = useState(String(n?.calories ?? 0));
+  const [protein, setProtein] = useState(String(n?.protein ?? 0));
+  const [carbs, setCarbs] = useState(String(n?.carbs ?? 0));
+  const [fat, setFat] = useState(String(n?.fat ?? 0));
+  const [fiber, setFiber] = useState(String(n?.fiber ?? ''));
+  const [salt, setSalt] = useState(String(n?.salt ?? ''));
+  const [sugar, setSugar] = useState(String(n?.sugar ?? ''));
+  const [saturatedFat, setSaturatedFat] = useState(String(n?.saturatedFat ?? ''));
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ocrConf = useMemo(() => confidenceLabel(scanResult.ocrConfidence), [scanResult.ocrConfidence]);
-  const aiConf = useMemo(() => confidenceLabel(scanResult.aiConfidence), [scanResult.aiConfidence]);
+  const ocrConf = useMemo(() => scanResult ? confidenceLabel(scanResult.ocrConfidence) : null, [scanResult]);
+  const aiConf = useMemo(() => scanResult ? confidenceLabel(scanResult.aiConfidence) : null, [scanResult]);
 
   // Save as ReusableItem + add to diary
   async function handleSaveAsProduct() {
@@ -95,8 +101,8 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
     setError(null);
     try {
       const result = await reusableItemsApi.create({
-        name: name.trim() || 'Gescanntes Produkt',
-        sourceType: 'label-scan',
+        name: name.trim() || (isManual ? 'Neues Produkt' : 'Gescanntes Produkt'),
+        sourceType: isManual ? 'manual' : 'label-scan',
         nutritionPer100g: {
           calories: num(calories),
           protein: num(protein),
@@ -115,7 +121,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
       const scale = grams / 100;
       await diaryApi.addItem(mealId, {
         productId: result.item.id,
-        productName: result.item.name,
+        productName: result.item.name ?? (isManual ? 'Neues Produkt' : 'Gescanntes Produkt'),
         inputMode: 'grams',
         inputAmount: grams,
         amountGrams: grams,
@@ -129,6 +135,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
 
       onSaved();
     } catch (e) {
+      console.error('[LabelScanReviewScreen] handleSaveAsProduct failed:', e);
       setError(formatApiError(e, 'Speichern fehlgeschlagen'));
     } finally {
       setSaving(false);
@@ -143,7 +150,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
       const grams = num(portionGrams) > 0 ? num(portionGrams) : 100;
       const scale = grams / 100;
       await diaryApi.addItem(mealId, {
-        name: name.trim() || 'Gescanntes Produkt',
+        name: name.trim() || (isManual ? 'Neues Produkt' : 'Gescanntes Produkt'),
         calories: Math.round(num(calories) * scale),
         protein: Math.round(num(protein) * scale * 10) / 10,
         carbs: Math.round(num(carbs) * scale * 10) / 10,
@@ -152,6 +159,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
       });
       onSaved();
     } catch (e) {
+      console.error('[LabelScanReviewScreen] handleAddOnce failed:', e);
       setError(formatApiError(e, 'Hinzufügen fehlgeschlagen'));
     } finally {
       setSaving(false);
@@ -164,32 +172,40 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Header — respects Safe Area (notch, status bar) */}
+        <View style={[styles.header, { paddingTop: Math.max(spacing.lg, insets.top) }]}>
           <TouchableOpacity onPress={onClose}>
             <Text style={styles.cancelText}>Abbrechen</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>📷 Scan-Ergebnis</Text>
+          <Text style={styles.headerTitle}>
+            {isManual ? '✏️ Produkt eingeben' : '📷 Scan-Ergebnis'}
+          </Text>
           <View style={{ width: 80 }} />
         </View>
 
-        <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled">
-          {/* Confidence indicators */}
-          <View style={styles.confidenceRow}>
-            <View style={styles.confidenceBadge}>
-              <Text style={[styles.confidenceLabel, { color: ocrConf.color }]}>
-                OCR: {ocrConf.label}
-              </Text>
+        <ScrollView
+          style={styles.scroll}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: insets.bottom + spacing.xl }}
+        >
+          {/* Confidence indicators — only for scan results */}
+          {!isManual && ocrConf && aiConf && (
+            <View style={styles.confidenceRow}>
+              <View style={styles.confidenceBadge}>
+                <Text style={[styles.confidenceLabel, { color: ocrConf.color }]}>
+                  OCR: {ocrConf.label}
+                </Text>
+              </View>
+              <View style={styles.confidenceBadge}>
+                <Text style={[styles.confidenceLabel, { color: aiConf.color }]}>
+                  KI: {aiConf.label}
+                </Text>
+              </View>
             </View>
-            <View style={styles.confidenceBadge}>
-              <Text style={[styles.confidenceLabel, { color: aiConf.color }]}>
-                KI: {aiConf.label}
-              </Text>
-            </View>
-          </View>
+          )}
 
-          {/* Warnings */}
-          {scanResult.warnings.length > 0 && (
+          {/* Warnings — only for scan results */}
+          {!isManual && scanResult && scanResult.warnings.length > 0 && (
             <View style={styles.warningsBox}>
               {scanResult.warnings.map((w, i) => (
                 <Text key={i} style={styles.warningText}>⚠️ {w}</Text>
@@ -202,49 +218,51 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, onC
           <TextInput style={styles.input} value={name} onChangeText={setName} />
 
           {/* Nutrition fields */}
-          <Text style={styles.sectionTitle}>Nährwerte pro 100{scanResult.baseUnit === '100ml' ? 'ml' : 'g'}</Text>
+          <Text style={styles.sectionTitle}>
+            Nährwerte pro 100{!isManual && scanResult?.baseUnit === '100ml' ? 'ml' : 'g'}
+          </Text>
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>Kalorien (kcal)</Text>
-              <TextInput style={styles.input} value={calories} onChangeText={setCalories} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={calories} onChangeText={setCalories} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>Protein (g)</Text>
-              <TextInput style={styles.input} value={protein} onChangeText={setProtein} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={protein} onChangeText={setProtein} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
           </View>
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>Kohlenhydrate (g)</Text>
-              <TextInput style={styles.input} value={carbs} onChangeText={setCarbs} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={carbs} onChangeText={setCarbs} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>davon Zucker (g)</Text>
-              <TextInput style={styles.input} value={sugar} onChangeText={setSugar} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={sugar} onChangeText={setSugar} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
           </View>
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>Fett (g)</Text>
-              <TextInput style={styles.input} value={fat} onChangeText={setFat} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={fat} onChangeText={setFat} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>davon gesättigt (g)</Text>
-              <TextInput style={styles.input} value={saturatedFat} onChangeText={setSaturatedFat} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={saturatedFat} onChangeText={setSaturatedFat} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
           </View>
 
           <View style={styles.fieldRow}>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>Ballaststoffe (g)</Text>
-              <TextInput style={styles.input} value={fiber} onChangeText={setFiber} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={fiber} onChangeText={setFiber} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
             <View style={styles.fieldCol}>
               <Text style={styles.fieldLabel}>Salz (g)</Text>
-              <TextInput style={styles.input} value={salt} onChangeText={setSalt} keyboardType="decimal-pad" />
+              <TextInput style={styles.input} value={salt} onChangeText={setSalt} keyboardType="decimal-pad" selectTextOnFocus />
             </View>
           </View>
 
@@ -318,7 +336,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
+    // paddingTop is set dynamically via insets in JSX
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
