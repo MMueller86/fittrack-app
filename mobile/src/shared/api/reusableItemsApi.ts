@@ -32,6 +32,11 @@ export interface UpdateReusableItemInput {
 export type CreateReusableItemInput = CreateManualItemInput | CreateAiItemInput;
 
 export const reusableItemsApi = {
+  /** GET /api/reusable-items/:id */
+  getById(id: string): Promise<{ item: ReusableItem }> {
+    return apiClient.get<{ item: ReusableItem }>(`/reusable-items/${id}`).then((r) => r.data);
+  },
+
   /** GET /api/reusable-items?query= */
   search(query: string): Promise<{ items: ReusableItem[] }> {
     return apiClient

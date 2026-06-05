@@ -1,7 +1,8 @@
 ﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 
-import { addItemHandler, createMealHandler } from './diary';
+import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler } from './diary';
 import { __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
+import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
 import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
 
 // Unit tests for POST /api/diary/meals/:id/items
@@ -318,5 +319,153 @@ describe('computeSummary', () => {
     expect(result.carbs).toBe(80);
     expect(result.fat).toBe(15);
     expect(result.fiber).toBe(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/diary/meals/:id/items/:itemId — updateItemHandler
+// ---------------------------------------------------------------------------
+
+describe('PUT /api/diary/meals/:id/items/:itemId — updateItemHandler', () => {
+  beforeEach(() => {
+    __resetDayMetaRepositoryForTests();
+  });
+
+  afterEach(() => {
+    __resetDayMetaRepositoryForTests();
+  });
+
+  it('scales macros proportionally for a manual item (grams mode)', async () => {
+    const mealId = await createMeal();
+    // Add a manual item: 100g → 200 kcal
+    const addRes = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          name: 'Banane',
+          calories: 200,
+          protein: 2,
+          carbs: 40,
+          fat: 1,
+          fiber: 2,
+        },
+      }),
+      makeContext(),
+    );
+    expect(addRes.status).toBe(201);
+    const item = (addRes.jsonBody as { meal: { items: Array<{ id: string; quantity: number }> } }).meal.items[0];
+    expect(item.quantity).toBe(1); // default quantity for flat-macro items
+
+    // Update to 200g (ratio 200/1 = 200x)
+    const res = await updateItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId, itemId: item.id },
+        body: { inputMode: 'grams', amountGrams: 200 },
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const updatedMeal = (res.jsonBody as { meal: { items: Array<{ quantity: number; unit: string; macros: { calories: number } }> } }).meal;
+    const updatedItem = updatedMeal.items[0];
+    expect(updatedItem.quantity).toBe(200);
+    expect(updatedItem.unit).toBe('g');
+    expect(updatedItem.macros.calories).toBe(40000); // 200 × 200 kcal
+  });
+
+  it('returns 404 when meal does not exist', async () => {
+    const res = await updateItemHandler(
+      await makeAuthRequest({
+        params: { id: 'nonexistent-meal', itemId: 'nonexistent-item' },
+        body: { inputMode: 'grams', amountGrams: 100 },
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 when item does not exist in meal', async () => {
+    const mealId = await createMeal();
+    const res = await updateItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId, itemId: 'ghost-item' },
+        body: { inputMode: 'grams', amountGrams: 100 },
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 for missing required field (no amountGrams in grams mode)', async () => {
+    const mealId = await createMeal();
+    const res = await updateItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId, itemId: 'any-id' },
+        body: { inputMode: 'grams' }, // amountGrams missing
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/diary/:date/day-type — workoutType support
+// ---------------------------------------------------------------------------
+
+describe('PUT /api/diary/:date/day-type with workoutType', () => {
+  beforeEach(() => {
+    __resetDayMetaRepositoryForTests();
+  });
+
+  afterEach(() => {
+    __resetDayMetaRepositoryForTests();
+  });
+
+  it('stores workoutType and returns it in GET response', async () => {
+    // Set training day + gym workout
+    const putRes = await setDayTypeHandler(
+      await makeAuthRequest({
+        params: { date: '2026-05-08' },
+        body: { dayType: 'training', workoutType: 'gym' },
+      }),
+      makeContext(),
+    );
+    expect(putRes.status).toBe(200);
+    const meta = (putRes.jsonBody as { dayMeta: { dayType: string; workoutType: string } }).dayMeta;
+    expect(meta.dayType).toBe('training');
+    expect(meta.workoutType).toBe('gym');
+
+    // Verify directly via repository
+    const repo = getDayMetaRepository();
+    const stored = await repo.get('test-user-abc-123', '2026-05-08');
+    expect(stored?.workoutType).toBe('gym');
+  });
+
+  it('clears workoutType when switching to rest day', async () => {
+    // First set training + bouldering
+    await setDayTypeHandler(
+      await makeAuthRequest({
+        params: { date: '2026-05-08' },
+        body: { dayType: 'training', workoutType: 'bouldering' },
+      }),
+      makeContext(),
+    );
+    // Then switch to rest
+    const restRes = await setDayTypeHandler(
+      await makeAuthRequest({
+        params: { date: '2026-05-08' },
+        body: { dayType: 'rest' },
+      }),
+      makeContext(),
+    );
+    expect(restRes.status).toBe(200);
+    const meta = (restRes.jsonBody as { dayMeta: { dayType: string; workoutType?: string } }).dayMeta;
+    expect(meta.dayType).toBe('rest');
+    expect(meta.workoutType).toBeUndefined();
+
+    // Verify directly via repository
+    const repo = getDayMetaRepository();
+    const stored = await repo.get('test-user-abc-123', '2026-05-08');
+    expect(stored?.workoutType).toBeUndefined();
   });
 });

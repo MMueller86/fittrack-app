@@ -13,6 +13,7 @@ import type {
   CreateMealInput,
   DiaryDayResult,
   DiaryRepository,
+  UpdateItemInput,
 } from './diaryRepository';
 import { computeSummary, recalcMacros } from './diaryRepository';
 
@@ -32,6 +33,14 @@ export class CosmosDiaryRepository implements DiaryRepository {
       )
       .fetchAll();
     return { meals: resources, summary: computeSummary(resources) };
+  }
+
+  async getMealById(userId: string, mealId: string): Promise<Meal | null> {
+    const { containers } = await getCosmos();
+    const { resource } = await containers.nutritionDiaryMeals
+      .item(mealId, userId)
+      .read<Meal>();
+    return resource ?? null;
   }
 
   async createMeal(input: CreateMealInput): Promise<Meal> {
@@ -75,6 +84,26 @@ export class CosmosDiaryRepository implements DiaryRepository {
       },
     };
     existing.items = [...(existing.items ?? []), newItem];
+
+    const { resource: updated } = await containers.nutritionDiaryMeals
+      .item(mealId, userId)
+      .replace<Meal>(existing);
+    return updated ?? existing;
+  }
+
+  async updateItem(userId: string, mealId: string, itemId: string, input: UpdateItemInput): Promise<Meal | null> {
+    const { containers } = await getCosmos();
+    const { resource: existing } = await containers.nutritionDiaryMeals
+      .item(mealId, userId)
+      .read<Meal>();
+    if (!existing) return null;
+
+    const item = existing.items.find((i) => i.id === itemId);
+    if (!item) return null;
+
+    item.quantity = input.quantity;
+    item.unit = input.unit;
+    item.macros = input.macros;
 
     const { resource: updated } = await containers.nutritionDiaryMeals
       .item(mealId, userId)

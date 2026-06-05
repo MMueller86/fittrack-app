@@ -240,8 +240,8 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
       >
         {/* Header — respects Safe Area (notch, status bar) */}
         <View style={[styles.header, { paddingTop: Math.max(spacing.lg, insets.top) }]}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={styles.cancelText}>Abbrechen</Text>
+          <TouchableOpacity onPress={onClose} style={styles.headerBackBtn}>
+            <Text style={styles.cancelText}>{isEditMode ? 'Abbrechen' : '‹ Zurück'}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
             {isEditMode ? '✏️ Produkt bearbeiten' : isManual ? '✏️ Produkt eingeben' : '📷 Scan-Ergebnis'}
@@ -467,6 +467,17 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
               >
                 <Text style={styles.secondaryBtnText}>Einmalig hinzufügen</Text>
               </TouchableOpacity>
+
+              {/* Re-scan: only available in scan mode (not manual entry) */}
+              {!isManual && (
+                <TouchableOpacity
+                  style={styles.rescanBtn}
+                  onPress={onClose}
+                  disabled={saving}
+                >
+                  <Text style={styles.rescanBtnText}>🔄 Erneut scannen</Text>
+                </TouchableOpacity>
+              )}
             </>
           )}
         </ScrollView>
@@ -549,6 +560,14 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   secondaryBtnText: { ...typography.body1, color: colors.primary },
+  rescanBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xl,
+  },
+  rescanBtnText: { ...typography.body2, color: colors.textSecondary },
+  headerBackBtn: { minWidth: 80 },
   btnDisabled: { opacity: 0.5 },
   portionHint: { ...typography.caption, color: colors.primary, marginBottom: spacing.sm },
   accordionHeader: {

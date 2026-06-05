@@ -4,13 +4,13 @@
 //   - COSMOS configured → CosmosDayMetaRepository (same nutritionDiaryMeals container)
 //   - Otherwise → InMemoryDayMetaRepository
 
-import type { DayMeta, DayType } from '@fittrack/shared';
+import type { DayMeta, DayType, WorkoutType } from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosDayMetaRepository } from './cosmosDayMetaRepository';
 
 export interface DayMetaRepository {
   get(userId: string, date: string): Promise<DayMeta | null>;
-  upsert(userId: string, date: string, dayType: DayType): Promise<DayMeta>;
+  upsert(userId: string, date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<DayMeta>;
 }
 
 class InMemoryDayMetaRepository implements DayMetaRepository {
@@ -24,12 +24,13 @@ class InMemoryDayMetaRepository implements DayMetaRepository {
     return this.store.get(this.key(userId, date)) ?? null;
   }
 
-  async upsert(userId: string, date: string, dayType: DayType): Promise<DayMeta> {
+  async upsert(userId: string, date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<DayMeta> {
     const meta: DayMeta = {
       id: `day:${date}`,
       userId,
       date,
       dayType,
+      ...(workoutType ? { workoutType } : {}),
       updatedAt: new Date().toISOString(),
       _docType: 'dayMeta',
     };

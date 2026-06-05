@@ -38,6 +38,15 @@ export interface AddItemInput {
   recipePortions?: number;
 }
 
+export interface UpdateItemInput {
+  /** Updated macros (pre-calculated by handler) */
+  macros: MealItemMacros;
+  /** Updated quantity value (grams or portions depending on unit) */
+  quantity: number;
+  /** Updated unit string */
+  unit: string;
+}
+
 export interface DaySummary {
   calories: number;
   protein: number;
@@ -53,8 +62,11 @@ export interface DiaryDayResult {
 
 export interface DiaryRepository {
   getDay(userId: string, date: string): Promise<DiaryDayResult>;
+  /** Fetch a single meal by id (across all days) — returns null if not found */
+  getMealById(userId: string, mealId: string): Promise<Meal | null>;
   createMeal(input: CreateMealInput): Promise<Meal>;
   addItem(userId: string, mealId: string, input: AddItemInput): Promise<Meal>;
+  updateItem(userId: string, mealId: string, itemId: string, input: UpdateItemInput): Promise<Meal | null>;
   deleteItem(userId: string, mealId: string, itemId: string): Promise<Meal | null>;
   deleteMeal(userId: string, mealId: string): Promise<boolean>;
   /** Count all diary items that reference the given reusable item — used for delete warnings */
@@ -122,6 +134,14 @@ class InMemoryDiaryRepository implements DiaryRepository {
     return { meals, summary: computeSummary(meals) };
   }
 
+  async getMealById(userId: string, mealId: string): Promise<Meal | null> {
+    for (const [, meals] of this.mealsByDay) {
+      const meal = meals.find((m) => m.id === mealId && m.userId === userId);
+      if (meal) return meal;
+    }
+    return null;
+  }
+
   async createMeal(input: CreateMealInput): Promise<Meal> {
     const meal: Meal = {
       id: randomUUID(),
@@ -165,6 +185,20 @@ class InMemoryDiaryRepository implements DiaryRepository {
       return meal;
     }
     throw new Error(`Meal ${mealId} not found`);
+  }
+
+  async updateItem(userId: string, mealId: string, itemId: string, input: UpdateItemInput): Promise<Meal | null> {
+    for (const [, meals] of this.mealsByDay) {
+      const meal = meals.find((m) => m.id === mealId && m.userId === userId);
+      if (!meal) continue;
+      const item = meal.items.find((i) => i.id === itemId);
+      if (!item) return null;
+      item.quantity = input.quantity;
+      item.unit = input.unit;
+      item.macros = input.macros;
+      return meal;
+    }
+    return null;
   }
 
   async deleteItem(userId: string, mealId: string, itemId: string): Promise<Meal | null> {

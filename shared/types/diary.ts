@@ -1,6 +1,6 @@
 // Diary types
 
-export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'preworkout' | 'postworkout';
 export type MealItemSourceType = 'manual' | 'reusableItem' | 'openFoodFacts' | 'ai' | 'ai-meal-estimate' | 'recipe';
 
 // --- Nutrition value containers ---
@@ -73,6 +73,7 @@ export interface DaySummary {
 }
 
 export type DayType = 'rest' | 'training';
+export type WorkoutType = 'gym' | 'bouldering' | 'running' | 'cycling' | 'other';
 
 /** Persisted per-day metadata document (id: "day:YYYY-MM-DD", _docType: "dayMeta"). */
 export interface DayMeta {
@@ -82,6 +83,7 @@ export interface DayMeta {
   /** ISO date string YYYY-MM-DD */
   date: string;
   dayType: DayType;
+  workoutType?: WorkoutType;
   updatedAt: string;
   _docType: 'dayMeta';
 }
@@ -90,6 +92,7 @@ export interface DiaryDayResponse {
   meals: Meal[];
   summary: DaySummary;
   dayType?: DayType;
+  workoutType?: WorkoutType;
 }
 
 // --- ReusableItem — extended model with Open Food Facts support ---

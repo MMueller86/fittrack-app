@@ -28,7 +28,24 @@ import { listWeights } from '../../services/weightsService';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { profileApi } from '../../shared/api/profileApi';
 import { useDayTypeStore } from '../nutrition/useDayTypeStore';
-import type { WeightEntry, DiaryDayResponse } from '@fittrack/shared';
+import WorkoutTypePicker from './WorkoutTypePicker';
+import type { WeightEntry, DiaryDayResponse, WorkoutType } from '@fittrack/shared';
+
+const WORKOUT_LABELS: Record<WorkoutType, string> = {
+  gym: 'Gym',
+  bouldering: 'Bouldern',
+  running: 'Laufen',
+  cycling: 'Radfahren',
+  other: 'Sonstiges',
+};
+
+const WORKOUT_ICONS: Record<WorkoutType, string> = {
+  gym: '🏋️',
+  bouldering: '🧗',
+  running: '🏃',
+  cycling: '🚴',
+  other: '💡',
+};
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
@@ -49,7 +66,22 @@ export default function HomeScreen({ navigation }: Props) {
   const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
   const [displayName, setDisplayName] = useState<string | undefined>(undefined);
 
-  const { dayType, targets, setTargets, setDayType } = useDayTypeStore();
+  const { dayType, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
+  const [workoutPickerVisible, setWorkoutPickerVisible] = useState(false);
+
+  const handleDayTypeToggle = (t: 'rest' | 'training') => {
+    if (t === 'rest') {
+      void setDayType('rest', null);
+    } else {
+      // Show picker to choose workout type
+      setWorkoutPickerVisible(true);
+    }
+  };
+
+  const handleWorkoutTypeSelect = (wt: WorkoutType) => {
+    setWorkoutPickerVisible(false);
+    void setDayType('training', wt);
+  };
 
   const load = useCallback(async () => {
     try {
@@ -63,10 +95,14 @@ export default function HomeScreen({ navigation }: Props) {
       if (profileData.profile?.targetWeightKg) setTargetWeightKg(profileData.profile.targetWeightKg);
       if (profileData.profile?.displayName) setDisplayName(profileData.profile.displayName);
       setTodayDiary(diaryData);
+      // Tages-Typ + Trainingsart aus API hydratisieren
+      if (diaryData.dayType != null) {
+        hydrateDayType(diaryData.dayType, TODAY, diaryData.workoutType ?? null);
+      }
     } catch {
       setEntries([]);
     }
-  }, [setTargets]);
+  }, [setTargets, hydrateDayType]);
 
   useFocusEffect(
     useCallback(() => {
@@ -141,11 +177,15 @@ export default function HomeScreen({ navigation }: Props) {
               <TouchableOpacity
                 key={t}
                 style={[styles.heroToggleBtn, dayType === t && styles.heroToggleBtnActive]}
-                onPress={() => setDayType(t)}
+                onPress={() => handleDayTypeToggle(t)}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.heroToggleText, dayType === t && styles.heroToggleTextActive]}>
-                  {t === 'rest' ? '🛌 Ruhetag' : '💪 Trainingstag'}
+                  {t === 'rest'
+                    ? '� Ruhetag'
+                    : workoutType && dayType === 'training'
+                      ? `${WORKOUT_ICONS[workoutType]} ${WORKOUT_LABELS[workoutType]}`
+                      : '💪 Training'}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -230,6 +270,12 @@ export default function HomeScreen({ navigation }: Props) {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <WorkoutTypePicker
+        visible={workoutPickerVisible}
+        onSelect={handleWorkoutTypeSelect}
+        onClose={() => setWorkoutPickerVisible(false)}
+      />
     </SafeAreaView>
   );
 }

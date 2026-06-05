@@ -80,4 +80,15 @@ export const diaryApi = {
       .delete<{ meal: Meal }>(`/diary/meals/${mealId}/items/${itemId}`)
       .then((r) => r.data);
   },
+
+  /** PUT /api/diary/meals/:id/items/:itemId */
+  updateItem(
+    mealId: string,
+    itemId: string,
+    input: { amountGrams?: number; portionCount?: number; inputMode: 'grams' | 'portion' },
+  ): Promise<{ meal: Meal }> {
+    return apiClient
+      .put<{ meal: Meal }>(`/diary/meals/${mealId}/items/${itemId}`, input)
+      .then((r) => r.data);
+  },
 };

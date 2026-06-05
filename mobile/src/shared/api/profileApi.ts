@@ -9,6 +9,7 @@ import type {
   CalculationMeta,
   DayType,
   DayMeta,
+  WorkoutType,
 } from '@fittrack/shared';
 
 export interface ProfileResponse {
@@ -53,9 +54,9 @@ export const profileApi = {
     return apiClient.delete('/profile').then(() => undefined);
   },
 
-  setDayType(date: string, dayType: DayType): Promise<{ dayMeta: DayMeta }> {
+  setDayType(date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<{ dayMeta: DayMeta }> {
     return apiClient
-      .put<{ dayMeta: DayMeta }>(`/diary/${date}/day-type`, { dayType })
+      .put<{ dayMeta: DayMeta }>(`/diary/${date}/day-type`, { dayType, workoutType: workoutType ?? undefined })
       .then((r) => r.data);
   },
 };

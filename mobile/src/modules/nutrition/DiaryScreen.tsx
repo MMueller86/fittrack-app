@@ -12,25 +12,30 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { DiaryDayResponse, Meal, MealType } from '@fittrack/shared';
+import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { MacroSummaryCard } from '../../shared/components/MacroSummaryCard';
 import { useDayTypeStore } from './useDayTypeStore';
 import AddItemModal from './AddItemModal';
+import EditItemSheet from './EditItemSheet';
 
-const MEAL_ORDER: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
   dinner: 'Dinner',
   snack: 'Snack',
+  preworkout: 'Pre-Workout',
+  postworkout: 'Post-Workout',
 };
 const MEAL_ICONS: Record<MealType, string> = {
   breakfast: '🌅',
   lunch: '☀️',
   dinner: '🌙',
   snack: '🍎',
+  preworkout: '⚡',
+  postworkout: '💪',
 };
 
 function isoToday(): string {
@@ -63,11 +68,13 @@ function MealCard({
   meal,
   onAddItem,
   onDeleteItem,
+  onEditItem,
   onDeleteMeal,
 }: {
   meal: Meal;
   onAddItem: (mealId: string, mealName: string) => void;
   onDeleteItem: (mealId: string, itemId: string, name: string) => void;
+  onEditItem: (mealId: string, item: MealItem) => void;
   onDeleteMeal: (meal: Meal) => void;
 }) {
   const totalCal = (meal.items ?? []).reduce((s, i) => s + i.macros.calories, 0);
@@ -99,7 +106,12 @@ function MealCard({
       </View>
       {/* Items */}
       {(meal.items ?? []).map((item) => (
-        <View key={item.id} style={styles.itemRow}>
+        <TouchableOpacity
+          key={item.id}
+          style={styles.itemRow}
+          onPress={() => onEditItem(meal.id, item)}
+          activeOpacity={0.7}
+        >
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Text style={styles.itemName}>{item.name}</Text>
@@ -129,7 +141,7 @@ function MealCard({
           >
             <Text style={styles.deleteItemText}>✕</Text>
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
       ))}
       {(meal.items ?? []).length === 0 && (
         <Text style={styles.emptyItems}>No items yet — tap + Add</Text>
@@ -155,6 +167,28 @@ export default function DiaryScreen() {
   const [selectedMealId, setSelectedMealId] = useState<string>('');
   const [selectedMealName, setSelectedMealName] = useState<string>('');
 
+  // EditItem sheet state
+  const [editingItem, setEditingItem] = useState<MealItem | null>(null);
+  const [editingMealId, setEditingMealId] = useState<string>('');
+
+  const handleEditItem = (mealId: string, item: MealItem) => {
+    setEditingMealId(mealId);
+    setEditingItem(item);
+  };
+
+  const handleEditSaved = (updatedMeal: Meal) => {
+    setEditingItem(null);
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        meals: prev.meals.map((m) => m.id === updatedMeal.id ? updatedMeal : m),
+      };
+    });
+    // Reload for updated summary
+    void loadDay(date);
+  };
+
   const loadDay = useCallback(async (d: string) => {
     try {
       setError(null);
@@ -162,7 +196,7 @@ export default function DiaryScreen() {
       setData(result);
       // Trainings-/Ruhetag aus API-Response hydratisieren — überschreibt Store-Default ('rest')
       if (result.dayType != null) {
-        hydrateDayType(result.dayType, d);
+        hydrateDayType(result.dayType, d, result.workoutType ?? null);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load diary');
@@ -191,37 +225,46 @@ export default function DiaryScreen() {
   };
   const isToday = date === isoToday();
 
-  // Add meal
-  const handleAddMeal = (type: MealType) => {
-    Alert.alert(`Add ${MEAL_LABELS[type]}`, `Add a ${MEAL_LABELS[type]} meal for ${formatDateLabel(date)}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Add',
-        onPress: async () => {
-          try {
-            await diaryApi.createMeal(date, type);
-            await loadDay(date);
-          } catch {
-            Alert.alert('Error', 'Could not create meal');
-          }
-        },
-      },
-    ]);
+  // Add meal — direkt ohne Bestätigungs-Alert, optimistisches Update
+  const handleAddMeal = async (type: MealType) => {
+    // Optimistisch: temporäre Meal-ID sofort in State einfügen
+    const tempId = `temp-${type}-${Date.now()}`;
+    const tempMeal: Meal = {
+      id: tempId,
+      userId: '',
+      date,
+      type,
+      name: MEAL_LABELS[type],
+      items: [],
+      createdAt: new Date().toISOString(),
+    };
+    setData((prev) => prev ? { ...prev, meals: [...prev.meals, tempMeal] } : prev);
+    try {
+      await diaryApi.createMeal(date, type);
+      await loadDay(date); // Server-Sync: ersetzt temp-Meal mit echter ID
+    } catch {
+      // Rollback bei Fehler
+      setData((prev) => prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== tempId) } : prev);
+      Alert.alert('Fehler', 'Mahlzeit konnte nicht angelegt werden.');
+    }
   };
 
   // Delete meal
   const handleDeleteMeal = (meal: Meal) => {
-    Alert.alert(`Delete ${meal.name}?`, 'This will remove the meal and all its items.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(`"${meal.name}" löschen?`, 'Mahlzeit und alle Einträge werden entfernt.', [
+      { text: 'Abbrechen', style: 'cancel' },
       {
-        text: 'Delete',
+        text: 'Löschen',
         style: 'destructive',
         onPress: async () => {
+          // Optimistisch entfernen
+          setData((prev) => prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== meal.id) } : prev);
           try {
             await diaryApi.deleteMeal(meal.id);
-            await loadDay(date);
+            void loadDay(date); // Sync im Hintergrund
           } catch {
-            Alert.alert('Error', 'Could not delete meal');
+            await loadDay(date); // Rollback via Server-State
+            Alert.alert('Fehler', 'Mahlzeit konnte nicht gelöscht werden.');
           }
         },
       },
@@ -230,17 +273,28 @@ export default function DiaryScreen() {
 
   // Delete item
   const handleDeleteItem = (mealId: string, itemId: string, name: string) => {
-    Alert.alert(`Remove "${name}"?`, undefined, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(`"${name}" entfernen?`, undefined, [
+      { text: 'Abbrechen', style: 'cancel' },
       {
-        text: 'Remove',
+        text: 'Entfernen',
         style: 'destructive',
         onPress: async () => {
+          // Optimistisch entfernen
+          setData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              meals: prev.meals.map((m) =>
+                m.id === mealId ? { ...m, items: m.items.filter((i) => i.id !== itemId) } : m,
+              ),
+            };
+          });
           try {
             await diaryApi.deleteItem(mealId, itemId);
-            await loadDay(date);
+            void loadDay(date); // Sync im Hintergrund (aktualisiert Summary)
           } catch {
-            Alert.alert('Error', 'Could not remove item');
+            await loadDay(date); // Rollback
+            Alert.alert('Fehler', 'Eintrag konnte nicht entfernt werden.');
           }
         },
       },
@@ -323,6 +377,7 @@ export default function DiaryScreen() {
               meal={meal}
               onAddItem={handleOpenAddItem}
               onDeleteItem={handleDeleteItem}
+              onEditItem={handleEditItem}
               onDeleteMeal={handleDeleteMeal}
             />
           ))}
@@ -354,6 +409,17 @@ export default function DiaryScreen() {
         onClose={() => setModalVisible(false)}
         onSaved={handleItemSaved}
       />
+
+      {/* Edit Item Sheet */}
+      {editingItem && (
+        <EditItemSheet
+          visible={!!editingItem}
+          mealId={editingMealId}
+          item={editingItem}
+          onSaved={handleEditSaved}
+          onClose={() => setEditingItem(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }

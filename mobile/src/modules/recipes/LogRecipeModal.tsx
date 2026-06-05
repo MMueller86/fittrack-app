@@ -30,6 +30,8 @@ const MEAL_LABELS: Record<MealType, string> = {
   lunch: 'Mittagessen',
   dinner: 'Abendessen',
   snack: 'Snack',
+  preworkout: 'Pre-Workout',
+  postworkout: 'Post-Workout',
 };
 
 function isoToday(): string {

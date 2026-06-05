@@ -26,7 +26,7 @@ const isoDate = z
     return d.getUTCFullYear() === y && d.getUTCMonth() + 1 === m && d.getUTCDate() === day;
   }, { message: 'must be a real calendar date' });
 
-const MealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack']);
+const MealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout']);
 
 const CreateMealSchema = z.object({
   date: isoDate,
@@ -115,6 +115,7 @@ export const getDiaryHandler = withHandler(
       jsonBody: {
         ...result,
         dayType: dayMeta?.dayType ?? null,
+        workoutType: dayMeta?.workoutType ?? null,
       },
     };
   },
@@ -129,11 +130,17 @@ export const setDayTypeHandler = withHandler(
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return { status: 400, jsonBody: { error: 'Route param "date" must be YYYY-MM-DD' } };
     }
-    const parsed = await parseBody(request, z.object({ dayType: z.enum(['rest', 'training']) }));
+    const parsed = await parseBody(request, z.object({
+      dayType: z.enum(['rest', 'training']),
+      workoutType: z.enum(['gym', 'bouldering', 'running', 'cycling', 'other']).nullable().optional(),
+    }));
     if (!parsed.ok) return parsed.response;
 
-    const dayMeta = await getDayMetaRepository().upsert(userId, date, parsed.data.dayType);
-    logEvent(ctx, 'info', 'diary.dayType.set', { userId, date, dayType: parsed.data.dayType });
+    const { dayType, workoutType } = parsed.data;
+    // When switching to rest, clear workoutType
+    const resolvedWorkoutType = dayType === 'rest' ? null : (workoutType ?? undefined);
+    const dayMeta = await getDayMetaRepository().upsert(userId, date, dayType, resolvedWorkoutType);
+    logEvent(ctx, 'info', 'diary.dayType.set', { userId, date, dayType, workoutType: resolvedWorkoutType ?? null });
     return { status: 200, jsonBody: { dayMeta } };
   },
 );
@@ -280,6 +287,83 @@ export const addItemHandler = withHandler(
   },
 );
 
+const UpdateItemSchema = z.object({
+  amountGrams: z.number().positive().optional(),
+  portionCount: z.number().positive().optional(),
+  inputMode: z.enum(['grams', 'portion']),
+}).refine(
+  (d) => (d.inputMode === 'grams' ? d.amountGrams != null : d.portionCount != null),
+  { message: 'amountGrams required for grams mode, portionCount for portion mode' },
+);
+
+// PUT /api/diary/meals/:id/items/:itemId
+export const updateItemHandler = withHandler(
+  'diary.items.update',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const mealId = request.params['id'];
+    const itemId = request.params['itemId'];
+    if (!mealId || !itemId) return { status: 400, jsonBody: { error: 'Missing meal or item id' } };
+
+    const parsed = await parseBody(request, UpdateItemSchema);
+    if (!parsed.ok) return parsed.response;
+    const d = parsed.data;
+
+    const repo = getDiaryRepository();
+    const meal = await repo.getMealById(userId, mealId);
+    if (!meal) return { status: 404, jsonBody: { error: 'Meal not found' } };
+    const existingItem = meal.items.find((i) => i.id === itemId);
+    if (!existingItem) return { status: 404, jsonBody: { error: 'Item not found' } };
+
+    let newQuantity: number;
+    let newUnit: string;
+    let newMacros: import('@fittrack/shared').MealItemMacros;
+
+    if (existingItem.sourceId) {
+      // Item from a ReusableItem — recalculate from source product nutrition
+      const product = await getReusableItemsRepository().getById(userId, existingItem.sourceId);
+      if (!product?.nutritionPer100g) {
+        return { status: 422, jsonBody: { error: 'Source product not found — cannot recalculate macros' } };
+      }
+      const n = product.nutritionPer100g;
+      const grams = d.inputMode === 'portion'
+        ? (d.portionCount! * (product.portion?.weightGrams ?? 100))
+        : d.amountGrams!;
+      const scale = grams / 100;
+      newMacros = {
+        calories: Math.round(n.calories * scale * 10) / 10,
+        protein:  Math.round((n.protein  ?? 0) * scale * 10) / 10,
+        carbs:    Math.round((n.carbs    ?? 0) * scale * 10) / 10,
+        fat:      Math.round((n.fat      ?? 0) * scale * 10) / 10,
+        fiber:    Math.round((n.fiber    ?? 0) * scale * 10) / 10,
+      };
+      newQuantity = d.inputMode === 'portion' ? d.portionCount! : d.amountGrams!;
+      newUnit = d.inputMode === 'portion' ? 'portion' : 'g';
+    } else {
+      // Manual item — scale proportionally
+      const oldQuantity = existingItem.quantity;
+      if (!oldQuantity) return { status: 422, jsonBody: { error: 'Cannot rescale item with zero quantity' } };
+      const newAmount = d.inputMode === 'portion' ? d.portionCount! : d.amountGrams!;
+      const ratio = newAmount / oldQuantity;
+      const m = existingItem.macros;
+      newMacros = {
+        calories: Math.round(m.calories * ratio * 10) / 10,
+        protein:  Math.round(m.protein  * ratio * 10) / 10,
+        carbs:    Math.round(m.carbs    * ratio * 10) / 10,
+        fat:      Math.round(m.fat      * ratio * 10) / 10,
+        fiber:    Math.round((m.fiber ?? 0) * ratio * 10) / 10,
+      };
+      newQuantity = newAmount;
+      newUnit = d.inputMode === 'portion' ? 'portion' : (existingItem.unit ?? 'g');
+    }
+
+    const updatedMeal = await repo.updateItem(userId, mealId, itemId, { macros: newMacros, quantity: newQuantity, unit: newUnit });
+    if (!updatedMeal) return { status: 404, jsonBody: { error: 'Item not found' } };
+    logEvent(ctx, 'info', 'diary.item.updated', { userId, mealId, itemId });
+    return { status: 200, jsonBody: { meal: updatedMeal } };
+  },
+);
+
 // DELETE /api/diary/meals/:id/items/:itemId
 export const deleteItemHandler = withHandler(
   'diary.items.delete',
@@ -344,7 +428,7 @@ app.http('diary-items-update', {
   methods: ['PUT'],
   authLevel: 'anonymous',
   route: 'diary/meals/{id}/items/{itemId}',
-  handler: async () => ({ status: 501, jsonBody: { message: 'Not implemented' } }),
+  handler: updateItemHandler,
 });
 
 app.http('diary-items-delete', {

@@ -71,6 +71,19 @@ const UpdateReusableItemSchema = z
     { message: 'At least one field must be provided' },
   );
 
+export const getReusableItemByIdHandler = withHandler(
+  'reusableItems.getById',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params['id'];
+    if (!id) return { status: 400, jsonBody: { error: 'Missing id' } };
+    const item = await getReusableItemsRepository().getById(userId, id);
+    if (!item) return { status: 404, jsonBody: { error: 'Not found' } };
+    logEvent(ctx, 'info', 'reusableItems.getById', { userId, id });
+    return { status: 200, jsonBody: { item } };
+  },
+);
+
 export const searchReusableItemsHandler = withHandler(
   'reusableItems.search',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
@@ -144,6 +157,13 @@ export const createReusableItemHandler = withHandler(
     return { status: 201, jsonBody: { item } };
   },
 );
+
+app.http('reusable-items-get-by-id', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'reusable-items/{id}',
+  handler: getReusableItemByIdHandler,
+});
 
 app.http('reusable-items-search', {
   methods: ['GET'],
