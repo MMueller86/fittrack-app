@@ -10,6 +10,8 @@
 import type { FoodProduct, FoodSearchResult } from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosFoodProductRepository } from './cosmosFoodProductRepository';
+import { rankByQuery } from '../searchRanking';
+export { rankByQuery } from '../searchRanking';
 
 // ---------------------------------------------------------------------------
 // Repository interface
@@ -77,24 +79,18 @@ export function foodProductToSearchResult(p: FoodProduct): FoodSearchResult {
 // Search ranking — applied in JS after Cosmos/in-memory retrieval
 // ---------------------------------------------------------------------------
 
-export type RankScore = 0 | 1 | 2 | 3 | 4;
+/**
+ * Generic ranking function — re-exported from searchRanking for backward compatibility.
+ * See searchRanking.ts for the full implementation.
+ */
+export type RankScore = number;
 
 /**
- * Returns a rank score (higher = more relevant) for a product against a query.
- * Ranking tiers:
- *   4 — exact normalizedName match
- *   3 — normalizedName starts with query (prefix match)
- *   2 — query appears anywhere in normalizedName (substring)
- *   1 — any searchKeyword matches query exactly
- *   0 — any searchKeyword contains query (substring keyword match)
+ * Returns a rank score for a FoodProduct against a query.
+ * Delegates to rankByQuery using normalizedName + searchKeywords.
  */
 export function rankProduct(p: FoodProduct, normalizedQuery: string): RankScore {
-  const name = p.normalizedName;
-  if (name === normalizedQuery) return 4;
-  if (name.startsWith(normalizedQuery)) return 3;
-  if (name.includes(normalizedQuery)) return 2;
-  if (p.searchKeywords.includes(normalizedQuery)) return 1;
-  return 0;
+  return rankByQuery(p.normalizedName, p.searchKeywords, normalizedQuery);
 }
 
 /**

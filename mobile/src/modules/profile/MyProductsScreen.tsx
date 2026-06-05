@@ -245,7 +245,10 @@ export default function MyProductsScreen({ navigation }: Props) {
           onSaved={() => setEditItem(null)}
           onUpdated={() => {
             setEditItem(null);
-            load();
+            void load();
+            // KI-Anreicherung läuft async (~2-3 Sek nach dem Save) — nochmal laden
+            // damit beim nächsten Öffnen der enrichte Status sichtbar ist.
+            setTimeout(() => void load(), 4000);
           }}
         />
       )}

@@ -39,6 +39,9 @@ export interface UpdateReusableItemInput {
   brand?: string;
   nutritionPer100g?: NutritionValues;
   portion?: PortionInfo | null;
+  searchTerms?: string[];
+  aiKeywords?: string[];
+  searchTermsEnriched?: boolean;
 }
 
 export interface ReusableItemsRepository {
@@ -109,6 +112,9 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
         ? (item.nutritionPer100g ? 'both' : 'perPortion')
         : (item.nutritionPer100g ? 'per100g' : 'perPortion');
     }
+    if (input.searchTerms !== undefined) item.searchTerms = input.searchTerms;
+    if (input.aiKeywords !== undefined) item.aiKeywords = input.aiKeywords;
+    if (input.searchTermsEnriched !== undefined) (item as ReusableItem & { searchTermsEnriched?: boolean }).searchTermsEnriched = input.searchTermsEnriched;
     (item as ReusableItem & { updatedAt?: string }).updatedAt = new Date().toISOString();
     return item;
   }

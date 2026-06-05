@@ -49,6 +49,18 @@ const CATALOG_APPLE: FoodSearchResult = {
   sourceRef: { provider: 'openFoodFacts', barcode: '001' },
 };
 
+// A catalog item that matches the query 'oa' / 'oats' — used in combined-result tests
+const CATALOG_OATMEAL: FoodSearchResult = {
+  id: 'openFoodFacts:003',
+  source: 'openFoodFacts',
+  name: 'Oatmeal',
+  displayLabel: '100g · 372 kcal',
+  nutritionBasis: 'per100g',
+  nutritionPer100g: { calories: 372, protein: 13, carbs: 65, fat: 7, fiber: 10 },
+  isComplete: true,
+  sourceRef: { provider: 'openFoodFacts', barcode: '003' },
+};
+
 const CATALOG_OATS_DUPLICATE: FoodSearchResult = {
   id: 'openFoodFacts:002',
   source: 'openFoodFacts',
@@ -74,7 +86,7 @@ beforeEach(() => {
 describe('foodSearchHandler', () => {
   it('returns 200 with combined results', async () => {
     mockLibRepo.search.mockResolvedValue([LIBRARY_ITEM]);
-    mockCatalogRepo.search.mockResolvedValue([CATALOG_APPLE]);
+    mockCatalogRepo.search.mockResolvedValue([CATALOG_OATMEAL]);
 
     const res = await foodSearchHandler(makeRequest('oa'), makeCtx());
     expect(res.status).toBe(200);
@@ -82,9 +94,9 @@ describe('foodSearchHandler', () => {
     expect(body.results).toHaveLength(2);
   });
 
-  it('puts library items before catalog results', async () => {
+  it('puts library items before catalog results when library ranks higher', async () => {
     mockLibRepo.search.mockResolvedValue([LIBRARY_ITEM]);
-    mockCatalogRepo.search.mockResolvedValue([CATALOG_APPLE]);
+    mockCatalogRepo.search.mockResolvedValue([CATALOG_OATMEAL]);
 
     const res = await foodSearchHandler(makeRequest('oa'), makeCtx());
     const body = res.jsonBody as { results: FoodSearchResult[] };
@@ -94,11 +106,11 @@ describe('foodSearchHandler', () => {
 
   it('deduplicates catalog results whose name matches a library item (case-insensitive)', async () => {
     mockLibRepo.search.mockResolvedValue([LIBRARY_ITEM]);
-    mockCatalogRepo.search.mockResolvedValue([CATALOG_OATS_DUPLICATE, CATALOG_APPLE]);
+    mockCatalogRepo.search.mockResolvedValue([CATALOG_OATS_DUPLICATE, CATALOG_OATMEAL]);
 
     const res = await foodSearchHandler(makeRequest('oa'), makeCtx());
     const body = res.jsonBody as { results: FoodSearchResult[] };
-    // CATALOG_OATS_DUPLICATE (name='Oats') should be removed; only lib + CATALOG_APPLE remain
+    // CATALOG_OATS_DUPLICATE (name='Oats') should be removed; only lib + CATALOG_OATMEAL remain
     expect(body.results).toHaveLength(2);
     expect(body.results.find((r) => r.id === 'openFoodFacts:002')).toBeUndefined();
   });
@@ -143,7 +155,7 @@ describe('foodSearchHandler', () => {
     mockLibRepo.search.mockRejectedValue(new Error('Cosmos error'));
     mockCatalogRepo.search.mockResolvedValue([CATALOG_APPLE]);
 
-    const res = await foodSearchHandler(makeRequest('ap'), makeCtx());
+    const res = await foodSearchHandler(makeRequest('apple'), makeCtx());
     expect(res.status).toBe(200);
     const body = res.jsonBody as { results: FoodSearchResult[] };
     expect(body.results).toHaveLength(1);

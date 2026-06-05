@@ -134,9 +134,9 @@ describe('rankProduct', () => {
     expect(rankProduct(HIGH_QUALITY_OATS, 'haferflocken')).toBe(3);
   });
 
-  it('gives rank 2 for substring match in normalizedName', () => {
+  it('gives rank 2.5 for word-boundary match in normalizedName', () => {
     const product = makeProduct({ id: 'x', name: 'Bio Haferflocken fein', normalizedName: 'bio haferflocken fein' });
-    expect(rankProduct(product, 'haferflocken')).toBe(2);
+    expect(rankProduct(product, 'haferflocken')).toBe(2.5);
   });
 
   it('gives rank 1 for exact keyword match', () => {

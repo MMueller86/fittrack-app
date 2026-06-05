@@ -5,6 +5,41 @@ import { randomUUID } from 'node:crypto';
 import type { ReusableItem } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
 import type { CreateReusableItemInput, ReusableItemsRepository, UpdateReusableItemInput } from './reusableItemsRepository';
+import { splitQueryTokens } from '../searchRanking';
+
+// ---------------------------------------------------------------------------
+// Query builder
+// ---------------------------------------------------------------------------
+
+interface TokenFilter {
+  whereClause: string;
+  parameters: { name: string; value: string }[];
+}
+
+/**
+ * Builds a Cosmos SQL WHERE clause that requires ALL tokens to appear in
+ * the item name (STARTSWITH) or any searchTerms element (EXISTS + STARTSWITH).
+ * Uses prefix matching so partial tokens (e.g. "voll" → "vollkorn") still match.
+ *
+ * Example for tokens ["vollkorn", "reis"]:
+ *   (STARTSWITH(LOWER(c.name), @q0) OR EXISTS(...WHERE STARTSWITH(t, @q0)))
+ *   AND
+ *   (STARTSWITH(LOWER(c.name), @q1) OR EXISTS(...WHERE STARTSWITH(t, @q1)))
+ */
+function buildTokenFilter(tokens: string[]): TokenFilter {
+  const clauses = tokens.map(
+    (_, i) =>
+      `(STARTSWITH(LOWER(c.name), @q${i}) OR CONTAINS(LOWER(c.name), @q${i}) OR EXISTS(SELECT VALUE t FROM t IN c.searchTerms WHERE STARTSWITH(t, @q${i})))`,
+  );
+  return {
+    whereClause: clauses.join(' AND '),
+    parameters: tokens.map((t, i) => ({ name: `@q${i}`, value: t })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Repository
+// ---------------------------------------------------------------------------
 
 export class CosmosReusableItemsRepository implements ReusableItemsRepository {
   async search(userId: string, query: string): Promise<ReusableItem[]> {
@@ -17,12 +52,15 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
         'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20';
       parameters = [{ name: '@userId', value: userId }];
     } else {
-      // Case-insensitive prefix match on name OR any searchTerms element
-      cosmosQuery =
-        'SELECT * FROM c WHERE c.userId = @userId AND (STARTSWITH(LOWER(c.name), @q) OR EXISTS(SELECT VALUE t FROM t IN c.searchTerms WHERE STARTSWITH(t, @q))) ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20';
+      // Multi-token AND: all tokens must match name or searchTerms
+      const tokens = splitQueryTokens(query);
+      // If every token is too short (< 2 chars), nothing matches — return early.
+      if (tokens.length === 0) return [];
+      const { whereClause, parameters: tokenParams } = buildTokenFilter(tokens);
+      cosmosQuery = `SELECT * FROM c WHERE c.userId = @userId AND ${whereClause} ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20`;
       parameters = [
         { name: '@userId', value: userId },
-        { name: '@q', value: query.toLowerCase() },
+        ...tokenParams,
       ];
     }
 
@@ -78,6 +116,9 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
         ? (existing.nutritionPer100g ? 'both' : 'perPortion')
         : (existing.nutritionPer100g ? 'per100g' : 'perPortion');
     }
+    if (input.searchTerms !== undefined) existing.searchTerms = input.searchTerms;
+    if (input.aiKeywords !== undefined) existing.aiKeywords = input.aiKeywords;
+    if (input.searchTermsEnriched !== undefined) (existing as ReusableItem & { searchTermsEnriched?: boolean }).searchTermsEnriched = input.searchTermsEnriched;
     (existing as ReusableItem & { updatedAt?: string }).updatedAt = new Date().toISOString();
 
     const { resource: updated } = await containers.reusableMealItems.item(id, userId).replace<ReusableItem>(existing);

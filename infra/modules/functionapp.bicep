@@ -63,6 +63,9 @@ param azureDocIntelligenceEndpoint string = ''
 @secure()
 param azureDocIntelligenceKey string = ''
 
+@description('Queue name for async AI keyword enrichment of reusable items.')
+param enrichQueueName string = 'reusable-items-enrich'
+
 @description('Tags applied to the resources.')
 param tags object = {}
 
@@ -188,6 +191,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         {
           name: 'AZURE_DI_KEY'
           value: azureDocIntelligenceKey
+        }
+        {
+          name: 'ENRICH_QUEUE_NAME'
+          value: enrichQueueName
         }
         // Linux native modules: let Oryx rebuild npm packages on the Linux host.
         // Required for packages with native binaries (e.g. sharp) deployed from Windows.

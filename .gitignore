@@ -11,6 +11,7 @@ out/
 # Azure Functions
 backend/local.settings.json
 backend/dist/
+backend/.azurite/
 
 # Expo / React Native
 mobile/.expo/

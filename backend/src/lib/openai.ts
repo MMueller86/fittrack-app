@@ -3,6 +3,10 @@
 // Uses Structured Outputs (API version >= 2024-07-01, model >= gpt-4o-mini 2024-07-18).
 
 import { AzureOpenAI } from 'openai';
+import { MEAL_PARSER_SYSTEM_PROMPT } from './prompts/mealParser';
+import { FOOD_ESTIMATE_SYSTEM_PROMPT } from './prompts/foodEstimate';
+import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
+import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,21 +73,7 @@ export function __setOpenAiClientForTests(client: AzureOpenAI | null): void {
 // Meal parser
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are a meal parsing assistant for a nutrition tracking app.
-Extract individual food items from the user's free-text meal description.
-For each item, identify:
-- rawText: the exact text fragment referring to this item
-- displayName: a clean, normalized German name for the item that preserves all meaningful type and product qualifiers
-  Good examples: "Sandwich Vollkorntoast", "Hähnchenbrust", "Lätta Halbfettmargarine", "Vollmilch 3,5%"
-  Bad examples (too stripped): "Toast", "Fleisch", "Margarine" — these lose important information
-- inputMode: "grams" if a weight in grams is mentioned, "portion" if a count/piece/portion is mentioned, "unknown" if unclear
-- inputAmount: the numeric amount (e.g. 200 for "200g", 2 for "2 Scheiben"), or null if unknown
 
-Rules:
-- Do NOT invent or estimate nutrition values.
-- Do NOT combine multiple ingredients into one item.
-- Preserve product type qualifiers (Sandwich, Vollkorn, Fett-%, brand hints) in displayName — they affect nutrition significantly.
-- Respond only with the structured JSON output.`;
 
 /**
  * Parse a free-text meal description into structured items via Azure OpenAI.
@@ -103,7 +93,7 @@ export async function parseMeal(text: string, context?: string): Promise<AiParse
   const response = await client.chat.completions.create({
     model: deployment,
     messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: MEAL_PARSER_SYSTEM_PROMPT },
       { role: 'user', content: userContent },
     ],
     response_format: {
@@ -208,43 +198,7 @@ const FOOD_ESTIMATE_SCHEMA = {
   additionalProperties: false,
 };
 
-const FOOD_ESTIMATE_SYSTEM_PROMPT = `You are a nutrition estimation assistant for a German food tracking app.
-The user provides a food name and optional context (the original text they typed).
-Estimate nutritional values per 100 g and a typical portion size.
 
-## Nutrition per 100 g — two-step process
-
-**Step 1 — Category average:** Recall the typical mid-range values for this food category from the German Bundeslebensmittelschlüssel (BLS) or equivalent European food composition data.
-
-**Step 2 — Specific product:** Identify a well-known, widely available German retail product that fits the user's input (e.g. from Aldi, Lidl, Rewe, Edeka, Ja!, Golden Toast, Weihenstephan, etc.). If you know the product's nutritional values from its packaging, use those values — provided they fall within a plausible range for the category (±30 % of category average). Set "sourceProduct" to the product name (brand + variant), e.g. "Golden Toast Vollkorn" or "Ja! Vollkorntoast".
-If no specific product comes to mind or its values seem implausible, fall back to the category average and set "sourceProduct" to null.
-
-## Portion size (estimatedPortion)
-Always define estimatedPortion as the **single serving unit** for the food type (one slice, one piece, one cup, etc.).
-- "label": name of a single unit in German (e.g. "1 Scheibe", "1 Stück", "1 Portion")
-- "weightGrams": weight of that single unit in grams
-- "suggestedAmount": if the context text specifies a count (e.g. "2 Scheiben", "3 Stück"), set this to that count; otherwise set to null
-
-Example: "2 Scheiben Vollkorntoast"
-→ label: "1 Scheibe", weightGrams: 37.5, suggestedAmount: 2
-
-Example: "Hähnchenbrust" (no count given)
-→ label: "1 Portion", weightGrams: 150, suggestedAmount: null
-
-This allows the app to display "2 × 1 Scheibe (37,5 g)" to the user.
-
-## Confidence
-- Generic, well-known foods (e.g. "Hähnchenbrust", "Vollmilch"): 0.7–0.9
-- Branded or specific products (unknown recipe): 0.3–0.5
-- Homemade or very ambiguous items: 0.2–0.4
-
-## Rules
-- Be conservative. Never hallucinate precise values.
-- Add a warning string for each area of uncertainty.
-- All numeric values must be non-negative.
-- category: general food category in German (e.g. "Fleisch", "Getreideprodukte", "Milchprodukte").
-- searchTerms: 5–10 lowercase German keywords that help users find this product later. Include: food type, category synonyms, brand words (if sourceProduct is set), common alternate names, and relevant qualifiers (e.g. "vollkorn", "toast", "brot", "sandwich", "golden toast"). No duplicates.
-- Respond only with the structured JSON output.`;
 
 /**
  * Estimate the nutritional values of a food item via Azure OpenAI.
@@ -333,51 +287,7 @@ const MEAL_ESTIMATE_SCHEMA = {
   additionalProperties: false,
 };
 
-const MEAL_ESTIMATE_SYSTEM_PROMPT = `Du bist ein KI-Ernährungsassistent für eine deutsche Ernährungs-App.
-Der Nutzer beschreibt eine Mahlzeit in freiem Text, z.B. "Schnitzel mit Pommes und Mayo" oder "Pizza Salami im Restaurant".
 
-## Deine Aufgabe
-
-Schätze die **Gesamtnährwerte der beschriebenen Mahlzeit als eine Portion** (NICHT per 100g).
-Erkenne gleichzeitig die Einzelbestandteile und eventuelle Kontextinformationen.
-
-## Kontext-Erkennung
-
-Suche im Text nach Hinweisen auf den Verzehrsort oder die Zubereitungsart:
-- Imbiss / Imbissbude / Schnellimbiss → größere, fettigere Portionen
-- Kantine / Mensa → mittlere Portionen, übliche Betriebsverpflegung
-- Restaurant / Gasthaus / Bistro → typische Restaurantportionen
-- Fast Food → Standardportionen der Fast-Food-Kette
-- Wenn kein Kontext erkennbar: durchschnittliche Haushalt- oder Restaurantportion annehmen
-
-Setze "contextDetected" auf den erkannten Ort (z.B. "Imbiss", "Kantine", "Restaurant") oder null.
-
-## Portionsschätzung
-
-Schätze eine realistische Gesamtportion für die beschriebene Mahlzeit:
-- Schnitzel mit Pommes (ohne Kontext): ca. 550-650 kcal
-- Schnitzel mit Pommes (Imbiss): ca. 950-1200 kcal
-- Pizza Salami (Restaurant, ganze Pizza): ca. 800-1100 kcal
-- Currywurst mit Pommes (Imbiss): ca. 800-1000 kcal
-- Burger-Menü (Fast Food): ca. 900-1200 kcal
-
-## Portionssicherheit (portionConfidence)
-- "high": Standard-Mahlzeit, gut definierte Portion (z.B. "1 Glas Milch 200ml", "2 Scheiben Toast")
-- "medium": Typische Mahlzeit, Portion plausibel schätzbar (z.B. "Schnitzel mit Pommes")
-- "low": Unklare Menge, sehr ambige Beschreibung oder unbekanntes Gericht
-
-## Annahmen (assumptions)
-Nenne in "assumptions" die wichtigsten Portionsannahmen auf Deutsch, z.B.:
-- "Typische Imbiss-Portion angenommen (ca. 380g Schnitzel + Pommes)"
-- "Standard-Restaurantportion für Pizza (ca. 400g)"
-Maximal 3 Annahmen, jede kurz und präzise.
-
-## Regeln
-- Alle Nährwerte müssen ≥ 0 sein
-- Gesamtkalorien sollten zwischen 50 und 3000 kcal liegen
-- components: Liste der erkannten Bestandteile als kurze deutsche Begriffe (ohne Mengenangaben), z.B. ["Schnitzel", "Pommes", "Mayo"]
-- mealName: normalisierter deutscher Name der Mahlzeit
-- Antworte NUR mit dem strukturierten JSON-Output, keine Erklärungen`;
 
 /**
  * Estimate the total nutrition of a described meal via Azure OpenAI.
@@ -479,30 +389,7 @@ const RECIPE_ANALYZE_SCHEMA = {
   additionalProperties: false,
 };
 
-const RECIPE_ANALYZE_SYSTEM_PROMPT = `Du bist ein Rezept-Assistent für eine deutsche Ernährungs-App.
-Der Nutzer gibt ein Rezept in freiem Text ein — mit möglichen Tippfehlern, Stichpunkten oder unvollständigen Sätzen.
-Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahieren und zu formulieren.
 
-## Ausgabefelder
-
-**suggestedName**: Ein prägnanter, ansprechender Rezeptname auf Deutsch. Falls der Nutzer einen Namen angegeben hat, verwende diesen (korrigiert). Ansonsten leite einen passenden Namen aus den Zutaten/Zubereitung ab.
-
-**description**: Ein einleitender Beschreibungstext in 2-4 Sätzen. Beschreibe das Gericht, seinen Charakter und Geschmack. Schreibe in natürlichem, einladendem Deutsch — kein Marketing-Sprech.
-
-**suggestedPortions**: Anzahl der Portionen als Zahl. Falls der Nutzer eine Anzahl nennt, übernehme diese. Ansonsten schätze eine sinnvolle Portionsgröße (Standard: 4 für Hauptgerichte, 12 für Backwaren wie Muffins/Plätzchen, 1 für Single-Portionen).
-
-**tags**: 2-5 passende deutsche Schlagwörter, z.B. "Vegetarisch", "Schnell", "Backen", "Familienrezept", "Glutenfrei", "Vegan". Nur wenn wirklich zutreffend.
-
-**ingredientLines**: Jede Zutat als eigene Zeile im Format "Menge Einheit Zutat", z.B. "300g Hähnchenbrust", "2 EL Olivenöl", "1 Zwiebel". Behalte die Original-Mengenangaben, korrigiere nur Tippfehler. Wenn keine Menge angegeben ist, schätze eine sinnvolle Menge für die angegebenen Portionen.
-
-**steps**: Die Zubereitungsschritte als geordnete Liste. Schreibe jeden Schritt als vollständigen, klaren Satz oder kurzen Absatz auf Deutsch. Konvertiere Stichpunkte in lesbare Anleitungen. Schätze bei Bedarf realistische Zeitangaben (durationMinutes). title ist ein optionaler kurzer Überschrift pro Schritt (z.B. "Teig vorbereiten", "Anbraten"), null wenn kein sinnvoller Titel passt.
-
-## Regeln
-- Korrigiere Rechtschreibfehler und Grammatik
-- Formuliere Schritte in aktivem, imperativen Stil ("Zwiebeln würfeln und in Öl anbraten.")
-- Erfinde keine Zutaten oder Schritte, die der Nutzer nicht erwähnt hat
-- suggestedPortions muss eine positive Zahl > 0 sein
-- Antworte NUR mit dem strukturierten JSON-Output`;
 
 /**
  * Analyze a free-text recipe description via Azure OpenAI.

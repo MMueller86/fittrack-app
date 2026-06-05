@@ -5,7 +5,9 @@ import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
-import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
+import { getReusableItemsRepository, type UpdateReusableItemInput } from '../lib/repositories/reusableItemsRepository';
+import { tokenizeProduct } from '../lib/tokenize';
+import { enqueueEnrichment } from '../lib/queueClient';
 
 // GET    /api/reusable-items?query=  — search / list all (empty query = all)
 // POST   /api/reusable-items         — create a new reusable item
@@ -45,6 +47,7 @@ const ManualCreateSchema = z.object({
 const AiCreateSchema = z.object({
   sourceType: z.enum(['ai', 'label-scan', 'manual']),
   name: z.string().trim().min(1).max(200),
+  brand: z.string().trim().max(100).optional(),
   nutritionPer100g: NutritionPer100gSchema,
   portion: PortionSchema.optional(),
   aiConfidence: z.number().min(0).max(1).optional(),
@@ -95,6 +98,7 @@ export const createReusableItemHandler = withHandler(
       item = await getReusableItemsRepository().create({
         userId,
         name: d.name,
+        brand: d.brand,
         nutritionBasis: d.portion ? 'both' : 'per100g',
         nutritionPer100g: {
           calories: d.nutritionPer100g.calories,
@@ -110,7 +114,7 @@ export const createReusableItemHandler = withHandler(
         sourceType: d.sourceType,
         aiConfidence: d.aiConfidence,
         aiWarnings: d.aiWarnings,
-        searchTerms: d.searchTerms,
+        searchTerms: [...new Set([...tokenizeProduct(d.name, d.brand), ...(d.searchTerms ?? [])])],
       });
     } else {
       // Manual flat macros — per-portion entry
@@ -130,10 +134,13 @@ export const createReusableItemHandler = withHandler(
         },
         isComplete: true,
         sourceType: 'manual',
+        searchTerms: tokenizeProduct(d.name),
       });
     }
 
     logEvent(ctx, 'info', 'reusableItems.created', { userId, itemId: item.id });
+    // Fire-and-forget: enqueue AI keyword enrichment (errors are swallowed inside enqueueEnrichment)
+    void enqueueEnrichment(userId, item.id, ctx);
     return { status: 201, jsonBody: { item } };
   },
 );
@@ -171,7 +178,17 @@ export const updateReusableItemHandler = withHandler(
     if (!existing) return { status: 404, jsonBody: { error: 'Item not found' } };
     if (existing.userId !== userId) return { status: 403, jsonBody: { error: 'Forbidden' } };
 
-    const item = await repo.update(userId, id, fields);
+    // Recompute searchTerms from updated name + brand.
+    // Reset searchTermsEnriched so the AI re-enriches with the new name/brand.
+    const updatedName = fields.name ?? existing.name;
+    const updatedBrand = fields.brand ?? existing.brand;
+    const updateInput: UpdateReusableItemInput = {
+      ...fields,
+      searchTerms: tokenizeProduct(updatedName, updatedBrand),
+      searchTermsEnriched: false,
+    };
+
+    const item = await repo.update(userId, id, updateInput);
     if (!item) return { status: 404, jsonBody: { error: 'Item not found' } };
 
     let updatedItemCount = 0;
@@ -186,6 +203,8 @@ export const updateReusableItemHandler = withHandler(
     }
 
     logEvent(ctx, 'info', 'reusableItems.updated', { userId, itemId: id, updateHistory: !!updateHistory, updatedItemCount });
+    // Fire-and-forget: re-enqueue AI enrichment so updated name/brand gets new keywords
+    void enqueueEnrichment(userId, id, ctx);
     return { status: 200, jsonBody: { item, updatedItemCount } };
   },
 );

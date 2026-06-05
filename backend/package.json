@@ -8,6 +8,8 @@
     "build:verify": "tsc --project tsconfig.json && node scripts/verify-build.mjs",
     "build:watch": "tsc --project tsconfig.json --watch",
     "start": "func start",
+    "dev": "npm-run-all build --parallel storage:start start",
+    "storage:start": "node scripts/start-azurite.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -20,6 +22,7 @@
     "@azure/cosmos": "^4.1.1",
     "@azure/functions": "^4.5.0",
     "@azure/storage-blob": "^12.25.0",
+    "@azure/storage-queue": "^12.30.0",
     "jose": "^6.2.3",
     "openai": "^4.104.0",
     "sharp": "^0.34.5",
@@ -28,6 +31,8 @@
   "devDependencies": {
     "@types/node": "^20.17.0",
     "@types/sharp": "^0.31.1",
+    "azurite": "^3.35.0",
+    "npm-run-all2": "^9.0.1",
     "typescript": "^5.8.0",
     "vitest": "^2.1.9"
   }

@@ -17,6 +17,7 @@ import { withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
+import { rankByQuery } from '../lib/searchRanking';
 
 // Map a user's ReusableItem to the unified FoodSearchResult shape.
 function reusableItemToSearchResult(item: ReusableItem): FoodSearchResult {
@@ -58,6 +59,52 @@ export const foodSearchHandler = withHandler(
       query.trim().length >= 2 ? getFoodProductRepository().search(query) : Promise.resolve([]),
     ]);
 
+    const nq = query.trim().toLowerCase();
+
+    if (nq.length >= 2) {
+      // Unified ranking: score library items (with +0.5 bonus) and catalog items,
+      // then merge into a single list sorted by score DESC.
+      const LIBRARY_BONUS = 0.5;
+
+      const rawLibrary = libraryItems.status === 'fulfilled' ? libraryItems.value : [];
+      const catalog: FoodSearchResult[] =
+        catalogResults.status === 'fulfilled' ? catalogResults.value : [];
+
+      const scoredLibrary = rawLibrary
+        .map((item) => ({
+          result: reusableItemToSearchResult(item),
+          score: rankByQuery(item.name, item.searchTerms ?? [], nq) + LIBRARY_BONUS,
+        }))
+        .filter((x) => x.score > LIBRARY_BONUS - 1); // exclude score=-1 (no match at all)
+
+      const scoredCatalog = catalog
+        .map((result) => ({
+          result,
+          score: rankByQuery(result.name, [], nq),
+        }))
+        .filter((x) => x.score >= 0);
+
+      // Dedup: skip catalog entries whose name already appears in library
+      const libraryNames = new Set(scoredLibrary.map((x) => x.result.name.toLowerCase()));
+      const deduplicatedCatalog = scoredCatalog.filter(
+        (x) => !libraryNames.has(x.result.name.toLowerCase()),
+      );
+
+      const results: FoodSearchResult[] = [...scoredLibrary, ...deduplicatedCatalog]
+        .sort((a, b) => b.score - a.score)
+        .map((x) => x.result);
+
+      logEvent(ctx, 'info', 'food.search', {
+        userId,
+        query,
+        libraryCount: scoredLibrary.length,
+        catalogCount: deduplicatedCatalog.length,
+      });
+
+      return { status: 200, jsonBody: { results } };
+    }
+
+    // Empty query: library first (by usageCount from Cosmos), then catalog
     const library: FoodSearchResult[] =
       libraryItems.status === 'fulfilled'
         ? libraryItems.value.map(reusableItemToSearchResult)

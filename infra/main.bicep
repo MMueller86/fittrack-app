@@ -167,6 +167,7 @@ module functionApp 'modules/functionapp.bicep' = {
     azureOpenAiDeploymentName: azureOpenAiDeploymentName
     azureDocIntelligenceEndpoint: resolvedDiEndpoint
     azureDocIntelligenceKey: resolvedDiKey
+    enrichQueueName: storage.outputs.enrichQueueName
     authIssuer: authIssuer
     authAudience: authAudience
     authJwksUri: authJwksUri

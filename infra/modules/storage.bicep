@@ -2,6 +2,7 @@
 //   - AzureWebJobsStorage support for the Function App (default endpoints)
 //   - Blob container `recipe-images` for backend-proxied recipe images
 //   - Blob container `label-scans` for temporary OCR image storage (7-day TTL)
+//   - Queue `reusable-items-enrich` for async AI keyword enrichment of user products
 //
 // Backend proxies all Blob access; no SAS tokens are exposed to mobile.
 
@@ -17,6 +18,9 @@ param storageAccountName string
 
 @description('Blob container for recipe images.')
 param recipeImagesContainerName string = 'recipe-images'
+
+@description('Queue name for async AI keyword enrichment of reusable items.')
+param enrichQueueName string = 'reusable-items-enrich'
 
 @description('Tags applied to the account.')
 param tags object = {}
@@ -99,6 +103,17 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
   }
 }
 
+// Queue service + enrichment queue for async AI keyword generation.
+resource queueServices 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' = {
+  parent: storage
+  name: 'default'
+}
+
+resource enrichQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = {
+  parent: queueServices
+  name: enrichQueueName
+}
+
 @description('Storage account resource id.')
 output storageAccountId string = storage.id
 
@@ -107,3 +122,6 @@ output storageAccountName string = storage.name
 
 @description('Recipe images container name.')
 output recipeImagesContainerName string = recipeImages.name
+
+@description('Enrich queue name for AI keyword enrichment.')
+output enrichQueueName string = enrichQueue.name
