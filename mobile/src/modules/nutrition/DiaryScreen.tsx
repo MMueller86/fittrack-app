@@ -147,7 +147,7 @@ export default function DiaryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { dayType, targets } = useDayTypeStore();
+  const { dayType, targets, hydrateDayType } = useDayTypeStore();
   const todayTargets = targets ? (dayType === 'training' ? targets.trainingDay : targets.restDay) : null;
 
   // AddItem modal state
@@ -160,10 +160,14 @@ export default function DiaryScreen() {
       setError(null);
       const result = await diaryApi.getDay(d);
       setData(result);
+      // Trainings-/Ruhetag aus API-Response hydratisieren — überschreibt Store-Default ('rest')
+      if (result.dayType != null) {
+        hydrateDayType(result.dayType, d);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load diary');
     }
-  }, []);
+  }, [hydrateDayType]);
 
   useEffect(() => {
     (async () => {

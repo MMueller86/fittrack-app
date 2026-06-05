@@ -700,6 +700,7 @@ function ManualMode({ mealId, onSaved }: { mealId: string; onSaved: () => void }
           protein: Math.round(parseNum(protein) * scale * 10) / 10,
           carbs: Math.round(parseNum(carbs) * scale * 10) / 10,
           fat: Math.round(parseNum(fat) * scale * 10) / 10,
+          fiber: Math.round(parseNum(fiber || '0') * scale * 10) / 10,
         },
       });
       onSaved();

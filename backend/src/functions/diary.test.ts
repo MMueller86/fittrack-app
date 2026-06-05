@@ -127,10 +127,90 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
     expect(body.meal.items[0]!.quantity).toBe(50);
     expect(body.meal.items[0]!.unit).toBe('g');
   });
+
+  // --- Fiber regression tests ---
+  // These tests guard against the bug where fiber was missing from calculatedNutrition
+  // on the client side, causing the backend to store fiber=0 and the summary to show 0.
+
+  it('speichert fiber aus calculatedNutrition korrekt in macros', async () => {
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId: 'lib:vollkornbrot',
+          productName: 'Vollkornbrot',
+          inputMode: 'grams',
+          inputAmount: 100,
+          amountGrams: 100,
+          calculatedNutrition: { calories: 240, protein: 8, carbs: 44, fat: 3, fiber: 6 },
+        },
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(201);
+    const body = res.jsonBody as { meal: { items: { macros: { fiber: number } }[] } };
+    expect(body.meal.items[0]!.macros.fiber).toBe(6);
+  });
+
+  it('speichert fiber=0 wenn calculatedNutrition kein fiber enthält (kein Absturz)', async () => {
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId: 'lib:butter',
+          productName: 'Butter',
+          inputMode: 'grams',
+          inputAmount: 10,
+          amountGrams: 10,
+          calculatedNutrition: { calories: 74, protein: 0.1, carbs: 0, fat: 8.2 }, // kein fiber
+        },
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(201);
+    const body = res.jsonBody as { meal: { items: { macros: { fiber: number } }[] } };
+    expect(body.meal.items[0]!.macros.fiber).toBe(0); // ?? 0 Fallback
+  });
+
+  it('rechnet fiber korrekt in die Tagessummary ein (End-to-End über addItem→computeSummary)', async () => {
+    const mealId = await createMeal();
+
+    // Eintrag 1: fiber=6 via calculatedNutrition (Produkt-Pfad)
+    await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productName: 'Vollkornbrot',
+          inputMode: 'grams',
+          inputAmount: 100,
+          amountGrams: 100,
+          calculatedNutrition: { calories: 240, protein: 8, carbs: 44, fat: 3, fiber: 6 },
+        },
+      }),
+      makeContext(),
+    );
+
+    // Eintrag 2: fiber=2.5 via Flat-Macros (manueller Pfad) — Rückgabe enthält beide Items
+    const res2 = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: { name: 'Apfel', calories: 52, protein: 0.3, carbs: 14, fat: 0.2, fiber: 2.5 },
+      }),
+      makeContext(),
+    );
+    expect(res2.status).toBe(201);
+
+    // addItem gibt die vollständige Mahlzeit zurück — daraus Summary direkt berechnen
+    const meal = (res2.jsonBody as { meal: import('@fittrack/shared').Meal }).meal;
+    const summary = computeSummary([meal]);
+    expect(summary.fiber).toBeCloseTo(8.5, 1); // 6 (Vollkornbrot) + 2.5 (Apfel)
+  });
 });
 
 // ---------------------------------------------------------------------------
-// Flat macros input (manual mode â€” existing behaviour)
+// Flat macros input (manual mode — existing behaviour)
 // ---------------------------------------------------------------------------
 
 describe('POST /api/diary/meals/:id/items â€” flat macros input', () => {

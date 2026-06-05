@@ -230,6 +230,18 @@ export default function ProfileScreen({ navigation }: Props) {
             <MacroGrid title="💪 Trainingstag" targets={targets.trainingDay} />
           </>
         )}
+
+        {/* Lebensmittel-Bibliothek */}
+        <Text style={styles.sectionHeader}>Bibliothek</Text>
+        <TouchableOpacity
+          style={styles.libraryBtn}
+          onPress={() => navigation.navigate('MyProducts')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.libraryBtnIcon}>📦</Text>
+          <Text style={styles.libraryBtnText}>Meine Lebensmittel</Text>
+          <Text style={styles.libraryBtnArrow}>›</Text>
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
@@ -285,6 +297,19 @@ const styles = StyleSheet.create({
   infoValue: { ...typography.body2, color: colors.text, fontWeight: '600' },
 
   sectionHeader: { ...typography.h3, color: colors.text, marginTop: spacing.sm, marginBottom: spacing.sm },
+  libraryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  libraryBtnIcon: { fontSize: 20, marginRight: spacing.sm },
+  libraryBtnText: { ...typography.body1, color: colors.text, flex: 1 },
+  libraryBtnArrow: { ...typography.h2, color: colors.textMuted, lineHeight: 24 },
 
   macroCard: {
     backgroundColor: colors.surface,

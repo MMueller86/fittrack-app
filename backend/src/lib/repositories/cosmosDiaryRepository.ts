@@ -14,7 +14,7 @@ import type {
   DiaryDayResult,
   DiaryRepository,
 } from './diaryRepository';
-import { computeSummary } from './diaryRepository';
+import { computeSummary, recalcMacros } from './diaryRepository';
 
 export class CosmosDiaryRepository implements DiaryRepository {
   async getDay(userId: string, date: string): Promise<DiaryDayResult> {
@@ -60,6 +60,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
       id: randomUUID(),
       name: input.name,
       sourceType: input.sourceType ?? 'manual',
+      ...(input.sourceId ? { sourceId: input.sourceId } : {}),
       ...(input.isAiEstimate ? { isAiEstimate: true } : {}),
       ...(input.recipeId ? { recipeId: input.recipeId } : {}),
       ...(input.recipePortions != null ? { recipePortions: input.recipePortions } : {}),
@@ -109,5 +110,61 @@ export class CosmosDiaryRepository implements DiaryRepository {
       }
       throw e;
     }
+  }
+
+  async countBySourceId(userId: string, sourceId: string): Promise<number> {
+    const { containers } = await getCosmos();
+    const { resources } = await containers.nutritionDiaryMeals.items
+      .query<Meal>(
+        {
+          query: 'SELECT * FROM c WHERE c.userId = @userId AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.sourceId = @sourceId)',
+          parameters: [
+            { name: '@userId', value: userId },
+            { name: '@sourceId', value: sourceId },
+          ],
+        },
+        { partitionKey: userId },
+      )
+      .fetchAll();
+    return resources.reduce(
+      (sum, meal) => sum + (meal.items ?? []).filter((i) => i.sourceId === sourceId).length,
+      0,
+    );
+  }
+
+  async updateMacrosBySourceId(
+    userId: string,
+    sourceId: string,
+    newNutritionPer100g: import('@fittrack/shared').NutritionValues,
+    newPortionWeightGrams?: number,
+  ): Promise<number> {
+    const { containers } = await getCosmos();
+    const { resources } = await containers.nutritionDiaryMeals.items
+      .query<Meal>(
+        {
+          query: 'SELECT * FROM c WHERE c.userId = @userId AND EXISTS(SELECT VALUE i FROM i IN c.items WHERE i.sourceId = @sourceId)',
+          parameters: [
+            { name: '@userId', value: userId },
+            { name: '@sourceId', value: sourceId },
+          ],
+        },
+        { partitionKey: userId },
+      )
+      .fetchAll();
+
+    let count = 0;
+    for (const meal of resources) {
+      let changed = false;
+      for (const item of meal.items ?? []) {
+        if (item.sourceId !== sourceId) continue;
+        item.macros = recalcMacros(item, newNutritionPer100g, newPortionWeightGrams);
+        changed = true;
+        count++;
+      }
+      if (changed) {
+        await containers.nutritionDiaryMeals.item(meal.id, userId).replace<Meal>(meal);
+      }
+    }
+    return count;
   }
 }

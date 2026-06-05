@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ReusableItem } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
-import type { CreateReusableItemInput, ReusableItemsRepository } from './reusableItemsRepository';
+import type { CreateReusableItemInput, ReusableItemsRepository, UpdateReusableItemInput } from './reusableItemsRepository';
 
 export class CosmosReusableItemsRepository implements ReusableItemsRepository {
   async search(userId: string, query: string): Promise<ReusableItem[]> {
@@ -53,5 +53,47 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
     };
     const { resource } = await containers.reusableMealItems.items.create<ReusableItem>(item);
     return resource ?? item;
+  }
+
+  async getById(userId: string, id: string): Promise<ReusableItem | null> {
+    const { containers } = await getCosmos();
+    const { resource } = await containers.reusableMealItems.item(id, userId).read<ReusableItem>();
+    return resource ?? null;
+  }
+
+  async update(userId: string, id: string, input: UpdateReusableItemInput): Promise<ReusableItem | null> {
+    const { containers } = await getCosmos();
+    const { resource: existing } = await containers.reusableMealItems.item(id, userId).read<ReusableItem>();
+    if (!existing) return null;
+
+    if (input.name !== undefined) existing.name = input.name;
+    if (input.brand !== undefined) existing.brand = input.brand ?? undefined;
+    if (input.nutritionPer100g !== undefined) {
+      existing.nutritionPer100g = input.nutritionPer100g;
+      existing.nutritionBasis = existing.portion ? 'both' : 'per100g';
+    }
+    if (input.portion !== undefined) {
+      existing.portion = input.portion ?? undefined;
+      existing.nutritionBasis = input.portion
+        ? (existing.nutritionPer100g ? 'both' : 'perPortion')
+        : (existing.nutritionPer100g ? 'per100g' : 'perPortion');
+    }
+    (existing as ReusableItem & { updatedAt?: string }).updatedAt = new Date().toISOString();
+
+    const { resource: updated } = await containers.reusableMealItems.item(id, userId).replace<ReusableItem>(existing);
+    return updated ?? existing;
+  }
+
+  async remove(userId: string, id: string): Promise<boolean> {
+    const { containers } = await getCosmos();
+    try {
+      await containers.reusableMealItems.item(id, userId).delete();
+      return true;
+    } catch (e) {
+      if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
+        return false;
+      }
+      throw e;
+    }
   }
 }

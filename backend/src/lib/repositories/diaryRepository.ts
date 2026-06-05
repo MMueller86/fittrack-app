@@ -8,7 +8,7 @@
 //   - Otherwise → InMemoryDiaryRepository (lost on restart)
 
 import { randomUUID } from 'node:crypto';
-import type { Meal, MealItem, MealType } from '@fittrack/shared';
+import type { Meal, MealItem, MealItemMacros, MealType, NutritionValues } from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosDiaryRepository } from './cosmosDiaryRepository';
 
@@ -26,6 +26,8 @@ export interface AddItemInput {
   carbs: number;
   fat: number;
   fiber: number;
+  /** ID of the ReusableItem this entry was logged from — enables history updates */
+  sourceId?: string;
   quantity?: number;
   unit?: string;
   isAiEstimate?: boolean;
@@ -55,6 +57,15 @@ export interface DiaryRepository {
   addItem(userId: string, mealId: string, input: AddItemInput): Promise<Meal>;
   deleteItem(userId: string, mealId: string, itemId: string): Promise<Meal | null>;
   deleteMeal(userId: string, mealId: string): Promise<boolean>;
+  /** Count all diary items that reference the given reusable item — used for delete warnings */
+  countBySourceId(userId: string, sourceId: string): Promise<number>;
+  /** Recalculate macros for all diary items referencing sourceId — returns number of updated items */
+  updateMacrosBySourceId(
+    userId: string,
+    sourceId: string,
+    newNutritionPer100g: NutritionValues,
+    newPortionWeightGrams?: number,
+  ): Promise<number>;
 }
 
 export function computeSummary(meals: Meal[]): DaySummary {
@@ -76,7 +87,28 @@ export function computeSummary(meals: Meal[]): DaySummary {
   summary.fiber   = Math.round(summary.fiber * 10) / 10;
   return summary;
 }
-
+/**
+ * Recalculate a single diary item's macros from updated product nutrition.
+ * Handles both gram-based and portion-based items.
+ */
+export function recalcMacros(
+  item: MealItem,
+  newNutrition: NutritionValues,
+  newPortionWeightGrams?: number,
+): MealItemMacros {
+  const grams =
+    item.unit === 'portion' && newPortionWeightGrams != null
+      ? item.quantity * newPortionWeightGrams
+      : item.quantity;
+  const scale = grams / 100;
+  return {
+    calories: Math.round(newNutrition.calories * scale * 10) / 10,
+    protein:  Math.round((newNutrition.protein  ?? 0) * scale * 10) / 10,
+    carbs:    Math.round((newNutrition.carbs    ?? 0) * scale * 10) / 10,
+    fat:      Math.round((newNutrition.fat      ?? 0) * scale * 10) / 10,
+    fiber:    Math.round((newNutrition.fiber    ?? 0) * scale * 10) / 10,
+  };
+}
 class InMemoryDiaryRepository implements DiaryRepository {
   // key: `${userId}:${date}`
   private readonly mealsByDay = new Map<string, Meal[]>();
@@ -115,6 +147,7 @@ class InMemoryDiaryRepository implements DiaryRepository {
         id: randomUUID(),
         name: input.name,
         sourceType: input.sourceType ?? 'manual',
+        ...(input.sourceId ? { sourceId: input.sourceId } : {}),
         ...(input.isAiEstimate ? { isAiEstimate: true } : {}),
         ...(input.recipeId ? { recipeId: input.recipeId } : {}),
         ...(input.recipePortions != null ? { recipePortions: input.recipePortions } : {}),
@@ -155,6 +188,37 @@ class InMemoryDiaryRepository implements DiaryRepository {
       return true;
     }
     return false;
+  }
+
+  async countBySourceId(userId: string, sourceId: string): Promise<number> {
+    let count = 0;
+    for (const [, meals] of this.mealsByDay) {
+      for (const meal of meals) {
+        if (meal.userId !== userId) continue;
+        count += (meal.items ?? []).filter((i) => i.sourceId === sourceId).length;
+      }
+    }
+    return count;
+  }
+
+  async updateMacrosBySourceId(
+    userId: string,
+    sourceId: string,
+    newNutritionPer100g: NutritionValues,
+    newPortionWeightGrams?: number,
+  ): Promise<number> {
+    let count = 0;
+    for (const [, meals] of this.mealsByDay) {
+      for (const meal of meals) {
+        if (meal.userId !== userId) continue;
+        for (const item of meal.items ?? []) {
+          if (item.sourceId !== sourceId) continue;
+          item.macros = recalcMacros(item, newNutritionPer100g, newPortionWeightGrams);
+          count++;
+        }
+      }
+    }
+    return count;
   }
 }
 

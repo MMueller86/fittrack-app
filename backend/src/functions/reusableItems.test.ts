@@ -1,8 +1,15 @@
 ﻿import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
 
-import { createReusableItemHandler, searchReusableItemsHandler } from './reusableItems';
+import {
+  createReusableItemHandler,
+  searchReusableItemsHandler,
+  updateReusableItemHandler,
+  deleteReusableItemHandler,
+} from './reusableItems';
 import { __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
-import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth, signTestToken } from '../test-utils/http';
+import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
+import { addItemHandler, createMealHandler } from './diary';
+import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth, signTestToken, TEST_USER_ID } from '../test-utils/http';
 
 const ctx = makeContext();
 
@@ -16,6 +23,7 @@ afterAll(() => {
 
 beforeEach(() => {
   __resetReusableItemsRepositoryForTests();
+  __resetDiaryRepositoryForTests();
 });
 
 // ---------------------------------------------------------------------------
@@ -297,5 +305,196 @@ describe('GET /api/reusable-items — search', () => {
     const { items } = res.jsonBody as { items: { name: string }[] };
     expect(items.length).toBeGreaterThanOrEqual(2);
     expect(items.every((i) => i.name.startsWith('Ap') || i.name.startsWith('ap'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/reusable-items/:id — update
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/reusable-items/:id — update', () => {
+  async function createProduct(name = 'Vollkornbrot') {
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'manual',
+          name,
+          nutritionPer100g: { calories: 240, protein: 8, carbs: 44, fat: 3, fiber: 0 },
+        },
+      }),
+      ctx,
+    );
+    return (res.jsonBody as { item: { id: string } }).item.id;
+  }
+
+  it('returns 200 and updated item when name is changed', async () => {
+    const id = await createProduct();
+    const res = await updateReusableItemHandler(
+      await makeAuthRequest({ params: { id }, body: { name: 'Vollkornbrot Bio' } }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    const { item } = res.jsonBody as { item: { name: string } };
+    expect(item.name).toBe('Vollkornbrot Bio');
+  });
+
+  it('returns 200 and updates nutritionPer100g including fiber', async () => {
+    const id = await createProduct();
+    const res = await updateReusableItemHandler(
+      await makeAuthRequest({
+        params: { id },
+        body: { nutritionPer100g: { calories: 240, protein: 8, carbs: 44, fat: 3, fiber: 6 } },
+      }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    const { item } = res.jsonBody as { item: { nutritionPer100g: { fiber: number } } };
+    expect(item.nutritionPer100g.fiber).toBe(6);
+  });
+
+  it('returns 404 when item does not exist', async () => {
+    const res = await updateReusableItemHandler(
+      await makeAuthRequest({ params: { id: 'non-existent-id' }, body: { name: 'X' } }),
+      ctx,
+    );
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 400 when no fields are provided', async () => {
+    const id = await createProduct();
+    const res = await updateReusableItemHandler(
+      await makeAuthRequest({ params: { id }, body: {} }),
+      ctx,
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it('updates diary item macros when updateHistory is true', async () => {
+    const productId = await createProduct('Ballaststoffarm');
+
+    // Mahlzeit anlegen + Item mit productId (= sourceId) loggen
+    const mealRes = await createMealHandler(
+      await makeAuthRequest({ body: { date: '2026-06-05', type: 'lunch', name: 'Lunch' } }),
+      ctx,
+    );
+    const mealId = (mealRes.jsonBody as { meal: { id: string } }).meal.id;
+
+    await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId,
+          productName: 'Ballaststoffarm',
+          inputMode: 'grams',
+          inputAmount: 200,
+          amountGrams: 200,
+          calculatedNutrition: { calories: 480, protein: 16, carbs: 88, fat: 6, fiber: 0 },
+        },
+      }),
+      ctx,
+    );
+
+    // Produkt mit korrektem fiber-Wert updaten + updateHistory
+    const updateRes = await updateReusableItemHandler(
+      await makeAuthRequest({
+        params: { id: productId },
+        body: {
+          nutritionPer100g: { calories: 240, protein: 8, carbs: 44, fat: 3, fiber: 6 },
+          updateHistory: true,
+        },
+      }),
+      ctx,
+    );
+    expect(updateRes.status).toBe(200);
+    const { updatedItemCount } = updateRes.jsonBody as { updatedItemCount: number };
+    expect(updatedItemCount).toBe(1);
+
+    // Diary-Eintrag muss jetzt fiber=12 haben (200g / 100 * 6 = 12)
+    const dayRes = await (await import('./diary')).getDiaryHandler(
+      {
+        params: {},
+        headers: { get: (n: string) => n === 'authorization' ? `Bearer ${(updateRes.jsonBody as never)}` : null },
+        query: { get: (k: string) => k === 'date' ? '2026-06-05' : null },
+      } as never,
+      ctx,
+    );
+    // Prüfe über Repository direkt (getDiaryHandler braucht Auth-Token)
+    const { getDiaryRepository } = await import('../lib/repositories/diaryRepository');
+    const dayData = await getDiaryRepository().getDay(TEST_USER_ID, '2026-06-05');
+    const fiber = dayData.meals[0]!.items[0]!.macros.fiber;
+    expect(fiber).toBeCloseTo(12, 1); // 200g * 6/100 = 12
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/reusable-items/:id — delete
+// ---------------------------------------------------------------------------
+
+describe('DELETE /api/reusable-items/:id — delete', () => {
+  async function createProduct() {
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'manual',
+          name: 'Löschbares Produkt',
+          nutritionPer100g: { calories: 100, protein: 5, carbs: 10, fat: 3, fiber: 2 },
+        },
+      }),
+      ctx,
+    );
+    return (res.jsonBody as { item: { id: string } }).item.id;
+  }
+
+  it('returns 200 with deleted:true and diaryUsageCount:0 when unused', async () => {
+    const id = await createProduct();
+    const res = await deleteReusableItemHandler(
+      await makeAuthRequest({ params: { id } }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { deleted: boolean; diaryUsageCount: number };
+    expect(body.deleted).toBe(true);
+    expect(body.diaryUsageCount).toBe(0);
+  });
+
+  it('returns 200 with diaryUsageCount > 0 when item was used in diary', async () => {
+    const productId = await createProduct();
+
+    const mealRes = await createMealHandler(
+      await makeAuthRequest({ body: { date: '2026-06-05', type: 'lunch', name: 'Lunch' } }),
+      ctx,
+    );
+    const mealId = (mealRes.jsonBody as { meal: { id: string } }).meal.id;
+    await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId,
+          productName: 'Löschbares Produkt',
+          inputMode: 'grams',
+          inputAmount: 100,
+          amountGrams: 100,
+          calculatedNutrition: { calories: 100, protein: 5, carbs: 10, fat: 3, fiber: 2 },
+        },
+      }),
+      ctx,
+    );
+
+    const res = await deleteReusableItemHandler(
+      await makeAuthRequest({ params: { id: productId } }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { deleted: boolean; diaryUsageCount: number };
+    expect(body.deleted).toBe(true);
+    expect(body.diaryUsageCount).toBe(1);
+  });
+
+  it('returns 404 when item does not exist', async () => {
+    const res = await deleteReusableItemHandler(
+      await makeAuthRequest({ params: { id: 'ghost-id' } }),
+      ctx,
+    );
+    expect(res.status).toBe(404);
   });
 });

@@ -34,9 +34,19 @@ export interface CreateReusableItemInput {
   searchTerms?: string[];
 }
 
+export interface UpdateReusableItemInput {
+  name?: string;
+  brand?: string;
+  nutritionPer100g?: NutritionValues;
+  portion?: PortionInfo | null;
+}
+
 export interface ReusableItemsRepository {
   search(userId: string, query: string): Promise<ReusableItem[]>;
+  getById(userId: string, id: string): Promise<ReusableItem | null>;
   create(input: CreateReusableItemInput): Promise<ReusableItem>;
+  update(userId: string, id: string, input: UpdateReusableItemInput): Promise<ReusableItem | null>;
+  remove(userId: string, id: string): Promise<boolean>;
 }
 
 class InMemoryReusableItemsRepository implements ReusableItemsRepository {
@@ -44,7 +54,7 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
 
   async search(userId: string, query: string): Promise<ReusableItem[]> {
     const items = this.itemsByUser.get(userId) ?? [];
-    if (!query.trim()) return items.slice(0, 20);
+    if (!query.trim()) return [...items].sort((a, b) => b.usageCount - a.usageCount).slice(0, 20);
     const q = query.toLowerCase();
     return items
       .filter((i) =>
@@ -52,6 +62,11 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
         (i.searchTerms ?? []).some((t) => t.startsWith(q)),
       )
       .slice(0, 20);
+  }
+
+  async getById(userId: string, id: string): Promise<ReusableItem | null> {
+    const items = this.itemsByUser.get(userId) ?? [];
+    return items.find((i) => i.id === id) ?? null;
   }
 
   async create(input: CreateReusableItemInput): Promise<ReusableItem> {
@@ -76,6 +91,35 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
     list.push(item);
     this.itemsByUser.set(input.userId, list);
     return item;
+  }
+
+  async update(userId: string, id: string, input: UpdateReusableItemInput): Promise<ReusableItem | null> {
+    const items = this.itemsByUser.get(userId) ?? [];
+    const item = items.find((i) => i.id === id);
+    if (!item) return null;
+    if (input.name !== undefined) item.name = input.name;
+    if (input.brand !== undefined) item.brand = input.brand ?? undefined;
+    if (input.nutritionPer100g !== undefined) {
+      item.nutritionPer100g = input.nutritionPer100g;
+      item.nutritionBasis = item.portion ? 'both' : 'per100g';
+    }
+    if (input.portion !== undefined) {
+      item.portion = input.portion ?? undefined;
+      item.nutritionBasis = input.portion
+        ? (item.nutritionPer100g ? 'both' : 'perPortion')
+        : (item.nutritionPer100g ? 'per100g' : 'perPortion');
+    }
+    (item as ReusableItem & { updatedAt?: string }).updatedAt = new Date().toISOString();
+    return item;
+  }
+
+  async remove(userId: string, id: string): Promise<boolean> {
+    const items = this.itemsByUser.get(userId) ?? [];
+    const idx = items.findIndex((i) => i.id === id);
+    if (idx === -1) return false;
+    items.splice(idx, 1);
+    this.itemsByUser.set(userId, items);
+    return true;
   }
 }
 

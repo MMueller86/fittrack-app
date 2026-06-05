@@ -4,7 +4,7 @@
     "slug": "fittrack",
     "owner": "michi01mueller",
     "scheme": "fittrack",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/brand/fittrack_app_icon_master_v1.png",
     "userInterfaceStyle": "dark",
@@ -19,7 +19,6 @@
     },
     "android": {
       "package": "com.fittrack.app",
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/fittrack_app_icon_master_v1.png",
         "backgroundColor": "#0B0F0C"

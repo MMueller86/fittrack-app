@@ -4,10 +4,13 @@ import { z } from 'zod';
 import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
+import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 
-// GET  /api/reusable-items?query=  — search by name (startsWith, top 20)
-// POST /api/reusable-items         — create a new reusable item
+// GET    /api/reusable-items?query=  — search / list all (empty query = all)
+// POST   /api/reusable-items         — create a new reusable item
+// PATCH  /api/reusable-items/:id     — update name/brand/nutrition; optionally update diary history
+// DELETE /api/reusable-items/:id     — delete item (diary snapshots remain)
 
 const positiveNumber = z.coerce.number().refine(
   (n) => Number.isFinite(n) && n >= 0,
@@ -50,6 +53,20 @@ const AiCreateSchema = z.object({
 });
 
 const CreateReusableItemSchema = z.union([AiCreateSchema, ManualCreateSchema]);
+
+const UpdateReusableItemSchema = z
+  .object({
+    name: z.string().trim().min(1).max(200).optional(),
+    brand: z.string().trim().max(100).nullable().optional(),
+    nutritionPer100g: NutritionPer100gSchema.optional(),
+    portion: PortionSchema.nullable().optional(),
+    /** When true, recalculate macros for all diary items linked to this product */
+    updateHistory: z.boolean().optional(),
+  })
+  .refine(
+    (d) => d.name !== undefined || d.brand !== undefined || d.nutritionPer100g !== undefined || d.portion !== undefined,
+    { message: 'At least one field must be provided' },
+  );
 
 export const searchReusableItemsHandler = withHandler(
   'reusableItems.search',
@@ -133,4 +150,79 @@ app.http('reusable-items-create', {
   authLevel: 'anonymous',
   route: 'reusable-items',
   handler: createReusableItemHandler,
+});
+
+export const updateReusableItemHandler = withHandler(
+  'reusableItems.update',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params['id'];
+    if (!id) return { status: 400, jsonBody: { error: 'Missing item id' } };
+
+    const parsed = await parseBody(request, UpdateReusableItemSchema);
+    if (!parsed.ok) return parsed.response;
+    const { updateHistory, brand: brandRaw, ...rest } = parsed.data;
+    const fields = { ...rest, ...(brandRaw !== undefined ? { brand: brandRaw ?? undefined } : {}) };
+
+    const repo = getReusableItemsRepository();
+
+    // Verify ownership
+    const existing = await repo.getById(userId, id);
+    if (!existing) return { status: 404, jsonBody: { error: 'Item not found' } };
+    if (existing.userId !== userId) return { status: 403, jsonBody: { error: 'Forbidden' } };
+
+    const item = await repo.update(userId, id, fields);
+    if (!item) return { status: 404, jsonBody: { error: 'Item not found' } };
+
+    let updatedItemCount = 0;
+    if (updateHistory && item.nutritionPer100g) {
+      const newPortionGrams = item.portion?.weightGrams;
+      updatedItemCount = await getDiaryRepository().updateMacrosBySourceId(
+        userId,
+        id,
+        item.nutritionPer100g,
+        newPortionGrams,
+      );
+    }
+
+    logEvent(ctx, 'info', 'reusableItems.updated', { userId, itemId: id, updateHistory: !!updateHistory, updatedItemCount });
+    return { status: 200, jsonBody: { item, updatedItemCount } };
+  },
+);
+
+export const deleteReusableItemHandler = withHandler(
+  'reusableItems.delete',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params['id'];
+    if (!id) return { status: 400, jsonBody: { error: 'Missing item id' } };
+
+    const repo = getReusableItemsRepository();
+
+    const existing = await repo.getById(userId, id);
+    if (!existing) return { status: 404, jsonBody: { error: 'Item not found' } };
+    if (existing.userId !== userId) return { status: 403, jsonBody: { error: 'Forbidden' } };
+
+    // Count diary usage before deleting (for response info)
+    const diaryUsageCount = await getDiaryRepository().countBySourceId(userId, id);
+
+    await repo.remove(userId, id);
+
+    logEvent(ctx, 'info', 'reusableItems.deleted', { userId, itemId: id, diaryUsageCount });
+    return { status: 200, jsonBody: { deleted: true, diaryUsageCount } };
+  },
+);
+
+app.http('reusable-items-update', {
+  methods: ['PATCH'],
+  authLevel: 'anonymous',
+  route: 'reusable-items/{id}',
+  handler: updateReusableItemHandler,
+});
+
+app.http('reusable-items-delete', {
+  methods: ['DELETE'],
+  authLevel: 'anonymous',
+  route: 'reusable-items/{id}',
+  handler: deleteReusableItemHandler,
 });

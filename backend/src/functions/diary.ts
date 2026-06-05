@@ -7,6 +7,7 @@ import { logEvent } from '../lib/log';
 import { calculate, NutritionCalculationError } from '../lib/nutritionCalculator';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository } from '../lib/repositories/dayMetaRepository';
+import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 
 // GET    /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
 // PUT    /api/diary/{date}/day-type             — set rest/training day type
@@ -188,16 +189,47 @@ export const addItemHandler = withHandler(
     // Resolve the display name: explicit > productName
     const itemName = d.name ?? d.productName!;
 
-    // Resolve macros: product path > calculated path > flat macros
+    // Resolve macros — priority:
+    // 1. productId → load ReusableItem from DB → server-side calculation (authoritative)
+    // 2. calculatedNutrition from client (fallback: OpenFoodFacts items, legacy clients)
+    // 3. quantityMode + nutritionPer100g (legacy calculated path)
+    // 4. Flat macros (manual one-off entry)
     let macros: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
-    if (d.amountGrams != null && d.calculatedNutrition != null) {
-      // Product input — nutrition already calculated on the client from nutritionPer100g
+
+    if (d.productId && d.amountGrams != null) {
+      // Priority 1: Try to resolve nutrition server-side from stored ReusableItem
+      const product = await getReusableItemsRepository().getById(userId, d.productId);
+      if (product?.nutritionPer100g) {
+        const n = product.nutritionPer100g;
+        const scale = d.amountGrams / 100;
+        macros = {
+          calories: Math.round(n.calories * scale * 10) / 10,
+          protein:  Math.round((n.protein  ?? 0) * scale * 10) / 10,
+          carbs:    Math.round((n.carbs    ?? 0) * scale * 10) / 10,
+          fat:      Math.round((n.fat      ?? 0) * scale * 10) / 10,
+          fiber:    Math.round((n.fiber    ?? 0) * scale * 10) / 10,
+        };
+        logEvent(ctx, 'info', 'diary.item.macrosFromProduct', { productId: d.productId });
+      } else if (d.calculatedNutrition != null) {
+        // Fallback: productId given but not a stored ReusableItem (e.g. OpenFoodFacts)
+        macros = {
+          calories: d.calculatedNutrition.calories,
+          protein:  d.calculatedNutrition.protein,
+          carbs:    d.calculatedNutrition.carbs,
+          fat:      d.calculatedNutrition.fat,
+          fiber:    d.calculatedNutrition.fiber ?? 0,
+        };
+      } else {
+        return { status: 400, jsonBody: { error: 'Product not found and no calculatedNutrition provided' } };
+      }
+    } else if (d.amountGrams != null && d.calculatedNutrition != null) {
+      // Priority 2: Client-provided nutrition (no productId — e.g. direct OpenFoodFacts add)
       macros = {
         calories: d.calculatedNutrition.calories,
-        protein: d.calculatedNutrition.protein,
-        carbs: d.calculatedNutrition.carbs,
-        fat: d.calculatedNutrition.fat,
-        fiber: d.calculatedNutrition.fiber ?? 0,
+        protein:  d.calculatedNutrition.protein,
+        carbs:    d.calculatedNutrition.carbs,
+        fat:      d.calculatedNutrition.fat,
+        fiber:    d.calculatedNutrition.fiber ?? 0,
       };
     } else if (d.quantityMode != null && d.quantity != null) {
       try {
@@ -229,6 +261,7 @@ export const addItemHandler = withHandler(
         ...macros,
         quantity: d.inputMode === 'portion' ? d.inputAmount! : (d.amountGrams ?? d.quantity ?? 1),
         unit: d.inputMode === 'portion' ? 'portion' : d.quantityMode === 'portions' ? 'portion' : (d.unit ?? 'g'),
+        ...(d.productId ? { sourceId: d.productId } : {}),
         ...(d.isAiEstimate ? { isAiEstimate: true } : {}),
         ...(d.sourceType === 'ai-meal-estimate' ? { sourceType: 'ai-meal-estimate' } : {}),
         ...(d.aiMealEstimateComponents ? { aiMealEstimateComponents: d.aiMealEstimateComponents } : {}),

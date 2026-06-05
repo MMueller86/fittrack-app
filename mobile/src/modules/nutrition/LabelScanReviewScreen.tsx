@@ -26,7 +26,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { NutritionLabelScanResult } from '@fittrack/shared';
+import type { NutritionLabelScanResult, ReusableItem } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
@@ -40,12 +40,18 @@ import { reusableItemsApi } from '../../shared/api/reusableItemsApi';
 interface Props {
   visible: boolean;
   mealId: string;
-  /** Vorausgefüllte Scan-Daten — fehlen bei manueller Eingabe (isManual=true) */
+  /** Vorausgefüllte Scan-Daten — fehlen bei manueller Eingabe (isManual=true) oder Edit-Modus */
   scanResult?: NutritionLabelScanResult;
   /** true = manuelle Eingabe (leere Felder, kein OCR/KI-Badge, anderer Titel) */
   isManual?: boolean;
+  /** Edit-Modus: vorhandenes Produkt bearbeiten statt neu anlegen */
+  existingItem?: ReusableItem;
+  /** 'create' (default) oder 'edit' */
+  mode?: 'create' | 'edit';
   onClose: () => void;
   onSaved: () => void;
+  /** Callback nach erfolgreichem Update im Edit-Modus */
+  onUpdated?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,33 +73,86 @@ function num(s: string): number {
 // Main screen
 // ---------------------------------------------------------------------------
 
-export default function LabelScanReviewScreen({ visible, mealId, scanResult, isManual = false, onClose, onSaved }: Props) {
+export default function LabelScanReviewScreen({ visible, mealId, scanResult, isManual = false, existingItem, mode = 'create', onClose, onSaved, onUpdated }: Props) {
   const insets = useSafeAreaInsets();
+  const isEditMode = mode === 'edit' && existingItem != null;
   const n = scanResult?.nutrition;
-  const fallbackName = isManual ? '' : 'Gescanntes Produkt';
+  const e100 = existingItem?.nutritionPer100g;
 
-  // Editable fields — pre-filled from scan data when available, empty for manual entry
+  // Im Edit-Modus aus existingItem vorbelegen, sonst wie bisher
   const [name, setName] = useState(
-    isManual ? '' : ([scanResult?.brand, scanResult?.productName].filter(Boolean).join(' – ') || 'Gescanntes Produkt'),
+    isEditMode
+      ? existingItem!.name
+      : isManual ? '' : ([scanResult?.brand, scanResult?.productName].filter(Boolean).join(' – ') || 'Gescanntes Produkt'),
   );
-  const [portionLabel, setPortionLabel] = useState(scanResult?.servingSize?.label ?? '');
+  const [portionLabel, setPortionLabel] = useState(
+    isEditMode ? (existingItem!.portion?.label ?? '') : (scanResult?.servingSize?.label ?? ''),
+  );
   const [portionGrams, setPortionGrams] = useState(
-    scanResult?.servingSize?.weightGrams != null ? String(scanResult.servingSize.weightGrams) : '',
+    isEditMode
+      ? (existingItem!.portion?.weightGrams != null ? String(existingItem!.portion!.weightGrams) : '')
+      : (scanResult?.servingSize?.weightGrams != null ? String(scanResult.servingSize.weightGrams) : ''),
   );
-  const [calories, setCalories] = useState(String(n?.calories ?? 0));
-  const [protein, setProtein] = useState(String(n?.protein ?? 0));
-  const [carbs, setCarbs] = useState(String(n?.carbs ?? 0));
-  const [fat, setFat] = useState(String(n?.fat ?? 0));
-  const [fiber, setFiber] = useState(String(n?.fiber ?? ''));
-  const [salt, setSalt] = useState(String(n?.salt ?? ''));
-  const [sugar, setSugar] = useState(String(n?.sugar ?? ''));
-  const [saturatedFat, setSaturatedFat] = useState(String(n?.saturatedFat ?? ''));
+  const [calories, setCalories] = useState(isEditMode ? String(e100?.calories ?? 0) : String(n?.calories ?? 0));
+  const [protein, setProtein] = useState(isEditMode ? String(e100?.protein ?? 0) : String(n?.protein ?? 0));
+  const [carbs, setCarbs] = useState(isEditMode ? String(e100?.carbs ?? 0) : String(n?.carbs ?? 0));
+  const [fat, setFat] = useState(isEditMode ? String(e100?.fat ?? 0) : String(n?.fat ?? 0));
+  const [fiber, setFiber] = useState(isEditMode ? String(e100?.fiber ?? '') : String(n?.fiber ?? ''));
+  const [salt, setSalt] = useState(isEditMode ? String((e100 as {salt?: number} | undefined)?.salt ?? '') : String(n?.salt ?? ''));
+  const [sugar, setSugar] = useState(isEditMode ? '' : String(n?.sugar ?? ''));
+  const [saturatedFat, setSaturatedFat] = useState(isEditMode ? '' : String(n?.saturatedFat ?? ''));
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const ocrConf = useMemo(() => scanResult ? confidenceLabel(scanResult.ocrConfidence) : null, [scanResult]);
   const aiConf = useMemo(() => scanResult ? confidenceLabel(scanResult.aiConfidence) : null, [scanResult]);
+
+  // Update existing ReusableItem (Edit-Modus)
+  async function handleUpdateProduct(updateHistory: boolean) {
+    if (!existingItem) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await reusableItemsApi.update(
+        existingItem.id,
+        {
+          name: name.trim() || existingItem.name,
+          nutritionPer100g: {
+            calories: num(calories),
+            protein: num(protein),
+            carbs: num(carbs),
+            fat: num(fat),
+            ...(fiber ? { fiber: num(fiber) } : {}),
+            ...(salt ? { salt: num(salt) } : {}),
+          },
+          portion: num(portionGrams) > 0
+            ? { label: portionLabel || `${num(portionGrams)} g`, weightGrams: num(portionGrams) }
+            : null,
+        },
+        updateHistory,
+      );
+      onUpdated?.();
+      onClose();
+    } catch (e) {
+      console.error('[LabelScanReviewScreen] handleUpdateProduct failed:', e);
+      setError(formatApiError(e, 'Speichern fehlgeschlagen'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleEditSave() {
+    Alert.alert(
+      'Historische Einträge aktualisieren?',
+      'Sollen alle bisherigen Diary-Einträge mit diesem Produkt auf die neuen Nährwerte (inkl. Ballaststoffe) aktualisiert werden?',
+      [
+        { text: 'Nur Produkt', style: 'default', onPress: () => handleUpdateProduct(false) },
+        { text: 'Produkt + History', style: 'default', onPress: () => handleUpdateProduct(true) },
+        { text: 'Abbrechen', style: 'cancel' },
+      ],
+    );
+  }
 
   // Save as ReusableItem + add to diary
   async function handleSaveAsProduct() {
@@ -130,6 +189,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
           protein: Math.round(num(protein) * scale * 10) / 10,
           carbs: Math.round(num(carbs) * scale * 10) / 10,
           fat: Math.round(num(fat) * scale * 10) / 10,
+          fiber: Math.round(num(fiber || '0') * scale * 10) / 10,
         },
       });
 
@@ -178,7 +238,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
             <Text style={styles.cancelText}>Abbrechen</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            {isManual ? '✏️ Produkt eingeben' : '📷 Scan-Ergebnis'}
+            {isEditMode ? '✏️ Produkt bearbeiten' : isManual ? '✏️ Produkt eingeben' : '📷 Scan-Ergebnis'}
           </Text>
           <View style={{ width: 80 }} />
         </View>
@@ -300,25 +360,43 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
           {error && <ErrorBanner error={error} />}
 
           {/* Action buttons */}
-          <TouchableOpacity
-            style={[styles.primaryBtn, saving && styles.btnDisabled]}
-            onPress={handleSaveAsProduct}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.primaryBtnText}>Als Produkt speichern + hinzufügen</Text>
-            )}
-          </TouchableOpacity>
+          {isEditMode ? (
+            <>
+              <TouchableOpacity
+                style={[styles.primaryBtn, saving && styles.btnDisabled]}
+                onPress={handleEditSave}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.primaryBtnText}>💾 Produkt speichern</Text>
+                )}
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <TouchableOpacity
+                style={[styles.primaryBtn, saving && styles.btnDisabled]}
+                onPress={handleSaveAsProduct}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Als Produkt speichern + hinzufügen</Text>
+                )}
+              </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.secondaryBtn, saving && styles.btnDisabled]}
-            onPress={handleAddOnce}
-            disabled={saving}
-          >
-            <Text style={styles.secondaryBtnText}>Einmalig hinzufügen</Text>
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.secondaryBtn, saving && styles.btnDisabled]}
+                onPress={handleAddOnce}
+                disabled={saving}
+              >
+                <Text style={styles.secondaryBtnText}>Einmalig hinzufügen</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </Modal>
