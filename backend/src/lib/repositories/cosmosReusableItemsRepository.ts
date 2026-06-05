@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 import type { ReusableItem } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
 import type { CreateReusableItemInput, ReusableItemsRepository, UpdateReusableItemInput } from './reusableItemsRepository';
-import { splitQueryTokens } from '../searchRanking';
 
 // ---------------------------------------------------------------------------
 // Query builder
@@ -52,9 +51,11 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
         'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20';
       parameters = [{ name: '@userId', value: userId }];
     } else {
-      // Multi-token AND: all tokens must match name or searchTerms
-      const tokens = splitQueryTokens(query);
-      // If every token is too short (< 2 chars), nothing matches — return early.
+      // Split query into tokens on whitespace. Min length 1 — STARTSWITH prefix search
+      // intentionally allows single characters (e.g. "o" matches "Oats").
+      // Note: splitQueryTokens from searchRanking enforces min length 2 for CONTAINS-based
+      // food-product search — that stricter rule does NOT apply here.
+      const tokens = query.toLowerCase().trim().split(/\s+/).filter((t) => t.length >= 1);
       if (tokens.length === 0) return [];
       const { whereClause, parameters: tokenParams } = buildTokenFilter(tokens);
       cosmosQuery = `SELECT * FROM c WHERE c.userId = @userId AND ${whereClause} ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20`;
