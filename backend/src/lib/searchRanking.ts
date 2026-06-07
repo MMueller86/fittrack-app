@@ -23,12 +23,18 @@ export function splitQueryTokens(query: string): string[] {
  *
  * Tiers (higher = more relevant):
  *   4   — exact name match
- *   3   — name starts with token (prefix)
+ *   3   — name starts with token (prefix)  |  searchTerm equals token exactly
  *   2.5 — token equals a complete word within name (word-boundary match)
  *   2   — token appears anywhere in name (substring)
- *   1   — any searchTerm equals token exactly
  *   0.5 — any searchTerm starts with token
  *  -1   — no match
+ *
+ * Rationale for searchTerm-exact = 3:
+ *   An AI-generated keyword exactly matching the query means the product IS
+ *   semantically this term (e.g. "Ei" has keyword "eier"). This is equivalent
+ *   in relevance to a product whose name starts with the query.
+ *   Combined with the +0.5 library bonus, own products reliably beat catalog
+ *   items that merely share the same name prefix.
  */
 function rankSingleToken(name: string, searchTerms: string[], token: string): number {
   const n = name.toLowerCase();
@@ -36,7 +42,7 @@ function rankSingleToken(name: string, searchTerms: string[], token: string): nu
   if (n.startsWith(token)) return 3;
   if (n.split(/\s+/).some((word) => word === token)) return 2.5;
   if (n.includes(token)) return 2;
-  if (searchTerms.includes(token)) return 1;
+  if (searchTerms.includes(token)) return 3;
   if (searchTerms.some((t) => t.startsWith(token))) return 0.5;
   return -1;
 }

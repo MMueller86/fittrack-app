@@ -20,6 +20,7 @@
                          "@azure/cosmos":  "^4.1.1",
                          "@azure/functions":  "^4.5.0",
                          "@azure/storage-blob":  "^12.25.0",
+                         "@azure/storage-queue":  "^12.30.0",
                          "jose":  "^6.2.3",
                          "openai":  "^4.104.0",
                          "sharp":  "^0.34.5",

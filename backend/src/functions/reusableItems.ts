@@ -26,6 +26,8 @@ const NutritionPer100gSchema = z.object({
   fat: positiveNumber,
   fiber: positiveNumber.optional(),
   salt: positiveNumber.optional(),
+  sugar: positiveNumber.optional(),
+  saturatedFat: positiveNumber.optional(),
 });
 
 const PortionSchema = z.object({
@@ -63,11 +65,13 @@ const UpdateReusableItemSchema = z
     brand: z.string().trim().max(100).nullable().optional(),
     nutritionPer100g: NutritionPer100gSchema.optional(),
     portion: PortionSchema.nullable().optional(),
+    /** Custom search terms — merged with auto-generated tokens on the server */
+    searchTerms: z.array(z.string().toLowerCase().trim().min(1).max(50)).max(50).optional(),
     /** When true, recalculate macros for all diary items linked to this product */
     updateHistory: z.boolean().optional(),
   })
   .refine(
-    (d) => d.name !== undefined || d.brand !== undefined || d.nutritionPer100g !== undefined || d.portion !== undefined,
+    (d) => d.name !== undefined || d.brand !== undefined || d.nutritionPer100g !== undefined || d.portion !== undefined || d.searchTerms !== undefined,
     { message: 'At least one field must be provided' },
   );
 
@@ -119,6 +123,9 @@ export const createReusableItemHandler = withHandler(
           carbs: d.nutritionPer100g.carbs,
           fat: d.nutritionPer100g.fat,
           ...(d.nutritionPer100g.fiber != null && { fiber: d.nutritionPer100g.fiber }),
+          ...(d.nutritionPer100g.salt != null && { salt: d.nutritionPer100g.salt }),
+          ...(d.nutritionPer100g.sugar != null && { sugar: d.nutritionPer100g.sugar }),
+          ...(d.nutritionPer100g.saturatedFat != null && { saturatedFat: d.nutritionPer100g.saturatedFat }),
         },
         portion: d.portion
           ? { label: d.portion.label, weightGrams: d.portion.weightGrams }
@@ -152,8 +159,9 @@ export const createReusableItemHandler = withHandler(
     }
 
     logEvent(ctx, 'info', 'reusableItems.created', { userId, itemId: item.id });
-    // Fire-and-forget: enqueue AI keyword enrichment (errors are swallowed inside enqueueEnrichment)
-    void enqueueEnrichment(userId, item.id, ctx);
+    // Awaited — ensures the queue message is sent before the response returns.
+    // Errors are swallowed inside enqueueEnrichment so this never blocks the 201.
+    await enqueueEnrichment(userId, item.id, ctx);
     return { status: 201, jsonBody: { item } };
   },
 );
@@ -198,14 +206,20 @@ export const updateReusableItemHandler = withHandler(
     if (!existing) return { status: 404, jsonBody: { error: 'Item not found' } };
     if (existing.userId !== userId) return { status: 403, jsonBody: { error: 'Forbidden' } };
 
-    // Recompute searchTerms from updated name + brand.
-    // Reset searchTermsEnriched so the AI re-enriches with the new name/brand.
+    // Recompute searchTerms from updated name + brand, merged with any
+    // custom terms the client sent (e.g. manually added tags like "magerquark").
+    // Only reset searchTermsEnriched when name or brand actually changes
+    // (otherwise custom tag edits would needlessly re-trigger AI enrichment).
     const updatedName = fields.name ?? existing.name;
     const updatedBrand = fields.brand ?? existing.brand;
+    const nameOrBrandChanged = fields.name !== undefined || fields.brand !== undefined;
+    const autoTokens = tokenizeProduct(updatedName, updatedBrand);
+    const clientTerms = fields.searchTerms ?? [];
+    const mergedSearchTerms = [...new Set([...autoTokens, ...clientTerms])];
     const updateInput: UpdateReusableItemInput = {
       ...fields,
-      searchTerms: tokenizeProduct(updatedName, updatedBrand),
-      searchTermsEnriched: false,
+      searchTerms: mergedSearchTerms,
+      ...(nameOrBrandChanged && { searchTermsEnriched: false }),
     };
 
     const item = await repo.update(userId, id, updateInput);
@@ -223,8 +237,8 @@ export const updateReusableItemHandler = withHandler(
     }
 
     logEvent(ctx, 'info', 'reusableItems.updated', { userId, itemId: id, updateHistory: !!updateHistory, updatedItemCount });
-    // Fire-and-forget: re-enqueue AI enrichment so updated name/brand gets new keywords
-    void enqueueEnrichment(userId, id, ctx);
+    // Awaited — ensures the queue message is sent before the response returns.
+    await enqueueEnrichment(userId, id, ctx);
     return { status: 200, jsonBody: { item, updatedItemCount } };
   },
 );

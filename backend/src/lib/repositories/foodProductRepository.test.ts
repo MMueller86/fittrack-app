@@ -139,14 +139,14 @@ describe('rankProduct', () => {
     expect(rankProduct(product, 'haferflocken')).toBe(2.5);
   });
 
-  it('gives rank 1 for exact keyword match', () => {
+  it('gives rank 3 for exact keyword match (same tier as name-prefix)', () => {
     const product = makeProduct({
       id: 'x',
       name: 'Protein Shake',
       normalizedName: 'protein shake',
       searchKeywords: ['protein', 'shake', 'hafer'],
     });
-    expect(rankProduct(product, 'hafer')).toBe(1);
+    expect(rankProduct(product, 'hafer')).toBe(3);
   });
 
   it('gives rank 2 for keyword substring match via normalizedName', () => {

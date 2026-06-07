@@ -11,6 +11,11 @@ export interface NutritionValues {
   carbs: number;
   fat: number;
   fiber?: number;
+  /** Davon Zucker (g) — optional, aus Nährwerttabelle */
+  sugar?: number;
+  /** Davon gesättigte Fettsäuren (g) — optional, aus Nährwerttabelle */
+  saturatedFat?: number;
+  salt?: number;
 }
 
 export interface PortionInfo {

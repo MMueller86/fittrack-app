@@ -15,7 +15,7 @@ export interface CreateAiItemInput {
   sourceType: 'ai' | 'label-scan' | 'manual';
   name: string;
   brand?: string;
-  nutritionPer100g: NutritionValues & { fiber?: number; salt?: number };
+  nutritionPer100g: NutritionValues;
   portion?: { label: string; weightGrams: number };
   aiConfidence?: number;
   aiWarnings?: string[];
@@ -25,8 +25,10 @@ export interface CreateAiItemInput {
 export interface UpdateReusableItemInput {
   name?: string;
   brand?: string | null;
-  nutritionPer100g?: NutritionValues & { fiber?: number; salt?: number };
+  nutritionPer100g?: NutritionValues;
   portion?: { label: string; weightGrams: number } | null;
+  /** Custom search terms (merged with auto-generated tokens on backend) */
+  searchTerms?: string[];
 }
 
 export type CreateReusableItemInput = CreateManualItemInput | CreateAiItemInput;

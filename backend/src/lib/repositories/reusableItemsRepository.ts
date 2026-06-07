@@ -50,6 +50,8 @@ export interface ReusableItemsRepository {
   create(input: CreateReusableItemInput): Promise<ReusableItem>;
   update(userId: string, id: string, input: UpdateReusableItemInput): Promise<ReusableItem | null>;
   remove(userId: string, id: string): Promise<boolean>;
+  /** Increment usageCount by 1. Called when a product is added to the diary. Fire-and-forget safe. */
+  incrementUsageCount(userId: string, id: string): Promise<void>;
 }
 
 class InMemoryReusableItemsRepository implements ReusableItemsRepository {
@@ -126,6 +128,12 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
     items.splice(idx, 1);
     this.itemsByUser.set(userId, items);
     return true;
+  }
+
+  async incrementUsageCount(userId: string, id: string): Promise<void> {
+    const items = this.itemsByUser.get(userId) ?? [];
+    const item = items.find((i) => i.id === id);
+    if (item) item.usageCount = (item.usageCount ?? 0) + 1;
   }
 }
 

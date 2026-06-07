@@ -65,16 +65,18 @@ export default function EditItemSheet({ visible, mealId, item, onSaved, onClose 
   const [saving, setSaving] = useState(false);
   const [sourceProduct, setSourceProduct] = useState<ReusableItem | null>(null);
 
-  // Load source product to get portion weight in grams
+  // Load source product to get portion weight in grams.
+  // Load whenever sourceId exists — not just for 'portion' unit items,
+  // so gram-based items can also switch to portion mode in edit.
   useEffect(() => {
-    if (item.sourceId && item.unit === 'portion') {
+    if (item.sourceId) {
       reusableItemsApi.getById(item.sourceId)
         .then((r) => setSourceProduct(r.item))
         .catch(() => setSourceProduct(null));
     } else {
       setSourceProduct(null);
     }
-  }, [item.sourceId, item.unit]);
+  }, [item.sourceId]);
 
   // Reset when item changes
   useEffect(() => {
@@ -189,8 +191,8 @@ export default function EditItemSheet({ visible, mealId, item, onSaved, onClose 
               );
             })()}
 
-            {/* Gram / Portion segmented control — always show "Gramm", "Portion" only when original unit was portion */}
-            {isPortion && (
+            {/* Gram / Portion segmented control — show when original unit was portion OR when sourceProduct has a portion size */}
+            {(isPortion || sourceProduct?.portion?.weightGrams) && (
               <View style={styles.segmentedControl}>
                 <TouchableOpacity
                   style={[styles.segment, inputMode === 'grams' && styles.segmentActive]}
@@ -200,7 +202,18 @@ export default function EditItemSheet({ visible, mealId, item, onSaved, onClose 
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segment, inputMode === 'portion' && styles.segmentActive]}
-                  onPress={() => { setInputMode('portion'); setAmount(String(item.quantity)); }}
+                  onPress={() => {
+                    setInputMode('portion');
+                    // When switching from grams to portion, estimate a sensible portion count
+                    const portionGrams = sourceProduct?.portion?.weightGrams;
+                    if (isPortion) {
+                      setAmount(String(item.quantity));
+                    } else if (portionGrams && parsedAmount > 0) {
+                      setAmount(String(Math.max(1, Math.round(parsedAmount / portionGrams))));
+                    } else {
+                      setAmount('1');
+                    }
+                  }}
                 >
                   <Text style={[styles.segmentText, inputMode === 'portion' && styles.segmentTextActive]}>Portion</Text>
                 </TouchableOpacity>

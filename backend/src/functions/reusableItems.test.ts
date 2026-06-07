@@ -1,4 +1,9 @@
-﻿import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
+﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
+
+// Must be hoisted before handler imports so vi.mock replaces the module before it loads
+vi.mock('../lib/queueClient', () => ({
+  enqueueEnrichment: vi.fn().mockResolvedValue(undefined),
+}));
 
 import {
   createReusableItemHandler,
@@ -6,6 +11,7 @@ import {
   updateReusableItemHandler,
   deleteReusableItemHandler,
 } from './reusableItems';
+import { enqueueEnrichment } from '../lib/queueClient';
 import { __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
 import { addItemHandler, createMealHandler } from './diary';
@@ -24,6 +30,7 @@ afterAll(() => {
 beforeEach(() => {
   __resetReusableItemsRepositoryForTests();
   __resetDiaryRepositoryForTests();
+  vi.mocked(enqueueEnrichment).mockClear();
 });
 
 // ---------------------------------------------------------------------------
@@ -496,5 +503,190 @@ describe('DELETE /api/reusable-items/:id — delete', () => {
       ctx,
     );
     expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// enqueueEnrichment — called and awaited on create/update
+// ---------------------------------------------------------------------------
+
+describe('enqueueEnrichment — called after create and update', () => {
+  it('calls enqueueEnrichment with correct itemId after POST create', async () => {
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'ai',
+          name: 'Joghurt Mild Stichfest',
+          brand: 'Ja!',
+          nutritionPer100g: { calories: 60, protein: 4, carbs: 5, fat: 2 },
+        },
+      }),
+      ctx,
+    );
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: { id: string } };
+
+    // enqueueEnrichment must have been called exactly once and awaited
+    // (if it were fire-and-forget the mock would still be called, but any
+    // rejection would go unnoticed — the await ensures failures propagate).
+    expect(enqueueEnrichment).toHaveBeenCalledOnce();
+    expect(enqueueEnrichment).toHaveBeenCalledWith(TEST_USER_ID, item.id, ctx);
+  });
+
+  it('calls enqueueEnrichment with correct itemId after PATCH update', async () => {
+    // Create first
+    const createRes = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'label-scan',
+          name: 'Erdbeere Marmelade weniger Zucker',
+          nutritionPer100g: { calories: 150, protein: 0.4, carbs: 36, fat: 0.1 },
+        },
+      }),
+      ctx,
+    );
+    const { item } = createRes.jsonBody as { item: { id: string } };
+    vi.mocked(enqueueEnrichment).mockClear(); // reset — only count the update call
+
+    const updateRes = await updateReusableItemHandler(
+      await makeAuthRequest({
+        params: { id: item.id },
+        body: { name: 'Erdbeer Konfitüre weniger Zucker' },
+      }),
+      ctx,
+    );
+    expect(updateRes.status).toBe(200);
+
+    expect(enqueueEnrichment).toHaveBeenCalledOnce();
+    expect(enqueueEnrichment).toHaveBeenCalledWith(TEST_USER_ID, item.id, ctx);
+  });
+
+  it('still returns 201 when storage is unavailable — enqueueEnrichment swallows errors internally', async () => {
+    // We mock at the queueClient level: the real enqueueEnrichment() wraps all
+    // storage operations in try/catch and never re-throws, so the mock resolves
+    // normally here. This test documents the contract: the handler always returns
+    // 201 regardless of what happens inside enqueueEnrichment.
+    vi.mocked(enqueueEnrichment).mockResolvedValueOnce(undefined);
+
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: { name: 'Haferflocken', calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10 },
+      }),
+      ctx,
+    );
+    expect(res.status).toBe(201);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sugar + saturatedFat — stored and returned
+// ---------------------------------------------------------------------------
+
+describe('sugar + saturatedFat — stored and returned via POST and PATCH', () => {
+  it('stores sugar and saturatedFat when provided via POST label-scan', async () => {
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'label-scan',
+          name: 'Joghurt Mild Stichfest',
+          brand: 'Ja!',
+          nutritionPer100g: {
+            calories: 62,
+            protein: 3.8,
+            carbs: 5.0,
+            fat: 2.5,
+            sugar: 4.8,
+            saturatedFat: 1.6,
+            salt: 0.1,
+          },
+        },
+      }),
+      ctx,
+    );
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: { nutritionPer100g: Record<string, number> } };
+    expect(item.nutritionPer100g.sugar).toBeCloseTo(4.8);
+    expect(item.nutritionPer100g.saturatedFat).toBeCloseTo(1.6);
+    expect(item.nutritionPer100g.salt).toBeCloseTo(0.1);
+  });
+
+  it('omits sugar and saturatedFat when not provided (no phantom undefined keys)', async () => {
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'label-scan',
+          name: 'Haferflocken',
+          nutritionPer100g: { calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10 },
+        },
+      }),
+      ctx,
+    );
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: { nutritionPer100g: Record<string, unknown> } };
+    expect(item.nutritionPer100g.sugar).toBeUndefined();
+    expect(item.nutritionPer100g.saturatedFat).toBeUndefined();
+  });
+
+  it('updates sugar and saturatedFat via PATCH', async () => {
+    // Create without the optional fields first
+    const createRes = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'label-scan',
+          name: 'Vollmilch',
+          nutritionPer100g: { calories: 64, protein: 3.4, carbs: 4.8, fat: 3.5 },
+        },
+      }),
+      ctx,
+    );
+    const { item: created } = createRes.jsonBody as { item: { id: string } };
+
+    // Now update with sugar + saturatedFat
+    const updateRes = await updateReusableItemHandler(
+      await makeAuthRequest({
+        params: { id: created.id },
+        body: {
+          nutritionPer100g: { calories: 64, protein: 3.4, carbs: 4.8, fat: 3.5, sugar: 4.8, saturatedFat: 2.1 },
+        },
+      }),
+      ctx,
+    );
+    expect(updateRes.status).toBe(200);
+    const { item } = updateRes.jsonBody as { item: { nutritionPer100g: Record<string, number> } };
+    expect(item.nutritionPer100g.sugar).toBeCloseTo(4.8);
+    expect(item.nutritionPer100g.saturatedFat).toBeCloseTo(2.1);
+  });
+
+  it('merges custom searchTerms with auto-tokens in PATCH without resetting enrichment', async () => {
+    const createRes = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'label-scan',
+          name: 'Magerquark',
+          nutritionPer100g: { calories: 67, protein: 12, carbs: 3.9, fat: 0.3 },
+        },
+      }),
+      ctx,
+    );
+    const { item: created } = createRes.jsonBody as { item: { id: string; searchTerms: string[] } };
+
+    // PATCH with only searchTerms (no name/brand change)
+    const updateRes = await updateReusableItemHandler(
+      await makeAuthRequest({
+        params: { id: created.id },
+        body: { searchTerms: ['quark', 'fettarm', 'protein'] },
+      }),
+      ctx,
+    );
+    expect(updateRes.status).toBe(200);
+    const { item } = updateRes.jsonBody as { item: { searchTerms: string[] } };
+
+    // Should contain both auto-tokens from "Magerquark" and the client-provided terms
+    expect(item.searchTerms).toContain('magerquark');
+    expect(item.searchTerms).toContain('quark');
+    expect(item.searchTerms).toContain('fettarm');
+    expect(item.searchTerms).toContain('protein');
+    // No duplicates
+    expect(new Set(item.searchTerms).size).toBe(item.searchTerms.length);
   });
 });

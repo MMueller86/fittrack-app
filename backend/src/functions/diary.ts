@@ -217,6 +217,9 @@ export const addItemHandler = withHandler(
           fiber:    Math.round((n.fiber    ?? 0) * scale * 10) / 10,
         };
         logEvent(ctx, 'info', 'diary.item.macrosFromProduct', { productId: d.productId });
+        // Increment usageCount so the item floats to the top of the "recently used" list.
+        // Fire-and-forget — errors are swallowed inside incrementUsageCount.
+        void getReusableItemsRepository().incrementUsageCount(userId, d.productId);
       } else if (d.calculatedNutrition != null) {
         // Fallback: productId given but not a stored ReusableItem (e.g. OpenFoodFacts)
         macros = {

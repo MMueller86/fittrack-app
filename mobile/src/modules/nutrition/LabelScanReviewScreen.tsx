@@ -98,13 +98,26 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
   const [carbs, setCarbs] = useState(isEditMode ? String(e100?.carbs ?? 0) : String(n?.carbs ?? 0));
   const [fat, setFat] = useState(isEditMode ? String(e100?.fat ?? 0) : String(n?.fat ?? 0));
   const [fiber, setFiber] = useState(isEditMode ? String(e100?.fiber ?? '') : String(n?.fiber ?? ''));
-  const [salt, setSalt] = useState(isEditMode ? String((e100 as {salt?: number} | undefined)?.salt ?? '') : String(n?.salt ?? ''));
-  const [sugar, setSugar] = useState(isEditMode ? '' : String(n?.sugar ?? ''));
-  const [saturatedFat, setSaturatedFat] = useState(isEditMode ? '' : String(n?.saturatedFat ?? ''));
+  const [salt, setSalt] = useState(isEditMode ? String(e100?.salt ?? '') : String(n?.salt ?? ''));
+  const [sugar, setSugar] = useState(isEditMode ? String(e100?.sugar ?? '') : String(n?.sugar ?? ''));
+  const [saturatedFat, setSaturatedFat] = useState(isEditMode ? String(e100?.saturatedFat ?? '') : String(n?.saturatedFat ?? ''));
   const [brand, setBrand] = useState(
     isEditMode ? (existingItem!.brand ?? '') : (scanResult?.brand ?? ''),
   );
   const [techOpen, setTechOpen] = useState(false);
+  // Editable search terms for the accordion tag editor (edit mode only)
+  const [editableSearchTerms, setEditableSearchTerms] = useState<string[]>(() => existingItem?.searchTerms ?? []);
+  const [termInput, setTermInput] = useState('');
+
+  // Diary-Menge: getrennt von der Portionsdefinition (portionLabel/portionGrams)
+  // diaryInputMode: 'grams' = direkte Gramm-Eingabe, 'portion' = Portionsmultiplikator
+  const hasPortion = num(portionGrams) > 0;
+  const [diaryInputMode, setDiaryInputMode] = useState<'grams' | 'portion'>(
+    () => (scanResult?.servingSize?.weightGrams ?? 0) > 0 ? 'portion' : 'grams',
+  );
+  const [diaryAmount, setDiaryAmount] = useState(
+    () => (scanResult?.servingSize?.weightGrams ?? 0) > 0 ? '1' : '100',
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,10 +143,13 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
             fat: num(fat),
             ...(fiber ? { fiber: num(fiber) } : {}),
             ...(salt ? { salt: num(salt) } : {}),
+            ...(sugar ? { sugar: num(sugar) } : {}),
+            ...(saturatedFat ? { saturatedFat: num(saturatedFat) } : {}),
           },
           portion: num(portionGrams) > 0
             ? { label: portionLabel || `${num(portionGrams)} g`, weightGrams: num(portionGrams) }
             : null,
+          searchTerms: editableSearchTerms,
         },
         updateHistory,
       );
@@ -175,21 +191,26 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
           fat: num(fat),
           ...(fiber ? { fiber: num(fiber) } : {}),
           ...(salt ? { salt: num(salt) } : {}),
+          ...(sugar ? { sugar: num(sugar) } : {}),
+          ...(saturatedFat ? { saturatedFat: num(saturatedFat) } : {}),
         },
         portion: num(portionGrams) > 0
           ? { label: portionLabel || `${num(portionGrams)} g`, weightGrams: num(portionGrams) }
           : undefined,
       });
 
-      // Add to diary using portion size if available, otherwise 100g
-      const grams = num(portionGrams) > 0 ? num(portionGrams) : 100;
-      const scale = grams / 100;
+      // Add to diary using diary amount selector (separate from portion definition)
+      const portionW = num(portionGrams);
+      const diaryGrams = diaryInputMode === 'portion' && portionW > 0
+        ? Math.max(1, num(diaryAmount)) * portionW
+        : Math.max(1, num(diaryAmount));
+      const scale = diaryGrams / 100;
       await diaryApi.addItem(mealId, {
         productId: result.item.id,
         productName: result.item.name ?? (isManual ? 'Neues Produkt' : 'Gescanntes Produkt'),
         inputMode: 'grams',
-        inputAmount: grams,
-        amountGrams: grams,
+        inputAmount: diaryGrams,
+        amountGrams: diaryGrams,
         calculatedNutrition: {
           calories: Math.round(num(calories) * scale),
           protein: Math.round(num(protein) * scale * 10) / 10,
@@ -213,8 +234,11 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
     setSaving(true);
     setError(null);
     try {
-      const grams = num(portionGrams) > 0 ? num(portionGrams) : 100;
-      const scale = grams / 100;
+      const portionW = num(portionGrams);
+      const diaryGrams = diaryInputMode === 'portion' && portionW > 0
+        ? Math.max(1, num(diaryAmount)) * portionW
+        : Math.max(1, num(diaryAmount));
+      const scale = diaryGrams / 100;
       await diaryApi.addItem(mealId, {
         name: name.trim() || (isManual ? 'Neues Produkt' : 'Gescanntes Produkt'),
         calories: Math.round(num(calories) * scale),
@@ -397,19 +421,56 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
                 </Text>
               </View>
 
-              {/* Tokens: auto-generated from name+brand */}
-              <Text style={[styles.techLabel, { marginTop: spacing.sm }]}>Suchbegriffe (aus Name/Marke)</Text>
-              {existingItem?.searchTerms && existingItem.searchTerms.length > 0 ? (
+              {/* Tokens + custom terms (merged on backend): editable in edit mode */}
+              <Text style={[styles.techLabel, { marginTop: spacing.sm }]}>Alle Suchbegriffe</Text>
+              {editableSearchTerms.length > 0 ? (
                 <View style={styles.tagsContainer}>
-                  {existingItem.searchTerms.map((term) => (
-                    <View key={term} style={styles.tag}>
+                  {editableSearchTerms.map((term) => (
+                    <TouchableOpacity
+                      key={term}
+                      style={styles.tagRemovable}
+                      onPress={() => setEditableSearchTerms((prev) => prev.filter((t) => t !== term))}
+                    >
                       <Text style={styles.tagText}>{term}</Text>
-                    </View>
+                      <Text style={styles.tagRemoveBtn}> ✕</Text>
+                    </TouchableOpacity>
                   ))}
                 </View>
               ) : (
                 <Text style={styles.techEmpty}>Keine Suchbegriffe</Text>
               )}
+              {/* Add custom term */}
+              <View style={styles.termInputRow}>
+                <TextInput
+                  style={styles.termInput}
+                  value={termInput}
+                  onChangeText={setTermInput}
+                  placeholder="Begriff hinzufügen…"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={() => {
+                    const t = termInput.trim().toLowerCase();
+                    if (t && !editableSearchTerms.includes(t)) {
+                      setEditableSearchTerms((prev) => [...prev, t]);
+                    }
+                    setTermInput('');
+                  }}
+                />
+                <TouchableOpacity
+                  style={styles.termAddBtn}
+                  onPress={() => {
+                    const t = termInput.trim().toLowerCase();
+                    if (t && !editableSearchTerms.includes(t)) {
+                      setEditableSearchTerms((prev) => [...prev, t]);
+                    }
+                    setTermInput('');
+                  }}
+                >
+                  <Text style={styles.termAddBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* AI Keywords: generated by enrichment pipeline */}
               <Text style={[styles.techLabel, { marginTop: spacing.sm }]}>KI-Keywords</Text>
@@ -430,6 +491,53 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
           )}
 
           {error && <ErrorBanner error={error} />}
+
+          {/* Diary amount selector — only in create mode, not in product edit mode */}
+          {!isEditMode && (
+            <View style={styles.diaryAmountBox}>
+              <Text style={styles.sectionTitle}>Menge</Text>
+              {/* Gramm / Portion segmented control */}
+              {hasPortion && (
+                <View style={styles.segmentRow}>
+                  <TouchableOpacity
+                    style={[styles.segmentBtn, diaryInputMode === 'grams' && styles.segmentBtnActive]}
+                    onPress={() => { setDiaryInputMode('grams'); setDiaryAmount('100'); }}
+                  >
+                    <Text style={[styles.segmentText, diaryInputMode === 'grams' && styles.segmentTextActive]}>g</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.segmentBtn, diaryInputMode === 'portion' && styles.segmentBtnActive]}
+                    onPress={() => { setDiaryInputMode('portion'); setDiaryAmount('1'); }}
+                  >
+                    <Text style={[styles.segmentText, diaryInputMode === 'portion' && styles.segmentTextActive]}>
+                      {portionLabel || 'Portion'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <TextInput
+                style={styles.diaryAmountInput}
+                value={diaryAmount}
+                onChangeText={setDiaryAmount}
+                keyboardType="decimal-pad"
+                selectTextOnFocus
+                placeholder={diaryInputMode === 'portion' ? '1' : '100'}
+                placeholderTextColor={colors.textMuted}
+              />
+              {/* Live kcal preview */}
+              {num(calories) > 0 && (
+                <Text style={styles.diaryAmountHint}>
+                  {(() => {
+                    const portionW = num(portionGrams);
+                    const g = diaryInputMode === 'portion' && portionW > 0
+                      ? Math.max(1, num(diaryAmount)) * portionW
+                      : Math.max(1, num(diaryAmount));
+                    return `≈ ${Math.round(num(calories) * g / 100)} kcal`;
+                  })()}
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Action buttons */}
           {isEditMode ? (
@@ -542,6 +650,36 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   servingText: { ...typography.body1, color: colors.textSecondary },
+  // Diary amount selector
+  diaryAmountBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginTop: spacing.md,
+  },
+  segmentRow: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: spacing.xs,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+  },
+  segmentBtnActive: { backgroundColor: colors.primary },
+  segmentText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
+  segmentTextActive: { color: colors.white },
+  diaryAmountInput: {
+    ...typography.h2,
+    color: colors.text,
+    textAlign: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  diaryAmountHint: { ...typography.caption, color: colors.primary, textAlign: 'center' },
   primaryBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
@@ -619,5 +757,37 @@ const styles = StyleSheet.create({
     borderColor: `${colors.primary}44`,
   },
   tagText: { ...typography.caption, color: colors.textSecondary },
+  tagRemovable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tagRemoveBtn: { ...typography.caption, color: colors.textMuted },
+  termInputRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm, alignItems: 'center' },
+  termInput: {
+    flex: 1,
+    ...typography.caption,
+    color: colors.text,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  termAddBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  termAddBtnText: { ...typography.h3, color: colors.white, lineHeight: 20 },
   techEmpty: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic' },
 });

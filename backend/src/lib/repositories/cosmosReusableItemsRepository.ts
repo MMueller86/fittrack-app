@@ -138,4 +138,16 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
       throw e;
     }
   }
+
+  async incrementUsageCount(userId: string, id: string): Promise<void> {
+    const { containers } = await getCosmos();
+    try {
+      // Cosmos patch operation: atomic increment without a full read-replace cycle
+      await containers.reusableMealItems.item(id, userId).patch([
+        { op: 'incr', path: '/usageCount', value: 1 },
+      ]);
+    } catch {
+      // Silently ignore — usageCount is best-effort for ordering, not critical
+    }
+  }
 }
