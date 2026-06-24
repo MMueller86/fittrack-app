@@ -59,14 +59,13 @@ class InMemoryReusableItemsRepository implements ReusableItemsRepository {
 
   async search(userId: string, query: string): Promise<ReusableItem[]> {
     const items = this.itemsByUser.get(userId) ?? [];
-    if (!query.trim()) return [...items].sort((a, b) => b.usageCount - a.usageCount).slice(0, 20);
+    if (!query.trim()) return [...items].sort((a, b) => b.usageCount - a.usageCount);
     const q = query.toLowerCase();
     return items
       .filter((i) =>
         i.name.toLowerCase().startsWith(q) ||
         (i.searchTerms ?? []).some((t) => t.startsWith(q)),
-      )
-      .slice(0, 20);
+      );
   }
 
   async getById(userId: string, id: string): Promise<ReusableItem | null> {

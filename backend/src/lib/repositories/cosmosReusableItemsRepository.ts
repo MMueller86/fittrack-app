@@ -48,7 +48,7 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
 
     if (!query.trim()) {
       cosmosQuery =
-        'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20';
+        'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.usageCount DESC';
       parameters = [{ name: '@userId', value: userId }];
     } else {
       // Split query into tokens on whitespace. Min length 1 — STARTSWITH prefix search
@@ -58,7 +58,7 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
       const tokens = query.toLowerCase().trim().split(/\s+/).filter((t) => t.length >= 1);
       if (tokens.length === 0) return [];
       const { whereClause, parameters: tokenParams } = buildTokenFilter(tokens);
-      cosmosQuery = `SELECT * FROM c WHERE c.userId = @userId AND ${whereClause} ORDER BY c.usageCount DESC OFFSET 0 LIMIT 20`;
+      cosmosQuery = `SELECT * FROM c WHERE c.userId = @userId AND ${whereClause} ORDER BY c.usageCount DESC`;
       parameters = [
         { name: '@userId', value: userId },
         ...tokenParams,

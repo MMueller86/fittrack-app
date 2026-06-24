@@ -1,4 +1,5 @@
 import { app } from '@azure/functions';
+import { requireUser } from '../lib/auth';
 
 // POST /api/auth/google    — validate Google ID token, return { accessToken, refreshToken }
 // POST /api/auth/refresh   — exchange refresh token for new access token
@@ -25,3 +26,5 @@ app.http('auth-logout', {
   route: 'auth/logout',
   handler: async () => ({ status: 501, jsonBody: { message: 'Not implemented — M2' } }),
 });
+
+

@@ -395,6 +395,7 @@ export default function ProfileScreen({ navigation }: Props) {
                   <MacroGrid title="💪 Trainingstag" targets={targets.trainingDay} />
                 </>
               )}
+
             </>
           )}
         </ScrollView>
