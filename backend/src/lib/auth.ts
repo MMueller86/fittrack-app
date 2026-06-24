@@ -20,6 +20,7 @@ export type UserTier = 'free' | 'premium' | 'internal';
 export interface UserContext {
   userId: string;
   tier: UserTier;
+  isAdmin: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +145,13 @@ async function getUserContext(request: HttpRequest): Promise<UserContext> {
     .filter(Boolean);
   const tier: UserTier = internalIds.includes(userId) ? 'internal' : 'free';
 
-  return { userId, tier };
+  // Detect Admin role from Entra App Role claim.
+  // Entra populates `roles` as a string array when App Roles are assigned.
+  // Detection happens post-verification — the claim is part of the signed payload.
+  const rawRoles = payload['roles'];
+  const isAdmin = Array.isArray(rawRoles) && rawRoles.includes('Admin');
+
+  return { userId, tier, isAdmin };
 }
 
 /**

@@ -20,8 +20,9 @@ vi.mock('./repositories/aiUsageRepository', () => {
 const { __mockRepo: mockRepo } = await import('./repositories/aiUsageRepository') as any;
 
 describe('enforceQuota', () => {
-  const freeUser: UserContext = { userId: 'user-1', tier: 'free' };
-  const premiumUser: UserContext = { userId: 'premium-user', tier: 'premium' };
+  const freeUser: UserContext = { userId: 'user-1', tier: 'free', isAdmin: false };
+  const premiumUser: UserContext = { userId: 'premium-user', tier: 'premium', isAdmin: false };
+  const adminUser: UserContext = { userId: 'admin-user', tier: 'free', isAdmin: true };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,10 +71,25 @@ describe('enforceQuota', () => {
     await enforceQuota(premiumUser, 'meal-parser');
     expect(mockRepo.checkQuota).toHaveBeenCalledWith('premium-user', 'meal-parser', 'premium');
   });
+
+  it('returns null for admin user without calling checkQuota', async () => {
+    const result = await enforceQuota(adminUser, 'meal-parser');
+    expect(result).toBeNull();
+    expect(mockRepo.checkQuota).not.toHaveBeenCalled();
+  });
+
+  it('returns null for admin user even when quota would be exceeded', async () => {
+    // checkQuota is never called, so mock value here is irrelevant —
+    // the test verifies the admin bypass fires before any repo access.
+    const result = await enforceQuota(adminUser, 'food-estimate');
+    expect(result).toBeNull();
+    expect(mockRepo.checkQuota).not.toHaveBeenCalled();
+  });
 });
 
 describe('trackUsage', () => {
-  const freeUser: UserContext = { userId: 'user-1', tier: 'free' };
+  const freeUser: UserContext = { userId: 'user-1', tier: 'free', isAdmin: false };
+  const adminUser: UserContext = { userId: 'admin-user', tier: 'free', isAdmin: true };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,5 +99,11 @@ describe('trackUsage', () => {
     mockRepo.incrementUsage.mockResolvedValue({});
     await trackUsage(freeUser, 'food-estimate');
     expect(mockRepo.incrementUsage).toHaveBeenCalledWith('user-1', 'food-estimate', 'free');
+  });
+
+  it('calls incrementUsage for admin user (usage is still counted)', async () => {
+    mockRepo.incrementUsage.mockResolvedValue({});
+    await trackUsage(adminUser, 'meal-parser');
+    expect(mockRepo.incrementUsage).toHaveBeenCalledWith('admin-user', 'meal-parser', 'free');
   });
 });

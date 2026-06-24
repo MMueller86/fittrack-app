@@ -118,6 +118,57 @@ describe('auth', () => {
 
     await expect(requireUser(makeRequest(token))).rejects.toThrow(UnauthorizedError);
   });
+
+  describe('isAdmin (Entra App Role)', () => {
+    it('token with roles:["Admin"] returns isAdmin=true', async () => {
+      const token = await signToken({ roles: ['Admin'] });
+      const ctx = await requireUser(makeRequest(token));
+      expect(ctx.isAdmin).toBe(true);
+    });
+
+    it('token without roles claim returns isAdmin=false', async () => {
+      const token = await signToken();
+      const ctx = await requireUser(makeRequest(token));
+      expect(ctx.isAdmin).toBe(false);
+    });
+
+    it('token with roles:[] returns isAdmin=false', async () => {
+      const token = await signToken({ roles: [] });
+      const ctx = await requireUser(makeRequest(token));
+      expect(ctx.isAdmin).toBe(false);
+    });
+
+    it('token with roles:["OtherRole"] returns isAdmin=false', async () => {
+      const token = await signToken({ roles: ['OtherRole'] });
+      const ctx = await requireUser(makeRequest(token));
+      expect(ctx.isAdmin).toBe(false);
+    });
+
+    it('token with roles:["Admin","OtherRole"] returns isAdmin=true', async () => {
+      const token = await signToken({ roles: ['Admin', 'OtherRole'] });
+      const ctx = await requireUser(makeRequest(token));
+      expect(ctx.isAdmin).toBe(true);
+    });
+
+    it('INTERNAL_USER_IDS user with Admin role gets tier:internal AND isAdmin:true', async () => {
+      process.env['INTERNAL_USER_IDS'] = 'internal-user-42';
+      try {
+        const token = await signToken({ sub: 'internal-user-42', roles: ['Admin'] });
+        const ctx = await requireUser(makeRequest(token));
+        expect(ctx.tier).toBe('internal');
+        expect(ctx.isAdmin).toBe(true);
+      } finally {
+        delete process.env['INTERNAL_USER_IDS'];
+      }
+    });
+
+    it('roles claim as non-array is ignored, isAdmin=false', async () => {
+      // Malformed token where roles is a string instead of array — must not crash
+      const token = await signToken({ roles: 'Admin' });
+      const ctx = await requireUser(makeRequest(token));
+      expect(ctx.isAdmin).toBe(false);
+    });
+  });
 });
 
 describe('parseBearer', () => {

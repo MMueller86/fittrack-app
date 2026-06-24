@@ -17,6 +17,10 @@ export async function enforceQuota(
   user: UserContext,
   feature: AiFeature,
 ): Promise<HttpResponseInit | null> {
+  // Admin users are never blocked by quota limits.
+  // Usage is still tracked via trackUsage() for observability.
+  if (user.isAdmin) return null;
+
   const repo = getAiUsageRepository();
   const result = await repo.checkQuota(user.userId, feature, user.tier);
 
