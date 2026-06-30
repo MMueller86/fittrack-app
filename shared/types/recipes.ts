@@ -35,6 +35,10 @@ export interface RecipeIngredient {
   linkedReusableItemId: string | null;
   /** True when nutrition was estimated by AI */
   isAiEstimate: boolean;
+  /** Gram weight of one portion — present when the source product has portion info */
+  portionWeightGrams?: number;
+  /** Display label for the portion (e.g. "Portion", "Scheibe") */
+  portionLabel?: string;
   /** Nutrition per 100g — used to recalculate on edit */
   nutritionPer100g: RecipeNutrition;
   /** Pre-calculated contribution of this ingredient to the total recipe */

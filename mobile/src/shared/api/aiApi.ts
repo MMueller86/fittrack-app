@@ -126,5 +126,12 @@ export const aiApi = {
       .post<AiRecipeAnalysis>('/ai/recipe-analyze', { text }, { timeout: 90_000 })
       .then((r) => r.data);
   },
+
+  /** POST /api/ai/food-estimate/batch — estimate nutrition for up to 10 items in one AI call */
+  estimateFoodBatch(items: Array<{ name: string }>): Promise<AiFoodEstimatePreview[]> {
+    return apiClient
+      .post<{ results: AiFoodEstimatePreview[] }>('/ai/food-estimate/batch', { items }, { timeout: 60_000 })
+      .then((r) => r.data.results);
+  },
 };
 

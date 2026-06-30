@@ -422,3 +422,61 @@ export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
 
   return JSON.parse(raw) as AiRecipeRaw;
 }
+
+// ---------------------------------------------------------------------------
+// Food nutrition batch estimator
+// ---------------------------------------------------------------------------
+
+const FOOD_ESTIMATE_BATCH_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    items: {
+      type: 'array' as const,
+      items: FOOD_ESTIMATE_SCHEMA,
+    },
+  },
+  required: ['items'],
+  additionalProperties: false,
+};
+
+/**
+ * Estimate the nutritional values of multiple food items in a single AI call.
+ * Returns results in the same order as the input names array.
+ */
+export async function estimateFoodBatch(names: string[]): Promise<AiFoodEstimate[]> {
+  if (names.length === 0) return [];
+
+  const client = getClient();
+  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+
+  const userMessage = names.map((n, i) => `${i + 1}. ${n}`).join('\n');
+
+  const response = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      {
+        role: 'system',
+        content:
+          FOOD_ESTIMATE_SYSTEM_PROMPT +
+          '\n\nDu erhältst eine nummerierte Liste von Lebensmitteln. Gib für jedes Lebensmittel einen Eintrag in "items" zurück – in derselben Reihenfolge wie die Eingabe.',
+      },
+      { role: 'user', content: userMessage },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'food_estimate_batch',
+        strict: true,
+        schema: FOOD_ESTIMATE_BATCH_SCHEMA,
+      },
+    },
+    temperature: 0,
+    max_tokens: 4096,
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI');
+
+  const parsed = JSON.parse(raw) as { items: AiFoodEstimate[] };
+  return parsed.items;
+}

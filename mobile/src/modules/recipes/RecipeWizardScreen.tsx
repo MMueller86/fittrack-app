@@ -20,7 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { randomUUID } from 'expo-crypto';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { FoodSearchResult, RecipeIngredient } from '@fittrack/shared';
-import { calculateRecipeNutrition } from '@fittrack/shared';
+import { calculateRecipeNutrition, calculateNutrition } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { aiApi, type AiFoodEstimatePreview, type AiRecipeStep, type MealParserPreviewItem } from '../../shared/api/aiApi';
 import { recipeApi } from '../../shared/api/recipeApi';
@@ -54,7 +54,20 @@ function buildIngFromCandidate(
   item: MealParserPreviewItem,
   candidate: FoodSearchResult,
 ): RecipeIngredient {
-  const amountGrams = item.amountGrams ?? item.inputAmount ?? 100;
+  const portionWeightGrams = candidate.portion?.weightGrams;
+  const portionLabel = candidate.portion?.label;
+  const hasPortions = portionWeightGrams != null && portionWeightGrams > 0;
+
+  // If the AI parser already determined a portion-based input and the product
+  // has portion data, preserve that. Otherwise default to grams.
+  const inputMode: 'grams' | 'portion' =
+    item.inputMode === 'portion' && hasPortions ? 'portion' : 'grams';
+
+  const inputAmount = item.inputAmount ?? (hasPortions && inputMode === 'portion' ? 1 : 100);
+  const amountGrams = inputMode === 'portion'
+    ? inputAmount * portionWeightGrams!
+    : (item.amountGrams ?? inputAmount);
+
   const raw = candidate.nutritionPer100g;
   const n = {
     calories: raw?.calories ?? 0,
@@ -67,13 +80,15 @@ function buildIngFromCandidate(
   return {
     id,
     displayName: candidate.name,
-    inputMode: item.inputMode === 'grams' ? 'grams' : 'portion',
-    inputAmount: item.inputAmount ?? amountGrams,
+    inputMode,
+    inputAmount,
     amountGrams,
-    unit: item.inputMode === 'grams' ? 'g' : 'Stück',
+    unit: inputMode === 'portion' ? (portionLabel ?? 'Portion') : 'g',
     linkedProductId: candidate.id,
     linkedReusableItemId: null,
     isAiEstimate: false,
+    portionWeightGrams: hasPortions ? portionWeightGrams : undefined,
+    portionLabel: hasPortions ? (portionLabel ?? 'Portion') : undefined,
     nutritionPer100g: n,
     nutritionContribution: {
       calories: Math.round(n.calories * scale * 10) / 10,
@@ -174,6 +189,7 @@ export default function RecipeWizardScreen({ navigation }: Props) {
   const [ingredients, setIngredients] = useState<WizardIngredient[]>([]);
   const [expandedIngId, setExpandedIngId] = useState<string | null>(null);
   const [addIngredientVisible, setAddIngredientVisible] = useState(false);
+  const [replacingIngId, setReplacingIngId] = useState<string | null>(null);
 
   // Steps
   const [steps, setSteps] = useState<WizardStepItem[]>([]);
@@ -183,6 +199,10 @@ export default function RecipeWizardScreen({ navigation }: Props) {
 
   // Save
   const [saving, setSaving] = useState(false);
+
+  // Amount editor state per resolved ingredient: { mode, value }
+  type AmountMode = 'grams' | 'portion';
+  const [amountEdits, setAmountEdits] = useState<Record<string, { mode: AmountMode; value: string }>>({});
 
   // ---------------------------------------------------------------------------
   // Back handling
@@ -225,7 +245,19 @@ export default function RecipeWizardScreen({ navigation }: Props) {
       setRecipeDescription(result.description);
       setPortions(Math.max(1, result.suggestedPortions));
       setTags(result.tags);
-      setIngredients(result.ingredients.map(initWizardIngredient));
+      const wizardIngredients = result.ingredients.map(initWizardIngredient);
+      setIngredients(wizardIngredients);
+      // Initialize amount editors for all auto-matched ingredients
+      const initialEdits: Record<string, { mode: 'grams' | 'portion'; value: string }> = {};
+      for (const wi of wizardIngredients) {
+        if (wi.resolvedIngredient) {
+          initialEdits[wi.id] = {
+            mode: wi.resolvedIngredient.inputMode,
+            value: String(wi.resolvedIngredient.inputAmount),
+          };
+        }
+      }
+      setAmountEdits(initialEdits);
       setSteps(
         result.steps.map((s: AiRecipeStep) => ({
           id: randomUUID(),
@@ -234,6 +266,40 @@ export default function RecipeWizardScreen({ navigation }: Props) {
         })),
       );
       setPhase('ingredients');
+
+      // Auto-batch AI estimate for all unmatched ingredients
+      const needsAi = wizardIngredients.filter((wi) => wi.status === 'needs-ai');
+      if (needsAi.length > 0) {
+        setIngredients((prev) =>
+          prev.map((wi) => wi.status === 'needs-ai' ? { ...wi, status: 'ai-estimating' } : wi),
+        );
+        try {
+          const batchResults = await aiApi.estimateFoodBatch(
+            needsAi.map((wi) => ({ name: wi.parserItem.displayName })),
+          );
+          setIngredients((prev) => {
+            const updated = [...prev];
+            needsAi.forEach((wi, idx) => {
+              const estimate = batchResults[idx];
+              const i = updated.findIndex((u) => u.id === wi.id);
+              if (i === -1 || !estimate) return;
+              if (estimate.confidence === 0) {
+                updated[i] = { ...updated[i]!, status: 'needs-ai' };
+                return;
+              }
+              const resolved = buildIngFromAiEstimate(wi.id, wi.parserItem, estimate);
+              updated[i] = { ...updated[i]!, status: 'confirmed', resolvedIngredient: resolved };
+              setAmountEdits((e) => ({ ...e, [wi.id]: { mode: resolved.inputMode, value: String(resolved.inputAmount) } }));
+            });
+            return updated;
+          });
+        } catch (err) {
+          console.error('[RecipeWizard] batch AI estimate failed:', err);
+          setIngredients((prev) =>
+            prev.map((wi) => wi.status === 'ai-estimating' ? { ...wi, status: 'needs-ai' } : wi),
+          );
+        }
+      }
     } catch (err: unknown) {
       console.error('[RecipeWizard] analyzeRecipe failed:', err);
       let detail = '';
@@ -257,13 +323,22 @@ export default function RecipeWizardScreen({ navigation }: Props) {
     setIngredients((prev) =>
       prev.map((ing) => {
         if (ing.id !== ingId) return ing;
-        return {
-          ...ing,
-          status: 'confirmed',
-          resolvedIngredient: buildIngFromCandidate(ing.id, ing.parserItem, candidate),
-        };
+        const resolved = buildIngFromCandidate(ing.id, ing.parserItem, candidate);
+        return { ...ing, status: 'confirmed', resolvedIngredient: resolved };
       }),
     );
+    // Initialize amount editor with defaults from the resolved ingredient
+    setIngredients((prev) => {
+      const ing = prev.find((i) => i.id === ingId);
+      if (ing?.resolvedIngredient) {
+        const ri = ing.resolvedIngredient;
+        setAmountEdits((e) => ({
+          ...e,
+          [ingId]: { mode: ri.inputMode, value: String(ri.inputAmount) },
+        }));
+      }
+      return prev;
+    });
     setExpandedIngId(null);
   };
 
@@ -275,14 +350,12 @@ export default function RecipeWizardScreen({ navigation }: Props) {
     );
     try {
       const estimate = await aiApi.estimateFood({ name: ing.parserItem.displayName });
+      const resolved = buildIngFromAiEstimate(ingId, ing.parserItem, estimate);
+      setAmountEdits((e) => ({ ...e, [ingId]: { mode: resolved.inputMode, value: String(resolved.inputAmount) } }));
       setIngredients((prev) =>
         prev.map((i) => {
           if (i.id !== ingId) return i;
-          return {
-            ...i,
-            status: 'confirmed',
-            resolvedIngredient: buildIngFromAiEstimate(i.id, i.parserItem, estimate),
-          };
+          return { ...i, status: 'confirmed', resolvedIngredient: resolved };
         }),
       );
     } catch (err: unknown) {
@@ -310,6 +383,42 @@ export default function RecipeWizardScreen({ navigation }: Props) {
 
   const handleRemoveIngredient = (ingId: string) => {
     setIngredients((prev) => prev.filter((i) => i.id !== ingId));
+    setAmountEdits((prev) => { const next = { ...prev }; delete next[ingId]; return next; });
+  };
+
+  const handleUpdateIngredientAmount = (ingId: string, mode: 'grams' | 'portion', rawValue: string) => {
+    setAmountEdits((prev) => ({ ...prev, [ingId]: { mode, value: rawValue } }));
+    const num = parseFloat(rawValue.replace(',', '.'));
+    if (!Number.isFinite(num) || num <= 0) return;
+    setIngredients((prev) =>
+      prev.map((ing) => {
+        if (ing.id !== ingId || !ing.resolvedIngredient) return ing;
+        const ri = ing.resolvedIngredient;
+        const portionWeightGrams = ri.portionWeightGrams;
+        const amountGrams = mode === 'portion' && portionWeightGrams
+          ? num * portionWeightGrams
+          : num;
+        const scale = amountGrams / 100;
+        const n = ri.nutritionPer100g;
+        return {
+          ...ing,
+          resolvedIngredient: {
+            ...ri,
+            inputMode: mode,
+            inputAmount: num,
+            amountGrams,
+            unit: mode === 'portion' ? (ri.portionLabel ?? 'Portion') : 'g',
+            nutritionContribution: {
+              calories: Math.round(n.calories * scale * 10) / 10,
+              protein: Math.round(n.protein * scale * 10) / 10,
+              carbs: Math.round(n.carbs * scale * 10) / 10,
+              fat: Math.round(n.fat * scale * 10) / 10,
+              fiber: Math.round(n.fiber * scale * 10) / 10,
+            },
+          },
+        };
+      }),
+    );
   };
 
   const handleAddManualIngredient = (ingredient: RecipeIngredient) => {
@@ -331,7 +440,14 @@ export default function RecipeWizardScreen({ navigation }: Props) {
       status: 'confirmed',
       resolvedIngredient: ingredient,
     };
-    setIngredients((prev) => [...prev, wi]);
+    const newEdit = { mode: ingredient.inputMode, value: String(ingredient.inputAmount) };
+    setAmountEdits((e) => ({ ...e, [ingredient.id]: newEdit }));
+    if (replacingIngId) {
+      setIngredients((prev) => prev.map((i) => i.id === replacingIngId ? wi : i));
+      setReplacingIngId(null);
+    } else {
+      setIngredients((prev) => [...prev, wi]);
+    }
   };
 
   // ---------------------------------------------------------------------------
@@ -593,18 +709,70 @@ export default function RecipeWizardScreen({ navigation }: Props) {
                     </View>
 
                     {/* Resolved row */}
-                    {isResolved && ing.resolvedIngredient && (
-                      <View style={styles.resolvedRow}>
-                        <Text style={styles.resolvedName} numberOfLines={1}>
-                          {ing.resolvedIngredient.isAiEstimate
-                            ? '✦ KI-Schätzung'
-                            : ing.resolvedIngredient.displayName}
-                        </Text>
-                        <TouchableOpacity onPress={() => handleRemoveIngredient(ing.id)}>
-                          <Text style={styles.changeLink}>Entfernen</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
+                    {isResolved && ing.resolvedIngredient && (() => {
+                      const ri = ing.resolvedIngredient;
+                      const edit = amountEdits[ing.id] ?? { mode: ri.inputMode, value: String(ri.inputAmount) };
+                      const hasPortions = ri.portionWeightGrams != null && ri.portionWeightGrams > 0;
+                      return (
+                        <>
+                          <View style={styles.resolvedRow}>
+                            <Text style={styles.resolvedName} numberOfLines={1}>
+                              {ri.isAiEstimate ? '✦ KI-Schätzung' : ri.displayName}
+                            </Text>
+                            <TouchableOpacity onPress={() => { setReplacingIngId(ing.id); setAddIngredientVisible(true); }}>
+                              <Text style={styles.changeLink}>Ersetzen</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleRemoveIngredient(ing.id)}>
+                              <Text style={styles.changeLink}>Entfernen</Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {/* g / Portion toggle — only when portion data is available */}
+                          {hasPortions && (
+                            <View style={styles.segmentedControl}>
+                              <TouchableOpacity
+                                style={[styles.segment, edit.mode === 'grams' && styles.segmentActive]}
+                                onPress={() => handleUpdateIngredientAmount(ing.id, 'grams', '100')}
+                              >
+                                <Text style={[styles.segmentText, edit.mode === 'grams' && styles.segmentTextActive]}>Gramm</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.segment, edit.mode === 'portion' && styles.segmentActive]}
+                                onPress={() => handleUpdateIngredientAmount(ing.id, 'portion', '1')}
+                              >
+                                <Text style={[styles.segmentText, edit.mode === 'portion' && styles.segmentTextActive]}>
+                                  {ri.portionLabel ?? 'Portion'}
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                          )}
+
+                          {/* Amount input */}
+                          <View style={styles.amountRow}>
+                            <TextInput
+                              style={styles.amountInput}
+                              value={edit.value}
+                              onChangeText={(v) => handleUpdateIngredientAmount(ing.id, edit.mode, v)}
+                              keyboardType="decimal-pad"
+                              selectTextOnFocus
+                            />
+                            <Text style={styles.amountUnit}>
+                              {edit.mode === 'grams' ? 'g' : (ri.portionLabel ?? 'Portion')}
+                            </Text>
+                            <Text style={styles.amountKcal}>
+                              {Math.round(ri.nutritionContribution.calories)} kcal
+                            </Text>
+                          </View>
+
+                          {/* Hint: 1 Portion = X g */}
+                          {edit.mode === 'portion' && ri.portionWeightGrams != null && (
+                            <Text style={styles.portionHint}>
+                              1 {ri.portionLabel ?? 'Portion'} = {ri.portionWeightGrams} g
+                            </Text>
+                          )}
+                        </>
+                      );
+                    })()}
 
                     {/* Needs AI estimate */}
                     {ing.status === 'needs-ai' && (
@@ -916,11 +1084,12 @@ export default function RecipeWizardScreen({ navigation }: Props) {
 
       <AddIngredientModal
         visible={addIngredientVisible}
-        onClose={() => setAddIngredientVisible(false)}
+        onClose={() => { setAddIngredientVisible(false); setReplacingIngId(null); }}
         onAdd={(ing) => {
           handleAddManualIngredient(ing);
           setAddIngredientVisible(false);
         }}
+        replacingIngId={replacingIngId}
       />
     </SafeAreaView>
   );
@@ -1070,6 +1239,45 @@ const styles = StyleSheet.create({
     marginRight: spacing.sm,
   },
   changeLink: { ...typography.caption, color: colors.negative },
+
+  // Amount editor
+  segmentedControl: {
+    flexDirection: 'row' as const,
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: spacing.sm,
+    overflow: 'hidden' as const,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: spacing.xs,
+    alignItems: 'center' as const,
+  },
+  segmentActive: { backgroundColor: colors.primary },
+  segmentText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' as const },
+  segmentTextActive: { color: colors.white },
+  amountRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  amountInput: {
+    ...typography.body1,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    minWidth: 70,
+    textAlign: 'center' as const,
+  },
+  amountUnit: { ...typography.body2, color: colors.textSecondary },
+  amountKcal: { ...typography.caption, color: colors.textMuted, marginLeft: 'auto' as const },
+  portionHint: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
 
   // AI button
   aiBtn: {

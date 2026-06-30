@@ -22,6 +22,7 @@ import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 import AddIngredientModal from './AddIngredientModal';
+import { QuantityInputRow } from '../../shared/components/QuantityInputRow';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeCreate'>;
 
@@ -52,6 +53,8 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [addIngredientVisible, setAddIngredientVisible] = useState(false);
+  const [amountEdits, setAmountEdits] = useState<Record<string, { mode: 'grams' | 'portion'; value: string }>>({});
+  const [replacingIngId, setReplacingIngId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!editId) return;
@@ -62,6 +65,11 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
       setPortions(String(data.portions));
       setTags(data.tags.join(', '));
       setIngredients(data.ingredients);
+      const edits: Record<string, { mode: 'grams' | 'portion'; value: string }> = {};
+      for (const ing of data.ingredients) {
+        edits[ing.id] = { mode: ing.inputMode, value: String(ing.inputAmount) };
+      }
+      setAmountEdits(edits);
       setSteps(data.steps.length > 0 ? data.steps : [buildEmptyStep(1)]);
     } catch {
       Alert.alert('Fehler', 'Rezept konnte nicht geladen werden.');
@@ -95,11 +103,47 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
 
   // --- Ingredient management ---
   const handleAddIngredient = (ingredient: RecipeIngredient) => {
-    setIngredients((prev) => [...prev, ingredient]);
+    setAmountEdits((prev) => ({ ...prev, [ingredient.id]: { mode: ingredient.inputMode, value: String(ingredient.inputAmount) } }));
+    if (replacingIngId) {
+      setIngredients((prev) => prev.map((ing) => ing.id === replacingIngId ? ingredient : ing));
+      setReplacingIngId(null);
+    } else {
+      setIngredients((prev) => [...prev, ingredient]);
+    }
   };
 
   const handleRemoveIngredient = (id: string) => {
     setIngredients((prev) => prev.filter((i) => i.id !== id));
+    setAmountEdits((prev) => { const next = { ...prev }; delete next[id]; return next; });
+  };
+
+  const handleUpdateIngredientAmount = (ingId: string, mode: 'grams' | 'portion', rawValue: string) => {
+    setAmountEdits((prev) => ({ ...prev, [ingId]: { mode, value: rawValue } }));
+    const num = parseFloat(rawValue.replace(',', '.'));
+    if (!Number.isFinite(num) || num <= 0) return;
+    setIngredients((prev) =>
+      prev.map((ing) => {
+        if (ing.id !== ingId) return ing;
+        const portionWeightGrams = ing.portionWeightGrams;
+        const amountGrams = mode === 'portion' && portionWeightGrams ? num * portionWeightGrams : num;
+        const scale = amountGrams / 100;
+        const n = ing.nutritionPer100g;
+        return {
+          ...ing,
+          inputMode: mode,
+          inputAmount: num,
+          amountGrams,
+          unit: mode === 'portion' ? (ing.portionLabel ?? 'Portion') : 'g',
+          nutritionContribution: {
+            calories: Math.round(n.calories * scale * 10) / 10,
+            protein: Math.round(n.protein * scale * 10) / 10,
+            carbs: Math.round(n.carbs * scale * 10) / 10,
+            fat: Math.round(n.fat * scale * 10) / 10,
+            fiber: Math.round(n.fiber * scale * 10) / 10,
+          },
+        };
+      }),
+    );
   };
 
   // --- Step management ---
@@ -269,20 +313,32 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
           {ingredients.length === 0 && (
             <Text style={styles.emptyHint}>Noch keine Zutaten hinzugefügt.</Text>
           )}
-          {ingredients.map((ing) => (
-            <View key={ing.id} style={styles.ingredientRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.ingredientName}>{ing.displayName}</Text>
-                <Text style={styles.ingredientMeta}>
-                  {ing.inputAmount}{ing.unit} · {Math.round(ing.nutritionContribution.calories)} kcal
-                  {ing.isAiEstimate ? ' · KI' : ''}
-                </Text>
+          {ingredients.map((ing) => {
+            const edit = amountEdits[ing.id] ?? { mode: ing.inputMode, value: String(ing.inputAmount) };
+            return (
+              <View key={ing.id} style={styles.ingredientCard}>
+                <View style={styles.ingredientCardHeader}>
+                  <Text style={styles.ingredientName} numberOfLines={1}>{ing.displayName}</Text>
+                  <View style={styles.ingredientCardActions}>
+                    <TouchableOpacity onPress={() => { setReplacingIngId(ing.id); setAddIngredientVisible(true); }}>
+                      <Text style={styles.replaceText}>Ersetzen</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleRemoveIngredient(ing.id)}>
+                      <Text style={styles.removeText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <QuantityInputRow
+                  nutritionPer100g={ing.nutritionPer100g}
+                  portionWeightGrams={ing.portionWeightGrams}
+                  portionLabel={ing.portionLabel}
+                  mode={edit.mode}
+                  value={edit.value}
+                  onChange={(m, v) => handleUpdateIngredientAmount(ing.id, m, v)}
+                />
               </View>
-              <TouchableOpacity onPress={() => handleRemoveIngredient(ing.id)}>
-                <Text style={styles.removeText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+            );
+          })}
 
           {/* Steps */}
           <View style={styles.sectionHeader}>
@@ -327,8 +383,9 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
 
       <AddIngredientModal
         visible={addIngredientVisible}
-        onClose={() => setAddIngredientVisible(false)}
+        onClose={() => { setAddIngredientVisible(false); setReplacingIngId(null); }}
         onAdd={(ing) => { handleAddIngredient(ing); setAddIngredientVisible(false); }}
+        replacingIngId={replacingIngId}
       />
     </SafeAreaView>
   );
@@ -384,16 +441,21 @@ const styles = StyleSheet.create({
   },
   imagePickerText: { ...typography.body2, color: colors.textMuted },
   emptyHint: { ...typography.body2, color: colors.textMuted, marginBottom: spacing.sm },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  ingredientCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
     padding: spacing.sm,
     marginBottom: spacing.xs,
   },
-  ingredientName: { ...typography.body2, color: colors.text, fontWeight: '600' },
-  ingredientMeta: { ...typography.caption, color: colors.textMuted },
+  ingredientCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  ingredientCardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  ingredientName: { ...typography.body2, color: colors.text, fontWeight: '600', flex: 1 },
+  replaceText: { ...typography.caption, color: colors.primary },
   removeText: { ...typography.body1, color: colors.negative, paddingHorizontal: spacing.sm },
   stepContainer: {
     backgroundColor: colors.surface,
