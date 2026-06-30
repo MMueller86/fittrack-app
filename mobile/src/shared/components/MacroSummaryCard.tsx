@@ -24,13 +24,17 @@ function MacroRow({
   value,
   target,
   color,
+  showRemaining,
 }: {
   label: string;
   value: number;
   target: number;
   color: string;
+  showRemaining?: boolean;
 }) {
   const pct = clamp(value, target);
+  const remaining = Math.max(0, Math.round(target - value));
+  const isOver = value > target;
   return (
     <View style={macroStyles.row}>
       <View style={macroStyles.labelCol}>
@@ -39,6 +43,9 @@ function MacroRow({
           <Text style={{ color }}>{Math.round(value)} g</Text>
           <Text style={macroStyles.separator}> / </Text>
           <Text style={macroStyles.targetText}>{target} g</Text>
+          {showRemaining && !isOver && remaining > 0 ? (
+            <Text style={macroStyles.remainingText}> · {remaining} g</Text>
+          ) : null}
         </Text>
       </View>
       <View style={macroStyles.trackWrap}>
@@ -61,11 +68,12 @@ const macroStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  labelCol: { width: 110 },
+  labelCol: { width: 145 },
   label: { ...typography.caption, color: colors.textMuted, marginBottom: 2 },
   values: { ...typography.caption, fontWeight: '600' },
   separator: { color: colors.textMuted },
   targetText: { color: colors.textSecondary },
+  remainingText: { color: colors.textMuted },
   trackWrap: { flex: 1 },
   track: {
     height: 5,
@@ -79,9 +87,10 @@ const macroStyles = StyleSheet.create({
 interface Props {
   summary: DiaryDayResponse['summary'];
   target: MacroTarget;
+  showRemaining?: boolean;
 }
 
-export function MacroSummaryCard({ summary, target }: Props) {
+export function MacroSummaryCard({ summary, target, showRemaining }: Props) {
   const calConsumed = Math.round(summary.calories);
   const remaining = Math.max(0, target.calories - calConsumed);
   const over = calConsumed > target.calories;
@@ -120,10 +129,10 @@ export function MacroSummaryCard({ summary, target }: Props) {
 
       {/* ── Makros ── */}
       <View style={styles.macroSection}>
-        <MacroRow label="Protein" value={summary.protein} target={target.proteinG} color="#3B82F6" />
-        <MacroRow label="Kohlenhydrate" value={summary.carbs} target={target.carbsG} color={colors.primary} />
-        <MacroRow label="Fett" value={summary.fat} target={target.fatG} color="#F59E0B" />
-        <MacroRow label="Ballaststoffe" value={summary.fiber} target={target.fiberG} color="#8B5CF6" />
+        <MacroRow label="Protein" value={summary.protein} target={target.proteinG} color="#3B82F6" showRemaining={showRemaining} />
+        <MacroRow label="Kohlenhydrate" value={summary.carbs} target={target.carbsG} color={colors.primary} showRemaining={showRemaining} />
+        <MacroRow label="Fett" value={summary.fat} target={target.fatG} color="#F59E0B" showRemaining={showRemaining} />
+        <MacroRow label="Ballaststoffe" value={summary.fiber} target={target.fiberG} color="#8B5CF6" showRemaining={showRemaining} />
       </View>
     </View>
   );

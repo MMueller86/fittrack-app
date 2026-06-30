@@ -15,9 +15,11 @@ import { colors, radius, spacing, typography } from '../../app/theme';
 
 interface Props {
   visible: boolean;
-  onSelect: (type: WorkoutType) => void;
+  onSelect: (type: WorkoutType | null) => void;
   onClose: () => void;
 }
+
+const REST_OPTION = { type: null as null, icon: '😴', label: 'Ruhetag' };
 
 const WORKOUT_OPTIONS: { type: WorkoutType; icon: string; label: string }[] = [
   { type: 'gym', icon: '🏋️', label: 'Gym' },
@@ -43,9 +45,20 @@ export default function WorkoutTypePicker({ visible, onSelect, onClose }: Props)
       {/* Sheet */}
       <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
         <View style={styles.handle} />
-        <Text style={styles.question}>Was trainierst du heute?</Text>
+        <Text style={styles.question}>Wie ist dein heutiger Tag?</Text>
 
         <View style={styles.optionList}>
+          {/* Ruhetag zuerst */}
+          <TouchableOpacity
+            key="rest"
+            style={styles.option}
+            onPress={() => onSelect(REST_OPTION.type)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.optionIcon}>{REST_OPTION.icon}</Text>
+            <Text style={styles.optionLabel}>{REST_OPTION.label}</Text>
+          </TouchableOpacity>
+
           {WORKOUT_OPTIONS.map(({ type, icon, label }) => (
             <TouchableOpacity
               key={type}
