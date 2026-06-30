@@ -8,7 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import HomeScreen from '../../modules/home/HomeScreen';
-import WeightDetailScreen from '../../modules/weight/WeightDetailScreen';
+import ProgressScreen from '../../modules/progress/ProgressScreen';
 import DiaryScreen from '../../modules/nutrition/DiaryScreen';
 import RecipeListScreen from '../../modules/recipes/RecipeListScreen';
 import RecipeDetailScreen from '../../modules/recipes/RecipeDetailScreen';
@@ -20,7 +20,7 @@ import MyProductsScreen from '../../modules/profile/MyProductsScreen';
 import ProfileWizardScreen, { SKIP_WIZARD_KEY } from '../../modules/profile/ProfileWizardScreen';
 import type { UserProfile } from '@fittrack/shared';
 import { colors } from '../theme';
-import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, WeightIcon } from '../../assets/icons/TabIcons';
+import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, ProgressIcon } from '../../assets/icons/TabIcons';
 import { profileApi } from '../../shared/api/profileApi';
 
 // React Navigation needs a theme that matches our dark palette so that
@@ -178,10 +178,10 @@ export function RootNavigator() {
         />
         <Tab.Screen
           name="Weight"
-          component={WeightDetailScreen}
+          component={ProgressScreen}
           options={{
-            tabBarLabel: 'Gewicht',
-            tabBarIcon: ({ color, size }) => <WeightIcon color={color} size={size} />,
+            tabBarLabel: 'Progress',
+            tabBarIcon: ({ color, size }) => <ProgressIcon color={color} size={size} />,
           }}
         />
         <Tab.Screen

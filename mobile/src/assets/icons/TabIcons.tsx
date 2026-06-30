@@ -70,3 +70,26 @@ export function RecipesIcon({ color, size = 24 }: IconProps) {
     </Svg>
   );
 }
+
+// Trending-up arrow: represents progress, development, and improvement across
+// all future metrics (weight, body measurements, AI insights, goal achievement).
+export function ProgressIcon({ color, size = 24 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 17L9 11L13 14L21 6"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M16 6H21V11"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
