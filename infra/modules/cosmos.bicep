@@ -72,6 +72,7 @@ var containerDefs = [
   { name: 'reusableMealItems', partitionKey: '/userId' }
   { name: 'recipes', partitionKey: '/userId' }
   { name: 'aiUsage', partitionKey: '/userId' }
+  { name: 'aiInsights', partitionKey: '/userId' }
   { name: 'profiles', partitionKey: '/userId' }
   { name: 'foodProducts', partitionKey: '/id' }
 ]

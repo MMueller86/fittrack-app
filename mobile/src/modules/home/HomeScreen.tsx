@@ -5,6 +5,7 @@
 //   1. BrandHeader: FitTrack-Logo + Name
 //   2. CoachingHeroCard: Begrüßung + Hint + Gewicht (2-Spalten) + Sparkline
 //   3. DayNutritionCard: Donut-Ring + animierte Kalorien + Makro-Balken
+//   4. InsightCard: KI-Tagesanalyse (async, non-blocking)
 
 import React, { useCallback, useState } from 'react';
 import {
@@ -28,7 +29,18 @@ import WorkoutTypePicker from './WorkoutTypePicker';
 import { getDayHint } from './getDayHint';
 import { CoachingHeroCard } from './CoachingHeroCard';
 import { DayNutritionCard } from './DayNutritionCard';
-import type { WeightEntry, DiaryDayResponse, WorkoutType } from '@fittrack/shared';
+import { InsightCard } from './InsightCard';
+import { getInsight } from '../../services/insightService';
+import type { WeightEntry, DiaryDayResponse, WorkoutType, InsightResponse } from '@fittrack/shared';
+
+// Shown when the insight could not be loaded (network error, backend unavailable, etc.)
+const INSIGHT_UNAVAILABLE: InsightResponse = {
+  title: 'Analyse nicht verfügbar',
+  summary: 'Sobald wieder eine Verbindung besteht, aktualisiere ich deine persönliche Analyse automatisch.',
+  generatedAt: new Date().toISOString(),
+  promptVersion: 'v1',
+  status: 'unavailable',
+};
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
@@ -48,6 +60,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
   const [displayName, setDisplayName] = useState<string | undefined>(undefined);
+  // Insight — null = loading (shows skeleton), InsightResponse = content arrived
+  const [insight, setInsight] = useState<InsightResponse | null>(null);
 
   const { dayType, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
   const [workoutPickerVisible, setWorkoutPickerVisible] = useState(false);
@@ -76,9 +90,15 @@ export default function HomeScreen({ navigation }: Props) {
       if (diaryData.dayType != null) {
         hydrateDayType(diaryData.dayType, TODAY, diaryData.workoutType ?? null);
       }
-    } catch {
+    } catch (err) {
+      console.error('[HomeScreen] load failed:', err);
       setEntries([]);
     }
+    // Insight runs independently — does NOT block the screen from rendering
+    setInsight(null);
+    getInsight(TODAY)
+      .then((result) => setInsight(result ?? INSIGHT_UNAVAILABLE))
+      .catch(() => setInsight(INSIGHT_UNAVAILABLE));
   }, [setTargets, hydrateDayType]);
 
   useFocusEffect(
@@ -154,6 +174,14 @@ export default function HomeScreen({ navigation }: Props) {
           onPress={() => navToTab('Nutrition')}
         />
 
+        {/* ── FitTrack Insight — async, non-blocking ── */}
+        <InsightCard
+          insight={insight}
+          onCtaPress={(target) => {
+            if (target === 'Nutrition') navToTab('Nutrition');
+            else if (target === 'Weight') navToTab('Weight');
+          }}
+        />
 
       </ScrollView>
 

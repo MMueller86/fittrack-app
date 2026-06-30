@@ -20,6 +20,7 @@ import './functions/foodSearch';
 import './functions/foodProducts';
 import './functions/reusableItemsEnrich';
 import './functions/reusableItemsEnrichScheduler';
+import './functions/dailyInsight';
 
 // Health check — used in M1 verification
 app.http('health', {

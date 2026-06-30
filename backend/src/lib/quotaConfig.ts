@@ -11,6 +11,7 @@ export interface TierLimits {
   'label-scan': number;
   'meal-estimate': number;
   'recipe-analyze': number;
+  'daily-insight': number;
 }
 
 const TIER_LIMITS: Record<UserTier, TierLimits> = {
@@ -20,6 +21,7 @@ const TIER_LIMITS: Record<UserTier, TierLimits> = {
     'label-scan': 30,
     'meal-estimate': 30,
     'recipe-analyze': 10,
+    'daily-insight': 30,
   },
   premium: {
     'meal-parser': 500,
@@ -27,6 +29,7 @@ const TIER_LIMITS: Record<UserTier, TierLimits> = {
     'label-scan': 300,
     'meal-estimate': 300,
     'recipe-analyze': 100,
+    'daily-insight': 300,
   },
   internal: {
     'meal-parser': Infinity,
@@ -34,6 +37,7 @@ const TIER_LIMITS: Record<UserTier, TierLimits> = {
     'label-scan': Infinity,
     'meal-estimate': Infinity,
     'recipe-analyze': Infinity,
+    'daily-insight': Infinity,
   },
 };
 

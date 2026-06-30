@@ -11,6 +11,7 @@ export * from './types/recipes';
 export * from './types/weights';
 export * from './types/foodProduct';
 export * from './types/quota';
+export * from './types/insight';
 export * from './lib/nutritionCalculator';
 export * from './lib/recipeCalculator';
 export * from './lib/profileCalculator';

@@ -7,6 +7,8 @@ import { MEAL_PARSER_SYSTEM_PROMPT } from './prompts/mealParser';
 import { FOOD_ESTIMATE_SYSTEM_PROMPT } from './prompts/foodEstimate';
 import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
 import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
+import { DAILY_INSIGHT_SYSTEM_PROMPT, DAILY_INSIGHT_PROMPT_VERSION } from './prompts/dailyInsight';
+import type { InsightInputContext, InsightResponse } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -480,3 +482,74 @@ export async function estimateFoodBatch(names: string[]): Promise<AiFoodEstimate
   const parsed = JSON.parse(raw) as { items: AiFoodEstimate[] };
   return parsed.items;
 }
+
+// ---------------------------------------------------------------------------
+// Daily Insight generator
+// ---------------------------------------------------------------------------
+
+export interface GenerateInsightResult {
+  response: Omit<InsightResponse, 'generatedAt' | 'promptVersion' | 'status'>;
+  tokensUsed: number;
+}
+
+/**
+ * Generate a daily AI insight from a structured input context.
+ * Returns structured JSON parsed and validated by Zod.
+ * Caller is responsible for caching and quota tracking.
+ */
+export async function generateDailyInsight(
+  context: InsightInputContext,
+): Promise<GenerateInsightResult> {
+  const client = getClient();
+  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+
+  const userMessage = JSON.stringify(context);
+
+  const completion = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      { role: 'system', content: DAILY_INSIGHT_SYSTEM_PROMPT },
+      { role: 'user', content: userMessage },
+    ],
+    response_format: { type: 'json_object' },
+    temperature: 0.4,   // slight creativity for natural phrasing, but still predictable
+    max_tokens: 400,
+  });
+
+  const raw = completion.choices[0]?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI (daily-insight)');
+
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+  // Validate required fields
+  if (typeof parsed['title'] !== 'string' || typeof parsed['summary'] !== 'string') {
+    throw new Error('Daily insight response missing required fields: title, summary');
+  }
+
+  const response: Omit<InsightResponse, 'generatedAt' | 'promptVersion' | 'status'> = {
+    title: String(parsed['title']).slice(0, 80),
+    summary: String(parsed['summary']).slice(0, 600),
+    recommendation:
+      typeof parsed['recommendation'] === 'string' && parsed['recommendation'].length > 0
+        ? parsed['recommendation']
+        : undefined,
+    cta:
+      typeof parsed['cta'] === 'string' && parsed['cta'].length > 0
+        ? parsed['cta']
+        : undefined,
+    ctaTarget:
+      parsed['ctaTarget'] === 'Nutrition' ||
+      parsed['ctaTarget'] === 'Weight' ||
+      parsed['ctaTarget'] === 'Training' ||
+      parsed['ctaTarget'] === 'Recipe'
+        ? parsed['ctaTarget']
+        : undefined,
+  };
+
+  const tokensUsed = completion.usage?.total_tokens ?? 0;
+
+  return { response, tokensUsed };
+}
+
+/** Exposed for mocking in tests. */
+export { DAILY_INSIGHT_PROMPT_VERSION };
