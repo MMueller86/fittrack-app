@@ -7,14 +7,20 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../app/theme';
-import type { WeightEntry } from '@fittrack/shared';
+import type { WeightEntry, GoalType } from '@fittrack/shared';
+import { evaluateWeightDelta } from '@fittrack/shared';
 
 interface TrendPillProps {
   latest?: WeightEntry;
   previous?: WeightEntry;
+  /**
+   * When provided, arrow color is derived from the user's goal.
+   * Defaults to lose_weight behaviour for backwards compatibility.
+   */
+  goalType?: GoalType;
 }
 
-export function TrendPill({ latest, previous }: TrendPillProps) {
+export function TrendPill({ latest, previous, goalType = 'lose_weight' }: TrendPillProps) {
   if (!latest) {
     return null;
   }
@@ -33,10 +39,20 @@ export function TrendPill({ latest, previous }: TrendPillProps) {
       </View>
     );
   }
-  const isDown = delta < 0;
-  const arrow = isDown ? '↓' : '↑';
-  const color = isDown ? colors.positive : colors.negative;
-  const bg = isDown ? 'rgba(103, 178, 62, 0.15)' : 'rgba(226, 107, 107, 0.15)';
+  const evaluation = evaluateWeightDelta(goalType, delta);
+  const isPositive = evaluation === 'positive';
+  const isNeutral = evaluation === 'neutral';
+  const arrow = delta < 0 ? '↓' : '↑';
+  const color = isNeutral
+    ? colors.neutral
+    : isPositive
+    ? colors.positive
+    : colors.negative;
+  const bg = isNeutral
+    ? colors.surfaceMuted
+    : isPositive
+    ? 'rgba(103, 178, 62, 0.15)'
+    : 'rgba(226, 107, 107, 0.15)';
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       <Text style={[styles.pillText, { color }]}>

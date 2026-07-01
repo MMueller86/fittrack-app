@@ -20,6 +20,7 @@ import {
   shouldRegenerate,
   computeTtlUntilMidnight,
 } from '../lib/repositories/insightRepository';
+import { computeProgressIntelligence } from '../lib/progressIntelligence';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getWeightsRepository } from '../lib/repositories/weightsRepository';
 import { getProfileRepository } from '../lib/repositories/profileRepository';
@@ -33,6 +34,7 @@ import type {
   InsightResponse,
   InsightWeightContext,
 } from '@fittrack/shared';
+import { PROGRESS_INTELLIGENCE_VERSION } from '../../../shared/types/insight';
 
 // ---------------------------------------------------------------------------
 // Friendly copy — never exposes technical terms to the user
@@ -74,6 +76,8 @@ function computeWeightTrend7d(values: number[]): InsightWeightContext['trend7d']
 async function buildInputContext(
   userId: string,
   date: string,
+  insightRepo: ReturnType<typeof getInsightRepository>,
+  localHour: number | null,
 ): Promise<InsightInputContext> {
   const diaryRepo = getDiaryRepository();
   const weightsRepo = getWeightsRepository();
@@ -81,11 +85,12 @@ async function buildInputContext(
   const dayMetaRepo = getDayMetaRepository();
 
   // Load in parallel
-  const [dayMeta, diaryToday, weightEntries, profile] = await Promise.all([
+  const [dayMeta, diaryToday, weightEntries, profile, insightHistory] = await Promise.all([
     dayMetaRepo.get(userId, date),
     diaryRepo.getDay(userId, date),
     weightsRepo.list(userId),
     profileRepo.get(userId),
+    insightRepo.listRecent(userId, 7, date),
   ]);
 
   // Last 3 completed diary days (excluding today)
@@ -119,6 +124,16 @@ async function buildInputContext(
       : profile.targets.restDay
     : null;
 
+  // Remaining daily budget (never negative; null when no target or nothing logged yet)
+  const todayCalories = diaryToday.summary.calories > 0 ? diaryToday.summary.calories : null;
+  const todayProtein  = diaryToday.summary.protein  > 0 ? diaryToday.summary.protein  : null;
+  const remainingCalories = targets && todayCalories != null
+    ? Math.max(0, Math.round(targets.calories - todayCalories))
+    : null;
+  const remainingProteinG = targets && todayProtein != null
+    ? Math.max(0, Math.round(targets.proteinG - todayProtein))
+    : null;
+
   const context: InsightInputContext = {
     date,
     dayType: dayMeta?.dayType ?? null,
@@ -150,8 +165,26 @@ async function buildInputContext(
             fiberG: targets.fiberG,
           }
         : null,
+      remainingCalories,
+      remainingProteinG,
       last3Days,
     },
+    userGoal: profile?.goal ?? 'maintain',
+    userGoalIntensity: profile?.goalIntensity ?? null,
+    displayName: profile?.displayName ?? 'Sportler',
+    progressIntelligence: computeProgressIntelligence({
+      entries: weightEntries,
+      targetWeightKg: profile?.targetWeightKg,
+      goal: profile?.goal ?? 'maintain',
+      todayIso: date,
+      unit: (weightEntries[0]?.unit ?? 'kg') as 'kg' | 'lbs',
+      hasWeightToday: weightEntries.some((e) => e.date === date),
+      hasMealsToday: (diaryToday.summary.calories ?? 0) > 0,
+      isTrainingDay: dayMeta?.dayType === 'training',
+      hasTrainingLogged: dayMeta?.workoutType != null,
+      insightHistory,
+    }),
+    currentHourLocal: localHour,
   };
 
   return context;
@@ -175,6 +208,15 @@ export const dailyInsightHandler = withHandler(
         ? rawDate
         : new Date().toISOString().split('T')[0]!;
 
+    // Local hour of the user's device (0–23), sent by the client to avoid
+    // timezone issues. Used by the AI to determine whether the day is still
+    // in progress. Null when not provided — treated as "unknown/end-of-day".
+    const rawHour = url.searchParams.get('localHour');
+    const localHour =
+      rawHour !== null && /^\d{1,2}$/.test(rawHour)
+        ? Math.min(23, Math.max(0, parseInt(rawHour, 10)))
+        : null;
+
     const insightRepo = getInsightRepository();
     const now = new Date();
 
@@ -182,8 +224,8 @@ export const dailyInsightHandler = withHandler(
     const cached = await insightRepo.get(userId, date);
 
     // Build current input context + hash
-    const context = await buildInputContext(userId, date);
-    const newHash = computeInputHash(context);
+    const context = await buildInputContext(userId, date, insightRepo, localHour);
+    const newHash = computeInputHash(context, DAILY_INSIGHT_PROMPT_VERSION);
 
     // Check whether we can/should regenerate
     const regen = shouldRegenerate(cached, newHash, now, isAdmin);
@@ -250,6 +292,9 @@ export const dailyInsightHandler = withHandler(
       lastGeneratedAt: generatedAt,
       feedbackScore: null,
       tokensUsed: generateResult.tokensUsed,
+      // goalAtCalculation is deprecated — canonical value lives in progressIntelligence.goalAtCalculation
+      goalAtCalculation: context.userGoal,
+      intelligenceVersion: PROGRESS_INTELLIGENCE_VERSION,
     };
 
     try {

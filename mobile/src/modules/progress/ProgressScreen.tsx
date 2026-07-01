@@ -26,7 +26,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { addWeight, deleteWeight, listWeights } from '../../services/weightsService';
-import type { WeightEntry, WeightUnit } from '@fittrack/shared';
+import type { WeightEntry, WeightUnit, GoalType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
@@ -55,6 +55,7 @@ export default function ProgressScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
+  const [goalType, setGoalType] = useState<GoalType>('lose_weight');
   const [windowDays, setWindowDays] = useState<WindowDays>(30);
 
   // Ref allows optimistic-delete rollback without stale closure
@@ -73,6 +74,9 @@ export default function ProgressScreen() {
       setEntries(data);
       if (profileData.profile?.targetWeightKg) {
         setTargetWeightKg(profileData.profile.targetWeightKg);
+      }
+      if (profileData.profile?.goal) {
+        setGoalType(profileData.profile.goal);
       }
     } catch (e) {
       setError(formatApiError(e, 'Fehler beim Laden der Daten'));
@@ -185,6 +189,7 @@ export default function ProgressScreen() {
               startEntry={startEntry}
               targetWeightKg={targetWeightKg}
               unit={unit}
+              goalType={goalType}
             />
 
             {/* Chart — only shown with ≥2 entries (WeightChart requires it) */}

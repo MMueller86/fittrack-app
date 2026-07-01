@@ -6,7 +6,8 @@
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { WeightEntry, WeightUnit } from '@fittrack/shared';
+import type { WeightEntry, WeightUnit, GoalType } from '@fittrack/shared';
+import { progressGrowsOnDecrease, goalLabel } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { TrendPill } from './TrendPill';
 
@@ -17,6 +18,8 @@ export interface ProgressHeroCardProps {
   startEntry: WeightEntry | undefined;
   targetWeightKg: number | undefined;
   unit: WeightUnit;
+  /** User's primary goal — drives all evaluations. Defaults to lose_weight. */
+  goalType?: GoalType;
 }
 
 function formatLongDate(iso: string): string {
@@ -46,6 +49,7 @@ export function ProgressHeroCard({
   startEntry,
   targetWeightKg,
   unit,
+  goalType = 'lose_weight',
 }: ProgressHeroCardProps) {
   if (!latest) {
     return (
@@ -59,24 +63,26 @@ export function ProgressHeroCard({
     );
   }
 
-  // Goal progress (computed in kg internally, displayed in active unit)
+  // Goal progress — direction determined by goalContext, not hardcoded
   const currentKg = toKg(latest);
   const startKg = startEntry ? toKg(startEntry) : currentKg;
   const hasGoal = targetWeightKg !== undefined;
-  const isLosingWeight = !hasGoal || targetWeightKg < startKg;
+  const growsOnDecrease = progressGrowsOnDecrease(goalType);
+  const hasDirectionalGoal = growsOnDecrease !== null;
 
   let progressPct = 0;
   let remainingDisplay: number | null = null;
 
-  if (hasGoal) {
-    const totalChange = Math.abs(startKg - targetWeightKg);
-    const achievedChange = isLosingWeight
+  if (hasGoal && hasDirectionalGoal) {
+    const targetKg = targetWeightKg!;
+    const totalChange = Math.abs(startKg - targetKg);
+    const achievedChange = growsOnDecrease
       ? Math.max(0, startKg - currentKg)
       : Math.max(0, currentKg - startKg);
     progressPct = totalChange > 0 ? Math.min(1, achievedChange / totalChange) : 1;
-    const remainingKg = isLosingWeight
-      ? Math.max(0, currentKg - targetWeightKg)
-      : Math.max(0, targetWeightKg - currentKg);
+    const remainingKg = growsOnDecrease
+      ? Math.max(0, currentKg - targetKg)
+      : Math.max(0, targetKg - currentKg);
     remainingDisplay = unit === 'lbs' ? remainingKg * 2.20462 : remainingKg;
   }
 
@@ -97,16 +103,16 @@ export function ProgressHeroCard({
           <Text style={styles.dateText}>{formatLongDate(latest.date)}</Text>
         </View>
         <View style={styles.pillContainer}>
-          <TrendPill latest={latest} previous={previous} />
+          <TrendPill latest={latest} previous={previous} goalType={goalType} />
         </View>
       </View>
 
-      {hasGoal && (
+      {hasGoal && hasDirectionalGoal && (
         <View style={styles.goalSection}>
           <View style={styles.goalHeader}>
             <Text style={styles.goalLabel}>
               {remainingDisplay !== null && remainingDisplay > 0.05
-                ? `Noch ${remainingDisplay.toFixed(1)} ${unit} bis zum Ziel`
+                ? `Noch ${remainingDisplay.toFixed(1)} ${unit} bis zum Ziel (${goalLabel(goalType)})`
                 : '🎯 Ziel erreicht!'}
             </Text>
             <Text style={styles.goalPct}>{Math.round(progressPct * 100)} %</Text>

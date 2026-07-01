@@ -15,3 +15,5 @@ export * from './types/insight';
 export * from './lib/nutritionCalculator';
 export * from './lib/recipeCalculator';
 export * from './lib/profileCalculator';
+export * from './lib/goalContext';
+export * from './lib/plateauDetector';

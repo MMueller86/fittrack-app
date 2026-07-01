@@ -30,9 +30,13 @@ export const MIN_REGEN_INTERVAL_MS = 30 * 60 * 1000;
  * Compute a stable hash of the insight input context.
  * Uses rounded values so minor fluctuations (< 100 kcal, < 10g protein,
  * < 0.5 kg weight) do NOT trigger a new AI call.
+ *
+ * @param promptVersion  Active prompt version (e.g. "v4"). Changes to the
+ *   prompt invalidate all cached documents automatically.
  */
-export function computeInputHash(ctx: InsightInputContext): string {
+export function computeInputHash(ctx: InsightInputContext, promptVersion: string): string {
   const stable = {
+    promptVersion,
     date: ctx.date,
     dayType: ctx.dayType,
     workoutType: ctx.workoutType,
@@ -51,6 +55,8 @@ export function computeInputHash(ctx: InsightInputContext): string {
         ? Math.round(ctx.weight.latestKg * 2) / 2
         : null,
     trend7d: ctx.weight.trend7d,
+    // Include primary signal type so a new dominant signal triggers a fresh AI call
+    primarySignalType: ctx.progressIntelligence?.primarySignal?.type ?? null,
   };
   return createHash('sha256').update(JSON.stringify(stable)).digest('hex');
 }
@@ -80,10 +86,13 @@ export function shouldRegenerate(
   if (cached.inputHash === newHash) return false;
 
   // Hash changed — check rate limits
+  // Admin users bypass both the daily generation limit and the min interval
+  if (isAdmin) return true;
+
   const lastGen = new Date(cached.lastGeneratedAt).getTime();
   if (now.getTime() - lastGen < MIN_REGEN_INTERVAL_MS) return false;
 
-  if (!isAdmin && cached.dailyGenerations >= MAX_DAILY_GENERATIONS) return false;
+  if (cached.dailyGenerations >= MAX_DAILY_GENERATIONS) return false;
 
   return true;
 }
@@ -118,6 +127,8 @@ export interface InsightRepository {
   get(userId: string, date: string): Promise<InsightDocument | null>;
   /** Create or replace the insight document (upsert). */
   upsert(doc: InsightDocument): Promise<void>;
+  /** List recent insight documents (newest first) within the last N calendar days up to and including referenceDate. */
+  listRecent(userId: string, days: number, referenceDate?: string): Promise<InsightDocument[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +148,16 @@ export class InMemoryInsightRepository implements InsightRepository {
 
   async upsert(doc: InsightDocument): Promise<void> {
     this.docs.set(this.makeKey(doc.userId, doc.date), doc);
+  }
+
+  async listRecent(userId: string, days: number, referenceDate?: string): Promise<InsightDocument[]> {
+    const ref = referenceDate ?? new Date().toISOString().split('T')[0]!;
+    const cutoff = new Date(ref + 'T00:00:00Z');
+    cutoff.setUTCDate(cutoff.getUTCDate() - days);
+    const cutoffIso = cutoff.toISOString().split('T')[0]!;
+    return Array.from(this.docs.values())
+      .filter((doc) => doc.userId === userId && doc.date >= cutoffIso && doc.date <= ref)
+      .sort((a, b) => b.date.localeCompare(a.date));
   }
 }
 
@@ -162,6 +183,26 @@ export class CosmosInsightRepository implements InsightRepository {
   async upsert(doc: InsightDocument): Promise<void> {
     const { containers } = await getCosmos();
     await containers.aiInsights.items.upsert<InsightDocument>(doc);
+  }
+
+  async listRecent(userId: string, days: number, referenceDate?: string): Promise<InsightDocument[]> {
+    const ref = referenceDate ?? new Date().toISOString().split('T')[0]!;
+    const cutoff = new Date(ref + 'T00:00:00Z');
+    cutoff.setUTCDate(cutoff.getUTCDate() - days);
+    const cutoffIso = cutoff.toISOString().split('T')[0]!;
+    const { containers } = await getCosmos();
+    const { resources } = await containers.aiInsights.items
+      .query<InsightDocument>({
+        query:
+          'SELECT * FROM c WHERE c.userId = @userId AND c.date >= @cutoffDate AND c.date <= @refDate ORDER BY c.date DESC',
+        parameters: [
+          { name: '@userId', value: userId },
+          { name: '@cutoffDate', value: cutoffIso },
+          { name: '@refDate', value: ref },
+        ],
+      })
+      .fetchAll();
+    return resources;
   }
 }
 

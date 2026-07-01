@@ -2,7 +2,7 @@
 //   - computeInputHash: stability + sensitivity
 //   - shouldRegenerate: all branching conditions
 //   - computeTtlUntilMidnight: correct TTL calculation
-//   - InMemoryInsightRepository: get + upsert
+//   - InMemoryInsightRepository: get + upsert + listRecent
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
@@ -72,6 +72,8 @@ function makeDocument(overrides: Partial<InsightDocument> = {}): InsightDocument
     lastGeneratedAt: '2026-06-30T10:00:00Z',
     feedbackScore: null,
     tokensUsed: 280,
+    goalAtCalculation: 'maintain',
+    intelligenceVersion: 'v1',
     ...overrides,
   };
 }
@@ -83,44 +85,49 @@ function makeDocument(overrides: Partial<InsightDocument> = {}): InsightDocument
 describe('computeInputHash', () => {
   it('returns the same hash for identical context', () => {
     const ctx = makeContext();
-    expect(computeInputHash(ctx)).toBe(computeInputHash(ctx));
+    expect(computeInputHash(ctx, 'v4')).toBe(computeInputHash(ctx, 'v4'));
   });
 
   it('returns same hash when calories differ by < 50 kcal (same rounding bucket)', () => {
     const a = makeContext({ nutrition: { ...makeContext().nutrition, today: { calories: 1600, protein: 120, carbs: 160, fat: 55, fiber: 22 } } });
     // +40 kcal — same bucket (both round to 16)
     const b = makeContext({ nutrition: { ...makeContext().nutrition, today: { calories: 1640, protein: 120, carbs: 160, fat: 55, fiber: 22 } } });
-    expect(computeInputHash(a)).toBe(computeInputHash(b));
+    expect(computeInputHash(a, 'v4')).toBe(computeInputHash(b, 'v4'));
   });
 
   it('returns different hash when calories differ by >= 100 kcal', () => {
     const a = makeContext({ nutrition: { ...makeContext().nutrition, today: { calories: 1600, protein: 120, carbs: 160, fat: 55, fiber: 22 } } });
     const b = makeContext({ nutrition: { ...makeContext().nutrition, today: { calories: 1700, protein: 120, carbs: 160, fat: 55, fiber: 22 } } });
-    expect(computeInputHash(a)).not.toBe(computeInputHash(b));
+    expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
   });
 
   it('returns different hash when dayType changes', () => {
     const a = makeContext({ dayType: 'training' });
     const b = makeContext({ dayType: 'rest' });
-    expect(computeInputHash(a)).not.toBe(computeInputHash(b));
+    expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
   });
 
   it('returns same hash when weight changes by < 0.25 kg (same rounding bucket)', () => {
     const a = makeContext();
     // +0.2 kg — both round to 83.0 in 0.5-buckets
     const b = makeContext({ weight: { ...makeContext().weight, latestKg: 83.2 } });
-    expect(computeInputHash(a)).toBe(computeInputHash(b));
+    expect(computeInputHash(a, 'v4')).toBe(computeInputHash(b, 'v4'));
   });
 
   it('returns different hash when weight changes by 0.5 kg', () => {
     const a = makeContext();
     const b = makeContext({ weight: { ...makeContext().weight, latestKg: 83.5 } });
-    expect(computeInputHash(a)).not.toBe(computeInputHash(b));
+    expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
   });
 
   it('handles null nutrition gracefully', () => {
     const ctx = makeContext({ nutrition: { ...makeContext().nutrition, today: null } });
-    expect(() => computeInputHash(ctx)).not.toThrow();
+    expect(() => computeInputHash(ctx, 'v4')).not.toThrow();
+  });
+
+  it('returns different hash when promptVersion changes', () => {
+    const ctx = makeContext();
+    expect(computeInputHash(ctx, 'v4')).not.toBe(computeInputHash(ctx, 'v5'));
   });
 });
 
@@ -129,7 +136,7 @@ describe('computeInputHash', () => {
 // ---------------------------------------------------------------------------
 
 describe('shouldRegenerate', () => {
-  const baseHash = computeInputHash(makeContext());
+  const baseHash = computeInputHash(makeContext(), 'v4');
   const now = new Date('2026-06-30T14:00:00Z');
 
   it('returns true when no cached document exists', () => {
@@ -167,6 +174,16 @@ describe('shouldRegenerate', () => {
       inputHash: 'oldhash',
       lastGeneratedAt: old.toISOString(),
       dailyGenerations: MAX_DAILY_GENERATIONS,
+    });
+    expect(shouldRegenerate(doc, 'newhash', now, true)).toBe(true);
+  });
+
+  it('returns true for admin even when min interval not yet met', () => {
+    const recent = new Date(now.getTime() - MIN_REGEN_INTERVAL_MS + 60_000); // 1 min before threshold
+    const doc = makeDocument({
+      inputHash: 'oldhash',
+      lastGeneratedAt: recent.toISOString(),
+      dailyGenerations: 1,
     });
     expect(shouldRegenerate(doc, 'newhash', now, true)).toBe(true);
   });
@@ -245,5 +262,78 @@ describe('InMemoryInsightRepository', () => {
     await repo.upsert(doc2);
     expect((await repo.get('user1', '2026-06-30'))?.userId).toBe('user1');
     expect((await repo.get('user2', '2026-06-30'))?.userId).toBe('user2');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// InMemoryInsightRepository.listRecent
+// ---------------------------------------------------------------------------
+
+describe('InMemoryInsightRepository.listRecent', () => {
+  let repo: InMemoryInsightRepository;
+
+  beforeEach(() => {
+    repo = new InMemoryInsightRepository();
+  });
+
+  it('returns empty array when no documents exist', async () => {
+    const result = await repo.listRecent('user1', 7, '2026-06-30');
+    expect(result).toEqual([]);
+  });
+
+  it('returns documents within the last N days of referenceDate', async () => {
+    const recent = makeDocument({ date: '2026-06-28', id: 'user1:2026-06-28' });
+    const old = makeDocument({ date: '2026-06-01', id: 'user1:2026-06-01' });
+    await repo.upsert(recent);
+    await repo.upsert(old);
+    const result = await repo.listRecent('user1', 7, '2026-06-30');
+    expect(result).toHaveLength(1);
+    expect(result[0]?.date).toBe('2026-06-28');
+  });
+
+  it('does NOT return documents older than N days before referenceDate', async () => {
+    // 8 days before referenceDate — outside the 7-day window
+    const old = makeDocument({ date: '2026-06-22', id: 'user1:2026-06-22' });
+    await repo.upsert(old);
+    const result = await repo.listRecent('user1', 7, '2026-06-30');
+    expect(result).toHaveLength(0);
+  });
+
+  it('does NOT return documents dated after referenceDate', async () => {
+    // Doc is newer than the referenceDate — should be excluded
+    // BUG: current code uses new Date() which is 2026-07-01, so doc 2026-06-30
+    // would be within 7 days of today and get included — but should not be
+    // included when referenceDate is 2026-06-25 (doc is after that date)
+    const futureDoc = makeDocument({ date: '2026-06-30', id: 'user1:2026-06-30' });
+    await repo.upsert(futureDoc);
+    // referenceDate = '2026-06-25': window is June 18–25, doc June 30 is AFTER → exclude
+    const result = await repo.listRecent('user1', 7, '2026-06-25');
+    expect(result).toHaveLength(0);
+  });
+
+  it('is deterministic — same args always return same result regardless of wall-clock', async () => {
+    const doc = makeDocument({ date: '2020-06-15', id: 'user1:2020-06-15' });
+    await repo.upsert(doc);
+    // referenceDate far in the future: doc should not be in the 7-day window
+    const result = await repo.listRecent('user1', 7, '2099-01-10');
+    expect(result).toHaveLength(0);
+  });
+
+  it('returns newest documents first', async () => {
+    const d1 = makeDocument({ date: '2026-06-28', id: 'user1:2026-06-28' });
+    const d2 = makeDocument({ date: '2026-06-30', id: 'user1:2026-06-30' });
+    const d3 = makeDocument({ date: '2026-06-25', id: 'user1:2026-06-25' });
+    await repo.upsert(d1); await repo.upsert(d2); await repo.upsert(d3);
+    const result = await repo.listRecent('user1', 7, '2026-06-30');
+    expect(result[0]?.date).toBe('2026-06-30');
+    expect(result[1]?.date).toBe('2026-06-28');
+    expect(result[2]?.date).toBe('2026-06-25');
+  });
+
+  it('does not return documents for other users', async () => {
+    const doc = makeDocument({ userId: 'user2', id: 'user2:2026-06-28', date: '2026-06-28' });
+    await repo.upsert(doc);
+    const result = await repo.listRecent('user1', 7, '2026-06-30');
+    expect(result).toHaveLength(0);
   });
 });

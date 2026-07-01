@@ -12,8 +12,9 @@ import type { InsightResponse } from '@fittrack/shared';
  */
 export async function getInsight(date: string): Promise<InsightResponse | null> {
   try {
+    const localHour = new Date().getHours(); // device local hour (0–23)
     const { data } = await apiClient.get<InsightResponse>(
-      `/ai/daily-insight?date=${encodeURIComponent(date)}`,
+      `/ai/daily-insight?date=${encodeURIComponent(date)}&localHour=${localHour}`,
     );
     return data;
   } catch {
