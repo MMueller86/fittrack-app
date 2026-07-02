@@ -45,6 +45,18 @@ export interface InsightWeightContext {
   trend7d: 'gaining' | 'losing' | 'stable' | null;
   /** Up to 7 most recent values, newest first */
   last7Values: number[];
+  /**
+   * True when `previousKg` is a statistical outlier relative to the surrounding
+   * values (spike > 1.5× stdDev of the 7-day window).
+   * When true, the AI MUST NOT use previousKg as a reference point for
+   * short-term progress — trend7d is the authoritative signal instead.
+   */
+  isOutlierPrevious: boolean;
+  /**
+   * True when `latestKg` itself is a spike (> 1.5× stdDev above the 7-day mean).
+   * Included for symmetry — prevents praising a drop from a spiked latestKg.
+   */
+  isOutlierLatest: boolean;
 }
 
 export interface InsightNutritionDay {

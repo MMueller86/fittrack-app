@@ -73,6 +73,20 @@ function computeWeightTrend7d(values: number[]): InsightWeightContext['trend7d']
   return 'stable';
 }
 
+/**
+ * Returns true when `candidate` is a statistical outlier in `values`
+ * (deviates more than 1.5× the standard deviation from the mean).
+ * With fewer than 3 values there is no reliable baseline → returns false.
+ */
+function isOutlier(candidate: number, values: number[]): boolean {
+  if (values.length < 3) return false;
+  const mean = values.reduce((s, v) => s + v, 0) / values.length;
+  const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
+  const sd = Math.sqrt(variance);
+  if (sd < 0.01) return false; // effectively constant series
+  return Math.abs(candidate - mean) > 1.5 * sd;
+}
+
 async function buildInputContext(
   userId: string,
   date: string,
@@ -144,6 +158,8 @@ async function buildInputContext(
       targetKg: profile?.targetWeightKg ?? null,
       trend7d: computeWeightTrend7d(last7Values),
       last7Values,
+      isOutlierPrevious: last7Values[1] != null ? isOutlier(last7Values[1], last7Values) : false,
+      isOutlierLatest:   last7Values[0] != null ? isOutlier(last7Values[0], last7Values) : false,
     },
     nutrition: {
       today:

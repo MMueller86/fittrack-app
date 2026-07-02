@@ -398,7 +398,7 @@ export default function MealEstimateReviewScreen({
             {refining ? (
               <ActivityIndicator color={colors.primary} />
             ) : (
-              <Text style={styles.secondaryBtnText}>Schätzung verfeinern</Text>
+              <Text style={styles.secondaryBtnText}>Schätzung aufschlüsseln</Text>
             )}
           </TouchableOpacity>
         </View>

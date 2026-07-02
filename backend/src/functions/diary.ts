@@ -8,6 +8,10 @@ import { calculate, NutritionCalculationError } from '../lib/nutritionCalculator
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository } from '../lib/repositories/dayMetaRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
+import { getProfileRepository } from '../lib/repositories/profileRepository';
+import { getHintStateRepository } from '../lib/repositories/hintStateRepository';
+import { evaluateHint } from '../lib/hintEngine';
+import type { DayTargets } from '../../../shared/types/nutrition';
 
 // GET    /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
 // PUT    /api/diary/{date}/day-type             — set rest/training day type
@@ -105,17 +109,49 @@ export const getDiaryHandler = withHandler(
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return { status: 400, jsonBody: { error: 'Query param "date" must be YYYY-MM-DD' } };
     }
-    const [result, dayMeta] = await Promise.all([
+    const localHour = parseInt(request.query.get('localHour') ?? '12', 10);
+    const currentHour = Number.isFinite(localHour) && localHour >= 0 && localHour <= 23 ? localHour : 12;
+
+    const [result, dayMeta, profile, hintState] = await Promise.all([
       getDiaryRepository().getDay(userId, date),
       getDayMetaRepository().get(userId, date),
+      getProfileRepository().get(userId),
+      getHintStateRepository().get(userId),
     ]);
-    logEvent(ctx, 'info', 'diary.get', { userId, date, mealCount: result.meals.length });
+
+    // Resolve targets for the effective day type
+    const resolvedDayType = dayMeta?.dayType ?? 'rest';
+    const fallbackTargets: DayTargets = { calories: 2000, proteinG: 150, carbsG: 200, fatG: 70, fiberG: 25 };
+    const targets: DayTargets = profile?.targets
+      ? (resolvedDayType === 'training' ? profile.targets.trainingDay : profile.targets.restDay)
+      : fallbackTargets;
+
+    // Evaluate hint — pure function, no I/O
+    const { hint, updatedState } = evaluateHint(
+      { meals: result.meals, summary: result.summary, targets, dayType: resolvedDayType, currentHour },
+      hintState,
+    );
+
+    // Persist updated state only when hint changed (avoid write amplification)
+    const hintChanged =
+      hintState === null ||
+      hintState.lastHintId !== hint.id ||
+      hintState.lastHintDate !== date;
+    if (hintChanged) {
+      updatedState.userId = userId;
+      getHintStateRepository().upsert(userId, updatedState).catch(() => {
+        // Non-critical — hint will be re-evaluated on next request
+      });
+    }
+
+    logEvent(ctx, 'info', 'diary.get', { userId, date, mealCount: result.meals.length, hintId: hint.id });
     return {
       status: 200,
       jsonBody: {
         ...result,
         dayType: dayMeta?.dayType ?? null,
         workoutType: dayMeta?.workoutType ?? null,
+        hint,
       },
     };
   },

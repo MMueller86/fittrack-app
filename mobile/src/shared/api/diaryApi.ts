@@ -56,7 +56,8 @@ export type AddItemInput = AddItemFlatInput | AddItemCalculatedInput | AddItemPr
 export const diaryApi = {
   /** GET /api/diary?date=YYYY-MM-DD */
   getDay(date: string): Promise<DiaryDayResponse> {
-    return apiClient.get<DiaryDayResponse>('/diary', { params: { date } }).then((r) => r.data);
+    const localHour = new Date().getHours();
+    return apiClient.get<DiaryDayResponse>('/diary', { params: { date, localHour } }).then((r) => r.data);
   },
 
   /** POST /api/diary/meals */

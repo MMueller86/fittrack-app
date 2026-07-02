@@ -17,3 +17,5 @@ export * from './lib/recipeCalculator';
 export * from './lib/profileCalculator';
 export * from './lib/goalContext';
 export * from './lib/plateauDetector';
+export * from './types/foodCategory';
+export * from './types/hint';

@@ -5,6 +5,7 @@ import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { RootNavigator } from './navigation';
 import LoginScreen from '../modules/auth/LoginScreen';
@@ -19,44 +20,50 @@ export default function App() {
     initialize();
   }, []);
 
-  // Loading state — checking stored tokens
+  let content: React.ReactNode;
+
   if (isAuthenticated === null) {
-    return (
-      <ErrorBoundary>
-        <SafeAreaProvider>
-          <View style={styles.loading}>
-            <StatusBar style="light" />
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        </SafeAreaProvider>
-      </ErrorBoundary>
+    // Loading state — checking stored tokens
+    content = (
+      <View style={styles.loading}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
-  }
-
-  // Unauthenticated — show login
-  if (!isAuthenticated) {
-    return (
-      <ErrorBoundary>
-        <SafeAreaProvider>
-          <StatusBar style="light" />
-          <LoginScreen onLoginSuccess={login} />
-        </SafeAreaProvider>
-      </ErrorBoundary>
+  } else if (!isAuthenticated) {
+    // Unauthenticated — show login
+    content = (
+      <>
+        <StatusBar style="light" />
+        <LoginScreen onLoginSuccess={login} />
+      </>
     );
-  }
-
-  // Authenticated — show main app
-  return (
-    <ErrorBoundary>
-      <SafeAreaProvider>
+  } else {
+    // Authenticated — show main app
+    content = (
+      <>
         <StatusBar style="light" />
         <RootNavigator />
-      </SafeAreaProvider>
-    </ErrorBoundary>
+      </>
+    );
+  }
+
+  return (
+    <GestureHandlerRootView style={styles.root}>
+      <ErrorBoundary>
+        <SafeAreaProvider>
+          {content}
+        </SafeAreaProvider>
+      </ErrorBoundary>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   loading: {
     flex: 1,
     alignItems: 'center',
