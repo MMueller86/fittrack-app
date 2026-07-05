@@ -73,6 +73,7 @@ export function foodProductToSearchResult(p: FoodProduct): FoodSearchResult {
     isComplete: true,
     sourceRef: { provider: 'openFoodFacts', barcode: p.barcode },
     ...(p.category ? { category: p.category } : {}),
+    ...(p.imageUrl ? { imageUrl: p.imageUrl } : {}),
   };
 }
 

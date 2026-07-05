@@ -27,6 +27,8 @@ const CONTAINER_DEFS = [
   { id: 'aiUsage', partitionKey: '/userId' },
   // Daily AI-generated insights — one document per user per calendar day
   { id: 'aiInsights', partitionKey: '/userId' },
+  // User-food relations — favorites, usage history (lastUsedAt, usageCount) per user
+  { id: 'userFoodRelations', partitionKey: '/userId' },
 ] as const;
 
 export type ContainerName = (typeof CONTAINER_DEFS)[number]['id'];

@@ -3,8 +3,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // Set up mocks before imports so vi.mock hoisting works
 vi.mock('../lib/repositories/reusableItemsRepository');
 vi.mock('../lib/repositories/foodProductRepository');
+vi.mock('../lib/repositories/userFoodRelationRepository', () => ({
+  getUserFoodRelationRepository: () => ({
+    listFavorites: async () => [],
+  }),
+}));
 vi.mock('../lib/auth', () => ({
   requireUser: async () => ({ userId: 'test-user', tier: 'free' }),
+  UnauthorizedError: class UnauthorizedError extends Error {},
 }));
 
 import { foodSearchHandler } from './foodSearch';
@@ -14,7 +20,7 @@ import { getFoodProductRepository } from '../lib/repositories/foodProductReposit
 
 // Helper: build a minimal InvocationContext mock
 function makeCtx() {
-  return { log: () => {} } as never;
+  return { log: () => {}, error: () => {}, warn: () => {}, info: () => {}, debug: () => {}, trace: () => {}, verbose: () => {} } as never;
 }
 
 // Helper: build a GET request mock

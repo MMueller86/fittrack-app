@@ -78,6 +78,9 @@ export interface FoodProduct {
     barcode: string;
   };
 
+  /** Front image URL from Open Food Facts (image_front_url), if available */
+  imageUrl?: string;
+
   meta: {
     source: 'openFoodFacts';
     /** sourceQualityScore / 100 */

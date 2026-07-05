@@ -120,6 +120,13 @@ export class CosmosReusableItemsRepository implements ReusableItemsRepository {
     if (input.searchTerms !== undefined) existing.searchTerms = input.searchTerms;
     if (input.aiKeywords !== undefined) existing.aiKeywords = input.aiKeywords;
     if (input.searchTermsEnriched !== undefined) (existing as ReusableItem & { searchTermsEnriched?: boolean }).searchTermsEnriched = input.searchTermsEnriched;
+    if (input.imageUrl !== undefined) {
+      if (input.imageUrl === null) {
+        delete existing.imageUrl;
+      } else {
+        existing.imageUrl = input.imageUrl;
+      }
+    }
     (existing as ReusableItem & { updatedAt?: string }).updatedAt = new Date().toISOString();
 
     const { resource: updated } = await containers.reusableMealItems.item(id, userId).replace<ReusableItem>(existing);

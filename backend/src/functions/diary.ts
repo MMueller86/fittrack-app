@@ -8,6 +8,7 @@ import { calculate, NutritionCalculationError } from '../lib/nutritionCalculator
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository } from '../lib/repositories/dayMetaRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
+import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
 import { getProfileRepository } from '../lib/repositories/profileRepository';
 import { getHintStateRepository } from '../lib/repositories/hintStateRepository';
 import { evaluateHint } from '../lib/hintEngine';
@@ -344,6 +345,41 @@ export const addItemHandler = withHandler(
         ...(d.category ? { category: d.category as import('@fittrack/shared').FoodCategory } : {}),
       });
       logEvent(ctx, 'info', 'diary.item.added', { userId, mealId });
+
+      // Fire-and-forget: Nutzungshistorie aufzeichnen (UserFoodRelation)
+      // Ermittelt foodRef + foodRefType aus dem sourceType des Items
+      void (async () => {
+        try {
+          const effectiveSourceType = d.sourceType;
+          let foodRef: string | null = null;
+          let foodRefType: import('@fittrack/shared').FoodRefType = 'personal';
+
+          if (effectiveSourceType === 'openFoodFacts' && d.productId) {
+            // OFF-Katalog: productId ist bereits 'openFoodFacts:<barcode>'
+            foodRef = d.productId;
+            foodRefType = 'catalog';
+          } else if (effectiveSourceType === 'reusableItem' && d.productId) {
+            foodRef = d.productId;
+            foodRefType = 'personal';
+          } else if (d.productId) {
+            // productId vorhanden ohne expliziten sourceType: ReusableItem-Lookup entscheidet
+            foodRef = d.productId;
+            foodRefType = 'personal';
+          }
+
+          if (foodRef) {
+            await getUserFoodRelationRepository().recordUsage(userId, {
+              foodRef,
+              foodRefType,
+              displayName: itemName,
+              displayBrand: undefined,
+            });
+          }
+        } catch {
+          // Non-critical — darf den Diary-Add nicht blockieren
+        }
+      })();
+
       return { status: 201, jsonBody: { meal } };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

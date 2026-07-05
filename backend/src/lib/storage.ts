@@ -1,4 +1,4 @@
-// Azure Blob Storage client for recipe images.
+// Azure Blob Storage client for recipe and product images.
 // Backend proxies all access — mobile never holds permanent credentials.
 // SAS tokens (read-only, 1h TTL) are generated per-request after ownership verification.
 //
@@ -10,6 +10,7 @@ import { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryPara
 import { randomUUID } from 'node:crypto';
 
 const CONTAINER_NAME = 'recipe-images';
+const PRODUCT_IMAGES_CONTAINER = 'product-images';
 const SAS_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 // ---------------------------------------------------------------------------
@@ -122,6 +123,83 @@ export async function generateRecipeImageSasUrl(blobName: string): Promise<strin
   const baseUrl = endpointMatch
     ? `${endpointMatch[1].replace(/\/$/, '')}/${CONTAINER_NAME}/${blobName}`
     : `https://${accountName}.blob.core.windows.net/${CONTAINER_NAME}/${blobName}`;
+
+  return `${baseUrl}?${sasQuery.toString()}`;
+}
+
+// ---------------------------------------------------------------------------
+// Product Images (ReusableItem)
+// ---------------------------------------------------------------------------
+
+/**
+ * Upload a product image buffer to Blob Storage.
+ * Blob path: {userId}/{reusableItemId}.{ext}
+ * Returns the blobName to be stored as ReusableItem.imageUrl.
+ */
+export async function uploadProductImage(
+  userId: string,
+  reusableItemId: string,
+  buffer: Buffer,
+  mimeType: 'image/jpeg' | 'image/png',
+): Promise<string> {
+  const ext = mimeType === 'image/png' ? 'png' : 'jpg';
+  const blobName = `${userId}/${reusableItemId}.${ext}`;
+
+  const client = getClient();
+  const containerClient = client.getContainerClient(PRODUCT_IMAGES_CONTAINER);
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+  await blockBlobClient.uploadData(buffer, {
+    blobHTTPHeaders: { blobContentType: mimeType },
+  });
+
+  return blobName;
+}
+
+/**
+ * Delete a product image blob.
+ * Silently succeeds if the blob does not exist (idempotent).
+ */
+export async function deleteProductImage(blobName: string): Promise<void> {
+  const client = getClient();
+  const containerClient = client.getContainerClient(PRODUCT_IMAGES_CONTAINER);
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+  await blockBlobClient.deleteIfExists();
+}
+
+/**
+ * Generate a short-lived read-only SAS URL for a product image blob.
+ * TTL: 1 hour.
+ */
+export async function generateProductImageSasUrl(blobName: string): Promise<string> {
+  const connStr = process.env['STORAGE_CONNECTION_STRING'];
+  if (!connStr) throw new Error('STORAGE_CONNECTION_STRING must be set');
+
+  const accountNameMatch = connStr.match(/AccountName=([^;]+)/);
+  const accountKeyMatch = connStr.match(/AccountKey=([^;]+)/);
+  if (!accountNameMatch || !accountKeyMatch) {
+    throw new Error('Cannot parse AccountName/AccountKey from STORAGE_CONNECTION_STRING');
+  }
+  const accountName = accountNameMatch[1];
+  const accountKey = accountKeyMatch[1];
+
+  const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+  const expiresOn = new Date(Date.now() + SAS_TTL_MS);
+
+  const sasQuery = generateBlobSASQueryParameters(
+    {
+      containerName: PRODUCT_IMAGES_CONTAINER,
+      blobName,
+      permissions: BlobSASPermissions.parse('r'),
+      expiresOn,
+    },
+    sharedKeyCredential,
+  );
+
+  const endpointMatch = connStr.match(/BlobEndpoint=([^;]+)/);
+  const baseUrl = endpointMatch
+    ? `${endpointMatch[1].replace(/\/$/, '')}/${PRODUCT_IMAGES_CONTAINER}/${blobName}`
+    : `https://${accountName}.blob.core.windows.net/${PRODUCT_IMAGES_CONTAINER}/${blobName}`;
 
   return `${baseUrl}?${sasQuery.toString()}`;
 }

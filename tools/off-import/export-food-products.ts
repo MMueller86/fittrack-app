@@ -93,6 +93,9 @@ interface FoodProduct {
     barcode: string;
   };
 
+  /** Front image URL from Open Food Facts (image_front_url), if available */
+  imageUrl?: string;
+
   // Debug / pipeline metadata
   meta: {
     source: 'openFoodFacts';
@@ -423,6 +426,36 @@ function getStr(doc: Document, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const val = doc[key];
     if (typeof val === 'string' && val.trim()) return val.trim();
+  }
+  return undefined;
+}
+
+/**
+ * Derives the 400px front image URL from the OFF images field.
+ * Priority: front_de → front_en → front_* → first uploaded image.
+ * Returns undefined if no usable image data is present.
+ *
+ * URL schema: https://images.openfoodfacts.org/images/products/<barcode_path>/<imgid>.<rev>.400.jpg
+ * For EAN-13 (>9 digits) the barcode_path is split into 3+3+3+rest groups.
+ */
+function getImageUrl(barcode: string, images: Record<string, unknown> | undefined): string | undefined {
+  if (!images) return undefined;
+
+  // Build the barcode path segment
+  const barcodePath = barcode.length > 9
+    ? `${barcode.slice(0, 3)}/${barcode.slice(3, 6)}/${barcode.slice(6, 9)}/${barcode.slice(9)}`
+    : barcode;
+
+  // Try front_de, front_en, then any front_* key
+  const candidates = ['front_de', 'front_en', ...Object.keys(images).filter(k => k.startsWith('front_'))];
+  for (const key of candidates) {
+    const entry = images[key] as Record<string, unknown> | undefined;
+    if (!entry) continue;
+    const rev = entry['rev'];
+    if (typeof rev === 'string' && rev) {
+      // OFF URL: /images/products/{barcodePath}/{label}.{rev}.400.jpg
+      return `https://images.openfoodfacts.org/images/products/${barcodePath}/${key}.${rev}.400.jpg`;
+    }
   }
   return undefined;
 }
@@ -896,6 +929,9 @@ function mapProduct(
       return pnns2 && pnns2 !== 'unknown' ? { category: pnns2 } : {};
     })()),
     sourceRef: { provider: 'openFoodFacts', barcode },
+    ...(getImageUrl(barcode, doc['images'] as Record<string, unknown> | undefined) && {
+      imageUrl: getImageUrl(barcode, doc['images'] as Record<string, unknown> | undefined),
+    }),
     meta: {
       source: 'openFoodFacts',
       confidence: Math.round((qualityScore / 100) * 100) / 100,
@@ -961,6 +997,7 @@ async function main() {
       _keywords: 1,
       categories_tags: 1,
       data_quality_errors_tags: 1,   // required for quality error filter
+      images: 1,                         // front_de / front_en image metadata
     };
 
     const cursor = col.find(mongoFilter, { projection });

@@ -17,6 +17,7 @@ import RecipeWizardScreen from '../../modules/recipes/RecipeWizardScreen';
 import ProfileScreen from '../../modules/profile/ProfileScreen';
 import ProfileEditScreen from '../../modules/profile/ProfileEditScreen';
 import MyProductsScreen from '../../modules/profile/MyProductsScreen';
+import LibraryScreen from '../../modules/profile/LibraryScreen';
 import ProfileWizardScreen, { SKIP_WIZARD_KEY } from '../../modules/profile/ProfileWizardScreen';
 import type { UserProfile } from '@fittrack/shared';
 import { colors } from '../theme';
@@ -64,6 +65,7 @@ export type ProfileStackParamList = {
   ProfileMain: undefined;
   ProfileEdit: { profile: UserProfile | null };
   MyProducts: undefined;
+  Library: undefined;
 };
 
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
@@ -79,6 +81,7 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <ProfileStack.Screen name="MyProducts" component={MyProductsScreen} />
+      <ProfileStack.Screen name="Library" component={LibraryScreen} />
     </ProfileStack.Navigator>
   );
 }

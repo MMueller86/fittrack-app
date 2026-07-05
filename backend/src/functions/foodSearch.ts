@@ -17,7 +17,19 @@ import { withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
+import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
 import { rankByQuery } from '../lib/searchRanking';
+
+// Build a Set of favorited foodRefs for O(1) lookup during result enrichment.
+async function loadFavoriteRefs(userId: string): Promise<Set<string>> {
+  try {
+    const favorites = await getUserFoodRelationRepository().listFavorites(userId);
+    return new Set(favorites.map((f) => f.foodRef));
+  } catch {
+    // Non-critical — favorites enrichment must not break search
+    return new Set();
+  }
+}
 
 // Map a user's ReusableItem to the unified FoodSearchResult shape.
 function reusableItemToSearchResult(item: ReusableItem): FoodSearchResult {
@@ -53,24 +65,25 @@ export const foodSearchHandler = withHandler(
     const { userId } = await requireUser(request);
     const query = request.query.get('query') ?? '';
 
-    // Fan-out: user library + internal product catalog in parallel
-    const [libraryItems, catalogResults] = await Promise.allSettled([
-      getReusableItemsRepository().search(userId, query),
-      query.trim().length >= 2 ? getFoodProductRepository().search(query) : Promise.resolve([]),
+    // Fan-out: user library + internal product catalog + favorites in parallel
+    const [libraryItems, catalogResults, favoriteRefs] = await Promise.all([
+      getReusableItemsRepository().search(userId, query).catch(() => [] as ReusableItem[]),
+      query.trim().length >= 2 ? getFoodProductRepository().search(query).catch(() => [] as FoodSearchResult[]) : Promise.resolve([] as FoodSearchResult[]),
+      loadFavoriteRefs(userId),
     ]);
+
+    // Enrich a result with isFavorite flag.
+    // Library items: favoriteRef = item.id. Catalog items: favoriteRef = item.id (= 'openFoodFacts:<barcode>').
+    const enrich = (r: FoodSearchResult): FoodSearchResult =>
+      favoriteRefs.has(r.id) ? { ...r, isFavorite: true } : r;
 
     const nq = query.trim().toLowerCase();
 
     if (nq.length >= 2) {
-      // Unified ranking: score library items (with +1.5 bonus) and catalog items,
-      // then merge into a single list sorted by score DESC.
-      // LIBRARY_BONUS must be large enough so that a library item matching via searchTerms
-      // (score 3) outranks a catalog item with an exact name match (score 4): 3 + 1.5 = 4.5 > 4.
       const LIBRARY_BONUS = 1.5;
 
-      const rawLibrary = libraryItems.status === 'fulfilled' ? libraryItems.value : [];
-      const catalog: FoodSearchResult[] =
-        catalogResults.status === 'fulfilled' ? catalogResults.value : [];
+      const rawLibrary = libraryItems;
+      const catalog: FoodSearchResult[] = catalogResults;
 
       const scoredLibrary = rawLibrary
         .map((item) => ({
@@ -94,7 +107,7 @@ export const foodSearchHandler = withHandler(
 
       const results: FoodSearchResult[] = [...scoredLibrary, ...deduplicatedCatalog]
         .sort((a, b) => b.score - a.score)
-        .map((x) => x.result);
+        .map((x) => enrich(x.result));
 
       logEvent(ctx, 'info', 'food.search', {
         userId,
@@ -107,19 +120,15 @@ export const foodSearchHandler = withHandler(
     }
 
     // Empty query: library first (by usageCount from Cosmos), then catalog
-    const library: FoodSearchResult[] =
-      libraryItems.status === 'fulfilled'
-        ? libraryItems.value.map(reusableItemToSearchResult)
-        : [];
+    const library: FoodSearchResult[] = libraryItems.map((item) => enrich(reusableItemToSearchResult(item)));
 
-    const catalog: FoodSearchResult[] =
-      catalogResults.status === 'fulfilled' ? catalogResults.value : [];
+    const catalog: FoodSearchResult[] = catalogResults;
 
     // De-duplicate: skip catalog results whose name already appears in the library
     const libraryNames = new Set(library.map((r) => r.name.toLowerCase()));
     const deduplicatedCatalog = catalog.filter((r) => !libraryNames.has(r.name.toLowerCase()));
 
-    const results: FoodSearchResult[] = [...library, ...deduplicatedCatalog];
+    const results: FoodSearchResult[] = [...library, ...deduplicatedCatalog.map(enrich)];
 
     logEvent(ctx, 'info', 'food.search', {
       userId,

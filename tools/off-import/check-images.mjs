@@ -1,0 +1,11 @@
+import { MongoClient } from 'mongodb';
+const client = new MongoClient('mongodb://localhost:27017');
+await client.connect();
+const db = client.db('off');
+const col = db.collection('products');
+const total = await col.countDocuments({ countries_tags: 'en:germany' });
+const withImage = await col.countDocuments({ countries_tags: 'en:germany', image_front_url: { $exists: true, $ne: '' } });
+console.log(`Total DE: ${total}, with image_front_url: ${withImage} (${Math.round(withImage/total*100)}%)`);
+const sample = await col.findOne({ countries_tags: 'en:germany', image_front_url: { $exists: true, $ne: '' } }, { projection: { code: 1, image_front_url: 1 } });
+console.log('Sample:', JSON.stringify(sample));
+await client.close();

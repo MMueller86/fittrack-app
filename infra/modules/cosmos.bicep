@@ -74,6 +74,7 @@ var containerDefs = [
   { name: 'aiUsage', partitionKey: '/userId' }
   { name: 'profiles', partitionKey: '/userId' }
   { name: 'foodProducts', partitionKey: '/id' }
+  { name: 'userFoodRelations', partitionKey: '/userId' }
 ]
 
 // aiInsights is defined separately because it needs defaultTtl: -1 to enable

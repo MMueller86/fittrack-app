@@ -339,13 +339,22 @@ export default function ProfileScreen({ navigation }: Props) {
               {/* Header */}
               <View style={styles.header}>
                 <Text style={styles.screenTitle}>Mein Profil</Text>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => navigation.navigate('ProfileEdit', { profile })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.editButtonText}>Bearbeiten</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => (navigation as any).navigate('Library')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.editButtonText}>Bibliothek</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => navigation.navigate('ProfileEdit', { profile })}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.editButtonText}>Bearbeiten</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Basisdaten */}

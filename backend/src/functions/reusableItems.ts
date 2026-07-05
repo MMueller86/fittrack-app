@@ -8,11 +8,15 @@ import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getReusableItemsRepository, type UpdateReusableItemInput } from '../lib/repositories/reusableItemsRepository';
 import { tokenizeProduct } from '../lib/tokenize';
 import { enqueueEnrichment } from '../lib/queueClient';
+import { uploadProductImage, deleteProductImage, generateProductImageSasUrl } from '../lib/storage';
 
-// GET    /api/reusable-items?query=  — search / list all (empty query = all)
-// POST   /api/reusable-items         — create a new reusable item
-// PATCH  /api/reusable-items/:id     — update name/brand/nutrition; optionally update diary history
-// DELETE /api/reusable-items/:id     — delete item (diary snapshots remain)
+// GET    /api/reusable-items?query=              — search / list all
+// POST   /api/reusable-items                     — create a new reusable item
+// PATCH  /api/reusable-items/:id                 — update name/brand/nutrition
+// DELETE /api/reusable-items/:id                 — delete item (diary snapshots remain)
+// POST   /api/reusable-items/:id/image           — upload product photo
+// GET    /api/reusable-items/:id/image           — get SAS URL for product photo
+// DELETE /api/reusable-items/:id/image           — delete product photo
 
 const positiveNumber = z.coerce.number().refine(
   (n) => Number.isFinite(n) && n >= 0,
@@ -279,3 +283,109 @@ app.http('reusable-items-delete', {
   route: 'reusable-items/{id}',
   handler: deleteReusableItemHandler,
 });
+
+// ---------------------------------------------------------------------------
+// Product Image Endpoints
+// ---------------------------------------------------------------------------
+
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png']);
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+export const uploadProductImageHandler = withHandler(
+  'reusableItems.image.upload',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params['id'];
+    if (!id) return { status: 400, jsonBody: { error: 'Missing item id' } };
+
+    const repo = getReusableItemsRepository();
+    const item = await repo.getById(userId, id);
+    if (!item) return { status: 404, jsonBody: { error: 'Item not found' } };
+    if (item.userId !== userId) return { status: 403, jsonBody: { error: 'Forbidden' } };
+
+    const formData = await request.formData();
+    const file = formData.get('image');
+    if (!file || typeof file === 'string') {
+      return { status: 400, jsonBody: { error: 'image field is required (multipart/form-data)' } };
+    }
+    const mimeType = file.type as string;
+    if (!ALLOWED_IMAGE_TYPES.has(mimeType)) {
+      return { status: 415, jsonBody: { error: 'Only image/jpeg and image/png are supported' } };
+    }
+    const arrayBuffer = await file.arrayBuffer();
+    if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
+      return { status: 413, jsonBody: { error: 'Image must be ≤ 10 MB' } };
+    }
+
+    const buffer = Buffer.from(arrayBuffer);
+    const blobName = await uploadProductImage(userId, id, buffer, mimeType as 'image/jpeg' | 'image/png');
+
+    // Delete old image if present (one image per product)
+    if (item.imageUrl && item.imageUrl !== blobName) {
+      await deleteProductImage(item.imageUrl).catch(() => {});
+    }
+
+    await repo.update(userId, id, { imageUrl: blobName } as Parameters<typeof repo.update>[2]);
+    logEvent(ctx, 'info', 'reusableItems.image.uploaded', { userId, itemId: id });
+    return { status: 201, jsonBody: { imageUrl: blobName } };
+  },
+);
+
+export const getProductImageHandler = withHandler(
+  'reusableItems.image.get',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params['id'];
+    if (!id) return { status: 400, jsonBody: { error: 'Missing item id' } };
+
+    const item = await getReusableItemsRepository().getById(userId, id);
+    if (!item) return { status: 404, jsonBody: { error: 'Item not found' } };
+    if (!item.imageUrl) return { status: 404, jsonBody: { error: 'No image' } };
+
+    const sasUrl = await generateProductImageSasUrl(item.imageUrl);
+    logEvent(ctx, 'info', 'reusableItems.image.get', { userId, itemId: id });
+    return { status: 200, jsonBody: { url: sasUrl } };
+  },
+);
+
+export const deleteProductImageHandler = withHandler(
+  'reusableItems.image.delete',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params['id'];
+    if (!id) return { status: 400, jsonBody: { error: 'Missing item id' } };
+
+    const repo = getReusableItemsRepository();
+    const item = await repo.getById(userId, id);
+    if (!item) return { status: 404, jsonBody: { error: 'Item not found' } };
+    if (item.userId !== userId) return { status: 403, jsonBody: { error: 'Forbidden' } };
+    if (!item.imageUrl) return { status: 204 };
+
+    await deleteProductImage(item.imageUrl).catch(() => {});
+    await repo.update(userId, id, { imageUrl: undefined } as Parameters<typeof repo.update>[2]);
+    logEvent(ctx, 'info', 'reusableItems.image.deleted', { userId, itemId: id });
+    return { status: 204 };
+  },
+);
+
+app.http('reusable-items-upload-image', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'reusable-items/{id}/image',
+  handler: uploadProductImageHandler,
+});
+
+app.http('reusable-items-get-image', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'reusable-items/{id}/image',
+  handler: getProductImageHandler,
+});
+
+app.http('reusable-items-delete-image', {
+  methods: ['DELETE'],
+  authLevel: 'anonymous',
+  route: 'reusable-items/{id}/image',
+  handler: deleteProductImageHandler,
+});
+

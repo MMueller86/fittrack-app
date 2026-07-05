@@ -151,6 +151,12 @@ export interface ReusableItem {
    * Not required — populated by AI enrichment or manual user input in future stories.
    */
   category?: FoodCategory;
+  /**
+   * Blob Storage path of the product image (e.g. "userId/itemId.jpg").
+   * Access via GET /api/reusable-items/:id/image which returns a short-lived SAS URL.
+   * null = kein Bild vorhanden.
+   */
+  imageUrl?: string;
 }
 
 // --- Food search result (unified view across user library + OFF) ---
@@ -171,6 +177,10 @@ export interface FoodSearchResult {
   isAiEstimate?: boolean;
   /** AI confidence 0.0–1.0; only present when isAiEstimate === true */
   aiConfidence?: number;
+  /** True when the current user has marked this product as favorite */
+  isFavorite?: boolean;
+  /** Front image URL (from Open Food Facts or Blob Storage for personal products) */
+  imageUrl?: string;
 }
 
 // --- AI Food Estimate — response shape for POST /api/ai/food-estimate/preview ---

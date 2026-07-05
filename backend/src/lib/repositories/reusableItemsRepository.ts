@@ -42,6 +42,8 @@ export interface UpdateReusableItemInput {
   searchTerms?: string[];
   aiKeywords?: string[];
   searchTermsEnriched?: boolean;
+  /** Blob Storage path of the product image. undefined = no change, null = remove. */
+  imageUrl?: string | null;
 }
 
 export interface ReusableItemsRepository {

@@ -19,3 +19,4 @@ export * from './lib/goalContext';
 export * from './lib/plateauDetector';
 export * from './types/foodCategory';
 export * from './types/hint';
+export * from './types/userFoodRelation';
