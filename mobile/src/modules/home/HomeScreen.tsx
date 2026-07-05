@@ -44,8 +44,6 @@ const INSIGHT_UNAVAILABLE: InsightResponse = {
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
-const TODAY = new Date().toISOString().split('T')[0];
-
 function getGreeting(): string {
   const h = new Date().getHours();
   if (h < 11) return 'Guten Morgen';
@@ -76,11 +74,14 @@ export default function HomeScreen({ navigation }: Props) {
   };
 
   const load = useCallback(async () => {
+    // Compute today's date inside the callback so it's always current,
+    // even if the app was backgrounded overnight (module-level constants freeze at load time).
+    const today = new Date().toISOString().split('T')[0]!;
     try {
       const [weightData, profileData, diaryData] = await Promise.all([
         listWeights(),
         profileApi.getMe(),
-        diaryApi.getDay(TODAY),
+        diaryApi.getDay(today),
       ]);
       setEntries(weightData);
       if (profileData.targets) setTargets(profileData.targets);
@@ -88,7 +89,7 @@ export default function HomeScreen({ navigation }: Props) {
       if (profileData.profile?.displayName) setDisplayName(profileData.profile.displayName);
       setTodayDiary(diaryData);
       if (diaryData.dayType != null) {
-        hydrateDayType(diaryData.dayType, TODAY, diaryData.workoutType ?? null);
+        hydrateDayType(diaryData.dayType, today, diaryData.workoutType ?? null);
       }
     } catch (err) {
       console.error('[HomeScreen] load failed:', err);
@@ -96,7 +97,7 @@ export default function HomeScreen({ navigation }: Props) {
     }
     // Insight runs independently — does NOT block the screen from rendering
     setInsight(null);
-    getInsight(TODAY)
+    getInsight(today)
       .then((result) => setInsight(result ?? INSIGHT_UNAVAILABLE))
       .catch(() => setInsight(INSIGHT_UNAVAILABLE));
   }, [setTargets, hydrateDayType]);

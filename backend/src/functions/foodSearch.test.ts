@@ -72,6 +72,34 @@ const CATALOG_OATS_DUPLICATE: FoodSearchResult = {
   sourceRef: { provider: 'openFoodFacts', barcode: '002' },
 };
 
+// Regression test data: user-created item via label scan vs. catalog exact-name match.
+// Query "marmelade" → library item name contains "Marmelade" as a word (word-boundary),
+// and "marmelade" is in searchTerms. Catalog item name is exactly "Marmelade".
+// After fix: library item must rank first (score 3 + LIBRARY_BONUS > catalog score 4).
+const LIBRARY_ITEM_MARMELADE: ReusableItem = {
+  id: 'lib-marmelade',
+  userId: 'test-user',
+  name: 'Erdbeer Marmelade Weniger Zucker',
+  nutritionBasis: 'per100g',
+  nutritionPer100g: { calories: 140, protein: 0.5, carbs: 34, fat: 0.1, fiber: 0.8 },
+  searchTerms: ['erdbeer', 'marmelade', 'weniger', 'zucker'],
+  isComplete: true,
+  sourceType: 'label-scan',
+  usageCount: 0,
+  createdAt: '2026-07-01T00:00:00Z',
+};
+
+const CATALOG_MARMELADE_EXACT: FoodSearchResult = {
+  id: 'openFoodFacts:marmelade-001',
+  source: 'openFoodFacts',
+  name: 'Marmelade',
+  displayLabel: '100g · 250 kcal',
+  nutritionBasis: 'per100g',
+  nutritionPer100g: { calories: 250, protein: 0.4, carbs: 62, fat: 0.1, fiber: 0.5 },
+  isComplete: true,
+  sourceRef: { provider: 'openFoodFacts', barcode: 'marmelade-001' },
+};
+
 let mockLibRepo: { search: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
 let mockCatalogRepo: { search: ReturnType<typeof vi.fn>; getById: ReturnType<typeof vi.fn> };
 
@@ -160,5 +188,22 @@ describe('foodSearchHandler', () => {
     const body = res.jsonBody as { results: FoodSearchResult[] };
     expect(body.results).toHaveLength(1);
     expect(body.results[0]!.id).toBe('openFoodFacts:001');
+  });
+
+  // ── Regression: user-created item must rank before catalog exact-name match ──
+  // Reproduces the bug: searching "marmelade" returned catalog "Marmelade" (exact-name
+  // score 4) before the user's own "Erdbeer Marmelade Weniger Zucker" (word-boundary
+  // score 2.5 + LIBRARY_BONUS 0.5 = 3.0 < 4.0).
+  // After fix: searchTerm-exact match gives score 3, LIBRARY_BONUS raised to 1.5 → 4.5 > 4.0.
+  it('ranks user library item above catalog exact-name match for single-word query', async () => {
+    mockLibRepo.search.mockResolvedValue([LIBRARY_ITEM_MARMELADE]);
+    mockCatalogRepo.search.mockResolvedValue([CATALOG_MARMELADE_EXACT]);
+
+    const res = await foodSearchHandler(makeRequest('marmelade'), makeCtx());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { results: FoodSearchResult[] };
+    expect(body.results).toHaveLength(2);
+    expect(body.results[0]!.id).toBe('lib-marmelade');    // library item first
+    expect(body.results[1]!.id).toBe('openFoodFacts:marmelade-001'); // catalog second
   });
 });

@@ -40,9 +40,12 @@ function rankSingleToken(name: string, searchTerms: string[], token: string): nu
   const n = name.toLowerCase();
   if (n === token) return 4;
   if (n.startsWith(token)) return 3;
+  // searchTerms exact match ranks equal to name-prefix (3) and must be checked BEFORE
+  // word-boundary (2.5) — otherwise a multi-word name like "Erdbeer Marmelade Weniger Zucker"
+  // would short-circuit at 2.5 and never reach the higher-score searchTerms check.
+  if (searchTerms.includes(token)) return 3;
   if (n.split(/\s+/).some((word) => word === token)) return 2.5;
   if (n.includes(token)) return 2;
-  if (searchTerms.includes(token)) return 3;
   if (searchTerms.some((t) => t.startsWith(token))) return 0.5;
   return -1;
 }

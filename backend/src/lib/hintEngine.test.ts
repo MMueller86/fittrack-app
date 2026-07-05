@@ -303,7 +303,7 @@ describe('H8 — training + protein deficit', () => {
 describe('H9 — no fruit/vegetable', () => {
   it('fires when no fruit or vegetable categories, and category data exists', () => {
     const meal = makeMeal('lunch');
-    meal.items[0].category = 'meat';
+    meal.items[0].category = 'Meat';
     const ctx = makeCtx({
       meals: [meal],
       summary: { calories: 500, protein: 40, carbs: 20, fat: 20, fiber: 2 },
@@ -345,11 +345,11 @@ describe('H12 — variety', () => {
   it('fires when 5+ food categories are present', () => {
     const meal = makeMeal('lunch');
     meal.items = [
-      { id: 'i1', name: 'apple', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 50, protein: 0, carbs: 13, fat: 0, fiber: 2 }, category: 'fruit' },
-      { id: 'i2', name: 'chicken', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 165, protein: 31, carbs: 0, fat: 4, fiber: 0 }, category: 'meat' },
-      { id: 'i3', name: 'broccoli', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 34, protein: 3, carbs: 7, fat: 0, fiber: 3 }, category: 'vegetable' },
-      { id: 'i4', name: 'rice', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 130, protein: 3, carbs: 28, fat: 0, fiber: 1 }, category: 'grain' },
-      { id: 'i5', name: 'yogurt', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 60, protein: 5, carbs: 5, fat: 2, fiber: 0 }, category: 'dairy' },
+      { id: 'i1', name: 'apple', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 50, protein: 0, carbs: 13, fat: 0, fiber: 2 }, category: 'Fruits' },
+      { id: 'i2', name: 'chicken', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 165, protein: 31, carbs: 0, fat: 4, fiber: 0 }, category: 'Meat' },
+      { id: 'i3', name: 'broccoli', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 34, protein: 3, carbs: 7, fat: 0, fiber: 3 }, category: 'Vegetables' },
+      { id: 'i4', name: 'rice', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 130, protein: 3, carbs: 28, fat: 0, fiber: 1 }, category: 'Cereals' },
+      { id: 'i5', name: 'yogurt', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 60, protein: 5, carbs: 5, fat: 2, fiber: 0 }, category: 'Milk and yogurt' },
     ];
     // fiber set to 12 (>40% of 25) to suppress H5; protein 42/150=28% (>25%) to suppress H3/H4
     const ctx = makeCtx({
@@ -370,8 +370,8 @@ describe('H10/H11 — fruit/vegetable', () => {
   it('H10 fires when fruit is present but not 5+ categories', () => {
     const meal = makeMeal('lunch');
     meal.items = [
-      { id: 'i1', name: 'apple', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 50, protein: 1, carbs: 13, fat: 0, fiber: 2 }, category: 'fruit' },
-      { id: 'i2', name: 'chicken', sourceType: 'manual', quantity: 200, unit: 'g', macros: { calories: 330, protein: 62, carbs: 0, fat: 8, fiber: 0 }, category: 'meat' },
+      { id: 'i1', name: 'apple', sourceType: 'manual', quantity: 100, unit: 'g', macros: { calories: 50, protein: 1, carbs: 13, fat: 0, fiber: 2 }, category: 'Fruits' },
+      { id: 'i2', name: 'chicken', sourceType: 'manual', quantity: 200, unit: 'g', macros: { calories: 330, protein: 62, carbs: 0, fat: 8, fiber: 0 }, category: 'Meat' },
     ];
     // fiber: 12 to suppress H5; protein 63/150=42% (>25%) suppresses H3; only 1 meal suppresses H4
     const ctx = makeCtx({
@@ -386,8 +386,8 @@ describe('H10/H11 — fruit/vegetable', () => {
   it('H11 fires when vegetable is present but not fruit, not 5+ categories', () => {
     const meal = makeMeal('lunch');
     meal.items = [
-      { id: 'i1', name: 'broccoli', sourceType: 'manual', quantity: 200, unit: 'g', macros: { calories: 68, protein: 6, carbs: 14, fat: 0, fiber: 6 }, category: 'vegetable' },
-      { id: 'i2', name: 'chicken', sourceType: 'manual', quantity: 200, unit: 'g', macros: { calories: 330, protein: 62, carbs: 0, fat: 8, fiber: 0 }, category: 'meat' },
+      { id: 'i1', name: 'broccoli', sourceType: 'manual', quantity: 200, unit: 'g', macros: { calories: 68, protein: 6, carbs: 14, fat: 0, fiber: 6 }, category: 'Vegetables' },
+      { id: 'i2', name: 'chicken', sourceType: 'manual', quantity: 200, unit: 'g', macros: { calories: 330, protein: 62, carbs: 0, fat: 8, fiber: 0 }, category: 'Meat' },
     ];
     // fiber: 12 to suppress H5; protein 68/150=45% (>25%) suppresses H3; only 1 meal suppresses H4
     const ctx = makeCtx({
@@ -692,5 +692,120 @@ describe('Priority cascade', () => {
     });
     const { hint } = evaluateHint(ctx, noState());
     expect(hint.id).toBe('H5');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Robustness — malformed Cosmos documents
+// ---------------------------------------------------------------------------
+
+describe('Robustness — missing items field', () => {
+  it('does not crash when a meal document has no items field (Cosmos legacy doc)', () => {
+    // Simulate a meal document read from Cosmos that is missing the items array.
+    // This caused a production HTTP 500: "Cannot read properties of undefined (reading 'length')".
+    const mealWithoutItems = {
+      ...makeMeal('lunch'),
+      items: undefined as unknown as Meal['items'],
+    };
+    expect(() => evaluateHint(makeCtx({ meals: [mealWithoutItems] }), noState())).not.toThrow();
+  });
+
+  it('treats a meal with missing items as empty (H1 fires)', () => {
+    const mealWithoutItems = {
+      ...makeMeal('breakfast'),
+      items: undefined as unknown as Meal['items'],
+    };
+    const { hint } = evaluateHint(makeCtx({ meals: [mealWithoutItems] }), noState());
+    expect(hint.id).toBe('H1');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H17: Training day + protein reached — cooldown regression (Bug B1)
+// ---------------------------------------------------------------------------
+
+describe('H17 — training + protein reached (cooldown regression)', () => {
+  const trainingProteinCtx = (): HintContext => makeCtx({
+    meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+    summary: { calories: 2000, protein: 150, carbs: 200, fat: 70, fiber: 25 },
+    dayType: 'training',
+    currentHour: 20,
+  });
+
+  it('H16 fires first (all macros balanced) on training day with all macros at target', () => {
+    const { hint } = evaluateHint(trainingProteinCtx(), noState());
+    expect(hint.id).toBe('H16');
+  });
+
+  it('H17 fires on training day when protein >= 95% and H16 + H15 are in cooldown', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const state: HintState = {
+      id: 'hintState',
+      userId: 'user1',
+      _docType: 'hintState',
+      lastHintId: 'H16',
+      lastHintDate: today,
+      lastHintGeneratedAt: new Date().toISOString(),
+      cooldownHistory: { H16: today, H15: today },
+      motivationIndex: 0,
+    };
+    // carbs slightly off to prevent H16 from firing again
+    const ctx = makeCtx({
+      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+      summary: { calories: 2000, protein: 148, carbs: 230, fat: 70, fiber: 25 },
+      // protein 148/150 = 98.7% ≥ 95%; carbs 230/200 = 115% → H16 won't fire
+      dayType: 'training',
+      currentHour: 20,
+    });
+    const { hint } = evaluateHint(ctx, state);
+    expect(hint.id).toBe('H17');
+    expect(hint.category).toBe('positive');
+  });
+
+  it('H17 records cooldown date in updatedState (regression: was missing from COOLDOWN_DAYS)', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const state: HintState = {
+      id: 'hintState',
+      userId: 'user1',
+      _docType: 'hintState',
+      lastHintId: 'H16',
+      lastHintDate: today,
+      lastHintGeneratedAt: new Date().toISOString(),
+      cooldownHistory: { H16: today, H15: today },
+      motivationIndex: 0,
+    };
+    const ctx = makeCtx({
+      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+      summary: { calories: 2000, protein: 148, carbs: 230, fat: 70, fiber: 25 },
+      dayType: 'training',
+      currentHour: 20,
+    });
+    const { updatedState } = evaluateHint(ctx, state);
+    // H17 must be in cooldownHistory after firing (was undefined before fix)
+    expect(updatedState.cooldownHistory.H17).toBe(today);
+  });
+
+  it('H17 is suppressed within 2-day cooldown', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const state: HintState = {
+      id: 'hintState',
+      userId: 'user1',
+      _docType: 'hintState',
+      lastHintId: 'H17',
+      lastHintDate: today,
+      lastHintGeneratedAt: new Date().toISOString(),
+      cooldownHistory: { H16: today, H15: today, H17: today },
+      motivationIndex: 0,
+    };
+    const ctx = makeCtx({
+      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+      summary: { calories: 2000, protein: 148, carbs: 230, fat: 70, fiber: 25 },
+      dayType: 'training',
+      currentHour: 20,
+    });
+    const { hint } = evaluateHint(ctx, state);
+    expect(hint.id).not.toBe('H17');
+    // Falls through to motivation
+    expect(hint.category).toBe('motivation');
   });
 });

@@ -85,6 +85,9 @@ interface FoodProduct {
 
   sourceQualityScore: number;        // 60–100
 
+  /** PNNS pnns_groups_2 category from OFF, if available */
+  category?: string;
+
   sourceRef: {
     provider: 'openFoodFacts';
     barcode: string;
@@ -143,29 +146,89 @@ function getNum(obj: Record<string, unknown>, ...keys: string[]): number | undef
 }
 
 function extractNutrition(doc: Document): NutritionPer100g | null {
+  // --- Old schema: flat nutriments object ---
   const n = doc['nutriments'] as Record<string, unknown> | undefined;
-  if (!n) return null;
 
-  // Calories: prefer kcal fields, fall back to kJ conversion
-  let calories = getNum(n, 'energy-kcal_100g', 'energy-kcal');
-  if (calories == null) {
-    const kj = getNum(n, 'energy_100g', 'energy');
-    if (kj != null) calories = kj * KJ_TO_KCAL;
+  // --- New schema: doc.nutrition.aggregated_set.nutrients (schema_version >= 1003) ---
+  const newNutrition = doc['nutrition'] as Record<string, unknown> | undefined;
+  const aggregatedSet = newNutrition?.['aggregated_set'] as Record<string, unknown> | undefined;
+  const aggregatedNutrients = aggregatedSet?.['nutrients'] as Record<string, { value?: unknown }> | undefined;
+
+  // Also try doc.nutrition.input_sets[0].nutrients as second fallback
+  const inputSets = newNutrition?.['input_sets'] as Array<Record<string, unknown>> | undefined;
+  const inputSetNutrients = inputSets?.[0]?.['nutrients'] as Record<string, { value?: unknown }> | undefined;
+
+  // Helper to read a value from the new nested structure
+  function getNewNum(nutrients: Record<string, { value?: unknown }>, key: string): number | null {
+    const entry = nutrients[key];
+    if (entry == null) return null;
+    const v = entry['value'];
+    if (typeof v === 'number' && isFinite(v)) return v;
+    if (typeof v === 'string') { const p = parseFloat(v); return isFinite(p) ? p : null; }
+    return null;
   }
 
-  // Calories are required. Protein/carbs/fat default to 0 if missing
-  // (valid for e.g. water, zero drinks, pure fiber products)
+  // Choose which nutrient source to use
+  let calories: number | null = null;
+  let protein: number | null = null;
+  let carbs: number | null = null;
+  let fat: number | null = null;
+  let fiber: number | null = null;
+  let salt: number | null = null;
+
+  // Priority: new schema (aggregated_set = best merged values) → old flat nutriments → input_sets[0]
+  if (aggregatedNutrients) {
+    calories = getNewNum(aggregatedNutrients, 'energy-kcal');
+    if (calories == null) {
+      const kj = getNewNum(aggregatedNutrients, 'energy-kj') ?? getNewNum(aggregatedNutrients, 'energy');
+      if (kj != null) calories = kj * KJ_TO_KCAL;
+    }
+    protein = getNewNum(aggregatedNutrients, 'proteins');
+    carbs   = getNewNum(aggregatedNutrients, 'carbohydrates');
+    fat     = getNewNum(aggregatedNutrients, 'fat');
+    fiber   = getNewNum(aggregatedNutrients, 'fiber');
+    salt    = getNewNum(aggregatedNutrients, 'salt');
+  }
+
+  // If new schema didn't yield calories, try old flat nutriments
+  if (calories == null && n) {
+    calories = getNum(n, 'energy-kcal_100g', 'energy-kcal') ?? null;
+    if (calories == null) {
+      const kj = getNum(n, 'energy_100g', 'energy');
+      if (kj != null) calories = kj * KJ_TO_KCAL;
+    }
+    protein = getNum(n, 'proteins_100g', 'proteins') ?? null;
+    carbs   = getNum(n, 'carbohydrates_100g', 'carbohydrates') ?? null;
+    fat     = getNum(n, 'fat_100g', 'fat') ?? null;
+    fiber   = getNum(n, 'fiber_100g', 'fiber') ?? null;
+    salt    = getNum(n, 'salt_100g', 'salt') ?? null;
+  }
+
+  // Last resort: input_sets[0]
+  if (calories == null && inputSetNutrients) {
+    calories = getNewNum(inputSetNutrients, 'energy-kcal');
+    if (calories == null) {
+      const kj = getNewNum(inputSetNutrients, 'energy-kj') ?? getNewNum(inputSetNutrients, 'energy');
+      if (kj != null) calories = kj * KJ_TO_KCAL;
+    }
+    protein = getNewNum(inputSetNutrients, 'proteins');
+    carbs   = getNewNum(inputSetNutrients, 'carbohydrates');
+    fat     = getNewNum(inputSetNutrients, 'fat');
+    fiber   = getNewNum(inputSetNutrients, 'fiber');
+    salt    = getNewNum(inputSetNutrients, 'salt');
+  }
+
   if (calories == null) return null;
 
-  const protein = getNum(n, 'proteins_100g', 'proteins') ?? 0;
-  const carbs   = getNum(n, 'carbohydrates_100g', 'carbohydrates') ?? 0;
-  const fat     = getNum(n, 'fat_100g', 'fat') ?? 0;
-
-  const result: NutritionPer100g = { per: '100g', calories: Math.round(calories * 100) / 100, protein: Math.round(protein * 100) / 100, carbs: Math.round(carbs * 100) / 100, fat: Math.round(fat * 100) / 100 };
-  const fiber = getNum(n, 'fiber_100g', 'fiber');
+  const result: NutritionPer100g = {
+    per: '100g',
+    calories: Math.round(calories * 100) / 100,
+    protein: Math.round((protein ?? 0) * 100) / 100,
+    carbs:   Math.round((carbs ?? 0)   * 100) / 100,
+    fat:     Math.round((fat ?? 0)     * 100) / 100,
+  };
   if (fiber != null) result.fiber = Math.round(fiber * 100) / 100;
-  const salt = getNum(n, 'salt_100g', 'salt');
-  if (salt != null) result.salt = Math.round(salt * 100) / 100;
+  if (salt  != null) result.salt  = Math.round(salt  * 100) / 100;
 
   return result;
 }
@@ -827,6 +890,11 @@ function mapProduct(
     },
     ...(flags.length > 0 && { qualityFlags: flags }),
     sourceQualityScore: qualityScore,
+    ...((() => {
+      // PNNS category: use pnns_groups_2 directly, fall back to undefined
+      const pnns2 = getStr(doc, 'pnns_groups_2');
+      return pnns2 && pnns2 !== 'unknown' ? { category: pnns2 } : {};
+    })()),
     sourceRef: { provider: 'openFoodFacts', barcode },
     meta: {
       source: 'openFoodFacts',
@@ -863,6 +931,8 @@ async function main() {
     examples: { food: [], beverage: [], supplement: [], flagged: [] },
   };
 
+  let progressTimer: ReturnType<typeof setInterval> | undefined;
+
   try {
     await client.connect();
     const col = client.db('off').collection('products');
@@ -885,6 +955,9 @@ async function main() {
       serving_size: 1,
       serving_quantity: 1,
       nutriments: 1,
+      nutrition: 1,
+      pnns_groups_1: 1,
+      pnns_groups_2: 1,
       _keywords: 1,
       categories_tags: 1,
       data_quality_errors_tags: 1,   // required for quality error filter
@@ -899,6 +972,14 @@ async function main() {
     let firstWritten = true;
 
     console.log('Streaming through MongoDB cursor …\n');
+
+    const startTime = Date.now();
+    progressTimer = setInterval(() => {
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+      const s = String(elapsed % 60).padStart(2, '0');
+      console.log(`  [${m}:${s}]  Scanned: ${stats.scanned.toLocaleString().padStart(8)}  |  Exported: ${stats.exported.toLocaleString().padStart(7)}`);
+    }, 30_000);
 
     for await (const doc of cursor) {
       if (stats.exported >= LIMIT) break;
@@ -929,20 +1010,16 @@ async function main() {
           stats.examples.supplement.push(mapped);
         }
       }
-
-      if (stats.scanned % 5_000 === 0) {
-        process.stdout.write(
-          `\r  Scanned: ${stats.scanned.toLocaleString().padStart(8)}  |  Exported: ${stats.exported.toLocaleString().padStart(7)}`,
-        );
-      }
     }
 
+    clearInterval(progressTimer);
+    progressTimer = undefined;
     fileStream.write('\n]\n');
     await new Promise<void>((resolve, reject) => {
       fileStream.end((err?: Error | null) => (err ? reject(err) : resolve()));
     });
 
-    if (stats.scanned >= 5_000) process.stdout.write('\n');
+    if (stats.scanned >= 5_000) console.log(`  [done]  Scanned: ${stats.scanned.toLocaleString()}  |  Exported: ${stats.exported.toLocaleString()}\n`);
 
     // ------------------------------------------------------------------
     // Quality Report
@@ -1023,6 +1100,7 @@ async function main() {
     console.log('════════════════════════════════════════════════════\n');
 
   } finally {
+    if (typeof progressTimer !== 'undefined') clearInterval(progressTimer);
     await client.close();
   }
 }

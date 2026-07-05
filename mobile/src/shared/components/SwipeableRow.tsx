@@ -5,6 +5,7 @@
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -28,6 +29,7 @@ export function SwipeableRow({ onDelete, children }: Props) {
   const isDeleting = useSharedValue(false);
 
   const triggerDelete = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onDelete();
   }, [onDelete]);
 

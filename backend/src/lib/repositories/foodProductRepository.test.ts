@@ -134,9 +134,13 @@ describe('rankProduct', () => {
     expect(rankProduct(HIGH_QUALITY_OATS, 'haferflocken')).toBe(3);
   });
 
-  it('gives rank 2.5 for word-boundary match in normalizedName', () => {
+  it('gives rank 3 for word-boundary match when token is also in searchKeywords (auto-generated from name)', () => {
+    // makeProduct auto-adds name tokens to searchKeywords, so 'haferflocken' ends up in both
+    // the normalizedName ("bio haferflocken fein") AND searchKeywords.
+    // searchKeywords.includes(token) now takes precedence over word-boundary, giving score 3.
+    // Pure word-boundary (2.5) only applies when the token is in the name but NOT in searchKeywords.
     const product = makeProduct({ id: 'x', name: 'Bio Haferflocken fein', normalizedName: 'bio haferflocken fein' });
-    expect(rankProduct(product, 'haferflocken')).toBe(2.5);
+    expect(rankProduct(product, 'haferflocken')).toBe(3);
   });
 
   it('gives rank 3 for exact keyword match (same tier as name-prefix)', () => {

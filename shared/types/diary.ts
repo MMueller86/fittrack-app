@@ -166,6 +166,7 @@ export interface FoodSearchResult {
   portion?: PortionInfo;
   isComplete: boolean;
   sourceRef?: OFFSourceRef;
+  category?: FoodCategory;
   /** True when this result came from an AI-estimated ReusableItem */
   isAiEstimate?: boolean;
   /** AI confidence 0.0–1.0; only present when isAiEstimate === true */

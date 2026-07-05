@@ -196,8 +196,13 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'ENRICH_QUEUE_NAME'
           value: enrichQueueName
         }
-        // Linux native modules: let Oryx rebuild npm packages on the Linux host.
-        // Required for packages with native binaries (e.g. sharp) deployed from Windows.
+        // WEBSITE_RUN_FROM_PACKAGE=1: deploy ZIP is mounted directly (no Oryx extraction).
+        // Required so that func CLI --no-build deploys work correctly with pre-built artifacts
+        // including Linux-native binaries (e.g. sharp) that are bundled in _deploy_staging.
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '1'
+        }
         {
           name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
           value: 'true'

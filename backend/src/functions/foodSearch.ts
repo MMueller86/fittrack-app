@@ -62,9 +62,11 @@ export const foodSearchHandler = withHandler(
     const nq = query.trim().toLowerCase();
 
     if (nq.length >= 2) {
-      // Unified ranking: score library items (with +0.5 bonus) and catalog items,
+      // Unified ranking: score library items (with +1.5 bonus) and catalog items,
       // then merge into a single list sorted by score DESC.
-      const LIBRARY_BONUS = 0.5;
+      // LIBRARY_BONUS must be large enough so that a library item matching via searchTerms
+      // (score 3) outranks a catalog item with an exact name match (score 4): 3 + 1.5 = 4.5 > 4.
+      const LIBRARY_BONUS = 1.5;
 
       const rawLibrary = libraryItems.status === 'fulfilled' ? libraryItems.value : [];
       const catalog: FoodSearchResult[] =

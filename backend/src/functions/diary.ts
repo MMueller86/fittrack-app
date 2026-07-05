@@ -83,6 +83,7 @@ const AddItemSchema = z
     isAiEstimate: z.boolean().optional(),
     // AI meal estimate metadata (fast path, sourceType === 'ai-meal-estimate')
     sourceType: z.enum(['manual', 'reusableItem', 'openFoodFacts', 'ai', 'ai-meal-estimate', 'recipe']).optional(),
+    category: z.string().optional(),
     aiMealEstimateComponents: z.array(z.string()).optional(),
     aiMealEstimateContext: z.string().trim().max(100).optional(),
     aiMealEstimateConfidence: z.enum(['high', 'medium', 'low']).optional(),
@@ -315,6 +316,7 @@ export const addItemHandler = withHandler(
         ...(d.aiMealEstimateConfidence ? { aiMealEstimateConfidence: d.aiMealEstimateConfidence } : {}),
         ...(d.aiMealEstimateAssumptions ? { aiMealEstimateAssumptions: d.aiMealEstimateAssumptions } : {}),
         ...(d.aiMealEstimatePhotoUsed ? { aiMealEstimatePhotoUsed: d.aiMealEstimatePhotoUsed } : {}),
+        ...(d.category ? { category: d.category as import('@fittrack/shared').FoodCategory } : {}),
       });
       logEvent(ctx, 'info', 'diary.item.added', { userId, mealId });
       return { status: 201, jsonBody: { meal } };

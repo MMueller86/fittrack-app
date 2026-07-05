@@ -72,10 +72,34 @@ var containerDefs = [
   { name: 'reusableMealItems', partitionKey: '/userId' }
   { name: 'recipes', partitionKey: '/userId' }
   { name: 'aiUsage', partitionKey: '/userId' }
-  { name: 'aiInsights', partitionKey: '/userId' }
   { name: 'profiles', partitionKey: '/userId' }
   { name: 'foodProducts', partitionKey: '/id' }
 ]
+
+// aiInsights is defined separately because it needs defaultTtl: -1 to enable
+// per-document TTL expiry. All other containers have no TTL (property omitted).
+// Cosmos DB only accepts -1 or a positive integer — omitting the property disables TTL.
+resource aiInsightsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+  parent: database
+  name: 'aiInsights'
+  properties: {
+    resource: {
+      id: 'aiInsights'
+      partitionKey: {
+        paths: ['/userId']
+        kind: 'Hash'
+      }
+      defaultTtl: -1
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [{ path: '/*' }]
+        excludedPaths: [{ path: '/"_etag"/?' }]
+        compositeIndexes: []
+      }
+    }
+  }
+}
 
 resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = [for c in containerDefs: {
   parent: database
@@ -90,10 +114,21 @@ resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containe
       indexingPolicy: {
         indexingMode: 'consistent'
         automatic: true
-        includedPaths: [
+        // foodProducts: targeted indexing — only index fields used in queries.
+        // At 210k documents with large keyword arrays, full /* indexing would
+        // consume excessive storage and RU on every write.
+        includedPaths: c.name == 'foodProducts' ? [
+          { path: '/normalizedName/?' }
+          { path: '/searchKeywords/*' }
+          { path: '/source/?' }
+          { path: '/barcode/?' }
+        ] : [
           { path: '/*' }
         ]
-        excludedPaths: [
+        excludedPaths: c.name == 'foodProducts' ? [
+          { path: '/*' }
+          { path: '/"_etag"/?' }
+        ] : [
           { path: '/"_etag"/?' }
         ]
         compositeIndexes: c.name == 'recipes' ? [

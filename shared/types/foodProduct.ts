@@ -1,3 +1,5 @@
+import type { FoodCategory } from './foodCategory';
+
 // FoodProduct — canonical type for the internal food product catalog.
 //
 // Sourced from the Open Food Facts export pipeline (tools/off-import/).
@@ -34,6 +36,8 @@ export interface FoodProduct {
 
   productType: FoodProductType;
   isEdible: boolean;
+  /** PNNS pnns_groups_2 value from Open Food Facts, if available */
+  category?: FoodCategory;
 
   nutritionBasis: 'per100g' | 'both';
   nutritionPer100g: FoodProductNutritionPer100g;

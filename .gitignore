@@ -53,3 +53,7 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# OFF Import Tool — generated output (large files, regenerate via npm run export:off)
+tools/off-import/output/
+!tools/off-import/output/food-products.sample.100.json

@@ -8,14 +8,22 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import type { Meal, MealItem } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { diaryApi } from '../../shared/api/diaryApi';
@@ -45,34 +53,6 @@ function derivePer100g(item: MealItem) {
     fiber: ((item.macros.fiber ?? 0) / q) * 100,
   };
 }
-
-function MacroPreviewRow({ label, value, unit, barPct }: {
-  label: string; value: number; unit: string; barPct?: number;
-}) {
-  return (
-    <View style={pStyles.row}>
-      <Text style={pStyles.label}>{label}</Text>
-      <View style={pStyles.right}>
-        <Text style={pStyles.value}>{Math.round(value * 10) / 10} <Text style={pStyles.unit}>{unit}</Text></Text>
-        {barPct !== undefined && (
-          <View style={pStyles.track}>
-            <View style={[pStyles.fill, { width: `${Math.min(barPct, 1) * 100}%` }]} />
-          </View>
-        )}
-      </View>
-    </View>
-  );
-}
-
-const pStyles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
-  label: { ...typography.caption, color: colors.textSecondary, width: 110 },
-  right: { flex: 1, alignItems: 'flex-end' },
-  value: { ...typography.caption, color: colors.text, fontWeight: '600' as const },
-  unit: { fontWeight: '400' as const, color: colors.textMuted },
-  track: { height: 3, backgroundColor: colors.border, borderRadius: 2, overflow: 'hidden', width: '100%', marginTop: 2 },
-  fill: { height: '100%', backgroundColor: '#3B82F6', borderRadius: 2 },
-});
 
 interface Props {
   visible: boolean;
@@ -123,14 +103,21 @@ export default function EditItemSheet({
       const s = amount / 100;
       return { calories: per100g.calories * s, protein: per100g.protein * s, carbs: per100g.carbs * s, fat: per100g.fat * s, fiber: per100g.fiber * s };
     }
+    // Fallback für Gramm-Modus bei portionsbasiertem Eintrag (per100g nicht verfügbar)
+    if (inputMode === 'grams' && portionWeightGrams && portionWeightGrams > 0 && item.quantity > 0) {
+      const totalGrams = item.quantity * portionWeightGrams;
+      const s = amount / totalGrams;
+      return { calories: item.macros.calories * s, protein: item.macros.protein * s, carbs: item.macros.carbs * s, fat: item.macros.fat * s, fiber: (item.macros.fiber ?? 0) * s };
+    }
     if (inputMode === 'portion') {
       const s = item.quantity > 0 ? amount / item.quantity : 1;
       return { calories: item.macros.calories * s, protein: item.macros.protein * s, carbs: item.macros.carbs * s, fat: item.macros.fat * s, fiber: (item.macros.fiber ?? 0) * s };
     }
     return null;
-  }, [amount, inputMode, per100g, item]);
+  }, [amount, inputMode, per100g, portionWeightGrams, item]);
 
   const adjustAmount = (delta: number) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setAmount((prev) => {
       const next = Math.max(0.5, +(prev + delta).toFixed(1));
       setAmountText(formatAmount(next, inputMode === 'portion'));
@@ -140,6 +127,7 @@ export default function EditItemSheet({
 
   const handleToggleMode = (mode: 'grams' | 'portion') => {
     if (mode === inputMode) return;
+    void Haptics.selectionAsync();
     setInputMode(mode);
     if (mode === 'portion') {
       if (isPortion) { setAmount(item.quantity); setAmountText(formatAmount(item.quantity, true)); }
@@ -161,6 +149,7 @@ export default function EditItemSheet({
         inputMode,
         ...(inputMode === 'portion' ? { portionCount: parsed } : { amountGrams: parsed }),
       });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onSaved(result.meal);
     } catch { /* caller handles errors */ }
     finally { setSaving(false); }
@@ -169,132 +158,192 @@ export default function EditItemSheet({
   const isValid = (() => { const p = parseFloat(amountText.replace(',', '.')); return Number.isFinite(p) && p > 0; })();
   const amountLabel = inputMode === 'grams' ? 'g' : 'Port.';
 
+  // Animated swipe-to-close + open animation
+  const dragY = useSharedValue(0);
+  const slideY = useSharedValue(600);
+  const sheetAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: dragY.value + slideY.value }],
+  }));
+
+  // Animate in when sheet opens; reset drag when reopened
+  useEffect(() => {
+    if (visible) {
+      dragY.value = 0;
+      slideY.value = 600;
+      slideY.value = withSpring(0, { damping: 22, stiffness: 160 });
+    }
+  }, [visible]);
+
+  const handleSwipeDismiss = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    dragY.value = 0;
+    onClose();
+  };
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => { dragY.value = Math.max(0, e.translationY); })
+    .onEnd((e) => {
+      if (e.translationY > 80) {
+        dragY.value = withTiming(800, { duration: 340 }, () => runOnJS(handleSwipeDismiss)());
+      } else {
+        dragY.value = withSpring(0, { damping: 18, stiffness: 140 });
+      }
+    });
+
   const moreActions = [
+    { label: 'Löschen', destructive: true, onPress: () => { setMoreActionsVisible(false); setDeleteConfirmVisible(true); } },
     ...(onMoveRequest ? [{ label: 'Verschieben…', onPress: () => { setMoreActionsVisible(false); onClose(); onMoveRequest(item); } }] : []),
     ...(onCopyRequest ? [{ label: 'Auf anderen Tag kopieren…', onPress: () => { setMoreActionsVisible(false); onClose(); onCopyRequest(item); } }] : []),
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : 'height'} style={styles.avoidingView}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
-          <View style={styles.handle} />
-          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {/* Header */}
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+      <GestureHandlerRootView style={styles.gestureRoot}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'position' : 'height'} style={styles.avoidingView}>
+          <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) }, sheetAnimStyle]}>
+            {/* Handle zone — drag down to dismiss */}
+            <GestureDetector gesture={panGesture}>
+              <View style={styles.handleArea}>
+                <View style={styles.handle} />
+              </View>
+            </GestureDetector>
+
+            {/* Fixed header — always visible, never scrolls away */}
             <View style={styles.headerRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                <Text style={styles.contextLabel}>in {mealName} · {dateLabel}</Text>
-              </View>
-              {moreActions.length > 0 && (
-                <TouchableOpacity style={styles.moreBtn} onPress={() => setMoreActionsVisible(true)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={styles.moreBtnText}>···</Text>
-                </TouchableOpacity>
-              )}
+              <Text style={[styles.itemName, { flex: 1 }]} numberOfLines={1}>{item.name}</Text>
+              <TouchableOpacity style={styles.headerActionBtn} onPress={() => setMoreActionsVisible(true)} hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
+                <Text style={styles.headerActionText}>···</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerActionBtn} onPress={onClose} hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}>
+                <Text style={styles.headerActionText}>✕</Text>
+              </TouchableOpacity>
             </View>
-
-            {/* Mode toggle */}
-            {canTogglePortion && (
-              <View style={styles.segmentedControl}>
-                {(['grams', 'portion'] as const).map((m) => (
-                  <TouchableOpacity key={m} style={[styles.segment, inputMode === m && styles.segmentActive]} onPress={() => handleToggleMode(m)}>
-                    <Text style={[styles.segmentText, inputMode === m && styles.segmentTextActive]}>{m === 'grams' ? 'Gramm' : 'Portionen'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            {/* Portion hint */}
-            {inputMode === 'portion' && portionWeightGrams && (
-              <Text style={styles.portionHint}>
+            {portionWeightGrams && (
+              <Text style={styles.portionSubtitle}>
                 1 Portion = {portionWeightGrams} g{sourceProduct?.portion?.label ? ` (${sourceProduct.portion.label})` : ''}
               </Text>
             )}
 
-            {/* Stepper */}
-            <View style={styles.stepperRow}>
-              <TouchableOpacity style={styles.stepBtn} onPress={() => adjustAmount(-getStep(amount, inputMode === 'portion'))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <Text style={styles.stepBtnText}>−</Text>
-              </TouchableOpacity>
-              {isTyping ? (
-                <TextInput style={styles.amountInput} value={amountText} onChangeText={(t) => { setAmountText(t); const p = parseFloat(t.replace(',', '.')); if (Number.isFinite(p) && p > 0) setAmount(p); }} onBlur={() => { setIsTyping(false); const p = parseFloat(amountText.replace(',', '.')); if (!Number.isFinite(p) || p <= 0) setAmountText(formatAmount(amount, inputMode === 'portion')); }} keyboardType="decimal-pad" selectTextOnFocus autoFocus />
-              ) : (
-                <TouchableOpacity onPress={() => setIsTyping(true)} style={styles.amountDisplay}>
-                  <Text style={styles.amountValue}>{amountText}</Text>
-                  <Text style={styles.amountUnit}>{amountLabel}</Text>
-                </TouchableOpacity>
+            <View>
+            {/* Mode toggle */}
+              {canTogglePortion && (
+                <View style={styles.segmentedControl}>
+                  {(['grams', 'portion'] as const).map((m) => (
+                    <TouchableOpacity key={m} style={[styles.segment, inputMode === m && styles.segmentActive]} onPress={() => handleToggleMode(m)}>
+                      <Text style={[styles.segmentText, inputMode === m && styles.segmentTextActive]}>{m === 'grams' ? 'Gramm' : 'Portionen'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               )}
-              <TouchableOpacity style={styles.stepBtn} onPress={() => adjustAmount(getStep(amount, inputMode === 'portion'))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <Text style={styles.stepBtnText}>+</Text>
+
+            {/* Stepper */}
+              <View style={styles.stepperRow}>
+                <TouchableOpacity style={styles.stepBtn} onPress={() => adjustAmount(-getStep(amount, inputMode === 'portion'))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Text style={styles.stepBtnText}>−</Text>
+                </TouchableOpacity>
+                {isTyping ? (
+                  <TextInput style={styles.amountInput} value={amountText} onChangeText={(t) => { setAmountText(t); const p = parseFloat(t.replace(',', '.')); if (Number.isFinite(p) && p > 0) setAmount(p); }} onBlur={() => { setIsTyping(false); const p = parseFloat(amountText.replace(',', '.')); if (!Number.isFinite(p) || p <= 0) setAmountText(formatAmount(amount, inputMode === 'portion')); }} keyboardType="decimal-pad" selectTextOnFocus autoFocus />
+                ) : (
+                  <TouchableOpacity onPress={() => setIsTyping(true)} style={styles.amountDisplay}>
+                    <Text style={styles.amountValue}>{amountText}</Text>
+                    <Text style={styles.amountUnit}>{amountLabel}</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={styles.stepBtn} onPress={() => adjustAmount(getStep(amount, inputMode === 'portion'))} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Text style={styles.stepBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Makro-Bar */}
+              {preview && (
+                <View style={styles.macroBar}>
+                  <View style={styles.macroHeroSlot}>
+                    <Text style={styles.macroHeroVal}>{Math.round(preview.calories)}</Text>
+                    <Text style={styles.macroLabel}>kcal</Text>
+                  </View>
+                  <View style={styles.macroDivider} />
+                  <View style={styles.macroSlot}>
+                    <Text style={styles.macroVal}>{Math.round(preview.protein * 10) / 10}g</Text>
+                    <Text style={styles.macroLabel}>Eiweiß</Text>
+                  </View>
+                  <View style={styles.macroDivider} />
+                  <View style={styles.macroSlot}>
+                    <Text style={styles.macroVal}>{Math.round(preview.carbs * 10) / 10}g</Text>
+                    <Text style={styles.macroLabel}>KH</Text>
+                  </View>
+                  <View style={styles.macroDivider} />
+                  <View style={styles.macroSlot}>
+                    <Text style={styles.macroVal}>{Math.round(preview.fat * 10) / 10}g</Text>
+                    <Text style={styles.macroLabel}>Fett</Text>
+                  </View>
+                  {preview.fiber > 0.1 && (
+                    <>
+                      <View style={styles.macroDivider} />
+                      <View style={styles.macroSlot}>
+                        <Text style={styles.macroVal}>{Math.round(preview.fiber * 10) / 10}g</Text>
+                        <Text style={styles.macroLabel}>Bst.</Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+              )}
+            </View>
+
+            {/* Action bar */}
+            <View style={styles.actionBar}>
+              <TouchableOpacity style={[styles.saveBtn, (!isValid || saving) && styles.saveBtnDisabled]} onPress={handleSave} disabled={!isValid || saving}>
+                {saving ? <ActivityIndicator size="small" color={colors.background} /> : <Text style={styles.saveBtnText}>Speichern</Text>}
               </TouchableOpacity>
             </View>
-            <Text style={styles.stepHint}>Schritt: ±{getStep(amount, inputMode === 'portion')}{inputMode === 'portion' ? ' Port.' : ' g'}</Text>
-
-            {/* Preview */}
-            {preview && (
-              <View style={styles.preview}>
-                <Text style={styles.previewTitle}>
-                  Nährwerte für {inputMode === 'grams' ? `${Math.round(amount)} g` : `${formatAmount(amount, true)} Portion${amount !== 1 ? 'en' : ''}`}
-                </Text>
-                <MacroPreviewRow label="Kalorien" value={preview.calories} unit="kcal" />
-                <MacroPreviewRow label="Eiweiß" value={preview.protein} unit="g" barPct={proteinTarget ? preview.protein / proteinTarget : undefined} />
-                <MacroPreviewRow label="Kohlenhydrate" value={preview.carbs} unit="g" />
-                <MacroPreviewRow label="Fett" value={preview.fat} unit="g" />
-                {preview.fiber > 0.1 && <MacroPreviewRow label="Ballaststoffe" value={preview.fiber} unit="g" />}
-              </View>
-            )}
-          </ScrollView>
-
-          {/* Action bar */}
-          <View style={styles.actionBar}>
-            <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteConfirmVisible(true)}>
-              <Text style={styles.deleteBtnText}>Löschen</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.saveBtn, (!isValid || saving) && styles.saveBtnDisabled]} onPress={handleSave} disabled={!isValid || saving}>
-              {saving ? <ActivityIndicator size="small" color={colors.background} /> : <Text style={styles.saveBtnText}>Speichern</Text>}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </GestureHandlerRootView>
 
       <ConfirmSheet visible={deleteConfirmVisible} title={`„${item.name}" löschen?`} actions={[{ label: 'Eintrag löschen', destructive: true, onPress: () => { setDeleteConfirmVisible(false); onClose(); onDeleted(mealId, item.id, item.name); } }]} onClose={() => setDeleteConfirmVisible(false)} />
-      {moreActions.length > 0 && <ConfirmSheet visible={moreActionsVisible} title={item.name} actions={moreActions} onClose={() => setMoreActionsVisible(false)} />}
+      <ConfirmSheet visible={moreActionsVisible} title={item.name} actions={moreActions} onClose={() => setMoreActionsVisible(false)} />
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  gestureRoot: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
   avoidingView: { justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, paddingHorizontal: spacing.md, paddingTop: spacing.sm, maxHeight: '90%' },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: 'center', marginBottom: spacing.md },
-  scrollContent: { paddingBottom: spacing.md },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: spacing.md, paddingTop: 0 },
+  handleArea: { alignItems: 'center', paddingTop: 5, paddingBottom: 4, marginBottom: 0 },
+  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border },
+  // Header zone
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 1, paddingHorizontal: 0 },
   itemName: { ...typography.h3, color: colors.text },
-  contextLabel: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
-  moreBtn: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', marginLeft: spacing.sm },
-  moreBtnText: { fontSize: 18, color: colors.textSecondary, letterSpacing: 2, lineHeight: 22 },
-  segmentedControl: { flexDirection: 'row', backgroundColor: colors.surfaceMuted, borderRadius: radius.md, padding: 3, marginBottom: spacing.sm },
-  segment: { flex: 1, paddingVertical: spacing.xs + 2, alignItems: 'center', borderRadius: radius.sm },
-  segmentActive: { backgroundColor: colors.surface },
+  headerActionBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', marginLeft: 6 },
+  headerActionText: { fontSize: 16, color: colors.textMuted },
+  portionSubtitle: { ...typography.caption, color: colors.textMuted, marginBottom: 8 },
+  // Toggle
+  segmentedControl: { flexDirection: 'row', backgroundColor: colors.surfaceMuted, borderRadius: radius.md, padding: 3, marginBottom: 4 },
+  segment: { flex: 1, paddingVertical: spacing.xs + 1, alignItems: 'center', borderRadius: radius.sm },
+  segmentActive: { backgroundColor: colors.primary },
   segmentText: { ...typography.body2, color: colors.textSecondary },
-  segmentTextActive: { color: colors.text, fontWeight: '600' as const },
-  portionHint: { ...typography.caption, color: colors.textSecondary, textAlign: 'center', marginBottom: spacing.sm },
-  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg, marginVertical: spacing.md },
-  stepBtn: { width: 52, height: 52, borderRadius: radius.lg, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
-  stepBtnText: { fontSize: 28, color: colors.text, fontWeight: '300' as const, lineHeight: 32 },
-  amountDisplay: { alignItems: 'center', minWidth: 100 },
-  amountValue: { ...typography.display, color: colors.text },
-  amountUnit: { ...typography.caption, color: colors.textMuted, marginTop: -4 },
-  amountInput: { ...typography.display, color: colors.text, backgroundColor: colors.surfaceMuted, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, textAlign: 'center', minWidth: 120 },
-  stepHint: { ...typography.caption, color: colors.textDisabled, textAlign: 'center', marginBottom: spacing.md },
-  preview: { backgroundColor: colors.surfaceMuted, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
-  previewTitle: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm, textTransform: 'uppercase' as const, letterSpacing: 0.8 },
-  actionBar: { flexDirection: 'row', gap: spacing.sm, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  deleteBtn: { flex: 1, paddingVertical: spacing.md, alignItems: 'center', borderRadius: radius.md, borderWidth: 1, borderColor: colors.negative },
-  deleteBtnText: { ...typography.button, color: colors.negative },
-  saveBtn: { flex: 2, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center' },
+  segmentTextActive: { color: colors.white, fontWeight: '600' as const },
+  // Stepper
+  stepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg, marginTop: 0, marginBottom: 4 },
+  stepBtn: { width: 44, height: 44, borderRadius: radius.lg, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.border },
+  stepBtnText: { fontSize: 22, color: colors.text, fontWeight: '400' as const, lineHeight: 26 },
+  amountDisplay: { alignItems: 'center', minWidth: 90 },
+  amountValue: { fontSize: 36, fontWeight: '700' as const, color: colors.text, letterSpacing: -0.5, fontVariant: ['tabular-nums'] as const },
+  amountUnit: { ...typography.caption, color: colors.textMuted, marginTop: -2 },
+  amountInput: { fontSize: 36, fontWeight: '700' as const, color: colors.text, backgroundColor: colors.surfaceMuted, borderRadius: radius.md, borderWidth: 1, borderColor: colors.primary, paddingHorizontal: spacing.md, paddingVertical: spacing.xs, textAlign: 'center', minWidth: 110 },
+  // Makro-Bar
+  macroBar: { flexDirection: 'row', backgroundColor: colors.surfaceMuted, borderRadius: radius.md, overflow: 'hidden', marginBottom: 4 },
+  macroHeroSlot: { flex: 1.3, alignItems: 'center', paddingVertical: 8 },
+  macroSlot: { flex: 1, alignItems: 'center', paddingVertical: 8 },
+  macroHeroVal: { fontSize: 20, fontWeight: '700' as const, color: colors.primary, fontVariant: ['tabular-nums'] as const },
+  macroVal: { fontSize: 14, fontWeight: '600' as const, color: colors.text, fontVariant: ['tabular-nums'] as const },
+  macroLabel: { ...typography.caption, color: colors.textMuted, marginTop: 1 },
+  macroDivider: { width: 1, backgroundColor: colors.border, marginVertical: 8 },
+  // Action bar
+  actionBar: { flexDirection: 'row', paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border },
+  saveBtn: { flex: 1, backgroundColor: colors.primary, borderRadius: radius.md, paddingVertical: 10, alignItems: 'center' },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { ...typography.button, color: colors.white },
 });

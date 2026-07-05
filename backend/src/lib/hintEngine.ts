@@ -37,9 +37,9 @@ const MOTIVATION_HINTS: Array<{ id: HintId; text: string; emoji: string }> = [
 
 const COOLDOWN_DAYS: Partial<Record<HintId, number>> = {
   H13: 1,
-  H14: 2,
   H15: 2,
   H16: 2,
+  H17: 2,
   M0: 30, M1: 30, M2: 30, M3: 30, M4: 30,
   M5: 30, M6: 30, M7: 30, M8: 30, M9: 30,
 };
@@ -137,7 +137,9 @@ export interface EvaluateHintResult {
 }
 
 export function evaluateHint(context: HintContext, state: HintState | null): EvaluateHintResult {
-  const { meals, summary, targets, dayType, currentHour } = context;
+  const { summary, targets, dayType, currentHour } = context;
+  // Guard: Cosmos documents written before items array existed may omit the field.
+  const meals: Meal[] = context.meals.map((m) => ({ ...m, items: m.items ?? [] }));
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 
   const cooldownHistory: Partial<Record<HintId, string>> = state?.cooldownHistory ?? {};
@@ -208,17 +210,17 @@ export function evaluateHint(context: HintContext, state: HintState | null): Eva
   }
 
   // H9: No fruit AND no vegetable present (only when category data exists)
-  if (!hint && anyHasCategoryData && !categories.has('fruit') && !categories.has('vegetable')) {
+  if (!hint && anyHasCategoryData && !categories.has('Fruits') && !categories.has('Vegetables')) {
     hint = makeHint('H9', 'Etwas Obst oder Gemüse würde deinen heutigen Tag noch abrunden.', '🌾', 'orientation');
   }
 
   // H10: At least one fruit present
-  if (!hint && categories.has('fruit')) {
+  if (!hint && categories.has('Fruits')) {
     hint = makeHint('H10', 'Schön, dass heute Obst auf deinem Speiseplan steht.', '🍓', 'orientation');
   }
 
   // H11: At least one vegetable present
-  if (!hint && categories.has('vegetable')) {
+  if (!hint && categories.has('Vegetables')) {
     hint = makeHint('H11', 'Heute ist bereits ordentlich Gemüse dabei.', '🥦', 'orientation');
   }
 

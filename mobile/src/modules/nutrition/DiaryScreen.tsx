@@ -15,9 +15,11 @@ import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/share
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { DayStoryCard } from '../../shared/components/DayStoryCard';
+import type { MealMacroSummary } from '../../shared/components/DayStoryCard';
 import type { MacroTarget } from '../../shared/components/MacroSummaryCard';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
+import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -36,9 +38,9 @@ const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'p
 // Mahlzeiten, die als leere State-B-Karten immer sichtbar sein sollen (Phase 6)
 export const DEFAULT_MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner'];
 const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
+  breakfast: 'Frühstück',
+  lunch: 'Mittagessen',
+  dinner: 'Abendessen',
   snack: 'Snack',
   preworkout: 'Pre-Workout',
   postworkout: 'Post-Workout',
@@ -65,8 +67,8 @@ function offsetDate(iso: string, days: number): string {
 function formatDateLabel(iso: string): string {
   const today = isoToday();
   const yesterday = offsetDate(today, -1);
-  if (iso === today) return 'Today';
-  if (iso === yesterday) return 'Yesterday';
+  if (iso === today) return 'Heute';
+  if (iso === yesterday) return 'Gestern';
   const [y, m, d] = iso.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   return date.toLocaleDateString(undefined, { weekday: 'short', day: '2-digit', month: 'short' });
@@ -125,23 +127,25 @@ function MealCard({
 }) {
   const items = meal.items ?? [];
   const totalCal = items.reduce((s, i) => s + i.macros.calories, 0);
-  const totalProtein = items.reduce((s, i) => s + i.macros.protein, 0);
   const isEmpty = items.length === 0;
   const isCurrent = isToday && isEmpty && getCurrentMealType() === meal.type;
 
   // State B: compact single-row for empty meals
   if (isEmpty) {
     return (
-      <TouchableOpacity
-        style={[styles.mealCardCompact, isCurrent && styles.mealCardCurrent]}
-        onPress={() => onAddItem(meal.id, meal.name)}
-        onLongPress={() => onDeleteMeal(meal)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
-        <Text style={styles.mealName}>{meal.name}</Text>
-        <Text style={styles.compactAddHint}>+ Hinzufügen</Text>
-      </TouchableOpacity>
+      <View style={styles.mealCardCompactWrapper}>
+        <SwipeableRow onDelete={() => onDeleteMeal(meal)}>
+          <TouchableOpacity
+            style={[styles.mealCardCompact, isCurrent && styles.mealCardCurrent]}
+            onPress={() => onAddItem(meal.id, meal.name)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
+            <Text style={styles.mealName}>{meal.name}</Text>
+            <Text style={styles.compactAddHint}>+ Hinzufügen</Text>
+          </TouchableOpacity>
+        </SwipeableRow>
+      </View>
     );
   }
 
@@ -155,25 +159,17 @@ function MealCard({
           <Text style={styles.mealName}>{meal.name}</Text>
           {items.length > 0 && (
             <Text style={styles.mealCal}>
-              {Math.round(totalCal)} kcal · {Math.round(totalProtein)} g Eiweiß
+              {Math.round(totalCal)} kcal
+              <Text style={styles.mealItemCount}> · {items.length} {items.length === 1 ? 'Eintrag' : 'Einträge'}</Text>
             </Text>
           )}
         </View>
         <TouchableOpacity
-          onPress={() => onAddItem(meal.id, meal.name)}
-          style={styles.addItemBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.addItemBtnText}>+ Add</Text>
-        </TouchableOpacity>
-        {/* Long press on ✕ to delete meal via ConfirmSheet */}
-        <TouchableOpacity
-          onLongPress={() => onDeleteMeal(meal)}
           onPress={() => onDeleteMeal(meal)}
-          style={styles.deleteMealBtn}
+          style={styles.moreBtn}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Text style={styles.deleteMealBtnText}>✕</Text>
+          <Text style={styles.moreBtnText}>···</Text>
         </TouchableOpacity>
       </View>
       {/* Items — swipe left to delete, tap to edit */}
@@ -199,7 +195,7 @@ function MealCard({
               <Text style={styles.itemMacros}>
                 {Math.round(item.macros.calories)} kcal · {Math.round(item.macros.protein)} g Eiweiß
               </Text>
-              {/* AI-meal-estimate: badge + Aufschlüsseln button */}
+              {/* AI-meal-estimate: badge only */}
               {item.sourceType === 'ai-meal-estimate' && (
                 <View style={styles.aiItemRow}>
                   <View style={styles.aiBadge}>
@@ -207,13 +203,6 @@ function MealCard({
                       {item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '✨ KI-Schätzung'}
                     </Text>
                   </View>
-                  <TouchableOpacity
-                    style={styles.refineBtn}
-                    onPress={() => onAddItem(meal.id, meal.name)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Text style={styles.refineBtnText}>Aufschlüsseln →</Text>
-                  </TouchableOpacity>
                 </View>
               )}
             </View>
@@ -221,15 +210,13 @@ function MealCard({
         </SwipeableRow>
         </AnimatedItem>
       ))}
-      {items.length === 0 && (
-        <Text style={styles.emptyItems}>Noch leer — tippe + Hinzufügen</Text>
-      )}
-      {/* Inline add link at bottom of filled card */}
+      {/* Footer add row — slot-style, same rhythm as item rows */}
       <TouchableOpacity
         style={styles.inlineAddBtn}
         onPress={() => onAddItem(meal.id, meal.name)}
+        activeOpacity={0.6}
       >
-        <Text style={styles.inlineAddBtnText}>+ Hinzufügen</Text>
+        <Text style={styles.inlineAddBtnText}>+ Eintrag hinzufügen</Text>
       </TouchableOpacity>
     </View>
   );
@@ -375,7 +362,8 @@ export default function DiaryScreen() {
           label: 'Mahlzeit löschen',
           destructive: true,
           onPress: async () => {
-            setData((prev) => prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== meal.id) } : prev);
+              void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              setData((prev) => prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== meal.id) } : prev);
             try {
               await diaryApi.deleteMeal(meal.id);
               void loadDay(date);
@@ -410,8 +398,7 @@ export default function DiaryScreen() {
       });
     showSnackbar({
       message: `„${name}" entfernt`,
-      onUndo: () => {
-        if (snapshot) setData(snapshot);
+      onUndo: () => {        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);        if (snapshot) setData(snapshot);
         void loadDay(date);
       },
     });
@@ -437,16 +424,34 @@ export default function DiaryScreen() {
     : [];
 
   const existingTypes = new Set(orderedMeals.map((m) => m.type));
-  const missingTypes = MEAL_ORDER.filter((t) => !existingTypes.has(t));
+  // Context-aware chip filter: training day → all missing types; rest/unknown → hide Pre/Post-Workout
+  const visibleMealTypes: MealType[] = dayType === 'training'
+    ? ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack']
+    : ['breakfast', 'lunch', 'dinner', 'snack'];
+  const missingTypes = visibleMealTypes.filter((t) => !existingTypes.has(t));
+
+  // Per-meal macro sums for the breakdown sheet in DayStoryCard
+  const mealSummaries: MealMacroSummary[] = orderedMeals
+    .filter((m) => (m.items ?? []).length > 0)
+    .map((m) => ({
+      type: m.type,
+      name: m.name,
+      macros: (m.items ?? []).reduce(
+        (acc, i) => ({
+          calories: acc.calories + i.macros.calories,
+          protein:  acc.protein  + i.macros.protein,
+          carbs:    acc.carbs    + i.macros.carbs,
+          fat:      acc.fat      + i.macros.fat,
+          fiber:    acc.fiber    + i.macros.fiber,
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      ),
+      items: (m.items ?? []).map((i) => ({ name: i.name, macros: i.macros })),
+    }));
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Nutrition Diary</Text>
-      </View>
-
-      {/* Date navigator — swipe left/right to change day */}
+      {/* Header + Date navigator — unified single row */}
       <GestureDetector gesture={Gesture.Pan()
         .activeOffsetX([-20, 20])
         .failOffsetY([-20, 20])
@@ -459,14 +464,21 @@ export default function DiaryScreen() {
           }
         })
       }>
-        <View style={styles.dateNav}>
-          <TouchableOpacity onPress={prevDay} style={styles.dateNavBtn}>
-            <Text style={styles.dateNavArrow}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.dateLabel}>{formatDateLabel(date)}</Text>
-          <TouchableOpacity onPress={nextDay} style={[styles.dateNavBtn, isToday && styles.dateNavBtnDisabled]} disabled={isToday}>
-            <Text style={[styles.dateNavArrow, isToday && styles.dateNavArrowDisabled]}>›</Text>
-          </TouchableOpacity>
+        <View style={styles.headerRow}>
+          {/* Left: screen eyebrow label */}
+          <Text style={styles.headerEyebrow}>Ernährung</Text>
+          {/* Center: date navigator */}
+          <View style={styles.dateNavCenter}>
+            <TouchableOpacity onPress={prevDay} style={styles.dateNavBtn}>
+              <Text style={styles.dateNavArrow}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.dateLabel}>{formatDateLabel(date)}</Text>
+            <TouchableOpacity onPress={nextDay} style={[styles.dateNavBtn, isToday && styles.dateNavBtnDisabled]} disabled={isToday}>
+              <Text style={[styles.dateNavArrow, isToday && styles.dateNavArrowDisabled]}>›</Text>
+            </TouchableOpacity>
+          </View>
+          {/* Right: spacer mirrors eyebrow width for optical centering */}
+          <View style={styles.headerSpacer} />
         </View>
       </GestureDetector>
 
@@ -479,7 +491,7 @@ export default function DiaryScreen() {
         <View style={styles.center}>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity onPress={() => loadDay(date)} style={styles.retryBtn}>
-            <Text style={styles.retryBtnText}>Retry</Text>
+              <Text style={styles.retryBtnText}>Erneut versuchen</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -496,6 +508,7 @@ export default function DiaryScreen() {
               summary={data.summary}
               target={todayTargets ?? { calories: 2000, proteinG: 150, carbsG: 200, fatG: 70, fiberG: 25 } satisfies MacroTarget}
               meals={orderedMeals.map((m) => ({ type: m.type, items: m.items ?? [] }))}
+              mealSummaries={mealSummaries}
               scrollRef={scrollViewRef}
               mealOffsets={mealOffsets}
               hint={data.hint}
@@ -522,7 +535,7 @@ export default function DiaryScreen() {
           {/* Add meal buttons for missing types */}
           {missingTypes.length > 0 && (
             <View style={styles.addMealSection}>
-              <Text style={styles.addMealSectionTitle}>Add a meal</Text>
+              <Text style={styles.addMealSectionTitle}>Weitere Mahlzeit</Text>
               <View style={styles.addMealGrid}>
                 {missingTypes.map((type) => (
                   <TouchableOpacity key={type} onPress={() => handleAddMeal(type)} style={styles.addMealChip}>
@@ -616,18 +629,30 @@ export default function DiaryScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  header: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  headerTitle: { ...typography.h2, color: colors.text },
-  dateNav: {
+  // ─── Unified header row ───
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  headerEyebrow: {
+    ...typography.caption,
+    fontWeight: '600' as const,
+    color: colors.textMuted,
+    width: 72,
+  },
+  dateNavCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  headerSpacer: {
+    width: 72,
   },
   dateNavBtn: {
     width: 36,
@@ -664,10 +689,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     marginBottom: spacing.sm,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  // Meal card — State B wrapper: clips SwipeableRow to card border-radius
+  mealCardCompactWrapper: {
+    borderRadius: radius.xl,
+    overflow: 'hidden' as const,
+    marginBottom: spacing.sm,
   },
   // Meal card — State B (compact empty)
   mealCardCompact: {
@@ -677,7 +708,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.md,
-    marginBottom: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -693,31 +723,31 @@ const styles = StyleSheet.create({
   },
   // Inline add link at bottom of filled card
   inlineAddBtn: {
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 4,
+    paddingHorizontal: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    alignItems: 'center',
-    marginTop: spacing.xs,
   },
-  inlineAddBtnText: { ...typography.caption, color: colors.primary, fontWeight: '600' },
-  mealHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
-  mealIcon: { fontSize: 20, marginRight: spacing.sm },
+  inlineAddBtnText: { ...typography.caption, color: colors.primary, fontWeight: '600' as const },
+  mealHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
+  mealIcon: { fontSize: 20, marginRight: spacing.sm, marginTop: 2 },
   mealName: { ...typography.h3, color: colors.text },
-  mealCal: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
-  addItemBtn: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.sm,
-    marginRight: spacing.sm,
+  mealCal: { ...typography.caption, color: colors.textSecondary, marginTop: 2, fontVariant: ['tabular-nums'] as const },
+  mealItemCount: { ...typography.caption, color: colors.textMuted },
+
+  moreBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addItemBtnText: { ...typography.caption, color: colors.primary, fontWeight: '600' },
-  deleteMealBtn: { padding: 4 },
-  deleteMealBtnText: { ...typography.caption, color: colors.textMuted },
+  moreBtnText: { fontSize: 16, color: colors.textSecondary, letterSpacing: 3, lineHeight: 18 },
   itemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.sm + 4,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -728,8 +758,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   itemName: { ...typography.body2, color: colors.text, fontWeight: '600' as const, flex: 1 },
-  itemAmount: { ...typography.caption, color: colors.textMuted, flexShrink: 0, marginLeft: spacing.xs },
-  itemMacros: { ...typography.caption, color: colors.textSecondary, marginBottom: 2 },
+  itemAmount: { ...typography.caption, color: colors.textMuted, flexShrink: 0, marginLeft: spacing.xs, fontVariant: ['tabular-nums'] as const },
+  itemMacros: { ...typography.caption, color: colors.textSecondary, marginBottom: 2, fontVariant: ['tabular-nums'] as const },
   aiItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 },
   aiBadge: {
     backgroundColor: colors.primarySoft,
@@ -738,16 +768,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   aiBadgeText: { ...typography.caption, color: colors.primary, fontWeight: '600' as const },
-  refineBtn: {
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  refineBtnText: { ...typography.caption, color: colors.primary, fontWeight: '600' as const },
   deleteItemText: { ...typography.body2, color: colors.textMuted },
-  emptyItems: { ...typography.caption, color: colors.textMuted, fontStyle: 'italic' as const, marginTop: spacing.xs },
 
   // Add meal section
   addMealSection: { marginTop: spacing.sm, marginBottom: spacing.sm },
@@ -765,6 +786,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   addMealChipIcon: { fontSize: 16 },
-  addMealChipLabel: { ...typography.button, color: colors.text },
+  addMealChipLabel: { ...typography.body2, color: colors.text },
 });
 

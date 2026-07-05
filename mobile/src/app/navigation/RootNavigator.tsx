@@ -169,7 +169,10 @@ export function RootNavigator() {
         <Tab.Screen
           name="Nutrition"
           component={DiaryScreen}
-          options={{ tabBarIcon: ({ color, size }) => <NutritionIcon color={color} size={size} /> }}
+          options={{
+            tabBarLabel: 'Ernährung',
+            tabBarIcon: ({ color, size }) => <NutritionIcon color={color} size={size} />,
+          }}
         />
         <Tab.Screen
           name="Recipes"

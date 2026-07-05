@@ -2,27 +2,43 @@
 // protein progress, meal completion chips, and contextual coaching text.
 // Used in DiaryScreen only. MacroSummaryCard is unchanged for HomeScreen.
 
-import React, { useRef, RefObject, useEffect } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
-import Svg, { Path } from 'react-native-svg';
+import React, { RefObject, useState } from 'react';
+import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Path, Circle, Line } from 'react-native-svg';
 import type { DiaryDayResponse, MealType } from '@fittrack/shared';
 import type { HintResult } from '../../../../shared/types/hint';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import type { MacroTarget } from './MacroSummaryCard';
 
+// ─── Public types ─────────────────────────────────────────────────────────────
+export type MacroKey = 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber';
+export type MealMacroItem = {
+  name: string;
+  macros: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+};
+export type MealMacroSummary = {
+  type: MealType;
+  name: string;
+  macros: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+  items: MealMacroItem[];
+};
+
 // ─── Semi-Circle Gauge ────────────────────────────────────────────────────────
-//  270° sweep centered at top, stroked arc using SVG Path
-const GAUGE_SIZE = 140;
-const STROKE = 12;
-const R = (GAUGE_SIZE - STROKE) / 2;
-const CX = GAUGE_SIZE / 2;
-const CY = GAUGE_SIZE / 2;
+//  270° sweep. Inner ring = calories (12 px). Outer ring = protein (8 px).
+const GAUGE_SIZE = 168;
+const STROKE_CAL = 12;   // calorie ring stroke width
+const STROKE_PRO = 8;    // protein ring stroke width
+const GAP = 5;           // gap between rings
+const R_CAL = 64;        // calorie ring radius (= (old 140 − 12) / 2)
+const R_PRO = R_CAL + STROKE_CAL / 2 + GAP + STROKE_PRO / 2; // 64+6+5+4 = 79
+const CX = GAUGE_SIZE / 2; // 84
+const CY = GAUGE_SIZE / 2; // 84
+const PROTEIN_COLOR = '#3B82F6';
+const CARBS_COLOR   = '#F97316'; // orange — warm energy, distinct from primary
+const FAT_COLOR     = '#F59E0B'; // amber — golden, distinct from orange
+const FIBER_COLOR   = '#8B5CF6'; // violet — cool, plant-associated
+// Ambient ring sits just outside the protein ring
+const R_AMBIENT = R_PRO + STROKE_PRO / 2 + 3;
 
 // Arc from -225° to +45° (270° sweep, bottom gap at bottom)
 // Start angle: 135°, End angle: 405° (=45°)
@@ -49,57 +65,63 @@ function gaugeColor(pct: number): string {
   return colors.primary;
 }
 
-function SemiCircleGauge({ pct }: { pct: number }) {
-  // Animate pct from 0 → target on mount and when pct changes
-  const animPct = useSharedValue(0);
-  useEffect(() => {
-    animPct.value = withTiming(Math.min(pct, 1), {
-      duration: 400,
-      easing: Easing.out(Easing.cubic),
-    });
-  }, [pct]);
+function SemiCircleGauge({ calPct, proteinPct }: { calPct: number; proteinPct: number }) {
+  const clampedCal = Math.min(calPct, 1);
+  const clampedPro = Math.min(proteinPct, 1);
 
-  // We can't animate SVG path d attribute directly with Reanimated without AnimatedProps.
-  // Instead, render the gauge using Animated.View scaling the fill arc container.
-  // Simple approach: render both paths statically but use an animated opacity/mask layer.
-  // Cleanest worklet-safe approach: use a JS-driven state for the fill path string.
-  // We'll use React state updated via useEffect on animPct changes → not worklet-safe.
-  // Best simple approach: use Animated.View with scaleX trick on the fill arc.
-  // We render the fill arc at full sweep, then clip it with a white overlay that shrinks.
+  const calTrack = arcPath(TRACK_START, TRACK_START + TRACK_SWEEP, R_CAL);
+  const calFill = clampedCal > 0
+    ? arcPath(TRACK_START, TRACK_START + Math.max(TRACK_SWEEP * clampedCal, 0.5), R_CAL)
+    : null;
 
-  const clampedPct = Math.min(pct, 1);
-  const fillSweep = TRACK_SWEEP * clampedPct;
-  const trackPath = arcPath(TRACK_START, TRACK_START + TRACK_SWEEP, R);
-  const fillPath = fillSweep > 0.5
-    ? arcPath(TRACK_START, TRACK_START + fillSweep, R)
-    : arcPath(TRACK_START, TRACK_START + 0.5, R);
+  const proTrack = arcPath(TRACK_START, TRACK_START + TRACK_SWEEP, R_PRO);
+  const proFill = clampedPro > 0
+    ? arcPath(TRACK_START, TRACK_START + Math.max(TRACK_SWEEP * clampedPro, 0.5), R_PRO)
+    : null;
 
-  // Animated container scales from 0→1 scaleX (pivot left) to reveal fill arc
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scaleX: animPct.value }],
-    transformOrigin: 'left center',
-  }));
+  // Tick marks at 25 %, 50 %, 75 % of the calorie ring sweep
+  const tickAngles = [0.25, 0.5, 0.75].map((f) => TRACK_START + TRACK_SWEEP * f);
+  const tickInner = R_CAL - 5;
+  const tickOuter = R_CAL + 5;
 
   return (
     <Svg width={GAUGE_SIZE} height={GAUGE_SIZE}>
-      {/* Track */}
-      <Path
-        d={trackPath}
+      {/* Ambient ring — full circle, very subtle */}
+      <Circle
+        cx={CX} cy={CY} r={R_AMBIENT}
         fill="none"
         stroke={colors.border ?? '#2A3A2A'}
-        strokeWidth={STROKE}
-        strokeLinecap="round"
+        strokeWidth={1}
+        opacity={0.4}
       />
-      {/* Fill — pre-rendered at target, revealed via Animated.View scale */}
-      {clampedPct > 0 && (
-        <Path
-          d={fillPath}
-          fill="none"
-          stroke={gaugeColor(pct)}
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-        />
+      {/* Protein ring — outer track */}
+      <Path d={proTrack} fill="none" stroke={colors.border ?? '#2A3A2A'} strokeWidth={STROKE_PRO} strokeLinecap="round" />
+      {/* Protein ring — outer fill */}
+      {proFill && (
+        <Path d={proFill} fill="none" stroke={PROTEIN_COLOR} strokeWidth={STROKE_PRO} strokeLinecap="round" />
       )}
+      {/* Calorie ring — inner track */}
+      <Path d={calTrack} fill="none" stroke={colors.border ?? '#2A3A2A'} strokeWidth={STROKE_CAL} strokeLinecap="round" />
+      {/* Calorie ring — inner fill */}
+      {calFill && (
+        <Path d={calFill} fill="none" stroke={gaugeColor(calPct)} strokeWidth={STROKE_CAL} strokeLinecap="round" />
+      )}
+      {/* Tick marks at 25 % / 50 % / 75 % */}
+      {tickAngles.map((angle) => {
+        const inner = polarToXY(angle, tickInner);
+        const outer = polarToXY(angle, tickOuter);
+        return (
+          <Line
+            key={angle}
+            x1={inner.x} y1={inner.y}
+            x2={outer.x} y2={outer.y}
+            stroke={colors.border ?? '#2A3A2A'}
+            strokeWidth={1.5}
+            opacity={0.7}
+            strokeLinecap="round"
+          />
+        );
+      })}
     </Svg>
   );
 }
@@ -127,30 +149,383 @@ function MealChip({
       activeOpacity={0.7}
     >
       <Text style={[styles.chipText, filled ? styles.chipTextFilled : styles.chipTextEmpty]}>
-        {filled ? '✓ ' : '— '}{label}
+        {filled ? '✓ ' : '○ '}{label}
       </Text>
     </TouchableOpacity>
   );
 }
 
+// ─── Macro line ───────────────────────────────────────────────────────────────
+// isCalorie: kcal row keeps its ring-colour on the value; all others use colors.text
+function MacroLine({
+  color, label, value, target, unit, isCalorie, onPress,
+}: {
+  color: string; label: string; value: number; target: number; unit: string;
+  isCalorie?: boolean; onPress?: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={styles.macroLine}
+      onPress={onPress}
+      activeOpacity={onPress ? 0.6 : 1}
+      disabled={!onPress}
+    >
+      <View style={[styles.macroPill, { backgroundColor: color }]} />
+      <Text style={styles.macroLabel}>{label}</Text>
+      <View style={styles.macroValues}>
+        <Text style={[styles.macroValue, isCalorie ? { color } : null]}>
+          {Math.round(value)}
+        </Text>
+        <Text style={styles.macroTarget}>
+          {' / '}{target}{unit ? ` ${unit}` : ''}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+
+// ─── Macro meta (labels, units, colors) ───────────────────────────────────────
+const MACRO_META = {
+  calories: { label: 'kcal',  unit: '',  color: '#22c55e' },
+  protein:  { label: 'EW',    unit: 'g', color: '#3B82F6' },
+  carbs:    { label: 'KH',    unit: 'g', color: '#F97316' },
+  fat:      { label: 'Fett',  unit: 'g', color: '#F59E0B' },
+  fiber:    { label: 'Bst',   unit: 'g', color: '#8B5CF6' },
+} as const satisfies Record<MacroKey, { label: string; unit: string; color: string }>;
+
+const MEAL_ICON: Partial<Record<MealType, string>> = {
+  breakfast:   '☀️',
+  lunch:       '🌞',
+  dinner:      '🌙',
+  snack:       '🍎',
+  preworkout:  '⚡',
+  postworkout: '💪',
+};
+
+// ─── MacroBreakdownSheet ───────────────────────────────────────────────────────
+// Slide-up modal showing per-meal contribution bars for a selected macro.
+// Tap a meal row to expand an accordion with individual items, sorted by macro.
+function MacroBreakdownSheet({
+  visible, macroKey, mealSummaries, totalConsumed, target, onClose,
+}: {
+  visible: boolean;
+  macroKey: MacroKey;
+  mealSummaries: MealMacroSummary[];
+  totalConsumed: number;
+  target: number;
+  onClose: () => void;
+}) {
+  const [expandedMeal, setExpandedMeal] = useState<MealType | null>(null);
+  const meta = MACRO_META[macroKey];
+  const unit = meta.unit ? ` ${meta.unit}` : '';
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={bsStyles.backdrop} activeOpacity={1} onPress={onClose} />
+      <View style={bsStyles.sheet}>
+        {/* Header */}
+        <View style={bsStyles.header}>
+          <Text style={bsStyles.title}>{meta.label} · Aufschlüsselung</Text>
+          <TouchableOpacity
+            onPress={onClose}
+            style={bsStyles.closeBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Text style={bsStyles.closeBtnText}>✕</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Per-meal rows */}
+        {mealSummaries.length === 0 ? (
+          <Text style={bsStyles.empty}>Noch keine Einträge für heute</Text>
+        ) : (
+          mealSummaries.map((ms) => {
+            const value = ms.macros[macroKey];
+            const pct = totalConsumed > 0 ? Math.min(value / totalConsumed, 1) : 0;
+            const icon = MEAL_ICON[ms.type] ?? '🍽️';
+            const isExpanded = expandedMeal === ms.type;
+            const sortedItems = [...ms.items].sort(
+              (a, b) => b.macros[macroKey] - a.macros[macroKey],
+            );
+            return (
+              <View key={ms.type}>
+                {/* Meal header row — tappable */}
+                <TouchableOpacity
+                  style={[bsStyles.mealRow, isExpanded && bsStyles.mealRowExpanded]}
+                  onPress={() => setExpandedMeal(isExpanded ? null : ms.type)}
+                  activeOpacity={0.6}
+                >
+                  <Text style={bsStyles.mealIcon}>{icon}</Text>
+                  <View style={bsStyles.mealInfo}>
+                    <View style={bsStyles.mealRowHeader}>
+                      <View style={bsStyles.mealNameRow}>
+                        <Text style={bsStyles.mealName}>{ms.name}</Text>
+                        {/* Item count badge */}
+                        <View style={bsStyles.countBadge}>
+                          <Text style={bsStyles.countBadgeText}>{ms.items.length}</Text>
+                        </View>
+                      </View>
+                      <View style={bsStyles.mealValueRow}>
+                        <Text style={bsStyles.mealValue}>
+                          {Math.round(value)}{unit}
+                          <Text style={bsStyles.mealPct}> ({Math.round(pct * 100)} %)</Text>
+                        </Text>
+                        <Text style={[bsStyles.chevron, isExpanded && bsStyles.chevronOpen]}>
+                          ▾
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={bsStyles.barTrack}>
+                      <View
+                        style={[
+                          bsStyles.barFill,
+                          { width: `${Math.round(pct * 100)}%`, backgroundColor: meta.color },
+                        ]}
+                      />
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Accordion: sorted items */}
+                {isExpanded && (
+                  <View style={[bsStyles.accordion, { borderLeftWidth: 2, borderLeftColor: meta.color }]}>
+                    {sortedItems.map((item, idx) => {
+                      const itemVal = item.macros[macroKey];
+                      const itemPct = value > 0 ? Math.min(itemVal / value, 1) : 0;
+                      return (
+                        <View key={idx} style={bsStyles.itemRow}>
+                          <View style={bsStyles.itemDot} />
+                          <Text style={bsStyles.itemName} numberOfLines={1}>{item.name}</Text>
+                          <Text style={bsStyles.itemValue}>
+                            {Math.round(itemVal)}{unit}
+                            <Text style={bsStyles.itemPct}> · {Math.round(itemPct * 100)} %</Text>
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            );
+          })
+        )}
+
+        {/* Footer: total / target */}
+        <View style={bsStyles.footer}>
+          <Text style={bsStyles.footerText}>
+            {'Gesamt: '}
+            <Text style={{ color: meta.color, fontWeight: '700' as const }}>
+              {Math.round(totalConsumed)}{unit}
+            </Text>
+            {'  /  Ziel: '}{Math.round(target)}{unit}
+          </Text>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const bsStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: spacing.md,
+    paddingBottom: 32,
+    paddingTop: spacing.sm,
+    maxHeight: '70%' as const,
+  },
+  header: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.sm,
+  },
+  title: {
+    ...typography.body1,
+    fontWeight: '700' as const,
+    color: colors.text,
+  },
+  closeBtn: {
+    width: 28,
+    height: 28,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  closeBtnText: {
+    fontSize: 16,
+    color: colors.textMuted,
+  },
+  empty: {
+    ...typography.body2,
+    color: colors.textMuted,
+    textAlign: 'center' as const,
+    paddingVertical: spacing.lg,
+  },
+  mealRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'flex-start' as const,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    marginHorizontal: -8,
+    borderRadius: 10,
+    gap: 10,
+  },
+  mealRowExpanded: {
+    // No background — chevron + badge are sufficient expanded signals
+  },
+  mealNameRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  countBadge: {
+    backgroundColor: colors.border,
+    borderRadius: 8,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 4,
+  },
+  countBadgeText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: colors.textMuted,
+    lineHeight: 13,
+  },
+  mealIcon: {
+    fontSize: 20,
+    lineHeight: 24,
+    width: 28,
+    textAlign: 'center' as const,
+  },
+  mealInfo: {
+    flex: 1,
+  },
+  mealRowHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: 5,
+  },
+  mealValueRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+  },
+  mealName: {
+    ...typography.body2,
+    fontWeight: '600' as const,
+    color: colors.text,
+  },
+  mealValue: {
+    ...typography.caption,
+    fontWeight: '700' as const,
+    color: colors.text,
+    fontVariant: ['tabular-nums'] as const,
+  },
+  mealPct: {
+    fontWeight: '400' as const,
+    color: colors.textMuted,
+  },
+  chevron: {
+    fontSize: 18,
+    fontWeight: '700' as const,
+    color: colors.primary,
+    lineHeight: 20,
+    transform: [{ rotate: '0deg' }],
+  },
+  chevronOpen: {
+    transform: [{ rotate: '180deg' }],
+  },
+  barTrack: {
+    height: 6,
+    backgroundColor: colors.border,
+    borderRadius: 3,
+    overflow: 'hidden' as const,
+  },
+  barFill: {
+    height: 6,
+    borderRadius: 3,
+  },
+  // ─── Accordion items ───
+  accordion: {
+    marginLeft: 38,
+    marginTop: 2,
+    marginBottom: 6,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingLeft: 12,
+    paddingRight: 8,
+    gap: 6,
+  },
+  itemRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 6,
+  },
+  itemDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.textMuted,
+    flexShrink: 0,
+  },
+  itemName: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  itemValue: {
+    ...typography.caption,
+    fontWeight: '600' as const,
+    color: colors.text,
+    fontVariant: ['tabular-nums'] as const,
+  },
+  itemPct: {
+    fontWeight: '400' as const,
+    color: colors.textMuted,
+  },
+  footer: {
+    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    alignItems: 'center' as const,
+  },
+  footerText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    fontVariant: ['tabular-nums'] as const,
+  },
+});
+
 // ─── Main component ───────────────────────────────────────────────────────────
 interface DayStoryCardProps {
   summary: DiaryDayResponse['summary'];
   target: MacroTarget;
-  /** Meals present on the day (to determine meal completion) */
   meals: Array<{ type: MealType; items: unknown[] }>;
-  /** Ref to the outer ScrollView so chips can scroll to meals */
+  mealSummaries: MealMacroSummary[];
   scrollRef: RefObject<ScrollView | null>;
-  /** Y-offsets of each meal card, keyed by MealType — for scroll-to behavior */
   mealOffsets: Partial<Record<MealType, number>>;
-  /** Rule-based hint from the backend hint engine */
   hint?: HintResult | null;
 }
 
-export function DayStoryCard({ summary, target, meals, scrollRef, mealOffsets, hint }: DayStoryCardProps) {
+export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef, mealOffsets, hint }: DayStoryCardProps) {
+  const [activeMacro, setActiveMacro] = useState<MacroKey | null>(null);
+
   const calConsumed = Math.round(summary.calories);
   const calTarget = target.calories;
-  const calPct = Math.min(calConsumed / (calTarget || 1), 1.5); // allow overflow
+  const calPct = Math.min(calConsumed / (calTarget || 1), 1.5);
   const calRemaining = Math.max(0, calTarget - calConsumed);
   const calOver = calConsumed > calTarget;
 
@@ -176,47 +551,30 @@ export function DayStoryCard({ summary, target, meals, scrollRef, mealOffsets, h
     <View style={styles.card}>
       {/* Main row: Gauge (left) + Protein (right) */}
       <View style={styles.mainRow}>
-        {/* Left: Semi-circle gauge */}
-        <View style={styles.gaugeWrapper}>
-          <SemiCircleGauge pct={calPct} />
-          {/* Centered label inside gauge */}
+        {/* Left: Semi-circle gauge — tappable for calorie breakdown */}
+        <TouchableOpacity
+          style={styles.gaugeWrapper}
+          onPress={() => setActiveMacro('calories')}
+          activeOpacity={0.8}
+        >
+          <SemiCircleGauge calPct={calPct} proteinPct={proteinPct} />
+          {/* Centered label inside gauge — 3-level hierarchy */}
           <View style={styles.gaugeCenter} pointerEvents="none">
-            <Text style={[styles.gaugeValue, calOver && styles.gaugeValueOver]}>
+            <Text style={[styles.gaugeValue, { color: gaugeColor(calPct) }]}>
               {calOver ? `+${calConsumed - calTarget}` : calRemaining}
             </Text>
-            <Text style={styles.gaugeLabel}>
-              {calOver ? 'kcal drüber' : 'kcal übrig'}
-            </Text>
+            <Text style={styles.gaugeUnit}>kcal</Text>
+            <Text style={styles.gaugeLabel}>{calOver ? 'drüber' : 'übrig'}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
-        {/* Right: Protein + secondary macros */}
-        <View style={styles.proteinCol}>
-          <Text style={styles.proteinValue}>{Math.round(protein)}</Text>
-          <Text style={styles.proteinUnit}>/ {proteinTarget} g Eiweiß</Text>
-
-          {/* Mini protein bar */}
-          <View style={styles.miniBarTrack}>
-            <View
-              style={[
-                styles.miniBarFill,
-                { width: `${Math.round(proteinPct * 100)}%` },
-              ]}
-            />
-          </View>
-
-          {/* Carbs + Fat secondary */}
-          <View style={styles.secondaryMacros}>
-            <Text style={styles.secondaryItem}>
-              <Text style={styles.secondaryLabel}>K </Text>
-              <Text style={styles.secondaryValue}>{Math.round(carbs)} g</Text>
-            </Text>
-            <Text style={styles.secondaryDot}>·</Text>
-            <Text style={styles.secondaryItem}>
-              <Text style={styles.secondaryLabel}>F </Text>
-              <Text style={styles.secondaryValue}>{Math.round(fat)} g</Text>
-            </Text>
-          </View>
+        {/* Right: Macro panel */}
+        <View style={styles.macroPanel}>
+          <MacroLine isCalorie color={gaugeColor(calPct)} label="kcal" value={calConsumed} target={calTarget} unit="" onPress={() => setActiveMacro('calories')} />
+          <MacroLine color={PROTEIN_COLOR}  label="EW"   value={protein}        target={proteinTarget}   unit="g" onPress={() => setActiveMacro('protein')} />
+          <MacroLine color={CARBS_COLOR}    label="KH"   value={carbs}          target={target.carbsG}  unit="g" onPress={() => setActiveMacro('carbs')} />
+          <MacroLine color={FAT_COLOR}      label="Fett" value={fat}            target={target.fatG}    unit="g" onPress={() => setActiveMacro('fat')} />
+          <MacroLine color={FIBER_COLOR}    label="Bst"  value={summary.fiber}  target={target.fiberG}  unit="g" onPress={() => setActiveMacro('fiber')} />
         </View>
       </View>
 
@@ -237,6 +595,30 @@ export function DayStoryCard({ summary, target, meals, scrollRef, mealOffsets, h
         <Text style={styles.contextText}>
           {hint.emoji}{'  '}{hint.text}
         </Text>
+      )}
+
+      {/* Macro Breakdown Sheet */}
+      {activeMacro && (
+        <MacroBreakdownSheet
+          visible={!!activeMacro}
+          macroKey={activeMacro}
+          mealSummaries={mealSummaries}
+          totalConsumed={
+            activeMacro === 'calories' ? summary.calories
+            : activeMacro === 'protein' ? summary.protein
+            : activeMacro === 'carbs'   ? summary.carbs
+            : activeMacro === 'fat'     ? summary.fat
+            : summary.fiber
+          }
+          target={
+            activeMacro === 'calories' ? target.calories
+            : activeMacro === 'protein' ? target.proteinG
+            : activeMacro === 'carbs'   ? target.carbsG
+            : activeMacro === 'fat'     ? target.fatG
+            : target.fiberG
+          }
+          onClose={() => setActiveMacro(null)}
+        />
       )}
     </View>
   );
@@ -272,69 +654,72 @@ const styles = StyleSheet.create({
   gaugeCenter: {
     position: 'absolute',
     alignItems: 'center',
-    // Nudge center label slightly upward to sit inside the arc visually
-    top: GAUGE_SIZE * 0.38,
+    // Nudge center label to sit inside the arc visually
+    top: GAUGE_SIZE * 0.35,
   },
   gaugeValue: {
-    ...typography.display,
+    fontSize: 34,
+    fontWeight: '800' as const,
     color: colors.text,
-    lineHeight: 36,
+    lineHeight: 38,
+    fontVariant: ['tabular-nums'] as const,
+    textAlign: 'center' as const,
   },
-  gaugeValueOver: {
-    color: colors.negative ?? '#E84040',
+  gaugeUnit: {
+    fontSize: 11,
+    fontWeight: '600' as const,
+    letterSpacing: 1.5,
+    color: colors.primary,
+    textTransform: 'uppercase' as const,
+    textAlign: 'center' as const,
+    marginTop: 1,
   },
   gaugeLabel: {
-    ...typography.overline,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '400' as const,
+    color: colors.textMuted,
+    textAlign: 'center' as const,
+    marginTop: 1,
   },
-  // Protein column
-  proteinCol: {
+  // Macro panel (right of gauge)
+  macroPanel: {
     flex: 1,
     justifyContent: 'center',
+    gap: 7,
   },
-  proteinValue: {
-    ...(typography.h1 ?? typography.h2),
-    color: colors.text,
-    lineHeight: 44,
-    fontWeight: '700',
-  },
-  proteinUnit: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  miniBarTrack: {
-    height: 6,
-    backgroundColor: colors.border,
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-  },
-  miniBarFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 3,
-  },
-  secondaryMacros: {
+  macroLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
-  secondaryItem: {
-    ...typography.caption,
+  // Vertical pill indicator replaces circular dot
+  macroPill: {
+    width: 3,
+    height: 14,
+    borderRadius: 2,
+    flexShrink: 0,
   },
-  secondaryLabel: {
-    color: colors.textMuted,
-  },
-  secondaryValue: {
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  secondaryDot: {
+  macroLabel: {
     ...typography.caption,
     color: colors.textMuted,
+    width: 32,
+  },
+  macroValues: {
+    flex: 1,
+    flexDirection: 'row' as const,
+    justifyContent: 'flex-end' as const,
+    alignItems: 'baseline' as const,
+  },
+  macroValue: {
+    ...typography.caption,
+    fontWeight: '700' as const,
+    color: colors.text,
+    fontVariant: ['tabular-nums'] as const,
+  },
+  macroTarget: {
+    ...typography.caption,
+    color: colors.textMuted,
+    fontVariant: ['tabular-nums'] as const,
   },
   // Meal chips
   chipRow: {
