@@ -201,6 +201,16 @@ export interface MilestoneIntelligence {
   unit: 'kg' | 'lbs';
   /** YYYY-MM-DD when it was first crossed */
   reachedAt: string;
+  /**
+   * Stufe 2: true when the 7-day moving average (≥4 measurements) also confirms
+   * the threshold is crossed. false = Stufe 1 (single measurement only).
+   */
+  confirmed: boolean;
+  /**
+   * The actual 7-day moving average at the time of detection.
+   * null when fewer than 4 measurements exist in the 7-day window (Stufe 1).
+   */
+  movingAvgAtThreshold: number | null;
 }
 
 export interface MonthlyDataPoint {

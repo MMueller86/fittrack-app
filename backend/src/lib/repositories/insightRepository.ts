@@ -57,6 +57,8 @@ export function computeInputHash(ctx: InsightInputContext, promptVersion: string
     trend7d: ctx.weight.trend7d,
     // Include primary signal type so a new dominant signal triggers a fresh AI call
     primarySignalType: ctx.progressIntelligence?.primarySignal?.type ?? null,
+    // Include milestone confirmation state: Stufe 1 → Stufe 2 transition triggers regeneration
+    milestoneConfirmed: ctx.progressIntelligence?.milestone?.confirmed ?? null,
   };
   return createHash('sha256').update(JSON.stringify(stable)).digest('hex');
 }

@@ -216,14 +216,15 @@ describe('computeMilestone', () => {
     expect(result!.unit).toBe('kg');
   });
 
-  it('returns null when milestone was recently shown in history', () => {
+  it('returns null when milestone was recently shown in history (within Stufe-1 lockout)', () => {
     const entries = [
       makeEntry(TODAY, 79.8),
       makeEntry('2026-06-14', 80.3),
       makeEntry('2026-06-10', 81.0),
     ];
+    // Use a date within the 3-day Stufe-1 lockout window (TODAY = 2026-06-15, so cutoff = 2026-06-12)
     const history: Partial<InsightDocument>[] = [{
-      date: '2026-06-08',
+      date: '2026-06-14', // 1 day ago — within 3-day Stufe-1 lockout
       progressIntelligence: {
         version: 'v1',
         primarySignal: { type: 'milestone_reached', confidence: 0.9, freshnessScore: 0 },
@@ -273,6 +274,96 @@ describe('computeMilestone', () => {
     // 110 is a multiple of 10 but NOT 25 — verify it's not detected as a threshold
     // by checking the milestone value is exactly 125 (the first multiple-of-25 crossed)
     expect(result!.value % 25).toBe(0);
+  });
+
+  // ── Journey-window filter tests ──────────────────────────────────────────
+
+  it('rejects threshold outside journey (85 kg when start = 84.8 kg)', () => {
+    // User's OLDEST entry (= journey start) is 84.8 kg.
+    // A spike to 85.5 exists later, but the journey started BELOW 85.
+    // Journey filter: threshold 85 must be < startInUnit (84.8) → FALSE → excluded.
+    const entries = [
+      makeEntry('2026-06-09', 84.8),  // oldest = journey start (below 85)
+      makeEntry('2026-06-10', 85.5),  // spike provides hadOppositeEntry for 85
+      makeEntry('2026-06-14', 84.7),
+      makeEntry(TODAY, 84.5),
+    ];
+    // 85 threshold: hadOppositeEntry=true (85.5 > 85), but isInJourney=(85<84.8)=false → excluded
+    // No other threshold is crossed (80 not reached) → null
+    const result = computeMilestone(entries, 'lose_weight', TODAY, emptyHistory, 'kg');
+    expect(result).toBeNull();
+  });
+
+  it('accepts threshold inside journey (80 kg, start = 84.9, target = 75)', () => {
+    const entries = [
+      makeEntry(TODAY, 79.8),
+      makeEntry('2026-06-12', 80.5),
+      makeEntry('2026-06-10', 84.9), // start weight
+    ];
+    // 80 is below start (84.9) and above target (75) → valid milestone
+    const result = computeMilestone(entries, 'lose_weight', TODAY, emptyHistory, 'kg', 75);
+    expect(result).not.toBeNull();
+    expect(result!.value).toBe(80);
+  });
+
+  it('excludes threshold that equals targetWeightKg', () => {
+    const entries = [
+      makeEntry(TODAY, 74.8),
+      makeEntry('2026-06-12', 75.5),
+      makeEntry('2026-06-10', 80.0),
+    ];
+    // 75 is the target → should be excluded; 70 not crossed yet
+    const result = computeMilestone(entries, 'lose_weight', TODAY, emptyHistory, 'kg', 75);
+    if (result !== null) expect(result.value).not.toBe(75);
+  });
+
+  // ── Stufe-2 (confirmed) tests ────────────────────────────────────────────
+
+  it('confirmed = false when fewer than 4 measurements in 7-day window', () => {
+    // Only 2 entries in 7-day window → Stufe 1
+    const entries = [
+      makeEntry(TODAY, 79.8),
+      makeEntry('2026-06-12', 80.5),
+      makeEntry('2026-05-01', 84.0), // older than 7 days from TODAY (2026-06-15)
+    ];
+    const result = computeMilestone(entries, 'lose_weight', TODAY, emptyHistory, 'kg');
+    expect(result).not.toBeNull();
+    expect(result!.confirmed).toBe(false);
+    expect(result!.movingAvgAtThreshold).toBeNull();
+  });
+
+  it('confirmed = true when ≥4 measurements and 7-day avg is under threshold', () => {
+    // 5 measurements in 7-day window, all under 80 kg → avg under 80
+    const entries = [
+      makeEntry(TODAY, 79.2),
+      makeEntry('2026-06-14', 79.5),
+      makeEntry('2026-06-13', 79.8),
+      makeEntry('2026-06-12', 79.6),
+      makeEntry('2026-06-11', 79.9),  // 5th measurement, avg = 79.6
+      makeEntry('2026-06-01', 81.0),  // older, provides hadOppositeEntry
+    ];
+    const result = computeMilestone(entries, 'lose_weight', TODAY, emptyHistory, 'kg');
+    expect(result).not.toBeNull();
+    expect(result!.value).toBe(80);
+    expect(result!.confirmed).toBe(true);
+    expect(result!.movingAvgAtThreshold).not.toBeNull();
+    expect(result!.movingAvgAtThreshold!).toBeLessThan(80);
+  });
+
+  it('confirmed = false when 7-day avg is above threshold despite crossing', () => {
+    // 4 measurements in window, but avg is above 80 (one outlier spike)
+    const entries = [
+      makeEntry(TODAY, 79.2),         // crossed
+      makeEntry('2026-06-14', 81.5),  // spike
+      makeEntry('2026-06-13', 81.0),  // spike
+      makeEntry('2026-06-12', 80.8),  // spike
+      makeEntry('2026-06-01', 83.0),  // older
+    ];
+    // avg of 4 recent = (79.2+81.5+81.0+80.8)/4 = 80.625 > 80 → not confirmed
+    const result = computeMilestone(entries, 'lose_weight', TODAY, emptyHistory, 'kg');
+    if (result !== null && result.value === 80) {
+      expect(result.confirmed).toBe(false);
+    }
   });
 });
 

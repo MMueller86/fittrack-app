@@ -199,6 +199,7 @@ export function computeMilestone(
   todayIso: string,
   insightHistory: InsightDocument[],
   unit: 'kg' | 'lbs',
+  targetWeightKg?: number,
 ): MilestoneIntelligence | null {
   if (goal === 'maintain' || goal === 'recomposition') return null;
 
@@ -212,6 +213,11 @@ export function computeMilestone(
     (a, b) => parseIsoDate(a.date).getTime() - parseIsoDate(b.date).getTime(),
   );
 
+  // Journey-window: determine start weight from the oldest entry
+  const startKg = toKg(sorted[0]!.value, sorted[0]!.unit);
+  const startInUnit = fromKg(startKg, unit);
+  const targetInUnit = targetWeightKg !== undefined ? fromKg(targetWeightKg, unit) : null;
+
   const thresholds = milestoneThresholds(unit);
   const newestKg = toKg(recentEntries[0]!.value, recentEntries[0]!.unit);
   const newestInUnit = fromKg(newestKg, unit);
@@ -224,7 +230,18 @@ export function computeMilestone(
     const isNowCrossed = growsOnDecrease ? newestInUnit <= threshold : newestInUnit >= threshold;
     if (!isNowCrossed) continue;
 
-    // Check if any older entry was on the wrong side
+    // Journey-window filter: threshold must be between start and target (exclusive).
+    // For lose_weight: threshold must be BELOW the start weight (user had to pass it)
+    // For gain_muscle: threshold must be ABOVE the start weight
+    const isInJourney = growsOnDecrease
+      ? threshold < startInUnit   // lose_weight: only thresholds below start are real milestones
+      : threshold > startInUnit;  // gain_muscle: only thresholds above start
+    if (!isInJourney) continue;
+
+    // Exclude the exact target weight threshold (that's "Ziel erreicht", a separate signal)
+    if (targetInUnit !== null && Math.abs(threshold - targetInUnit) < 0.1) continue;
+
+    // Check if any older entry was on the wrong side of this threshold
     const hadOppositeEntry = sorted.some((e) => {
       // Only consider entries older than the most recent one
       if (e.date === recentEntries[0]!.date) return false;
@@ -246,9 +263,25 @@ export function computeMilestone(
 
   if (crossedThreshold === null || crossedDate === null) return null;
 
-  // Check lockout: was this milestone mentioned in recent history?
+  // Stufe 2: check if the 7-day moving average also confirms the crossing (≥4 measurements)
+  const recentKgValues = recentEntries.map((e) => toKg(e.value, e.unit));
+  const hasEnoughForAvg = recentKgValues.length >= 4;
+  const movingAvg = hasEnoughForAvg
+    ? recentKgValues.reduce((s, v) => s + v, 0) / recentKgValues.length
+    : null;
+  const confirmed = hasEnoughForAvg && movingAvg !== null && (() => {
+    const avgInUnit = fromKg(movingAvg, unit);
+    return growsOnDecrease ? avgInUnit <= crossedThreshold : avgInUnit >= crossedThreshold;
+  })();
+  const movingAvgAtThreshold = movingAvg !== null
+    ? parseFloat(fromKg(movingAvg, unit).toFixed(1))
+    : null;
+
+  // Lockout: Stufe 2 (confirmed) blocks for full MILESTONE_LOCKOUT_DAYS.
+  // Stufe 1 (unconfirmed) only blocks for 3 days so Stufe 2 can follow within the same week.
+  const effectiveLockoutDays = confirmed ? MILESTONE_LOCKOUT_DAYS : 3;
   const lockoutCutoff = new Date(parseIsoDate(todayIso));
-  lockoutCutoff.setUTCDate(lockoutCutoff.getUTCDate() - MILESTONE_LOCKOUT_DAYS);
+  lockoutCutoff.setUTCDate(lockoutCutoff.getUTCDate() - effectiveLockoutDays);
 
   const alreadyMentioned = insightHistory
     .filter((doc) => parseIsoDate(doc.date) >= lockoutCutoff)
@@ -260,7 +293,7 @@ export function computeMilestone(
 
   if (alreadyMentioned) return null;
 
-  return { value: crossedThreshold, unit, reachedAt: crossedDate };
+  return { value: crossedThreshold, unit, reachedAt: crossedDate, confirmed, movingAvgAtThreshold };
 }
 
 export function computeMonthlyTrend(
@@ -395,7 +428,7 @@ export function computeProgressIntelligence(
   const plateau = computePlateauSignal(entries, todayIso);
   const phase = computePhase(entries, todayIso, goal);
   const progress = computeProgress(entries, targetWeightKg, goal, todayIso, unit);
-  const milestone = computeMilestone(entries, goal, todayIso, insightHistory, unit);
+  const milestone = computeMilestone(entries, goal, todayIso, insightHistory, unit, targetWeightKg);
   const monthlyTrend = computeMonthlyTrend(entries, todayIso, goal, unit);
   const dayCompleteness = computeDayCompleteness({
     hasWeightToday, hasMealsToday, isTrainingDay, hasTrainingLogged,

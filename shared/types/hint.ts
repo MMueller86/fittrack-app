@@ -18,6 +18,7 @@ import type { DayTargets } from './nutrition';
 export type HintId =
   | 'H1' | 'H2' | 'H3' | 'H4' | 'H5' | 'H6' | 'H7' | 'H8'
   | 'H9' | 'H10' | 'H11' | 'H12' | 'H13' | 'H14' | 'H15' | 'H16' | 'H17'
+  | 'H18' | 'H19' | 'H20' | 'H21' | 'H22' | 'H23' | 'H24' | 'H25' | 'H26' | 'H27' | 'H28'
   | 'M0' | 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9';
 
 /** Semantic grouping for visual styling in the mobile UI. */
@@ -53,6 +54,21 @@ export interface HintContext {
    * Provided by the mobile client via query param.
    */
   currentHour: number;
+  /**
+   * Basal metabolic rate (kcal/day) from profile.calculationMeta.bmr.
+   * Used for H27 (under-BMR warning). Undefined when no profile exists.
+   */
+  bmr?: number;
+  /**
+   * User body weight in kg from profile.weightKg.
+   * Used for H28 (protein per kg body weight check). Undefined when no profile exists.
+   */
+  weightKg?: number;
+  /**
+   * Calorie intake as % of daily target for the last N completed days (newest first).
+   * Used for H25/H26 (multi-day overage detection). Empty array when no history available.
+   */
+  recentDaysCaloriesPct?: number[];
 }
 
 // ---------------------------------------------------------------------------

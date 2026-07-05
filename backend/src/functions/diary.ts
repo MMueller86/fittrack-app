@@ -113,11 +113,22 @@ export const getDiaryHandler = withHandler(
     const localHour = parseInt(request.query.get('localHour') ?? '12', 10);
     const currentHour = Number.isFinite(localHour) && localHour >= 0 && localHour <= 23 ? localHour : 12;
 
-    const [result, dayMeta, profile, hintState] = await Promise.all([
-      getDiaryRepository().getDay(userId, date),
+    const diaryRepo = getDiaryRepository();
+
+    // Load last 3 completed days for multi-day calorie trend (H25/H26)
+    const today = new Date(date + 'T00:00:00Z');
+    const recentDayDates = [1, 2, 3].map((i) => {
+      const d = new Date(today);
+      d.setUTCDate(d.getUTCDate() - i);
+      return d.toISOString().slice(0, 10);
+    });
+
+    const [result, dayMeta, profile, hintState, ...recentDays] = await Promise.all([
+      diaryRepo.getDay(userId, date),
       getDayMetaRepository().get(userId, date),
       getProfileRepository().get(userId),
       getHintStateRepository().get(userId),
+      ...recentDayDates.map((d) => diaryRepo.getDay(userId, d)),
     ]);
 
     // Resolve targets for the effective day type
@@ -127,9 +138,23 @@ export const getDiaryHandler = withHandler(
       ? (resolvedDayType === 'training' ? profile.targets.trainingDay : profile.targets.restDay)
       : fallbackTargets;
 
+    // Calorie % for each recent day (only include days that have actual entries)
+    const recentDaysCaloriesPct = recentDays
+      .map((d) => (d.summary.calories > 0 && targets.calories > 0 ? (d.summary.calories / targets.calories) * 100 : null))
+      .filter((v): v is number => v !== null);
+
     // Evaluate hint — pure function, no I/O
     const { hint, updatedState } = evaluateHint(
-      { meals: result.meals, summary: result.summary, targets, dayType: resolvedDayType, currentHour },
+      {
+        meals: result.meals,
+        summary: result.summary,
+        targets,
+        dayType: resolvedDayType,
+        currentHour,
+        bmr: profile?.calculationMeta?.bmr,
+        weightKg: profile?.weightKg,
+        recentDaysCaloriesPct,
+      },
       hintState,
     );
 
