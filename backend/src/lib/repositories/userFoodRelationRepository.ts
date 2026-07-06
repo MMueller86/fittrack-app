@@ -15,7 +15,7 @@ export interface UserFoodRelationRepository {
   upsert(userId: string, input: UpsertUserFoodRelationInput): Promise<UserFoodRelation>;
 
   /** Setzt isFavorite. Legt die Relation an wenn sie noch nicht existiert. */
-  setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean): Promise<UserFoodRelation>;
+  setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean, imageUrl?: string): Promise<UserFoodRelation>;
 
   /** Gibt alle Favoriten zurück (isFavorite=true), sortiert nach displayName. */
   listFavorites(userId: string): Promise<UserFoodRelation[]>;
@@ -75,10 +75,10 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
     return relation;
   }
 
-  async setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean): Promise<UserFoodRelation> {
+  async setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean, imageUrl?: string): Promise<UserFoodRelation> {
     const existing = this.store.get(this.key(userId, foodRef));
     const relation: UserFoodRelation = existing
-      ? { ...existing, isFavorite }
+      ? { ...existing, isFavorite, ...(imageUrl !== undefined ? { imageUrl } : {}) }
       : {
           id: `${userId}:${foodRef}`,
           userId,
@@ -87,6 +87,7 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
           displayName,
           displayBrand,
           isFavorite,
+          ...(imageUrl ? { imageUrl } : {}),
           lastUsedAt: null,
           usageCount: 0,
           createdAt: new Date().toISOString(),

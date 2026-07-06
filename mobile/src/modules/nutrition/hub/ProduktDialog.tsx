@@ -168,6 +168,7 @@ export function ProduktDialog({ product, context, onDismiss, onAdded }: Props) {
           foodRefType,
           displayName: product.name,
           displayBrand: product.brand,
+          imageUrl: product.imageUrl ?? null,
         });
         setFavToast('Zu Favoriten hinzugefügt');
       } else {

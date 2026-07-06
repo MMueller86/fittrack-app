@@ -31,6 +31,8 @@ export interface UserFoodRelation {
   displayName: string;
   /** Denormalisierter Markenname (optional) */
   displayBrand?: string;
+  /** Denormalisiertes Produktbild (URL, für Favoriten-Chips ohne extra Lookup) */
+  imageUrl?: string | null;
   /** True wenn der Nutzer dieses Lebensmittel als Favorit markiert hat */
   isFavorite: boolean;
   /** ISO-Timestamp der letzten Verwendung im Tagebuch. Null = noch nie verwendet. */
@@ -58,6 +60,8 @@ export interface UpsertUserFoodRelationInput {
   foodRefType: FoodRefType;
   displayName: string;
   displayBrand?: string;
+  /** Produktbild-URL — wird denormalisiert gespeichert für Favoriten-Chips */
+  imageUrl?: string | null;
   /** Letzter Eingabemodus — wird bei recordUsage gespeichert */
   lastInputMode?: 'grams' | 'portion';
   /** Letzte Eingabemenge — wird bei recordUsage gespeichert */

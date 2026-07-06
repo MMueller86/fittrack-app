@@ -270,7 +270,7 @@ export function IdleState({ onSelectRelation, onOpenSubflow, onOpenAllFavorites,
                 key={item.id}
                 displayName={item.displayName}
                 shortName={item.shortName}
-                imageUrl={null}
+                imageUrl={item.imageUrl ?? null}
                 onPress={() => onSelectRelation(item)}
                 accessibilityLabel={item.shortName ?? item.displayName}
               />

@@ -47,12 +47,13 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     displayName: string,
     displayBrand: string | undefined,
     isFavorite: boolean,
+    imageUrl?: string,
   ): Promise<UserFoodRelation> {
     const { containers } = await getCosmos();
     const existing = await this.getByFoodRef(userId, foodRef);
     const id = this.makeId(userId, foodRef);
     const relation: UserFoodRelation = existing
-      ? { ...existing, isFavorite, displayName, displayBrand }
+      ? { ...existing, isFavorite, displayName, displayBrand, ...(imageUrl !== undefined ? { imageUrl } : {}) }
       : {
           id,
           userId,
@@ -60,6 +61,7 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
           foodRefType,
           displayName,
           displayBrand,
+          ...(imageUrl ? { imageUrl } : {}),
           isFavorite,
           lastUsedAt: null,
           usageCount: 0,

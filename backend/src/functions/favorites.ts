@@ -18,6 +18,7 @@ const AddFavoriteBodySchema = z.object({
   foodRefType: z.enum(['catalog', 'personal']),
   displayName: z.string().trim().min(1).max(200),
   displayBrand: z.string().trim().max(200).optional(),
+  imageUrl: z.string().url().max(1000).optional().nullable(),
 });
 
 // GET /api/favorites
@@ -49,6 +50,7 @@ export const addFavoriteHandler = withHandler(
       body.displayName,
       body.displayBrand,
       true,
+      body.imageUrl ?? undefined,
     );
     logEvent(ctx, 'info', 'favorites.add', { foodRef: body.foodRef });
 
