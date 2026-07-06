@@ -29,10 +29,10 @@ import Animated, {
 import { runOnJS } from 'react-native-reanimated';
 import { SwipeableRow } from '../../shared/components/SwipeableRow';
 import { useDayTypeStore } from './useDayTypeStore';
-import AddItemModal from './AddItemModal';
 import EditItemSheet from './EditItemSheet';
 import MoveItemSheet from './MoveItemSheet';
 import CopyItemSheet from './CopyItemSheet';
+import { useFoodEntryHubStore } from './hub/useFoodEntryHubStore';
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 // Mahlzeiten, die als leere State-B-Karten immer sichtbar sein sollen (Phase 6)
@@ -233,6 +233,7 @@ export default function DiaryScreen() {
 
   const { dayType, targets, hydrateDayType } = useDayTypeStore();
   const todayTargets = targets ? (dayType === 'training' ? targets.trainingDay : targets.restDay) : null;
+  const openHub = useFoodEntryHubStore((s) => s.open);
 
   // Snackbar
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
@@ -254,11 +255,6 @@ export default function DiaryScreen() {
   }>({ visible: false, title: '', actions: [] });
 
   const closeConfirmSheet = () => setConfirmSheet((s) => ({ ...s, visible: false }));
-
-  // AddItem modal state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedMealId, setSelectedMealId] = useState<string>('');
-  const [selectedMealName, setSelectedMealName] = useState<string>('');
 
   // EditItem sheet state
   const [editingItem, setEditingItem] = useState<MealItem | null>(null);
@@ -404,15 +400,18 @@ export default function DiaryScreen() {
     });
   };
 
-  // Open add-item modal
-  const handleOpenAddItem = (mealId: string, mealName: string) => {
-    setSelectedMealId(mealId);
-    setSelectedMealName(mealName);
-    setModalVisible(true);
+  // Open hub for adding items (replaces AddItemModal as primary entry)
+  const handleOpenAddItem = (mealId: string, _mealName: string) => {
+    const meal = orderedMeals.find((m) => m.id === mealId);
+    openHub({
+      mealId,
+      date,
+      mealType: meal?.type,
+      onSuccess: () => { void loadDay(date); },
+    });
   };
 
   const handleItemSaved = async () => {
-    setModalVisible(false);
     await loadDay(date);
   };
 
@@ -551,15 +550,6 @@ export default function DiaryScreen() {
         </ScrollView>
       )}
       </Animated.View>
-
-      {/* Add Item Modal */}
-      <AddItemModal
-        visible={modalVisible}
-        mealId={selectedMealId}
-        mealName={selectedMealName}
-        onClose={() => setModalVisible(false)}
-        onSaved={handleItemSaved}
-      />
 
       {/* Edit Item Sheet */}
       {editingItem && (

@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,7 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { HomeStackParamList, RootTabParamList } from '../../app/navigation/RootNavigator';
-import { colors, spacing, typography } from '../../app/theme';
+import { colors, spacing, typography, radius } from '../../app/theme';
 import { listWeights } from '../../services/weightsService';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { profileApi } from '../../shared/api/profileApi';
@@ -28,6 +29,7 @@ import { useDayTypeStore } from '../nutrition/useDayTypeStore';
 import WorkoutTypePicker from './WorkoutTypePicker';
 import { getDayHint } from './getDayHint';
 import { CoachingHeroCard } from './CoachingHeroCard';
+import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { DayNutritionCard } from './DayNutritionCard';
 import { InsightCard } from './InsightCard';
 import { getInsight } from '../../services/insightService';
@@ -52,6 +54,7 @@ function getGreeting(): string {
 }
 
 export default function HomeScreen({ navigation }: Props) {
+  const openHub = useFoodEntryHubStore((s) => s.open);
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [todayDiary, setTodayDiary] = useState<DiaryDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -184,6 +187,21 @@ export default function HomeScreen({ navigation }: Props) {
           }}
         />
 
+        {/* ── Schnell-Hinzufügen — öffnet FoodEntryHub ohne Mahlzeit-Kontext ── */}
+        <TouchableOpacity
+          style={styles.quickAddBtn}
+          onPress={() => {
+            console.log('[HomeScreen] Lebensmittel-Button gedrückt');
+            openHub();
+            console.log('[HomeScreen] openHub() aufgerufen');
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Lebensmittel hinzufügen"
+        >
+          <Text style={styles.quickAddIcon}>+</Text>
+          <Text style={styles.quickAddText}>Lebensmittel erfassen</Text>
+        </TouchableOpacity>
+
       </ScrollView>
 
       <WorkoutTypePicker
@@ -197,6 +215,28 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
+  quickAddBtn: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  quickAddIcon: {
+    fontSize: 20,
+    color: colors.primary,
+    fontWeight: '700' as const,
+  },
+  quickAddText: {
+    ...typography.button,
+    color: colors.primary,
+  },
   content: {
     paddingTop: spacing.lg,
     paddingBottom: spacing.xxl,

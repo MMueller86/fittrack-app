@@ -45,6 +45,42 @@ try {
 }
 
 // ---------------------------------------------------------------------------
+// CameraErrorBoundary — fängt Render-Fehler von vision-camera Hooks ab.
+// In Expo Go lädt das JS-Modul erfolgreich, aber native Hooks (useCameraDevice,
+// useCodeScanner) werfen beim ersten Render. Da Hooks nicht in try/catch sein
+// können, kapseln wir CameraScanner in einem eigenen ErrorBoundary.
+// ---------------------------------------------------------------------------
+
+interface CameraErrorBoundaryProps {
+  children: React.ReactNode;
+  onError: () => void;
+}
+
+class CameraErrorBoundary extends React.Component<
+  CameraErrorBoundaryProps,
+  { hasError: boolean }
+> {
+  constructor(props: CameraErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn('[BarcodeScannerScreen] CameraScanner Render-Fehler (kein EAS Build?):', error.message);
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -55,6 +91,8 @@ interface Props {
   onProductFound?: (result: FoodSearchResult) => void;
   /** Called when user saved a new personal product from the no-match flow */
   onProductCreated?: (item: ReusableItem) => void;
+  /** Called when barcode scanned but no product found and user wants to scan the label */
+  onNoMatch?: (barcode: string) => void;
 }
 
 type ScanState = 'scanning' | 'loading' | 'not-found' | 'error';
@@ -113,6 +151,7 @@ export default function BarcodeScannerScreen({
   onClose,
   onProductFound,
   onProductCreated,
+  onNoMatch,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [scanState, setScanState] = useState<ScanState>('scanning');
@@ -185,9 +224,14 @@ export default function BarcodeScannerScreen({
         onRequestClose={onClose}
       >
         <View style={[styles.container, { paddingTop: insets.top }]}>
-          {/* Camera */}
+          {/* Camera — in CameraErrorBoundary gekapselt, da vision-camera Hooks
+               in Expo Go laden aber beim Render werfen. Der ErrorBoundary
+               fängt den Fehler ab und setzt cameraPermission='denied' statt
+               den gesamten App-Tree zu crashen. */}
           {nativeAvailable && cameraPermission === 'granted' && scanState === 'scanning' && (
-            <CameraScanner onCodeScanned={handleCodeScanned} />
+            <CameraErrorBoundary onError={() => setCameraPermission('denied')}>
+              <CameraScanner onCodeScanned={handleCodeScanned} />
+            </CameraErrorBoundary>
           )}
 
           {/* Overlay content */}
@@ -247,8 +291,16 @@ export default function BarcodeScannerScreen({
                     Barcode: {lastBarcode}
                     {'\n'}Kein Eintrag in der Datenbank.
                   </Text>
-                  <TouchableOpacity style={styles.primaryButton} onPress={handleOpenEditor}>
-                    <Text style={styles.primaryButtonText}>Manuell anlegen</Text>
+                  {onNoMatch && (
+                    <TouchableOpacity
+                      style={styles.primaryButton}
+                      onPress={() => onNoMatch(lastBarcode ?? '')}
+                    >
+                      <Text style={styles.primaryButtonText}>📷 Nährwert-Label scannen</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={onNoMatch ? styles.secondaryButton : styles.primaryButton} onPress={handleOpenEditor}>
+                    <Text style={onNoMatch ? styles.secondaryButtonText : styles.primaryButtonText}>Manuell anlegen</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.secondaryButton} onPress={handleRetry}>
                     <Text style={styles.secondaryButtonText}>Erneut scannen</Text>

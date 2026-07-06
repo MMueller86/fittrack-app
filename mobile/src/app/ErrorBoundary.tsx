@@ -12,12 +12,13 @@ interface Props {
 
 interface State {
   error: Error | null;
+  componentStack: string | null;
 }
 
 export default class ErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { error: null };
+    this.state = { error: null, componentStack: null };
   }
 
   static getDerivedStateFromError(error: Error): State {
@@ -26,16 +27,20 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary] Uncaught error:', error.message);
-    console.error('[ErrorBoundary] Stack:', error.stack);
+    console.error('[ErrorBoundary] JS Stack:', error.stack);
     console.error('[ErrorBoundary] Component stack:', info.componentStack);
+    // Auch als einzelne Zeilen für bessere Terminal-Lesbarkeit
+    info.componentStack?.split('\n').forEach((line, i) => {
+      if (line.trim()) console.error(`  [#${i}] ${line.trim()}`);
+    });
   }
 
   handleReset = () => {
-    this.setState({ error: null });
+    this.setState({ error: null, componentStack: null });
   };
 
   render() {
-    const { error } = this.state;
+    const { error, componentStack } = this.state;
 
     if (!error) {
       return this.props.children;
@@ -51,10 +56,20 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           </Text>
 
           <View style={styles.errorBox}>
+            <Text style={styles.errorLabel} selectable>Fehler:</Text>
             <Text style={styles.errorText} selectable>
               {error.message}
             </Text>
           </View>
+
+          {componentStack ? (
+            <View style={styles.stackBox}>
+              <Text style={styles.errorLabel}>Component Stack (kopierbar):</Text>
+              <Text style={styles.stackText} selectable>
+                {componentStack}
+              </Text>
+            </View>
+          ) : null}
 
           <TouchableOpacity style={styles.button} onPress={this.handleReset} activeOpacity={0.8}>
             <Text style={styles.buttonText}>Erneut versuchen</Text>
@@ -100,13 +115,36 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
     width: '100%',
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
+  },
+  errorLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: 4,
+    fontWeight: '600' as const,
   },
   errorText: {
     ...typography.caption,
     color: colors.negative,
     fontFamily: 'monospace',
     lineHeight: 18,
+  },
+  stackBox: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    width: '100%',
+    marginBottom: spacing.xl,
+    maxHeight: 300,
+  },
+  stackText: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontFamily: 'monospace',
+    lineHeight: 16,
+    fontSize: 10,
   },
   button: {
     backgroundColor: colors.primary,

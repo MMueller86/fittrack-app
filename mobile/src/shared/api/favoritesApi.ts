@@ -24,4 +24,11 @@ export const favoritesApi = {
       .get<UserFoodRelation[]>('/food-relations/recent', { params: { limit } })
       .then((r) => r.data);
   },
+
+  /** GET /api/food-relations/frequent?limit= */
+  listFrequent(limit = 10): Promise<UserFoodRelation[]> {
+    return apiClient
+      .get<UserFoodRelation[]>('/food-relations/frequent', { params: { limit } })
+      .then((r) => r.data);
+  },
 };

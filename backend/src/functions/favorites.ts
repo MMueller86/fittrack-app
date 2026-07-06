@@ -88,6 +88,20 @@ export const listRecentHandler = withHandler(
   },
 );
 
+// GET /api/food-relations/frequent
+export const listFrequentHandler = withHandler(
+  'foodRelations.frequent',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const limitParam = request.query.get('limit');
+    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 10, 1), 50) : 10;
+    const repo = getUserFoodRelationRepository();
+    const frequent = await repo.listFrequent(userId, limit);
+    logEvent(ctx, 'info', 'foodRelations.frequent', { count: frequent.length });
+    return { status: 200, jsonBody: frequent };
+  },
+);
+
 // Azure Functions registrations
 
 app.http('favorites-list', {
@@ -116,4 +130,11 @@ app.http('food-relations-recent', {
   route: 'food-relations/recent',
   authLevel: 'anonymous',
   handler: listRecentHandler,
+});
+
+app.http('food-relations-frequent', {
+  methods: ['GET'],
+  route: 'food-relations/frequent',
+  authLevel: 'anonymous',
+  handler: listFrequentHandler,
 });

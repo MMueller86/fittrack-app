@@ -15,6 +15,9 @@ module.exports = ({ config }) => ({
   android: {
     ...config.android,
     package: IS_DEV ? 'com.fittrack.app.dev' : 'com.fittrack.app',
+    // Required for @gorhom/bottom-sheet keyboard handling on Android.
+    // Without this, the keyboard overlaps sheet content instead of resizing the layout.
+    softwareKeyboardLayoutMode: 'resize',
   },
   ios: {
     ...config.ios,

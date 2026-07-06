@@ -27,6 +27,13 @@ export interface UserFoodRelationRepository {
   listRecent(userId: string, limit?: number): Promise<UserFoodRelation[]>;
 
   /**
+   * Gibt die häufigsten Einträge zurück, sortiert nach usageCount DESC.
+   * Nur Einträge mit usageCount > 0 werden berücksichtigt.
+   * @param limit Maximalanzahl — Standard 10.
+   */
+  listFrequent(userId: string, limit?: number): Promise<UserFoodRelation[]>;
+
+  /**
    * Zeichnet eine Verwendung auf: lastUsedAt = jetzt, usageCount++.
    * Legt die Relation an wenn sie noch nicht existiert.
    * Fire-and-forget sicher — Fehler werden intern geloggt.
@@ -98,6 +105,13 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
     return [...this.store.values()]
       .filter((r) => r.userId === userId && r.lastUsedAt !== null)
       .sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? ''))
+      .slice(0, limit);
+  }
+
+  async listFrequent(userId: string, limit = 10): Promise<UserFoodRelation[]> {
+    return [...this.store.values()]
+      .filter((r) => r.userId === userId && r.usageCount > 0)
+      .sort((a, b) => b.usageCount - a.usageCount)
       .slice(0, limit);
   }
 

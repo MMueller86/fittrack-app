@@ -373,6 +373,8 @@ export const addItemHandler = withHandler(
               foodRefType,
               displayName: itemName,
               displayBrand: undefined,
+              ...(d.inputMode ? { lastInputMode: d.inputMode } : {}),
+              ...(d.inputAmount != null ? { lastInputAmount: d.inputAmount } : {}),
             });
           }
         } catch {

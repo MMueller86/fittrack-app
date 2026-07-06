@@ -37,6 +37,10 @@ export interface UserFoodRelation {
   lastUsedAt: string | null;
   /** Anzahl der Verwendungen im Tagebuch */
   usageCount: number;
+  /** Letzter Eingabemodus (Gramm oder Portion) — für UX-Vorbelegen */
+  lastInputMode?: 'grams' | 'portion';
+  /** Letzte Eingabemenge — für UX-Vorbelegen */
+  lastInputAmount?: number;
   /** ISO-Timestamp der Ersterstellung dieses Eintrags */
   createdAt: string;
 }
@@ -47,4 +51,8 @@ export interface UpsertUserFoodRelationInput {
   foodRefType: FoodRefType;
   displayName: string;
   displayBrand?: string;
+  /** Letzter Eingabemodus — wird bei recordUsage gespeichert */
+  lastInputMode?: 'grams' | 'portion';
+  /** Letzte Eingabemenge — wird bei recordUsage gespeichert */
+  lastInputAmount?: number;
 }
