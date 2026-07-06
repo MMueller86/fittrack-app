@@ -8,6 +8,13 @@ import { Keyboard, Platform, StyleSheet, Text, TouchableOpacity, View } from 're
 import { BottomSheetModal, BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  Easing,
+} from 'react-native-reanimated';
 import type { FoodSearchResult } from '@fittrack/shared';
 import { Icon } from '../../../shared/components/Icon';
 
@@ -36,10 +43,16 @@ export function FoodEntryHub() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const searchInputRef = useRef<any>(null);
   // Trackt ob das Sheet gerade visuell offen ist (nicht den Store-State).
-  // Verhindert doppeltes dismiss() nach Swipe-Close, was die Reanimated
-  // State-Machine korrumpiert und künftige present()-Aufrufe blockiert.
   const sheetIsOpenRef = useRef(false);
   const insets = useSafeAreaInsets();
+
+  // P-8: Animations
+  const contentOpacity = useSharedValue(0);
+  const snackbarTranslateY = useSharedValue(80);
+  const contentAnimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
+  const snackbarAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: snackbarTranslateY.value }],
+  }));
 
   // ---------------------------------------------------------------------------
   // Open / close sync with store
@@ -52,12 +65,26 @@ export function FoodEntryHub() {
       setSearchQuery('');
       setSearchFocused(false);
       setAddedProduct(null);
+      contentOpacity.value = 0;
       sheetRef.current?.present();
+      // Fade-in content after sheet settles
+      setTimeout(() => {
+        contentOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.ease) });
+      }, 180);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else if (sheetIsOpenRef.current) {
+      contentOpacity.value = 0;
       sheetRef.current?.dismiss();
     }
-  }, [isOpen]);
+  }, [isOpen, contentOpacity]);
+
+  // P-8: Snackbar spring-in animation
+  useEffect(() => {
+    if (addedProduct) {
+      snackbarTranslateY.value = 80;
+      snackbarTranslateY.value = withSpring(0, { damping: 15, stiffness: 200 });
+    }
+  }, [addedProduct, snackbarTranslateY]);
 
   // ---------------------------------------------------------------------------
   // Sheet dismiss callback (user drags down)
@@ -212,6 +239,7 @@ export function FoodEntryHub() {
         enablePanDownToClose
       >
         <BottomSheetView style={[styles.container, { paddingBottom: insets.bottom + spacing.md }]}>
+          <Animated.View style={[styles.animatedContent, contentAnimStyle]}>
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerText}>
@@ -305,6 +333,7 @@ export function FoodEntryHub() {
               </View>
             </View>
           ) : null}
+          </Animated.View>
         </BottomSheetView>
       </BottomSheetModal>
 
@@ -369,6 +398,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
+  },
+  animatedContent: {
+    flex: 1,
   },
   handle: {
     backgroundColor: colors.border,

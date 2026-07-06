@@ -20,6 +20,7 @@ import { diaryApi } from '../../../shared/api/diaryApi';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
+import { Icon } from '../../../shared/components/Icon';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 
 const SNAP_POINTS = ['50%', '92%'];
@@ -58,6 +59,17 @@ function MacroItem({ label, value, unit }: { label: string; value: number; unit:
       <Text style={styles.macroValue}>{Math.round(value)}</Text>
       <Text style={styles.macroUnit}>{unit}</Text>
       <Text style={styles.macroLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// Kalorien als prominente Einzelzahl (P-6.1)
+function CaloriesDisplay({ calories, amountGrams }: { calories: number; amountGrams: number }) {
+  return (
+    <View style={styles.caloriesDisplay}>
+      <Text style={styles.caloriesValue}>{Math.round(calories)}</Text>
+      <Text style={styles.caloriesUnit}>kcal</Text>
+      <Text style={styles.caloriesContext}>für {Math.round(amountGrams)} g</Text>
     </View>
   );
 }
@@ -257,9 +269,12 @@ export function ProduktDialog({ product, context, onDismiss, onAdded }: Props) {
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
           >
-            <Text style={[styles.favIcon, isFavorite && styles.favIconActive]}>
-              {isFavorite ? '❤️' : '♡'}
-            </Text>
+            <Icon
+              lib="ion"
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size="lg"
+              color={isFavorite ? colors.negative : colors.textMuted}
+            />
           </TouchableOpacity>
         </View>
 
@@ -273,8 +288,9 @@ export function ProduktDialog({ product, context, onDismiss, onAdded }: Props) {
         {/* Unvollständiges Produkt — Warnung */}
         {!product.isComplete ? (
           <View style={styles.warning}>
+            <Icon lib="feather" name="alert-circle" size="sm" color={colors.negative} />
             <Text style={styles.warningText}>
-              ⚠ Unvollständige Nährwertdaten – Werte könnten ungenau sein.
+              Unvollständige Nährwertdaten – Werte könnten ungenau sein.
             </Text>
           </View>
         ) : null}
@@ -345,14 +361,14 @@ export function ProduktDialog({ product, context, onDismiss, onAdded }: Props) {
           ) : null}
         </View>
 
-        {/* Makro-Vorschau */}
+        {/* Makro-Vorschau — P-6.1: Kalorien prominent, dann Makros */}
         {preview ? (
           <View style={styles.macroPreview}>
-            <Text style={styles.macroPreviewTitle}>
-              Nährwerte ({Math.round(preview.amountGrams)} g)
-            </Text>
+            <CaloriesDisplay
+              calories={preview.calculatedNutrition.calories}
+              amountGrams={preview.amountGrams}
+            />
             <View style={styles.macroRow}>
-              <MacroItem label="Kalorien" value={preview.calculatedNutrition.calories} unit="kcal" />
               <MacroItem label="Protein" value={preview.calculatedNutrition.protein} unit="g" />
               <MacroItem label="Kohlenhydr." value={preview.calculatedNutrition.carbs} unit="g" />
               <MacroItem label="Fett" value={preview.calculatedNutrition.fat} unit="g" />
@@ -459,19 +475,26 @@ const styles = StyleSheet.create({
 
   // Favorite toast
   favToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
+    borderRadius: radius.full,
     paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
     alignSelf: 'center',
   },
   favToastText: {
     ...typography.caption,
     color: colors.textSecondary,
+    textAlign: 'center',
   },
 
   // Warning
   warning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: 'rgba(226, 107, 107, 0.12)',
     borderRadius: radius.md,
     padding: spacing.sm,
@@ -481,6 +504,7 @@ const styles = StyleSheet.create({
   warningText: {
     ...typography.caption,
     color: colors.negative,
+    flex: 1,
   },
 
   // Meal chips
@@ -571,14 +595,32 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Macro preview
+  // Macro preview — Kalorien prominent
   macroPreview: {
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
     padding: spacing.md,
-    gap: spacing.sm,
+    gap: spacing.md,
+    alignItems: 'center',
   },
-  macroPreviewTitle: {
+  caloriesDisplay: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  caloriesValue: {
+    ...typography.display,
+    fontSize: 36,
+    fontWeight: '800' as const,
+    color: colors.text,
+    lineHeight: 40,
+  },
+  caloriesUnit: {
+    ...typography.caption,
+    color: colors.primary,
+    fontWeight: '700' as const,
+    letterSpacing: 1,
+  },
+  caloriesContext: {
     ...typography.caption,
     color: colors.textMuted,
   },

@@ -28,6 +28,7 @@ import { profileApi } from '../../shared/api/profileApi';
 import { useDayTypeStore } from '../nutrition/useDayTypeStore';
 import WorkoutTypePicker from './WorkoutTypePicker';
 import { getDayHint } from './getDayHint';
+import { Icon } from '../../shared/components/Icon';
 import { CoachingHeroCard } from './CoachingHeroCard';
 import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { DayNutritionCard } from './DayNutritionCard';
@@ -144,20 +145,33 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        {/* ── Brand Header ── */}
+      {/* Sticky Header: Brand + Search Bar */}
+      <View style={styles.stickyHeader}>
         <View style={styles.brandHeader}>
           <Text style={styles.brandLogo}>
             Fit<Text style={styles.brandAccent}>Track</Text>
           </Text>
           <Text style={styles.brandName}>{displayName ?? 'Willkommen'}</Text>
         </View>
+        {/* Persistent Search Bar — Tap öffnet Hub direkt im Such-Modus */}
+        <TouchableOpacity
+          style={styles.searchBar}
+          onPress={() => openHub()}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Lebensmittel suchen"
+        >
+          <Icon lib="feather" name="search" size="sm" color={colors.textMuted} />
+          <Text style={styles.searchBarPlaceholder}>Lebensmittel suchen…</Text>
+        </TouchableOpacity>
+      </View>
 
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
         {/* ── Coaching Hero Card ── */}
         <CoachingHeroCard
           displayName={displayName ?? 'Sportler'}
@@ -187,17 +201,7 @@ export default function HomeScreen({ navigation }: Props) {
           }}
         />
 
-        {/* ── Schnell-Hinzufügen — öffnet FoodEntryHub ohne Mahlzeit-Kontext ── */}
-        <TouchableOpacity
-          style={styles.quickAddBtn}
-          onPress={() => openHub()}
-          accessibilityRole="button"
-          accessibilityLabel="Lebensmittel hinzufügen"
-        >
-          <Text style={styles.quickAddIcon}>+</Text>
-          <Text style={styles.quickAddText}>Lebensmittel erfassen</Text>
-        </TouchableOpacity>
-
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
 
       <WorkoutTypePicker
@@ -211,40 +215,25 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  quickAddBtn: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  quickAddIcon: {
-    fontSize: 20,
-    color: colors.primary,
-    fontWeight: '700' as const,
-  },
-  quickAddText: {
-    ...typography.button,
-    color: colors.primary,
-  },
   content: {
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
 
-  // ── Brand Header ──
+  // Sticky Header
+  stickyHeader: {
+    backgroundColor: colors.background,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   brandHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
   brandLogo: {
     fontSize: 22,
@@ -258,5 +247,22 @@ const styles = StyleSheet.create({
   brandName: {
     ...typography.caption,
     color: colors.textMuted,
+  },
+
+  // Persistent Search Bar
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.md,
+    paddingHorizontal: spacing.md,
+    height: 44,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.full,
+  },
+  searchBarPlaceholder: {
+    ...typography.body1,
+    color: colors.textMuted,
+    flex: 1,
   },
 });
