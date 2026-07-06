@@ -156,7 +156,7 @@ export default function HomeScreen({ navigation }: Props) {
         {/* Persistent Search Bar — Tap öffnet Hub direkt im Such-Modus */}
         <TouchableOpacity
           style={styles.searchBar}
-          onPress={() => openHub()}
+          onPress={() => openHub({ autoFocusSearch: true })}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="Lebensmittel suchen"

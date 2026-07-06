@@ -18,25 +18,19 @@ export interface FoodEntryHubContext {
 interface FoodEntryHubStore {
   isOpen: boolean;
   context: FoodEntryHubContext;
-  /**
-   * Callback invoked after a successful diary entry.
-   * Callers use this to invalidate / reload their diary/home state.
-   */
+  /** If true, hub opens with search focused (keyboard open) — used from HomeScreen */
+  autoFocusSearch: boolean;
   onSuccess: (() => void) | null;
 
-  /**
-   * Opens the hub. Always resets internal hub state (even if already open).
-   * If no date is provided, defaults to today.
-   * If no mealType is provided, derives it from the current time.
-   */
   open: (params?: {
     mealId?: string;
     date?: string;
     mealType?: MealType;
     onSuccess?: () => void;
+    /** Open hub directly in search mode (keyboard auto-opens) */
+    autoFocusSearch?: boolean;
   }) => void;
 
-  /** Closes the hub and clears the context. */
   close: () => void;
 }
 
@@ -44,6 +38,7 @@ const TODAY = () => new Date().toISOString().split('T')[0]!;
 
 export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   isOpen: false,
+  autoFocusSearch: false,
   context: {
     date: TODAY(),
     mealType: getSuggestedMealType(),
@@ -55,6 +50,7 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
     const mealType = params?.mealType ?? getSuggestedMealType();
     set({
       isOpen: true,
+      autoFocusSearch: params?.autoFocusSearch ?? false,
       context: {
         mealId: params?.mealId,
         date,
@@ -65,6 +61,6 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   },
 
   close: () => {
-    set({ isOpen: false, onSuccess: null });
+    set({ isOpen: false, autoFocusSearch: false, onSuccess: null });
   },
 }));

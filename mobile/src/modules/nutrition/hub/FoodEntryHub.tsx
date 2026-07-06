@@ -34,7 +34,7 @@ import { LabelSubFlow } from './LabelSubFlow';
 const SNAP_POINTS = ['75%', '90%'];
 
 export function FoodEntryHub() {
-  const { isOpen, context, onSuccess, close } = useFoodEntryHubStore();
+  const { isOpen, context, onSuccess, close, autoFocusSearch } = useFoodEntryHubStore();
   const [hubState, dispatch] = useReducer(hubReducer, INITIAL_HUB_STATE);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -70,6 +70,10 @@ export function FoodEntryHub() {
       // Fade-in content after sheet settles
       setTimeout(() => {
         contentOpacity.value = withTiming(1, { duration: 220, easing: Easing.out(Easing.ease) });
+        // Auto-focus search if opened from HomeScreen search bar
+        if (autoFocusSearch) {
+          setTimeout(() => searchInputRef.current?.focus(), 300);
+        }
       }, 180);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else if (sheetIsOpenRef.current) {
@@ -240,45 +244,61 @@ export function FoodEntryHub() {
       >
         <BottomSheetView style={[styles.container, { paddingBottom: insets.bottom + spacing.md }]}>
           <Animated.View style={[styles.animatedContent, contentAnimStyle]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerText}>
-              <Text style={styles.title}>Lebensmittel hinzufügen</Text>
-              {subtitle ? (
-                <Text style={styles.subtitleText}>{subtitle}</Text>
-              ) : null}
-            </View>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={close}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              accessibilityLabel="Hub schließen"
-              accessibilityRole="button"
-            >
-              <Text style={styles.closeIcon}>✕</Text>
-            </TouchableOpacity>
-          </View>
 
-          {/* Search input */}
-          <View style={styles.searchRow}>
-            <BottomSheetTextInput
-              ref={searchInputRef}
-              style={styles.searchInput}
-              placeholder="Lebensmittel suchen…"
-              placeholderTextColor={colors.textMuted}
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              onFocus={handleSearchFocus}
-              onBlur={handleSearchBlur}
-              returnKeyType="search"
-              keyboardType="default"
-              autoCorrect={false}
-              autoCapitalize="none"
-              spellCheck={false}
-              clearButtonMode="while-editing"
-              accessibilityLabel="Lebensmittel suchen"
-            />
-          </View>
+            {/* Header — kompakt: Kontext-Badge links, Close-Icon rechts */}
+            <View style={styles.header}>
+              {subtitle ? (
+                <View style={styles.contextBadge}>
+                  <Text style={styles.contextBadgeText} numberOfLines={1}>{subtitle}</Text>
+                </View>
+              ) : (
+                <View style={styles.headerSpacer} />
+              )}
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={close}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityLabel="Hub schließen"
+                accessibilityRole="button"
+              >
+                <Icon lib="feather" name="x" size="md" color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Suchfeld — Pill-Form mit Icon + Android Clear Button */}
+            <View style={styles.searchRow}>
+              <View style={styles.searchContainer}>
+                <View style={styles.searchIconLeft}>
+                  <Icon lib="feather" name="search" size="sm" color={colors.textMuted} />
+                </View>
+                <BottomSheetTextInput
+                  ref={searchInputRef}
+                  style={styles.searchInput}
+                  placeholder={subtitle ? `Für ${context.mealType === 'breakfast' ? 'Frühstück' : context.mealType === 'lunch' ? 'Mittagessen' : context.mealType === 'dinner' ? 'Abendessen' : 'Mahlzeit'} suchen…` : 'Lebensmittel suchen…'}
+                  placeholderTextColor={colors.textMuted}
+                  value={searchQuery}
+                  onChangeText={handleSearchChange}
+                  onFocus={handleSearchFocus}
+                  onBlur={handleSearchBlur}
+                  returnKeyType="search"
+                  keyboardType="default"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  clearButtonMode={Platform.OS === 'ios' ? 'while-editing' : 'never'}
+                  accessibilityLabel="Lebensmittel suchen"
+                />
+                {Platform.OS === 'android' && searchQuery.length > 0 ? (
+                  <TouchableOpacity
+                    style={styles.searchClearBtn}
+                    onPress={() => handleSearchChange('')}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Icon lib="feather" name="x-circle" size="sm" color={colors.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
 
           {/* Content: Idle oder Search */}
           {showSearch ? (

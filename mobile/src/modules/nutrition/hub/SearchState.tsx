@@ -51,10 +51,6 @@ function Thumbnail({ uri, size = 48 }: { uri?: string | null; size?: number }) {
 // CompactActionBar — sticky über den Suchergebnissen
 // ---------------------------------------------------------------------------
 
-interface ActionBarProps {
-  onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void;
-}
-
 function CompactActionBar({ onOpenSubflow }: { onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void }) {
   return (
     <View style={styles.actionBar}>
@@ -96,7 +92,7 @@ function CompactActionBar({ onOpenSubflow }: { onOpenSubflow: (flow: 'barcode' |
 function ResultRow({ item, onPress }: { item: FoodSearchResult; onPress: (i: FoodSearchResult) => void }) {
   const [isFavorite, setIsFavorite] = useState(item.isFavorite ?? false);
 
-  const handleFavoriteToggle = useCallback(async (e: { stopPropagation?: () => void }) => {
+  const handleFavoriteToggle = useCallback(async () => {
     const next = !isFavorite;
     setIsFavorite(next);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -135,7 +131,7 @@ function ResultRow({ item, onPress }: { item: FoodSearchResult; onPress: (i: Foo
           <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
           {/* Inline Favoriten-Toggle */}
           <TouchableOpacity
-            onPress={(e) => void handleFavoriteToggle(e)}
+            onPress={() => void handleFavoriteToggle()}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
           >
