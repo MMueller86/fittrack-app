@@ -4,11 +4,12 @@
 // Closes automatically on tab navigation.
 
 import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { Keyboard, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Keyboard, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BottomSheetModal, BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { FoodSearchResult } from '@fittrack/shared';
+import { Icon } from '../../../shared/components/Icon';
 
 import type { ReusableItem } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
@@ -378,45 +379,61 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.md,
   },
+  // Kompakter Header: Kontext-Badge links, Close rechts
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    minHeight: 36,
   },
-  headerText: {
+  headerSpacer: {
     flex: 1,
   },
-  title: {
-    ...typography.h3,
-    color: colors.text,
+  contextBadge: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    flex: 1,
+    alignSelf: 'center',
+    marginRight: spacing.sm,
   },
-  subtitleText: {
+  contextBadgeText: {
     ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
+    color: colors.primary,
+    fontWeight: '600' as const,
   },
   closeButton: {
     padding: spacing.xs,
-    marginLeft: spacing.sm,
   },
-  closeIcon: {
-    fontSize: 18,
-    color: colors.textMuted,
-  },
+  // Pill-Suchfeld
   searchRow: {
     marginBottom: spacing.md,
   },
-  searchInput: {
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderRadius: radius.full,
+    height: 44,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    gap: spacing.sm,
+  },
+  searchIconLeft: {
+    width: 20,
+    alignItems: 'center',
+  },
+  searchInput: {
+    flex: 1,
     color: colors.text,
     ...typography.body1,
+    paddingVertical: 0,
+  },
+  searchClearBtn: {
+    width: 20,
+    alignItems: 'center',
   },
 
   // Hub-Snackbar — absolut positioniert am unteren Rand des Sheets,

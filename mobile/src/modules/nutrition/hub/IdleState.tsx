@@ -1,65 +1,95 @@
 // IdleState — Idle-Ansicht des FoodEntryHub.
-// Zeigt Favoriten + Recents (wenn vorhanden), sonst Quick-Actions.
-// Skeleton während des Ladens, ErrorBanner bei Fehler.
+// Favoriten: horizontale Chip-Reihe
+// Recents: vertikale Liste mit Zeitstempel + letzter Menge
+// Quick Actions: kompakte Icon-Toolbar
+// Skeleton: animiertes Pulsing (Reanimated)
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
+  Image,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import type { UserFoodRelation, FoodSearchResult } from '@fittrack/shared';
+import type { UserFoodRelation } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
+import { Icon } from '../../../shared/components/Icon';
 
 interface Props {
-  /** Called when user taps a favorite or recent item */
   onSelectRelation: (relation: UserFoodRelation) => void;
-  /** Called when user taps Barcode / KI / Manuell */
   onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void;
-  /** Search field is focused — hide idle content */
   searchFocused: boolean;
-  /** Hub just opened — trigger data load */
   isOpen: boolean;
-  /** Auto-focus search when both favorites and recents are empty */
   onRequestFocus?: () => void;
 }
 
 // ---------------------------------------------------------------------------
-// Skeleton helpers
+// Skeleton helpers — animiertes Pulsing statt statischer grauer Boxen
 // ---------------------------------------------------------------------------
 
-function SkeletonRow() {
-  return <View style={styles.skeletonRow} />;
+function SkeletonPulse({ style }: { style: object }) {
+  const opacity = useSharedValue(0.4);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.8, { duration: 600, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.4, { duration: 600, easing: Easing.inOut(Easing.ease) }),
+      ),
+      -1,
+      false,
+    );
+  }, [opacity]);
+
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return <Animated.View style={[style, animStyle]} />;
 }
 
-function SkeletonSection() {
+function SkeletonRow() {
+  return <SkeletonPulse style={styles.skeletonRow} />;
+}
+
+// ---------------------------------------------------------------------------
+// Thumbnail
+// ---------------------------------------------------------------------------
+
+function Thumbnail({ uri, size = 36 }: { uri?: string | null; size?: number }) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={[styles.thumbnail, { width: size, height: size }]}
+        resizeMode="cover"
+      />
+    );
+  }
   return (
-    <View style={styles.section}>
-      <View style={styles.skeletonLabel} />
-      <SkeletonRow />
-      <SkeletonRow />
-      <SkeletonRow />
+    <View style={[styles.thumbnailFallback, { width: size, height: size }]}>
+      <Icon lib="feather" name="database" size="sm" color={colors.textMuted} />
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Single food-relation row
+// FavoriteChip
 // ---------------------------------------------------------------------------
 
-interface RelationRowProps {
-  item: UserFoodRelation;
-  onPress: (item: UserFoodRelation) => void;
-}
-
-function RelationRow({ item, onPress }: RelationRowProps) {
+function FavoriteChip({ item, onPress }: { item: UserFoodRelation; onPress: (i: UserFoodRelation) => void }) {
   const handlePress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress(item);
@@ -67,34 +97,79 @@ function RelationRow({ item, onPress }: RelationRowProps) {
 
   return (
     <TouchableOpacity
-      style={styles.row}
+      style={styles.chip}
       onPress={handlePress}
       activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={item.displayName}
     >
-      <View style={styles.rowText}>
-        <Text style={styles.rowName} numberOfLines={1}>{item.displayName}</Text>
-        {item.displayBrand ? (
-          <Text style={styles.rowBrand} numberOfLines={1}>{item.displayBrand}</Text>
-        ) : null}
-      </View>
-      <Text style={styles.rowChevron}>›</Text>
+      <Thumbnail uri={null} size={36} />
+      <Text style={styles.chipName} numberOfLines={2}>{item.displayName}</Text>
+      {item.displayBrand ? (
+        <Text style={styles.chipBrand} numberOfLines={1}>{item.displayBrand}</Text>
+      ) : null}
     </TouchableOpacity>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Quick-Action button
+// RecentItem
 // ---------------------------------------------------------------------------
 
-interface QuickActionProps {
-  icon: string;
-  label: string;
-  onPress: () => void;
+function relativeTime(isoDate: string | null): string {
+  if (!isoDate) return '';
+  const d = new Date(isoDate);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'heute';
+  if (diffDays === 1) return 'gestern';
+  if (diffDays < 7) {
+    return ['So.', 'Mo.', 'Di.', 'Mi.', 'Do.', 'Fr.', 'Sa.'][d.getDay()] ?? '';
+  }
+  return `${d.getDate()}.${d.getMonth() + 1}.`;
 }
 
-function QuickAction({ icon, label, onPress }: QuickActionProps) {
+function RecentItem({ item, onPress }: { item: UserFoodRelation; onPress: (i: UserFoodRelation) => void }) {
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress(item);
+  }, [item, onPress]);
+
+  const timeStr = relativeTime(item.lastUsedAt);
+  const amountStr = item.lastInputAmount
+    ? item.lastInputMode === 'portion'
+      ? `${item.lastInputAmount} Port.`
+      : `${Math.round(item.lastInputAmount)} g`
+    : '';
+  const rightLabel = [amountStr, timeStr].filter(Boolean).join(' · ');
+
+  return (
+    <TouchableOpacity
+      style={styles.recentRow}
+      onPress={handlePress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={item.displayName}
+    >
+      <Thumbnail uri={null} size={36} />
+      <View style={styles.recentBody}>
+        <Text style={styles.recentName} numberOfLines={1}>{item.displayName}</Text>
+        {item.displayBrand ? (
+          <Text style={styles.recentBrand} numberOfLines={1}>{item.displayBrand}</Text>
+        ) : null}
+      </View>
+      {rightLabel ? (
+        <Text style={styles.recentMeta} numberOfLines={1}>{rightLabel}</Text>
+      ) : null}
+    </TouchableOpacity>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// QuickAction
+// ---------------------------------------------------------------------------
+
+function QuickAction({ iconEl, label, onPress }: { iconEl: React.ReactNode; label: string; onPress: () => void }) {
   return (
     <TouchableOpacity
       style={styles.quickAction}
@@ -102,7 +177,7 @@ function QuickAction({ icon, label, onPress }: QuickActionProps) {
       activeOpacity={0.7}
       accessibilityRole="button"
     >
-      <Text style={styles.quickActionIcon}>{icon}</Text>
+      {iconEl}
       <Text style={styles.quickActionLabel}>{label}</Text>
     </TouchableOpacity>
   );
@@ -165,10 +240,22 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
   // Loading skeleton
   if (loading) {
     return (
-      <>
-        <SkeletonSection />
-        <SkeletonSection />
-      </>
+      <View style={{ gap: spacing.md }}>
+        <View style={styles.section}>
+          <SkeletonPulse style={styles.skeletonLabel} />
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <SkeletonPulse style={styles.skeletonChip} />
+            <SkeletonPulse style={styles.skeletonChip} />
+            <SkeletonPulse style={styles.skeletonChip} />
+          </View>
+        </View>
+        <View style={styles.section}>
+          <SkeletonPulse style={styles.skeletonLabel} />
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </View>
+      </View>
     );
   }
 
@@ -182,36 +269,51 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
-      {/* Favorites */}
+      {/* Favoriten — horizontale Chips */}
       {hasFavorites && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Favoriten</Text>
-          {favorites.map((item) => (
-            <RelationRow key={item.id} item={item} onPress={onSelectRelation} />
-          ))}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs }}
+          >
+            {favorites.map((item) => (
+              <FavoriteChip key={item.id} item={item} onPress={onSelectRelation} />
+            ))}
+          </ScrollView>
         </View>
       )}
 
-      {/* Recents */}
+      {/* Recents — vertikale Liste mit Zeitstempel + letzter Menge */}
       {hasRecents && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Zuletzt</Text>
           {recents.map((item) => (
-            <RelationRow key={item.id} item={item} onPress={onSelectRelation} />
+            <RecentItem key={item.id} item={item} onPress={onSelectRelation} />
           ))}
         </View>
       )}
 
-      {/* Quick Actions — immer sichtbar */}
-      <View style={styles.section}>
-        <View style={styles.quickActions}>
-          <QuickAction icon="📷" label="Barcode" onPress={() => onOpenSubflow('barcode')} />
-          <QuickAction icon="✨" label="KI-Analyse" onPress={() => onOpenSubflow('ai')} />
-          <QuickAction icon="✏️" label="Manuell erfassen" onPress={() => onOpenSubflow('manual')} />
-        </View>
+      {/* Quick Actions — kompakte Icon-Toolbar */}
+      <View style={styles.quickActionsRow}>
+        <QuickAction
+          iconEl={<Icon lib="mci" name="barcode-scan" size="md" color={colors.textSecondary} />}
+          label="Barcode"
+          onPress={() => onOpenSubflow('barcode')}
+        />
+        <QuickAction
+          iconEl={<Icon lib="mci" name="auto-fix" size="md" color={colors.textSecondary} />}
+          label="KI-Analyse"
+          onPress={() => onOpenSubflow('ai')}
+        />
+        <QuickAction
+          iconEl={<Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />}
+          label="Manuell erfassen"
+          onPress={() => onOpenSubflow('manual')}
+        />
       </View>
 
-      {/* Empty-state hint */}
       {!hasFavorites && !hasRecents && (
         <View style={styles.emptyHint}>
           <Text style={styles.emptyText}>Noch keine Einträge</Text>
@@ -220,6 +322,8 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
           </Text>
         </View>
       )}
+
+      <View style={{ height: spacing.xl * 2 }} />
     </BottomSheetScrollView>
   );
 }
@@ -229,60 +333,80 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: spacing.lg,
-    gap: spacing.sm,
-  },
-  errorContainer: {
-    marginTop: spacing.sm,
-  },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: spacing.lg, gap: spacing.md },
+  errorContainer: { marginTop: spacing.sm },
 
-  // Sections
-  section: {
-    gap: spacing.xs,
-  },
+  section: { gap: spacing.xs },
   sectionLabel: {
     ...typography.overline,
     color: colors.textMuted,
     paddingHorizontal: spacing.xs,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs,
+    paddingBottom: 2,
   },
 
-  // Rows
-  row: {
+  // Favorite Chips
+  chip: {
+    width: 110,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    gap: 4,
+    alignItems: 'flex-start',
+  },
+  chipName: {
+    ...typography.caption,
+    fontWeight: '600' as const,
+    color: colors.text,
+  },
+  chipBrand: {
+    fontSize: 10,
+    color: colors.textMuted,
+    fontWeight: '400' as const,
+  },
+
+  // Thumbnail
+  thumbnail: { borderRadius: radius.sm },
+  thumbnailFallback: {
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Recents
+  recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
     gap: spacing.sm,
   },
-  rowText: {
-    flex: 1,
-  },
-  rowName: {
-    ...typography.body1,
+  recentBody: { flex: 1 },
+  recentName: {
+    ...typography.body2,
+    fontWeight: '600' as const,
     color: colors.text,
   },
-  rowBrand: {
+  recentBrand: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: colors.textMuted,
     marginTop: 1,
   },
-  rowChevron: {
-    fontSize: 20,
+  recentMeta: {
+    ...typography.caption,
     color: colors.textMuted,
+    textAlign: 'right',
+    maxWidth: 90,
   },
 
-  // Quick actions
-  quickActions: {
+  // Quick Actions Toolbar
+  quickActionsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+    marginTop: spacing.xs,
   },
   quickAction: {
     flex: 1,
@@ -291,32 +415,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
     gap: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  quickActionIcon: {
-    fontSize: 22,
   },
   quickActionLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 10,
+    color: colors.textMuted,
+    fontWeight: '500' as const,
+    textAlign: 'center',
   },
 
   // Skeleton
   skeletonRow: {
-    height: 48,
+    height: 52,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+  },
+  skeletonChip: {
+    width: 110,
+    height: 80,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
   },
   skeletonLabel: {
-    height: 12,
-    width: 80,
+    height: 10,
+    width: 60,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.sm,
-    marginBottom: spacing.xs,
   },
 
-  // Empty state
+  // Empty State
   emptyHint: {
     alignItems: 'center',
     paddingTop: spacing.xl,
@@ -324,6 +450,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     ...typography.body1,
+    color: colors.textSecondary,
+    fontWeight: '600' as const,
+  },
+  emptySubText: {
+    ...typography.body2,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+});
     color: colors.textSecondary,
   },
   emptySubText: {

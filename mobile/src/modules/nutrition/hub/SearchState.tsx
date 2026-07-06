@@ -1,21 +1,24 @@
-// SearchState — Suchergebnisse + kompakte Quick-Action-Leiste.
-// Wird in FoodEntryHub angezeigt, sobald das Suchfeld fokussiert ist.
-// Beinhaltet immer [📷] [✨] [✏️] direkt unter dem Suchfeld.
+// SearchState — Rich Suchergebnisse + sticky CompactActionBar.
+// P-5: Produktbild, Typographie-Hierarchie, Inline-Favoriten-Toggle, Source-Badge.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { BottomSheetFlatList } from '@gorhom/bottom-sheet';
+import * as Haptics from 'expo-haptics';
 import type { FoodSearchResult } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { foodApi } from '../../../shared/api/foodApi';
+import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
+import { Icon } from '../../../shared/components/Icon';
 
 interface Props {
   query: string;
@@ -24,14 +27,35 @@ interface Props {
 }
 
 // ---------------------------------------------------------------------------
-// Compact action bar — immer sichtbar bei aktiver Suche
+// Thumbnail
+// ---------------------------------------------------------------------------
+
+function Thumbnail({ uri, size = 48 }: { uri?: string | null; size?: number }) {
+  if (uri) {
+    return (
+      <Image
+        source={{ uri }}
+        style={[styles.thumbnail, { width: size, height: size }]}
+        resizeMode="cover"
+      />
+    );
+  }
+  return (
+    <View style={[styles.thumbnailFallback, { width: size, height: size }]}>
+      <Icon lib="feather" name="database" size="sm" color={colors.textMuted} />
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// CompactActionBar — sticky über den Suchergebnissen
 // ---------------------------------------------------------------------------
 
 interface ActionBarProps {
   onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void;
 }
 
-function CompactActionBar({ onOpenSubflow }: ActionBarProps) {
+function CompactActionBar({ onOpenSubflow }: { onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void }) {
   return (
     <View style={styles.actionBar}>
       <TouchableOpacity
@@ -40,25 +64,25 @@ function CompactActionBar({ onOpenSubflow }: ActionBarProps) {
         accessibilityRole="button"
         accessibilityLabel="Barcode scannen"
       >
-        <Text style={styles.actionBtnIcon}>📷</Text>
+        <Icon lib="mci" name="barcode-scan" size="md" color={colors.textSecondary} />
         <Text style={styles.actionBtnLabel}>Barcode</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.actionBtn}
         onPress={() => onOpenSubflow('ai')}
         accessibilityRole="button"
-        accessibilityLabel="KI-Schätzung"
+        accessibilityLabel="KI-Analyse"
       >
-        <Text style={styles.actionBtnIcon}>✨</Text>
-        <Text style={styles.actionBtnLabel}>KI</Text>
+        <Icon lib="mci" name="auto-fix" size="md" color={colors.textSecondary} />
+        <Text style={styles.actionBtnLabel}>KI-Analyse</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.actionBtn}
         onPress={() => onOpenSubflow('manual')}
         accessibilityRole="button"
-        accessibilityLabel="Manuell eingeben"
+        accessibilityLabel="Manuell erfassen"
       >
-        <Text style={styles.actionBtnIcon}>✏️</Text>
+        <Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />
         <Text style={styles.actionBtnLabel}>Manuell</Text>
       </TouchableOpacity>
     </View>
@@ -66,38 +90,83 @@ function CompactActionBar({ onOpenSubflow }: ActionBarProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Single result row
+// Rich ResultRow — Thumbnail + Name/Brand-Hierarchie + Favoriten-Toggle + Source
 // ---------------------------------------------------------------------------
 
-interface ResultRowProps {
-  item: FoodSearchResult;
-  onPress: (item: FoodSearchResult) => void;
-}
+function ResultRow({ item, onPress }: { item: FoodSearchResult; onPress: (i: FoodSearchResult) => void }) {
+  const [isFavorite, setIsFavorite] = useState(item.isFavorite ?? false);
 
-function ResultRow({ item, onPress }: ResultRowProps) {
+  const handleFavoriteToggle = useCallback(async (e: { stopPropagation?: () => void }) => {
+    const next = !isFavorite;
+    setIsFavorite(next);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      if (next) {
+        await favoritesApi.addFavorite({
+          foodRef: item.id,
+          foodRefType: item.source === 'openFoodFacts' ? 'catalog' : 'personal',
+          displayName: item.name,
+          displayBrand: item.brand,
+        });
+      } else {
+        await favoritesApi.removeFavorite(item.id);
+      }
+    } catch {
+      setIsFavorite(!next); // revert on error
+    }
+  }, [isFavorite, item]);
+
+  const calories = item.nutritionPer100g?.calories;
+  const isOFP = item.source === 'openFoodFacts';
+
   return (
     <TouchableOpacity
       style={styles.row}
       onPress={() => onPress(item)}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
       accessibilityRole="button"
     >
+      {/* Thumbnail */}
+      <Thumbnail uri={item.imageUrl} size={48} />
+
+      {/* Body */}
       <View style={styles.rowBody}>
-        <View style={styles.rowNameRow}>
+        <View style={styles.rowTopRow}>
           <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
-          {!item.isComplete && (
-            <Text style={styles.warnBadge}>⚠</Text>
-          )}
-          {item.isAiEstimate && (
-            <Text style={styles.aiBadge}>✨</Text>
-          )}
+          {/* Inline Favoriten-Toggle */}
+          <TouchableOpacity
+            onPress={(e) => void handleFavoriteToggle(e)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+          >
+            <Icon
+              lib="ion"
+              name={isFavorite ? 'heart' : 'heart-outline'}
+              size="md"
+              color={isFavorite ? colors.negative : colors.textMuted}
+            />
+          </TouchableOpacity>
         </View>
-        {item.brand ? (
-          <Text style={styles.rowBrand} numberOfLines={1}>{item.brand}</Text>
-        ) : null}
-        <Text style={styles.rowMeta}>{item.displayLabel}</Text>
+        <View style={styles.rowBottomRow}>
+          <View style={styles.rowMeta}>
+            {item.brand ? (
+              <Text style={styles.rowBrand} numberOfLines={1}>{item.brand}</Text>
+            ) : null}
+            {isOFP ? (
+              <Text style={styles.sourceBadge}>OFP</Text>
+            ) : null}
+            {item.isAiEstimate ? (
+              <Icon lib="mci" name="auto-fix" size="sm" color={colors.textMuted} />
+            ) : null}
+            {!item.isComplete ? (
+              <Icon lib="feather" name="alert-circle" size="sm" color={colors.neutral} />
+            ) : null}
+          </View>
+          {calories != null ? (
+            <Text style={styles.rowCalories}>{Math.round(calories)} kcal</Text>
+          ) : null}
+        </View>
       </View>
-      <Text style={styles.rowChevron}>›</Text>
     </TouchableOpacity>
   );
 }
@@ -152,10 +221,8 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Kompakte Action-Leiste — immer sichtbar */}
+      {/* CompactActionBar — STICKY über den Ergebnissen */}
       <CompactActionBar onOpenSubflow={onOpenSubflow} />
-
-      {/* Trennlinie */}
       <View style={styles.divider} />
 
       {/* Error */}
@@ -170,7 +237,7 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
         <ActivityIndicator color={colors.primary} style={styles.spinner} />
       ) : null}
 
-      {/* Suchergebnisse */}
+      {/* Rich Suchergebnisse */}
       {!loading && !error && hasResults ? (
         <BottomSheetFlatList
           data={results}
@@ -179,32 +246,31 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       ) : null}
 
-      {/* Kein Ergebnis — 3 Quick-Actions statt "Keine Ergebnisse" */}
+      {/* Kein Ergebnis — kompakte Quick Actions */}
       {emptyWithQuery ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>Kein Treffer für „{query}"</Text>
-          <Text style={styles.emptySubtext}>Alternativ:</Text>
           <View style={styles.emptyActions}>
             <TouchableOpacity style={styles.emptyAction} onPress={() => onOpenSubflow('barcode')}>
-              <Text style={styles.emptyActionIcon}>📷</Text>
+              <Icon lib="mci" name="barcode-scan" size="md" color={colors.textSecondary} />
               <Text style={styles.emptyActionLabel}>Barcode scannen</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.emptyAction} onPress={() => onOpenSubflow('ai')}>
-              <Text style={styles.emptyActionIcon}>✨</Text>
-              <Text style={styles.emptyActionLabel}>KI-Schätzung</Text>
+              <Icon lib="mci" name="auto-fix" size="md" color={colors.textSecondary} />
+              <Text style={styles.emptyActionLabel}>KI-Analyse</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.emptyAction} onPress={() => onOpenSubflow('manual')}>
-              <Text style={styles.emptyActionIcon}>✏️</Text>
-              <Text style={styles.emptyActionLabel}>Manuell eingeben</Text>
+              <Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />
+              <Text style={styles.emptyActionLabel}>Manuell erfassen</Text>
             </TouchableOpacity>
           </View>
         </View>
       ) : null}
 
-      {/* Kein Query — Hinweis */}
       {!hasQuery && !loading ? (
         <Text style={styles.hint}>Gib einen Suchbegriff ein…</Text>
       ) : null}
@@ -217,11 +283,9 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
 
-  // Action bar
+  // Action bar — sticky
   actionBar: {
     flexDirection: 'row',
     gap: spacing.sm,
@@ -236,80 +300,83 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  actionBtnIcon: {
-    fontSize: 15,
   },
   actionBtnLabel: {
     ...typography.caption,
     color: colors.textSecondary,
     fontWeight: '600' as const,
   },
-
   divider: {
     height: 1,
     backgroundColor: colors.border,
     marginBottom: spacing.sm,
   },
 
-  // Result rows
-  listContent: {
-    paddingBottom: spacing.lg,
-  },
+  // Rich Result rows
+  listContent: { paddingBottom: spacing.xl * 2 },
+  separator: { height: spacing.xs },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
-    marginBottom: spacing.xs,
     gap: spacing.sm,
   },
-  rowBody: {
-    flex: 1,
+
+  // Thumbnail
+  thumbnail: { borderRadius: radius.sm },
+  thumbnailFallback: {
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  rowNameRow: {
+
+  // Row body
+  rowBody: { flex: 1, gap: 3 },
+  rowTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
   rowName: {
     ...typography.body1,
+    fontWeight: '600' as const,
     color: colors.text,
-    flexShrink: 1,
+    flex: 1,
   },
-  warnBadge: {
-    fontSize: 14,
-    color: colors.negative,
+  rowBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  aiBadge: {
-    fontSize: 13,
+  rowMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flex: 1,
   },
   rowBrand: {
     ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 1,
+    color: colors.textMuted,
   },
-  rowMeta: {
+  sourceBadge: {
+    fontSize: 10,
+    color: colors.textMuted,
+    fontWeight: '500' as const,
+    letterSpacing: 0.3,
+  },
+  rowCalories: {
     ...typography.caption,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  rowChevron: {
-    fontSize: 20,
-    color: colors.textMuted,
+    color: colors.textSecondary,
+    fontWeight: '600' as const,
   },
 
   // States
-  spinner: {
-    marginTop: spacing.lg,
-  },
-  errorContainer: {
-    marginBottom: spacing.sm,
-  },
+  spinner: { marginTop: spacing.lg },
+  errorContainer: { marginBottom: spacing.sm },
   hint: {
     ...typography.body2,
     color: colors.textMuted,
@@ -317,7 +384,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xl,
   },
 
-  // Empty state
+  // Empty State
   emptyState: {
     alignItems: 'center',
     paddingTop: spacing.lg,
@@ -326,30 +393,25 @@ const styles = StyleSheet.create({
   emptyTitle: {
     ...typography.body1,
     color: colors.textSecondary,
-  },
-  emptySubtext: {
-    ...typography.caption,
-    color: colors.textMuted,
+    fontWeight: '600' as const,
   },
   emptyActions: {
-    width: '100%',
+    flexDirection: 'row',
     gap: spacing.sm,
+    width: '100%',
   },
   emptyAction: {
-    flexDirection: 'row',
+    flex: 1,
     alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
+    gap: spacing.xs,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  emptyActionIcon: {
-    fontSize: 22,
   },
   emptyActionLabel: {
-    ...typography.body1,
-    color: colors.text,
+    fontSize: 10,
+    color: colors.textMuted,
+    fontWeight: '500' as const,
+    textAlign: 'center',
   },
 });
