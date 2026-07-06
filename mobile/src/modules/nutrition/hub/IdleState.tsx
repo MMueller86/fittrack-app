@@ -1,17 +1,17 @@
 // IdleState — Idle-Ansicht des FoodEntryHub.
-// Favoriten: horizontale Chip-Reihe
+// Favoriten: Wrap-Grid (max 3 Zeilen) mit KI-Kurznamen
 // Recents: vertikale Liste mit Zeitstempel + letzter Menge
-// Quick Actions: kompakte Icon-Toolbar
+// Quick Actions: kompakte Icon-Toolbar (textDisabled)
 // Skeleton: animiertes Pulsing (Reanimated)
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Image,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import Animated, {
@@ -28,10 +28,16 @@ import { colors, radius, spacing, typography } from '../../../app/theme';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
+import { FavoriteChip } from '../../../shared/components/FavoriteChip';
+
+// Maximale Anzahl Favoriten-Chips bevor "→ Alle" erscheint
+const MAX_CHIP_ROWS = 3;
 
 interface Props {
   onSelectRelation: (relation: UserFoodRelation) => void;
   onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void;
+  /** Callback um „Alle Favoriten“ Modal zu öffnen */
+  onOpenAllFavorites?: () => void;
   searchFocused: boolean;
   isOpen: boolean;
   onRequestFocus?: () => void;
@@ -85,33 +91,6 @@ function Thumbnail({ uri, size = 36 }: { uri?: string | null; size?: number }) {
     <View style={[styles.thumbnailFallback, { width: size, height: size }]}>
       <Icon lib="feather" name="database" size="sm" color={colors.textMuted} />
     </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// FavoriteChip
-// ---------------------------------------------------------------------------
-
-function FavoriteChip({ item, onPress }: { item: UserFoodRelation; onPress: (i: UserFoodRelation) => void }) {
-  const handlePress = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress(item);
-  }, [item, onPress]);
-
-  return (
-    <TouchableOpacity
-      style={styles.chip}
-      onPress={handlePress}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={item.displayName}
-    >
-      <Thumbnail uri={null} size={36} />
-      <Text style={styles.chipName} numberOfLines={2}>{item.displayName}</Text>
-      {item.displayBrand ? (
-        <Text style={styles.chipBrand} numberOfLines={1}>{item.displayBrand}</Text>
-      ) : null}
-    </TouchableOpacity>
   );
 }
 
@@ -190,7 +169,13 @@ function QuickAction({ iconEl, label, onPress }: { iconEl: React.ReactNode; labe
 // IdleState component
 // ---------------------------------------------------------------------------
 
-export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOpen, onRequestFocus }: Props) {
+export function IdleState({ onSelectRelation, onOpenSubflow, onOpenAllFavorites, searchFocused, isOpen, onRequestFocus }: Props) {
+  const { width: screenWidth } = useWindowDimensions();
+  // Berechne max. Chips pro Zeile basierend auf Chip-Breite (72) + Gap (spacing.sm = 8)
+  const CHIP_WIDTH = 72 + spacing.sm;
+  const CHIP_PADDING = spacing.md * 2; // paddingHorizontal des Containers
+  const chipsPerRow = Math.max(2, Math.floor((screenWidth - CHIP_PADDING) / CHIP_WIDTH));
+  const maxVisibleChips = chipsPerRow * MAX_CHIP_ROWS;
   const [favorites, setFavorites] = useState<UserFoodRelation[]>([]);
   const [recents, setRecents] = useState<UserFoodRelation[]>([]);
   const [loading, setLoading] = useState(false);
@@ -277,15 +262,29 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
       {hasFavorites && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Favoriten</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.xs }}
-          >
-            {favorites.map((item) => (
-              <FavoriteChip key={item.id} item={item} onPress={onSelectRelation} />
+          {/* Wrap-Grid: max MAX_CHIP_ROWS Zeilen, danach "Alle" Chip */}
+          <View style={styles.chipsGrid}>
+            {favorites.slice(0, maxVisibleChips).map((item) => (
+              <FavoriteChip
+                key={item.id}
+                displayName={item.displayName}
+                shortName={item.shortName}
+                imageUrl={null}
+                onPress={() => onSelectRelation(item)}
+                accessibilityLabel={item.shortName ?? item.displayName}
+              />
             ))}
-          </ScrollView>
+            {favorites.length > maxVisibleChips && (
+              <TouchableOpacity
+                style={styles.chipAll}
+                onPress={onOpenAllFavorites}
+                accessibilityRole="button"
+                accessibilityLabel="Alle Favoriten anzeigen"
+              >
+                <Text style={styles.chipAllText}>Alle{'\n'}{favorites.length} →</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
 
@@ -349,28 +348,34 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
 
-  // Favorite Chips — primarySoft-Badge-Pattern (= aiBadge aus DiaryScreen)
-  // Favoriten sind aktive Nutzerentscheidungen → grüner Tint signalisiert "meine Wahl"
-  chip: {
-    width: 90,
-    backgroundColor: colors.primarySoft,
+  // Favoriten Wrap-Grid — max MAX_CHIP_ROWS Zeilen + optionaler "Alle" Chip
+  // Chip-Styling jetzt in shared/components/FavoriteChip.tsx
+  chipsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  chipAll: {
+    width: 72,
+    backgroundColor: 'transparent',
     borderRadius: radius.lg,
-    padding: spacing.sm,
-    gap: 4,
-    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderStyle: 'dashed' as const,
+    padding: spacing.xs + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 72,
   },
-  chipName: {
+  chipAllText: {
     ...typography.caption,
-    fontWeight: '600' as const,
-    color: colors.primary,
-  },
-  chipBrand: {
-    fontSize: 10,
-    color: colors.primaryDark,
-    fontWeight: '400' as const,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 
-  // Thumbnail
+  // Thumbnail (für RecentItem)
   thumbnail: { borderRadius: radius.sm },
   thumbnailFallback: {
     borderRadius: radius.sm,

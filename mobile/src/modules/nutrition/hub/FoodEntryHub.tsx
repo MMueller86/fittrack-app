@@ -25,6 +25,7 @@ import { hubReducer, INITIAL_HUB_STATE } from './hubReducer';
 import { IdleState } from './IdleState';
 import { SearchState } from './SearchState';
 import { ProduktDialog } from './ProduktDialog';
+import { AlleFavoritenModal } from './AlleFavoritenModal';
 import { ManuellerSubFlow } from './ManuellerSubFlow';
 import { AISubFlow } from './AISubFlow';
 import { BarcodeSubFlow } from './BarcodeSubFlow';
@@ -39,6 +40,7 @@ export function FoodEntryHub() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [addedProduct, setAddedProduct] = useState<string | null>(null);
+  const [showAllFavorites, setShowAllFavorites] = useState(false);
   const sheetRef = useRef<BottomSheetModal>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const searchInputRef = useRef<any>(null);
@@ -324,6 +326,7 @@ export function FoodEntryHub() {
               }}
               onOpenSubflow={handleOpenSubflow}
               onRequestFocus={handleRequestFocus}
+              onOpenAllFavorites={() => setShowAllFavorites(true)}
             />
           )}
 
@@ -363,6 +366,24 @@ export function FoodEntryHub() {
         context={context}
         onDismiss={handleProduktDismiss}
         onAdded={handleProduktAdded}
+      />
+
+      {/* Alle Favoriten Modal */}
+      <AlleFavoritenModal
+        visible={showAllFavorites}
+        onClose={() => setShowAllFavorites(false)}
+        onSelectRelation={(relation) => {
+          setShowAllFavorites(false);
+          handleSelectProduct({
+            id: relation.foodRef,
+            source: relation.foodRefType === 'catalog' ? 'openFoodFacts' : 'library',
+            name: relation.displayName,
+            brand: relation.displayBrand,
+            displayLabel: '',
+            nutritionBasis: 'per100g',
+            isComplete: true,
+          });
+        }}
       />
 
       {/* Sub-Flow Overlays — nur mounten wenn aktiv.

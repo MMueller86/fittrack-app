@@ -41,6 +41,13 @@ export interface UserFoodRelation {
   lastInputMode?: 'grams' | 'portion';
   /** Letzte Eingabemenge — für UX-Vorbelegen */
   lastInputAmount?: number;
+  /**
+   * Kurz-Anzeigename für Favoriten-Chips.
+   * Wird befüllt wenn ein AI-generierter Kurzname für dieses Produkt verfügbar ist.
+   * null = noch kein Kurzname generiert — Fallback auf displayName.
+   * Wird aus FoodProduct.shortName übernommen (oder später nutzerspezifisch überschrieben).
+   */
+  shortName?: string | null;
   /** ISO-Timestamp der Ersterstellung dieses Eintrags */
   createdAt: string;
 }

@@ -5,6 +5,7 @@ import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
+import { generateFavoriteShortName } from '../lib/favoriteShortNameService';
 import type { FoodRefType } from '@fittrack/shared';
 
 // GET    /api/favorites                -- list all favorites for current user
@@ -50,6 +51,15 @@ export const addFavoriteHandler = withHandler(
       true,
     );
     logEvent(ctx, 'info', 'favorites.add', { foodRef: body.foodRef });
+
+    // Fire & forget: AI-Kurzname asynchron generieren (blockiert die Response nicht)
+    generateFavoriteShortName(
+      userId,
+      body.foodRef,
+      body.foodRefType as 'catalog' | 'personal',
+      body.displayName,
+    );
+
     return { status: 201, jsonBody: relation };
   },
 );
