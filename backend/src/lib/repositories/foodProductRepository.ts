@@ -36,14 +36,6 @@ export interface FoodProductRepository {
 // Result mapper — converts a FoodProduct document to the unified FoodSearchResult shape
 // ---------------------------------------------------------------------------
 
-// Construct OFF CDN URL from barcode (EAN-13: split as 3/3/3/rest, shorter: literal)
-function offCdnUrl(barcode: string): string {
-  const path = barcode.length > 9
-    ? `${barcode.slice(0, 3)}/${barcode.slice(3, 6)}/${barcode.slice(6, 9)}/${barcode.slice(9)}`
-    : barcode;
-  return `https://images.openfoodfacts.org/images/products/${path}/front_en.full.jpg`;
-}
-
 export function foodProductToSearchResult(p: FoodProduct): FoodSearchResult {
   let displayLabel: string;
   if (p.nutritionBasis === 'both' && p.portion) {
@@ -81,9 +73,7 @@ export function foodProductToSearchResult(p: FoodProduct): FoodSearchResult {
     isComplete: true,
     sourceRef: { provider: 'openFoodFacts', barcode: p.barcode },
     ...(p.category ? { category: p.category } : {}),
-    // Use stored imageUrl if available; fall back to OFF CDN URL derived from barcode.
-    // The CDN serves images without a revision suffix — usable as best-effort fallback.
-    imageUrl: p.imageUrl ?? offCdnUrl(p.barcode),
+    ...(p.imageUrl ? { imageUrl: p.imageUrl } : {}),
   };
 }
 
