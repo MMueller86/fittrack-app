@@ -78,6 +78,9 @@ export function ProduktDialog({ product, context, onDismiss, onAdded }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedMealType, setSelectedMealType] = useState<MealType>(context.mealType);
+  // P-1.4: selectedMealType nur beim ERSTEN Öffnen auf Kontext setzen,
+  // nicht bei jedem Produkt-Wechsel (verhindert Reset einer User-Auswahl)
+  const isFirstProductRef = useRef(true);
 
   const hasPortions = !!product?.portion?.weightGrams;
   const hasPer100g = !!product?.nutritionPer100g;
@@ -94,6 +97,11 @@ export function ProduktDialog({ product, context, onDismiss, onAdded }: Props) {
       setIsFavorite(product.isFavorite ?? false);
       setError(null);
       setSaving(false);
+      // Meal-Type nur beim ersten Open zurücksetzen
+      if (isFirstProductRef.current) {
+        setSelectedMealType(context.mealType);
+        isFirstProductRef.current = false;
+      }
       sheetRef.current?.present();
 
       // UX-2: Pre-fill last used quantity from UserFoodRelation
@@ -109,6 +117,7 @@ export function ProduktDialog({ product, context, onDismiss, onAdded }: Props) {
         // Non-critical — ignore
       });
     } else {
+      isFirstProductRef.current = true; // Reset für nächstes Öffnen
       sheetRef.current?.dismiss();
     }
   }, [product]);

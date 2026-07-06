@@ -40,36 +40,20 @@ export function FoodEntryHub() {
   const sheetIsOpenRef = useRef(false);
   const insets = useSafeAreaInsets();
 
-  // Mount/Unmount-Log
-  useEffect(() => {
-    console.log('[FoodEntryHub] GEMOUNTET');
-    return () => console.log('[FoodEntryHub] UNMOUNTED');
-  }, []);
-
   // ---------------------------------------------------------------------------
   // Open / close sync with store
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
-    console.log('[FoodEntryHub] isOpen geändert:', isOpen, '| sheetRef:', !!sheetRef.current, '| sheetIsOpen:', sheetIsOpenRef.current);
     if (isOpen) {
       sheetIsOpenRef.current = true;
       dispatch({ type: 'RESET' });
       setSearchQuery('');
       setSearchFocused(false);
       setAddedProduct(null);
-      console.log('[FoodEntryHub] Rufe present() auf...');
-      try {
-        sheetRef.current?.present();
-        console.log('[FoodEntryHub] present() aufgerufen (kein Fehler)');
-      } catch (e) {
-        console.error('[FoodEntryHub] present() Exception:', e);
-      }
+      sheetRef.current?.present();
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else if (sheetIsOpenRef.current) {
-      // Nur dismiss() wenn das Sheet noch visuell offen ist (programmatisches Schließen).
-      // Nach Swipe-Close setzt onDismiss sheetIsOpenRef=false BEVOR close() den Store ändert,
-      // sodass hier kein doppeltes dismiss() ausgeführt wird.
       sheetRef.current?.dismiss();
     }
   }, [isOpen]);
@@ -230,7 +214,7 @@ export function FoodEntryHub() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.headerText}>
-              <Text style={styles.title}>Lebensmittel hinzuügen</Text>
+              <Text style={styles.title}>Lebensmittel hinzufügen</Text>
               {subtitle ? (
                 <Text style={styles.subtitleText}>{subtitle}</Text>
               ) : null}
@@ -261,6 +245,7 @@ export function FoodEntryHub() {
               keyboardType="default"
               autoCorrect={false}
               autoCapitalize="none"
+              spellCheck={false}
               clearButtonMode="while-editing"
               accessibilityLabel="Lebensmittel suchen"
             />
@@ -434,15 +419,24 @@ const styles = StyleSheet.create({
     ...typography.body1,
   },
 
-  // Hub-Snackbar
+  // Hub-Snackbar — absolut positioniert am unteren Rand des Sheets,
+  // überlagert den Scrollbereich (verhindert dass sie hinter flex:1 Content verschwindet)
   hubSnackbar: {
+    position: 'absolute',
+    bottom: 0,
+    left: spacing.md,
+    right: spacing.md,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
     padding: spacing.md,
     gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    marginTop: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
   },
   hubSnackbarText: {
     ...typography.body2,

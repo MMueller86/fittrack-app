@@ -6,12 +6,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
 import type { UserFoodRelation, FoodSearchResult } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
@@ -176,7 +176,7 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
   const hasRecents = recents.length > 0;
 
   return (
-    <ScrollView
+    <BottomSheetScrollView
       style={styles.scroll}
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
@@ -195,7 +195,7 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
       {/* Recents */}
       {hasRecents && (
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Zuletzt verwendet</Text>
+          <Text style={styles.sectionLabel}>Zuletzt</Text>
           {recents.map((item) => (
             <RelationRow key={item.id} item={item} onPress={onSelectRelation} />
           ))}
@@ -204,11 +204,10 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
 
       {/* Quick Actions — immer sichtbar */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Weitere Optionen</Text>
         <View style={styles.quickActions}>
           <QuickAction icon="📷" label="Barcode" onPress={() => onOpenSubflow('barcode')} />
-          <QuickAction icon="✨" label="KI-Schätzung" onPress={() => onOpenSubflow('ai')} />
-          <QuickAction icon="✏️" label="Manuell" onPress={() => onOpenSubflow('manual')} />
+          <QuickAction icon="✨" label="KI-Analyse" onPress={() => onOpenSubflow('ai')} />
+          <QuickAction icon="✏️" label="Manuell erfassen" onPress={() => onOpenSubflow('manual')} />
         </View>
       </View>
 
@@ -221,7 +220,7 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
           </Text>
         </View>
       )}
-    </ScrollView>
+    </BottomSheetScrollView>
   );
 }
 

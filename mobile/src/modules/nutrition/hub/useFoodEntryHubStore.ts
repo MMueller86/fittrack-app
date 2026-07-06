@@ -51,7 +51,6 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   onSuccess: null,
 
   open: (params) => {
-    console.log('[HubStore] open() aufgerufen', params);
     const date = params?.date ?? TODAY();
     const mealType = params?.mealType ?? getSuggestedMealType();
     set({
@@ -63,7 +62,6 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
       },
       onSuccess: params?.onSuccess ?? null,
     });
-    console.log('[HubStore] set() aufgerufen, isOpen=true');
   },
 
   close: () => {

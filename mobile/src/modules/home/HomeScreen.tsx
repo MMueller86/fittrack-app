@@ -190,11 +190,7 @@ export default function HomeScreen({ navigation }: Props) {
         {/* ── Schnell-Hinzufügen — öffnet FoodEntryHub ohne Mahlzeit-Kontext ── */}
         <TouchableOpacity
           style={styles.quickAddBtn}
-          onPress={() => {
-            console.log('[HomeScreen] Lebensmittel-Button gedrückt');
-            openHub();
-            console.log('[HomeScreen] openHub() aufgerufen');
-          }}
+          onPress={() => openHub()}
           accessibilityRole="button"
           accessibilityLabel="Lebensmittel hinzufügen"
         >
