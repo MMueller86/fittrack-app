@@ -299,20 +299,20 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
         </View>
       )}
 
-      {/* Quick Actions — kompakte Icon-Toolbar */}
+      {/* Quick Actions — sehr zur\u00fcckhaltend, textDisabled */}
       <View style={styles.quickActionsRow}>
         <QuickAction
-          iconEl={<Icon lib="mci" name="barcode-scan" size="md" color={colors.textSecondary} />}
+          iconEl={<Icon lib="mci" name="barcode-scan" size="md" color={colors.textDisabled} />}
           label="Barcode"
           onPress={() => onOpenSubflow('barcode')}
         />
         <QuickAction
-          iconEl={<Icon lib="mci" name="auto-fix" size="md" color={colors.textSecondary} />}
+          iconEl={<Icon lib="mci" name="auto-fix" size="md" color={colors.textDisabled} />}
           label="KI-Analyse"
           onPress={() => onOpenSubflow('ai')}
         />
         <QuickAction
-          iconEl={<Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />}
+          iconEl={<Icon lib="feather" name="edit-2" size="md" color={colors.textDisabled} />}
           label="Manuell erfassen"
           onPress={() => onOpenSubflow('manual')}
         />
@@ -349,11 +349,12 @@ const styles = StyleSheet.create({
     paddingBottom: 2,
   },
 
-  // Favorite Chips
+  // Favorite Chips — primarySoft-Badge-Pattern (= aiBadge aus DiaryScreen)
+  // Favoriten sind aktive Nutzerentscheidungen → grüner Tint signalisiert "meine Wahl"
   chip: {
-    width: 110,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
+    width: 90,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
     padding: spacing.sm,
     gap: 4,
     alignItems: 'flex-start',
@@ -361,11 +362,11 @@ const styles = StyleSheet.create({
   chipName: {
     ...typography.caption,
     fontWeight: '600' as const,
-    color: colors.text,
+    color: colors.primary,
   },
   chipBrand: {
     fontSize: 10,
-    color: colors.textMuted,
+    color: colors.primaryDark,
     fontWeight: '400' as const,
   },
 
@@ -373,19 +374,18 @@ const styles = StyleSheet.create({
   thumbnail: { borderRadius: radius.sm },
   thumbnailFallback: {
     borderRadius: radius.sm,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: 'rgba(103, 178, 62, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
 
-  // Recents
+  // Recents — itemRow-Pattern aus DiaryScreen (kein Card-Hintergrund, nur Divider)
   recentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.md,
+    paddingVertical: spacing.sm + 2,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     gap: spacing.sm,
   },
   recentBody: { flex: 1 },
@@ -404,25 +404,27 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'right',
     maxWidth: 90,
+    fontVariant: ['tabular-nums'] as const,
   },
 
-  // Quick Actions Toolbar
+  // Quick Actions Toolbar — sehr zurückhaltend (textDisabled, kein Hintergrund)
   quickActionsRow: {
     flexDirection: 'row',
     gap: spacing.sm,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   quickAction: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.md,
-    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    gap: 4,
   },
   quickActionLabel: {
     fontSize: 10,
-    color: colors.textMuted,
+    color: colors.textDisabled,
     fontWeight: '500' as const,
     textAlign: 'center',
   },

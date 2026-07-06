@@ -63,7 +63,7 @@ function CompactActionBar({ onOpenSubflow }: { onOpenSubflow: (flow: 'barcode' |
         accessibilityRole="button"
         accessibilityLabel="Barcode scannen"
       >
-        <Icon lib="mci" name="barcode-scan" size="md" color={colors.textSecondary} />
+        <Icon lib="mci" name="barcode-scan" size="md" color={colors.textDisabled} />
         <Text style={styles.actionBtnLabel}>Barcode</Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -72,7 +72,7 @@ function CompactActionBar({ onOpenSubflow }: { onOpenSubflow: (flow: 'barcode' |
         accessibilityRole="button"
         accessibilityLabel="KI-Analyse"
       >
-        <Icon lib="mci" name="auto-fix" size="md" color={colors.textSecondary} />
+        <Icon lib="mci" name="auto-fix" size="md" color={colors.textDisabled} />
         <Text style={styles.actionBtnLabel}>KI-Analyse</Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -81,7 +81,7 @@ function CompactActionBar({ onOpenSubflow }: { onOpenSubflow: (flow: 'barcode' |
         accessibilityRole="button"
         accessibilityLabel="Manuell erfassen"
       >
-        <Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />
+        <Icon lib="feather" name="edit-2" size="md" color={colors.textDisabled} />
         <Text style={styles.actionBtnLabel}>Manuell</Text>
       </TouchableOpacity>
     </View>
@@ -284,11 +284,14 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Action bar — sticky
+  // Action bar — sehr diskret, textDisabled (tertiäre Aktionen)
   actionBar: {
     flexDirection: 'row',
     gap: spacing.sm,
     paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginBottom: spacing.xs,
   },
   actionBtn: {
     flex: 1,
@@ -296,14 +299,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
+    paddingVertical: spacing.xs,
   },
   actionBtnLabel: {
     ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '600' as const,
+    color: colors.textDisabled,
+    fontWeight: '500' as const,
   },
   divider: {
     height: 1,
@@ -311,16 +312,23 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
 
-  // Rich Result rows
+  // Rich Result rows — mealCard-Pattern aus DiaryScreen
   listContent: { paddingBottom: spacing.xl * 2 },
-  separator: { height: spacing.xs },
+  separator: { height: spacing.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    elevation: 2,
     gap: spacing.sm,
   },
 
@@ -361,16 +369,24 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
   },
+  // Source badge — aiBadge-Pattern (primarySoft BG + primary Text)
   sourceBadge: {
     fontSize: 10,
-    color: colors.textMuted,
-    fontWeight: '500' as const,
+    color: colors.primary,
+    fontWeight: '600' as const,
     letterSpacing: 0.3,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    overflow: 'hidden' as const,
   },
+  // Kalorien — primary-Farbe (aktive Information), tabular-nums für Ausrichtung
   rowCalories: {
     ...typography.caption,
-    color: colors.textSecondary,
+    color: colors.primary,
     fontWeight: '600' as const,
+    fontVariant: ['tabular-nums'] as const,
   },
 
   // States
