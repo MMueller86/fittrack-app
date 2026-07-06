@@ -460,12 +460,3 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 });
-    color: colors.textSecondary,
-  },
-  emptySubText: {
-    ...typography.body2,
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-});
