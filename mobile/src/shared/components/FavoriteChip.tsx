@@ -1,10 +1,6 @@
 // FavoriteChip — Shared Komponente für Favoriten-Schnellzugriffe.
-// Verwendet überall wo Favoriten als kompakte Chips erscheinen:
-// - Food Entry Hub (IdleState)
-// - Künftig: Profil → Bibliothek → Favoriten
-//
-// Zeigt: shortName (AI-generiert) ?? displayName (Fallback) + optionales Produktbild.
-// Design: primarySoft-Badge-Pattern (= aiBadge aus DiaryScreen).
+// Orientiert sich am addMealChip-Pattern aus DiaryScreen (surface + border, horizontal).
+// Zeigt: kleines Thumbnail links + shortName (AI) ?? displayName (Fallback) rechts.
 
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -17,7 +13,7 @@ export interface FavoriteChipProps {
   displayName: string;
   /** AI-generierter Kurzname — wenn vorhanden, wird dieser angezeigt */
   shortName?: string | null;
-  /** Produktbild-URL (32pt Thumbnail) */
+  /** Produktbild-URL (24pt Thumbnail) */
   imageUrl?: string | null;
   /** Callback beim Antippen */
   onPress: () => void;
@@ -48,7 +44,7 @@ export function FavoriteChip({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? displayName}
     >
-      {/* Thumbnail */}
+      {/* Thumbnail — wie Emoji-Icon in addMealChip */}
       {imageUrl && !imgError ? (
         <Image
           source={{ uri: imageUrl }}
@@ -58,42 +54,43 @@ export function FavoriteChip({
         />
       ) : (
         <View style={styles.thumbnailFallback}>
-          <Icon lib="feather" name="database" size="sm" color={colors.primary} />
+          <Icon lib="feather" name="database" size="sm" color={colors.textMuted} />
         </View>
       )}
 
       {/* Name (shortName hat Vorrang, Fallback: displayName) */}
-      <Text style={styles.chipName} numberOfLines={2}>{label}</Text>
+      <Text style={styles.chipName} numberOfLines={1}>{label}</Text>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
+  // addMealChip-Pattern aus DiaryScreen: surface + border, horizontal, radius.md
   chip: {
-    width: 72,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.lg,
-    padding: spacing.xs + 2,
-    gap: 4,
-    alignItems: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    gap: spacing.xs,
   },
   thumbnail: {
-    width: 32,
-    height: 32,
+    width: 20,
+    height: 20,
     borderRadius: radius.sm,
   },
   thumbnailFallback: {
-    width: 32,
-    height: 32,
+    width: 20,
+    height: 20,
     borderRadius: radius.sm,
-    backgroundColor: 'rgba(103, 178, 62, 0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   chipName: {
-    ...typography.caption,
-    fontWeight: '600' as const,
-    color: colors.primary,
-    lineHeight: 14,
+    ...typography.body2,
+    color: colors.text,
   },
 });

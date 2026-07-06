@@ -171,10 +171,11 @@ function QuickAction({ iconEl, label, onPress }: { iconEl: React.ReactNode; labe
 
 export function IdleState({ onSelectRelation, onOpenSubflow, onOpenAllFavorites, searchFocused, isOpen, onRequestFocus }: Props) {
   const { width: screenWidth } = useWindowDimensions();
-  // Berechne max. Chips pro Zeile basierend auf Chip-Breite (72) + Gap (spacing.sm = 8)
-  const CHIP_WIDTH = 72 + spacing.sm;
-  const CHIP_PADDING = spacing.md * 2; // paddingHorizontal des Containers
-  const chipsPerRow = Math.max(2, Math.floor((screenWidth - CHIP_PADDING) / CHIP_WIDTH));
+  // Chip-Breite: "Haferflocken" ≈ 110pt, mit Padding + Border = ca. 120pt
+  // chipsPerRow bestimmt wie viele Chips nebeneinander passen
+  const CHIP_APPROX_WIDTH = 120 + spacing.sm;
+  const CHIP_PADDING = spacing.md * 2;
+  const chipsPerRow = Math.max(2, Math.floor((screenWidth - CHIP_PADDING) / CHIP_APPROX_WIDTH));
   const maxVisibleChips = chipsPerRow * MAX_CHIP_ROWS;
   const [favorites, setFavorites] = useState<UserFoodRelation[]>([]);
   const [recents, setRecents] = useState<UserFoodRelation[]>([]);
