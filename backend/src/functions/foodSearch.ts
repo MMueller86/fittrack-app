@@ -53,6 +53,7 @@ function reusableItemToSearchResult(item: ReusableItem): FoodSearchResult {
     portion: item.portion,
     isComplete: item.isComplete,
     sourceRef: item.sourceRef,
+    ...(item.imageUrl ? { imageUrl: item.imageUrl } : {}),
     ...(item.sourceType === 'ai' && { isAiEstimate: true }),
     ...(item.sourceType === 'ai' && item.aiConfidence != null && { aiConfidence: item.aiConfidence }),
   };

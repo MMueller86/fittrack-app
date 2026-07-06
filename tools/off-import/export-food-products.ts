@@ -438,7 +438,17 @@ function getStr(doc: Document, ...keys: string[]): string | undefined {
  * URL schema: https://images.openfoodfacts.org/images/products/<barcode_path>/<imgid>.<rev>.400.jpg
  * For EAN-13 (>9 digits) the barcode_path is split into 3+3+3+rest groups.
  */
-function getImageUrl(barcode: string, images: Record<string, unknown> | undefined): string | undefined {
+function getImageUrl(barcode: string, images: Record<string, unknown> | undefined, doc?: Record<string, unknown>): string | undefined {
+  // Fallback 1: direktes OFF-Feld (image_front_url) — in älteren und neueren Dump-Formaten verfügbar
+  if (doc) {
+    const directUrl = typeof doc['image_front_url'] === 'string' && doc['image_front_url']
+      ? doc['image_front_url'] as string
+      : typeof doc['image_front_small_url'] === 'string' && doc['image_front_small_url']
+        ? doc['image_front_small_url'] as string
+        : null;
+    if (directUrl) return directUrl;
+  }
+
   if (!images) return undefined;
 
   // Build the barcode path segment
@@ -929,9 +939,11 @@ function mapProduct(
       return pnns2 && pnns2 !== 'unknown' ? { category: pnns2 } : {};
     })()),
     sourceRef: { provider: 'openFoodFacts', barcode },
-    ...(getImageUrl(barcode, doc['images'] as Record<string, unknown> | undefined) && {
-      imageUrl: getImageUrl(barcode, doc['images'] as Record<string, unknown> | undefined),
-    }),
+    // Priority: image_front_url (direktes Feld) → images.front_de/en.rev → kein Bild
+    ...((() => {
+      const url = getImageUrl(barcode, doc['images'] as Record<string, unknown> | undefined, doc as Record<string, unknown>);
+      return url ? { imageUrl: url } : {};
+    })()),
     meta: {
       source: 'openFoodFacts',
       confidence: Math.round((qualityScore / 100) * 100) / 100,

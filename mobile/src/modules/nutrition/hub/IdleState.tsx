@@ -69,12 +69,15 @@ function SkeletonRow() {
 // ---------------------------------------------------------------------------
 
 function Thumbnail({ uri, size = 36 }: { uri?: string | null; size?: number }) {
-  if (uri) {
+  const [imgError, setImgError] = useState(false);
+
+  if (uri && !imgError) {
     return (
       <Image
         source={{ uri }}
         style={[styles.thumbnail, { width: size, height: size }]}
         resizeMode="cover"
+        onError={() => setImgError(true)}
       />
     );
   }
@@ -215,7 +218,8 @@ export function IdleState({ onSelectRelation, onOpenSubflow, searchFocused, isOp
     } finally {
       setLoading(false);
     }
-  }, []);
+  // onRequestFocus ist optional und stabil — in deps aufnehmen verhindert stale closure bei UX-1
+  }, [onRequestFocus]);
 
   // Reload every time hub opens
   useEffect(() => {

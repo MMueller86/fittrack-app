@@ -31,12 +31,15 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 function Thumbnail({ uri, size = 48 }: { uri?: string | null; size?: number }) {
-  if (uri) {
+  const [imgError, setImgError] = React.useState(false);
+
+  if (uri && !imgError) {
     return (
       <Image
         source={{ uri }}
         style={[styles.thumbnail, { width: size, height: size }]}
         resizeMode="cover"
+        onError={() => setImgError(true)}
       />
     );
   }
