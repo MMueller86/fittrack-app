@@ -439,7 +439,7 @@ function getStr(doc: Document, ...keys: string[]): string | undefined {
  * For EAN-13 (>9 digits) the barcode_path is split into 3+3+3+rest groups.
  */
 function getImageUrl(barcode: string, images: Record<string, unknown> | undefined, doc?: Record<string, unknown>): string | undefined {
-  // Fallback 1: direktes OFF-Feld (image_front_url) — in älteren und neueren Dump-Formaten verfügbar
+  // Fallback 1: direktes OFF-Feld (image_front_url) — in einigen Dump-Varianten verfügbar
   if (doc) {
     const directUrl = typeof doc['image_front_url'] === 'string' && doc['image_front_url']
       ? doc['image_front_url'] as string
@@ -451,22 +451,42 @@ function getImageUrl(barcode: string, images: Record<string, unknown> | undefine
 
   if (!images) return undefined;
 
-  // Build the barcode path segment
+  // Build the barcode path segment (EAN-13 > 9 digits: split as 3/3/3/rest)
   const barcodePath = barcode.length > 9
     ? `${barcode.slice(0, 3)}/${barcode.slice(3, 6)}/${barcode.slice(6, 9)}/${barcode.slice(9)}`
     : barcode;
 
-  // Try front_de, front_en, then any front_* key
-  const candidates = ['front_de', 'front_en', ...Object.keys(images).filter(k => k.startsWith('front_'))];
-  for (const key of candidates) {
-    const entry = images[key] as Record<string, unknown> | undefined;
-    if (!entry) continue;
-    const rev = entry['rev'];
-    if (typeof rev === 'string' && rev) {
-      // OFF URL: /images/products/{barcodePath}/{label}.{rev}.400.jpg
+  const buildUrl = (key: string, rev: unknown): string | null => {
+    if ((typeof rev === 'string' || typeof rev === 'number') && rev) {
       return `https://images.openfoodfacts.org/images/products/${barcodePath}/${key}.${rev}.400.jpg`;
     }
+    return null;
+  };
+
+  // Schema 1 (alt): images.front_de.rev, images.front_en.rev
+  // Priorität: front_de → front_en → beliebiger front_* Key
+  const directCandidates = ['front_de', 'front_en', ...Object.keys(images).filter(k => k.startsWith('front_'))];
+  for (const key of [...new Set(directCandidates)]) {
+    const entry = images[key] as Record<string, unknown> | undefined;
+    if (!entry) continue;
+    const url = buildUrl(key, entry['rev']);
+    if (url) return url;
   }
+
+  // Schema 2 (neu): images.selected.front.{lang}.rev
+  // Struktur: images.selected.front.de = { imgid, rev, sizes }
+  const selected = images['selected'] as Record<string, unknown> | undefined;
+  const selectedFront = selected?.['front'] as Record<string, unknown> | undefined;
+  if (selectedFront) {
+    const langPriority = ['de', 'en', 'fr', ...Object.keys(selectedFront)];
+    for (const lang of [...new Set(langPriority)]) {
+      const langEntry = selectedFront[lang] as Record<string, unknown> | undefined;
+      if (!langEntry) continue;
+      const url = buildUrl(`front_${lang}`, langEntry['rev']);
+      if (url) return url;
+    }
+  }
+
   return undefined;
 }
 
