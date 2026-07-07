@@ -106,6 +106,7 @@ function ResultRow({ item, onPress }: { item: FoodSearchResult; onPress: (i: Foo
           foodRefType: item.source === 'openFoodFacts' ? 'catalog' : 'personal',
           displayName: item.name,
           displayBrand: item.brand,
+          imageUrl: item.imageUrl ?? null,
         });
       } else {
         await favoritesApi.removeFavorite(item.id);
