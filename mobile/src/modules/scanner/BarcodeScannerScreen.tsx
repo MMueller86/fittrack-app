@@ -210,7 +210,8 @@ export default function BarcodeScannerScreen({
         );
         if (match) {
           onProductFound?.(match);
-          onClose();
+          // Kein onClose() hier — der Hub schließt den Scanner automatisch wenn
+          // SELECT_PRODUCT den hubState.mode von 'subflow' auf 'product' wechselt.
         } else {
           setScanState('not-found');
         }
@@ -218,7 +219,7 @@ export default function BarcodeScannerScreen({
         setScanState('error');
       }
     },
-    [scanState, onProductFound, onClose],
+    [scanState, onProductFound],
   );
 
   function handleRetry() {

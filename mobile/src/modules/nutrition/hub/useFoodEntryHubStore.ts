@@ -20,6 +20,10 @@ interface FoodEntryHubStore {
   context: FoodEntryHubContext;
   /** If true, hub opens with search focused (keyboard open) — used from HomeScreen */
   autoFocusSearch: boolean;
+  /** If set, hub opens directly into this subflow */
+  initialSubflow: 'barcode' | 'ai' | null;
+  /** If true, hub closes automatically after a subflow saves (HomeScreen use case) */
+  autoCloseOnSave: boolean;
   onSuccess: (() => void) | null;
 
   open: (params?: {
@@ -29,6 +33,10 @@ interface FoodEntryHubStore {
     onSuccess?: () => void;
     /** Open hub directly in search mode (keyboard auto-opens) */
     autoFocusSearch?: boolean;
+    /** Open hub directly in a subflow */
+    initialSubflow?: 'barcode' | 'ai';
+    /** Close hub automatically after save (HomeScreen use case) */
+    autoCloseOnSave?: boolean;
   }) => void;
 
   close: () => void;
@@ -39,6 +47,8 @@ const TODAY = () => new Date().toISOString().split('T')[0]!;
 export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   isOpen: false,
   autoFocusSearch: false,
+  initialSubflow: null,
+  autoCloseOnSave: false,
   context: {
     date: TODAY(),
     mealType: getSuggestedMealType(),
@@ -51,6 +61,8 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
     set({
       isOpen: true,
       autoFocusSearch: params?.autoFocusSearch ?? false,
+      initialSubflow: params?.initialSubflow ?? null,
+      autoCloseOnSave: params?.autoCloseOnSave ?? false,
       context: {
         mealId: params?.mealId,
         date,
@@ -61,6 +73,6 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   },
 
   close: () => {
-    set({ isOpen: false, autoFocusSearch: false, onSuccess: null });
+    set({ isOpen: false, autoFocusSearch: false, initialSubflow: null, autoCloseOnSave: false, onSuccess: null });
   },
 }));

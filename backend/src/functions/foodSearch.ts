@@ -96,7 +96,11 @@ export const foodSearchHandler = withHandler(
       const scoredCatalog = catalog
         .map((result) => ({
           result,
-          score: rankByQuery(result.name, [], nq),
+          // Barcode-Treffer (rein numerische Query): Score 4 (= exact match tier),
+          // da das Repository bereits den exakten Barcode-Lookup gemacht hat.
+          score: /^\d+$/.test(nq)
+            ? 4
+            : rankByQuery(result.name, [], nq),
         }))
         .filter((x) => x.score >= 0);
 

@@ -313,11 +313,17 @@ export function QuantityView({ product, context, onBack, onAdded }: QuantityView
     setLoading(true);
     setError(null);
     try {
-      // Wenn kein mealId: neue Mahlzeit anlegen
+      // Wenn kein mealId: existierende Mahlzeit suchen, sonst neu anlegen
       let mealId = context.mealId;
       if (!mealId) {
-        const created = await diaryApi.createMeal(context.date, selectedMeal);
-        mealId = created.meal.id;
+        const dayData = await diaryApi.getDay(context.date);
+        const existing = dayData.meals.find((m) => m.type === selectedMeal);
+        if (existing) {
+          mealId = existing.id;
+        } else {
+          const created = await diaryApi.createMeal(context.date, selectedMeal);
+          mealId = created.meal.id;
+        }
       }
       const calcNutrition = product.nutritionPer100g
         ? calculateNutrition('grams', gramsValue, product.nutritionPer100g).calculatedNutrition

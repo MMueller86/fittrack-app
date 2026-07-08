@@ -153,17 +153,37 @@ export default function HomeScreen({ navigation }: Props) {
           </Text>
           <Text style={styles.brandName}>{displayName ?? 'Willkommen'}</Text>
         </View>
-        {/* Persistent Search Bar — Tap öffnet Hub direkt im Such-Modus */}
-        <TouchableOpacity
-          style={styles.searchBar}
-          onPress={() => openHub()}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Lebensmittel suchen"
-        >
-          <Icon lib="feather" name="search" size="sm" color={colors.textMuted} />
-          <Text style={styles.searchBarPlaceholder}>Lebensmittel suchen…</Text>
-        </TouchableOpacity>
+        {/* Search Row — identisches Layout wie im Food Hub */}
+        <View style={styles.searchRow}>
+          <TouchableOpacity
+            style={styles.searchPill}
+            onPress={() => openHub({ autoFocusSearch: true })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Lebensmittel suchen"
+          >
+            <Icon lib="feather" name="search" size="sm" color={colors.textMuted} />
+            <Text style={styles.searchPillPlaceholder}>Lebensmittel suchen…</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.searchAction}
+            onPress={() => openHub({ initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="KI-Analyse"
+          >
+            <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.searchAction}
+            onPress={() => openHub({ initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Barcode scannen"
+          >
+            <Icon lib="mci" name="barcode-scan" size="md" color={colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -249,20 +269,35 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Persistent Search Bar
-  searchBar: {
+  // Search Row — identisch zum Food Hub
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: spacing.md,
+    marginBottom: 2,
+  },
+  searchPill: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    marginHorizontal: spacing.md,
-    paddingHorizontal: spacing.md,
-    height: 44,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.full,
+    height: 52,
+    paddingHorizontal: spacing.md,
   },
-  searchBarPlaceholder: {
+  searchPillPlaceholder: {
     ...typography.body1,
     color: colors.textMuted,
     flex: 1,
+  },
+  searchAction: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

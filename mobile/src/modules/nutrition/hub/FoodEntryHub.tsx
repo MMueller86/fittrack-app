@@ -36,7 +36,7 @@ import { LabelSubFlow } from './LabelSubFlow';
 const SNAP_POINTS = ['85%'];
 
 export function FoodEntryHub() {
-  const { isOpen, context, onSuccess, close, autoFocusSearch } = useFoodEntryHubStore();
+  const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave } = useFoodEntryHubStore();
   const [hubState, dispatch] = useReducer(hubReducer, INITIAL_HUB_STATE);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -79,7 +79,6 @@ export function FoodEntryHub() {
 
   useEffect(() => {
     if (isOpen) {
-      sheetIsOpenRef.current = true;
       dispatch({ type: 'RESET' });
       setSearchQuery('');
       setSearchFocused(false);
@@ -88,15 +87,36 @@ export function FoodEntryHub() {
       setAllFavoritesMode(false);
       setCachedResults([]);
       favoritesApi.listRecent(20).then(setRecents).catch(() => setRecents([]));
+
+      if (autoCloseOnSave && initialSubflow) {
+        // HomeScreen-Subflow: Bottom Sheet NICHT öffnen — kein sheetIsOpenRef setzen
+        dispatch({ type: 'OPEN_SUBFLOW', flow: initialSubflow });
+        return;
+      }
+
+      sheetIsOpenRef.current = true;
       sheetRef.current?.present();
       if (autoFocusSearch) {
         setTimeout(() => searchInputRef.current?.focus(), 480);
+      }
+      if (initialSubflow) {
+        // Kleines Delay damit das Sheet erst animiert hat
+        setTimeout(() => dispatch({ type: 'OPEN_SUBFLOW', flow: initialSubflow }), 350);
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else if (sheetIsOpenRef.current) {
       sheetRef.current?.dismiss();
     }
   }, [isOpen]);
+
+  // Lazy Sheet-Präsentation: wenn im HomeScreen-Subflow ein Produkt gefunden wurde,
+  // muss das Sheet jetzt geöffnet werden (QuantityView lebt darin).
+  useEffect(() => {
+    if (isOpen && hubState.mode === 'product' && !sheetIsOpenRef.current) {
+      sheetIsOpenRef.current = true;
+      sheetRef.current?.present();
+    }
+  }, [isOpen, hubState.mode]);
 
   // Keyboard-Listener: zuverlÃ¤ssige Tastatur-Dismiss-Erkennung (onBlur feuert in BottomSheet nicht immer)
   useEffect(() => {
@@ -248,6 +268,12 @@ export function FoodEntryHub() {
   }, []);
 
   const handleQuantityAdded = useCallback((productName: string, mealId: string, itemId: string) => {
+    if (autoCloseOnSave) {
+      // HomeScreen-Modus: Hub sofort schließen, kein Snackbar
+      onSuccess?.();
+      close();
+      return;
+    }
     dispatch({ type: 'RESET' });
     setSearchQuery('');
     searchQueryRef.current = '';
@@ -257,7 +283,7 @@ export function FoodEntryHub() {
     onSuccess?.();
     // Recents sofort aktualisieren -- neues Item erscheint direkt in der Liste
     favoritesApi.listRecent(20).then(setRecents).catch(() => {});
-  }, [onSuccess]);
+  }, [autoCloseOnSave, onSuccess, close]);
 
   // ---------------------------------------------------------------------------
   // Hub-Snackbar actions
@@ -295,11 +321,18 @@ export function FoodEntryHub() {
   }, []);
 
   const handleSubflowSaved = useCallback((productName: string) => {
+    if (autoCloseOnSave) {
+      // HomeScreen-Modus: Subflow-State leeren, Hub schließen, HomeScreen aktualisieren
+      dispatch({ type: 'RESET' });
+      onSuccess?.();
+      close();
+      return;
+    }
     dispatch({ type: 'RESET' });
     // Subflows: kein itemId verfuegbar -> Snackbar ohne Undo
     setAddedItem({ productName, mealId: '', itemId: '' });
     onSuccess?.();
-  }, [onSuccess]);
+  }, [autoCloseOnSave, onSuccess, close]);
 
   const handleBarcodeProductFound = useCallback((product: FoodSearchResult) => {
     dispatch({ type: 'SELECT_PRODUCT', product });
