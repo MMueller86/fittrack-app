@@ -36,7 +36,8 @@ export function AlleFavoritenModal({ visible, onClose, onSelectRelation }: Props
 
   useEffect(() => {
     if (visible) {
-      sheetRef.current?.present();
+      // Tick delay: sicherstellen dass Ref gebunden ist bevor present() aufgerufen wird
+      setTimeout(() => sheetRef.current?.present(), 0);
       void loadFavorites();
     } else {
       sheetRef.current?.dismiss();

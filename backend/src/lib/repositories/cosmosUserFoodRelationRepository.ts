@@ -112,6 +112,8 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
             usageCount: existing.usageCount + 1,
             displayName: input.displayName,
             displayBrand: input.displayBrand,
+            // imageUrl aktualisieren wenn neu geliefert (überschreibt nie mit null wenn bereits gesetzt)
+            ...(input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
             ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
             ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
           }
@@ -122,6 +124,7 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
             foodRefType: input.foodRefType,
             displayName: input.displayName,
             displayBrand: input.displayBrand,
+            imageUrl: input.imageUrl ?? null,
             isFavorite: false,
             lastUsedAt: now,
             usageCount: 1,

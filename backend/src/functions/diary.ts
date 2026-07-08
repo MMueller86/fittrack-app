@@ -90,6 +90,7 @@ const AddItemSchema = z
     aiMealEstimateConfidence: z.enum(['high', 'medium', 'low']).optional(),
     aiMealEstimateAssumptions: z.array(z.string()).optional(),
     aiMealEstimatePhotoUsed: z.boolean().optional(),
+    imageUrl: z.string().url().optional().nullable(),
   })
   .refine(
     (d) => {
@@ -373,6 +374,7 @@ export const addItemHandler = withHandler(
               foodRefType,
               displayName: itemName,
               displayBrand: undefined,
+              imageUrl: ('imageUrl' in d && d.imageUrl != null) ? String(d.imageUrl) : undefined,
               ...(d.inputMode ? { lastInputMode: d.inputMode } : {}),
               ...(d.inputAmount != null ? { lastInputAmount: d.inputAmount } : {}),
             });

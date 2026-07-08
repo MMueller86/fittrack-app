@@ -44,6 +44,7 @@ export interface AddItemProductInput {
   unit?: string;
   isAiEstimate?: boolean;
   sourceType?: string;
+  imageUrl?: string | null;
   aiMealEstimateComponents?: string[];
   aiMealEstimateContext?: string;
   aiMealEstimateConfidence?: 'high' | 'medium' | 'low';

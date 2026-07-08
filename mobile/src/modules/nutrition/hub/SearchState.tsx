@@ -1,10 +1,13 @@
-// SearchState — Rich Suchergebnisse + sticky CompactActionBar.
-// P-5: Produktbild, Typographie-Hierarchie, Inline-Favoriten-Toggle, Source-Badge.
+﻿// SearchState -- Story 2: Suchergebnisse, 3-Zeilen-Layout, Keyboard-on-Drag.
+// MacroAndPortionLine: "251 kcal . EW 8 g . KH 43 g . F 3 g . je 100 g"
+// FallbackSection immer als ListFooterComponent sichtbar.
+// keyboardDismissMode="on-drag": Tastatur schliesst beim Scrollen.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,87 +15,180 @@ import {
 } from 'react-native';
 import { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import type { FoodSearchResult } from '@fittrack/shared';
+import type { FoodSearchResult, NutritionValues, PortionInfo, UserFoodRelation } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { foodApi } from '../../../shared/api/foodApi';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
+import { RecentItem } from './RecentItem';
 
 interface Props {
   query: string;
+  recents: UserFoodRelation[];
+  /** Gecachte Ergebnisse aus FoodEntryHub -- verhindert Leerzeile beim Zurueck aus QuantityView */
+  initialResults?: FoodSearchResult[];
   onSelect: (item: FoodSearchResult) => void;
-  onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void;
+  onSelectRelation: (relation: UserFoodRelation) => void;
+  onOpenSubflow: (flow: 'barcode' | 'ai' | 'label' | 'manual') => void;
+  /** Callback wenn neue Ergebnisse geladen -- fuer Cache-Update in FoodEntryHub */
+  onResultsChange?: (results: FoodSearchResult[]) => void;
+}
+
+const THUMBNAIL_SIZE = 44;
+
+// ---------------------------------------------------------------------------
+// ProductBadge
+// ---------------------------------------------------------------------------
+
+type BadgeVariant = 'off' | 'ai' | 'eigen';
+
+function ProductBadge({ label, variant }: { label: string; variant: BadgeVariant }) {
+  return (
+    <View style={variant === 'eigen' ? styles.badgeEigen : styles.badgeDefault}>
+      <Text style={variant === 'eigen' ? styles.badgeTextEigen : styles.badgeTextDefault}>
+        {label}
+      </Text>
+    </View>
+  );
 }
 
 // ---------------------------------------------------------------------------
-// Thumbnail
+// Thumbnail mit Buchstaben-Avatar Fallback
 // ---------------------------------------------------------------------------
 
-function Thumbnail({ uri, size = 48 }: { uri?: string | null; size?: number }) {
-  const [imgError, setImgError] = React.useState(false);
+function Thumbnail({ uri, name }: { uri?: string | null; name: string }) {
+  const [imgError, setImgError] = useState(false);
+  const letter = name.trim().charAt(0).toUpperCase() || '?';
 
   if (uri && !imgError) {
     return (
       <Image
         source={{ uri }}
-        style={[styles.thumbnail, { width: size, height: size }]}
+        style={styles.thumbnail}
         resizeMode="cover"
         onError={() => setImgError(true)}
       />
     );
   }
   return (
-    <View style={[styles.thumbnailFallback, { width: size, height: size }]}>
-      <Icon lib="feather" name="database" size="sm" color={colors.textMuted} />
+    <View style={[styles.thumbnail, styles.thumbnailAvatar]}>
+      <Text style={styles.thumbnailLetter}>{letter}</Text>
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// CompactActionBar — sticky über den Suchergebnissen
+// MacroAndPortionLine -- "251 kcal . EW 8 g . KH 43 g . F 3 g . je 100 g"
+// Makros und Portionsreferenz in einer Zeile -- kompakteres Layout.
+// Nicht rendern wenn keine Kaloriendaten vorhanden.
 // ---------------------------------------------------------------------------
 
-function CompactActionBar({ onOpenSubflow }: { onOpenSubflow: (flow: 'barcode' | 'ai' | 'manual') => void }) {
+function MacroAndPortionLine({
+  nutrition,
+  nutritionBasis,
+  portion,
+  isAiEstimate,
+}: {
+  nutrition?: NutritionValues;
+  nutritionBasis: string;
+  portion?: PortionInfo;
+  isAiEstimate?: boolean;
+}) {
+  if (!nutrition || nutrition.calories == null) return null;
+
+  const parts: string[] = [`${Math.round(nutrition.calories)} kcal`];
+  if (nutrition.protein != null) parts.push(`EW ${Math.round(nutrition.protein)} g`);
+  if (nutrition.carbs != null) parts.push(`KH ${Math.round(nutrition.carbs)} g`);
+  if (nutrition.fat != null) parts.push(`F ${Math.round(nutrition.fat)} g`);
+
+  // Portionsreferenz ans Ende
+  if (!isAiEstimate || portion) {
+    if (nutritionBasis === 'per100g' || nutritionBasis === 'both') {
+      parts.push('je 100 g');
+    } else if (nutritionBasis === 'perPortion' && portion) {
+      const portionLabel = portion.weightGrams
+        ? `pro ${portion.label} (${Math.round(portion.weightGrams)} g)`
+        : `pro ${portion.label}`;
+      parts.push(portionLabel);
+    }
+  }
+
   return (
-    <View style={styles.actionBar}>
-      <TouchableOpacity
-        style={styles.actionBtn}
-        onPress={() => onOpenSubflow('barcode')}
-        accessibilityRole="button"
-        accessibilityLabel="Barcode scannen"
-      >
-        <Icon lib="mci" name="barcode-scan" size="md" color={colors.textDisabled} />
-        <Text style={styles.actionBtnLabel}>Barcode</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.actionBtn}
-        onPress={() => onOpenSubflow('ai')}
-        accessibilityRole="button"
-        accessibilityLabel="KI-Analyse"
-      >
-        <Icon lib="mci" name="auto-fix" size="md" color={colors.textDisabled} />
-        <Text style={styles.actionBtnLabel}>KI-Analyse</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.actionBtn}
-        onPress={() => onOpenSubflow('manual')}
-        accessibilityRole="button"
-        accessibilityLabel="Manuell erfassen"
-      >
-        <Icon lib="feather" name="edit-2" size="md" color={colors.textDisabled} />
-        <Text style={styles.actionBtnLabel}>Manuell</Text>
-      </TouchableOpacity>
+    <Text style={styles.macroLine} numberOfLines={1}>{parts.join(' \u00b7 ')}</Text>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FallbackSection -- immer als ListFooterComponent
+// ---------------------------------------------------------------------------
+
+function FallbackSection({
+  hasResults,
+  query,
+  onOpenSubflow,
+}: {
+  hasResults: boolean;
+  query: string;
+  onOpenSubflow: (flow: 'barcode' | 'ai' | 'label' | 'manual') => void;
+}) {
+  return (
+    <View style={styles.fallback}>
+      <Text style={styles.fallbackTitle}>
+        {hasResults ? 'Nicht das passende dabei?' : `Kein Treffer fuer "${query}"`}
+      </Text>
+      {!hasResults ? (
+        <Text style={styles.fallbackSubtitle}>Wir haben ein paar andere Ideen:</Text>
+      ) : null}
+      <View style={styles.fallbackActions}>
+        {/* KI als bevorzugter Workflow — primary hervorgehoben */}
+        <TouchableOpacity
+          style={[styles.fallbackAction, styles.fallbackActionPrimary]}
+          onPress={() => onOpenSubflow('ai')}
+          accessibilityRole="button"
+          accessibilityLabel="KI-Schaetzung"
+        >
+          <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
+          <Text style={[styles.fallbackActionLabel, styles.fallbackActionLabelPrimary]}>KI-Schätzung</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.fallbackAction}
+          onPress={() => onOpenSubflow('label')}
+          accessibilityRole="button"
+          accessibilityLabel="Label scannen"
+        >
+          <Icon lib="mci" name="text-recognition" size="md" color={colors.textSecondary} />
+          <Text style={styles.fallbackActionLabel}>Label scannen</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.fallbackAction}
+          onPress={() => onOpenSubflow('manual')}
+          accessibilityRole="button"
+          accessibilityLabel="Manuell erfassen"
+        >
+          <Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />
+          <Text style={styles.fallbackActionLabel}>Manuell</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Rich ResultRow — Thumbnail + Name/Brand-Hierarchie + Favoriten-Toggle + Source
+// ResultRow -- 3 Zeilen, React.memo
+// Zeile 1: Produktname + Herz
+// Zeile 2: Marke + Badges
+// Zeile 3: Makros + Portionsreferenz (kombiniert)
 // ---------------------------------------------------------------------------
 
-function ResultRow({ item, onPress }: { item: FoodSearchResult; onPress: (i: FoodSearchResult) => void }) {
+interface ResultRowProps {
+  item: FoodSearchResult;
+  onPress: (item: FoodSearchResult) => void;
+  isFirst?: boolean;
+}
+
+const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst }: ResultRowProps) {
   const [isFavorite, setIsFavorite] = useState(item.isFavorite ?? false);
 
   const handleFavoriteToggle = useCallback(async () => {
@@ -112,32 +208,35 @@ function ResultRow({ item, onPress }: { item: FoodSearchResult; onPress: (i: Foo
         await favoritesApi.removeFavorite(item.id);
       }
     } catch {
-      setIsFavorite(!next); // revert on error
+      setIsFavorite(!next);
     }
   }, [isFavorite, item]);
 
-  const calories = item.nutritionPer100g?.calories;
+  const handlePress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress(item);
+  }, [item, onPress]);
+
   const isOFP = item.source === 'openFoodFacts';
+  const isPersonal = item.source === 'library' && !item.isAiEstimate;
 
   return (
-    <TouchableOpacity
-      style={styles.row}
-      onPress={() => onPress(item)}
-      activeOpacity={0.75}
+    <Pressable
+      style={({ pressed }) => [styles.row, isFirst && styles.rowFirst, pressed && styles.rowPressed]}
+      onPress={handlePress}
+      android_ripple={{ color: colors.surfaceMuted, borderless: false }}
       accessibilityRole="button"
     >
-      {/* Thumbnail */}
-      <Thumbnail uri={item.imageUrl} size={48} />
+      <Thumbnail uri={item.imageUrl} name={item.name} />
 
-      {/* Body */}
       <View style={styles.rowBody}>
-        <View style={styles.rowTopRow}>
+        {/* Zeile 1: Produktname + Herz */}
+        <View style={styles.rowLine1}>
           <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
-          {/* Inline Favoriten-Toggle */}
           <TouchableOpacity
             onPress={() => void handleFavoriteToggle()}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+            accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufuegen'}
           >
             <Icon
               lib="ion"
@@ -147,38 +246,40 @@ function ResultRow({ item, onPress }: { item: FoodSearchResult; onPress: (i: Foo
             />
           </TouchableOpacity>
         </View>
-        <View style={styles.rowBottomRow}>
-          <View style={styles.rowMeta}>
-            {item.brand ? (
-              <Text style={styles.rowBrand} numberOfLines={1}>{item.brand}</Text>
-            ) : null}
-            {isOFP ? (
-              <Text style={styles.sourceBadge}>OFP</Text>
-            ) : null}
-            {item.isAiEstimate ? (
-              <Icon lib="mci" name="auto-fix" size="sm" color={colors.textMuted} />
-            ) : null}
-            {!item.isComplete ? (
-              <Icon lib="feather" name="alert-circle" size="sm" color={colors.neutral} />
-            ) : null}
-          </View>
-          {calories != null ? (
-            <Text style={styles.rowCalories}>{Math.round(calories)} kcal</Text>
+
+        {/* Zeile 2: Marke + Badges + Warnung */}
+        <View style={styles.rowLine2}>
+          {item.brand ? (
+            <Text style={styles.rowBrand} numberOfLines={1}>{item.brand}</Text>
+          ) : null}
+          {isOFP ? <ProductBadge label="OFF" variant="off" /> : null}
+          {isPersonal ? <ProductBadge label="Eigen" variant="eigen" /> : null}
+          {item.isAiEstimate ? <ProductBadge label="KI" variant="ai" /> : null}
+          {!item.isComplete ? (
+            <Icon lib="feather" name="alert-circle" size="sm" color={colors.neutral} />
           ) : null}
         </View>
+
+        {/* Zeile 3: Makros + Portion (kombiniert) */}
+        <MacroAndPortionLine
+          nutrition={item.nutritionPer100g}
+          nutritionBasis={item.nutritionBasis}
+          portion={item.portion}
+          isAiEstimate={item.isAiEstimate}
+        />
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
-// SearchState component
+// SearchState
 // ---------------------------------------------------------------------------
 
 const DEBOUNCE_MS = 300;
 
-export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
-  const [results, setResults] = useState<FoodSearchResult[]>([]);
+export function SearchState({ query, recents, initialResults, onSelect, onSelectRelation, onOpenSubflow, onResultsChange }: Props) {
+  const [results, setResults] = useState<FoodSearchResult[]>(initialResults ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchedQuery, setSearchedQuery] = useState('');
@@ -197,6 +298,7 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
       const { results: r } = await foodApi.search(q.trim());
       setResults(r);
       setSearchedQuery(q.trim());
+      onResultsChange?.(r);
     } catch (e: unknown) {
       setError(formatApiError(e, 'Suche fehlgeschlagen'));
     } finally {
@@ -204,7 +306,6 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
     }
   }, []);
 
-  // Debounce query changes
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
@@ -217,62 +318,58 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
 
   const hasQuery = query.trim().length > 0;
   const hasResults = results.length > 0;
-  const emptyWithQuery = hasQuery && !loading && !error && !hasResults && searchedQuery === query.trim();
+  const showFallback = hasQuery && !loading && !error;
 
   return (
     <View style={styles.container}>
-      {/* CompactActionBar — STICKY über den Ergebnissen */}
-      <CompactActionBar onOpenSubflow={onOpenSubflow} />
-      <View style={styles.divider} />
-
-      {/* Error */}
       {error ? (
         <View style={styles.errorContainer}>
           <ErrorBanner error={error} onRetry={() => void doSearch(query)} />
         </View>
       ) : null}
 
-      {/* Loading */}
       {loading ? (
         <ActivityIndicator color={colors.primary} style={styles.spinner} />
       ) : null}
 
-      {/* Rich Suchergebnisse */}
-      {!loading && !error && hasResults ? (
+      {!loading && !error && hasQuery ? (
         <BottomSheetFlatList
           data={results}
           keyExtractor={(item) => `${item.source}-${item.id}`}
-          renderItem={({ item }) => <ResultRow item={item} onPress={onSelect} />}
+          renderItem={({ item, index }) => <ResultRow item={item} onPress={onSelect} isFirst={index === 0} />}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          nestedScrollEnabled={true}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListFooterComponent={
+            showFallback ? (
+              <FallbackSection
+                hasResults={hasResults}
+                query={searchedQuery || query}
+                onOpenSubflow={onOpenSubflow}
+              />
+            ) : null
+          }
         />
       ) : null}
 
-      {/* Kein Ergebnis — kompakte Quick Actions */}
-      {emptyWithQuery ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Kein Treffer für „{query}"</Text>
-          <View style={styles.emptyActions}>
-            <TouchableOpacity style={styles.emptyAction} onPress={() => onOpenSubflow('barcode')}>
-              <Icon lib="mci" name="barcode-scan" size="md" color={colors.textSecondary} />
-              <Text style={styles.emptyActionLabel}>Barcode scannen</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.emptyAction} onPress={() => onOpenSubflow('ai')}>
-              <Icon lib="mci" name="auto-fix" size="md" color={colors.textSecondary} />
-              <Text style={styles.emptyActionLabel}>KI-Analyse</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.emptyAction} onPress={() => onOpenSubflow('manual')}>
-              <Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />
-              <Text style={styles.emptyActionLabel}>Manuell erfassen</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
-
-      {!hasQuery && !loading ? (
-        <Text style={styles.hint}>Gib einen Suchbegriff ein…</Text>
+      {!hasQuery && !loading && recents.length > 0 ? (
+        <>
+          {/* Sticky Label -- scrollt NICHT mit */}
+          <Text style={styles.recentsLabel}>Zuletzt hinzugefügt</Text>
+          <BottomSheetFlatList
+            data={recents}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item, index }) => (
+              <RecentItem key={item.id} item={item} onPress={onSelectRelation} isFirst={index === 0} />
+            )}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.recentsListContent}
+          />
+        </>
       ) : null}
     </View>
   );
@@ -284,150 +381,175 @@ export function SearchState({ query, onSelect, onOpenSubflow }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  listContent: { paddingBottom: spacing.lg },
 
-  // Action bar — sehr diskret, textDisabled (tertiäre Aktionen)
-  actionBar: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    marginBottom: spacing.xs,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-  },
-  actionBtnLabel: {
-    ...typography.caption,
-    color: colors.textDisabled,
-    fontWeight: '500' as const,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-
-  // Rich Result rows — mealCard-Pattern aus DiaryScreen
-  listContent: { paddingBottom: spacing.xl * 2 },
-  separator: { height: spacing.sm },
+  // Row -- Separator-Liste
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: 12,
     gap: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  rowPressed: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  rowFirst: {
+    borderTopWidth: 0,
   },
 
-  // Thumbnail
-  thumbnail: { borderRadius: radius.sm },
-  thumbnailFallback: {
+  // Thumbnail -- 48pt mit Buchstaben-Avatar Fallback
+  thumbnail: {
+    width: THUMBNAIL_SIZE,
+    height: THUMBNAIL_SIZE,
     borderRadius: radius.sm,
-    backgroundColor: colors.surfaceMuted,
+    flexShrink: 0,
+  },
+  thumbnailAvatar: {
+    backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  thumbnailLetter: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.primary,
   },
 
   // Row body
   rowBody: { flex: 1, gap: 3 },
-  rowTopRow: {
+
+  // Zeile 1: Name + Herz
+  rowLine1: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
   rowName: {
-    ...typography.body1,
-    fontWeight: '600' as const,
+    ...typography.body2,
+    fontWeight: '700',
     color: colors.text,
     flex: 1,
   },
-  rowBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  rowMeta: {
+
+  // Zeile 2: Marke + Badges
+  rowLine2: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    flex: 1,
   },
   rowBrand: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: colors.textSecondary,
+    flexShrink: 1,
   },
-  // Source badge — aiBadge-Pattern (primarySoft BG + primary Text)
-  sourceBadge: {
-    fontSize: 10,
-    color: colors.primary,
-    fontWeight: '600' as const,
-    letterSpacing: 0.3,
+
+  // Badges -- dezenter, nicht dominant
+  badgeDefault: {
     backgroundColor: colors.primarySoft,
     borderRadius: radius.full,
     paddingHorizontal: 5,
-    paddingVertical: 1,
-    overflow: 'hidden' as const,
+    paddingVertical: 2,
+    flexShrink: 0,
   },
-  // Kalorien — primary-Farbe (aktive Information), tabular-nums für Ausrichtung
-  rowCalories: {
-    ...typography.caption,
+  badgeTextDefault: {
+    fontSize: 9,
+    fontWeight: '600',
     color: colors.primary,
-    fontWeight: '600' as const,
-    fontVariant: ['tabular-nums'] as const,
+    opacity: 0.85,
+  },
+  badgeEigen: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.full,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    flexShrink: 0,
+  },
+  badgeTextEigen: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+
+  // Zeile 3: Makros + Portion kombiniert
+  macroLine: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    fontVariant: ['tabular-nums'],
   },
 
   // States
   spinner: { marginTop: spacing.lg },
   errorContainer: { marginBottom: spacing.sm },
-  hint: {
+
+  // FallbackSection -- konsistente Sprache mit Row-Separatoren
+  fallback: {
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    marginTop: spacing.xs,
+  },
+  fallbackDivider: {
+    height: 0,
+  },
+  fallbackTitle: {
     ...typography.body2,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  fallbackSubtitle: {
+    ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
-    marginTop: spacing.xl,
   },
-
-  // Empty State
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: spacing.lg,
-    gap: spacing.md,
-  },
-  emptyTitle: {
-    ...typography.body1,
-    color: colors.textSecondary,
-    fontWeight: '600' as const,
-  },
-  emptyActions: {
+  fallbackActions: {
     flexDirection: 'row',
     gap: spacing.sm,
-    width: '100%',
+    paddingTop: spacing.xs,
   },
-  emptyAction: {
+  fallbackAction: {
     flex: 1,
     alignItems: 'center',
     gap: spacing.xs,
-    paddingVertical: spacing.md,
+    paddingVertical: 12,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  emptyActionLabel: {
+  fallbackActionPrimary: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  fallbackActionLabel: {
     fontSize: 10,
     color: colors.textMuted,
-    fontWeight: '500' as const,
+    fontWeight: '500',
     textAlign: 'center',
+  },
+  fallbackActionLabelPrimary: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
+
+  // Recents -- via BottomSheetFlatList (gleiche Gesture-Integration wie Suchergebnisse)
+  recentsListContent: { paddingBottom: spacing.xl },
+  recentsLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    color: colors.textMuted,
+    opacity: 0.7,
+    paddingHorizontal: spacing.xs,
+    paddingBottom: spacing.xs,
+    textTransform: 'uppercase',
   },
 });

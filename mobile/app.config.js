@@ -12,6 +12,17 @@ const IS_DEV = process.env.APP_VARIANT === 'development';
 module.exports = ({ config }) => ({
   ...config,
   name: IS_DEV ? 'FitTrack (Dev)' : 'FitTrack',
+  plugins: [
+    ...(config.plugins ?? []),
+    [
+      'expo-camera',
+      {
+        cameraPermission: 'FitTrack benötigt Kamerazugriff für den Barcode-Scanner und KI-Analyse.',
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
+  ],
   android: {
     ...config.android,
     package: IS_DEV ? 'com.fittrack.app.dev' : 'com.fittrack.app',
