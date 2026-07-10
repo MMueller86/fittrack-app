@@ -52,6 +52,10 @@ export function FoodEntryHub() {
   const sheetRef = useRef<BottomSheetModal>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const searchInputRef = useRef<any>(null);
+  // Guard: ignoriert Android-Auto-Focus während der Sheet-Öffnungsanimation.
+  // Auf Android fokussiert das System den ersten TextInput automatisch beim Sheet-Open.
+  // Ohne diesen Guard aktiviert sich searchActive sofort und überschreibt IdleState.
+  const sheetSettledRef = useRef(false);
   // Trackt ob das Sheet gerade visuell offen ist (nicht den Store-State).
   const sheetIsOpenRef = useRef(false);
   // Verhindert Reset wenn Tastatur durch Produktauswahl geschlossen wird
@@ -95,7 +99,10 @@ export function FoodEntryHub() {
       }
 
       sheetIsOpenRef.current = true;
+      sheetSettledRef.current = false;
       sheetRef.current?.present();
+      // Nach der Sheet-Animation (600ms) Focus-Events wieder erlauben
+      setTimeout(() => { sheetSettledRef.current = true; }, 600);
       if (autoFocusSearch) {
         setTimeout(() => searchInputRef.current?.focus(), 480);
       }
@@ -197,11 +204,13 @@ export function FoodEntryHub() {
   // ---------------------------------------------------------------------------
 
   const handleSearchFocus = useCallback(() => {
+    // Android fokussiert TextInput automatisch beim Sheet-Open — ignorieren bis Sheet settled ist
+    if (!sheetSettledRef.current && !autoFocusSearch) return;
     searchFocusedRef.current = true;
     setSearchFocused(true);
     setSearchActive(true);
     dispatch({ type: 'OPEN_SEARCH' });
-  }, []);
+  }, [autoFocusSearch]);
 
   const handleSearchBlur = useCallback(() => {
     // Tastatur-Dismiss wird primÃ¤r Ã¼ber keyboardDidHide-Listener behandelt.
@@ -380,7 +389,7 @@ export function FoodEntryHub() {
         enableDynamicSizing={false}
         index={0}
         onDismiss={handleSheetDismiss}
-        keyboardBehavior="none"
+        keyboardBehavior={'none' as 'interactive'}
         backgroundStyle={styles.background}
         handleIndicatorStyle={styles.handle}
         enablePanDownToClose

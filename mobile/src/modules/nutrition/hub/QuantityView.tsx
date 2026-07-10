@@ -335,7 +335,7 @@ export function QuantityView({ product, context, onBack, onAdded }: QuantityView
         inputAmount: gramsValue,
         amountGrams: gramsValue,
         calculatedNutrition: calcNutrition,
-        sourceType: product.source,
+        sourceType: product.source === 'library' ? 'reusableItem' : product.source,
         imageUrl: product.imageUrl ?? null,
       });
       const newItem = result.meal.items[result.meal.items.length - 1];

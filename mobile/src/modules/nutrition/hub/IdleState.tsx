@@ -1,5 +1,5 @@
 // IdleState — Idle-Ansicht des FoodEntryHub.
-// Zeigt ausschließlich Schnellzugriff (Favoriten-Chips, max 3 Zeilen).
+// Zeigt ausschließlich Schnellzugriff (Favoriten-Chips, max 4 Zeilen).
 // Recents und Quick Actions sind in dieser Story entfernt worden.
 // Bei leeren Favoriten: Auto-Focus auf das Suchfeld.
 
@@ -27,7 +27,7 @@ import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { FavoriteChip } from '../../../shared/components/FavoriteChip';
 
 // Maximale Anzahl Favoriten-Chips bevor "→ Alle" erscheint
-const MAX_CHIP_ROWS = 3;
+const MAX_CHIP_ROWS = 4;
 
 interface Props {
   onSelectRelation: (relation: UserFoodRelation) => void;

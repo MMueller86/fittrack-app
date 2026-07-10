@@ -157,7 +157,7 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.searchRow}>
           <TouchableOpacity
             style={styles.searchPill}
-            onPress={() => openHub({ autoFocusSearch: true })}
+            onPress={() => openHub()}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Lebensmittel suchen"
