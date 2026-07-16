@@ -15,7 +15,7 @@ export interface UserFoodRelationRepository {
   upsert(userId: string, input: UpsertUserFoodRelationInput): Promise<UserFoodRelation>;
 
   /** Setzt isFavorite. Legt die Relation an wenn sie noch nicht existiert. */
-  setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean): Promise<UserFoodRelation>;
+  setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean, imageUrl?: string): Promise<UserFoodRelation>;
 
   /** Gibt alle Favoriten zurück (isFavorite=true), sortiert nach displayName. */
   listFavorites(userId: string): Promise<UserFoodRelation[]>;
@@ -25,6 +25,13 @@ export interface UserFoodRelationRepository {
    * @param limit Maximalanzahl — Standard 10.
    */
   listRecent(userId: string, limit?: number): Promise<UserFoodRelation[]>;
+
+  /**
+   * Gibt die häufigsten Einträge zurück, sortiert nach usageCount DESC.
+   * Nur Einträge mit usageCount > 0 werden berücksichtigt.
+   * @param limit Maximalanzahl — Standard 10.
+   */
+  listFrequent(userId: string, limit?: number): Promise<UserFoodRelation[]>;
 
   /**
    * Zeichnet eine Verwendung auf: lastUsedAt = jetzt, usageCount++.
@@ -68,10 +75,10 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
     return relation;
   }
 
-  async setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean): Promise<UserFoodRelation> {
+  async setFavorite(userId: string, foodRef: string, foodRefType: FoodRefType, displayName: string, displayBrand: string | undefined, isFavorite: boolean, imageUrl?: string): Promise<UserFoodRelation> {
     const existing = this.store.get(this.key(userId, foodRef));
     const relation: UserFoodRelation = existing
-      ? { ...existing, isFavorite }
+      ? { ...existing, isFavorite, ...(imageUrl !== undefined ? { imageUrl } : {}) }
       : {
           id: `${userId}:${foodRef}`,
           userId,
@@ -80,6 +87,7 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
           displayName,
           displayBrand,
           isFavorite,
+          ...(imageUrl ? { imageUrl } : {}),
           lastUsedAt: null,
           usageCount: 0,
           createdAt: new Date().toISOString(),
@@ -98,6 +106,13 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
     return [...this.store.values()]
       .filter((r) => r.userId === userId && r.lastUsedAt !== null)
       .sort((a, b) => (b.lastUsedAt ?? '').localeCompare(a.lastUsedAt ?? ''))
+      .slice(0, limit);
+  }
+
+  async listFrequent(userId: string, limit = 10): Promise<UserFoodRelation[]> {
+    return [...this.store.values()]
+      .filter((r) => r.userId === userId && r.usageCount > 0)
+      .sort((a, b) => b.usageCount - a.usageCount)
       .slice(0, limit);
   }
 

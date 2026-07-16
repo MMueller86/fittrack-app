@@ -13,6 +13,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,14 +21,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { HomeStackParamList, RootTabParamList } from '../../app/navigation/RootNavigator';
-import { colors, spacing, typography } from '../../app/theme';
+import { colors, spacing, typography, radius } from '../../app/theme';
 import { listWeights } from '../../services/weightsService';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { profileApi } from '../../shared/api/profileApi';
 import { useDayTypeStore } from '../nutrition/useDayTypeStore';
 import WorkoutTypePicker from './WorkoutTypePicker';
 import { getDayHint } from './getDayHint';
+import { Icon } from '../../shared/components/Icon';
 import { CoachingHeroCard } from './CoachingHeroCard';
+import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { DayNutritionCard } from './DayNutritionCard';
 import { InsightCard } from './InsightCard';
 import { getInsight } from '../../services/insightService';
@@ -52,6 +55,7 @@ function getGreeting(): string {
 }
 
 export default function HomeScreen({ navigation }: Props) {
+  const openHub = useFoodEntryHubStore((s) => s.open);
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [todayDiary, setTodayDiary] = useState<DiaryDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -141,20 +145,53 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        {/* ── Brand Header ── */}
+      {/* Sticky Header: Brand + Search Bar */}
+      <View style={styles.stickyHeader}>
         <View style={styles.brandHeader}>
           <Text style={styles.brandLogo}>
             Fit<Text style={styles.brandAccent}>Track</Text>
           </Text>
           <Text style={styles.brandName}>{displayName ?? 'Willkommen'}</Text>
         </View>
+        {/* Search Row — identisches Layout wie im Food Hub */}
+        <View style={styles.searchRow}>
+          <TouchableOpacity
+            style={styles.searchPill}
+            onPress={() => openHub()}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Lebensmittel suchen"
+          >
+            <Icon lib="feather" name="search" size="sm" color={colors.textMuted} />
+            <Text style={styles.searchPillPlaceholder}>Lebensmittel suchen…</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.searchAction}
+            onPress={() => openHub({ initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="KI-Analyse"
+          >
+            <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.searchAction}
+            onPress={() => openHub({ initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh })}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Barcode scannen"
+          >
+            <Icon lib="mci" name="barcode-scan" size="md" color={colors.primary} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+        }
+      >
         {/* ── Coaching Hero Card ── */}
         <CoachingHeroCard
           displayName={displayName ?? 'Sportler'}
@@ -184,6 +221,7 @@ export default function HomeScreen({ navigation }: Props) {
           }}
         />
 
+        <View style={{ height: spacing.xl }} />
       </ScrollView>
 
       <WorkoutTypePicker
@@ -198,17 +236,24 @@ export default function HomeScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   content: {
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
 
-  // ── Brand Header ──
+  // Sticky Header
+  stickyHeader: {
+    backgroundColor: colors.background,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   brandHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
   brandLogo: {
     fontSize: 22,
@@ -222,5 +267,37 @@ const styles = StyleSheet.create({
   brandName: {
     ...typography.caption,
     color: colors.textMuted,
+  },
+
+  // Search Row — identisch zum Food Hub
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginHorizontal: spacing.md,
+    marginBottom: 2,
+  },
+  searchPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.full,
+    height: 52,
+    paddingHorizontal: spacing.md,
+  },
+  searchPillPlaceholder: {
+    ...typography.body1,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  searchAction: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -25,6 +25,7 @@ import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
 import { colors, spacing, typography } from '../../app/theme';
 import { foodApi } from '../../shared/api/foodApi';
 import ProductEditor from '../nutrition/ProductEditor';
+import { AndroidBarcodeScanner } from './AndroidBarcodeScanner';
 
 // ---------------------------------------------------------------------------
 // Camera + CodeScanner import with graceful fallback
@@ -32,16 +33,55 @@ import ProductEditor from '../nutrition/ProductEditor';
 
 let Camera: any = null;
 let useCameraDevice: any = null;
-let useCodeScanner: any = null;
+let useObjectOutput: any = null;
+let useCameraPermission: any = null;
 
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const visionCamera = require('react-native-vision-camera');
   Camera = visionCamera.Camera;
   useCameraDevice = visionCamera.useCameraDevice;
-  useCodeScanner = visionCamera.useCodeScanner;
+  useObjectOutput = visionCamera.useObjectOutput;
+  // v5: hook-based permission API
+  useCameraPermission = visionCamera.useCameraPermission;
 } catch {
   // native module not available (Expo Go, CI, etc.)
+}
+
+// ---------------------------------------------------------------------------
+// CameraErrorBoundary — fängt Render-Fehler von vision-camera Hooks ab.
+// In Expo Go lädt das JS-Modul erfolgreich, aber native Hooks (useCameraDevice,
+// useCodeScanner) werfen beim ersten Render. Da Hooks nicht in try/catch sein
+// können, kapseln wir CameraScanner in einem eigenen ErrorBoundary.
+// ---------------------------------------------------------------------------
+
+interface CameraErrorBoundaryProps {
+  children: React.ReactNode;
+  onError: () => void;
+}
+
+class CameraErrorBoundary extends React.Component<
+  CameraErrorBoundaryProps,
+  { hasError: boolean }
+> {
+  constructor(props: CameraErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn('[BarcodeScannerScreen] CameraScanner Render-Fehler (kein EAS Build?):', error.message);
+    this.props.onError();
+  }
+
+  render() {
+    if (this.state.hasError) return null;
+    return this.props.children;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +95,8 @@ interface Props {
   onProductFound?: (result: FoodSearchResult) => void;
   /** Called when user saved a new personal product from the no-match flow */
   onProductCreated?: (item: ReusableItem) => void;
+  /** Called when barcode scanned but no product found and user wants to scan the label */
+  onNoMatch?: (barcode: string) => void;
 }
 
 type ScanState = 'scanning' | 'loading' | 'not-found' | 'error';
@@ -68,16 +110,30 @@ const SCAN_COOLDOWN_MS = 2000;
 
 function CameraScanner({
   onCodeScanned,
+  onPermissionDenied,
 }: {
   onCodeScanned: (barcode: string) => void;
+  onPermissionDenied: () => void;
 }) {
   const lastScan = useRef(0);
+  const { hasPermission, requestPermission } = useCameraPermission();
+
+  useEffect(() => {
+    if (!hasPermission) {
+      requestPermission().then((granted: boolean) => {
+        if (!granted) onPermissionDenied();
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const device = useCameraDevice('back');
-  const codeScanner = useCodeScanner({
-    codeTypes: ['ean-13', 'ean-8', 'upc-a', 'upc-e', 'code-128', 'code-39', 'qr'],
-    onCodeScanned: (codes: Array<{ value?: string }>) => {
-      const code = codes[0]?.value;
+
+  // v5: useObjectOutput ist iOS-only (wirft auf Android)
+  const objectOutput = useObjectOutput({
+    types: ['ean-13', 'ean-8', 'upc-e', 'code-128', 'code-39', 'qr'],
+    onObjectsScanned: (objects: Array<{ value?: string }>) => {
+      const code = objects[0]?.value;
       if (!code) return;
       const now = Date.now();
       if (now - lastScan.current < SCAN_COOLDOWN_MS) return;
@@ -85,6 +141,10 @@ function CameraScanner({
       onCodeScanned(code);
     },
   });
+
+  if (!hasPermission) {
+    return null;
+  }
 
   if (!device) {
     return (
@@ -99,7 +159,7 @@ function CameraScanner({
       style={StyleSheet.absoluteFill}
       device={device}
       isActive
-      codeScanner={codeScanner}
+      outputs={[objectOutput]}
     />
   );
 }
@@ -113,6 +173,7 @@ export default function BarcodeScannerScreen({
   onClose,
   onProductFound,
   onProductCreated,
+  onNoMatch,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [scanState, setScanState] = useState<ScanState>('scanning');
@@ -120,23 +181,17 @@ export default function BarcodeScannerScreen({
   const [showEditor, setShowEditor] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<'granted' | 'denied' | 'checking'>('checking');
 
-  // Request camera permission on open
+  // Permission-Anfrage vollständig im CameraScanner-Hook (v5)
+  // Kein eigener useEffect mehr nötig
   useEffect(() => {
     if (!visible) return;
     setScanState('scanning');
     setLastBarcode(null);
     setShowEditor(false);
 
-    if (!Camera) {
+    if (!Camera || !useCameraPermission) {
       setCameraPermission('denied');
-      return;
     }
-
-    Camera.requestCameraPermission()
-      .then((status: string) => {
-        setCameraPermission(status === 'granted' ? 'granted' : 'denied');
-      })
-      .catch(() => setCameraPermission('denied'));
   }, [visible]);
 
   const handleCodeScanned = useCallback(
@@ -155,7 +210,8 @@ export default function BarcodeScannerScreen({
         );
         if (match) {
           onProductFound?.(match);
-          onClose();
+          // Kein onClose() hier — der Hub schließt den Scanner automatisch wenn
+          // SELECT_PRODUCT den hubState.mode von 'subflow' auf 'product' wechselt.
         } else {
           setScanState('not-found');
         }
@@ -163,7 +219,7 @@ export default function BarcodeScannerScreen({
         setScanState('error');
       }
     },
-    [scanState, onProductFound, onClose],
+    [scanState, onProductFound],
   );
 
   function handleRetry() {
@@ -175,7 +231,8 @@ export default function BarcodeScannerScreen({
     setShowEditor(true);
   }
 
-  const nativeAvailable = !!Camera;
+  // CameraScanner (useObjectOutput) wird nur auf iOS gerendert—auf Android nicht verfügbar
+  const nativeAvailable = !!Camera && Platform.OS === 'ios';
 
   return (
     <>
@@ -185,9 +242,26 @@ export default function BarcodeScannerScreen({
         onRequestClose={onClose}
       >
         <View style={[styles.container, { paddingTop: insets.top }]}>
-          {/* Camera */}
-          {nativeAvailable && cameraPermission === 'granted' && scanState === 'scanning' && (
-            <CameraScanner onCodeScanned={handleCodeScanned} />
+          {/* Camera — in CameraErrorBoundary gekapselt, da vision-camera Hooks
+               in Expo Go laden aber beim Render werfen. Der ErrorBoundary
+               fängt den Fehler ab und setzt cameraPermission='denied' statt
+               den gesamten App-Tree zu crashen. */}
+          {/* iOS: react-native-vision-camera (useObjectOutput) */}
+          {Platform.OS === 'ios' && nativeAvailable && cameraPermission !== 'denied' && scanState === 'scanning' && (
+            <CameraErrorBoundary onError={() => setCameraPermission('denied')}>
+              <CameraScanner
+                onCodeScanned={handleCodeScanned}
+                onPermissionDenied={() => setCameraPermission('denied')}
+              />
+            </CameraErrorBoundary>
+          )}
+
+          {/* Android: expo-camera mit nativem Barcode-Support */}
+          {Platform.OS === 'android' && scanState === 'scanning' && (
+            <AndroidBarcodeScanner
+              onCodeScanned={handleCodeScanned}
+              onPermissionDenied={() => setCameraPermission('denied')}
+            />
           )}
 
           {/* Overlay content */}
@@ -207,7 +281,8 @@ export default function BarcodeScannerScreen({
 
             {/* Centre content */}
             <View style={styles.centerArea}>
-              {!nativeAvailable && (
+              {/* iOS: kein EAS-Build */}
+              {!nativeAvailable && Platform.OS !== 'android' && (
                 <View style={styles.messageBox}>
                   <Text style={styles.messageTitle}>Kamera nicht verfügbar</Text>
                   <Text style={styles.messageBody}>
@@ -216,11 +291,8 @@ export default function BarcodeScannerScreen({
                 </View>
               )}
 
-              {nativeAvailable && cameraPermission === 'checking' && (
-                <ActivityIndicator color={colors.primary} size="large" />
-              )}
-
-              {nativeAvailable && cameraPermission === 'denied' && (
+              {/* Kein Kamerazugriff (iOS + Android) */}
+              {cameraPermission === 'denied' && (
                 <View style={styles.messageBox}>
                   <Text style={styles.messageTitle}>Kein Kamerazugriff</Text>
                   <Text style={styles.messageBody}>
@@ -229,7 +301,7 @@ export default function BarcodeScannerScreen({
                 </View>
               )}
 
-              {scanState === 'scanning' && nativeAvailable && cameraPermission === 'granted' && (
+              {scanState === 'scanning' && cameraPermission !== 'denied' && (
                 <View style={styles.scanFrame} />
               )}
 
@@ -247,8 +319,16 @@ export default function BarcodeScannerScreen({
                     Barcode: {lastBarcode}
                     {'\n'}Kein Eintrag in der Datenbank.
                   </Text>
-                  <TouchableOpacity style={styles.primaryButton} onPress={handleOpenEditor}>
-                    <Text style={styles.primaryButtonText}>Manuell anlegen</Text>
+                  {onNoMatch && (
+                    <TouchableOpacity
+                      style={styles.primaryButton}
+                      onPress={() => onNoMatch(lastBarcode ?? '')}
+                    >
+                      <Text style={styles.primaryButtonText}>📷 Nährwert-Label scannen</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={onNoMatch ? styles.secondaryButton : styles.primaryButton} onPress={handleOpenEditor}>
+                    <Text style={onNoMatch ? styles.secondaryButtonText : styles.primaryButtonText}>Manuell anlegen</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.secondaryButton} onPress={handleRetry}>
                     <Text style={styles.secondaryButtonText}>Erneut scannen</Text>

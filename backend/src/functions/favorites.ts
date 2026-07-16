@@ -5,6 +5,7 @@ import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
+import { generateFavoriteShortName } from '../lib/favoriteShortNameService';
 import type { FoodRefType } from '@fittrack/shared';
 
 // GET    /api/favorites                -- list all favorites for current user
@@ -17,6 +18,7 @@ const AddFavoriteBodySchema = z.object({
   foodRefType: z.enum(['catalog', 'personal']),
   displayName: z.string().trim().min(1).max(200),
   displayBrand: z.string().trim().max(200).optional(),
+  imageUrl: z.string().url().max(1000).optional().nullable(),
 });
 
 // GET /api/favorites
@@ -48,8 +50,18 @@ export const addFavoriteHandler = withHandler(
       body.displayName,
       body.displayBrand,
       true,
+      body.imageUrl ?? undefined,
     );
     logEvent(ctx, 'info', 'favorites.add', { foodRef: body.foodRef });
+
+    // Fire & forget: AI-Kurzname asynchron generieren (blockiert die Response nicht)
+    generateFavoriteShortName(
+      userId,
+      body.foodRef,
+      body.foodRefType as 'catalog' | 'personal',
+      body.displayName,
+    );
+
     return { status: 201, jsonBody: relation };
   },
 );
@@ -88,6 +100,20 @@ export const listRecentHandler = withHandler(
   },
 );
 
+// GET /api/food-relations/frequent
+export const listFrequentHandler = withHandler(
+  'foodRelations.frequent',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const limitParam = request.query.get('limit');
+    const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 10, 1), 50) : 10;
+    const repo = getUserFoodRelationRepository();
+    const frequent = await repo.listFrequent(userId, limit);
+    logEvent(ctx, 'info', 'foodRelations.frequent', { count: frequent.length });
+    return { status: 200, jsonBody: frequent };
+  },
+);
+
 // Azure Functions registrations
 
 app.http('favorites-list', {
@@ -116,4 +142,11 @@ app.http('food-relations-recent', {
   route: 'food-relations/recent',
   authLevel: 'anonymous',
   handler: listRecentHandler,
+});
+
+app.http('food-relations-frequent', {
+  methods: ['GET'],
+  route: 'food-relations/frequent',
+  authLevel: 'anonymous',
+  handler: listFrequentHandler,
 });

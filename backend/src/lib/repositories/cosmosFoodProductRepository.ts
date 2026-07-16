@@ -55,6 +55,15 @@ export class CosmosFoodProductRepository implements FoodProductRepository {
     const nq = q.toLowerCase().trim();
     if (nq.length < 2) return [];
 
+    // Fast path: rein numerische Anfrage → Barcode-Direktlookup (O(1) Point Read).
+    // Deckt alle EAN-8, EAN-13, UPC-A, UPC-E etc. Formate ab.
+    if (/^\d+$/.test(nq)) {
+      const byId = await this.getById(`openFoodFacts:${nq}`);
+      if (byId) return [foodProductToSearchResult(byId)];
+      // Kein Treffer → kein Fallback auf Keyword-Suche (Zahlenstrings liefern dort nie sinnvolle Treffer)
+      return [];
+    }
+
     const tokens = splitQueryTokens(nq);
     if (tokens.length === 0) return [];
 

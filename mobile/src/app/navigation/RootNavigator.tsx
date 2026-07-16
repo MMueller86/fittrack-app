@@ -1,7 +1,7 @@
 // RootNavigator — bottom tab shell with Home stack.
 // On first launch (no profile): shows ProfileWizardScreen as a modal.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -23,6 +23,7 @@ import type { UserProfile } from '@fittrack/shared';
 import { colors } from '../theme';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, ProgressIcon } from '../../assets/icons/TabIcons';
 import { profileApi } from '../../shared/api/profileApi';
+import { useFoodEntryHubStore } from '../../modules/nutrition/hub/useFoodEntryHubStore';
 
 // React Navigation needs a theme that matches our dark palette so that
 // transient surfaces (e.g. screen background flashes between renders)
@@ -125,6 +126,9 @@ const Tab = createBottomTabNavigator<RootTabParamList>();
 
 export function RootNavigator() {
   const [showWizard, setShowWizard] = useState(false);
+  const closeHub = useFoodEntryHubStore((s) => s.close);
+  const isHubOpen = useFoodEntryHubStore((s) => s.isOpen);
+  const activeTabRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     (async () => {
@@ -152,7 +156,16 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer
+      theme={navigationTheme}
+      onStateChange={(state) => {
+        const currentTab = state?.routes[state.index ?? 0]?.name;
+        if (activeTabRef.current !== undefined && activeTabRef.current !== currentTab) {
+          if (isHubOpen) closeHub();
+        }
+        activeTabRef.current = currentTab;
+      }}
+    >
       <Tab.Navigator
         screenOptions={{
           tabBarActiveTintColor: colors.primaryBright,

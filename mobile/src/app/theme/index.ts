@@ -18,7 +18,7 @@ const palette = {
 
   textPrimary: '#F2F4F1',
   textSecondary: '#A6B0A4',
-  textMuted: '#6E776C',
+  textMuted: '#7E8B7C',
   textDisabled: '#4A5249',
 
   positive: '#67B23E', // weight loss reads as "good" — reuse primary green

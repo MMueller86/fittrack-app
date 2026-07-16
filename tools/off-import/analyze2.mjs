@@ -1,0 +1,25 @@
+﻿import { MongoClient } from 'mongodb';
+const client = new MongoClient('mongodb://localhost:27017');
+await client.connect();
+const db = client.db('off');
+const collections = await db.listCollections().toArray();
+console.log('Collections:', collections.map(c => c.name).join(', '));
+const colName = collections[0]?.name;
+const col = db.collection(colName);
+const total = await col.countDocuments();
+console.log('Total docs:', total);
+const sample = await col.findOne({});
+const keys = Object.keys(sample||{}).slice(0,30);
+console.log('Keys:', keys.join(', '));
+const imgKeys = sample?.images ? Object.keys(sample.images).slice(0,20) : [];
+console.log('Image keys:', imgKeys.join(', '));
+const n = imgKeys.find(k => !/^\d+$/.test(k));
+if (n) console.log('Named image key value:', JSON.stringify(sample.images[n]).substring(0,300));
+console.log('image_front_url:', sample?.image_front_url ?? 'MISSING');
+const c1 = await col.countDocuments({'image_front_url':{$exists:true,$ne:''}});
+const c2 = await col.countDocuments({'images.front_de':{$exists:true}});
+const c3 = await col.countDocuments({'images.front_en':{$exists:true}});
+console.log('With image_front_url:', c1, '| front_de:', c2, '| front_en:', c3);
+const ex = await col.findOne({'images.front_de':{$exists:true}},{projection:{product_name_de:1,product_name:1,'images.front_de':1,image_front_url:1,code:1}});
+if(ex){console.log('Example front_de:', JSON.stringify(ex.images?.front_de));console.log('rev type:', typeof ex.images?.front_de?.rev);}
+await client.close();

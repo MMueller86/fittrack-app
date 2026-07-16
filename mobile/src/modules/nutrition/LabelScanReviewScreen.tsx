@@ -50,6 +50,11 @@ interface Props {
   mode?: 'create' | 'edit';
   onClose: () => void;
   onSaved: () => void;
+  /**
+   * Wenn gesetzt: "Als Produkt speichern" fügt NICHT zum Tagebuch hinzu,
+   * sondern gibt das erstellte ReusableItem zurück (z.B. für ProduktDialog-Öffnung im Hub).
+   */
+  onSavedAsProduct?: (item: ReusableItem) => void;
   /** Callback nach erfolgreichem Update im Edit-Modus */
   onUpdated?: () => void;
 }
@@ -73,7 +78,7 @@ function num(s: string): number {
 // Main screen
 // ---------------------------------------------------------------------------
 
-export default function LabelScanReviewScreen({ visible, mealId, scanResult, isManual = false, existingItem, mode = 'create', onClose, onSaved, onUpdated }: Props) {
+export default function LabelScanReviewScreen({ visible, mealId, scanResult, isManual = false, existingItem, mode = 'create', onClose, onSaved, onSavedAsProduct, onUpdated }: Props) {
   const insets = useSafeAreaInsets();
   const isEditMode = mode === 'edit' && existingItem != null;
   const n = scanResult?.nutrition;
@@ -199,7 +204,13 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
           : undefined,
       });
 
-      // Add to diary using diary amount selector (separate from portion definition)
+      // If caller wants to handle diary add itself (e.g. open ProduktDialog), skip diary add
+      if (onSavedAsProduct) {
+        onSavedAsProduct(result.item);
+        return;
+      }
+
+      // Default: add to diary using diary amount selector (separate from portion definition)
       const portionW = num(portionGrams);
       const diaryGrams = diaryInputMode === 'portion' && portionW > 0
         ? Math.max(1, num(diaryAmount)) * portionW

@@ -47,12 +47,13 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     displayName: string,
     displayBrand: string | undefined,
     isFavorite: boolean,
+    imageUrl?: string,
   ): Promise<UserFoodRelation> {
     const { containers } = await getCosmos();
     const existing = await this.getByFoodRef(userId, foodRef);
     const id = this.makeId(userId, foodRef);
     const relation: UserFoodRelation = existing
-      ? { ...existing, isFavorite, displayName, displayBrand }
+      ? { ...existing, isFavorite, displayName, displayBrand, ...(imageUrl !== undefined ? { imageUrl } : {}) }
       : {
           id,
           userId,
@@ -60,6 +61,7 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
           foodRefType,
           displayName,
           displayBrand,
+          ...(imageUrl ? { imageUrl } : {}),
           isFavorite,
           lastUsedAt: null,
           usageCount: 0,
@@ -104,7 +106,17 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
       const existing = await this.getByFoodRef(userId, input.foodRef);
       const id = this.makeId(userId, input.foodRef);
       const relation: UserFoodRelation = existing
-        ? { ...existing, lastUsedAt: now, usageCount: existing.usageCount + 1, displayName: input.displayName, displayBrand: input.displayBrand }
+        ? {
+            ...existing,
+            lastUsedAt: now,
+            usageCount: existing.usageCount + 1,
+            displayName: input.displayName,
+            displayBrand: input.displayBrand,
+            // imageUrl aktualisieren wenn neu geliefert (überschreibt nie mit null wenn bereits gesetzt)
+            ...(input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
+            ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
+            ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
+          }
         : {
             id,
             userId,
@@ -112,6 +124,7 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
             foodRefType: input.foodRefType,
             displayName: input.displayName,
             displayBrand: input.displayBrand,
+            imageUrl: input.imageUrl ?? null,
             isFavorite: false,
             lastUsedAt: now,
             usageCount: 1,
@@ -132,5 +145,19 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     } catch {
       return null;
     }
+  }
+
+  async listFrequent(userId: string, limit = 10): Promise<UserFoodRelation[]> {
+    const { containers } = await getCosmos();
+    const { resources } = await containers.userFoodRelations.items
+      .query<UserFoodRelation>(
+        {
+          query: `SELECT TOP ${limit} * FROM c WHERE c.userId = @userId AND c.usageCount > 0 ORDER BY c.usageCount DESC`,
+          parameters: [{ name: '@userId', value: userId }],
+        },
+        { partitionKey: userId },
+      )
+      .fetchAll();
+    return resources;
   }
 }
