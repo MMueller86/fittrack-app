@@ -11,7 +11,7 @@ export type HubMode =
   | { mode: 'idle' }
   | { mode: 'search'; query: string }
   | { mode: 'product'; product: FoodSearchResult; previousMode: 'idle' | 'search'; previousQuery: string }
-  | { mode: 'subflow'; flow: 'barcode' | 'ai' | 'label' | 'manual' };
+  | { mode: 'subflow'; flow: 'barcode' | 'ai' | 'label' | 'manual'; previousMode: 'idle' | 'search'; previousQuery: string };
 
 // ---------------------------------------------------------------------------
 // Actions
@@ -66,10 +66,16 @@ export function hubReducer(state: HubMode, action: HubAction): HubMode {
     }
 
     case 'OPEN_SUBFLOW': {
-      return { mode: 'subflow', flow: action.flow };
+      const previousMode = state.mode === 'search' ? 'search' : 'idle';
+      const previousQuery = state.mode === 'search' ? state.query : '';
+      return { mode: 'subflow', flow: action.flow, previousMode, previousQuery };
     }
 
     case 'CLOSE_SUBFLOW': {
+      if (state.mode !== 'subflow') return state;
+      if (state.previousMode === 'search') {
+        return { mode: 'search', query: state.previousQuery };
+      }
       return { mode: 'idle' };
     }
 

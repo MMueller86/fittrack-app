@@ -80,13 +80,31 @@ describe('hubReducer', () => {
 
   it('OPEN_SUBFLOW: always transitions to subflow', () => {
     const next = hubReducer(INITIAL_HUB_STATE, { type: 'OPEN_SUBFLOW', flow: 'barcode' });
-    expect(next).toEqual({ mode: 'subflow', flow: 'barcode' });
+    expect(next).toEqual({ mode: 'subflow', flow: 'barcode', previousMode: 'idle', previousQuery: '' });
   });
 
-  it('CLOSE_SUBFLOW: always returns to idle', () => {
-    const subflow: HubMode = { mode: 'subflow', flow: 'ai' };
+  it('CLOSE_SUBFLOW: returns to idle when previous was idle', () => {
+    const subflow: HubMode = { mode: 'subflow', flow: 'ai', previousMode: 'idle', previousQuery: '' };
     const next = hubReducer(subflow, { type: 'CLOSE_SUBFLOW' });
     expect(next).toEqual({ mode: 'idle' });
+  });
+
+  it('CLOSE_SUBFLOW: restores search state when previous was search', () => {
+    const subflow: HubMode = { mode: 'subflow', flow: 'barcode', previousMode: 'search', previousQuery: 'hähnchen' };
+    const next = hubReducer(subflow, { type: 'CLOSE_SUBFLOW' });
+    expect(next).toEqual({ mode: 'search', query: 'hähnchen' });
+  });
+
+  it('CLOSE_SUBFLOW: no-op when not in subflow mode', () => {
+    expect(hubReducer(INITIAL_HUB_STATE, { type: 'CLOSE_SUBFLOW' })).toBe(INITIAL_HUB_STATE);
+    const search: HubMode = { mode: 'search', query: 'banane' };
+    expect(hubReducer(search, { type: 'CLOSE_SUBFLOW' })).toBe(search);
+  });
+
+  it('OPEN_SUBFLOW from search: remembers previous query', () => {
+    const search: HubMode = { mode: 'search', query: 'banane' };
+    const next = hubReducer(search, { type: 'OPEN_SUBFLOW', flow: 'ai' });
+    expect(next).toEqual({ mode: 'subflow', flow: 'ai', previousMode: 'search', previousQuery: 'banane' });
   });
 
   it('RESET: always returns to idle from any state', () => {
@@ -95,5 +113,8 @@ describe('hubReducer', () => {
 
     const product: HubMode = { mode: 'product', product: mockProduct as never, previousMode: 'search', previousQuery: 'test' };
     expect(hubReducer(product, { type: 'RESET' })).toEqual({ mode: 'idle' });
+
+    const subflow: HubMode = { mode: 'subflow', flow: 'barcode', previousMode: 'search', previousQuery: 'test' };
+    expect(hubReducer(subflow, { type: 'RESET' })).toEqual({ mode: 'idle' });
   });
 });
