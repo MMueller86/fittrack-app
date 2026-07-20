@@ -4,6 +4,7 @@ import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler
 import { __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
 import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
+import { getUserFoodRelationRepository, __resetUserFoodRelationRepositoryForTests } from '../lib/repositories/userFoodRelationRepository';
 
 // Unit tests for POST /api/diary/meals/:id/items
 //
@@ -406,6 +407,43 @@ describe('PUT /api/diary/meals/:id/items/:itemId — updateItemHandler', () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it('scales macros proportionally for an OFf item (sourceId starts with openFoodFacts:)', async () => {
+    const mealId = await createMeal();
+    // Add an OFf item via the product input path with calculatedNutrition
+    const addRes = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId: 'openFoodFacts:3017620422003',
+          productName: 'Nutella',
+          inputMode: 'grams',
+          inputAmount: 100,
+          amountGrams: 100,
+          calculatedNutrition: { calories: 539, protein: 6.3, carbs: 57.5, fat: 30.9, fiber: 0 },
+        },
+      }),
+      makeContext(),
+    );
+    expect(addRes.status).toBe(201);
+    const item = (addRes.jsonBody as { meal: { items: Array<{ id: string; quantity: number; macros: { calories: number } }> } }).meal.items[0];
+    expect(item.quantity).toBe(100);
+    expect(item.macros.calories).toBe(539);
+
+    // Update to 50g — should scale proportionally (ratio = 50/100 = 0.5)
+    const res = await updateItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId, itemId: item.id },
+        body: { inputMode: 'grams', amountGrams: 50 },
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const updatedItem = (res.jsonBody as { meal: { items: Array<{ quantity: number; macros: { calories: number; protein: number } }> } }).meal.items[0];
+    expect(updatedItem.quantity).toBe(50);
+    expect(updatedItem.macros.calories).toBe(269.5);
+    expect(updatedItem.macros.protein).toBe(3.2);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -467,5 +505,46 @@ describe('PUT /api/diary/:date/day-type with workoutType', () => {
     const repo = getDayMetaRepository();
     const stored = await repo.get('test-user-abc-123', '2026-05-08');
     expect(stored?.workoutType).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recordUsage — foodRefType mapping per sourceType
+// ---------------------------------------------------------------------------
+
+describe('addItemHandler — recordUsage foodRefType mapping', () => {
+  beforeEach(() => {
+    __resetUserFoodRelationRepositoryForTests();
+  });
+
+  afterEach(() => {
+    __resetUserFoodRelationRepositoryForTests();
+  });
+
+  it('creates UserFoodRelation with foodRefType "recipe" when sourceType is "recipe"', async () => {
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId: 'recipe:abc-123',
+          productName: 'Pasta al Pomodoro',
+          sourceType: 'recipe',
+          inputMode: 'portion',
+          inputAmount: 1,
+          amountGrams: 400,
+          calculatedNutrition: { calories: 520, protein: 18, carbs: 72, fat: 14, fiber: 4 },
+        },
+      }),
+      makeContext(),
+    );
+    expect(res.status).toBe(201);
+
+    // Flush the fire-and-forget recordUsage microtask
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+    const repo = getUserFoodRelationRepository();
+    const rel = await repo.getByFoodRef('test-user-abc-123', 'recipe:abc-123');
+    expect(rel?.foodRefType).toBe('recipe');
   });
 });

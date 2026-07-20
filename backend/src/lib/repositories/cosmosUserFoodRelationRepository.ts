@@ -1,9 +1,9 @@
 // Cosmos-backed implementation of UserFoodRelationRepository.
 // Container: userFoodRelations, partition key: /userId
 
-import type { UserFoodRelation, UpsertUserFoodRelationInput, FoodRefType } from '@fittrack/shared';
+import type { UserFoodRelation, UpsertUserFoodRelationInput, FoodRefType, NutritionValues, PortionInfo } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
-import type { UserFoodRelationRepository } from './userFoodRelationRepository';
+import { EMA_ALPHA, type UserFoodRelationRepository } from './userFoodRelationRepository';
 
 export class CosmosUserFoodRelationRepository implements UserFoodRelationRepository {
 
@@ -48,12 +48,23 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     displayBrand: string | undefined,
     isFavorite: boolean,
     imageUrl?: string,
+    nutritionPer100g?: NutritionValues,
+    portion?: PortionInfo | null,
   ): Promise<UserFoodRelation> {
     const { containers } = await getCosmos();
     const existing = await this.getByFoodRef(userId, foodRef);
     const id = this.makeId(userId, foodRef);
     const relation: UserFoodRelation = existing
-      ? { ...existing, isFavorite, displayName, displayBrand, ...(imageUrl !== undefined ? { imageUrl } : {}) }
+      ? {
+          ...existing,
+          isFavorite,
+          displayName,
+          displayBrand,
+          ...(imageUrl !== undefined ? { imageUrl } : {}),
+          ...(nutritionPer100g !== undefined ? { nutritionPer100g } : {}),
+          ...(portion !== undefined ? { portion } : {}),
+          ...(isFavorite && !existing.favoritedAt ? { favoritedAt: new Date().toISOString() } : {}),
+        }
       : {
           id,
           userId,
@@ -62,6 +73,9 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
           displayName,
           displayBrand,
           ...(imageUrl ? { imageUrl } : {}),
+          ...(nutritionPer100g ? { nutritionPer100g } : {}),
+          ...(portion != null ? { portion } : {}),
+          ...(isFavorite ? { favoritedAt: new Date().toISOString() } : {}),
           isFavorite,
           lastUsedAt: null,
           usageCount: 0,
@@ -105,7 +119,8 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
       const now = new Date().toISOString();
       const existing = await this.getByFoodRef(userId, input.foodRef);
       const id = this.makeId(userId, input.foodRef);
-      const relation: UserFoodRelation = existing
+
+      let relation: UserFoodRelation = existing
         ? {
             ...existing,
             lastUsedAt: now,
@@ -130,6 +145,38 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
             usageCount: 1,
             createdAt: now,
           };
+
+      // usageDates — append today and trim to last 90 days
+      const today = new Date().toISOString().substring(0, 10);
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+      const existingDates = relation.usageDates ?? [];
+      relation = { ...relation, usageDates: [...existingDates, today].filter(d => d >= ninetyDaysAgo) };
+
+      // mealTypeCounts
+      if (input.mealType) {
+        const counts: Partial<Record<string, number>> = { ...(relation.mealTypeCounts ?? {}) };
+        counts[input.mealType] = (counts[input.mealType] ?? 0) + 1;
+        relation = { ...relation, mealTypeCounts: counts as UserFoodRelation['mealTypeCounts'] };
+      }
+
+      // preferredInputMode via running score
+      if (input.lastInputMode !== undefined) {
+        const delta = input.lastInputMode === 'portion' ? 1 : -1;
+        const currentScore = existing?.inputModeScore ?? 0;
+        const newScore = Math.max(-10, Math.min(10, currentScore + delta));
+        relation = { ...relation, inputModeScore: newScore, preferredInputMode: newScore > 0 ? 'portion' : 'grams' };
+      }
+
+      // preferredInputAmount via EMA
+      if (input.lastInputAmount !== undefined) {
+        const prev = existing?.preferredInputAmount;
+        const incoming = input.lastInputAmount;
+        const newAmount = prev === undefined
+          ? incoming
+          : EMA_ALPHA * incoming + (1 - EMA_ALPHA) * prev;
+        relation = { ...relation, preferredInputAmount: newAmount };
+      }
+
       await containers.userFoodRelations.items.upsert(relation);
     } catch (_err) {
       // Fire-and-forget — Fehler dürfen den Diary-Add nicht blockieren
@@ -159,5 +206,36 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
       )
       .fetchAll();
     return resources;
+  }
+
+  async listByFoodRef(userId: string, foodRef: string): Promise<UserFoodRelation[]> {
+    const { containers } = await getCosmos();
+    const { resources } = await containers.userFoodRelations.items
+      .query<UserFoodRelation>(
+        {
+          query: 'SELECT * FROM c WHERE c.userId = @userId AND c.foodRef = @foodRef',
+          parameters: [
+            { name: '@userId', value: userId },
+            { name: '@foodRef', value: foodRef },
+          ],
+        },
+        { partitionKey: userId },
+      )
+      .fetchAll();
+    return resources;
+  }
+
+  async updateNutritionDenormalized(
+    userId: string,
+    foodRef: string,
+    nutritionPer100g: NutritionValues,
+    portion: PortionInfo | null,
+  ): Promise<void> {
+    const { containers } = await getCosmos();
+    const relations = await this.listByFoodRef(userId, foodRef);
+    for (const relation of relations) {
+      const updated: UserFoodRelation = { ...relation, nutritionPer100g, portion };
+      await containers.userFoodRelations.items.upsert(updated);
+    }
   }
 }

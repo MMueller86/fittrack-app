@@ -362,6 +362,9 @@ export const addItemHandler = withHandler(
           } else if (effectiveSourceType === 'reusableItem' && d.productId) {
             foodRef = d.productId;
             foodRefType = 'personal';
+          } else if (effectiveSourceType === 'recipe' && d.productId) {
+            foodRef = d.productId;
+            foodRefType = 'recipe';
           } else if (d.productId) {
             // productId vorhanden ohne expliziten sourceType: ReusableItem-Lookup entscheidet
             foodRef = d.productId;
@@ -377,6 +380,7 @@ export const addItemHandler = withHandler(
               imageUrl: ('imageUrl' in d && d.imageUrl != null) ? String(d.imageUrl) : undefined,
               ...(d.inputMode ? { lastInputMode: d.inputMode } : {}),
               ...(d.inputAmount != null ? { lastInputAmount: d.inputAmount } : {}),
+              mealType: meal.type,
             });
           }
         } catch {
@@ -425,9 +429,12 @@ export const updateItemHandler = withHandler(
     let newUnit: string;
     let newMacros: import('@fittrack/shared').MealItemMacros;
 
-    if (existingItem.sourceId) {
+    const isPersonalLibraryItem =
+      !!existingItem.sourceId && !existingItem.sourceId.startsWith('openFoodFacts:');
+
+    if (isPersonalLibraryItem) {
       // Item from a ReusableItem — recalculate from source product nutrition
-      const product = await getReusableItemsRepository().getById(userId, existingItem.sourceId);
+      const product = await getReusableItemsRepository().getById(userId, existingItem.sourceId!);
       if (!product?.nutritionPer100g) {
         return { status: 422, jsonBody: { error: 'Source product not found — cannot recalculate macros' } };
       }

@@ -28,7 +28,7 @@ interface TokenFilter {
 function buildTokenFilter(tokens: string[]): TokenFilter {
   const clauses = tokens.map(
     (_, i) =>
-      `(STARTSWITH(LOWER(c.name), @q${i}) OR CONTAINS(LOWER(c.name), @q${i}) OR EXISTS(SELECT VALUE t FROM t IN c.searchTerms WHERE STARTSWITH(t, @q${i})))`,
+      `(STARTSWITH(LOWER(c.name), @q${i}) OR CONTAINS(LOWER(c.name), @q${i}) OR EXISTS(SELECT VALUE t FROM t IN c.searchTerms WHERE STARTSWITH(t, @q${i})) OR (IS_STRING(c.brand) AND CONTAINS(LOWER(c.brand), @q${i})))`,
   );
   return {
     whereClause: clauses.join(' AND '),

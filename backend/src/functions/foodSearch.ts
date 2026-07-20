@@ -89,7 +89,7 @@ export const foodSearchHandler = withHandler(
       const scoredLibrary = rawLibrary
         .map((item) => ({
           result: reusableItemToSearchResult(item),
-          score: rankByQuery(item.name, item.searchTerms ?? [], nq) + LIBRARY_BONUS,
+          score: rankByQuery(item.name, item.searchTerms ?? [], nq, item.brand ?? undefined) + LIBRARY_BONUS,
         }))
         .filter((x) => x.score > LIBRARY_BONUS - 1); // exclude score=-1 (no match at all)
 
@@ -100,7 +100,7 @@ export const foodSearchHandler = withHandler(
           // da das Repository bereits den exakten Barcode-Lookup gemacht hat.
           score: /^\d+$/.test(nq)
             ? 4
-            : rankByQuery(result.name, [], nq),
+            : rankByQuery(result.name, [], nq, result.brand ?? undefined),
         }))
         .filter((x) => x.score >= 0);
 

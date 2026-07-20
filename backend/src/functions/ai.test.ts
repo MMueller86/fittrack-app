@@ -530,18 +530,6 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     expect(body.contextDetected).toBe('Imbiss');
   });
 
-  it('returns 422 when AI returns implausibly low calories', async () => {
-    mockMealEstimateClient({
-      ...VALID_ESTIMATE,
-      mealEstimate: { calories: 10, protein: 1, carbs: 1, fat: 0, fiber: 0 },
-    });
-    const res = await mealEstimatePreviewHandler(
-      await makeAuthRequest({ body: { text: 'Schnitzel mit Pommes' } }),
-      makeContext(),
-    );
-    expect(res.status).toBe(422);
-  });
-
   it('returns 422 when AI returns calories over 3000', async () => {
     mockMealEstimateClient({
       ...VALID_ESTIMATE,

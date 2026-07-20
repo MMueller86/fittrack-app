@@ -279,9 +279,6 @@ function validateMealEstimate(macros: {
       errors.push(`${label} muss eine nicht-negative Zahl sein (erhalten: ${val})`);
     }
   }
-  if (Number.isFinite(calories) && calories < 50) {
-    errors.push(`Mahlzeit mit ${calories} kcal ist unplausibel gering`);
-  }
   if (Number.isFinite(calories) && calories > 3000) {
     errors.push(`Mahlzeit mit ${calories} kcal übersteigt das Maximum von 3000 kcal`);
   }

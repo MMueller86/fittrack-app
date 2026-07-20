@@ -29,6 +29,11 @@ export function splitQueryTokens(query: string): string[] {
  *   0.5 — any searchTerm starts with token
  *  -1   — no match
  *
+ * Brand scoring (optional, lower priority than name):
+ *   3   — brand equals token exactly
+ *   2   — brand starts with token
+ *   1.5 — brand contains token
+ *
  * Rationale for searchTerm-exact = 3:
  *   An AI-generated keyword exactly matching the query means the product IS
  *   semantically this term (e.g. "Ei" has keyword "eier"). This is equivalent
@@ -36,7 +41,7 @@ export function splitQueryTokens(query: string): string[] {
  *   Combined with the +0.5 library bonus, own products reliably beat catalog
  *   items that merely share the same name prefix.
  */
-function rankSingleToken(name: string, searchTerms: string[], token: string): number {
+function rankSingleToken(name: string, searchTerms: string[], token: string, brand?: string): number {
   const n = name.toLowerCase();
   if (n === token) return 4;
   if (n.startsWith(token)) return 3;
@@ -47,6 +52,13 @@ function rankSingleToken(name: string, searchTerms: string[], token: string): nu
   if (n.split(/\s+/).some((word) => word === token)) return 2.5;
   if (n.includes(token)) return 2;
   if (searchTerms.some((t) => t.startsWith(token))) return 0.5;
+  // Brand matching — lower priority than name, but high enough to surface brand-only searches
+  if (brand) {
+    const b = brand.toLowerCase();
+    if (b === token) return 3;
+    if (b.startsWith(token)) return 2;
+    if (b.includes(token)) return 1.5;
+  }
   return -1;
 }
 
@@ -61,14 +73,14 @@ function rankSingleToken(name: string, searchTerms: string[], token: string): nu
  *   - Score = average of per-token scores, so more specific multi-word
  *     queries don't artificially outrank exact single-word matches.
  */
-export function rankByQuery(name: string, searchTerms: string[], query: string): number {
+export function rankByQuery(name: string, searchTerms: string[], query: string, brand?: string): number {
   const tokens = splitQueryTokens(query);
   if (tokens.length === 0) return -1;
-  if (tokens.length === 1) return rankSingleToken(name, searchTerms, tokens[0]!);
+  if (tokens.length === 1) return rankSingleToken(name, searchTerms, tokens[0]!, brand);
 
   let total = 0;
   for (const token of tokens) {
-    const score = rankSingleToken(name, searchTerms, token);
+    const score = rankSingleToken(name, searchTerms, token, brand);
     if (score < 0) return -1; // one token unmatched → whole query fails
     total += score;
   }

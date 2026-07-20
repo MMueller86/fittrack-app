@@ -6,6 +6,7 @@ import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getReusableItemsRepository, type UpdateReusableItemInput } from '../lib/repositories/reusableItemsRepository';
+import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
 import { tokenizeProduct } from '../lib/tokenize';
 import { enqueueEnrichment } from '../lib/queueClient';
 import { uploadProductImage, deleteProductImage, generateProductImageSasUrl } from '../lib/storage';
@@ -228,6 +229,23 @@ export const updateReusableItemHandler = withHandler(
 
     const item = await repo.update(userId, id, updateInput);
     if (!item) return { status: 404, jsonBody: { error: 'Item not found' } };
+
+    // Fire-and-forget: sync denormalized nutrition in all UserFoodRelations for this item
+    if (item.nutritionPer100g !== undefined) {
+      void (async () => {
+        try {
+          const ufRepo = getUserFoodRelationRepository();
+          await ufRepo.updateNutritionDenormalized(
+            userId,
+            item.id,
+            item.nutritionPer100g!,
+            item.portion ?? null,
+          );
+        } catch {
+          // Non-critical — log but don't fail the request
+        }
+      })();
+    }
 
     let updatedItemCount = 0;
     if (updateHistory && item.nutritionPer100g) {

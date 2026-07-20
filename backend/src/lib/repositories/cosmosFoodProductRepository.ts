@@ -38,7 +38,7 @@ interface TokenFilter {
 function buildTokenFilter(tokens: string[]): TokenFilter {
   const clauses = tokens.map(
     (_, i) =>
-      `(CONTAINS(c.normalizedName, @q${i}) OR ARRAY_CONTAINS(c.searchKeywords, @q${i}))`,
+      `(CONTAINS(c.normalizedName, @q${i}) OR ARRAY_CONTAINS(c.searchKeywords, @q${i}) OR (IS_STRING(c.brand) AND CONTAINS(LOWER(c.brand), @q${i})))`,
   );
   return {
     whereClause: clauses.join(' AND '),
@@ -70,17 +70,57 @@ export class CosmosFoodProductRepository implements FoodProductRepository {
     const { containers } = await getCosmos();
     const { whereClause, parameters } = buildTokenFilter(tokens);
 
-    // Cosmos SQL: all tokens must appear in normalizedName or searchKeywords (AND across tokens).
-    // We over-fetch (COSMOS_PREFETCH) and rank in JS so all scoring tiers are applied.
-    const { resources } = await containers.foodProducts.items
-      .query<FoodProduct>({
-        query: `SELECT TOP @prefetch * FROM c WHERE ${whereClause}`,
-        parameters: [
-          ...parameters,
-          { name: '@prefetch', value: COSMOS_PREFETCH },
-        ],
-      })
-      .fetchAll();
+    // Three-pass fetch (parallel): exact match + prefix + contains, merged before JS ranking.
+    //
+    // Problem: with 1300+ STARTSWITH and 4000+ CONTAINS matches for "tomaten",
+    // SELECT TOP N returns arbitrary results — exact matches like "Tomaten" are crowded out.
+    //
+    // Pass 1 (exact normalizedName): guarantees products whose name exactly equals the query
+    //   are always included (e.g. 25 × "Tomaten" for query "tomaten"). Fast index lookup.
+    // Pass 2 (STARTSWITH + all tokens): includes prefix matches like "Tomaten Passata".
+    //   Uses full token filter so multi-token queries don't return false positives.
+    // Pass 3 (CONTAINS, existing logic): broader substring matches.
+    // All three run in parallel → no extra latency.
+    const [
+      { resources: exactResources },
+      { resources: prefixResources },
+      { resources: containsResources },
+    ] = await Promise.all([
+      // Pass 1: exact normalizedName match (normalized query as whole string)
+      containers.foodProducts.items
+        .query<FoodProduct>({
+          query: 'SELECT TOP 30 * FROM c WHERE c.normalizedName = @exactQuery',
+          parameters: [{ name: '@exactQuery', value: nq }],
+        })
+        .fetchAll(),
+      // Pass 2: STARTSWITH on normalizedName + all tokens must match
+      containers.foodProducts.items
+        .query<FoodProduct>({
+          query: `SELECT TOP @prefixLimit * FROM c WHERE STARTSWITH(c.normalizedName, @q0) AND ${whereClause}`,
+          parameters: [
+            ...parameters,
+            { name: '@prefixLimit', value: 50 },
+          ],
+        })
+        .fetchAll(),
+      // Pass 3: full CONTAINS query
+      containers.foodProducts.items
+        .query<FoodProduct>({
+          query: `SELECT TOP @prefetch * FROM c WHERE ${whereClause}`,
+          parameters: [
+            ...parameters,
+            { name: '@prefetch', value: COSMOS_PREFETCH },
+          ],
+        })
+        .fetchAll(),
+    ]);
+
+    const seenIds = new Set(exactResources.map((r) => r.id));
+    const resources = [
+      ...exactResources,
+      ...prefixResources.filter((r) => !seenIds.has(r.id) && (seenIds.add(r.id), true)),
+      ...containsResources.filter((r) => !seenIds.has(r.id)),
+    ];
 
     return rankAndSort(resources, nq, limit).map(foodProductToSearchResult);
   }

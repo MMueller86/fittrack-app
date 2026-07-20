@@ -92,7 +92,7 @@ export type RankScore = number;
  * Delegates to rankByQuery using normalizedName + searchKeywords.
  */
 export function rankProduct(p: FoodProduct, normalizedQuery: string): RankScore {
-  return rankByQuery(p.normalizedName, p.searchKeywords, normalizedQuery);
+  return rankByQuery(p.normalizedName, p.searchKeywords, normalizedQuery, p.brand);
 }
 
 /**

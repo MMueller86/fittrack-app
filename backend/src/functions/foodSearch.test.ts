@@ -138,15 +138,17 @@ describe('foodSearchHandler', () => {
     expect(body.results[1]!.source).toBe('openFoodFacts');
   });
 
-  it('deduplicates catalog results whose name matches a library item (case-insensitive)', async () => {
+  it('deduplicates catalog entries whose name already appears in the library', async () => {
     mockLibRepo.search.mockResolvedValue([LIBRARY_ITEM]);
     mockCatalogRepo.search.mockResolvedValue([CATALOG_OATS_DUPLICATE, CATALOG_OATMEAL]);
 
     const res = await foodSearchHandler(makeRequest('oa'), makeCtx());
     const body = res.jsonBody as { results: FoodSearchResult[] };
-    // CATALOG_OATS_DUPLICATE (name='Oats') should be removed; only lib + CATALOG_OATMEAL remain
+    // CATALOG_OATS_DUPLICATE (name "Oats") is deduplicated because library already has "Oats"
+    // CATALOG_OATMEAL (name "Oatmeal") has no library match and should appear
     expect(body.results).toHaveLength(2);
     expect(body.results.find((r) => r.id === 'openFoodFacts:002')).toBeUndefined();
+    expect(body.results.find((r) => r.id === 'openFoodFacts:003')).toBeDefined();
   });
 
   it('returns empty results for empty query without calling catalog', async () => {
