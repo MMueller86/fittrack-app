@@ -4,7 +4,7 @@
 // Shows delta arrow vs the previous chronological entry.
 // Fully memoised — re-renders only when entries change.
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { WeightEntry, WeightUnit } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
@@ -97,8 +97,59 @@ function buildGroups(entries: WeightEntry[]): Group[] {
   return result;
 }
 
+function getMondayOf(iso: string): string {
+  const d = parseDate(iso);
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatWeekRange(mondayIso: string): string {
+  const monday = parseDate(mondayIso);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  const fmt = (dt: Date) =>
+    `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}.`;
+  return `${fmt(monday)} – ${fmt(sunday)}`;
+}
+
+interface WeekGroup {
+  key: string;
+  label: string;
+  avgValue: number;
+  unit: string;
+  count: number;
+  items: HistoryItem[];
+}
+
+function buildWeekGroups(items: HistoryItem[]): WeekGroup[] {
+  const map = new Map<string, HistoryItem[]>();
+  for (const item of items) {
+    const monday = getMondayOf(item.entry.date);
+    const bucket = map.get(monday) ?? [];
+    bucket.push(item);
+    map.set(monday, bucket);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([key, weekItems]) => ({
+      key,
+      label: formatWeekRange(key),
+      avgValue: weekItems.reduce((s, i) => s + i.entry.value, 0) / weekItems.length,
+      unit: weekItems[0]?.entry.unit ?? 'kg',
+      count: weekItems.length,
+      items: weekItems,
+    }));
+}
+
 export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
   const groups = useMemo(() => buildGroups(entries), [entries]);
+  const weekGroups = useMemo(() => {
+    const older = groups.find((g) => g.title === 'Älter');
+    return older ? buildWeekGroups(older.items) : [];
+  }, [groups]);
+  const [expandedWeeks, setExpandedWeeks] = useState<Set<string>>(new Set());
 
   if (groups.length === 0) {
     return (
@@ -110,67 +161,108 @@ export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
     );
   }
 
+  const toggleWeek = (key: string) =>
+    setExpandedWeeks((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const renderRow = (entry: WeightEntry, delta: number | null, isLast: boolean) => {
+    const isDown = delta !== null && delta < 0;
+    const isUp = delta !== null && delta > 0;
+    const isNeutral = delta !== null && parseFloat(Math.abs(delta).toFixed(2)) === 0;
+    const deltaColor = isNeutral
+      ? colors.textMuted
+      : isDown
+      ? colors.positive
+      : isUp
+      ? colors.negative
+      : colors.textMuted;
+    const deltaStr =
+      delta === null
+        ? null
+        : isNeutral
+        ? '─'
+        : `${isDown ? '↓' : '↑'} ${Math.abs(delta).toFixed(2)}`;
+    return (
+      <View key={entry.id} style={[styles.row, !isLast && styles.rowBorder]}>
+        <View style={styles.dotWrap}>
+          <View style={styles.dot} />
+        </View>
+        <Text style={styles.dateText}>{formatEntryDate(entry.date)}</Text>
+        <Text style={styles.valueText}>
+          {entry.value.toFixed(2)}{' '}
+          <Text style={styles.unitText}>{entry.unit}</Text>
+        </Text>
+        {deltaStr ? (
+          <Text style={[styles.deltaText, { color: deltaColor }]}>{deltaStr}</Text>
+        ) : (
+          <View style={styles.deltaPlaceholder} />
+        )}
+        <TouchableOpacity
+          onPress={() => onDelete(entry)}
+          hitSlop={{ top: 8, bottom: 8, left: 12, right: 8 }}
+          disabled={deleting?.has(entry.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`Eintrag vom ${entry.date} löschen`}
+        >
+          <Text style={styles.deleteText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <View>
-      {groups.map((group) => (
-        <View key={group.title} style={styles.group}>
-          <Text style={styles.groupTitle}>{group.title}</Text>
+      {groups
+        .filter((g) => g.title !== 'Älter')
+        .map((group) => (
+          <View key={group.title} style={styles.group}>
+            <Text style={styles.groupTitle}>{group.title}</Text>
+            <View style={styles.groupCard}>
+              {group.items.map(({ entry, delta }, idx) =>
+                renderRow(entry, delta, idx === group.items.length - 1)
+              )}
+            </View>
+          </View>
+        ))}
+
+      {weekGroups.length > 0 && (
+        <View style={styles.group}>
+          <Text style={styles.groupTitle}>Älter</Text>
           <View style={styles.groupCard}>
-            {group.items.map(({ entry, delta }, idx) => {
-              const isDown = delta !== null && delta < 0;
-              const isUp = delta !== null && delta > 0;
-              const isNeutral = delta !== null && Math.abs(delta) < 0.05;
-              const deltaColor = isNeutral
-                ? colors.textMuted
-                : isDown
-                ? colors.positive
-                : isUp
-                ? colors.negative
-                : colors.textMuted;
-              const deltaStr =
-                delta === null
-                  ? null
-                  : isNeutral
-                  ? '─'
-                  : `${isDown ? '↓' : '↑'} ${Math.abs(delta).toFixed(1)}`;
-
-              const isLast = idx === group.items.length - 1;
-
+            {weekGroups.map((wg, wi) => {
+              const isExpanded = expandedWeeks.has(wg.key);
+              const isLastWeek = wi === weekGroups.length - 1;
               return (
-                <View
-                  key={entry.id}
-                  style={[styles.row, !isLast && styles.rowBorder]}
-                >
-                  <View style={styles.dotWrap}>
-                    <View style={styles.dot} />
-                  </View>
-                  <Text style={styles.dateText}>{formatEntryDate(entry.date)}</Text>
-                  <Text style={styles.valueText}>
-                    {entry.value.toFixed(1)}{' '}
-                    <Text style={styles.unitText}>{entry.unit}</Text>
-                  </Text>
-                  {deltaStr ? (
-                    <Text style={[styles.deltaText, { color: deltaColor }]}>
-                      {deltaStr}
-                    </Text>
-                  ) : (
-                    <View style={styles.deltaPlaceholder} />
-                  )}
+                <View key={wg.key}>
                   <TouchableOpacity
-                    onPress={() => onDelete(entry)}
-                    hitSlop={{ top: 8, bottom: 8, left: 12, right: 8 }}
-                    disabled={deleting?.has(entry.id)}
+                    onPress={() => toggleWeek(wg.key)}
+                    style={[styles.weekHeader, (!isLastWeek || isExpanded) && styles.rowBorder]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Eintrag vom ${entry.date} löschen`}
+                    accessibilityState={{ expanded: isExpanded }}
                   >
-                    <Text style={styles.deleteText}>✕</Text>
+                    <View style={styles.weekHeaderLeft}>
+                      <Text style={styles.weekLabel}>{wg.label}</Text>
+                      <Text style={styles.weekMeta}>
+                        Ø {wg.avgValue.toFixed(2)} {wg.unit} · {wg.count}{' '}
+                        {wg.count === 1 ? 'Messung' : 'Messungen'}
+                      </Text>
+                    </View>
+                    <Text style={styles.chevron}>{isExpanded ? '▲' : '▼'}</Text>
                   </TouchableOpacity>
+                  {isExpanded &&
+                    wg.items.map(({ entry, delta }, idx) =>
+                      renderRow(entry, delta, isLastWeek && idx === wg.items.length - 1)
+                    )}
                 </View>
               );
             })}
           </View>
         </View>
-      ))}
+      )}
     </View>
   );
 }
@@ -249,5 +341,29 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textDisabled,
     paddingLeft: spacing.sm,
+  },
+  weekHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    gap: spacing.sm,
+  },
+  weekHeaderLeft: {
+    flex: 1,
+  },
+  weekLabel: {
+    ...typography.body2,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  weekMeta: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  chevron: {
+    fontSize: 10,
+    color: colors.textMuted,
   },
 });

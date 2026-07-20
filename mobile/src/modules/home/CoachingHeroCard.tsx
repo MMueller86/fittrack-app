@@ -124,11 +124,11 @@ export function CoachingHeroCard({
         {/* Rechte Spalte: Gewicht + Delta + Sparkline */}
         {latest ? (
           <View style={styles.right}>
-            <Text style={styles.weightValue}>{latest.value.toFixed(1)}</Text>
+            <Text style={styles.weightValue}>{latest.value.toFixed(2)}</Text>
             <Text style={styles.weightUnit}>kg</Text>
             {delta !== null ? (
               <Text style={[styles.weightDelta, deltaGood ? styles.deltaGood : styles.deltaBad]}>
-                {delta < 0 ? '↓' : delta > 0 ? '↑' : '→'} {Math.abs(delta).toFixed(1)} kg
+                {delta < 0 ? '↓' : delta > 0 ? '↑' : '→'} {Math.abs(delta).toFixed(2)} kg
               </Text>
             ) : null}
             {previous ? (

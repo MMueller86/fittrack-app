@@ -108,7 +108,7 @@ export default function MoveItemSheet({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.mealName}>{meal.name}</Text>
                   <Text style={styles.mealMeta}>
-                    {meal.items.length > 0
+                    {(meal.items?.length ?? 0) > 0
                       ? `${meal.items.length} Eintrag${meal.items.length !== 1 ? 'einträge' : ''}`
                       : '— leer —'}
                   </Text>

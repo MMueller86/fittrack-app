@@ -66,11 +66,13 @@ function computeStats(entries: WeightEntry[], unit: WeightUnit): Stats {
 
 function Stat({
   label,
+  sublabel,
   value,
   suffix,
   valueColor = colors.text,
 }: {
   label: string;
+  sublabel?: string;
   value: string;
   suffix: string;
   valueColor?: string;
@@ -82,6 +84,7 @@ function Stat({
         {suffix ? <Text style={styles.statSuffix}> {suffix}</Text> : null}
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
+      {sublabel ? <Text style={styles.statSublabel}>{sublabel}</Text> : null}
     </View>
   );
 }
@@ -120,7 +123,8 @@ export function TrendStatsRow({ entries, unit }: TrendStatsRowProps) {
       />
       <View style={styles.divider} />
       <Stat
-        label="Ø / Woche"
+        label="Trend / Woche"
+        sublabel="BASIS: 30 TAGE"
         value={changeStr}
         suffix={stats.weeklyChange !== null ? unit : ''}
         valueColor={changeColor}
@@ -159,6 +163,11 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  statSublabel: {
+    ...typography.overline,
+    color: colors.textDisabled,
+    marginTop: 1,
   },
   divider: {
     width: 1,

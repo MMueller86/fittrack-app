@@ -54,6 +54,11 @@ function formatShortDate(iso: string): string {
   return `${d}.${m}`;
 }
 
+function dateToMs(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y!, m! - 1, d!).getTime();
+}
+
 function smoothPath(pts: Point[]): string {
   if (pts.length === 0) return '';
   if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
@@ -80,6 +85,31 @@ function areaPath(pts: Point[], bottomY: number): string {
   if (pts.length < 2) return '';
   const last = pts[pts.length - 1];
   return `${smoothPath(pts)} L ${last.x.toFixed(2)} ${bottomY.toFixed(2)} L ${pts[0].x.toFixed(2)} ${bottomY.toFixed(2)} Z`;
+}
+
+const GAP_MS = 3 * 86_400_000;
+
+function segmentize(points: Point[], data: { date: string }[]): Point[][] {
+  if (points.length === 0) return [];
+  const segments: Point[][] = [];
+  let current: Point[] = [points[0]!];
+  for (let i = 1; i < points.length; i++) {
+    if (dateToMs(data[i]!.date) - dateToMs(data[i - 1]!.date) > GAP_MS) {
+      segments.push(current);
+      current = [];
+    }
+    current.push(points[i]!);
+  }
+  segments.push(current);
+  return segments.filter((s) => s.length > 0);
+}
+
+function gapFillPath(from: Point, to: Point, bottomY: number): string {
+  return `M ${from.x.toFixed(2)} ${from.y.toFixed(2)} L ${to.x.toFixed(2)} ${to.y.toFixed(2)} L ${to.x.toFixed(2)} ${bottomY.toFixed(2)} L ${from.x.toFixed(2)} ${bottomY.toFixed(2)} Z`;
+}
+
+function gapLinePath(from: Point, to: Point): string {
+  return `M ${from.x.toFixed(2)} ${from.y.toFixed(2)} L ${to.x.toFixed(2)} ${to.y.toFixed(2)}`;
 }
 
 export function WeightChart({
@@ -116,8 +146,12 @@ export function WeightChart({
   const innerH = height - PAD.top - PAD.bottom;
   const bottomY = PAD.top + innerH;
 
+  const firstMs   = dateToMs(data[0]!.date);
+  const lastMs    = dateToMs(data[data.length - 1]!.date);
+  const dateRange = Math.max(lastMs - firstMs, 1);
+
   const xFor = (i: number) =>
-    PAD.left + (data.length === 1 ? innerW / 2 : (i / (data.length - 1)) * innerW);
+    PAD.left + ((dateToMs(data[i]!.date) - firstMs) / dateRange) * innerW;
   const yFor = (v: number) =>
     PAD.top + innerH - ((v - min) / (max - min)) * innerH;
 
@@ -134,9 +168,17 @@ export function WeightChart({
     date: data[i].date,
   }));
 
-  const linePath = smoothPath(actualPoints);
-  const fillPath = areaPath(actualPoints, bottomY);
-  const avgLinePath = smoothPath(avgPoints);
+  const actualSegments = segmentize(actualPoints, data);
+  const avgSegments    = segmentize(avgPoints, data);
+
+  const gapConnectors: Array<{ from: Point; to: Point }> = [];
+  for (let i = 0; i < actualSegments.length - 1; i++) {
+    const seg  = actualSegments[i]!;
+    const next = actualSegments[i + 1]!;
+    if (seg.length > 0 && next.length > 0) {
+      gapConnectors.push({ from: seg[seg.length - 1]!, to: next[0]! });
+    }
+  }
 
   const n = actualPoints.length;
   const step = Math.max(1, Math.floor(n / 5));
@@ -157,6 +199,11 @@ export function WeightChart({
             <Stop offset="0%"   stopColor={LINE_COLOR} stopOpacity="0.5" />
             <Stop offset="55%"  stopColor={LINE_COLOR} stopOpacity="0.1" />
             <Stop offset="100%" stopColor={LINE_COLOR} stopOpacity="0"   />
+          </LinearGradient>
+          <LinearGradient id="areaGradGap" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0%"   stopColor={LINE_COLOR} stopOpacity="0.12" />
+            <Stop offset="55%"  stopColor={LINE_COLOR} stopOpacity="0.04" />
+            <Stop offset="100%" stopColor={LINE_COLOR} stopOpacity="0"    />
           </LinearGradient>
         </Defs>
 
@@ -201,29 +248,60 @@ export function WeightChart({
           </SvgText>
         ))}
 
-        {/* Filled gradient area */}
-        <Path d={fillPath} fill="url(#areaGrad)" />
+        {/* Gap zones — dimmed fill rendered behind actual data */}
+        {gapConnectors.map((gc, gi) => (
+          <Path
+            key={`gap-fill-${gi}`}
+            d={gapFillPath(gc.from, gc.to, bottomY)}
+            fill="url(#areaGradGap)"
+          />
+        ))}
 
-        {/* 7-day moving average — dashed */}
-        <Path
-          d={avgLinePath}
-          fill="none"
-          stroke={AVG_COLOR}
-          strokeWidth={1.5}
-          strokeDasharray="6,4"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {/* Filled gradient area — one fill per continuous segment */}
+        {actualSegments.map((seg, si) => (
+          <Path key={`fill-${si}`} d={areaPath(seg, bottomY)} fill="url(#areaGrad)" />
+        ))}
 
-        {/* Actual weight — smooth bezier line */}
-        <Path
-          d={linePath}
-          fill="none"
-          stroke={LINE_COLOR}
-          strokeWidth={2.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {/* 7-day moving average — dashed, per segment */}
+        {avgSegments.map((seg, si) => (
+          <Path
+            key={`avg-${si}`}
+            d={smoothPath(seg)}
+            fill="none"
+            stroke={AVG_COLOR}
+            strokeWidth={1.5}
+            strokeDasharray="6,4"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
+
+        {/* Actual weight — smooth bezier line, per segment */}
+        {actualSegments.map((seg, si) => (
+          <Path
+            key={`line-${si}`}
+            d={smoothPath(seg)}
+            fill="none"
+            stroke={LINE_COLOR}
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
+
+        {/* Gap connectors — thin dashed line over dimmed fill */}
+        {gapConnectors.map((gc, gi) => (
+          <Path
+            key={`gap-line-${gi}`}
+            d={gapLinePath(gc.from, gc.to)}
+            fill="none"
+            stroke={LINE_COLOR}
+            strokeWidth={1}
+            strokeDasharray="4,3"
+            strokeOpacity={0.35}
+            strokeLinecap="round"
+          />
+        ))}
 
         {/* Dots — glow on latest, small on periodic points */}
         {actualPoints.map((p, i) => {

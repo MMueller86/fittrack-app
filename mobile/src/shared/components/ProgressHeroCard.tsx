@@ -97,7 +97,7 @@ export function ProgressHeroCard({
       <View style={styles.valueRow}>
         <View style={styles.valueLeft}>
           <View style={styles.numberRow}>
-            <Text style={styles.valueText}>{latest.value.toFixed(1)}</Text>
+            <Text style={styles.valueText}>{latest.value.toFixed(2)}</Text>
             <Text style={styles.unitText}>{latest.unit}</Text>
           </View>
           <Text style={styles.dateText}>{formatLongDate(latest.date)}</Text>
@@ -112,7 +112,7 @@ export function ProgressHeroCard({
           <View style={styles.goalHeader}>
             <Text style={styles.goalLabel}>
               {remainingDisplay !== null && remainingDisplay > 0.05
-                ? `Noch ${remainingDisplay.toFixed(1)} ${unit} bis zum Ziel (${goalLabel(goalType)})`
+                ? `Noch ${remainingDisplay.toFixed(2)} ${unit} bis zum Ziel (${goalLabel(goalType)})`
                 : '🎯 Ziel erreicht!'}
             </Text>
             <Text style={styles.goalPct}>{Math.round(progressPct * 100)} %</Text>

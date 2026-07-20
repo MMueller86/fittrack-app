@@ -59,7 +59,7 @@ export function WeightCoachCard({ entries, targetWeightKg, loading, onPress }: P
           <Text style={styles.eyebrow}>GEWICHT</Text>
           {latest ? (
             <View style={styles.valueRow}>
-              <Text style={styles.value}>{latest.value.toFixed(1)}</Text>
+              <Text style={styles.value}>{latest.value.toFixed(2)}</Text>
               <Text style={styles.unit}> kg</Text>
             </View>
           ) : null}

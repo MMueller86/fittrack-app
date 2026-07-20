@@ -32,7 +32,7 @@ export function TrendPill({ latest, previous, goalType = 'lose_weight' }: TrendP
     );
   }
   const delta = latest.value - previous.value;
-  if (Math.abs(delta) < 0.05) {
+  if (parseFloat(Math.abs(delta).toFixed(2)) === 0) {
     return (
       <View style={[styles.pill, styles.neutralPill]}>
         <Text style={styles.neutralText}>● No change</Text>
@@ -56,7 +56,7 @@ export function TrendPill({ latest, previous, goalType = 'lose_weight' }: TrendP
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       <Text style={[styles.pillText, { color }]}>
-        {arrow} {Math.abs(delta).toFixed(1)} {latest.unit}
+        {arrow} {Math.abs(delta).toFixed(2)} {latest.unit}
       </Text>
     </View>
   );
