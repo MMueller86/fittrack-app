@@ -74,12 +74,41 @@ Library: `@gorhom/bottom-sheet` v5
 
 ## IdleState
 
-Shows when mode = `idle`:
-- Favorites chips (horizontal scroll, `primarySoft` background)
-- Recents list ("Kürzlich hinzugefügt") — sorted by `lastUsedAt` DESC
-- Section label: "Schnellzugriff" (not "Favoriten")
+Shows when mode = `idle`. The hub's personal Quick Entry list.
 
-Recents are loaded by `FoodEntryHub.tsx` and passed as props. `RecentItem.tsx` is the extracted row component.
+Data source: `favoritesApi.listFavorites()` → sorted by `computeRelevanceOrder()`.
+
+**Layout:**
+- Header: active filter name (h3) + chevron — tapping opens filter modal
+- Subtitle: context hint (e.g. "Passend zur Mittagszeit") — visible in "Für dich" filter only
+- Content: `RelationRow` list via `FoodList.tsx`
+
+**Filter options:**
+- **Für dich** (default) — relevance-sorted favorites; shows last-usage info in line 3
+- **Zuletzt verwendet** — auto-selected on search focus; shows recency info
+- **Mahlzeit filters** (Frühstück, Mittagessen, etc.) — filtered by `mealTypeCounts`
+- **Alle** — favorites + personal library + recipes, alphabetical; shows macros
+
+**State transitions during search:**
+- Keyboard focus → filter switches to "Zuletzt verwendet", SearchState shown
+- Active query → header shows "Suchergebnisse", filter modal not accessible
+- Blur without selection → filter resets to "Für dich"
+
+**RelationRow layout (3 lines + thumbnail):**
+- Line 1: `displayName` + heart icon (right)
+- Line 2: `displayBrand` / "Eigenes Rezept" / "Eigenes Lebensmittel" (fallback by foodRefType)
+- Line 3: contextual secondary info (last usage or macro reference) + optional "+ N g" direct-add pill
+
+**Direct-Add ("Wie immer?"):**
+- Visible in "Für dich" when `preferredInputAmount > 0`
+- Bypasses QuantityView; directly calls `diaryApi.addItem()` with preferred amount
+- Requires `context.mealId` — falls back to QuantityView if absent
+
+**Key files:**
+- `mobile/src/modules/nutrition/hub/FoodEntryHub.tsx` — filter state, data loading, hub wiring
+- `mobile/src/modules/nutrition/hub/FoodList.tsx` — generic list component
+- `mobile/src/modules/nutrition/hub/RelationRow.tsx` — unified list row
+- `mobile/src/modules/nutrition/hub/quickEntryRelevance.ts` — `computeRelevanceOrder()`, `computeLastUsageText()`, `computeDirectAddLabel()`
 
 ## SearchState
 

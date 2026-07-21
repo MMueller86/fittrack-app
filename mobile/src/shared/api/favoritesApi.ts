@@ -1,6 +1,6 @@
 // favoritesApi — calls /api/favorites and /api/food-relations/recent
 import { apiClient } from './client';
-import type { UserFoodRelation, UpsertUserFoodRelationInput } from '@fittrack/shared';
+import type { UserFoodRelation, UpsertUserFoodRelationInput, QuickEntryGroupedResponse } from '@fittrack/shared';
 
 export const favoritesApi = {
   /** GET /api/favorites */
@@ -16,6 +16,11 @@ export const favoritesApi = {
   /** DELETE /api/favorites/:foodRef */
   removeFavorite(foodRef: string): Promise<void> {
     return apiClient.delete(`/favorites/${encodeURIComponent(foodRef)}`).then(() => undefined);
+  },
+
+  /** GET /api/favorites/grouped — returns ungrouped, groups, all */
+  listGrouped(): Promise<QuickEntryGroupedResponse> {
+    return apiClient.get<QuickEntryGroupedResponse>('/favorites/grouped').then((r) => r.data);
   },
 
   /** GET /api/food-relations/recent?limit= */

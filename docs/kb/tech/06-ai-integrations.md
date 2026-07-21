@@ -72,7 +72,6 @@ User provides free-text recipe. AI extracts ingredients with amounts.
 After a user creates a reusable item, the backend enriches it asynchronously by generating:
 - `searchTerms` — alternative search queries
 - `aiKeywords` — keywords for auto-matching in meal parser
-- `shortName` — for favorites display (via `favoriteShortNameService.ts`)
 
 A timer trigger (`reusableItemsEnrichScheduler.ts`) processes pending enrichments in batch.
 

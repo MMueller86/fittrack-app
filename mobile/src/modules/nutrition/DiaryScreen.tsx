@@ -33,6 +33,7 @@ import EditItemSheet from './EditItemSheet';
 import MoveItemSheet from './MoveItemSheet';
 import CopyItemSheet from './CopyItemSheet';
 import { useFoodEntryHubStore } from './hub/useFoodEntryHubStore';
+import { applyAddMeal } from './diaryItemUtils';
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 // Mahlzeiten, die als leere State-B-Karten immer sichtbar sein sollen (Phase 6)
@@ -284,7 +285,7 @@ export default function DiaryScreen() {
     void loadDay(date);
   };
 
-  const loadDay = useCallback(async (d: string) => {
+  const loadDay = useCallback(async (d: string): Promise<boolean> => {
     try {
       setError(null);
       const result = await diaryApi.getDay(d);
@@ -292,8 +293,10 @@ export default function DiaryScreen() {
       if (result.dayType != null) {
         hydrateDayType(result.dayType, d, result.workoutType ?? null);
       }
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load diary');
+      return false;
     }
   }, [hydrateDayType]);
 
@@ -325,7 +328,6 @@ export default function DiaryScreen() {
 
   // Add meal — direkt ohne Bestätigungs-Alert, optimistisches Update
   const handleAddMeal = async (type: MealType) => {
-    // Optimistisch: temporäre Meal-ID sofort in State einfügen
     const tempId = `temp-${type}-${Date.now()}`;
     const tempMeal: Meal = {
       id: tempId,
@@ -337,14 +339,17 @@ export default function DiaryScreen() {
       createdAt: new Date().toISOString(),
     };
     setData((prev) => prev ? { ...prev, meals: [...prev.meals, tempMeal] } : prev);
-    try {
-      await diaryApi.createMeal(date, type);
-      await loadDay(date); // Server-Sync: ersetzt temp-Meal mit echter ID
-    } catch {
-      // Rollback bei Fehler
-      setData((prev) => prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== tempId) } : prev);
-      showSnackbar({ message: 'Mahlzeit konnte nicht angelegt werden.' });
-    }
+
+    await applyAddMeal({
+      type,
+      date,
+      tempId,
+      setData,
+      showSnackbar,
+      loadDay,
+      createMeal: (d, t) => diaryApi.createMeal(d, t),
+      mealLabels: MEAL_LABELS,
+    });
   };
 
   // Delete meal — opens ConfirmSheet

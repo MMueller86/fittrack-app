@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -151,8 +152,14 @@ export default function EditItemSheet({
       });
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onSaved(result.meal);
-    } catch { /* caller handles errors */ }
-    finally { setSaving(false); }
+    } catch (err) {
+      console.error('[EditItemSheet] handleSave failed:', err);
+      Alert.alert(
+        'Speichern fehlgeschlagen',
+        'Der Eintrag konnte nicht gespeichert werden. Bitte versuche es erneut.',
+        [{ text: 'OK' }],
+      );
+    } finally { setSaving(false); }
   };
 
   const isValid = (() => { const p = parseFloat(amountText.replace(',', '.')); return Number.isFinite(p) && p > 0; })();

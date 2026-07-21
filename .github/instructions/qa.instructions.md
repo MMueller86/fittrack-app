@@ -93,6 +93,32 @@ The Red → Green workflow is an **implementation practice**, not a QA verificat
 
 The workflow itself is documented in [`backend.instructions.md`](backend.instructions.md) for implementation agents.
 
+## Encoding Validation (Mobile Files)
+
+When reviewing changes to any file in `mobile/src/`, grep all modified files for mojibake sequences before issuing a verdict. Encoding corruption is a **blocking** finding.
+
+Mojibake occurs when a tool reads a UTF-8 file as Latin-1 and writes it back. Common corrupted sequences:
+
+| Mojibake | Should be |
+|---|---|
+| `Ã¤` | `ä` |
+| `Ã¼` | `ü` |
+| `ÃŸ` | `ß` |
+| `Ãœ` | `Ü` |
+| `Ã¶` | `ö` |
+| `â€"` | `—` |
+| `â€™` | `'` |
+| `â†'` | `→` |
+| `â‰¤` | `≤` |
+| `â¤ï¸` | `❤️` |
+
+**Check command:**
+```
+grep -rn "Ã¤\|Ã¼\|ÃŸ\|Ãœ\|â€"\|â€™\|â†'\|â¤\|â‰¤" mobile/src/
+```
+
+If any match is found in a file touched by the current change: **classify as Blocking**. The corrupted file must be fully restored to correct UTF-8 before the verdict can be PASS or PASS WITH ISSUES.
+
 ## Review Output
 
 After completing a review, summarise findings using one of these verdicts:

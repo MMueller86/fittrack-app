@@ -6,8 +6,39 @@
 //   3. portion-based item WITH sourceId but NO portionWeightGrams → flat macros fallback
 //   4. no sourceId (AI, manual) → flat macros + all aiMealEstimate* fields
 
-import type { MealItem, ReusableItem } from '@fittrack/shared';
+import type { DiaryDayResponse, MealItem, MealType, ReusableItem } from '@fittrack/shared';
 import type { AddItemInput } from '../../shared/api/diaryApi';
+
+export async function applyAddMeal(params: {
+  type: MealType;
+  date: string;
+  tempId: string;
+  setData: (updater: (prev: DiaryDayResponse | null) => DiaryDayResponse | null) => void;
+  showSnackbar: (opts: { message: string }) => void;
+  loadDay: (date: string) => Promise<boolean>;
+  createMeal: (date: string, type: MealType) => Promise<unknown>;
+  mealLabels: Record<MealType, string>;
+}): Promise<void> {
+  const { type, date, tempId, setData, showSnackbar, loadDay, createMeal } = params;
+
+  try {
+    await createMeal(date, type);
+  } catch {
+    setData((prev) =>
+      prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== tempId) } : prev,
+    );
+    showSnackbar({ message: 'Mahlzeit konnte nicht angelegt werden.' });
+    return;
+  }
+
+  const synced = await loadDay(date);
+  if (!synced) {
+    setData((prev) =>
+      prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== tempId) } : prev,
+    );
+    showSnackbar({ message: 'Ansicht konnte nicht aktualisiert werden. Bitte einmal nach unten ziehen.' });
+  }
+}
 
 export function buildCopyPayload(
   item: MealItem,

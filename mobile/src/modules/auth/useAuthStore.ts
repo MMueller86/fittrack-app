@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { authService } from '../../services/authService';
-import { authEvents } from '../../shared/api/client';
+import { apiClient, authEvents } from '../../shared/api/client';
 
 interface AuthState {
   /** null = still loading, true = authenticated, false = unauthenticated */
@@ -28,13 +28,23 @@ export const useAuthStore = create<AuthState>((set) => ({
     // If token is expired, try silent refresh
     if (authService.isTokenExpired(token)) {
       const refreshed = await authService.refreshAccessToken();
+      if (refreshed !== null) {
+        // Fire-and-forget warmup — Azure Functions cold start mitigation
+        apiClient.get('/health').catch(() => { /* ignorieren */ });
+      }
       set({ isAuthenticated: refreshed !== null });
     } else {
+      // Fire-and-forget warmup — Azure Functions cold start mitigation
+      apiClient.get('/health').catch(() => { /* ignorieren */ });
       set({ isAuthenticated: true });
     }
   },
 
-  login: () => set({ isAuthenticated: true }),
+  login: () => {
+    // Fire-and-forget warmup — Azure Functions cold start mitigation
+    apiClient.get('/health').catch(() => { /* ignorieren */ });
+    set({ isAuthenticated: true });
+  },
 
   logout: async () => {
     await authService.clearTokens();

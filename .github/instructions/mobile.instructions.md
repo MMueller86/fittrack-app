@@ -125,6 +125,12 @@ All user-facing text must be in **German**. No exceptions.
 <Text>Add food</Text>
 ```
 
+## File Encoding
+
+All source files in `mobile/src/` must be saved as **UTF-8**. Never use PowerShell's `Set-Content` or `Out-File` without the explicit `-Encoding UTF8` flag — the default encoding on Windows corrupts non-ASCII characters.
+
+When editing files that contain German characters (`ä`, `ö`, `ü`, `ß`) or emoji: verify after saving that the characters render correctly. Corrupted sequences like `Ã¤`, `ÃŸ`, `â€"` indicate an encoding error — the file must be rewritten in UTF-8 immediately.
+
 ## UX Patterns
 
 Before implementing new UX flows, consult:

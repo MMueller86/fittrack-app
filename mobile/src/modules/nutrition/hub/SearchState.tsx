@@ -22,7 +22,7 @@ import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
-import { RecentItem } from './RecentItem';
+import { RelationRow } from './RelationRow';
 
 interface Props {
   query: string;
@@ -203,6 +203,8 @@ const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst }: Resu
           displayName: item.name,
           displayBrand: item.brand,
           imageUrl: item.imageUrl ?? null,
+          nutritionPer100g: item.nutritionPer100g,
+          portion: item.portion ?? null,
         });
       } else {
         await favoritesApi.removeFavorite(item.id);
@@ -277,6 +279,19 @@ const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst }: Resu
 // ---------------------------------------------------------------------------
 
 const DEBOUNCE_MS = 300;
+
+// ---------------------------------------------------------------------------
+// Relative usage helper
+// ---------------------------------------------------------------------------
+
+function relativeUsage(isoDate: string): string {
+  const days = Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000);
+  if (days === 0) return 'Heute verwendet';
+  if (days === 1) return 'Gestern verwendet';
+  if (days < 7) return `Vor ${days} Tagen verwendet`;
+  if (days < 14) return 'Vor einer Woche verwendet';
+  return `Vor ${Math.floor(days / 7)} Wochen verwendet`;
+}
 
 export function SearchState({ query, recents, initialResults, onSelect, onSelectRelation, onOpenSubflow, onResultsChange }: Props) {
   const [results, setResults] = useState<FoodSearchResult[]>(initialResults ?? []);
@@ -356,13 +371,17 @@ export function SearchState({ query, recents, initialResults, onSelect, onSelect
 
       {!hasQuery && !loading && recents.length > 0 ? (
         <>
-          {/* Sticky Label -- scrollt NICHT mit */}
-          <Text style={styles.recentsLabel}>Zuletzt hinzugefügt</Text>
           <BottomSheetFlatList
             data={recents}
             keyExtractor={(item) => item.id}
             renderItem={({ item, index }) => (
-              <RecentItem key={item.id} item={item} onPress={onSelectRelation} isFirst={index === 0} />
+              <RelationRow
+                key={item.id}
+                relation={item}
+                onPress={() => onSelectRelation(item)}
+                isFirst={index === 0}
+                getSecondaryText={(r) => r.lastUsedAt ? relativeUsage(r.lastUsedAt) : null}
+              />
             )}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
@@ -542,14 +561,4 @@ const styles = StyleSheet.create({
 
   // Recents -- via BottomSheetFlatList (gleiche Gesture-Integration wie Suchergebnisse)
   recentsListContent: { paddingBottom: spacing.xl },
-  recentsLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.8,
-    color: colors.textMuted,
-    opacity: 0.7,
-    paddingHorizontal: spacing.xs,
-    paddingBottom: spacing.xs,
-    textTransform: 'uppercase',
-  },
 });

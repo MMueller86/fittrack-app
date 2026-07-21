@@ -89,8 +89,6 @@ function mergeWithExisting(incoming: FoodProduct, existing: FoodProduct): FoodPr
         ...(existing.manualKeywords.length > 0 ? existing.manualKeywords : incoming.manualKeywords),
       ]),
     ],
-    // Preserve AI-generated short name — set after first user favorites this product
-    ...(existing.shortName ? { shortName: existing.shortName } : {}),
   };
 }
 

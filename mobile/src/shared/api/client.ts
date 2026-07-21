@@ -86,6 +86,26 @@ apiClient.interceptors.response.use(
         };
       }
     }
+
+    // 5xx / timeout — retry nur für GET-Anfragen (Kaltstart-Mitigation)
+    const isRetryableStatus =
+      axios.isAxiosError(error) &&
+      error.response?.status != null &&
+      [502, 503, 504].includes(error.response.status);
+
+    const isTimeout = axios.isAxiosError(error) && error.code === 'ECONNABORTED';
+    const isGetRequest = error.config?.method?.toUpperCase() === 'GET';
+
+    type RetryConfig = InternalAxiosRequestConfig & { _retryCount?: number };
+    const retryCount = (error.config as RetryConfig)?._retryCount ?? 0;
+
+    if ((isRetryableStatus || isTimeout) && isGetRequest && retryCount < 2 && error.config) {
+      (error.config as RetryConfig)._retryCount = retryCount + 1;
+      const delay = retryCount === 0 ? 1500 : 3000;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      return apiClient(error.config);
+    }
+
     return Promise.reject(error);
   },
 );

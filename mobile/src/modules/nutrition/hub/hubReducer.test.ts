@@ -35,6 +35,12 @@ describe('hubReducer', () => {
     expect(next).toEqual({ mode: 'search', query: 'toast' });
   });
 
+  it('SET_QUERY: preserves trailing whitespace (regression: trimEnd removed from handleSearchChange)', () => {
+    const search: HubMode = { mode: 'search', query: '' };
+    const next = hubReducer(search, { type: 'SET_QUERY', query: 'Magnum ' });
+    expect(next).toEqual({ mode: 'search', query: 'Magnum ' });
+  });
+
   it('SELECT_PRODUCT from search: remembers previous query', () => {
     const search: HubMode = { mode: 'search', query: 'hähnchen' };
     const next = hubReducer(search, { type: 'SELECT_PRODUCT', product: mockProduct as never });

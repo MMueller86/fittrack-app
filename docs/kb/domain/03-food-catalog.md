@@ -76,20 +76,43 @@ Within the same rank, `sourceQualityScore` is the tiebreaker. Higher score = bet
 
 Minimum query length: 2 characters for catalog-only endpoints.
 
-## Favorites and Recents
+## Favorites and Quick Entry
 
-`UserFoodRelation` (`shared/types/userFoodRelation.ts`) — tracks a user's relationship with a food item.
+`UserFoodRelation` (`shared/types/userFoodRelation.ts`) — tracks a user's relationship with a food item, including favorites and usage patterns.
 
-- `userId`, `foodRef` (ID), `foodRefType: 'catalog' | 'personal'`
-- `isFavorite: boolean`
-- `displayName`, `displayBrand` — short names for chips/quick access
-- `imageUrl`
-- `lastUsedAt`, `usageCount` — for recents ranking
-- `shortName` — AI-generated short display name (via `favoriteShortNameService.ts`)
+Core fields:
+- `userId`, `foodRef` (item ID), `foodRefType: 'catalog' | 'personal' | 'recipe'`
+- `isFavorite: boolean` — marks an item as a Quick Entry
+- `displayName`, `displayBrand`, `imageUrl` — denormalized for instant display without API lookups
 
-API:
-- `GET /api/favorites` — all favorites
-- `GET /api/food-relations/recent` — top 10 items sorted by `lastUsedAt` DESC
+Nutrition denormalization (stored at time of favoriting, enables instant QuantityView):
+- `nutritionPer100g?: NutritionValues` — macros per 100g
+- `portion?: PortionInfo` — portion label + weightGrams
+
+Usage tracking:
+- `lastUsedAt`, `usageCount` — recency and frequency
+- `lastInputMode?: 'grams' | 'portion'` — last used input mode
+- `lastInputAmount?: number` — last used amount
+- `preferredInputMode?: 'grams' | 'portion'` — EMA-derived preferred mode
+- `preferredInputAmount?: number` — EMA-derived preferred amount (α = 0.3)
+- `mealTypeCounts?: Partial<Record<MealType, number>>` — per-meal usage counts
+- `usageDates?: string[]` — ISO date strings of recent uses, trimmed to 90 days (used for 30-day count)
+- `favoritedAt?: string` — ISO timestamp when `isFavorite` was first set to `true`
+
+`@deprecated` fields (kept for backward compat with existing documents):
+- `shortName?: string` — no longer generated or used; `displayName` is used everywhere
+
+### Quick Entry Relevance
+
+Favorites (Quick Entries) are sorted for display using `computeRelevanceOrder()` in `mobile/src/modules/nutrition/hub/quickEntryRelevance.ts`. Scoring factors: novelty bonus (favoritedAt within 7 days), contextual usage (mealTypeCounts), global usage (usageCount), recency (lastUsedAt).
+
+### API
+
+- `GET /api/favorites` — all favorites, sorted by displayName
+- `GET /api/favorites/grouped` — favorites pre-grouped into `{ ungrouped, groups, all }` (used by legacy IdleState; flat `all` used by current hub)
+- `POST /api/favorites` — upsert a favorite; stores `nutritionPer100g`, `portion`, `favoritedAt`
+- `DELETE /api/favorites/{foodRef}` — removes favorite (sets `isFavorite: false`)
+- `GET /api/food-relations/recent` — top N items sorted by `lastUsedAt` DESC
 
 ## Badge Semantics
 

@@ -13,9 +13,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { Recipe } from '@fittrack/shared';
+import type { Recipe, UserFoodRelation } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
+import { favoritesApi } from '../../shared/api/favoritesApi';
+import { Icon } from '../../shared/components/Icon';
+import { computeRecipeQuickEntryData } from './recipeUtils';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeList'>;
@@ -26,10 +29,14 @@ function formatKcal(n: number) {
 
 function RecipeCard({
   recipe,
+  isFavorite,
   onPress,
+  onFavoriteToggle,
 }: {
   recipe: Recipe;
+  isFavorite: boolean;
   onPress: () => void;
+  onFavoriteToggle: (recipe: Recipe) => void;
 }) {
   const thumbnailUrl = recipe.images.length > 0 ? (recipe.images[0]!.url ?? null) : null;
 
@@ -57,6 +64,19 @@ function RecipeCard({
             </Text>
           )}
         </View>
+        <TouchableOpacity
+          onPress={() => onFavoriteToggle(recipe)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={cardStyles.heartButton}
+          accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+        >
+          <Icon
+            lib="ion"
+            name={isFavorite ? 'heart' : 'heart-outline'}
+            size="md"
+            color={isFavorite ? colors.negative : colors.textMuted}
+          />
+        </TouchableOpacity>
         <Text style={cardStyles.chevron}>›</Text>
       </View>
     </TouchableOpacity>
@@ -104,17 +124,20 @@ const cardStyles = StyleSheet.create({
   meta: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   tags: { ...typography.caption, color: colors.primary, marginTop: 2 },
   chevron: { ...typography.h2, color: colors.textMuted, marginLeft: spacing.sm },
+  heartButton: { marginLeft: spacing.sm },
 });
 
 export default function RecipeListScreen({ navigation }: Props) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [favorites, setFavorites] = useState<UserFoodRelation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const data = await recipeApi.list();
+      const [data, favs] = await Promise.all([recipeApi.list(), favoritesApi.listFavorites()]);
       setRecipes(data.recipes);
+      setFavorites(favs);
     } catch {
       Alert.alert('Fehler', 'Rezepte konnten nicht geladen werden.');
     } finally {
@@ -122,6 +145,43 @@ export default function RecipeListScreen({ navigation }: Props) {
       setRefreshing(false);
     }
   }, []);
+
+  const favoriteIds = new Set(favorites.map((f) => f.foodRef));
+
+  const handleFavoriteToggle = useCallback(
+    async (recipe: Recipe) => {
+      const isCurrentlyFavorite = favorites.some((f) => f.foodRef === recipe.id);
+      // Optimistic update
+      if (isCurrentlyFavorite) {
+        setFavorites((prev) => prev.filter((f) => f.foodRef !== recipe.id));
+      } else {
+        setFavorites((prev) => [...prev, { foodRef: recipe.id } as UserFoodRelation]);
+      }
+      try {
+        if (isCurrentlyFavorite) {
+          await favoritesApi.removeFavorite(recipe.id);
+        } else {
+          const { nutritionPer100g, portion } = computeRecipeQuickEntryData(recipe);
+          await favoritesApi.addFavorite({
+            foodRef: recipe.id,
+            foodRefType: 'recipe',
+            displayName: recipe.name,
+            imageUrl: recipe.images[0]?.url ?? null,
+            nutritionPer100g,
+            portion,
+          });
+        }
+      } catch {
+        // Revert on error
+        if (isCurrentlyFavorite) {
+          setFavorites((prev) => [...prev, { foodRef: recipe.id } as UserFoodRelation]);
+        } else {
+          setFavorites((prev) => prev.filter((f) => f.foodRef !== recipe.id));
+        }
+      }
+    },
+    [favorites],
+  );
 
   useEffect(() => {
     load();
@@ -155,7 +215,9 @@ export default function RecipeListScreen({ navigation }: Props) {
               <RecipeCard
                 key={r.id}
                 recipe={r}
+                isFavorite={favoriteIds.has(r.id)}
                 onPress={() => navigation.navigate('RecipeDetail', { id: r.id })}
+                onFavoriteToggle={handleFavoriteToggle}
               />
             ))}
           </>
@@ -168,7 +230,9 @@ export default function RecipeListScreen({ navigation }: Props) {
               <RecipeCard
                 key={r.id}
                 recipe={r}
+                isFavorite={favoriteIds.has(r.id)}
                 onPress={() => navigation.navigate('RecipeDetail', { id: r.id })}
+                onFavoriteToggle={handleFavoriteToggle}
               />
             ))}
           </>

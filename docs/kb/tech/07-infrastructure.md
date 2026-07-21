@@ -107,23 +107,25 @@ Remove-Item -Recurse -Force "_deploy_staging\dist"
 Copy-Item -Recurse -Force "dist\*" "_deploy_staging\dist\"
 
 # 3. Verify the build before deploying (spot-check a known value)
-(Get-Content "_deploy_staging\dist\src\lib\auth.js") -match "isAdmin"
+(Get-Content "_deploy_staging\dist\src\lib\repositories\cosmosUserFoodRelationRepository.js") -match "favoritedAt"
 # Must return True — if False, the build did not include recent changes
 
 # 4. Deploy — always from _deploy_staging/, never from backend/
-cd ..\_ deploy_staging
-func azure functionapp publish func-fittrack-alpha-ppf5sc --no-build
+cd ..\_deploy_staging
+func azure functionapp publish func-fittrack-alpha-ppf5sc --no-build --javascript
 ```
 
 ### Rules
 
 [Rule] Always deploy from `_deploy_staging/` with `--no-build`. Never deploy from `backend/` directly.
 
+[Rule] Always include `--javascript`. The `_deploy_staging/` directory has no `local.settings.json`, so the `func` CLI cannot auto-detect the Node.js worker runtime without this flag.
+
 [Rule] Always delete `dist/` and `tsconfig.tsbuildinfo` before building. Incremental TypeScript build cache silently omits changes — this has caused real production bugs.
 
 [Rule] Use wildcard when copying: `Copy-Item -Recurse -Force "dist\*" "_deploy_staging\dist\"`. Without the `*`, PowerShell creates `_deploy_staging\dist\dist\` (nesting) when the target already exists.
 
-[Rule] Verify `_deploy_staging` contents before deploying. The grep check (`-match "isAdmin"`) confirms the compiled output contains recent code.
+[Rule] Verify `_deploy_staging` contents before deploying. The grep check (`-match "favoritedAt"` on `cosmosUserFoodRelationRepository.js`) confirms the compiled output contains recent code.
 
 ## Application Settings — Local Dev Credentials
 

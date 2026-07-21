@@ -54,7 +54,6 @@ Health check: `GET /api/health` — anonymous, always returns `{ status: 'ok' }`
 | `tokenize.ts` | Text tokenization for food product search keywords |
 | `log.ts` | `logEvent()` structured logging |
 | `openFoodFactsClient.ts` | (Unused at runtime — kept for reference) |
-| `favoriteShortNameService.ts` | AI-generated short display names for favorites |
 | `repositories/` | Repository pattern implementations |
 | `prompts/` | System prompt strings for each AI feature |
 

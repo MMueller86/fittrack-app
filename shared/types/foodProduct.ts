@@ -81,13 +81,6 @@ export interface FoodProduct {
   /** Front image URL from Open Food Facts (image_front_url), if available */
   imageUrl?: string;
 
-  /**
-   * AI-generierter Kurzname für Favoriten-Chips (max. 2 Wörter, ca. 14 Zeichen).
-   * Wird einmalig generiert wenn ein Nutzer das Produkt zum ersten Mal favorisiert.
-   * MUSS bei Re-Imports erhalten bleiben (wie manualKeywords).
-   */
-  shortName?: string;
-
   meta: {
     source: 'openFoodFacts';
     /** sourceQualityScore / 100 */

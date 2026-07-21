@@ -15,6 +15,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
+import { favoritesApi } from '../../shared/api/favoritesApi';
+import { Icon } from '../../shared/components/Icon';
+import { computeRecipeQuickEntryData } from './recipeUtils';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 import LogRecipeModal from './LogRecipeModal';
 
@@ -51,6 +54,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [logVisible, setLogVisible] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
+  const [isFavorite, setIsFavorite] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -76,6 +80,59 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    favoritesApi
+      .listFavorites()
+      .then((favs) => setIsFavorite(favs.some((f) => f.foodRef === id)))
+      .catch(() => {
+        /* ignore — heart defaults to unfavorited */
+      });
+  }, [id]);
+
+  const handleToggleFavorite = useCallback(async () => {
+    if (!recipe) return;
+    const next = !isFavorite;
+    setIsFavorite(next);
+    try {
+      if (next) {
+        const { nutritionPer100g, portion } = computeRecipeQuickEntryData(recipe);
+        await favoritesApi.addFavorite({
+          foodRef: recipe.id,
+          foodRefType: 'recipe',
+          displayName: recipe.name,
+          imageUrl: recipe.images[0]?.url ?? null,
+          nutritionPer100g,
+          portion,
+        });
+      } else {
+        await favoritesApi.removeFavorite(recipe.id);
+      }
+    } catch {
+      setIsFavorite(!next); // revert on error
+    }
+  }, [recipe, isFavorite]);
+
+  useEffect(() => {
+    if (!recipe) return;
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => void handleToggleFavorite()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ marginRight: spacing.md }}
+          accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+        >
+          <Icon
+            lib="ion"
+            name={isFavorite ? 'heart' : 'heart-outline'}
+            size="lg"
+            color={isFavorite ? colors.negative : colors.textMuted}
+          />
+        </TouchableOpacity>
+      ),
+    });
+  }, [recipe, isFavorite, navigation, handleToggleFavorite]);
 
   const handleDelete = () => {
     Alert.alert('Rezept löschen', 'Möchtest du dieses Rezept wirklich löschen?', [

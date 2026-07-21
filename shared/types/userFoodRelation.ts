@@ -1,3 +1,5 @@
+import type { NutritionValues, PortionInfo, MealType } from './diary';
+
 // UserFoodRelation — nutzerspezifische Beziehung zwischen einem Nutzer und einem Lebensmittel.
 //
 // Ist unabhängig davon, ob das Lebensmittel aus dem OFF-Katalog (FoodProduct) oder
@@ -9,7 +11,7 @@
 //
 // Cosmos: container "userFoodRelations", partition key /userId
 
-export type FoodRefType = 'catalog' | 'personal';
+export type FoodRefType = 'catalog' | 'personal' | 'recipe';
 
 export interface UserFoodRelation {
   /** userId + ":" + foodRef — zusammengesetzter Primärschlüssel */
@@ -20,6 +22,7 @@ export interface UserFoodRelation {
    * Opake Referenz auf das Lebensmittel.
    * - OFF-Katalog: "openFoodFacts:<barcode>"
    * - ReusableItem: UUID
+   * - Rezept: UUID
    */
   foodRef: string;
   /**
@@ -43,15 +46,43 @@ export interface UserFoodRelation {
   lastInputMode?: 'grams' | 'portion';
   /** Letzte Eingabemenge — für UX-Vorbelegen */
   lastInputAmount?: number;
-  /**
-   * Kurz-Anzeigename für Favoriten-Chips.
-   * Wird befüllt wenn ein AI-generierter Kurzname für dieses Produkt verfügbar ist.
-   * null = noch kein Kurzname generiert — Fallback auf displayName.
-   * Wird aus FoodProduct.shortName übernommen (oder später nutzerspezifisch überschrieben).
-   */
-  shortName?: string | null;
   /** ISO-Timestamp der Ersterstellung dieses Eintrags */
   createdAt: string;
+  /**
+   * ISO-8601 timestamp when the user first marked this item as a Quick Entry favourite.
+   * Set on the isFavorite: false → true transition only. Never overwritten.
+   * Used by the Quick Entry relevance engine for novelty scoring.
+   */
+  favoritedAt?: string;
+  /** Denormalized nutrition per 100g — enables instant QuantityView without a search call */
+  nutritionPer100g?: NutritionValues;
+  /** Denormalized portion info */
+  portion?: PortionInfo | null;
+  /**
+   * Per-meal usage count map.
+   * Keys: MealType values. Values: count of times logged to that meal type.
+   */
+  mealTypeCounts?: Partial<Record<MealType, number>>;
+  /**
+   * Preferred input mode — updated via running score on each recordUsage call.
+   * Score +1 for 'portion', -1 for 'grams', clamped to [-10, +10].
+   * Score > 0 → 'portion'; score <= 0 → 'grams'.
+   */
+  preferredInputMode?: 'grams' | 'portion';
+  /**
+   * ISO date strings (YYYY-MM-DD) of recent diary additions for this item.
+   * Trimmed to entries within the last 90 days on every recordUsage call.
+   * Used by the client to compute a rolling 30-day usage count.
+   * Max array length: 90 entries.
+   */
+  usageDates?: string[];
+  /**
+   * Preferred input amount — EMA-updated (alpha = EMA_ALPHA constant = 0.3).
+   * Grams when preferredInputMode='grams'; portion count when 'portion'.
+   */
+  preferredInputAmount?: number;
+  /** Internal: running score for input mode tracking. Not exposed as business logic. */
+  inputModeScore?: number;
 }
 
 /** Input zum Anlegen oder Aktualisieren einer UserFoodRelation (upsert-Semantik) */
@@ -66,4 +97,23 @@ export interface UpsertUserFoodRelationInput {
   lastInputMode?: 'grams' | 'portion';
   /** Letzte Eingabemenge — wird bei recordUsage gespeichert */
   lastInputAmount?: number;
+  /** Denormalized nutrition per 100g */
+  nutritionPer100g?: NutritionValues;
+  /** Denormalized portion info */
+  portion?: PortionInfo | null;
+  /** Meal type of the diary entry being recorded — used to update mealTypeCounts */
+  mealType?: MealType;
+}
+
+export interface QuickEntryGroupedResponse {
+  /** Favorites with no mealTypeCounts (or all zero) — shown above tab strip */
+  ungrouped: UserFoodRelation[];
+  /** Per-meal-type groups — only populated when total favorites > 10 */
+  groups: {
+    mealType: MealType;
+    label: string;
+    entries: UserFoodRelation[];
+  }[];
+  /** Flat list of all favorites — used for ≤10 flat display mode */
+  all: UserFoodRelation[];
 }

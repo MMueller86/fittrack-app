@@ -4,13 +4,22 @@
 import type { FoodSearchResult } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export type QuickEntryPrefill = {
+  inputMode?: 'grams' | 'portion';
+  inputAmount?: number;
+};
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
 export type HubMode =
   | { mode: 'idle' }
   | { mode: 'search'; query: string }
-  | { mode: 'product'; product: FoodSearchResult; previousMode: 'idle' | 'search'; previousQuery: string }
+  | { mode: 'product'; product: FoodSearchResult; prefill?: QuickEntryPrefill; previousMode: 'idle' | 'search'; previousQuery: string }
   | { mode: 'subflow'; flow: 'barcode' | 'ai' | 'label' | 'manual'; previousMode: 'idle' | 'search'; previousQuery: string };
 
 // ---------------------------------------------------------------------------
@@ -20,7 +29,7 @@ export type HubMode =
 export type HubAction =
   | { type: 'OPEN_SEARCH' }
   | { type: 'SET_QUERY'; query: string }
-  | { type: 'SELECT_PRODUCT'; product: FoodSearchResult }
+  | { type: 'SELECT_PRODUCT'; product: FoodSearchResult; prefill?: QuickEntryPrefill }
   | { type: 'CLOSE_PRODUCT' }
   | { type: 'OPEN_SUBFLOW'; flow: 'barcode' | 'ai' | 'label' | 'manual' }
   | { type: 'CLOSE_SUBFLOW' }
@@ -54,7 +63,7 @@ export function hubReducer(state: HubMode, action: HubAction): HubMode {
     case 'SELECT_PRODUCT': {
       const previousMode = state.mode === 'search' ? 'search' : 'idle';
       const previousQuery = state.mode === 'search' ? state.query : '';
-      return { mode: 'product', product: action.product, previousMode, previousQuery };
+      return { mode: 'product', product: action.product, prefill: action.prefill, previousMode, previousQuery };
     }
 
     case 'CLOSE_PRODUCT': {

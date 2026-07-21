@@ -58,6 +58,11 @@ interface QuantityViewProps {
   context: FoodEntryHubContext;
   onBack: () => void;
   onAdded: (productName: string, mealId: string, itemId: string) => void;
+  /** Optional prefill from a Quick Entry tap — pre-selects unit and amount */
+  prefill?: {
+    inputMode?: 'grams' | 'portion';
+    inputAmount?: number;
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +184,7 @@ function formatAmount(val: number, isPortion: boolean): string {
 // ---------------------------------------------------------------------------
 // QuantityView — Hauptkomponente
 // ---------------------------------------------------------------------------
-export function QuantityView({ product, context, onBack, onAdded }: QuantityViewProps) {
+export function QuantityView({ product, context, onBack, onAdded, prefill }: QuantityViewProps) {
   // Mahlzeit-Auswahl (nur relevant wenn kein mealId im context)
   const defaultMeal: MealType =
     (context.mealId as MealType | null) ?? 'breakfast';
@@ -188,12 +193,17 @@ export function QuantityView({ product, context, onBack, onAdded }: QuantityView
   // Einheit
   const portionGrams = product.portion?.weightGrams;
   const hasPortion = !!(portionGrams && portionGrams > 0);
-  const [unit, setUnit] = useState<UnitType>('g');
+  const initialUnit: UnitType = prefill?.inputMode === 'portion' && hasPortion ? 'portion' : 'g';
+  const initialAmount: number =
+    prefill?.inputAmount != null && prefill.inputAmount > 0
+      ? prefill.inputAmount
+      : initialUnit === 'portion' ? 1 : (portionGrams ?? 100);
+
+  const [unit, setUnit] = useState<UnitType>(initialUnit);
 
   // Menge
-  const defaultGrams = portionGrams ?? 100;
   const [quantityStr, setQuantityStr] = useState(
-    String(defaultGrams),
+    formatAmount(initialAmount, initialUnit === 'portion'),
   );
 
   // Favorit
@@ -295,6 +305,8 @@ export function QuantityView({ product, context, onBack, onAdded }: QuantityView
           displayName: product.name,
           displayBrand: product.brand,
           imageUrl: product.imageUrl ?? null,
+          nutritionPer100g: product.nutritionPer100g,
+          portion: product.portion ?? null,
         });
       }
       setIsFavorite((prev) => !prev);
@@ -312,6 +324,10 @@ export function QuantityView({ product, context, onBack, onAdded }: QuantityView
     Keyboard.dismiss();
     setLoading(true);
     setError(null);
+    const isPortion = unit === 'portion';
+    const parsedPortionCount = isPortion
+      ? parseFloat(quantityStr.replace(',', '.'))
+      : undefined;
     try {
       // Wenn kein mealId: existierende Mahlzeit suchen, sonst neu anlegen
       let mealId = context.mealId;
@@ -331,8 +347,8 @@ export function QuantityView({ product, context, onBack, onAdded }: QuantityView
       const result = await diaryApi.addItem(mealId, {
         productId: product.id,
         productName: product.name,
-        inputMode: 'grams',
-        inputAmount: gramsValue,
+        inputMode: isPortion ? 'portion' : 'grams',
+        inputAmount: isPortion ? (parsedPortionCount ?? 1) : gramsValue,
         amountGrams: gramsValue,
         calculatedNutrition: calcNutrition,
         sourceType: product.source === 'library' ? 'reusableItem' : product.source,
@@ -345,7 +361,7 @@ export function QuantityView({ product, context, onBack, onAdded }: QuantityView
     } finally {
       setLoading(false);
     }
-  }, [gramsValue, loading, context.mealId, selectedMeal, product, onAdded]);
+  }, [gramsValue, loading, context.mealId, selectedMeal, product, onAdded, unit, quantityStr]);
 
   const canAdd = gramsValue > 0 && !loading;
 
