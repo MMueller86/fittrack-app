@@ -88,6 +88,41 @@ export interface DaySummary {
 export type DayType = 'rest' | 'training';
 export type WorkoutType = 'gym' | 'bouldering' | 'running' | 'cycling' | 'other';
 
+export type SpecialActivityType = 'hiking' | 'running' | 'cycling' | 'other';
+
+export type PackCategory = 'none' | 'small' | 'medium' | 'heavy';
+export type TerrainType  = 'path' | 'trail' | 'alpine' | 'scramble';
+
+export interface HikingActivityInputs {
+  movementTimeMinutes: number;
+  distanceKm: number;
+  elevationGainM: number;
+  elevationLossM?: number;
+  /** @deprecated Use packCategory instead */
+  hasBackpack?: boolean;
+  packCategory?: PackCategory;
+  terrainType?: TerrainType;
+}
+
+export interface ActivityBonusResult {
+  estimatedMet: number;
+  hikingCalories: number;
+  alreadyAccountedCalories: number;
+  activityBonus: number;
+  // V3 intermediates (optional, populated by new calculator)
+  metBase?: number;
+  metLocomotion?: number;
+  terrainFactor?: number;
+  deltaPack?: number;
+}
+
+export interface SpecialActivity extends HikingActivityInputs, ActivityBonusResult {
+  type: SpecialActivityType;
+  bodyWeightKg: number;
+  dailyCalorieTarget: number;
+  calculatedAt: string;             // ISO timestamp
+}
+
 /** Persisted per-day metadata document (id: "day:YYYY-MM-DD", _docType: "dayMeta"). */
 export interface DayMeta {
   /** Format: "day:{date}", e.g. "day:2026-06-03" */
@@ -97,6 +132,7 @@ export interface DayMeta {
   date: string;
   dayType: DayType;
   workoutType?: WorkoutType;
+  specialActivity?: SpecialActivity;
   updatedAt: string;
   _docType: 'dayMeta';
 }
@@ -108,6 +144,9 @@ export interface DiaryDayResponse {
   workoutType?: WorkoutType;
   /** Rule-based hint for the day — always present in API response. */
   hint?: HintResult;
+  specialActivity?: SpecialActivity | null;
+  activityBonus?: number;
+  previousDayHasActivity?: boolean;
 }
 
 // --- ReusableItem — extended model with Open Food Facts support ---

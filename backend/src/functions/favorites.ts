@@ -5,6 +5,7 @@ import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
+import { sortByRelevance } from '../lib/favoritesScoring';
 import type { FoodRefType, MealType, UserFoodRelation } from '@fittrack/shared';
 
 // GET    /api/favorites                -- list all favorites for current user
@@ -36,12 +37,26 @@ const AddFavoriteBodySchema = z.object({
 });
 
 // GET /api/favorites
+const VALID_MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout']);
+
 export const listFavoritesHandler = withHandler(
   'favorites.list',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const repo = getUserFoodRelationRepository();
     const favorites = await repo.listFavorites(userId);
+
+    const contextParam = request.query.get('context');
+    if (contextParam !== null) {
+      if (!VALID_MEAL_TYPES.has(contextParam)) {
+        return { status: 400, jsonBody: { error: `Invalid context. Must be one of: ${[...VALID_MEAL_TYPES].join(', ')}` } };
+      }
+      const context = contextParam as MealType;
+      const sorted = sortByRelevance(favorites, context);
+      logEvent(ctx, 'info', 'favorites.list', { count: favorites.length, context });
+      return { status: 200, jsonBody: { items: sorted, context } };
+    }
+
     logEvent(ctx, 'info', 'favorites.list', { count: favorites.length });
     return { status: 200, jsonBody: favorites };
   },
@@ -143,43 +158,9 @@ export const getFavoritesGroupedHandler = withHandler(
 
     const all = sortFavorites(favorites);
 
-    const hasAnyMealCounts = (rel: UserFoodRelation): boolean => {
-      if (!rel.mealTypeCounts) return false;
-      return Object.values(rel.mealTypeCounts).some(v => (v ?? 0) > 0);
-    };
-
-    const ungrouped = all.filter(r => !hasAnyMealCounts(r));
-    const withMealCounts = all.filter(hasAnyMealCounts);
-
-    const mealTypeLabels: Record<MealType, string> = {
-      breakfast: 'Frühstück',
-      lunch: 'Mittagessen',
-      dinner: 'Abendessen',
-      snack: 'Snack',
-      preworkout: 'Pre-Workout',
-      postworkout: 'Post-Workout',
-    };
-
-    const mealTypes: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout'];
-
-    const groups = mealTypes
-      .map(mealType => ({
-        mealType,
-        label: mealTypeLabels[mealType],
-        entries: withMealCounts
-          .filter(r => (r.mealTypeCounts?.[mealType] ?? 0) > 0)
-          .sort((a, b) => {
-            const countDiff = (b.mealTypeCounts?.[mealType] ?? 0) - (a.mealTypeCounts?.[mealType] ?? 0);
-            if (countDiff !== 0) return countDiff;
-            const usageDiff = (b.usageCount ?? 0) - (a.usageCount ?? 0);
-            if (usageDiff !== 0) return usageDiff;
-            return (a.displayName ?? '').localeCompare(b.displayName ?? '', 'de');
-          }),
-      }))
-      .filter(g => g.entries.length > 0);
-
-    logEvent(ctx, 'info', 'favorites.grouped', { userId, total: all.length, groups: groups.length });
-    return { status: 200, jsonBody: { ungrouped, groups, all } };
+    // mealTypeCounts is no longer written — all items are ungrouped, groups always empty
+    logEvent(ctx, 'info', 'favorites.grouped', { userId, total: all.length, groups: 0 });
+    return { status: 200, jsonBody: { ungrouped: all, groups: [], all } };
   },
 );
 

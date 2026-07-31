@@ -3,6 +3,7 @@
 // Used in DiaryScreen only. MacroSummaryCard is unchanged for HomeScreen.
 
 import React, { RefObject, useState } from 'react';
+import { Icon } from './Icon';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import type { DiaryDayResponse, MealType } from '@fittrack/shared';
@@ -509,6 +510,89 @@ const bsStyles = StyleSheet.create({
   },
 });
 
+// ─── ActivityBonusLines ──────────────────────────────────────────────────────
+// Three-line calorie breakdown shown in the macro panel when activityBonus > 0.
+function ActivityBonusLines({
+  baseTarget,
+  bonus,
+  onShowBreakdown,
+}: {
+  baseTarget: number;
+  bonus: number;
+  onShowBreakdown: () => void;
+}) {
+  const effectiveTarget = baseTarget + bonus;
+  return (
+    <View style={bonusStyles.container}>
+      {/* Row: Basisziel */}
+      <View style={bonusStyles.line}>
+        <Text style={bonusStyles.label}>Basisziel</Text>
+        <Text style={bonusStyles.value}>{Math.round(baseTarget)} kcal</Text>
+      </View>
+      {/* Row: Aktivitätsbonus — tappable */}
+      <TouchableOpacity style={bonusStyles.line} onPress={onShowBreakdown} activeOpacity={0.7}>
+        <Text style={[bonusStyles.label, bonusStyles.bonusLabel]}>+ Bonus</Text>
+        <View style={bonusStyles.bonusValueRow}>
+          <Text style={[bonusStyles.value, bonusStyles.bonusValue]}>+{Math.round(bonus)} kcal</Text>
+          <Icon lib="feather" name="chevron-right" size={12} color={colors.primary} />
+        </View>
+      </TouchableOpacity>
+      {/* Divider */}
+      <View style={bonusStyles.divider} />
+      {/* Row: Gesamtes Ziel */}
+      <View style={bonusStyles.line}>
+        <Text style={[bonusStyles.label, bonusStyles.totalLabel]}>Gesamt</Text>
+        <Text style={[bonusStyles.value, bonusStyles.totalValue]}>{Math.round(effectiveTarget)} kcal</Text>
+      </View>
+    </View>
+  );
+}
+
+const bonusStyles = StyleSheet.create({
+  container: {
+    gap: 3,
+  },
+  line: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+  },
+  label: {
+    ...typography.caption,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  bonusLabel: {
+    color: colors.primary,
+  },
+  totalLabel: {
+    color: colors.text,
+    fontWeight: '600' as const,
+  },
+  value: {
+    ...typography.caption,
+    fontWeight: '700' as const,
+    color: colors.text,
+    fontVariant: ['tabular-nums'] as const,
+  },
+  bonusValueRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 2,
+  },
+  bonusValue: {
+    color: colors.primary,
+  },
+  totalValue: {
+    fontSize: 13,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 2,
+  },
+});
+
 // ─── Main component ───────────────────────────────────────────────────────────
 interface DayStoryCardProps {
   summary: DiaryDayResponse['summary'];
@@ -518,15 +602,22 @@ interface DayStoryCardProps {
   scrollRef: RefObject<ScrollView | null>;
   mealOffsets: Partial<Record<MealType, number>>;
   hint?: HintResult | null;
+  /** When present and bonus > 0, shows the 3-line calorie breakdown in the macro panel. */
+  activityBonusInfo?: {
+    bonus: number;
+    onShowBreakdown: () => void;
+  };
 }
 
-export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef, mealOffsets, hint }: DayStoryCardProps) {
+export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef, mealOffsets, hint, activityBonusInfo }: DayStoryCardProps) {
   const [activeMacro, setActiveMacro] = useState<MacroKey | null>(null);
 
   const calConsumed = Math.round(summary.calories);
-  const calTarget = target.calories;
+  const baseCalTarget = target.calories;
+  const hasBonus = !!(activityBonusInfo && activityBonusInfo.bonus > 0);
+  const calTarget = Math.round(hasBonus ? baseCalTarget + activityBonusInfo!.bonus : baseCalTarget);
   const calPct = Math.min(calConsumed / (calTarget || 1), 1.5);
-  const calRemaining = Math.max(0, calTarget - calConsumed);
+  const calRemaining = Math.round(Math.max(0, calTarget - calConsumed));
   const calOver = calConsumed > calTarget;
 
   const protein = summary.protein;
@@ -570,7 +661,15 @@ export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef,
 
         {/* Right: Macro panel */}
         <View style={styles.macroPanel}>
-          <MacroLine isCalorie color={gaugeColor(calPct)} label="kcal" value={calConsumed} target={calTarget} unit="" onPress={() => setActiveMacro('calories')} />
+          {hasBonus ? (
+            <ActivityBonusLines
+              baseTarget={baseCalTarget}
+              bonus={activityBonusInfo!.bonus}
+              onShowBreakdown={activityBonusInfo!.onShowBreakdown}
+            />
+          ) : (
+            <MacroLine isCalorie color={gaugeColor(calPct)} label="kcal" value={calConsumed} target={calTarget} unit="" onPress={() => setActiveMacro('calories')} />
+          )}
           <MacroLine color={PROTEIN_COLOR}  label="EW"   value={protein}        target={proteinTarget}   unit="g" onPress={() => setActiveMacro('protein')} />
           <MacroLine color={CARBS_COLOR}    label="KH"   value={carbs}          target={target.carbsG}  unit="g" onPress={() => setActiveMacro('carbs')} />
           <MacroLine color={FAT_COLOR}      label="Fett" value={fat}            target={target.fatG}    unit="g" onPress={() => setActiveMacro('fat')} />

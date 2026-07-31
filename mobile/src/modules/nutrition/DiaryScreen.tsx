@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { diaryApi } from '../../shared/api/diaryApi';
@@ -34,6 +36,10 @@ import MoveItemSheet from './MoveItemSheet';
 import CopyItemSheet from './CopyItemSheet';
 import { useFoodEntryHubStore } from './hub/useFoodEntryHubStore';
 import { applyAddMeal } from './diaryItemUtils';
+import { ActivityBonusSheet } from './components/ActivityBonusSheet';
+import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
+
+type Props = NativeStackScreenProps<NutritionStackParamList, 'DiaryMain'>;
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 // Mahlzeiten, die als leere State-B-Karten immer sichtbar sein sollen (Phase 6)
@@ -225,7 +231,7 @@ function MealCard({
 
 // --- Main Screen ---
 
-export default function DiaryScreen() {
+export default function DiaryScreen({ navigation }: Props) {
   const [date, setDate] = useState(isoToday());
   const [data, setData] = useState<DiaryDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -266,6 +272,9 @@ export default function DiaryScreen() {
   const [movingSourceMealId, setMovingSourceMealId] = useState<string>('');
   const [copyingItem, setCopyingItem] = useState<MealItem | null>(null);
   const [copyingSourceMealType, setCopyingSourceMealType] = useState<MealType>('breakfast');
+
+  // Activity states
+  const [activityBonusSheetVisible, setActivityBonusSheetVisible] = useState(false);
 
   const handleEditItem = (mealId: string, item: MealItem) => {
     setEditingMealId(mealId);
@@ -317,6 +326,18 @@ export default function DiaryScreen() {
     await loadDay(date);
     setRefreshing(false);
   }, [date, loadDay]);
+
+  // Reload when returning from child screens (e.g. HikingInputScreen)
+  const isInitialMount = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (isInitialMount.current) {
+        isInitialMount.current = false;
+        return;
+      }
+      void loadDay(date);
+    }, [date, loadDay]),
+  );
 
   // Date navigation
   const prevDay = () => setDate((d) => offsetDate(d, -1));
@@ -516,6 +537,10 @@ export default function DiaryScreen() {
               scrollRef={scrollViewRef}
               mealOffsets={mealOffsets}
               hint={data.hint}
+              activityBonusInfo={data.activityBonus && data.activityBonus > 0 ? {
+                bonus: data.activityBonus,
+                onShowBreakdown: () => setActivityBonusSheetVisible(true),
+              } : undefined}
             />
           )}
 
@@ -615,6 +640,15 @@ export default function DiaryScreen() {
         actions={confirmSheet.actions}
         onClose={closeConfirmSheet}
       />
+
+      {/* Activity bonus breakdown sheet */}
+      {data?.specialActivity && (
+        <ActivityBonusSheet
+          visible={activityBonusSheetVisible}
+          onClose={() => setActivityBonusSheetVisible(false)}
+          activity={data.specialActivity}
+        />
+      )}
 
       {/* Snackbar (item delete undo + error feedback) */}
       <Snackbar ref={snackbarRef} />

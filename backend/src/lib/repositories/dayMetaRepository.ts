@@ -4,13 +4,15 @@
 //   - COSMOS configured → CosmosDayMetaRepository (same nutritionDiaryMeals container)
 //   - Otherwise → InMemoryDayMetaRepository
 
-import type { DayMeta, DayType, WorkoutType } from '@fittrack/shared';
+import type { DayMeta, DayType, WorkoutType, SpecialActivity } from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosDayMetaRepository } from './cosmosDayMetaRepository';
 
 export interface DayMetaRepository {
   get(userId: string, date: string): Promise<DayMeta | null>;
   upsert(userId: string, date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<DayMeta>;
+  setSpecialActivity(userId: string, date: string, activity: SpecialActivity): Promise<DayMeta>;
+  removeSpecialActivity(userId: string, date: string): Promise<DayMeta>;
 }
 
 class InMemoryDayMetaRepository implements DayMetaRepository {
@@ -25,15 +27,55 @@ class InMemoryDayMetaRepository implements DayMetaRepository {
   }
 
   async upsert(userId: string, date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<DayMeta> {
+    const existing = this.store.get(this.key(userId, date));
     const meta: DayMeta = {
+      ...(existing ?? {}),
       id: `day:${date}`,
       userId,
       date,
       dayType,
-      ...(workoutType ? { workoutType } : {}),
       updatedAt: new Date().toISOString(),
       _docType: 'dayMeta',
     };
+    if (workoutType === null) {
+      delete meta.workoutType;
+    } else if (workoutType != null) {
+      meta.workoutType = workoutType;
+    }
+    this.store.set(this.key(userId, date), meta);
+    return meta;
+  }
+
+  async setSpecialActivity(userId: string, date: string, activity: SpecialActivity): Promise<DayMeta> {
+    const existing = this.store.get(this.key(userId, date));
+    const meta: DayMeta = {
+      ...(existing ?? {
+        id: `day:${date}`,
+        userId,
+        date,
+        dayType: 'rest',
+        _docType: 'dayMeta',
+      }),
+      specialActivity: activity,
+      updatedAt: new Date().toISOString(),
+    };
+    this.store.set(this.key(userId, date), meta);
+    return meta;
+  }
+
+  async removeSpecialActivity(userId: string, date: string): Promise<DayMeta> {
+    const existing = this.store.get(this.key(userId, date));
+    const meta: DayMeta = {
+      ...(existing ?? {
+        id: `day:${date}`,
+        userId,
+        date,
+        dayType: 'rest',
+        _docType: 'dayMeta',
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+    delete meta.specialActivity;
     this.store.set(this.key(userId, date), meta);
     return meta;
   }

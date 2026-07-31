@@ -2,6 +2,7 @@
 // Shared between backend (generation) and mobile (display).
 
 import type { GoalType, GoalIntensity } from './profile';
+import type { SpecialActivity } from './diary';
 
 /** How fresh the insight is and whether it could be generated at all. */
 export type InsightStatus = 'fresh' | 'cached' | 'quota_exceeded' | 'unavailable';
@@ -57,6 +58,17 @@ export interface InsightWeightContext {
    * Included for symmetry — prevents praising a drop from a spiked latestKg.
    */
   isOutlierLatest: boolean;
+  /**
+   * How many calendar days ago the last weight was measured (0 = today, 1 = yesterday, …).
+   * null when no weight entries exist.
+   * Use to detect stale data: values older than 14 days are not representative of current weight.
+   */
+  daysSinceLastMeasurement: number | null;
+  /**
+   * ISO date string (YYYY-MM-DD) of the last weight measurement.
+   * null when no weight entries exist.
+   */
+  lastMeasurementDate: string | null;
 }
 
 export interface InsightNutritionDay {
@@ -81,9 +93,10 @@ export interface InsightNutritionContext {
     fiberG: number;
   } | null;
   /**
-   * Remaining daily budget: max(0, target − logged so far).
+   * Remaining daily budget: target − logged so far (can be negative when over budget).
    * null when no target is set or nothing logged yet.
-   * Forward-looking: never use to judge — only to recommend.
+   * Negative value = calories exceeded; positive = budget remaining.
+   * Forward-looking: use to recommend next steps, not to judge past behaviour.
    */
   remainingCalories: number | null;
   remainingProteinG: number | null;
@@ -112,6 +125,8 @@ export interface InsightInputContext {
    * Used to determine whether the day is still in progress.
    */
   currentHourLocal: number | null;
+  /** Special activity logged for this day (e.g. hiking), or null when absent. */
+  specialActivity?: SpecialActivity | null;
 }
 
 // ---------------------------------------------------------------------------

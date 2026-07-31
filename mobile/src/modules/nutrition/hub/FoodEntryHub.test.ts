@@ -26,9 +26,9 @@ describe('computeLastUsageText', () => {
     expect(computeLastUsageText(item)).toBe('100 g \u00b7 350 kcal');
   });
 
-  it('Branch 3: returns "je 100 g" when no lastInputAmount, no nutritionPer100g, no portion', () => {
+  it('Branch 3: returns "Keine Nährwertdaten" when no lastInputAmount, no nutritionPer100g, no portion', () => {
     const item = makeItem({});
-    expect(computeLastUsageText(item)).toBe('je 100 g');
+    expect(computeLastUsageText(item)).toBe('Keine Nährwertdaten');
   });
 
   it('Branch 3: returns portion reference when no lastInputAmount, no nutritionPer100g, but portion present', () => {
@@ -139,11 +139,17 @@ describe('computeDirectAddLabel', () => {
     expect(computeDirectAddLabel(item, 'fuerDich')).toBeNull();
   });
 
+  it('returns null when nutritionPer100g is absent', () => {
+    const item = makeItem({ preferredInputMode: 'grams', preferredInputAmount: 100 });
+    expect(computeDirectAddLabel(item, 'fuerDich')).toBeNull();
+  });
+
   it('portion mode with portion.label returns label as-is', () => {
     const item = makeItem({
       preferredInputMode: 'portion',
       preferredInputAmount: 2,
       portion: { label: 'Scheibe', weightGrams: 30 },
+      nutritionPer100g: { calories: 200, protein: 10, carbs: 20, fat: 5 },
     });
     expect(computeDirectAddLabel(item, 'fuerDich')).toBe('2 Scheibe');
   });
@@ -152,6 +158,7 @@ describe('computeDirectAddLabel', () => {
     const item = makeItem({
       preferredInputMode: 'portion',
       preferredInputAmount: 1,
+      nutritionPer100g: { calories: 200, protein: 10, carbs: 20, fat: 5 },
     });
     expect(computeDirectAddLabel(item, 'fuerDich')).toBe('1 Portion');
   });
@@ -160,6 +167,7 @@ describe('computeDirectAddLabel', () => {
     const item = makeItem({
       preferredInputMode: 'portion',
       preferredInputAmount: 1.5,
+      nutritionPer100g: { calories: 200, protein: 10, carbs: 20, fat: 5 },
     });
     expect(computeDirectAddLabel(item, 'fuerDich')).toBe('1.5 Portion');
   });
@@ -168,6 +176,7 @@ describe('computeDirectAddLabel', () => {
     const item = makeItem({
       preferredInputMode: 'grams',
       preferredInputAmount: 150,
+      nutritionPer100g: { calories: 200, protein: 10, carbs: 20, fat: 5 },
     });
     expect(computeDirectAddLabel(item, 'fuerDich')).toBe('150 g');
   });
@@ -176,6 +185,7 @@ describe('computeDirectAddLabel', () => {
     const item = makeItem({
       preferredInputMode: 'grams',
       preferredInputAmount: 182.3,
+      nutritionPer100g: { calories: 200, protein: 10, carbs: 20, fat: 5 },
     });
     expect(computeDirectAddLabel(item, 'fuerDich')).toBe('182 g');
   });

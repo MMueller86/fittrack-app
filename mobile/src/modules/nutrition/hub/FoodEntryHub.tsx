@@ -25,7 +25,7 @@ import { diaryApi } from '../../../shared/api/diaryApi';
 import { reusableItemsApi } from '../../../shared/api/reusableItemsApi';
 import { recipeApi } from '../../../shared/api/recipeApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
-import { computeLastUsageText, computeMacroText, computeDirectAddLabel } from './FoodEntryHub.utils';
+import { computeLastUsageText, computeMacroText, computeDirectAddLabel, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
 export { computeLastUsageText, computeMacroText };
 import { useFoodEntryHubStore } from './useFoodEntryHubStore';
 import { hubReducer, INITIAL_HUB_STATE } from './hubReducer';
@@ -37,7 +37,6 @@ import { ManuellerSubFlow } from './ManuellerSubFlow';
 import { AISubFlow } from './AISubFlow';
 import { BarcodeSubFlow } from './BarcodeSubFlow';
 import { LabelSubFlow } from './LabelSubFlow';
-import { computeRelevanceOrder } from './quickEntryRelevance';
 import { getSuggestedMealType } from './mealTimeRules';
 
 // Einziger Snap Point -- Sheet bleibt bei 85%, Tastatur überlagert nur den unteren Inhalt
@@ -74,15 +73,6 @@ const MEAL_LABEL: Record<string, string> = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function relativeUsage(isoDate: string): string {
-  const days = Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000);
-  if (days === 0) return 'Heute verwendet';
-  if (days === 1) return 'Gestern verwendet';
-  if (days < 7) return `Vor ${days} Tagen verwendet`;
-  if (days < 14) return 'Vor einer Woche verwendet';
-  return `Vor ${Math.floor(days / 7)} Wochen verwendet`;
-}
-
 export function FoodEntryHub() {
   const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave } = useFoodEntryHubStore();
   const [hubState, dispatch] = useReducer(hubReducer, INITIAL_HUB_STATE);
@@ -103,7 +93,7 @@ export function FoodEntryHub() {
   // "Alle"-Liste (lazily loaded)
   const [allItems, setAllItems] = useState<UserFoodRelation[]>([]);
   const [allItemsLoaded, setAllItemsLoaded] = useState(false);
-  // Session-stabile Relevanzsortierung
+  // Session-stabile Relevanzsortierung + Kontext-Mahlzeit
   const sessionOrderRef = useRef<UserFoodRelation[] | null>(null);
   const [recents, setRecents] = useState<UserFoodRelation[]>([]);
   // Gecachte Suchergebnisse — erhalten beim Übergang in Quantity-Modus und zurück
@@ -146,17 +136,16 @@ export function FoodEntryHub() {
     setAllFavoritesLoading(true);
     setAllFavoritesError(null);
     try {
-      const data = await favoritesApi.listFavorites();
-      setAllFavorites(data);
-      if (sessionOrderRef.current === null) {
-        sessionOrderRef.current = computeRelevanceOrder(data, getSuggestedMealType());
-      }
+      const contextMealType = context.mealType ?? getSuggestedMealType();
+      const response = await favoritesApi.listFavoritesRanked(contextMealType);
+      setAllFavorites(response.items);
+      sessionOrderRef.current = response.items;
     } catch (e: unknown) {
       setAllFavoritesError(e instanceof Error ? e.message : 'Laden fehlgeschlagen');
     } finally {
       setAllFavoritesLoading(false);
     }
-  }, []);
+  }, [context.mealType]);
 
   const loadAllItems = useCallback(async () => {
     if (allItemsLoaded) return;
@@ -459,7 +448,10 @@ export function FoodEntryHub() {
     onSuccess?.();
     // Recents sofort aktualisieren -- neues Item erscheint direkt in der Liste
     favoritesApi.listRecent(20).then(setRecents).catch(() => {});
-  }, [autoCloseOnSave, onSuccess, close]);
+    // Favoriten neu laden damit lastInputAmount sofort sichtbar wird
+    sessionOrderRef.current = null;
+    void loadFavorites();
+  }, [autoCloseOnSave, onSuccess, close, loadFavorites]);
 
   // ---------------------------------------------------------------------------
   // Hub-Snackbar actions
@@ -508,11 +500,7 @@ export function FoodEntryHub() {
         return allItems;
       default: {
         const mealType = activeFilter as MealType;
-        return ordered
-          .filter(item => (item.mealTypeCounts?.[mealType] ?? 0) > 0)
-          .sort((a, b) =>
-            (b.mealTypeCounts?.[mealType] ?? 0) - (a.mealTypeCounts?.[mealType] ?? 0),
-          );
+        return sortByMealTypeUsage(ordered, mealType);
       }
     }
   }, [activeFilter, ordered, recents, allItems]);
@@ -527,7 +515,7 @@ export function FoodEntryHub() {
         return computeMacroText(item);
       default: {
         const mealType = activeFilter as MealType;
-        const count = item.mealTypeCounts?.[mealType] ?? 0;
+        const count = (item.usageDates ?? []).filter(e => e.mealType === mealType).length;
         const label = MEAL_LABEL[mealType] ?? mealType;
         return count > 0 ? `${count}\u00d7 zum ${label}` : null;
       }
@@ -554,7 +542,7 @@ export function FoodEntryHub() {
   const visibleMealFilters = useMemo((): FilterKey[] => {
     const mealKeys: FilterKey[] = ['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout'];
     return mealKeys.filter(key =>
-      allFavorites.some(item => (item.mealTypeCounts?.[key as MealType] ?? 0) > 0)
+      allFavorites.some(item => (item.usageDates ?? []).some(e => e.mealType === (key as MealType)))
     );
   }, [allFavorites]);
 

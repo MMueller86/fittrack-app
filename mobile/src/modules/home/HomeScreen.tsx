@@ -35,6 +35,11 @@ import { DayNutritionCard } from './DayNutritionCard';
 import { InsightCard } from './InsightCard';
 import { getInsight } from '../../services/insightService';
 import type { WeightEntry, DiaryDayResponse, WorkoutType, InsightResponse } from '@fittrack/shared';
+import { ActivityCtaCard } from '../nutrition/components/ActivityCtaCard';
+import { ActivityCard } from '../nutrition/components/ActivityCard';
+import { ActivityPickerSheet } from '../nutrition/components/ActivityPickerSheet';
+import { ActivityBonusSheet } from '../nutrition/components/ActivityBonusSheet';
+import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 
 // Shown when the insight could not be loaded (network error, backend unavailable, etc.)
 const INSIGHT_UNAVAILABLE: InsightResponse = {
@@ -67,6 +72,14 @@ export default function HomeScreen({ navigation }: Props) {
 
   const { dayType, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
   const [workoutPickerVisible, setWorkoutPickerVisible] = useState(false);
+  const [activityPickerVisible, setActivityPickerVisible] = useState(false);
+  const [activityBonusSheetVisible, setActivityBonusSheetVisible] = useState(false);
+  const [confirmSheet, setConfirmSheet] = useState<{
+    visible: boolean;
+    title: string;
+    subtitle?: string;
+    actions: ConfirmSheetAction[];
+  }>({ visible: false, title: '', actions: [] });
 
   const handleWorkoutTypeSelect = (wt: WorkoutType | null) => {
     setWorkoutPickerVisible(false);
@@ -75,6 +88,35 @@ export default function HomeScreen({ navigation }: Props) {
     } else {
       void setDayType('training', wt);
     }
+  };
+
+  const todayDate = new Date().toISOString().split('T')[0]!;
+
+  const handleDeleteActivity = () => {
+    setConfirmSheet({
+      visible: true,
+      title: 'Aktivität entfernen?',
+      subtitle: 'Der Aktivitätsbonus wird aus deinem Kalorienziel entfernt.',
+      actions: [
+        {
+          label: 'Aktivität entfernen',
+          destructive: true,
+          onPress: async () => {
+            try {
+              await diaryApi.removeSpecialActivity(todayDate);
+              await load();
+            } catch {
+              // silent — reload zeigt aktuellen Stand
+            }
+          },
+        },
+      ],
+    });
+  };
+
+  const handleEditActivity = () => {
+    if (!todayDiary?.specialActivity) return;
+    navigation.navigate('HikingInput', { date: todayDate, existing: todayDiary.specialActivity });
   };
 
   const load = useCallback(async () => {
@@ -210,7 +252,26 @@ export default function HomeScreen({ navigation }: Props) {
           summary={todayDiary?.summary ?? null}
           target={todayTargets}
           onPress={() => navToTab('Nutrition')}
+          activityBonus={todayDiary?.activityBonus ?? 0}
         />
+
+        {/* ── Besondere Aktivität ── */}
+        {todayDiary && (
+          todayDiary.specialActivity ? (
+            <ActivityCard
+              activity={todayDiary.specialActivity}
+              onShowBreakdown={() => setActivityBonusSheetVisible(true)}
+              onEdit={handleEditActivity}
+              onDelete={handleDeleteActivity}
+              consumedCalories={todayDiary.summary?.calories ?? 0}
+            />
+          ) : (
+            <ActivityCtaCard
+              dynamic={todayDiary.previousDayHasActivity ?? false}
+              onAdd={() => setActivityPickerVisible(true)}
+            />
+          )
+        )}
 
         {/* ── FitTrack Insight — async, non-blocking ── */}
         <InsightCard
@@ -228,6 +289,31 @@ export default function HomeScreen({ navigation }: Props) {
         visible={workoutPickerVisible}
         onSelect={handleWorkoutTypeSelect}
         onClose={() => setWorkoutPickerVisible(false)}
+      />
+
+      <ActivityPickerSheet
+        visible={activityPickerVisible}
+        onClose={() => setActivityPickerVisible(false)}
+        onSelectHiking={() => {
+          setActivityPickerVisible(false);
+          navigation.navigate('HikingInput', { date: todayDate });
+        }}
+      />
+
+      {todayDiary?.specialActivity && (
+        <ActivityBonusSheet
+          visible={activityBonusSheetVisible}
+          onClose={() => setActivityBonusSheetVisible(false)}
+          activity={todayDiary.specialActivity}
+        />
+      )}
+
+      <ConfirmSheet
+        visible={confirmSheet.visible}
+        title={confirmSheet.title}
+        subtitle={confirmSheet.subtitle}
+        actions={confirmSheet.actions}
+        onClose={() => setConfirmSheet((s) => ({ ...s, visible: false }))}
       />
     </SafeAreaView>
   );

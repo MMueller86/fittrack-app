@@ -1,10 +1,11 @@
 ﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 
-import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler } from './diary';
+import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler, getDiaryHandler } from './diary';
 import { __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
 import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
 import { getUserFoodRelationRepository, __resetUserFoodRelationRepositoryForTests } from '../lib/repositories/userFoodRelationRepository';
+import type { SpecialActivity } from '@fittrack/shared';
 
 // Unit tests for POST /api/diary/meals/:id/items
 //
@@ -546,5 +547,95 @@ describe('addItemHandler — recordUsage foodRefType mapping', () => {
     const repo = getUserFoodRelationRepository();
     const rel = await repo.getByFoodRef('test-user-abc-123', 'recipe:abc-123');
     expect(rel?.foodRefType).toBe('recipe');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/diary — specialActivity fields
+// ---------------------------------------------------------------------------
+
+describe('GET /api/diary — specialActivity response fields', () => {
+  const GET_DATE = '2026-07-21';
+
+  // Helper to build a fake GET request with query params
+  async function makeGetRequest(date: string) {
+    const token = await (async () => {
+      // Re-use makeAuthRequest pattern with query support
+      const { signTestToken } = await import('../test-utils/http');
+      return signTestToken();
+    })();
+    // Build a fake request manually with query support
+    const { makeRequest } = await import('../test-utils/http');
+    return makeRequest({
+      query: { date },
+      headers: { authorization: `Bearer ${token}` },
+    });
+  }
+
+  beforeEach(() => {
+    __resetDayMetaRepositoryForTests();
+  });
+
+  it('returns specialActivity: null and activityBonus: 0 when no activity is set', async () => {
+    const req = await makeGetRequest(GET_DATE);
+    const res = await getDiaryHandler(req, makeContext());
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { specialActivity: null; activityBonus: number; previousDayHasActivity: boolean };
+    expect(body.specialActivity).toBeNull();
+    expect(body.activityBonus).toBe(0);
+    expect(body.previousDayHasActivity).toBe(false);
+  });
+
+  it('returns correct activityBonus when specialActivity is set for the requested day', async () => {
+    const mockActivity: SpecialActivity = {
+      type: 'hiking',
+      movementTimeMinutes: 240,
+      distanceKm: 16,
+      elevationGainM: 800,
+      hasBackpack: false,
+      bodyWeightKg: 70,
+      dailyCalorieTarget: 2000,
+      calculatedAt: '2026-07-21T08:00:00Z',
+      estimatedMet: 4.5,
+      hikingCalories: 1260,
+      alreadyAccountedCalories: 333.33,
+      activityBonus: 926.67,
+    };
+    await getDayMetaRepository().setSpecialActivity('test-user-abc-123', GET_DATE, mockActivity);
+
+    const req = await makeGetRequest(GET_DATE);
+    const res = await getDiaryHandler(req, makeContext());
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { specialActivity: SpecialActivity; activityBonus: number };
+    expect(body.activityBonus).toBeCloseTo(926.67, 1);
+    expect(body.specialActivity?.type).toBe('hiking');
+  });
+
+  it('returns previousDayHasActivity: true when yesterday has a special activity', async () => {
+    // Yesterday = 2026-07-20
+    const mockActivity: SpecialActivity = {
+      type: 'hiking',
+      movementTimeMinutes: 120,
+      distanceKm: 8,
+      elevationGainM: 400,
+      hasBackpack: false,
+      bodyWeightKg: 70,
+      dailyCalorieTarget: 2000,
+      calculatedAt: '2026-07-20T10:00:00Z',
+      estimatedMet: 4.5,
+      hikingCalories: 630,
+      alreadyAccountedCalories: 166.67,
+      activityBonus: 463.33,
+    };
+    await getDayMetaRepository().setSpecialActivity('test-user-abc-123', '2026-07-20', mockActivity);
+
+    const req = await makeGetRequest(GET_DATE);
+    const res = await getDiaryHandler(req, makeContext());
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { previousDayHasActivity: boolean };
+    expect(body.previousDayHasActivity).toBe(true);
   });
 });

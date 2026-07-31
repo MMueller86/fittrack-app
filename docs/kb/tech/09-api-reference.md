@@ -39,6 +39,40 @@ Request body for POST/PUT: `ProfileInput` — validated with Zod.
 | PUT | `/api/diary/meals/{mealId}/items/{itemId}` | Yes | Update item |
 | DELETE | `/api/diary/meals/{mealId}/items/{itemId}` | Yes | |
 | PUT | `/api/diary/day/{date}/meta` | Yes | Set dayType / workoutType |
+| PUT | `/api/diary/day/{date}/special-activity` | Yes | Record a hiking activity and calculate activity bonus |
+| DELETE | `/api/diary/day/{date}/special-activity` | Yes | Remove the special activity for a day |
+
+### PUT /api/diary/day/{date}/special-activity
+
+Records a hiking activity, calculates the activity bonus using the V3 MET model, and persists the result in `DayMeta`.
+
+**Request body:**
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `movementTimeMinutes` | `number` | Yes | 30–1200 |
+| `distanceKm` | `number` | Yes | 0.5–100 |
+| `elevationGainM` | `number` | Yes | 0–3000 |
+| `elevationLossM` | `number` | No | 0–3000; defaults to 0 |
+| `packCategory` | `'none'\|'small'\|'medium'\|'heavy'` | No | Defaults to `'none'` when absent |
+| `terrainType` | `'path'\|'trail'\|'alpine'\|'scramble'` | No | Defaults to `'path'` when absent |
+| `hasBackpack` | `boolean` | No | **Deprecated** — maps to `packCategory: 'medium'` when true |
+
+**Response body (200):**
+
+| Field | Notes |
+|---|---|
+| `specialActivity` | Full `SpecialActivity` object (persisted) |
+| `activityBonus` | Extra calories added to the day target (rounded to 50 kcal) |
+| `effectiveCalorieTarget` | `dailyCalorieTarget + activityBonus` |
+| `metBase` | Flat-terrain walking MET (V3 intermediate) |
+| `metLocomotion` | MET after elevation adjustments (V3 intermediate) |
+| `terrainFactor` | Multiplicative terrain factor applied (V3 intermediate) |
+| `deltaPack` | Additive pack bonus applied (V3 intermediate) |
+
+**Error responses:**
+- `400` — invalid or non-calendar `date` route param
+- `422` — speed outside plausible hiking range (< 0.5 or > 10 km/h), or no body weight on record
 
 ## Reusable Items (Personal Food Library)
 

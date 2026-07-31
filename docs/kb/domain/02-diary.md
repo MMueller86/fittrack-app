@@ -48,8 +48,45 @@ Key fields:
 
 - `dayType: 'rest' | 'training'` — determines which targets apply
 - `workoutType` — optional label for training days
+- `specialActivity?: SpecialActivity` — persisted result of a special activity calculation (see below)
 
 The diary GET endpoint assembles `DayMeta` and selects the correct `DayTargets` accordingly.
+
+## Special Activity
+
+A **special activity** represents a single high-intensity physical effort (currently: hiking) that meaningfully exceeds the activity level already baked into the user's daily calorie target.
+
+### Activity Bonus
+
+The **activity bonus** is extra calories added on top of the base daily target for the day on which the activity occurred.
+
+Formula: `activityBonus = max(0, hikingCalories − alreadyAccountedCalories)`, rounded to the nearest 50 kcal.
+
+- `hikingCalories` — estimated energy expenditure: `estimatedMet × weightKg × movementTimeH`
+- `alreadyAccountedCalories` — the fraction of the base target that already covers the movement window: `dailyCalorieTarget × (movementTimeH / 24)`
+
+The hint engine uses `dailyCalorieTarget + activityBonus` as the effective calorie target for the day, so hints that compare logged calories against targets remain accurate.
+
+### Hiking Inputs
+
+| Field | Type | Notes |
+|---|---|---|
+| `movementTimeMinutes` | `number` | Net moving time |
+| `distanceKm` | `number` | Horizontal distance |
+| `elevationGainM` | `number` | Total ascent in metres |
+| `elevationLossM?` | `number` | Total descent in metres; defaults to 0 |
+| `packCategory?` | `PackCategory` | `'none'` / `'small'` / `'medium'` / `'heavy'`; defaults to `'none'` |
+| `terrainType?` | `TerrainType` | `'path'` / `'trail'` / `'alpine'` / `'scramble'`; defaults to `'path'` |
+| `hasBackpack?` | `boolean` | **Deprecated** — maps to `packCategory: 'medium'` when true |
+
+### ActivityBonusResult Fields
+
+In addition to `activityBonus`, the calculation returns V3 intermediates for display in the mobile breakdown sheet:
+
+- `metBase` — flat-terrain walking MET derived from speed
+- `metLocomotion` — MET after adding ascent/descent deltas
+- `terrainFactor` — multiplicative terrain multiplier applied
+- `deltaPack` — additive pack bonus applied after terrain multiplication
 
 ## Day Summary
 
@@ -87,6 +124,9 @@ The `currentHour` query parameter (local device time 0–23) enables time-gated 
 - `targets: DayTargets` — resolved for current day type
 - `dayType: 'rest' | 'training'`
 - `hint: HintResult`
+- `specialActivity?: SpecialActivity | null` — persisted special activity for the day, or null
+- `activityBonus?: number` — extra calories from the special activity (0 when none)
+- `previousDayHasActivity?: boolean` — true when the previous day had a special activity logged
 
 ## Business Rules
 

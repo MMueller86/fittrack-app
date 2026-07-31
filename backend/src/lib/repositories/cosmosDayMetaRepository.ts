@@ -2,7 +2,7 @@
 // DayMeta documents are stored in the nutritionDiaryMeals container,
 // discriminated by _docType: 'dayMeta'.
 
-import type { DayMeta, DayType, WorkoutType } from '@fittrack/shared';
+import type { DayMeta, DayType, WorkoutType, SpecialActivity } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
 import type { DayMetaRepository } from './dayMetaRepository';
 
@@ -39,6 +39,44 @@ export class CosmosDayMetaRepository implements DayMetaRepository {
     } else if (workoutType != null) {
       meta.workoutType = workoutType;
     }
+    const { resource } = await containers.nutritionDiaryMeals.items.upsert<DayMeta>(meta);
+    if (!resource) throw new Error('Cosmos upsert returned no resource');
+    return resource;
+  }
+
+  async setSpecialActivity(userId: string, date: string, activity: SpecialActivity): Promise<DayMeta> {
+    const { containers } = await getCosmos();
+    const existing = await this.get(userId, date);
+    const meta: DayMeta = {
+      ...(existing ?? {
+        id: `day:${date}`,
+        userId,
+        date,
+        dayType: 'rest',
+        _docType: 'dayMeta',
+      }),
+      specialActivity: activity,
+      updatedAt: new Date().toISOString(),
+    };
+    const { resource } = await containers.nutritionDiaryMeals.items.upsert<DayMeta>(meta);
+    if (!resource) throw new Error('Cosmos upsert returned no resource');
+    return resource;
+  }
+
+  async removeSpecialActivity(userId: string, date: string): Promise<DayMeta> {
+    const { containers } = await getCosmos();
+    const existing = await this.get(userId, date);
+    const meta: DayMeta = {
+      ...(existing ?? {
+        id: `day:${date}`,
+        userId,
+        date,
+        dayType: 'rest',
+        _docType: 'dayMeta',
+      }),
+      updatedAt: new Date().toISOString(),
+    };
+    delete meta.specialActivity;
     const { resource } = await containers.nutritionDiaryMeals.items.upsert<DayMeta>(meta);
     if (!resource) throw new Error('Cosmos upsert returned no resource');
     return resource;

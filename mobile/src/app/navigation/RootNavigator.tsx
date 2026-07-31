@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import HomeScreen from '../../modules/home/HomeScreen';
 import ProgressScreen from '../../modules/progress/ProgressScreen';
 import DiaryScreen from '../../modules/nutrition/DiaryScreen';
+import HikingInputScreen from '../../modules/nutrition/HikingInputScreen';
 import RecipeListScreen from '../../modules/recipes/RecipeListScreen';
 import RecipeDetailScreen from '../../modules/recipes/RecipeDetailScreen';
 import RecipeCreateScreen from '../../modules/recipes/RecipeCreateScreen';
@@ -20,6 +21,7 @@ import MyProductsScreen from '../../modules/profile/MyProductsScreen';
 import LibraryScreen from '../../modules/profile/LibraryScreen';
 import ProfileWizardScreen, { SKIP_WIZARD_KEY } from '../../modules/profile/ProfileWizardScreen';
 import type { UserProfile } from '@fittrack/shared';
+import type { SpecialActivity } from '@fittrack/shared';
 import { colors } from '../theme';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, ProgressIcon } from '../../assets/icons/TabIcons';
 import { profileApi } from '../../shared/api/profileApi';
@@ -44,6 +46,7 @@ const navigationTheme = {
 // --- Home stack ---
 export type HomeStackParamList = {
   HomeMain: undefined;
+  HikingInput: { date: string; existing?: SpecialActivity };
 };
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -57,6 +60,7 @@ function HomeStackNavigator() {
       }}
     >
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
+      <HomeStack.Screen name="HikingInput" component={HikingInputScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -87,9 +91,30 @@ function ProfileStackNavigator() {
   );
 }
 
+// --- Nutrition stack ---
+export type NutritionStackParamList = {
+  DiaryMain: undefined;
+  HikingInput: { date: string; existing?: SpecialActivity };
+};
+
+const NutritionStack = createNativeStackNavigator<NutritionStackParamList>();
+
+function NutritionStackNavigator() {
+  return (
+    <NutritionStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
+      <NutritionStack.Screen name="DiaryMain" component={DiaryScreen} />
+      <NutritionStack.Screen name="HikingInput" component={HikingInputScreen} />
+    </NutritionStack.Navigator>
+  );
+}
+
 // --- Recipe stack ---
-export type RecipeStackParamList = {
-  RecipeList: undefined;
+export type RecipeStackParamList = {  RecipeList: undefined;
   RecipeDetail: { id: string };
   RecipeCreate: { editId?: string };
   RecipeWizard: undefined;
@@ -184,7 +209,7 @@ export function RootNavigator() {
         />
         <Tab.Screen
           name="Nutrition"
-          component={DiaryScreen}
+          component={NutritionStackNavigator}
           options={{
             tabBarLabel: 'Ernährung',
             tabBarIcon: ({ color, size }) => <NutritionIcon color={color} size={size} />,

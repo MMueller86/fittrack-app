@@ -35,11 +35,25 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `MealItem` — diary entry for one food item; includes `isAiEstimate`, `confidence`, `warnings`, `components`
 - `Meal` — container for multiple `MealItem`s on a date, with a `type`
 - `DaySummary` — aggregated macro totals for a day
-- `DayMeta` — per-day metadata (`dayType: 'rest' | 'training'`, `workoutType`)
+- `DayMeta` — per-day metadata (`dayType: 'rest' | 'training'`, `workoutType`, `specialActivity?`)
 - `ReusableItem` — user's personal food library item; includes AI-generated `searchTerms` and `aiKeywords`
 - `FoodSearchResult` — unified search result (library + catalog); includes `source`, `portion`, `isComplete`
 - `AiFoodEstimatePreview` — AI food estimation with `confidence`, `warnings`, `estimatedPortion`
 - `NutritionLabelScanResult` — OCR + AI label extraction result
+- `PackCategory` — `'none' | 'small' | 'medium' | 'heavy'` — pack/backpack weight class for hiking
+- `TerrainType` — `'path' | 'trail' | 'alpine' | 'scramble'` — terrain difficulty class for hiking
+- `HikingActivityInputs` — inputs for activity bonus calculation:
+  - `movementTimeMinutes`, `distanceKm`, `elevationGainM` — core fields
+  - `elevationLossM?` — descent in metres (V3; defaults to 0 when absent)
+  - `packCategory?: PackCategory` — replaces deprecated `hasBackpack?`
+  - `terrainType?: TerrainType` — defaults to `'path'` when absent
+  - `hasBackpack?: boolean` — **@deprecated** — mapped to `packCategory: 'medium'` for backward compatibility
+- `ActivityBonusResult` — result of activity bonus calculation:
+  - `estimatedMet`, `hikingCalories`, `alreadyAccountedCalories`, `activityBonus` — core outputs
+  - `metBase?` — flat-terrain walking MET derived from speed (V3 intermediate)
+  - `metLocomotion?` — MET after adding ascent/descent deltas (V3 intermediate)
+  - `terrainFactor?` — multiplicative terrain multiplier applied (V3 intermediate)
+  - `deltaPack?` — additive pack bonus applied after terrain multiplication (V3 intermediate)
 
 ### `recipes.ts`
 - `RecipeIngredient` — amount in grams, linked to food catalog or reusable item
@@ -76,7 +90,8 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 ### `insight.ts`
 - `InsightStatus` — `'fresh' | 'cached' | 'quota_exceeded' | 'unavailable'`
 - `InsightResponse` — daily AI briefing payload
-- `InsightWeightContext`, `InsightNutritionDay`, `InsightInputContext` — AI input context
+- `InsightWeightContext` — weight data sent to the AI; includes `latestKg`, `previousKg`, `targetKg`, `trend7d`, `last7Values`, `isOutlierPrevious`, `isOutlierLatest`, `daysSinceLastMeasurement`, `lastMeasurementDate: string | null` (ISO date of last measurement)
+- `InsightNutritionDay`, `InsightInputContext` — AI input context
 
 ### `aiMealEstimate.ts`
 - `AiMealEstimatePreview` — meal image estimate result
@@ -99,6 +114,24 @@ All functions are pure (no I/O, no state).
 | `goalContext.ts` | `evaluateWeightDelta()`, `progressGrowsOnDecrease()` | Goal-relative progress direction |
 | `plateauDetector.ts` | `computePlateauSignal(entries)` | Std-dev plateau detection over 28-day window |
 | `recipeCalculator.ts` | `calculateRecipeNutrition(ingredients)` | Recipe totals + per-portion |
+| `activityBonusCalculator.ts` | `calculateActivityBonus(inputs, weightKg, dailyCalorieTarget)` | V3 piecewise-linear MET model for hiking; returns `ActivityBonusResult` including V3 intermediates |
+
+### `activityBonusCalculator.ts` — V3 Algorithm
+
+Implements a piecewise-linear MET model based on Ainsworth Compendium 2024, Pandolf et al. (1977), and Minetti et al. (2002).
+
+**Calculation steps:**
+
+1. **Guard** — if `distanceKm = 0` or `movementTimeMinutes = 0`, returns `activityBonus = 0`.
+2. **Backward compatibility** — `hasBackpack: true` maps to `packCategory: 'medium'`; absent `terrainType` defaults to `'path'`.
+3. **Speed → `metBase`** — flat-terrain walking MET via `SPEED_ANCHORS` lerp (floor 2.0, cap 4.5).
+4. **Elevation deltas** — ascent/descent distance split proportionally; `gainPerKm` → `Δ_asc` via `ASCENT_ANCHORS`; `lossPerKm` → `Δ_desc` via `DESCENT_ANCHORS` (non-monotone, minimum at 100 m/km).
+5. **`metLocomotion`** — `metBase + Δ_asc·f_asc + Δ_desc·f_desc` (Naismith-weighted phase fractions).
+6. **Terrain** — `metLocomotion × terrainFactor` (`path=1.00`, `trail=1.35`, `alpine=1.45`, `scramble=1.60`).
+7. **Pack** — `deltaPack` added after terrain multiplication (`none=0.0`, `small=0.5`, `medium=1.0`, `heavy=1.5`).
+8. **`estimatedMet`** — clamped to `[2.0, 9.5]`.
+9. **`hikingCalories`** — `estimatedMet × weightKg × movementTimeH`.
+10. **`activityBonus`** — `max(0, hikingCalories − alreadyAccountedCalories)`, rounded to nearest 50 kcal. `alreadyAccountedCalories = dailyCalorieTarget × (movementTimeH / 24)`.
 
 ## Import Pattern for Backend
 

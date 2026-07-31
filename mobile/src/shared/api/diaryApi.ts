@@ -2,7 +2,7 @@
 // Uses the shared apiClient (auth interceptors, base URL).
 
 import { apiClient } from './client';
-import type { DiaryDayResponse, MealType, Meal, NutritionValues } from '@fittrack/shared';
+import type { DiaryDayResponse, MealType, Meal, NutritionValues, SpecialActivity } from '@fittrack/shared';
 
 export type QuantityMode = 'grams' | 'portions';
 
@@ -92,5 +92,32 @@ export const diaryApi = {
     return apiClient
       .put<{ meal: Meal }>(`/diary/meals/${mealId}/items/${itemId}`, input)
       .then((r) => r.data);
+  },
+
+  /** PUT /api/diary/day/:date/special-activity */
+  setSpecialActivity(
+    date: string,
+    input: {
+      type: 'hiking';
+      movementTimeMinutes: number;
+      distanceKm: number;
+      elevationGainM: number;
+      elevationLossM?: number;
+      packCategory?: import('@fittrack/shared').PackCategory;
+      terrainType?: import('@fittrack/shared').TerrainType;
+      hasBackpack?: boolean;
+    },
+  ): Promise<{ specialActivity: SpecialActivity; activityBonus: number; effectiveCalorieTarget: number }> {
+    return apiClient
+      .put<{ specialActivity: SpecialActivity; activityBonus: number; effectiveCalorieTarget: number }>(
+        `/diary/day/${date}/special-activity`,
+        input,
+      )
+      .then((r) => r.data);
+  },
+
+  /** DELETE /api/diary/day/:date/special-activity */
+  removeSpecialActivity(date: string): Promise<void> {
+    return apiClient.delete(`/diary/day/${date}/special-activity`).then(() => undefined);
   },
 };

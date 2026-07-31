@@ -125,9 +125,15 @@ export const getDiaryHandler = withHandler(
       return d.toISOString().slice(0, 10);
     });
 
-    const [result, dayMeta, profile, hintState, ...recentDays] = await Promise.all([
+    // Compute yesterday's date for previousDayHasActivity check
+    const yesterday = new Date(today);
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayDate = yesterday.toISOString().slice(0, 10);
+
+    const [result, dayMeta, previousDayMeta, profile, hintState, ...recentDays] = await Promise.all([
       diaryRepo.getDay(userId, date),
       getDayMetaRepository().get(userId, date),
+      getDayMetaRepository().get(userId, yesterdayDate),
       getProfileRepository().get(userId),
       getHintStateRepository().get(userId),
       ...recentDayDates.map((d) => diaryRepo.getDay(userId, d)),
@@ -146,11 +152,15 @@ export const getDiaryHandler = withHandler(
       .filter((v): v is number => v !== null);
 
     // Evaluate hint — pure function, no I/O
+    const activityBonus = dayMeta?.specialActivity?.activityBonus ?? 0;
+    const effectiveTargets = activityBonus > 0
+      ? { ...targets, calories: targets.calories + activityBonus }
+      : targets;
     const { hint, updatedState } = evaluateHint(
       {
         meals: result.meals,
         summary: result.summary,
-        targets,
+        targets: effectiveTargets,
         dayType: resolvedDayType,
         currentHour,
         bmr: profile?.calculationMeta?.bmr,
@@ -180,6 +190,9 @@ export const getDiaryHandler = withHandler(
         dayType: dayMeta?.dayType ?? null,
         workoutType: dayMeta?.workoutType ?? null,
         hint,
+        specialActivity: dayMeta?.specialActivity ?? null,
+        activityBonus,
+        previousDayHasActivity: previousDayMeta?.specialActivity != null,
       },
     };
   },

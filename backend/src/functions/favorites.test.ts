@@ -166,14 +166,12 @@ describe('GET /api/favorites', () => {
     const body = res.jsonBody as Array<{
       nutritionPer100g?: unknown;
       portion?: unknown;
-      mealTypeCounts?: Record<string, number>;
       preferredInputMode?: string;
       preferredInputAmount?: number;
     }>;
     expect(body).toHaveLength(1);
     expect(body[0]!.nutritionPer100g).toBeDefined();
     expect(body[0]!.portion).toBeDefined();
-    expect(body[0]!.mealTypeCounts?.breakfast).toBe(1);
     expect(body[0]!.preferredInputMode).toBe('portion');
     expect(body[0]!.preferredInputAmount).toBe(1);
   });
@@ -215,7 +213,7 @@ describe('GET /api/favorites/grouped', () => {
     expect(body.groups).toHaveLength(0);
   });
 
-  it('puts entries with mealTypeCounts into the correct group', async () => {
+  it('puts entries into ungrouped (mealTypeCounts no longer tracked)', async () => {
     await addFavoriteHandler(
       await makeAuthRequest({
         body: { foodRef: 'openFoodFacts:a', foodRefType: 'catalog', displayName: 'Apple' },
@@ -232,18 +230,14 @@ describe('GET /api/favorites/grouped', () => {
     });
 
     const res = await getFavoritesGroupedHandler(await makeAuthRequest(), ctx);
-    const body = res.jsonBody as {
-      ungrouped: unknown[];
-      groups: Array<{ mealType: string; entries: Array<{ foodRef: string }> }>;
-      all: unknown[];
-    };
-    expect(body.ungrouped).toHaveLength(0);
-    expect(body.groups).toHaveLength(1);
-    expect(body.groups[0]!.mealType).toBe('breakfast');
-    expect(body.groups[0]!.entries[0]!.foodRef).toBe('openFoodFacts:a');
+    const body = res.jsonBody as { ungrouped: Array<{ foodRef: string }>; groups: unknown[] };
+    expect(body.ungrouped).toHaveLength(1);
+    expect(body.ungrouped[0]!.foodRef).toBe('openFoodFacts:a');
+    // groups is always empty since mealTypeCounts is no longer tracked
+    expect(body.groups).toHaveLength(0);
   });
 
-  it('an entry used in multiple meal types appears in multiple groups', async () => {
+  it('groups is always empty (mealTypeCounts no longer written)', async () => {
     await addFavoriteHandler(
       await makeAuthRequest({
         body: { foodRef: 'openFoodFacts:a', foodRefType: 'catalog', displayName: 'Apple' },
@@ -266,18 +260,11 @@ describe('GET /api/favorites/grouped', () => {
     });
 
     const res = await getFavoritesGroupedHandler(await makeAuthRequest(), ctx);
-    const body = res.jsonBody as {
-      ungrouped: unknown[];
-      groups: Array<{ mealType: string; entries: unknown[] }>;
-    };
-    expect(body.ungrouped).toHaveLength(0);
-    expect(body.groups).toHaveLength(2);
-    const mealTypes = body.groups.map(g => g.mealType);
-    expect(mealTypes).toContain('breakfast');
-    expect(mealTypes).toContain('snack');
+    const body = res.jsonBody as { groups: unknown[] };
+    expect(body.groups).toHaveLength(0);
   });
 
-  it('all contains every favorite regardless of mealTypeCounts', async () => {
+  it('all contains every favorite', async () => {
     await addFavoriteHandler(
       await makeAuthRequest({
         body: { foodRef: 'openFoodFacts:a', foodRefType: 'catalog', displayName: 'Apple' },
@@ -340,5 +327,68 @@ describe('favoritedAt', () => {
     expect(favorited.favoritedAt).toBeDefined();
     const unfavorited = await repo.setFavorite(TEST_USER_ID, 'openFoodFacts:fav-unset', 'catalog', 'Unfav Item', undefined, false);
     expect(unfavorited.favoritedAt).toBe(favorited.favoritedAt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/favorites?context=<mealType>
+// ---------------------------------------------------------------------------
+
+describe('GET /api/favorites — context param', () => {
+  it('without context → returns UserFoodRelation[] directly (backward compat)', async () => {
+    await addFavoriteHandler(
+      await makeAuthRequest({
+        body: { foodRef: 'openFoodFacts:a', foodRefType: 'catalog', displayName: 'Apple' },
+      }),
+      ctx,
+    );
+    const res = await listFavoritesHandler(await makeAuthRequest(), ctx);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.jsonBody)).toBe(true);
+  });
+
+  it('GET /api/favorites?context=lunch → returns { items, context: "lunch" }', async () => {
+    await addFavoriteHandler(
+      await makeAuthRequest({
+        body: { foodRef: 'openFoodFacts:a', foodRefType: 'catalog', displayName: 'Apple' },
+      }),
+      ctx,
+    );
+    const res = await listFavoritesHandler(
+      await makeAuthRequest({ query: { context: 'lunch' } }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { items: unknown[]; context: string };
+    expect(Array.isArray(body.items)).toBe(true);
+    expect(body.context).toBe('lunch');
+  });
+
+  it('GET /api/favorites?context=invalid → 400', async () => {
+    const res = await listFavoritesHandler(
+      await makeAuthRequest({ query: { context: 'invalid' } }),
+      ctx,
+    );
+    expect(res.status).toBe(400);
+    const body = res.jsonBody as { error: string };
+    expect(body.error).toMatch(/invalid context/i);
+  });
+
+  it('GET /api/favorites?context=breakfast → correct response shape', async () => {
+    await addFavoriteHandler(
+      await makeAuthRequest({
+        body: { foodRef: 'openFoodFacts:b', foodRefType: 'catalog', displayName: 'Banana' },
+      }),
+      ctx,
+    );
+    const res = await listFavoritesHandler(
+      await makeAuthRequest({ query: { context: 'breakfast' } }),
+      ctx,
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { items: Array<{ foodRef: string }>; context: string };
+    expect(body.context).toBe('breakfast');
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]!.foodRef).toBe('openFoodFacts:b');
   });
 });

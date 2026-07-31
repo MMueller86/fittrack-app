@@ -58,11 +58,8 @@ export interface UserFoodRelation {
   nutritionPer100g?: NutritionValues;
   /** Denormalized portion info */
   portion?: PortionInfo | null;
-  /**
-   * Per-meal usage count map.
-   * Keys: MealType values. Values: count of times logged to that meal type.
-   */
-  mealTypeCounts?: Partial<Record<MealType, number>>;
+  /** True wenn Nährwertdaten vollständig vorhanden sind */
+  isComplete?: boolean;
   /**
    * Preferred input mode — updated via running score on each recordUsage call.
    * Score +1 for 'portion', -1 for 'grams', clamped to [-10, +10].
@@ -70,12 +67,12 @@ export interface UserFoodRelation {
    */
   preferredInputMode?: 'grams' | 'portion';
   /**
-   * ISO date strings (YYYY-MM-DD) of recent diary additions for this item.
+   * Structured usage date entries for this item.
+   * Each entry records the date (YYYY-MM-DD) and meal type of a diary addition.
    * Trimmed to entries within the last 90 days on every recordUsage call.
-   * Used by the client to compute a rolling 30-day usage count.
-   * Max array length: 90 entries.
+   * Old string entries are discarded on read (self-cleaning migration).
    */
-  usageDates?: string[];
+  usageDates?: Array<{ date: string; mealType: MealType }>;
   /**
    * Preferred input amount — EMA-updated (alpha = EMA_ALPHA constant = 0.3).
    * Grams when preferredInputMode='grams'; portion count when 'portion'.
@@ -101,10 +98,11 @@ export interface UpsertUserFoodRelationInput {
   nutritionPer100g?: NutritionValues;
   /** Denormalized portion info */
   portion?: PortionInfo | null;
-  /** Meal type of the diary entry being recorded — used to update mealTypeCounts */
+  /** Meal type of the diary entry being recorded — stored in usageDates entries */
   mealType?: MealType;
 }
 
+/** @deprecated Use GET /api/favorites?context=MealType with backend scoring instead. */
 export interface QuickEntryGroupedResponse {
   /** Favorites with no mealTypeCounts (or all zero) — shown above tab strip */
   ungrouped: UserFoodRelation[];

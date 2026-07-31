@@ -59,6 +59,10 @@ export function computeInputHash(ctx: InsightInputContext, promptVersion: string
     primarySignalType: ctx.progressIntelligence?.primarySignal?.type ?? null,
     // Include milestone confirmation state: Stufe 1 → Stufe 2 transition triggers regeneration
     milestoneConfirmed: ctx.progressIntelligence?.milestone?.confirmed ?? null,
+    // Include weight staleness bucket so a fresh measurement after a stale period triggers regeneration
+    weightStaleness:
+      ctx.weight.daysSinceLastMeasurement === null ? 'none' :
+      ctx.weight.daysSinceLastMeasurement > 14 ? 'stale' : 'fresh',
   };
   return createHash('sha256').update(JSON.stringify(stable)).digest('hex');
 }

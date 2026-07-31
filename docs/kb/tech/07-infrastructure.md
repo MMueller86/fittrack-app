@@ -91,28 +91,50 @@ az deployment group create \
 
 **Context:** The Azure Function App runs on **Linux**. Development happens on **Windows** (PowerShell). This combination has caused repeated deployment failures. Follow the steps below exactly.
 
-### Step-by-Step
+### Directory Structure
+
+`_deploy_staging/` is a **separate directory** at the repo root — it is NOT a symlink to `backend/dist/`. It has its own `dist/` folder that must be explicitly synced from `backend/dist/` before every deploy.
+
+```
+fittrack-app/
+├── backend/
+│   └── dist/               ← TypeScript compiler output (tsc outDir)
+│       ├── backend/src/     ← compiled backend source
+│       └── shared/          ← compiled shared library
+└── _deploy_staging/
+    ├── dist/               ← SEPARATE copy — must be synced manually before deploy
+    ├── node_modules/        ← Linux-compatible node_modules (do NOT rebuild on Windows)
+    ├── host.json
+    └── package.json
+```
+
+**Root cause of missing endpoints on Alpha:** If step 2 (sync) is skipped, `_deploy_staging/dist/` contains stale compiled output. The deploy succeeds (exit 0) but the new functions are absent. Always verify step 3 before deploying.
+
+### Step-by-Step (run from repo root)
 
 ```powershell
 # 1. Clean build — REQUIRED. Incremental build cache silently omits changes.
-Remove-Item -Recurse -Force backend\dist
-Remove-Item -Force backend\tsconfig.tsbuildinfo
+#    Run from repo root.
+Remove-Item -Recurse -Force "backend\dist" -ErrorAction SilentlyContinue
+Remove-Item -Force "backend\tsconfig.tsbuildinfo" -ErrorAction SilentlyContinue
 cd backend
-npm run build
+npx tsc --project tsconfig.json
+cd ..
 
-# 2. Copy output to _deploy_staging/
-#    WARNING: Copy-Item trap — if target exists, Recurse creates nested folder.
-#    Always use wildcard (*) to copy contents, not the folder itself:
-Remove-Item -Recurse -Force "_deploy_staging\dist"
-Copy-Item -Recurse -Force "dist\*" "_deploy_staging\dist\"
+# 2. Sync build output to _deploy_staging/dist/ using robocopy (mirror).
+#    robocopy exit codes 0–7 are all SUCCESS (0=nothing to copy, 1=files copied).
+#    Do NOT use Copy-Item — it creates nested folders when target exists.
+robocopy "backend\dist" "_deploy_staging\dist" /MIR /NFL /NDL /NJH /NJS
 
-# 3. Verify the build before deploying (spot-check a known value)
-(Get-Content "_deploy_staging\dist\src\lib\repositories\cosmosUserFoodRelationRepository.js") -match "favoritedAt"
-# Must return True — if False, the build did not include recent changes
+# 3. Verify: spot-check that a recently added/changed function file is present.
+#    Replace the filename with the most recently added function in functions/.
+Test-Path "_deploy_staging\dist\backend\src\functions\specialActivity.js"
+# Must return True — if False, step 2 did not sync correctly.
 
 # 4. Deploy — always from _deploy_staging/, never from backend/
-cd ..\_deploy_staging
+cd _deploy_staging
 func azure functionapp publish func-fittrack-alpha-ppf5sc --no-build --javascript
+cd ..
 ```
 
 ### Rules
@@ -121,11 +143,11 @@ func azure functionapp publish func-fittrack-alpha-ppf5sc --no-build --javascrip
 
 [Rule] Always include `--javascript`. The `_deploy_staging/` directory has no `local.settings.json`, so the `func` CLI cannot auto-detect the Node.js worker runtime without this flag.
 
-[Rule] Always delete `dist/` and `tsconfig.tsbuildinfo` before building. Incremental TypeScript build cache silently omits changes — this has caused real production bugs.
+[Rule] Always delete `backend/dist/` and `backend/tsconfig.tsbuildinfo` before building. Incremental TypeScript build cache silently omits changes — this has caused real production bugs.
 
-[Rule] Use wildcard when copying: `Copy-Item -Recurse -Force "dist\*" "_deploy_staging\dist\"`. Without the `*`, PowerShell creates `_deploy_staging\dist\dist\` (nesting) when the target already exists.
+[Rule] Always sync with `robocopy /MIR` (step 2) before deploying. `_deploy_staging/dist/` is NOT automatically updated by `tsc`. Skipping this step deploys stale code silently.
 
-[Rule] Verify `_deploy_staging` contents before deploying. The grep check (`-match "favoritedAt"` on `cosmosUserFoodRelationRepository.js`) confirms the compiled output contains recent code.
+[Rule] Verify step 3 before deploying. A successful `func publish` (exit 0) does NOT guarantee the new functions are present — it only confirms the upload succeeded. Only the function list in the output or a `Test-Path` check confirms the sync was complete.
 
 ## Application Settings — Local Dev Credentials
 

@@ -1,4 +1,4 @@
-import type { UserFoodRelation } from '@fittrack/shared';
+import type { UserFoodRelation, MealType } from '@fittrack/shared';
 
 export function computeLastUsageText(item: UserFoodRelation): string | null {
   const { lastInputMode, lastInputAmount, nutritionPer100g, portion } = item;
@@ -37,12 +37,12 @@ export function computeLastUsageText(item: UserFoodRelation): string | null {
     return `100 g \u00b7 ${kcal} kcal`;
   }
 
-  // Branch 3: no history, no nutrition — show standard reference
+  // Branch 3: no history, no nutrition — cannot compute calories
   if (portion?.weightGrams) {
     const label = portion.label ?? 'Portion';
     return `1 ${label} (${portion.weightGrams} g)`;
   }
-  return 'je 100 g';
+  return 'Keine Nährwertdaten';
 }
 
 export function computeDirectAddLabel(
@@ -50,6 +50,7 @@ export function computeDirectAddLabel(
   activeFilter: string,
 ): string | null {
   if (activeFilter !== 'fuerDich') return null;
+  if (!item.nutritionPer100g) return null;
   const { preferredInputMode, preferredInputAmount } = item;
   if (!preferredInputAmount || preferredInputAmount <= 0) return null;
   if (preferredInputMode === 'portion') {
@@ -72,3 +73,34 @@ export function computeMacroText(item: UserFoodRelation): string | null {
   parts.push('je 100 g');
   return parts.join(' \u00b7 ');
 }
+
+// ---------------------------------------------------------------------------
+// Relative date label for "Zuletzt verwendet" filter
+// ---------------------------------------------------------------------------
+
+export function relativeUsage(isoDate: string): string {
+  const days = Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000);
+  if (days === 0) return 'Heute verwendet';
+  if (days === 1) return 'Gestern verwendet';
+  if (days < 7) return `Vor ${days} Tagen verwendet`;
+  if (days < 14) return 'Vor einer Woche verwendet';
+  return `Vor ${Math.floor(days / 7)} Wochen verwendet`;
+}
+
+// ---------------------------------------------------------------------------
+// MealType-filter sort helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns items that have at least one usageDates entry for the given mealType,
+ * sorted descending by the count of such entries.
+ */
+export function sortByMealTypeUsage(items: UserFoodRelation[], mealType: MealType): UserFoodRelation[] {
+  const count = (item: UserFoodRelation) =>
+    (item.usageDates ?? []).filter(e => e.mealType === mealType).length;
+  return [...items]
+    .filter(item => count(item) > 0)
+    .sort((a, b) => count(b) - count(a));
+}
+
+

@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import type { MealType } from '@fittrack/shared';
 import { thumbnailBorderWidth } from './RelationRow.utils';
 
-function makeDate(daysAgo: number): string {
-  return new Date(Date.now() - daysAgo * 86_400_000).toISOString().substring(0, 10);
+function makeDate(daysAgo: number): { date: string; mealType: MealType } {
+  return {
+    date: new Date(Date.now() - daysAgo * 86_400_000).toISOString().substring(0, 10),
+    mealType: 'lunch' as MealType,
+  };
 }
 
 describe('thumbnailBorderWidth', () => {

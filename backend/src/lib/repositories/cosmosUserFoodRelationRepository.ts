@@ -120,44 +120,52 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
       const existing = await this.getByFoodRef(userId, input.foodRef);
       const id = this.makeId(userId, input.foodRef);
 
-      let relation: UserFoodRelation = existing
-        ? {
-            ...existing,
-            lastUsedAt: now,
-            usageCount: existing.usageCount + 1,
-            displayName: input.displayName,
-            displayBrand: input.displayBrand,
-            // imageUrl aktualisieren wenn neu geliefert (überschreibt nie mit null wenn bereits gesetzt)
-            ...(input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
-            ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
-            ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
-          }
-        : {
-            id,
-            userId,
-            foodRef: input.foodRef,
-            foodRefType: input.foodRefType,
-            displayName: input.displayName,
-            displayBrand: input.displayBrand,
-            imageUrl: input.imageUrl ?? null,
-            isFavorite: false,
-            lastUsedAt: now,
-            usageCount: 1,
-            createdAt: now,
-          };
+      // Fix C: drop mealTypeCounts from existing doc spread (self-cleaning)
+      let relation: UserFoodRelation;
+      if (existing) {
+        const { mealTypeCounts: _dropped, ...existingWithoutLegacy } = existing as UserFoodRelation & { mealTypeCounts?: unknown };
+        relation = {
+          ...existingWithoutLegacy,
+          lastUsedAt: now,
+          usageCount: existing.usageCount + 1,
+          displayName: input.displayName,
+          displayBrand: input.displayBrand,
+          // imageUrl aktualisieren wenn neu geliefert (überschreibt nie mit null wenn bereits gesetzt)
+          ...(input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
+          ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
+          ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
+        };
+      } else {
+        // Fix A: new-document path includes lastInputMode and lastInputAmount
+        relation = {
+          id,
+          userId,
+          foodRef: input.foodRef,
+          foodRefType: input.foodRefType,
+          displayName: input.displayName,
+          displayBrand: input.displayBrand,
+          imageUrl: input.imageUrl ?? null,
+          isFavorite: false,
+          lastUsedAt: now,
+          usageCount: 1,
+          createdAt: now,
+          ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
+          ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
+        };
+      }
 
-      // usageDates — append today and trim to last 90 days
+      // Fix B: usageDates — append {date, mealType} entry, drop old string entries, trim to 90 days
       const today = new Date().toISOString().substring(0, 10);
       const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
-      const existingDates = relation.usageDates ?? [];
-      relation = { ...relation, usageDates: [...existingDates, today].filter(d => d >= ninetyDaysAgo) };
-
-      // mealTypeCounts
-      if (input.mealType) {
-        const counts: Partial<Record<string, number>> = { ...(relation.mealTypeCounts ?? {}) };
-        counts[input.mealType] = (counts[input.mealType] ?? 0) + 1;
-        relation = { ...relation, mealTypeCounts: counts as UserFoodRelation['mealTypeCounts'] };
-      }
+      const existingEntries = (relation.usageDates ?? []).filter(
+        (e): e is { date: string; mealType: import('@fittrack/shared').MealType } =>
+          typeof e === 'object' && e !== null && 'date' in e,
+      );
+      const newEntry = { date: today, mealType: input.mealType ?? ('snack' as import('@fittrack/shared').MealType) };
+      relation = {
+        ...relation,
+        usageDates: [...existingEntries, newEntry].filter(e => e.date >= ninetyDaysAgo),
+      };
 
       // preferredInputMode via running score
       if (input.lastInputMode !== undefined) {

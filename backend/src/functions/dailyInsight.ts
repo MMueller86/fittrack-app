@@ -130,6 +130,14 @@ async function buildInputContext(
 
   // Weight context
   const last7Values = weightEntries.slice(0, 7).map((e) => e.value);
+  const lastWeightDate = weightEntries[0]?.date ?? null;
+  const daysSinceLastMeasurement = lastWeightDate != null
+    ? Math.floor(
+        (new Date(date + 'T00:00:00Z').getTime() - new Date(lastWeightDate + 'T00:00:00Z').getTime())
+        / (1000 * 60 * 60 * 24),
+      )
+    : null;
+  const isWeightStale = daysSinceLastMeasurement !== null && daysSinceLastMeasurement > 14;
 
   // Nutrition targets from profile
   const targets = profile?.targets
@@ -141,8 +149,12 @@ async function buildInputContext(
   // Remaining daily budget (never negative; null when no target or nothing logged yet)
   const todayCalories = diaryToday.summary.calories > 0 ? diaryToday.summary.calories : null;
   const todayProtein  = diaryToday.summary.protein  > 0 ? diaryToday.summary.protein  : null;
-  const remainingCalories = targets && todayCalories != null
-    ? Math.max(0, Math.round(targets.calories - todayCalories))
+  // Effective calorie target = base target + activity bonus (if any)
+  const activityBonus = dayMeta?.specialActivity?.activityBonus ?? 0;
+  const effectiveCalorieTarget = targets ? targets.calories + activityBonus : null;
+  // Allow negative values so the AI knows when calories are exceeded (not just "at zero")
+  const remainingCalories = effectiveCalorieTarget != null && todayCalories != null
+    ? Math.round(effectiveCalorieTarget - todayCalories)
     : null;
   const remainingProteinG = targets && todayProtein != null
     ? Math.max(0, Math.round(targets.proteinG - todayProtein))
@@ -153,13 +165,15 @@ async function buildInputContext(
     dayType: dayMeta?.dayType ?? null,
     workoutType: dayMeta?.workoutType ?? null,
     weight: {
-      latestKg: last7Values[0] ?? null,
-      previousKg: last7Values[1] ?? null,
+      latestKg: isWeightStale ? null : (last7Values[0] ?? null),
+      previousKg: isWeightStale ? null : (last7Values[1] ?? null),
       targetKg: profile?.targetWeightKg ?? null,
-      trend7d: computeWeightTrend7d(last7Values),
-      last7Values,
-      isOutlierPrevious: last7Values[1] != null ? isOutlier(last7Values[1], last7Values) : false,
-      isOutlierLatest:   last7Values[0] != null ? isOutlier(last7Values[0], last7Values) : false,
+      trend7d: isWeightStale ? null : computeWeightTrend7d(last7Values),
+      last7Values: isWeightStale ? [] : last7Values,
+      isOutlierPrevious: isWeightStale ? false : (last7Values[1] != null ? isOutlier(last7Values[1], last7Values) : false),
+      isOutlierLatest:   isWeightStale ? false : (last7Values[0] != null ? isOutlier(last7Values[0], last7Values) : false),
+      daysSinceLastMeasurement,
+      lastMeasurementDate: lastWeightDate,
     },
     nutrition: {
       today:
@@ -174,7 +188,7 @@ async function buildInputContext(
           : null,
       targets: targets
         ? {
-            calories: targets.calories,
+            calories: effectiveCalorieTarget ?? targets.calories,
             proteinG: targets.proteinG,
             carbsG: targets.carbsG,
             fatG: targets.fatG,
@@ -201,6 +215,7 @@ async function buildInputContext(
       insightHistory,
     }),
     currentHourLocal: localHour,
+    specialActivity: dayMeta?.specialActivity ?? null,
   };
 
   return context;

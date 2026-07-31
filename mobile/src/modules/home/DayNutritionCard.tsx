@@ -81,9 +81,11 @@ interface MacroRowProps {
   value: number;
   target: number;
   color: string;
+  unit?: string;
 }
 
-function MacroRow({ label, value, target, color }: MacroRowProps) {
+function MacroRow({ label, value, target, color, unit }: MacroRowProps) {
+  const resolvedUnit = unit ?? 'g';
   const pct = clamp(value, target);
   const pctDisplay = Math.round(pct * 100);
   const remaining = Math.max(0, Math.round(target - value));
@@ -95,12 +97,12 @@ function MacroRow({ label, value, target, color }: MacroRowProps) {
         <Text style={rowStyles.label}>{label}</Text>
         <Text style={rowStyles.valueText}>
           <Text style={{ color }}>{Math.round(value)}</Text>
-          <Text style={rowStyles.sep}> / {target} g</Text>
+          <Text style={rowStyles.sep}> / {target} {resolvedUnit}</Text>
         </Text>
         <Text style={rowStyles.remaining}>
           {isOver
-            ? `+${Math.round(value - target)} g`
-            : `noch ${remaining} g`}
+            ? `+${Math.round(value - target)} ${resolvedUnit}`
+            : `noch ${remaining} ${resolvedUnit}`}
         </Text>
         <Text style={[rowStyles.pct, { color }]}>{pctDisplay} %</Text>
       </View>
@@ -165,9 +167,10 @@ interface Props {
   summary: DiaryDayResponse['summary'] | null;
   target: MacroTarget | null;
   onPress: () => void;
+  activityBonus?: number;
 }
 
-export function DayNutritionCard({ summary, target, onPress }: Props) {
+export function DayNutritionCard({ summary, target, onPress, activityBonus }: Props) {
   if (!target) return null;
 
   const isEmpty = !summary || summary.calories === 0;
@@ -189,10 +192,12 @@ export function DayNutritionCard({ summary, target, onPress }: Props) {
     );
   }
 
+  const bonus = activityBonus ?? 0;
+  const effectiveCalorieTarget = Math.round(target.calories + bonus);
   const calConsumed = Math.round(summary!.calories);
-  const remaining = Math.max(0, target.calories - calConsumed);
-  const isOver = calConsumed > target.calories;
-  const calPct = clamp(summary!.calories, target.calories);
+  const remaining = Math.round(Math.max(0, effectiveCalorieTarget - calConsumed));
+  const isOver = calConsumed > effectiveCalorieTarget;
+  const calPct = clamp(summary!.calories, effectiveCalorieTarget);
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
@@ -203,7 +208,7 @@ export function DayNutritionCard({ summary, target, onPress }: Props) {
           <DonutRing pct={calPct} isOver={isOver} />
           <View style={styles.donutCenter}>
             <Text style={styles.donutValue}>
-              {isOver ? `+${calConsumed - target.calories}` : remaining}
+              {isOver ? `+${calConsumed - effectiveCalorieTarget}` : remaining}
             </Text>
             <Text style={styles.donutLabel}>
               {isOver ? 'über' : 'kcal\nverfügbar'}
@@ -214,7 +219,10 @@ export function DayNutritionCard({ summary, target, onPress }: Props) {
         {/* Zahlen rechts */}
         <View style={styles.calInfo}>
           <Text style={styles.calConsumed}>{calConsumed} kcal</Text>
-          <Text style={styles.calTarget}>Ziel {target.calories} kcal</Text>
+          <Text style={styles.calTarget}>
+            Ziel {effectiveCalorieTarget} kcal
+            {bonus > 0 && <Text style={styles.bonusBadge}> +{bonus}</Text>}
+          </Text>
         </View>
       </View>
 
@@ -224,6 +232,15 @@ export function DayNutritionCard({ summary, target, onPress }: Props) {
       <MacroRow label="Kohlenhydrate" value={summary!.carbs} target={target.carbsG} color={colors.primary} />
       <MacroRow label="Fett" value={summary!.fat} target={target.fatG} color="#F59E0B" />
       <MacroRow label="Ballaststoffe" value={summary!.fiber} target={target.fiberG} color="#8B5CF6" />
+      {(activityBonus ?? 0) > 0 && (
+        <MacroRow
+          label="Aktivitätsbonus"
+          value={Math.max(0, calConsumed - target.calories)}
+          target={Math.round(activityBonus!)}
+          color={colors.primary}
+          unit="kcal"
+        />
+      )}
     </TouchableOpacity>
   );
 }
@@ -285,6 +302,10 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  bonusBadge: {
+    color: colors.primary,
+    fontWeight: '700' as const,
   },
   divider: {
     height: 1,
