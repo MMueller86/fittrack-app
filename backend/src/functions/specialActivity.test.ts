@@ -205,7 +205,7 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     const res = await setSpecialActivityHandler(
       await makeAuthRequest({
         params: { date: VALID_DATE },
-        body: { movementTimeMinutes: 60, distanceKm: 20, elevationGainM: 0, hasBackpack: false },
+        body: { type: 'hiking', movementTimeMinutes: 60, distanceKm: 20, elevationGainM: 0, hasBackpack: false },
       }),
       makeContext(),
     );
@@ -222,7 +222,7 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     const res = await setSpecialActivityHandler(
       await makeAuthRequest({
         params: { date: VALID_DATE },
-        body: { movementTimeMinutes: 30, distanceKm: 1, elevationGainM: 0, hasBackpack: false },
+        body: { type: 'hiking', movementTimeMinutes: 30, distanceKm: 1, elevationGainM: 0, hasBackpack: false },
       }),
       makeContext(),
     );
@@ -235,7 +235,7 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
   it('packCategory heavy liefert höheren Bonus als none', async () => {
     await createProfile();
 
-    const baseBody = { movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 1000, elevationLossM: 1000, terrainType: 'alpine' };
+    const baseBody = { type: 'hiking', movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 1000, elevationLossM: 1000, terrainType: 'alpine' };
 
     const resNone = await setSpecialActivityHandler(
       await makeAuthRequest({ params: { date: VALID_DATE }, body: { ...baseBody, packCategory: 'none' } }),
@@ -254,7 +254,7 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
   it('terrainType alpine liefert höheren Bonus als path', async () => {
     await createProfile();
 
-    const baseBody = { movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 1000, elevationLossM: 1000, packCategory: 'none' };
+    const baseBody = { type: 'hiking', movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 1000, elevationLossM: 1000, packCategory: 'none' };
 
     const resPath   = await setSpecialActivityHandler(
       await makeAuthRequest({ params: { date: VALID_DATE }, body: { ...baseBody, terrainType: 'path' } }),
@@ -276,7 +276,7 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     const res = await setSpecialActivityHandler(
       await makeAuthRequest({
         params: { date: VALID_DATE },
-        body: { movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 600, elevationLossM: 500, packCategory: 'none', terrainType: 'trail' },
+        body: { type: 'hiking', movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 600, elevationLossM: 500, packCategory: 'none', terrainType: 'trail' },
       }),
       makeContext(),
     );
@@ -308,7 +308,7 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     const res = await setSpecialActivityHandler(
       await makeAuthRequest({
         params: { date: VALID_DATE },
-        body: { movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 600, hasBackpack: true },
+        body: { type: 'hiking', movementTimeMinutes: 240, distanceKm: 12, elevationGainM: 600, hasBackpack: true },
       }),
       makeContext(),
     );
@@ -408,3 +408,142 @@ describe('DELETE /api/diary/day/{date}/special-activity', () => {
     expect(res.status).toBe(400);
   });
 });
+
+// ---------------------------------------------------------------------------
+// PUT /api/diary/day/{date}/special-activity — cycling tests (B12)
+// ---------------------------------------------------------------------------
+
+const VALID_CYCLING_BODY = {
+  type: 'cycling',
+  movementTimeMinutes: 120,
+  distanceKm: 40,
+  elevationGainM: 200,
+  elevationLossM: 100,
+  asphaltShare: 0.6,
+  gravelShare: 0.3,
+  trailShare: 0.1,
+  ebikeSupport: 'NONE',
+};
+
+describe('PUT /api/diary/day/{date}/special-activity — cycling', () => {
+  it('valid cycling input → 200, type=cycling', async () => {
+    await createProfile();
+
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE }, body: VALID_CYCLING_BODY }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { specialActivity: SpecialActivity; activityBonus: number };
+    expect(body.specialActivity.type).toBe('cycling');
+    expect(body.activityBonus).toBeGreaterThanOrEqual(0);
+  });
+
+  it('speed < 3 km/h → 422 (German message)', async () => {
+    await createProfile();
+
+    // 1 km in 120 min = 0.5 km/h
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({
+        params: { date: VALID_DATE },
+        body: { ...VALID_CYCLING_BODY, movementTimeMinutes: 120, distanceKm: 1 },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    const body = res.jsonBody as { error: string };
+    expect(body.error).toContain('Radfahrt');
+  });
+
+  it('speed > 80 km/h → 422', async () => {
+    await createProfile();
+
+    // 200 km in 120 min = 100 km/h
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({
+        params: { date: VALID_DATE },
+        body: { ...VALID_CYCLING_BODY, movementTimeMinutes: 120, distanceKm: 200 },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+  });
+
+  it('no body weight → 422', async () => {
+    // No profile, no weight entries
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE }, body: VALID_CYCLING_BODY }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    const body = res.jsonBody as { error: string };
+    expect(body.error).toContain('Körpergewicht');
+  });
+
+  it('ebikeSupport HIGH stored correctly in specialActivity', async () => {
+    await createProfile();
+
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({
+        params: { date: VALID_DATE },
+        body: { ...VALID_CYCLING_BODY, ebikeSupport: 'HIGH' },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { specialActivity: SpecialActivity };
+    expect((body.specialActivity as import('@fittrack/shared').CyclingSpecialActivity).ebikeSupport).toBe('HIGH');
+  });
+
+  it('terrain shares stored in response', async () => {
+    await createProfile();
+
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE }, body: VALID_CYCLING_BODY }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const activity = (res.jsonBody as { specialActivity: SpecialActivity }).specialActivity as import('@fittrack/shared').CyclingSpecialActivity;
+    expect(activity.asphaltShare).toBe(0.6);
+    expect(activity.gravelShare).toBe(0.3);
+    expect(activity.trailShare).toBe(0.1);
+  });
+
+  it('type hiking still works after cycling support added (no regression)', async () => {
+    await createProfile();
+
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE }, body: VALID_HIKING_BODY }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { specialActivity: SpecialActivity };
+    expect(body.specialActivity.type).toBe('hiking');
+  });
+
+  it('DELETE for cycling activity → 200', async () => {
+    await createProfile();
+
+    // First store a cycling activity
+    await setSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE }, body: VALID_CYCLING_BODY }),
+      makeContext(),
+    );
+
+    const res = await removeSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect((res.jsonBody as { success: boolean }).success).toBe(true);
+  });
+});
+

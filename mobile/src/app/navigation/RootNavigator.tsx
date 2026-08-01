@@ -11,6 +11,7 @@ import HomeScreen from '../../modules/home/HomeScreen';
 import ProgressScreen from '../../modules/progress/ProgressScreen';
 import DiaryScreen from '../../modules/nutrition/DiaryScreen';
 import HikingInputScreen from '../../modules/nutrition/HikingInputScreen';
+import CyclingInputScreen from '../../modules/nutrition/CyclingInputScreen';
 import RecipeListScreen from '../../modules/recipes/RecipeListScreen';
 import RecipeDetailScreen from '../../modules/recipes/RecipeDetailScreen';
 import RecipeCreateScreen from '../../modules/recipes/RecipeCreateScreen';
@@ -47,6 +48,7 @@ const navigationTheme = {
 export type HomeStackParamList = {
   HomeMain: undefined;
   HikingInput: { date: string; existing?: SpecialActivity };
+  CyclingInput: { date: string; existing?: SpecialActivity };
 };
 
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -61,6 +63,7 @@ function HomeStackNavigator() {
     >
       <HomeStack.Screen name="HomeMain" component={HomeScreen} />
       <HomeStack.Screen name="HikingInput" component={HikingInputScreen} />
+      <HomeStack.Screen name="CyclingInput" component={CyclingInputScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -95,6 +98,7 @@ function ProfileStackNavigator() {
 export type NutritionStackParamList = {
   DiaryMain: undefined;
   HikingInput: { date: string; existing?: SpecialActivity };
+  CyclingInput: { date: string; existing?: SpecialActivity };
 };
 
 const NutritionStack = createNativeStackNavigator<NutritionStackParamList>();
@@ -109,6 +113,7 @@ function NutritionStackNavigator() {
     >
       <NutritionStack.Screen name="DiaryMain" component={DiaryScreen} />
       <NutritionStack.Screen name="HikingInput" component={HikingInputScreen} />
+      <NutritionStack.Screen name="CyclingInput" component={CyclingInputScreen} />
     </NutritionStack.Navigator>
   );
 }

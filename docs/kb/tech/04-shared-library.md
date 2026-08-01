@@ -42,18 +42,26 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `NutritionLabelScanResult` — OCR + AI label extraction result
 - `PackCategory` — `'none' | 'small' | 'medium' | 'heavy'` — pack/backpack weight class for hiking
 - `TerrainType` — `'path' | 'trail' | 'alpine' | 'scramble'` — terrain difficulty class for hiking
-- `HikingActivityInputs` — inputs for activity bonus calculation:
+- `CyclingTerrainType` — `'asphalt' | 'gravel' | 'trail'` — dominant terrain type for cycling (maps to pure share presets)
+- `EbikeSupport` — `'NONE' | 'LIGHT' | 'HIGH'` — eBike motor assistance level
+- `HikingActivityInputs` — inputs for hiking activity bonus calculation:
   - `movementTimeMinutes`, `distanceKm`, `elevationGainM` — core fields
   - `elevationLossM?` — descent in metres (V3; defaults to 0 when absent)
   - `packCategory?: PackCategory` — replaces deprecated `hasBackpack?`
   - `terrainType?: TerrainType` — defaults to `'path'` when absent
   - `hasBackpack?: boolean` — **@deprecated** — mapped to `packCategory: 'medium'` for backward compatibility
-- `ActivityBonusResult` — result of activity bonus calculation:
-  - `estimatedMet`, `hikingCalories`, `alreadyAccountedCalories`, `activityBonus` — core outputs
-  - `metBase?` — flat-terrain walking MET derived from speed (V3 intermediate)
-  - `metLocomotion?` — MET after adding ascent/descent deltas (V3 intermediate)
-  - `terrainFactor?` — multiplicative terrain multiplier applied (V3 intermediate)
-  - `deltaPack?` — additive pack bonus applied after terrain multiplication (V3 intermediate)
+- `CyclingActivityInputs` — inputs for cycling activity bonus calculation:
+  - `movementTimeMinutes`, `distanceKm`, `elevationGainM` — core fields
+  - `elevationLossM?` — descent in metres; defaults to 0 when absent
+  - `asphaltShare`, `gravelShare`, `trailShare` — terrain mix as fractions 0.0–1.0; must sum to 1.0
+  - `ebikeSupport: EbikeSupport` — motor assistance level
+- `ActivityBonusResult` — result of activity bonus calculation (shared by hiking and cycling):
+  - `estimatedMet`, `activityCalories`, `alreadyAccountedCalories`, `activityBonus` — core outputs
+  - `metBase?`, `metLocomotion?`, `terrainFactor?`, `deltaPack?` — hiking V3 intermediates (optional)
+  - `speedMet?`, `uphillBonusMet?`, `terrainBonusMet?`, `effectiveSupport?` — cycling V1.1 intermediates (optional)
+- `HikingSpecialActivity` — `HikingActivityInputs & ActivityBonusResult & { type: 'hiking', bodyWeightKg, dailyCalorieTarget, calculatedAt }`
+- `CyclingSpecialActivity` — `CyclingActivityInputs & ActivityBonusResult & { type: 'cycling', bodyWeightKg, dailyCalorieTarget, calculatedAt }`
+- `SpecialActivity` — discriminated union: `HikingSpecialActivity | CyclingSpecialActivity`
 
 ### `recipes.ts`
 - `RecipeIngredient` — amount in grams, linked to food catalog or reusable item
@@ -115,8 +123,9 @@ All functions are pure (no I/O, no state).
 | `plateauDetector.ts` | `computePlateauSignal(entries)` | Std-dev plateau detection over 28-day window |
 | `recipeCalculator.ts` | `calculateRecipeNutrition(ingredients)` | Recipe totals + per-portion |
 | `activityBonusCalculator.ts` | `calculateActivityBonus(inputs, weightKg, dailyCalorieTarget)` | V3 piecewise-linear MET model for hiking; returns `ActivityBonusResult` including V3 intermediates |
+| `cyclingBonusCalculator.ts` | `calculateCyclingActivityBonus(inputs, weightKg, dailyCalorieTarget)` | `cycling-met-estimator@1.1.0` — speed + elevation + terrain + eBike MET model for cycling; 250 spec test cases |
 
-### `activityBonusCalculator.ts` — V3 Algorithm
+### `activityBonusCalculator.ts` — V3 Algorithm (Hiking)
 
 Implements a piecewise-linear MET model based on Ainsworth Compendium 2024, Pandolf et al. (1977), and Minetti et al. (2002).
 
@@ -130,8 +139,28 @@ Implements a piecewise-linear MET model based on Ainsworth Compendium 2024, Pand
 6. **Terrain** — `metLocomotion × terrainFactor` (`path=1.00`, `trail=1.35`, `alpine=1.45`, `scramble=1.60`).
 7. **Pack** — `deltaPack` added after terrain multiplication (`none=0.0`, `small=0.5`, `medium=1.0`, `heavy=1.5`).
 8. **`estimatedMet`** — clamped to `[2.0, 9.5]`.
-9. **`hikingCalories`** — `estimatedMet × weightKg × movementTimeH`.
-10. **`activityBonus`** — `max(0, hikingCalories − alreadyAccountedCalories)`, rounded to nearest 50 kcal. `alreadyAccountedCalories = dailyCalorieTarget × (movementTimeH / 24)`.
+9. **`activityCalories`** — `estimatedMet × weightKg × movementTimeH`.
+10. **`activityBonus`** — `max(0, activityCalories − alreadyAccountedCalories)`, rounded to nearest 50 kcal. `alreadyAccountedCalories = dailyCalorieTarget × (movementTimeH / 24)`.
+
+### `cyclingBonusCalculator.ts` — V1.1 Algorithm (Cycling)
+
+Implements the `cycling-met-estimator@1.1.0` model. Spec source: `docs/kb/Specs/specialActivityBike/`. 250 test cases, all verified.
+
+**Inputs:** `distanceKm`, `movementTimeMinutes`, `elevationGainM`, `elevationLossM?`, `asphaltShare`, `gravelShare`, `trailShare`, `ebikeSupport`.
+
+**Key formula chain:**
+1. `averageSpeedKmh = distanceKm / (movementTimeMinutes / 60)`
+2. `speedMet` — piecewise interpolation from speed lookup table (floor 2.3 at 0 km/h, peaks at 35 km/h)
+3. `uphillBonusMet` — piecewise interpolation from elevation rate lookup table
+4. `terrainBonusMet = asphaltShare×0 + gravelShare×0.5 + trailShare×1.5`
+5. `gravityFactor` — reduces speed contribution when descent dominates
+6. `effectiveSupport` — eBike reduction: `supportReduction × speedMotorFactor × downhillMotorFactor` (0.0 for NONE, up to 0.75 for HIGH at low speeds)
+7. `finalMetRaw = speedMetWithMotor + uphillBonusWithMotor + terrainBonusMet`
+8. `estimatedMet = roundHalfUp(finalMetRaw, 1)`
+9. `activityCalories = finalMetRaw × weightKg × movingTimeHours` (uses unrounded MET)
+10. `activityBonus = max(0, activityCalories − normalCalories)`, rounded to nearest 50 kcal
+
+**eBike support levels:** NONE=0%, LIGHT=35% speed / 40% uphill reduction, HIGH=75% / 75%.
 
 ## Import Pattern for Backend
 

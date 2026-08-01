@@ -78,6 +78,14 @@ function metIntensityLabel(met: number): string {
   return 'sehr anstrengendem Bergwandern im alpinen Gelände';
 }
 
+function cyclingMetIntensityLabel(met: number): string {
+  if (met < 4.0) return 'sehr ruhigem Radfahren';
+  if (met < 6.0) return 'gemäßigtem Radfahren';
+  if (met < 8.0) return 'flottem Radfahren';
+  if (met < 10.0) return 'schnellem Radfahren';
+  return 'sehr intensivem Radfahren';
+}
+
 // ─── Props ───────────────────────────────────────────────────────────────────
 
 export interface ActivityBonusSheetProps {
@@ -137,20 +145,34 @@ export function ActivityBonusSheet({ visible, onClose, activity }: ActivityBonus
     subtitleParts.push(`\u2191 ${activity.elevationGainM} hm`);
   if (activity.elevationLossM != null && activity.elevationLossM > 0)
     subtitleParts.push(`\u2193 ${activity.elevationLossM} hm`);
-  const TERRAIN_LABELS: Record<string, string> = {
-    trail: 'Wanderweg',
-    alpine: 'Alpin',
-    scramble: 'Klettersteig',
-  };
-  if (activity.terrainType && TERRAIN_LABELS[activity.terrainType])
-    subtitleParts.push(TERRAIN_LABELS[activity.terrainType]);
-  const PACK_LABELS: Record<string, string> = {
-    small: 'Rucksack (klein)',
-    medium: 'Rucksack (mittel)',
-    heavy: 'Rucksack (schwer)',
-  };
-  if (activity.packCategory && activity.packCategory !== 'none' && PACK_LABELS[activity.packCategory])
-    subtitleParts.push(PACK_LABELS[activity.packCategory]);
+  if (activity.type === 'hiking') {
+    const TERRAIN_LABELS: Record<string, string> = {
+      trail: 'Wanderweg',
+      alpine: 'Alpin',
+      scramble: 'Klettersteig',
+    };
+    if (activity.terrainType && TERRAIN_LABELS[activity.terrainType])
+      subtitleParts.push(TERRAIN_LABELS[activity.terrainType]);
+    const PACK_LABELS: Record<string, string> = {
+      small: 'Rucksack (klein)',
+      medium: 'Rucksack (mittel)',
+      heavy: 'Rucksack (schwer)',
+    };
+    if (activity.packCategory && activity.packCategory !== 'none' && PACK_LABELS[activity.packCategory])
+      subtitleParts.push(PACK_LABELS[activity.packCategory]);
+  }
+  if (activity.type === 'cycling') {
+    const EBIKE_LABELS: Record<string, string> = {
+      LIGHT: 'eBike leicht',
+      HIGH: 'eBike stark',
+    };
+    if (activity.ebikeSupport !== 'NONE' && EBIKE_LABELS[activity.ebikeSupport])
+      subtitleParts.push(EBIKE_LABELS[activity.ebikeSupport]);
+    if (activity.trailShare >= 0.5)
+      subtitleParts.push('Trail');
+    else if (activity.gravelShare >= 0.5)
+      subtitleParts.push('Schotter');
+  }
   const subtitle = subtitleParts.join(' \u00b7 ');
 
   // Energy bar fraction
@@ -160,7 +182,7 @@ export function ActivityBonusSheet({ visible, onClose, activity }: ActivityBonus
   );
 
   // Calculation card data
-  const hikingCalRounded = Math.round(activity.hikingCalories);
+  const hikingCalRounded = Math.round(activity.activityCalories);
   const alreadyAccountedRounded = Math.round(activity.alreadyAccountedCalories);
   const durationHours = (activity.movementTimeMinutes / 60).toFixed(1).replace('.0', '');
   const metEquation = `MET ${activity.estimatedMet.toFixed(1)} × ${activity.bodyWeightKg} kg × ${durationHours} h`;
@@ -248,7 +270,9 @@ export function ActivityBonusSheet({ visible, onClose, activity }: ActivityBonus
               <View style={styles.calcRow}>
                 <View style={styles.calcRowLeft}>
                   <View style={styles.calcRowTitleRow}>
-                    <Text style={styles.calcRowLabel}>Wanderverbrauch</Text>
+                    <Text style={styles.calcRowLabel}>
+                    {activity.type === 'cycling' ? 'Fahrverbrauch' : 'Wanderverbrauch'}
+                  </Text>
                     <View style={styles.metBadge}>
                       <Text style={styles.metBadgeText}>MET {activity.estimatedMet.toFixed(1)}</Text>
                     </View>
@@ -288,8 +312,48 @@ export function ActivityBonusSheet({ visible, onClose, activity }: ActivityBonus
               </View>
             </View>
 
-            {/* ⑤ MET Breakdown Card (V3 — only when metBase is available) */}
-            {activity.metBase != null && (
+            {/* ⑤ MET Breakdown Card — cycling (V1.1) */}
+            {activity.type === 'cycling' && activity.speedMet != null && (
+              <View style={styles.metBreakdownCard}>
+                <Text style={styles.metBreakdownTitle}>MET-Schätzung</Text>
+                <View style={styles.metBreakdownRow}>
+                  <Text style={styles.metBreakdownLabel}>Grundtempo</Text>
+                  <Text style={styles.metBreakdownValue}>{activity.speedMet.toFixed(1)}</Text>
+                </View>
+                {activity.uphillBonusMet != null && activity.uphillBonusMet > 0 && (
+                  <View style={styles.metBreakdownRow}>
+                    <Text style={styles.metBreakdownLabel}>+ Anstieg</Text>
+                    <Text style={styles.metBreakdownValue}>+{activity.uphillBonusMet.toFixed(1)}</Text>
+                  </View>
+                )}
+                {activity.terrainBonusMet != null && activity.terrainBonusMet > 0 && (
+                  <View style={styles.metBreakdownRow}>
+                    <Text style={styles.metBreakdownLabel}>+ Untergrund</Text>
+                    <Text style={styles.metBreakdownValue}>+{activity.terrainBonusMet.toFixed(1)}</Text>
+                  </View>
+                )}
+                {activity.effectiveSupport != null && activity.effectiveSupport > 0 && (
+                  <View style={styles.metBreakdownRow}>
+                    <Text style={styles.metBreakdownLabel}>
+                      {`eBike-Reduktion (\u2212${Math.round(activity.effectiveSupport * 100)} %)`}
+                    </Text>
+                    <Text style={styles.metBreakdownValue}>
+                      \u2212{((activity.speedMet - 2.3) * activity.effectiveSupport).toFixed(1)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.metBreakdownDivider} />
+                <View style={styles.metBreakdownRow}>
+                  <Text style={[styles.metBreakdownLabel, styles.metBreakdownLabelTotal]}>= MET gesamt</Text>
+                  <Text style={[styles.metBreakdownValue, styles.metBreakdownValueTotal]}>
+                    {activity.estimatedMet.toFixed(1)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* ⑤ MET Breakdown Card — hiking (V3 — only when metBase is available) */}
+            {activity.type !== 'cycling' && activity.metBase != null && (
               <View style={styles.metBreakdownCard}>
                 <Text style={styles.metBreakdownTitle}>MET-Schätzung</Text>
                 <View style={styles.metBreakdownRow}>
@@ -341,12 +405,16 @@ export function ActivityBonusSheet({ visible, onClose, activity }: ActivityBonus
               <Text style={styles.infoText}>
                 Das MET-Verfahren (Metabolic Equivalent of Task) ist die wissenschaftliche
                 Standardmethode zur Energieverbrauchsschätzung. Ein MET-Wert von{' '}
-                {activity.estimatedMet.toFixed(1)} entspricht{' '}{metIntensityLabel(activity.estimatedMet)}.
+                {activity.estimatedMet.toFixed(1)} entspricht{' '}
+                {activity.type === 'cycling'
+                  ? cyclingMetIntensityLabel(activity.estimatedMet)
+                  : metIntensityLabel(activity.estimatedMet)}.
               </Text>
               <Text style={[styles.infoText, { marginTop: spacing.sm }]}>
                 Dein Tagesziel deckt deinen Energiebedarf für den gesamten Tag ab – einschließlich
-                der Wanderzeit. Wir ziehen den zeitanteiligen Anteil des Tagesziels ab, damit
-                dieser Zeitraum nicht doppelt gezählt wird.
+                der {activity.type === 'cycling' ? 'Fahrzeit' : 'Wanderzeit'}. Wir ziehen den
+                zeitanteiligen Anteil des Tagesziels ab, damit dieser Zeitraum nicht doppelt
+                gezählt wird.
               </Text>
             </View>
 

@@ -1,0 +1,62 @@
+schemaVersion: '1.1'
+model:
+  id: cycling-met-estimator
+  version: 1.1.0
+  purpose: Fachliche, deterministische Schätzung für FitTrack; keine Runtime-Spezifikation.
+  changes:
+  - Untere Geschwindigkeitsskala von 0 bis 16 km/h ergänzt.
+  - Mischuntergrund- und Grenzwerttests ergänzt.
+  - Bestehende Referenzwerte ab 16 km/h bleiben unverändert.
+units:
+  distanceKm: km
+  movingTimeHours: h
+  uphillMeters: m
+  downhillMeters: m
+  averageSpeedKmh: km/h
+  elevationRate: m/h
+  terrainShare: fraction
+  met: MET
+  bodyWeightKg: kg
+  tdeeKcalPerDay: kcal/day
+  calories: kcal
+requiredInputs:
+  distanceKm: number >= 0
+  movingTimeHours: number > 0
+  uphillMeters: number >= 0
+  downhillMeters: number >= 0
+  terrain:
+    asphaltShare: 0..1
+    gravelShare: 0..1
+    trailShare: 0..1
+    sum: '1.0'
+  ebikeSupport:
+  - NONE
+  - LIGHT
+  - HIGH
+optionalInputs:
+  bodyWeightKg: number > 0; erforderlich für activityCalories
+  tdeeKcalPerDay: number > 0; erforderlich für normalCalories und extraCalories
+calculationOrder:
+- averageSpeedKmh
+- uphillMetersPerHour
+- downhillMetersPerHour
+- speedMet
+- uphillBonusMet
+- terrainBonusMet
+- elevationTotalMeters
+- downhillRatio
+- gravityFactor
+- profileSpeedMet
+- downhillDominance
+- downhillMotorFactor
+- speedMotorFactor
+- supportReduction
+- uphillReduction
+- effectiveSupport
+- speedMetWithMotor
+- uphillBonusWithMotor
+- finalMetRaw
+- finalMetDisplayed
+- activityCalories
+- normalCalories
+- extraCalories

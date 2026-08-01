@@ -18,6 +18,7 @@ export * from './lib/profileCalculator';
 export * from './lib/goalContext';
 export * from './lib/plateauDetector';
 export * from './lib/activityBonusCalculator';
+export * from './lib/cyclingBonusCalculator';
 export * from './types/foodCategory';
 export * from './types/hint';
 export * from './types/userFoodRelation';

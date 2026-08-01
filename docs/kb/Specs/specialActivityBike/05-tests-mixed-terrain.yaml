@@ -1,0 +1,202 @@
+schemaVersion: '1.1'
+modelRef: cycling-met-estimator@1.1.0
+assertion: abs(actual.finalMetDisplayed - expected) <= 0.05
+terrainInputMapping:
+  MIX_ASPHALT_GRAVEL_50_50:
+    asphaltShare: 0.5
+    gravelShare: 0.5
+    trailShare: 0.0
+  MIX_GRAVEL_TRAIL_50_50:
+    asphaltShare: 0.0
+    gravelShare: 0.5
+    trailShare: 0.5
+  MIX_ALL_33_33_34:
+    asphaltShare: 0.33
+    gravelShare: 0.33
+    trailShare: 0.34
+terrainBonuses:
+  MIX_ASPHALT_GRAVEL_50_50: 0.25
+  MIX_GRAVEL_TRAIL_50_50: 1.0
+  MIX_ALL_33_33_34: 0.675
+profiles:
+- id: P1
+  description: Flache, langsame Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 32.0
+    uphillMeters: 0
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 4.3
+      LIGHT: 3.7
+      HIGH: 3.0
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 5.0
+      LIGHT: 4.4
+      HIGH: 3.7
+    MIX_ALL_33_33_34:
+      NONE: 4.7
+      LIGHT: 4.1
+      HIGH: 3.4
+- id: P2
+  description: Flache Fahrt mit 20 km/h
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 0
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 8.3
+      LIGHT: 6.3
+      HIGH: 4.0
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 9.0
+      LIGHT: 7.0
+      HIGH: 4.7
+    MIX_ALL_33_33_34:
+      NONE: 8.7
+      LIGHT: 6.7
+      HIGH: 4.4
+- id: P3
+  description: Schnelle, flache Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 51.4
+    uphillMeters: 0
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 10.3
+      LIGHT: 8.9
+      HIGH: 7.4
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 11.0
+      LIGHT: 9.7
+      HIGH: 8.2
+    MIX_ALL_33_33_34:
+      NONE: 10.7
+      LIGHT: 9.4
+      HIGH: 7.8
+- id: P4
+  description: Moderater Anstieg
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 400
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 9.8
+      LIGHT: 7.2
+      HIGH: 4.4
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 10.5
+      LIGHT: 7.9
+      HIGH: 5.1
+    MIX_ALL_33_33_34:
+      NONE: 10.2
+      LIGHT: 7.6
+      HIGH: 4.8
+- id: P5
+  description: Starker Anstieg
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 1200
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 13.3
+      LIGHT: 9.3
+      HIGH: 5.2
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 14.0
+      LIGHT: 10.0
+      HIGH: 6.0
+    MIX_ALL_33_33_34:
+      NONE: 13.7
+      LIGHT: 9.7
+      HIGH: 5.6
+- id: P6
+  description: Ausgeglichenes Profil mit moderaten Höhenmetern
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 600
+    downhillMeters: 600
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 9.2
+      LIGHT: 6.8
+      HIGH: 4.2
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 10.0
+      LIGHT: 7.5
+      HIGH: 5.0
+    MIX_ALL_33_33_34:
+      NONE: 9.7
+      LIGHT: 7.2
+      HIGH: 4.6
+- id: P7
+  description: Ausgeglichenes Profil mit vielen Höhenmetern
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 1200
+    downhillMeters: 1200
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 11.5
+      LIGHT: 8.1
+      HIGH: 4.8
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 12.2
+      LIGHT: 8.8
+      HIGH: 5.5
+    MIX_ALL_33_33_34:
+      NONE: 11.9
+      LIGHT: 8.5
+      HIGH: 5.2
+- id: P8
+  description: Stark abfahrtsdominierte Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 0
+    downhillMeters: 1000
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 4.9
+      LIGHT: 4.7
+      HIGH: 4.5
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 5.6
+      LIGHT: 5.4
+      HIGH: 5.2
+    MIX_ALL_33_33_34:
+      NONE: 5.3
+      LIGHT: 5.1
+      HIGH: 4.9
+- id: P9
+  description: Sehr stark abfahrtsdominierte Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 0
+    downhillMeters: 1500
+  expectedFinalMetDisplayed:
+    MIX_ASPHALT_GRAVEL_50_50:
+      NONE: 4.4
+      LIGHT: 4.2
+      HIGH: 4.0
+    MIX_GRAVEL_TRAIL_50_50:
+      NONE: 5.1
+      LIGHT: 5.0
+      HIGH: 4.8
+    MIX_ALL_33_33_34:
+      NONE: 4.8
+      LIGHT: 4.6
+      HIGH: 4.4
+expectedTestCount: 81

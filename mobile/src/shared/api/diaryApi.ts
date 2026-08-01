@@ -97,16 +97,28 @@ export const diaryApi = {
   /** PUT /api/diary/day/:date/special-activity */
   setSpecialActivity(
     date: string,
-    input: {
-      type: 'hiking';
-      movementTimeMinutes: number;
-      distanceKm: number;
-      elevationGainM: number;
-      elevationLossM?: number;
-      packCategory?: import('@fittrack/shared').PackCategory;
-      terrainType?: import('@fittrack/shared').TerrainType;
-      hasBackpack?: boolean;
-    },
+    input:
+      | {
+          type: 'hiking';
+          movementTimeMinutes: number;
+          distanceKm: number;
+          elevationGainM: number;
+          elevationLossM?: number;
+          packCategory?: import('@fittrack/shared').PackCategory;
+          terrainType?: import('@fittrack/shared').TerrainType;
+          hasBackpack?: boolean;
+        }
+      | {
+          type: 'cycling';
+          movementTimeMinutes: number;
+          distanceKm: number;
+          elevationGainM: number;
+          elevationLossM?: number;
+          asphaltShare: number;
+          gravelShare: number;
+          trailShare: number;
+          ebikeSupport: import('@fittrack/shared').EbikeSupport;
+        },
   ): Promise<{ specialActivity: SpecialActivity; activityBonus: number; effectiveCalorieTarget: number }> {
     return apiClient
       .put<{ specialActivity: SpecialActivity; activityBonus: number; effectiveCalorieTarget: number }>(

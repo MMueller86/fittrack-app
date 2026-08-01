@@ -1,0 +1,37 @@
+schemaVersion: '1.1'
+modelRef: cycling-met-estimator@1.1.0
+formulas:
+  averageSpeedKmh: distanceKm / movingTimeHours
+  uphillMetersPerHour: uphillMeters / movingTimeHours
+  downhillMetersPerHour: downhillMeters / movingTimeHours
+  speedMet: interpolate(lookupTables.speedMet, averageSpeedKmh)
+  uphillBonusMet: interpolate(lookupTables.uphillBonusMet, uphillMetersPerHour)
+  terrainBonusMet: terrain.asphaltShare * lookupTables.terrainBonusMet.ASPHALT + terrain.gravelShare *
+    lookupTables.terrainBonusMet.GRAVEL + terrain.trailShare * lookupTables.terrainBonusMet.TRAIL
+  elevationTotalMeters: uphillMeters + downhillMeters
+  downhillRatio: if(elevationTotalMeters == 0, 0, downhillMeters / elevationTotalMeters)
+  gravityFactor: 1 - downhillRatio * (1 - 1 / (1 + downhillMetersPerHour / constants.gravityScaleMetersPerHour))
+  profileSpeedMet: constants.activityFloorMet + (speedMet - constants.activityFloorMet) * gravityFactor
+  downhillDominance: if(elevationTotalMeters == 0, 0, max(0, (downhillMeters - uphillMeters) / elevationTotalMeters))
+  downhillMotorFactor: 1 - constants.downhillMotorReductionCoefficient * downhillDominance
+  speedMotorFactor: interpolate(lookupTables.speedMotorFactor, averageSpeedKmh)
+  supportReduction: lookupTables.supportReduction[ebikeSupport]
+  uphillReduction: lookupTables.uphillReduction[ebikeSupport]
+  effectiveSupport: supportReduction * speedMotorFactor * downhillMotorFactor
+  speedMetWithMotor: constants.activityFloorMet + (profileSpeedMet - constants.activityFloorMet) * (1
+    - effectiveSupport)
+  uphillBonusWithMotor: uphillBonusMet * (1 - uphillReduction)
+  finalMetRaw: speedMetWithMotor + uphillBonusWithMotor + terrainBonusMet
+  finalMetDisplayed: roundHalfUp(finalMetRaw, 1)
+  activityCalories: finalMetRaw * bodyWeightKg * movingTimeHours
+  normalCalories: tdeeKcalPerDay * (movingTimeHours / 24)
+  extraCalories: max(0, activityCalories - normalCalories)
+rounding:
+  intermediateValues: NO_ROUNDING
+  finalMetDisplayed:
+    decimals: 1
+    mode: HALF_UP
+  displayedCalories:
+    decimals: 0
+    mode: HALF_UP
+  calorieCalculationUses: finalMetRaw

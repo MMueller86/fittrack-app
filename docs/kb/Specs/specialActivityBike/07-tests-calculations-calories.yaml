@@ -1,0 +1,203 @@
+schemaVersion: '1.1'
+modelRef: cycling-met-estimator@1.1.0
+intermediateCalculationTests:
+- id: C1
+  description: Flat 20 km/h, asphalt, no support
+  input:
+    distanceKm: 40
+    movingTimeHours: 2
+    uphillMeters: 0
+    downhillMeters: 0
+    terrain: &id001
+      asphaltShare: 1.0
+      gravelShare: 0.0
+      trailShare: 0.0
+    ebikeSupport: NONE
+  expected:
+    averageSpeedKmh: 20.0
+    uphillMetersPerHour: 0.0
+    downhillMetersPerHour: 0.0
+    speedMet: 8.0
+    uphillBonusMet: 0.0
+    terrainBonusMet: 0.0
+    downhillRatio: 0
+    gravityFactor: 1.0
+    profileSpeedMet: 8.0
+    downhillDominance: 0
+    downhillMotorFactor: 1.0
+    speedMotorFactor: 1.0
+    effectiveSupport: 0.0
+    speedMetWithMotor: 8.0
+    uphillBonusWithMotor: 0.0
+    finalMetRaw: 8.0
+    finalMetDisplayed: 8.0
+- id: C2
+  description: Flat 20 km/h, asphalt, high support
+  input:
+    distanceKm: 40
+    movingTimeHours: 2
+    uphillMeters: 0
+    downhillMeters: 0
+    terrain: *id001
+    ebikeSupport: HIGH
+  expected:
+    averageSpeedKmh: 20.0
+    uphillMetersPerHour: 0.0
+    downhillMetersPerHour: 0.0
+    speedMet: 8.0
+    uphillBonusMet: 0.0
+    terrainBonusMet: 0.0
+    downhillRatio: 0
+    gravityFactor: 1.0
+    profileSpeedMet: 8.0
+    downhillDominance: 0
+    downhillMotorFactor: 1.0
+    speedMotorFactor: 1.0
+    effectiveSupport: 0.75
+    speedMetWithMotor: 3.725
+    uphillBonusWithMotor: 0.0
+    finalMetRaw: 3.725
+    finalMetDisplayed: 3.7
+- id: C3
+  description: Mixed climb/descent, mixed terrain, light support
+  input:
+    distanceKm: 40
+    movingTimeHours: 2
+    uphillMeters: 600
+    downhillMeters: 600
+    terrain: &id002
+      asphaltShare: 0.33
+      gravelShare: 0.33
+      trailShare: 0.34
+    ebikeSupport: LIGHT
+  expected:
+    averageSpeedKmh: 20.0
+    uphillMetersPerHour: 300.0
+    downhillMetersPerHour: 300.0
+    speedMet: 8.0
+    uphillBonusMet: 2.3
+    terrainBonusMet: 0.675
+    downhillRatio: 0.5
+    gravityFactor: 0.769231
+    profileSpeedMet: 6.684615
+    downhillDominance: 0
+    downhillMotorFactor: 1.0
+    speedMotorFactor: 1.0
+    effectiveSupport: 0.35
+    speedMetWithMotor: 5.15
+    uphillBonusWithMotor: 1.38
+    finalMetRaw: 7.205
+    finalMetDisplayed: 7.2
+- id: C4
+  description: Strong descent, trail, high support
+  input:
+    distanceKm: 40
+    movingTimeHours: 2
+    uphillMeters: 0
+    downhillMeters: 1000
+    terrain:
+      asphaltShare: 0.0
+      gravelShare: 0.0
+      trailShare: 1.0
+    ebikeSupport: HIGH
+  expected:
+    averageSpeedKmh: 20.0
+    uphillMetersPerHour: 0.0
+    downhillMetersPerHour: 500.0
+    speedMet: 8.0
+    uphillBonusMet: 0.0
+    terrainBonusMet: 1.5
+    downhillRatio: 1.0
+    gravityFactor: 0.411765
+    profileSpeedMet: 4.647059
+    downhillDominance: 1.0
+    downhillMotorFactor: 0.25
+    speedMotorFactor: 1.0
+    effectiveSupport: 0.1875
+    speedMetWithMotor: 4.206985
+    uphillBonusWithMotor: 0.0
+    finalMetRaw: 5.706985
+    finalMetDisplayed: 5.7
+- id: C5
+  description: Low-speed ride, asphalt, none
+  input:
+    distanceKm: 16
+    movingTimeHours: 2
+    uphillMeters: 0
+    downhillMeters: 0
+    terrain: *id001
+    ebikeSupport: NONE
+  expected:
+    averageSpeedKmh: 8.0
+    uphillMetersPerHour: 0.0
+    downhillMetersPerHour: 0.0
+    speedMet: 3.0
+    uphillBonusMet: 0.0
+    terrainBonusMet: 0.0
+    downhillRatio: 0
+    gravityFactor: 1.0
+    profileSpeedMet: 3.0
+    downhillDominance: 0
+    downhillMotorFactor: 1.0
+    speedMotorFactor: 1.0
+    effectiveSupport: 0.0
+    speedMetWithMotor: 3.0
+    uphillBonusWithMotor: 0.0
+    finalMetRaw: 3.0
+    finalMetDisplayed: 3.0
+calorieTests:
+- id: K1
+  input:
+    distanceKm: 40
+    movingTimeHours: 2
+    uphillMeters: 0
+    downhillMeters: 0
+    terrain: *id001
+    ebikeSupport: NONE
+    bodyWeightKg: 83
+    tdeeKcalPerDay: 2400
+  expected:
+    finalMetRaw: 8.0
+    activityCaloriesRaw: 1328.0
+    activityCaloriesDisplayed: 1328.0
+    normalCaloriesRaw: 200.0
+    normalCaloriesDisplayed: 200.0
+    extraCaloriesRaw: 1128.0
+    extraCaloriesDisplayed: 1128.0
+- id: K2
+  input:
+    distanceKm: 40
+    movingTimeHours: 2
+    uphillMeters: 600
+    downhillMeters: 600
+    terrain: *id002
+    ebikeSupport: LIGHT
+    bodyWeightKg: 83
+    tdeeKcalPerDay: 2400
+  expected:
+    finalMetRaw: 7.205
+    activityCaloriesRaw: 1196.03
+    activityCaloriesDisplayed: 1196.0
+    normalCaloriesRaw: 200.0
+    normalCaloriesDisplayed: 200.0
+    extraCaloriesRaw: 996.03
+    extraCaloriesDisplayed: 996.0
+- id: K3
+  input:
+    distanceKm: 16
+    movingTimeHours: 2
+    uphillMeters: 0
+    downhillMeters: 0
+    terrain: *id001
+    ebikeSupport: HIGH
+    bodyWeightKg: 83
+    tdeeKcalPerDay: 2400
+  expected:
+    finalMetRaw: 2.475
+    activityCaloriesRaw: 410.85
+    activityCaloriesDisplayed: 411.0
+    normalCaloriesRaw: 200.0
+    normalCaloriesDisplayed: 200.0
+    extraCaloriesRaw: 210.85
+    extraCaloriesDisplayed: 211.0
+expectedTestCount: 8

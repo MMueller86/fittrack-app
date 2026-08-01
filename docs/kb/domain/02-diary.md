@@ -54,20 +54,22 @@ The diary GET endpoint assembles `DayMeta` and selects the correct `DayTargets` 
 
 ## Special Activity
 
-A **special activity** represents a single high-intensity physical effort (currently: hiking) that meaningfully exceeds the activity level already baked into the user's daily calorie target.
+A **special activity** represents a single high-intensity physical effort (hiking or cycling) that meaningfully exceeds the activity level already baked into the user's daily calorie target.
+
+`SpecialActivity` is a discriminated union: `HikingSpecialActivity | CyclingSpecialActivity`. The `type` field determines which input fields and intermediates are present.
 
 ### Activity Bonus
 
 The **activity bonus** is extra calories added on top of the base daily target for the day on which the activity occurred.
 
-Formula: `activityBonus = max(0, hikingCalories − alreadyAccountedCalories)`, rounded to the nearest 50 kcal.
+Formula: `activityBonus = max(0, activityCalories − alreadyAccountedCalories)`, rounded to the nearest 50 kcal.
 
-- `hikingCalories` — estimated energy expenditure: `estimatedMet × weightKg × movementTimeH`
+- `activityCalories` — estimated energy expenditure: `estimatedMet × weightKg × movementTimeH`
 - `alreadyAccountedCalories` — the fraction of the base target that already covers the movement window: `dailyCalorieTarget × (movementTimeH / 24)`
 
 The hint engine uses `dailyCalorieTarget + activityBonus` as the effective calorie target for the day, so hints that compare logged calories against targets remain accurate.
 
-### Hiking Inputs
+### Hiking Inputs (`type: 'hiking'`)
 
 | Field | Type | Notes |
 |---|---|---|
@@ -75,18 +77,40 @@ The hint engine uses `dailyCalorieTarget + activityBonus` as the effective calor
 | `distanceKm` | `number` | Horizontal distance |
 | `elevationGainM` | `number` | Total ascent in metres |
 | `elevationLossM?` | `number` | Total descent in metres; defaults to 0 |
-| `packCategory?` | `PackCategory` | `'none'` / `'small'` / `'medium'` / `'heavy'`; defaults to `'none'` |
-| `terrainType?` | `TerrainType` | `'path'` / `'trail'` / `'alpine'` / `'scramble'`; defaults to `'path'` |
+| `packCategory?` | `PackCategory` | `'none'` / `'small'` / `'medium'` / `'heavy'`; defaults to `'none'` when absent |
+| `terrainType?` | `TerrainType` | `'path'` / `'trail'` / `'alpine'` / `'scramble'`; defaults to `'path'` when absent |
 | `hasBackpack?` | `boolean` | **Deprecated** — maps to `packCategory: 'medium'` when true |
+
+### Cycling Inputs (`type: 'cycling'`)
+
+| Field | Type | Notes |
+|---|---|---|
+| `movementTimeMinutes` | `number` | Net moving time; 15–1200 |
+| `distanceKm` | `number` | Horizontal distance; 1–200 |
+| `elevationGainM` | `number` | Total ascent in metres; 0–8000 |
+| `elevationLossM?` | `number` | Total descent in metres; defaults to 0 |
+| `asphaltShare` | `number` | Fraction of route on asphalt; 0.0–1.0 |
+| `gravelShare` | `number` | Fraction of route on gravel/dirt; 0.0–1.0 |
+| `trailShare` | `number` | Fraction of route on trail/path; 0.0–1.0 |
+| `ebikeSupport` | `EbikeSupport` | `'NONE'` / `'LIGHT'` / `'HIGH'`; reduces effective MET |
+
+The three terrain shares must sum to 1.0. Speed plausibility: 3–80 km/h; outside this range → 422.
 
 ### ActivityBonusResult Fields
 
-In addition to `activityBonus`, the calculation returns V3 intermediates for display in the mobile breakdown sheet:
+In addition to `activityBonus`, the calculation returns intermediates for display in the mobile breakdown sheet:
 
+**Hiking intermediates (V3):**
 - `metBase` — flat-terrain walking MET derived from speed
 - `metLocomotion` — MET after adding ascent/descent deltas
 - `terrainFactor` — multiplicative terrain multiplier applied
 - `deltaPack` — additive pack bonus applied after terrain multiplication
+
+**Cycling intermediates (V1.1):**
+- `speedMet` — base MET from average speed (lookup table)
+- `uphillBonusMet` — MET bonus from elevation rate (lookup table)
+- `terrainBonusMet` — MET bonus from terrain mix (ASPHALT=0, GRAVEL=0.5, TRAIL=1.5 per share)
+- `effectiveSupport` — combined eBike reduction factor (0.0 when `ebikeSupport: 'NONE'`)
 
 ## Day Summary
 

@@ -1,0 +1,354 @@
+schemaVersion: '1.1'
+modelRef: cycling-met-estimator@1.1.0
+speedInterpolationTests:
+- speedKmh: 0
+  expectedSpeedMet: 2.3
+  expectedFinalMetDisplayed: 2.3
+- speedKmh: 2
+  expectedSpeedMet: 2.4
+  expectedFinalMetDisplayed: 2.4
+- speedKmh: 4
+  expectedSpeedMet: 2.5
+  expectedFinalMetDisplayed: 2.5
+- speedKmh: 6
+  expectedSpeedMet: 2.75
+  expectedFinalMetDisplayed: 2.8
+- speedKmh: 8
+  expectedSpeedMet: 3.0
+  expectedFinalMetDisplayed: 3.0
+- speedKmh: 10
+  expectedSpeedMet: 3.25
+  expectedFinalMetDisplayed: 3.3
+- speedKmh: 12
+  expectedSpeedMet: 3.5
+  expectedFinalMetDisplayed: 3.5
+- speedKmh: 14
+  expectedSpeedMet: 3.75
+  expectedFinalMetDisplayed: 3.8
+- speedKmh: 15.9
+  expectedSpeedMet: 3.9875
+  expectedFinalMetDisplayed: 4.0
+- speedKmh: 16
+  expectedSpeedMet: 4.0
+  expectedFinalMetDisplayed: 4.0
+- speedKmh: 17
+  expectedSpeedMet: 4.875
+  expectedFinalMetDisplayed: 4.9
+- speedKmh: 18
+  expectedSpeedMet: 5.75
+  expectedFinalMetDisplayed: 5.8
+- speedKmh: 19.2
+  expectedSpeedMet: 6.8
+  expectedFinalMetDisplayed: 6.8
+- speedKmh: 19.6
+  expectedSpeedMet: 7.4
+  expectedFinalMetDisplayed: 7.4
+- speedKmh: 20
+  expectedSpeedMet: 8.0
+  expectedFinalMetDisplayed: 8.0
+- speedKmh: 21
+  expectedSpeedMet: 8.0
+  expectedFinalMetDisplayed: 8.0
+- speedKmh: 22.4
+  expectedSpeedMet: 8.0
+  expectedFinalMetDisplayed: 8.0
+- speedKmh: 23
+  expectedSpeedMet: 8.375
+  expectedFinalMetDisplayed: 8.4
+- speedKmh: 24
+  expectedSpeedMet: 9.0
+  expectedFinalMetDisplayed: 9.0
+- speedKmh: 25
+  expectedSpeedMet: 9.625
+  expectedFinalMetDisplayed: 9.6
+- speedKmh: 25.6
+  expectedSpeedMet: 10.0
+  expectedFinalMetDisplayed: 10.0
+- speedKmh: 26
+  expectedSpeedMet: 10.121212
+  expectedFinalMetDisplayed: 10.1
+- speedKmh: 28
+  expectedSpeedMet: 10.727273
+  expectedFinalMetDisplayed: 10.7
+- speedKmh: 30
+  expectedSpeedMet: 11.333333
+  expectedFinalMetDisplayed: 11.3
+- speedKmh: 32.2
+  expectedSpeedMet: 12.0
+  expectedFinalMetDisplayed: 12.0
+- speedKmh: 35
+  expectedSpeedMet: 16.8
+  expectedFinalMetDisplayed: 16.8
+- speedKmh: 40
+  expectedSpeedMet: 16.8
+  expectedFinalMetDisplayed: 16.8
+uphillInterpolationTests:
+- uphillMetersPerHour: 0
+  inputUphillMeters: 0
+  expectedUphillBonusMet: 0.0
+  expectedFinalMetDisplayed: 8.0
+- uphillMetersPerHour: 25
+  inputUphillMeters: 50
+  expectedUphillBonusMet: 0.15
+  expectedFinalMetDisplayed: 8.2
+- uphillMetersPerHour: 50
+  inputUphillMeters: 100
+  expectedUphillBonusMet: 0.3
+  expectedFinalMetDisplayed: 8.3
+- uphillMetersPerHour: 75
+  inputUphillMeters: 150
+  expectedUphillBonusMet: 0.5
+  expectedFinalMetDisplayed: 8.5
+- uphillMetersPerHour: 100
+  inputUphillMeters: 200
+  expectedUphillBonusMet: 0.7
+  expectedFinalMetDisplayed: 8.7
+- uphillMetersPerHour: 150
+  inputUphillMeters: 300
+  expectedUphillBonusMet: 1.1
+  expectedFinalMetDisplayed: 9.1
+- uphillMetersPerHour: 200
+  inputUphillMeters: 400
+  expectedUphillBonusMet: 1.5
+  expectedFinalMetDisplayed: 9.5
+- uphillMetersPerHour: 250
+  inputUphillMeters: 500
+  expectedUphillBonusMet: 1.9
+  expectedFinalMetDisplayed: 9.9
+- uphillMetersPerHour: 300
+  inputUphillMeters: 600
+  expectedUphillBonusMet: 2.3
+  expectedFinalMetDisplayed: 10.3
+- uphillMetersPerHour: 350
+  inputUphillMeters: 700
+  expectedUphillBonusMet: 2.75
+  expectedFinalMetDisplayed: 10.8
+- uphillMetersPerHour: 400
+  inputUphillMeters: 800
+  expectedUphillBonusMet: 3.2
+  expectedFinalMetDisplayed: 11.2
+- uphillMetersPerHour: 450
+  inputUphillMeters: 900
+  expectedUphillBonusMet: 3.65
+  expectedFinalMetDisplayed: 11.7
+- uphillMetersPerHour: 500
+  inputUphillMeters: 1000
+  expectedUphillBonusMet: 4.1
+  expectedFinalMetDisplayed: 12.1
+- uphillMetersPerHour: 550
+  inputUphillMeters: 1100
+  expectedUphillBonusMet: 4.55
+  expectedFinalMetDisplayed: 12.6
+- uphillMetersPerHour: 600
+  inputUphillMeters: 1200
+  expectedUphillBonusMet: 5.0
+  expectedFinalMetDisplayed: 13.0
+- uphillMetersPerHour: 650
+  inputUphillMeters: 1300
+  expectedUphillBonusMet: 5.5
+  expectedFinalMetDisplayed: 13.5
+- uphillMetersPerHour: 700
+  inputUphillMeters: 1400
+  expectedUphillBonusMet: 6.0
+  expectedFinalMetDisplayed: 14.0
+- uphillMetersPerHour: 800
+  inputUphillMeters: 1600
+  expectedUphillBonusMet: 6.0
+  expectedFinalMetDisplayed: 14.0
+- uphillMetersPerHour: 900
+  inputUphillMeters: 1800
+  expectedUphillBonusMet: 6.0
+  expectedFinalMetDisplayed: 14.0
+downhillProfileTests:
+- uphillMeters: 0
+  downhillMeters: 100
+  expected:
+    NONE:
+      gravityFactor: 0.875
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 7.3
+    LIGHT:
+      gravityFactor: 0.875
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 6.9
+    HIGH:
+      gravityFactor: 0.875
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 6.4
+- uphillMeters: 0
+  downhillMeters: 300
+  expected:
+    NONE:
+      gravityFactor: 0.7
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 6.3
+    LIGHT:
+      gravityFactor: 0.7
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 5.9
+    HIGH:
+      gravityFactor: 0.7
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 5.5
+- uphillMeters: 0
+  downhillMeters: 500
+  expected:
+    NONE:
+      gravityFactor: 0.583333
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 5.6
+    LIGHT:
+      gravityFactor: 0.583333
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 5.3
+    HIGH:
+      gravityFactor: 0.583333
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 5.0
+- uphillMeters: 0
+  downhillMeters: 1000
+  expected:
+    NONE:
+      gravityFactor: 0.411765
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 4.6
+    LIGHT:
+      gravityFactor: 0.411765
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 4.4
+    HIGH:
+      gravityFactor: 0.411765
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 4.2
+- uphillMeters: 0
+  downhillMeters: 1500
+  expected:
+    NONE:
+      gravityFactor: 0.318182
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 4.1
+    LIGHT:
+      gravityFactor: 0.318182
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 4.0
+    HIGH:
+      gravityFactor: 0.318182
+      downhillDominance: 1.0
+      downhillMotorFactor: 0.25
+      finalMetDisplayed: 3.8
+- uphillMeters: 300
+  downhillMeters: 600
+  expected:
+    NONE:
+      gravityFactor: 0.692308
+      downhillDominance: 0.333333
+      downhillMotorFactor: 0.75
+      finalMetDisplayed: 7.3
+    LIGHT:
+      gravityFactor: 0.692308
+      downhillDominance: 0.333333
+      downhillMotorFactor: 0.75
+      finalMetDisplayed: 5.9
+    HIGH:
+      gravityFactor: 0.692308
+      downhillDominance: 0.333333
+      downhillMotorFactor: 0.75
+      finalMetDisplayed: 4.3
+- uphillMeters: 600
+  downhillMeters: 900
+  expected:
+    NONE:
+      gravityFactor: 0.6625
+      downhillDominance: 0.2
+      downhillMotorFactor: 0.85
+      finalMetDisplayed: 8.4
+    LIGHT:
+      gravityFactor: 0.6625
+      downhillDominance: 0.2
+      downhillMotorFactor: 0.85
+      finalMetDisplayed: 6.3
+    HIGH:
+      gravityFactor: 0.6625
+      downhillDominance: 0.2
+      downhillMotorFactor: 0.85
+      finalMetDisplayed: 4.2
+- uphillMeters: 900
+  downhillMeters: 1200
+  expected:
+    NONE:
+      gravityFactor: 0.639098
+      downhillDominance: 0.142857
+      downhillMotorFactor: 0.892857
+      finalMetDisplayed: 9.6
+    LIGHT:
+      gravityFactor: 0.639098
+      downhillDominance: 0.142857
+      downhillMotorFactor: 0.892857
+      finalMetDisplayed: 7.0
+    HIGH:
+      gravityFactor: 0.639098
+      downhillDominance: 0.142857
+      downhillMotorFactor: 0.892857
+      finalMetDisplayed: 4.4
+- uphillMeters: 1200
+  downhillMeters: 600
+  expected:
+    NONE:
+      gravityFactor: 0.846154
+      downhillDominance: 0
+      downhillMotorFactor: 1.0
+      finalMetDisplayed: 12.1
+    LIGHT:
+      gravityFactor: 0.846154
+      downhillDominance: 0
+      downhillMotorFactor: 1.0
+      finalMetDisplayed: 8.4
+    HIGH:
+      gravityFactor: 0.846154
+      downhillDominance: 0
+      downhillMotorFactor: 1.0
+      finalMetDisplayed: 4.8
+motorFactorTests:
+- speedKmh: 20
+  expectedSpeedMotorFactor: 1.0
+  expectedEffectiveSupportHigh: 0.75
+  expectedFinalMetDisplayedHigh: 3.7
+- speedKmh: 22
+  expectedSpeedMotorFactor: 0.9
+  expectedEffectiveSupportHigh: 0.675
+  expectedFinalMetDisplayedHigh: 4.2
+- speedKmh: 24
+  expectedSpeedMotorFactor: 0.75
+  expectedEffectiveSupportHigh: 0.5625
+  expectedFinalMetDisplayedHigh: 5.2
+- speedKmh: 25
+  expectedSpeedMotorFactor: 0.6
+  expectedEffectiveSupportHigh: 0.45
+  expectedFinalMetDisplayedHigh: 6.3
+- speedKmh: 26
+  expectedSpeedMotorFactor: 0.45
+  expectedEffectiveSupportHigh: 0.3375
+  expectedFinalMetDisplayedHigh: 7.5
+- speedKmh: 28
+  expectedSpeedMotorFactor: 0.2
+  expectedEffectiveSupportHigh: 0.15
+  expectedFinalMetDisplayedHigh: 9.5
+- speedKmh: 30
+  expectedSpeedMotorFactor: 0.1
+  expectedEffectiveSupportHigh: 0.075
+  expectedFinalMetDisplayedHigh: 10.7
+expectedTestCount: 80

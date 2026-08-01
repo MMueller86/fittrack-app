@@ -1,0 +1,17 @@
+outputDirectory: /mnt/data/cycling-met-fittrack-v1.1
+files:
+- 01-model.yaml
+- 02-tables.yaml
+- 03-formulas.yaml
+- 04-tests-regression.yaml
+- 05-tests-mixed-terrain.yaml
+- 06-tests-boundaries.yaml
+- 07-tests-calculations-calories.yaml
+testCounts:
+  existingRegression: 81
+  mixedTerrain: 81
+  boundaries: 80
+  calculationAndCalories: 8
+  total: 250
+verification: PASS
+existing81TestsUnchanged: true

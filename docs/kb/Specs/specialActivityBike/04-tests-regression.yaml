@@ -1,0 +1,198 @@
+schemaVersion: '1.1'
+modelRef: cycling-met-estimator@1.1.0
+assertion: abs(actual.finalMetDisplayed - expected) <= 0.05
+terrainInputMapping:
+  ASPHALT:
+    asphaltShare: 1.0
+    gravelShare: 0.0
+    trailShare: 0.0
+  GRAVEL:
+    asphaltShare: 0.0
+    gravelShare: 1.0
+    trailShare: 0.0
+  TRAIL:
+    asphaltShare: 0.0
+    gravelShare: 0.0
+    trailShare: 1.0
+profiles:
+- id: P1
+  description: Flache, langsame Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 32.0
+    uphillMeters: 0
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 4.0
+      LIGHT: 3.4
+      HIGH: 2.7
+    GRAVEL:
+      NONE: 4.5
+      LIGHT: 3.9
+      HIGH: 3.2
+    TRAIL:
+      NONE: 5.5
+      LIGHT: 4.9
+      HIGH: 4.2
+- id: P2
+  description: Flache Fahrt mit 20 km/h
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 0
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 8.0
+      LIGHT: 6.0
+      HIGH: 3.7
+    GRAVEL:
+      NONE: 8.5
+      LIGHT: 6.5
+      HIGH: 4.2
+    TRAIL:
+      NONE: 9.5
+      LIGHT: 7.5
+      HIGH: 5.2
+- id: P3
+  description: Schnelle, flache Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 51.4
+    uphillMeters: 0
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 10.0
+      LIGHT: 8.7
+      HIGH: 7.2
+    GRAVEL:
+      NONE: 10.5
+      LIGHT: 9.2
+      HIGH: 7.7
+    TRAIL:
+      NONE: 11.5
+      LIGHT: 10.2
+      HIGH: 8.7
+- id: P4
+  description: Moderater Anstieg
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 400
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 9.5
+      LIGHT: 6.9
+      HIGH: 4.1
+    GRAVEL:
+      NONE: 10.0
+      LIGHT: 7.4
+      HIGH: 4.6
+    TRAIL:
+      NONE: 11.0
+      LIGHT: 8.4
+      HIGH: 5.6
+- id: P5
+  description: Starker Anstieg
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 1200
+    downhillMeters: 0
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 13.0
+      LIGHT: 9.0
+      HIGH: 5.0
+    GRAVEL:
+      NONE: 13.5
+      LIGHT: 9.5
+      HIGH: 5.5
+    TRAIL:
+      NONE: 14.5
+      LIGHT: 10.5
+      HIGH: 6.5
+- id: P6
+  description: Ausgeglichenes Profil mit moderaten Höhenmetern
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 600
+    downhillMeters: 600
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 9.0
+      LIGHT: 6.5
+      HIGH: 4.0
+    GRAVEL:
+      NONE: 9.5
+      LIGHT: 7.0
+      HIGH: 4.5
+    TRAIL:
+      NONE: 10.5
+      LIGHT: 8.0
+      HIGH: 5.5
+- id: P7
+  description: Ausgeglichenes Profil mit vielen Höhenmetern
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 1200
+    downhillMeters: 1200
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 11.2
+      LIGHT: 7.8
+      HIGH: 4.5
+    GRAVEL:
+      NONE: 11.7
+      LIGHT: 8.3
+      HIGH: 5.0
+    TRAIL:
+      NONE: 12.7
+      LIGHT: 9.3
+      HIGH: 6.0
+- id: P8
+  description: Stark abfahrtsdominierte Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 0
+    downhillMeters: 1000
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 4.6
+      LIGHT: 4.4
+      HIGH: 4.2
+    GRAVEL:
+      NONE: 5.1
+      LIGHT: 4.9
+      HIGH: 4.7
+    TRAIL:
+      NONE: 6.1
+      LIGHT: 5.9
+      HIGH: 5.7
+- id: P9
+  description: Sehr stark abfahrtsdominierte Fahrt
+  input:
+    movingTimeHours: 2.0
+    distanceKm: 40.0
+    uphillMeters: 0
+    downhillMeters: 1500
+  expectedFinalMetDisplayed:
+    ASPHALT:
+      NONE: 4.1
+      LIGHT: 4.0
+      HIGH: 3.8
+    GRAVEL:
+      NONE: 4.6
+      LIGHT: 4.5
+      HIGH: 4.3
+    TRAIL:
+      NONE: 5.6
+      LIGHT: 5.5
+      HIGH: 5.3
+expectedTestCount: 81

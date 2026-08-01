@@ -12,7 +12,8 @@ import { getDayMetaRepository } from '../lib/repositories/dayMetaRepository';
 import { getProfileRepository } from '../lib/repositories/profileRepository';
 import { getWeightsRepository } from '../lib/repositories/weightsRepository';
 import { calculateActivityBonus } from '../../../shared/lib/activityBonusCalculator';
-import type { SpecialActivity } from '@fittrack/shared';
+import { calculateCyclingActivityBonus } from '../../../shared/lib/cyclingBonusCalculator';
+import type { SpecialActivity, HikingSpecialActivity, CyclingSpecialActivity } from '@fittrack/shared';
 
 const isoDate = z
   .string()
@@ -25,6 +26,7 @@ const isoDate = z
   }, { message: 'must be a real calendar date' });
 
 const HikingInputSchema = z.object({
+  type: z.literal('hiking'),
   movementTimeMinutes: z.number().min(30, 'movementTimeMinutes must be at least 30').max(1200, 'movementTimeMinutes must be at most 1200'),
   distanceKm: z.number().min(0.5, 'distanceKm must be at least 0.5').max(100, 'distanceKm must be at most 100'),
   elevationGainM: z.number().min(0, 'elevationGainM must be at least 0').max(3000, 'elevationGainM must be at most 3000'),
@@ -34,6 +36,23 @@ const HikingInputSchema = z.object({
   packCategory: z.enum(['none', 'small', 'medium', 'heavy']).optional(),
   terrainType: z.enum(['path', 'trail', 'alpine', 'scramble']).optional(),
 });
+
+const CyclingInputSchema = z.object({
+  type: z.literal('cycling'),
+  movementTimeMinutes: z.number().min(15).max(1200),
+  distanceKm: z.number().min(1).max(200),
+  elevationGainM: z.number().min(0).max(8000),
+  elevationLossM: z.number().min(0).max(8000).optional(),
+  asphaltShare: z.number().min(0).max(1),
+  gravelShare: z.number().min(0).max(1),
+  trailShare: z.number().min(0).max(1),
+  ebikeSupport: z.enum(['NONE', 'LIGHT', 'HIGH']),
+});
+
+const SpecialActivityInputSchema = z.discriminatedUnion('type', [
+  HikingInputSchema,
+  CyclingInputSchema,
+]);
 
 // PUT /api/diary/day/{date}/special-activity
 export const setSpecialActivityHandler = withHandler(
@@ -47,22 +66,10 @@ export const setSpecialActivityHandler = withHandler(
       return { status: 400, jsonBody: { error: 'Route param "date" must be a valid ISO YYYY-MM-DD date' } };
     }
 
-    const parsed = await parseBody(request, HikingInputSchema);
+    const parsed = await parseBody(request, SpecialActivityInputSchema);
     if (!parsed.ok) return parsed.response;
 
-    const { movementTimeMinutes, distanceKm, elevationGainM, hasBackpack, elevationLossM, packCategory, terrainType } = parsed.data;
-
-    // Speed plausibility check
-    const movementTimeH = movementTimeMinutes / 60;
-    const speedKmh = distanceKm / movementTimeH;
-    if (speedKmh < 0.5 || speedKmh > 10.0) {
-      return {
-        status: 422,
-        jsonBody: { error: 'Eingaben sind für eine Wanderung nicht plausibel' },
-      };
-    }
-
-    // Resolve body weight: profile.weightKg → newest WeightEntry → 422
+    // Resolve body weight (shared by all activity types)
     const profile = await getProfileRepository().get(userId);
     let weightKg: number | null = profile?.weightKg ?? null;
 
@@ -78,7 +85,7 @@ export const setSpecialActivityHandler = withHandler(
       };
     }
 
-    // Resolve daily calorie target from DayMeta + profile targets
+    // Resolve daily calorie target (shared)
     const dayMeta = await getDayMetaRepository().get(userId, date);
     const resolvedDayType = dayMeta?.dayType ?? 'rest';
     const fallbackCalories = 2000;
@@ -88,11 +95,78 @@ export const setSpecialActivityHandler = withHandler(
         : profile.targets.restDay.calories)
       : fallbackCalories;
 
-    // Calculate activity bonus
+    if (parsed.data.type === 'cycling') {
+      const { movementTimeMinutes, distanceKm, elevationGainM, elevationLossM, asphaltShare, gravelShare, trailShare, ebikeSupport } = parsed.data;
+
+      // Speed plausibility check
+      const movementTimeH = movementTimeMinutes / 60;
+      const speedKmh = distanceKm / movementTimeH;
+      if (speedKmh < 3 || speedKmh > 80) {
+        return {
+          status: 422,
+          jsonBody: { error: 'Eingaben sind für eine Radfahrt nicht plausibel' },
+        };
+      }
+
+      const inputs = { movementTimeMinutes, distanceKm, elevationGainM, elevationLossM, asphaltShare, gravelShare, trailShare, ebikeSupport };
+      const bonusResult = calculateCyclingActivityBonus(inputs, weightKg, dailyCalorieTarget);
+
+      const specialActivity: CyclingSpecialActivity = {
+        type: 'cycling',
+        movementTimeMinutes,
+        distanceKm,
+        elevationGainM,
+        elevationLossM,
+        asphaltShare,
+        gravelShare,
+        trailShare,
+        ebikeSupport,
+        bodyWeightKg: weightKg,
+        dailyCalorieTarget,
+        calculatedAt: new Date().toISOString(),
+        ...bonusResult,
+      };
+
+      await getDayMetaRepository().setSpecialActivity(userId, date, specialActivity);
+
+      logEvent(ctx, 'info', 'diary.specialActivity.set', {
+        userId,
+        date,
+        type: 'cycling',
+        activityBonus: specialActivity.activityBonus,
+      });
+
+      return {
+        status: 200,
+        jsonBody: {
+          specialActivity,
+          activityBonus: specialActivity.activityBonus,
+          effectiveCalorieTarget: dailyCalorieTarget + specialActivity.activityBonus,
+          speedMet: bonusResult.speedMet,
+          uphillBonusMet: bonusResult.uphillBonusMet,
+          terrainBonusMet: bonusResult.terrainBonusMet,
+          effectiveSupport: bonusResult.effectiveSupport,
+        },
+      };
+    }
+
+    // type === 'hiking'
+    const { movementTimeMinutes, distanceKm, elevationGainM, hasBackpack, elevationLossM, packCategory, terrainType } = parsed.data;
+
+    // Speed plausibility check
+    const movementTimeH = movementTimeMinutes / 60;
+    const speedKmh = distanceKm / movementTimeH;
+    if (speedKmh < 0.5 || speedKmh > 10.0) {
+      return {
+        status: 422,
+        jsonBody: { error: 'Eingaben sind für eine Wanderung nicht plausibel' },
+      };
+    }
+
     const inputs = { movementTimeMinutes, distanceKm, elevationGainM, hasBackpack, elevationLossM, packCategory, terrainType };
     const bonusResult = calculateActivityBonus(inputs, weightKg, dailyCalorieTarget);
 
-    const specialActivity: SpecialActivity = {
+    const specialActivity: HikingSpecialActivity = {
       type: 'hiking',
       movementTimeMinutes,
       distanceKm,

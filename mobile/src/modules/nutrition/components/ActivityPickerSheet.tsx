@@ -18,6 +18,7 @@ export interface ActivityPickerSheetProps {
   visible: boolean;
   onClose: () => void;
   onSelectHiking: () => void;
+  onSelectCycling: () => void;
 }
 
 interface ActivityOption {
@@ -28,13 +29,13 @@ interface ActivityOption {
   onPress?: () => void;
 }
 
-export function ActivityPickerSheet({ visible, onClose, onSelectHiking }: ActivityPickerSheetProps) {
+export function ActivityPickerSheet({ visible, onClose, onSelectHiking, onSelectCycling }: ActivityPickerSheetProps) {
   const insets = useSafeAreaInsets();
 
   const activities: ActivityOption[] = [
     { key: 'hiking',  label: 'Wandern',    iconName: 'hiking',          available: true,  onPress: onSelectHiking },
     { key: 'running', label: 'Laufen',     iconName: 'run',             available: false },
-    { key: 'cycling', label: 'Radfahren',  iconName: 'bike',            available: false },
+    { key: 'cycling', label: 'Radfahren',  iconName: 'bike',            available: true,  onPress: onSelectCycling },
     { key: 'other',   label: 'Sonstige',   iconName: 'dots-horizontal', available: false },
   ];
 

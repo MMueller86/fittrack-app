@@ -89,7 +89,7 @@ export function calculateActivityBonus(
   if (!inputs.distanceKm || !inputs.movementTimeMinutes) {
     return {
       estimatedMet: MET_MIN,
-      hikingCalories: 0,
+      activityCalories: 0,
       alreadyAccountedCalories: 0,
       activityBonus: 0,
     };
@@ -135,14 +135,14 @@ export function calculateActivityBonus(
   ));
 
   // Calorie calculations (unchanged formula)
-  const hikingCalories           = estimatedMet * weightKg * movementTimeH;
+  const activityCalories         = estimatedMet * weightKg * movementTimeH;
   const alreadyAccountedCalories = dailyCalorieTarget * (movementTimeH / 24);
-  const rawBonus      = Math.max(0, hikingCalories - alreadyAccountedCalories);
+  const rawBonus      = Math.max(0, activityCalories - alreadyAccountedCalories);
   const activityBonus = Math.round(rawBonus / 50) * 50;
 
   return {
     estimatedMet,
-    hikingCalories,
+    activityCalories,
     alreadyAccountedCalories,
     activityBonus,
     metBase,

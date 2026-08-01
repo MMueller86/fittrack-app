@@ -598,7 +598,7 @@ describe('GET /api/diary — specialActivity response fields', () => {
       dailyCalorieTarget: 2000,
       calculatedAt: '2026-07-21T08:00:00Z',
       estimatedMet: 4.5,
-      hikingCalories: 1260,
+      activityCalories: 1260,
       alreadyAccountedCalories: 333.33,
       activityBonus: 926.67,
     };
@@ -625,7 +625,7 @@ describe('GET /api/diary — specialActivity response fields', () => {
       dailyCalorieTarget: 2000,
       calculatedAt: '2026-07-20T10:00:00Z',
       estimatedMet: 4.5,
-      hikingCalories: 630,
+      activityCalories: 630,
       alreadyAccountedCalories: 166.67,
       activityBonus: 463.33,
     };

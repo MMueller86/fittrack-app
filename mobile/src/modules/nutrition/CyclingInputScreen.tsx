@@ -1,4 +1,4 @@
-// HikingInputScreen — form screen for logging a hiking activity.
+// CyclingInputScreen — form screen for logging a cycling activity.
 // Navigation params: { date: string; existing?: SpecialActivity }
 // On success: navigates back and the DiaryScreen reloads via useFocusEffect.
 
@@ -17,8 +17,8 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming, run
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { PackCategory, SpecialActivity, TerrainType } from '@fittrack/shared';
-import { calculateActivityBonus } from '@fittrack/shared';
+import type { EbikeSupport, SpecialActivity } from '@fittrack/shared';
+import { calculateCyclingActivityBonus } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { profileApi } from '../../shared/api/profileApi';
@@ -27,7 +27,7 @@ import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
 import { useDayTypeStore } from './useDayTypeStore';
 
-type Props = NativeStackScreenProps<NutritionStackParamList, 'HikingInput'>;
+type Props = NativeStackScreenProps<NutritionStackParamList, 'CyclingInput'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,61 +45,39 @@ function formatDateLabel(dateStr: string): string {
   return `${weekdays[d.getDay()]} ${d.getDate()}. ${months[d.getMonth()]}`;
 }
 
-function getSpeedLabel(kmh: number): { label: string; color: string; ok: boolean } {
-  if (kmh < 0.5) return { label: 'Zu langsam für eine Wanderung', color: colors.negative, ok: false };
-  if (kmh <= 2.0) return { label: 'Sehr ruhiges Tempo', color: colors.primary, ok: true };
-  if (kmh <= 3.5) return { label: 'Gemütliches Wandertempo', color: colors.primary, ok: true };
-  if (kmh <= 5.0) return { label: 'Flüssiges Wandertempo', color: colors.primary, ok: true };
-  if (kmh <= 7.0) return { label: 'Zügiges Tempo', color: colors.primary, ok: true };
-  if (kmh <= 10.0) return { label: 'Sehr schnelles Tempo', color: colors.neutral, ok: true };
-  return { label: 'Zu schnell für eine Wanderung', color: colors.negative, ok: false };
+function getCyclingSpeedLabel(kmh: number): { label: string; color: string; ok: boolean } {
+  if (kmh < 3)   return { label: 'Zu langsam für eine Radfahrt', color: colors.negative, ok: false };
+  if (kmh <= 10) return { label: 'Sehr ruhiges Tempo', color: colors.primary, ok: true };
+  if (kmh <= 20) return { label: 'Gemäßigtes Radtempo', color: colors.primary, ok: true };
+  if (kmh <= 30) return { label: 'Flottes Radtempo', color: colors.primary, ok: true };
+  if (kmh <= 45) return { label: 'Schnelles Tempo', color: colors.neutral, ok: true };
+  if (kmh <= 80) return { label: 'Sehr schnelles Tempo', color: colors.neutral, ok: true };
+  return { label: 'Zu schnell für eine Radfahrt', color: colors.negative, ok: false };
 }
 
-// ─── Pack default helper ───────────────────────────────────────────────────────
-
-function getDefaultPack(minutes: number): PackCategory {
-  if (minutes > 240) return 'medium';
-  if (minutes >= 120) return 'small';
-  return 'none';
-}
-
-// ─── Terrain config ────────────────────────────────────────────────────────────
-
-const TERRAIN_OPTIONS: Array<{ value: TerrainType; label: string; iconLib: 'mci'; icon: string }> = [
-  { value: 'path',     label: 'Weg',         iconLib: 'mci', icon: 'road-variant' },
-  { value: 'trail',    label: 'Wanderweg',   iconLib: 'mci', icon: 'hiking' },
-  { value: 'alpine',   label: 'Alpin',       iconLib: 'mci', icon: 'image-filter-hdr' },
-  { value: 'scramble', label: 'Klettersteig',iconLib: 'mci', icon: 'terrain' },
-];
+// ─── Terrain info ──────────────────────────────────────────────────────────────
 
 const TERRAIN_INFO = [
   {
-    label: '🛣️  Weg',
-    description:
-      'Befestigter oder fester Weg, Forststraße oder Teerweg. Gleichmäßiger Untergrund ohne Hindernisse – typisch für Talboden und Zufahrtswege.',
+    label: '🛣️  Asphalt',
+    description: 'Befestigter Straßenbelag, Radweg oder Teerweg. Geringster Rollwiderstand.',
   },
   {
-    label: '🥾  Wanderweg',
-    description:
-      'Markierter Bergweg mit natürlichem Untergrund (Erde, Schotter, Wurzeln). Kann steile Abschnitte und unebenes Gelände enthalten – der häufigste Wandertyp.',
+    label: '🪨  Schotter / Kies',
+    description: 'Unbefestigter Weg, Waldweg oder Kiesweg. Erhöhter Rollwiderstand.',
   },
   {
-    label: '🏔️  Alpin',
-    description:
-      'Steiler Steig im felsigen Hochgebirge. Hände werden gelegentlich zur Stabilisierung benötigt. Entspricht etwa T3–T4 der SAC-Wanderskala.',
-  },
-  {
-    label: '🧗  Klettersteig',
-    description:
-      'Sehr anspruchsvolles Gelände mit Leitern, Stufen und Sicherungsseil. Entspricht Klettersteigkategorie A–D. Spezielle Ausrüstung und Erfahrung erforderlich.',
+    label: '🌲  Trail / Pfad',
+    description: 'Naturbelassener Pfad, Singletrack oder technisches Gelände. Höchster Rollwiderstand.',
   },
 ];
 
-const PACK_OPTIONS: Array<{ value: PackCategory; label: string }> = [
-  { value: 'none',   label: 'Kein' },
-  { value: 'small',  label: 'Klein\n(<5 kg)' },
-  { value: 'medium', label: 'Mittel\n(5–10 kg)' },
-  { value: 'heavy',  label: 'Schwer\n(>10 kg)' },
+// ─── eBike options ─────────────────────────────────────────────────────────────
+
+const EBIKE_OPTIONS: Array<{ value: EbikeSupport; label: string }> = [
+  { value: 'NONE',  label: 'Ohne Motor' },
+  { value: 'LIGHT', label: 'Leichte Unterstützung' },
+  { value: 'HIGH',  label: 'Starke Unterstützung' },
 ];
 
 // ─── Stepper ──────────────────────────────────────────────────────────────────
@@ -165,7 +143,7 @@ function useCountUp(target: number, active: boolean): number {
     const timer = setInterval(() => {
       step++;
       const t = step / steps;
-      const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+      const eased = 1 - Math.pow(1 - t, 3);
       setCurrent(Math.round(target * eased));
       if (step >= steps) clearInterval(timer);
     }, interval);
@@ -174,46 +152,53 @@ function useCountUp(target: number, active: boolean): number {
   return current;
 }
 
-export default function HikingInputScreen({ navigation, route }: Props) {
+export default function CyclingInputScreen({ navigation, route }: Props) {
   const { date, existing } = route.params;
-  const existingHiking = existing?.type === 'hiking' ? existing : undefined;
-  const isEdit = !!existing;
+  const existingCycling = existing?.type === 'cycling' ? existing : null;
+  const isEdit = !!existingCycling;
 
   // Form state — pre-fill from existing if editing
   const [hoursVal, setHoursVal] = useState<number>(
-    existing ? Math.floor(existing.movementTimeMinutes / 60) : 2,
+    existingCycling ? Math.floor(existingCycling.movementTimeMinutes / 60) : 1,
   );
   const [minutesVal, setMinutesVal] = useState<number>(
-    existing ? Math.round((existing.movementTimeMinutes % 60) / 15) * 15 : 0,
+    existingCycling ? Math.round((existingCycling.movementTimeMinutes % 60) / 15) * 15 : 0,
   );
   const [distanceKmVal, setDistanceKmVal] = useState<number>(
-    existing ? existing.distanceKm : 6,
+    existingCycling ? existingCycling.distanceKm : 20,
   );
   const [elevationGainMVal, setElevationGainMVal] = useState<number>(
-    existing ? existing.elevationGainM : 200,
+    existingCycling ? existingCycling.elevationGainM : 0,
   );
   const [elevationLossM, setElevationLossM] = useState<number>(
-    existing ? (existing.elevationLossM ?? 0) : 0,
+    existingCycling ? (existingCycling.elevationLossM ?? 0) : 0,
   );
-  const [terrainType, setTerrainType] = useState<TerrainType>(
-    existingHiking?.terrainType ?? (existing ? 'path' : 'trail'),
+  const [asphaltShare, setAsphaltShare] = useState<number>(
+    existingCycling ? existingCycling.asphaltShare : 0.7,
+  );
+  const [gravelShare, setGravelShare] = useState<number>(
+    existingCycling ? existingCycling.gravelShare : 0.3,
+  );
+  const [ebikeSupport, setEbikeSupport] = useState<EbikeSupport>(
+    existingCycling ? existingCycling.ebikeSupport : 'NONE',
   );
 
-  const initialMinutes = existing ? existing.movementTimeMinutes : 120;
-  const [packCategory, setPackCategory] = useState<PackCategory>(
-    existingHiking?.packCategory ?? getDefaultPack(initialMinutes),
-  );
-  // Track whether user has manually changed the pack category
-  const packUserModified = useRef(!!existingHiking?.packCategory);
+  // trailShare is always derived — never stored in state
+  const trailShare = Math.max(0, 1 - asphaltShare - gravelShare);
 
   const [profileWeight, setProfileWeight] = useState<number>(
-    existing?.bodyWeightKg ?? 75,
+    existingCycling?.bodyWeightKg ?? 75,
   );
-
   const [saving, setSaving] = useState(false);
   const [terrainInfoVisible, setTerrainInfoVisible] = useState(false);
   const [sliderScrollEnabled, setSliderScrollEnabled] = useState(true);
+  const [inlineError, setInlineError] = useState<string | null>(null);
+  const previewAnimDoneRef = useRef(false);
+  const [previewActive, setPreviewActive] = useState(false);
 
+  const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
+
+  // Terrain info sheet swipe-to-close
   const terrainDragY = useSharedValue(0);
   const terrainAnimStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: terrainDragY.value }],
@@ -252,27 +237,22 @@ export default function HikingInputScreen({ navigation, route }: Props) {
   const distanceProgress = useSharedValue(distanceKmVal);
   const elevationProgress = useSharedValue(elevationGainMVal);
   const elevationLossProgress = useSharedValue(elevationLossM);
-  const distanceMin = useSharedValue(0.5);
-  const distanceMax = useSharedValue(35);
+  const asphaltProgress = useSharedValue(asphaltShare);
+  const gravelProgress = useSharedValue(gravelShare);
+  const distanceMin = useSharedValue(1);
+  const distanceMax = useSharedValue(200);
   const elevationMin = useSharedValue(0);
-  const elevationMax = useSharedValue(3000);
+  const elevationMax = useSharedValue(8000);
   const elevationLossMin = useSharedValue(0);
-  const elevationLossMax = useSharedValue(3000);
+  const elevationLossMax = useSharedValue(8000);
+  const terrainMin = useSharedValue(0);
+  const terrainMax = useSharedValue(1);
 
-  useEffect(() => {
-    distanceProgress.value = distanceKmVal;
-  }, [distanceKmVal]);
-  useEffect(() => {
-    elevationProgress.value = elevationGainMVal;
-  }, [elevationGainMVal]);
-  useEffect(() => {
-    elevationLossProgress.value = elevationLossM;
-  }, [elevationLossM]);
-  const [inlineError, setInlineError] = useState<string | null>(null);
-  const previewAnimDoneRef = useRef(false);
-  const [previewActive, setPreviewActive] = useState(false);
-
-  const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
+  useEffect(() => { distanceProgress.value = distanceKmVal; }, [distanceKmVal]);
+  useEffect(() => { elevationProgress.value = elevationGainMVal; }, [elevationGainMVal]);
+  useEffect(() => { elevationLossProgress.value = elevationLossM; }, [elevationLossM]);
+  useEffect(() => { asphaltProgress.value = asphaltShare; }, [asphaltShare]);
+  useEffect(() => { gravelProgress.value = gravelShare; }, [gravelShare]);
 
   // Load profile weight for live preview
   useEffect(() => {
@@ -284,33 +264,26 @@ export default function HikingInputScreen({ navigation, route }: Props) {
   // ─── Derived values ─────────────────────────────────────────────────────────
 
   const totalMinutes = hoursVal * 60 + minutesVal;
-  const parsedDistance = distanceKmVal;
-  const parsedElevation = elevationGainMVal;
-
-  // Auto-update packCategory when time changes and user hasn't manually chosen
-  useEffect(() => {
-    if (!packUserModified.current) {
-      setPackCategory(getDefaultPack(totalMinutes));
-    }
-  }, [totalMinutes]);
 
   const speedInfo = useMemo(() => {
-    if (totalMinutes <= 0 || parsedDistance <= 0) return null;
-    const kmh = parsedDistance / (totalMinutes / 60);
-    return { kmh, ...getSpeedLabel(kmh) };
-  }, [totalMinutes, parsedDistance]);
+    if (totalMinutes <= 0 || distanceKmVal <= 0) return null;
+    const kmh = distanceKmVal / (totalMinutes / 60);
+    return { kmh, ...getCyclingSpeedLabel(kmh) };
+  }, [totalMinutes, distanceKmVal]);
 
   const liveResult = useMemo(() => {
-    if (totalMinutes < 30 || parsedDistance < 0.5) return null;
+    if (totalMinutes < 15 || distanceKmVal < 1) return null;
     try {
-      return calculateActivityBonus(
+      return calculateCyclingActivityBonus(
         {
           movementTimeMinutes: totalMinutes,
-          distanceKm: parsedDistance,
-          elevationGainM: parsedElevation,
+          distanceKm: distanceKmVal,
+          elevationGainM: elevationGainMVal,
           elevationLossM,
-          packCategory,
-          terrainType,
+          asphaltShare,
+          gravelShare,
+          trailShare: Math.max(0, 1 - asphaltShare - gravelShare),
+          ebikeSupport,
         },
         profileWeight,
         dailyCalorieTarget,
@@ -318,7 +291,7 @@ export default function HikingInputScreen({ navigation, route }: Props) {
     } catch {
       return null;
     }
-  }, [totalMinutes, parsedDistance, parsedElevation, elevationLossM, packCategory, terrainType, profileWeight, dailyCalorieTarget]);
+  }, [totalMinutes, distanceKmVal, elevationGainMVal, elevationLossM, asphaltShare, gravelShare, ebikeSupport, profileWeight, dailyCalorieTarget]);
 
   const liveResultAvailable = liveResult != null;
   useEffect(() => {
@@ -338,10 +311,9 @@ export default function HikingInputScreen({ navigation, route }: Props) {
   // ─── Validation ─────────────────────────────────────────────────────────────
 
   function validate(): string | null {
-    if (totalMinutes < 30) {
-      return 'Die Bewegungszeit muss mindestens 30 Minuten betragen.';
+    if (totalMinutes < 15) {
+      return 'Die Bewegungszeit muss mindestens 15 Minuten betragen.';
     }
-    // distanceKm und elevationGainM sind durch die Slider immer im gültigen Bereich
     return null;
   }
 
@@ -357,13 +329,15 @@ export default function HikingInputScreen({ navigation, route }: Props) {
     setSaving(true);
     try {
       await diaryApi.setSpecialActivity(date, {
-        type: 'hiking',
+        type: 'cycling',
         movementTimeMinutes: totalMinutes,
-        distanceKm: parsedDistance,
-        elevationGainM: parsedElevation,
+        distanceKm: distanceKmVal,
+        elevationGainM: elevationGainMVal,
         elevationLossM,
-        packCategory,
-        terrainType,
+        asphaltShare,
+        gravelShare,
+        trailShare: Math.max(0, 1 - asphaltShare - gravelShare),
+        ebikeSupport,
       });
       navigation.goBack();
     } catch (err: unknown) {
@@ -378,7 +352,7 @@ export default function HikingInputScreen({ navigation, route }: Props) {
     }
   }
 
-  const canSubmit = totalMinutes >= 30;
+  const canSubmit = totalMinutes >= 15;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -392,7 +366,7 @@ export default function HikingInputScreen({ navigation, route }: Props) {
           <Icon lib="feather" name="arrow-left" size="md" color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerTextBlock}>
-          <Text style={styles.screenTitle}>{isEdit ? 'Wanderung bearbeiten' : 'Wanderung erfassen'}</Text>
+          <Text style={styles.screenTitle}>{isEdit ? 'Radfahrt bearbeiten' : 'Radfahrt erfassen'}</Text>
           <Text style={styles.screenDate}>{formatDateLabel(date)}</Text>
         </View>
         <View style={styles.headerSpacer} />
@@ -405,231 +379,295 @@ export default function HikingInputScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
         scrollEnabled={sliderScrollEnabled}
       >
-          {/* ② Live-Vorschau-Karte */}
-          {liveResult != null ? (
-            <View style={styles.previewCard}>
-              <Text style={styles.previewOverline}>🥾  GESCHÄTZTER AKTIVITÄTSBONUS</Text>
-              <Text style={styles.previewBonus}>≈  {previewActive ? animBonus : Math.round(liveResult.activityBonus)} kcal</Text>
-              <Text style={styles.previewDetail}>
-                MET {liveResult.estimatedMet.toFixed(1)} · {(totalMinutes / 60).toFixed(1)} h · {Math.round(profileWeight)} kg · {Math.round(liveResult.activityCalories)} kcal Wanderverbrauch
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.previewPlaceholder}>
-              <Text style={styles.previewPlaceholderText}>
-                Gib Bewegungszeit und Strecke ein, um den geschätzten Aktivitätsbonus zu berechnen.
+        {/* ② Live-Vorschau-Karte */}
+        {liveResult != null ? (
+          <View style={styles.previewCard}>
+            <Text style={styles.previewOverline}>🚴  GESCHÄTZTER AKTIVITÄTSBONUS</Text>
+            <Text style={styles.previewBonus}>
+              ≈  {previewActive ? animBonus : Math.round(liveResult.activityBonus)} kcal
+            </Text>
+            <Text style={styles.previewDetail}>
+              MET {liveResult.estimatedMet.toFixed(1)} · {(totalMinutes / 60).toFixed(1)} h · {Math.round(profileWeight)} kg · {Math.round(liveResult.activityCalories)} kcal Fahrverbrauch
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.previewPlaceholder}>
+            <Text style={styles.previewPlaceholderText}>
+              Gib Bewegungszeit und Strecke ein, um den geschätzten Aktivitätsbonus zu berechnen.
+            </Text>
+          </View>
+        )}
+
+        {/* ③ Disclaimer */}
+        <View style={styles.disclaimerCard}>
+          <Icon lib="feather" name="info" size="sm" color={colors.textMuted} />
+          <Text style={styles.disclaimerText}>
+            Alle Werte sind Schätzungen. Individuelle Faktoren wie Fitnesslevel, Höhe und Wetter können abweichen.
+          </Text>
+        </View>
+
+        {/* ④ Eingabe-Karte: Bewegungszeit */}
+        <View style={styles.inputCard}>
+          <Text style={styles.cardOverline}>⏱  BEWEGUNGSZEIT</Text>
+          <View style={styles.timeRow}>
+            <Stepper
+              value={hoursVal}
+              onDecrement={() => setHoursVal(v => Math.max(0, v - 1))}
+              onIncrement={() => setHoursVal(v => Math.min(14, v + 1))}
+              unit="h"
+              minReached={hoursVal === 0}
+              maxReached={hoursVal === 14}
+            />
+            <Stepper
+              value={minutesVal}
+              onDecrement={() => setMinutesVal(v => (v === 0 ? 45 : v - 15))}
+              onIncrement={() => setMinutesVal(v => (v === 45 ? 0 : v + 15))}
+              unit="min"
+              minReached={false}
+              maxReached={false}
+            />
+          </View>
+          {speedInfo && (
+            <View style={styles.speedRow}>
+              <Icon
+                lib="feather"
+                name={speedInfo.ok ? 'check-circle' : 'alert-circle'}
+                size="sm"
+                color={speedInfo.color}
+              />
+              <Text style={[styles.speedLabel, { color: speedInfo.color }]}>
+                {speedInfo.kmh.toFixed(1)} km/h — {speedInfo.label}
               </Text>
             </View>
           )}
+        </View>
 
-          {/* Disclaimer */}
-          <View style={styles.disclaimerCard}>
-            <Icon lib="feather" name="info" size="sm" color={colors.textMuted} />
-            <Text style={styles.disclaimerText}>
-              Alle Werte sind Schätzungen. Individuelle Faktoren wie Fitnesslevel, Höhe und Wetter können abweichen.
-            </Text>
+        {/* ⑤ Eingabe-Karte: Strecke */}
+        <View style={styles.inputCard}>
+          <Text style={styles.cardOverline}>📍  STRECKE</Text>
+          <View style={styles.sliderValueRow}>
+            <Text style={styles.sliderValue}>{distanceKmVal} km</Text>
           </View>
-
-          {/* ③ Eingabe-Karte: Bewegungszeit */}
-          <View style={styles.inputCard}>
-            <Text style={styles.cardOverline}>⏱  BEWEGUNGSZEIT</Text>
-            <View style={styles.timeRow}>
-              <Stepper
-                value={hoursVal}
-                onDecrement={() => setHoursVal(v => Math.max(0, v - 1))}
-                onIncrement={() => setHoursVal(v => Math.min(14, v + 1))}
-                unit="h"
-                minReached={hoursVal === 0}
-                maxReached={hoursVal === 14}
-              />
-              <Stepper
-                value={minutesVal}
-                onDecrement={() => setMinutesVal(v => (v === 0 ? 45 : v - 15))}
-                onIncrement={() => setMinutesVal(v => (v === 45 ? 0 : v + 15))}
-                unit="min"
-                minReached={false}
-                maxReached={false}
-              />
-            </View>
-            {speedInfo && (
-              <View style={styles.speedRow}>
-                <Icon
-                  lib="feather"
-                  name={speedInfo.ok ? 'check-circle' : 'alert-circle'}
-                  size="sm"
-                  color={speedInfo.color}
-                />
-                <Text style={[styles.speedLabel, { color: speedInfo.color }]}>
-                  {speedInfo.kmh.toFixed(1)} km/h — {speedInfo.label}
-                </Text>
-              </View>
-            )}
+          <Slider
+            progress={distanceProgress}
+            minimumValue={distanceMin}
+            maximumValue={distanceMax}
+            onValueChange={(v) => {
+              const snapped = Math.round(v);
+              setDistanceKmVal(snapped);
+            }}
+            onSlidingStart={() => setSliderScrollEnabled(false)}
+            onSlidingComplete={() => setSliderScrollEnabled(true)}
+            theme={{
+              maximumTrackTintColor: colors.border,
+              minimumTrackTintColor: colors.primary,
+              bubbleBackgroundColor: colors.surface,
+              bubbleTextColor: colors.primary,
+            }}
+            style={{ height: 40 }}
+            thumbWidth={24}
+          />
+          <View style={styles.sliderRange}>
+            <Text style={styles.sliderRangeText}>1 km</Text>
+            <Text style={styles.sliderRangeText}>200 km</Text>
           </View>
+        </View>
 
-          {/* ④ Eingabe-Karten: Strecke & Höhenmeter */}
-          <View style={styles.inputCard}>
-            <Text style={styles.cardOverline}>📍  STRECKE</Text>
-            <View style={styles.sliderValueRow}>
-              <Text style={styles.sliderValue}>
-                {distanceKmVal % 1 === 0 ? `${distanceKmVal} km` : `${distanceKmVal.toFixed(1)} km`}
-              </Text>
-            </View>
-            <Slider
-              progress={distanceProgress}
-              minimumValue={distanceMin}
-              maximumValue={distanceMax}
-              onValueChange={(v) => {
-                const snapped = Math.round(v / 0.5) * 0.5;
-                setDistanceKmVal(snapped);
-              }}
-              onSlidingStart={() => setSliderScrollEnabled(false)}
-              onSlidingComplete={() => setSliderScrollEnabled(true)}
-              theme={{
-                maximumTrackTintColor: colors.border,
-                minimumTrackTintColor: colors.primary,
-                bubbleBackgroundColor: colors.surface,
-                bubbleTextColor: colors.primary,
-              }}
-              style={{ height: 40 }}
-              thumbWidth={24}
-            />
-            <View style={styles.sliderRange}>
-              <Text style={styles.sliderRangeText}>0.5 km</Text>
-              <Text style={styles.sliderRangeText}>35 km</Text>
-            </View>
+        {/* ⑥ Eingabe-Karte: Anstieg */}
+        <View style={styles.inputCard}>
+          <Text style={styles.cardOverline}>⛰  ANSTIEG</Text>
+          <View style={styles.sliderValueRow}>
+            <Text style={styles.sliderValue}>{elevationGainMVal} m</Text>
           </View>
-
-          <View style={styles.inputCard}>
-            <Text style={styles.cardOverline}>⛰  HÖHENMETER</Text>
-            <View style={styles.sliderValueRow}>
-              <Text style={styles.sliderValue}>{elevationGainMVal} m</Text>
-            </View>
-            <Slider
-              progress={elevationProgress}
-              minimumValue={elevationMin}
-              maximumValue={elevationMax}
-              onValueChange={(v) => {
-                const snapped = Math.round(v / 50) * 50;
-                setElevationGainMVal(snapped);
-              }}
-              onSlidingStart={() => setSliderScrollEnabled(false)}
-              onSlidingComplete={() => setSliderScrollEnabled(true)}
-              theme={{
-                maximumTrackTintColor: colors.border,
-                minimumTrackTintColor: colors.primary,
-                bubbleBackgroundColor: colors.surface,
-                bubbleTextColor: colors.primary,
-              }}
-              style={{ height: 40 }}
-              thumbWidth={24}
-            />
-            <View style={styles.sliderRange}>
-              <Text style={styles.sliderRangeText}>0 m</Text>
-              <Text style={styles.sliderRangeText}>3000 m</Text>
-            </View>
+          <Slider
+            progress={elevationProgress}
+            minimumValue={elevationMin}
+            maximumValue={elevationMax}
+            onValueChange={(v) => {
+              const snapped = Math.round(v / 50) * 50;
+              setElevationGainMVal(snapped);
+            }}
+            onSlidingStart={() => setSliderScrollEnabled(false)}
+            onSlidingComplete={() => setSliderScrollEnabled(true)}
+            theme={{
+              maximumTrackTintColor: colors.border,
+              minimumTrackTintColor: colors.primary,
+              bubbleBackgroundColor: colors.surface,
+              bubbleTextColor: colors.primary,
+            }}
+            style={{ height: 40 }}
+            thumbWidth={24}
+          />
+          <View style={styles.sliderRange}>
+            <Text style={styles.sliderRangeText}>0 m</Text>
+            <Text style={styles.sliderRangeText}>8000 m</Text>
           </View>
+        </View>
 
-          {/* ⑤ Eingabe-Karte: Abstieg */}
-          <View style={styles.inputCard}>
-            <Text style={styles.cardOverline}>🏔  ABSTIEG</Text>
-            <View style={styles.sliderValueRow}>
-              <Text style={styles.sliderValue}>{elevationLossM} m</Text>
-            </View>
-            <Slider
-              progress={elevationLossProgress}
-              minimumValue={elevationLossMin}
-              maximumValue={elevationLossMax}
-              onValueChange={(v) => {
-                const snapped = Math.round(v / 50) * 50;
-                setElevationLossM(snapped);
-              }}
-              onSlidingStart={() => setSliderScrollEnabled(false)}
-              onSlidingComplete={() => setSliderScrollEnabled(true)}
-              theme={{
-                maximumTrackTintColor: colors.border,
-                minimumTrackTintColor: colors.primary,
-                bubbleBackgroundColor: colors.surface,
-                bubbleTextColor: colors.primary,
-              }}
-              style={{ height: 40 }}
-              thumbWidth={24}
-            />
-            <View style={styles.sliderRange}>
-              <Text style={styles.sliderRangeText}>0 m</Text>
-              <Text style={styles.sliderRangeText}>3000 m</Text>
-            </View>
+        {/* ⑦ Eingabe-Karte: Abstieg */}
+        <View style={styles.inputCard}>
+          <Text style={styles.cardOverline}>🏔  ABSTIEG</Text>
+          <View style={styles.sliderValueRow}>
+            <Text style={styles.sliderValue}>{elevationLossM} m</Text>
+          </View>
+          <Slider
+            progress={elevationLossProgress}
+            minimumValue={elevationLossMin}
+            maximumValue={elevationLossMax}
+            onValueChange={(v) => {
+              const snapped = Math.round(v / 50) * 50;
+              setElevationLossM(snapped);
+            }}
+            onSlidingStart={() => setSliderScrollEnabled(false)}
+            onSlidingComplete={() => setSliderScrollEnabled(true)}
+            theme={{
+              maximumTrackTintColor: colors.border,
+              minimumTrackTintColor: colors.primary,
+              bubbleBackgroundColor: colors.surface,
+              bubbleTextColor: colors.primary,
+            }}
+            style={{ height: 40 }}
+            thumbWidth={24}
+          />
+          <View style={styles.sliderRange}>
+            <Text style={styles.sliderRangeText}>0 m</Text>
+            <Text style={styles.sliderRangeText}>8000 m</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.rundwegBtn}
+            onPress={() => setElevationLossM(elevationGainMVal)}
+            activeOpacity={0.7}
+          >
+            <Icon lib="mci" name="swap-vertical" size="sm" color={colors.primary} />
+            <Text style={styles.rundwegBtnText}>Rundweg (Abstieg = Aufstieg)</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ⑧ Eingabe-Karte: Untergrund */}
+        <View style={styles.inputCard}>
+          <View style={styles.cardOverlineRow}>
+            <Text style={styles.cardOverline}>🛣️  UNTERGRUND</Text>
             <TouchableOpacity
-              style={styles.rundwegBtn}
-              onPress={() => setElevationLossM(elevationGainMVal)}
+              onPress={() => setTerrainInfoVisible(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               activeOpacity={0.7}
             >
-              <Icon lib="mci" name="swap-vertical" size="sm" color={colors.primary} />
-              <Text style={styles.rundwegBtnText}>Rundweg (Abstieg = Aufstieg)</Text>
+              <Icon lib="feather" name="info" size="sm" color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
-          {/* ⑥ Eingabe-Karte: Gelände */}
-          <View style={styles.inputCard}>
-            <View style={styles.cardOverlineRow}>
-              <Text style={styles.cardOverline}>🗺  GELÄNDE</Text>
-              <TouchableOpacity
-                onPress={() => setTerrainInfoVisible(true)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                activeOpacity={0.7}
-              >
-                <Icon lib="feather" name="info" size="sm" color={colors.textMuted} />
-              </TouchableOpacity>
+          {/* Asphalt slider */}
+          <View style={styles.terrainSliderBlock}>
+            <View style={styles.terrainSliderHeader}>
+              <Text style={styles.terrainSliderLabel}>Asphalt</Text>
+              <Text style={styles.terrainSliderValue}>{Math.round(asphaltShare * 100)} %</Text>
             </View>
-            <View style={styles.chipGroup}>
-              {TERRAIN_OPTIONS.map((opt) => {
-                const active = terrainType === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => setTerrainType(opt.value)}
-                    activeOpacity={0.7}
-                  >
-                    <Icon lib={opt.iconLib} name={opt.icon as any} size="sm" color={active ? colors.primary : colors.textMuted} />
-                    <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <Slider
+              progress={asphaltProgress}
+              minimumValue={terrainMin}
+              maximumValue={terrainMax}
+              onValueChange={(v) => {
+                const snapped = Math.round(v / 0.05) * 0.05;
+                const newAsphalt = Math.max(0, Math.min(1, snapped));
+                const newGravel = newAsphalt + gravelShare > 1 ? 1 - newAsphalt : gravelShare;
+                setAsphaltShare(newAsphalt);
+                setGravelShare(newGravel);
+              }}
+              onSlidingStart={() => setSliderScrollEnabled(false)}
+              onSlidingComplete={() => setSliderScrollEnabled(true)}
+              theme={{
+                maximumTrackTintColor: colors.border,
+                minimumTrackTintColor: colors.primary,
+                bubbleBackgroundColor: colors.surface,
+                bubbleTextColor: colors.primary,
+              }}
+              style={{ height: 40 }}
+              thumbWidth={24}
+            />
+          </View>
+
+          {/* Schotter/Kies slider */}
+          <View style={styles.terrainSliderBlock}>
+            <View style={styles.terrainSliderHeader}>
+              <Text style={styles.terrainSliderLabel}>Schotter / Kies</Text>
+              <Text style={styles.terrainSliderValue}>{Math.round(gravelShare * 100)} %</Text>
+            </View>
+            <Slider
+              progress={gravelProgress}
+              minimumValue={terrainMin}
+              maximumValue={terrainMax}
+              onValueChange={(v) => {
+                const snapped = Math.round(v / 0.05) * 0.05;
+                const newGravel = Math.max(0, Math.min(1, snapped));
+                const newAsphalt = asphaltShare + newGravel > 1 ? 1 - newGravel : asphaltShare;
+                setGravelShare(newGravel);
+                setAsphaltShare(newAsphalt);
+              }}
+              onSlidingStart={() => setSliderScrollEnabled(false)}
+              onSlidingComplete={() => setSliderScrollEnabled(true)}
+              theme={{
+                maximumTrackTintColor: colors.border,
+                minimumTrackTintColor: colors.primary,
+                bubbleBackgroundColor: colors.surface,
+                bubbleTextColor: colors.primary,
+              }}
+              style={{ height: 40 }}
+              thumbWidth={24}
+            />
+          </View>
+
+          {/* Trail — read-only derived fill-bar */}
+          <View style={styles.terrainSliderBlock}>
+            <View style={styles.terrainSliderHeader}>
+              <Text style={styles.terrainSliderLabel}>Trail / Pfad</Text>
+              <Text style={styles.terrainSliderValue}>{Math.round(trailShare * 100)} %</Text>
+            </View>
+            <View style={styles.trailBarTrack}>
+              <View
+                style={[
+                  styles.trailBarFill,
+                  { width: `${Math.round(trailShare * 100)}%` as `${number}%` },
+                ]}
+              />
             </View>
           </View>
 
-          {/* ⑦ Eingabe-Karte: Rucksack */}
-          <View style={styles.inputCard}>
-            <Text style={styles.cardOverline}>🎒  RUCKSACK</Text>
-            <View style={styles.chipGroup}>
-              {PACK_OPTIONS.map((opt) => {
-                const active = packCategory === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[styles.chip, active && styles.chipActive]}
-                    onPress={() => {
-                      packUserModified.current = true;
-                      setPackCategory(opt.value);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{opt.label}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+          <Text style={styles.terrainHint}>Die drei Anteile ergeben zusammen 100 %.</Text>
+        </View>
 
-          {/* ⑨ Inline-Fehler */}
-          {inlineError && (            <View style={styles.errorCard}>
-              <Icon lib="feather" name="alert-circle" size="sm" color={colors.negative} />
-              <Text style={styles.errorText}>{inlineError}</Text>
-            </View>
-          )}
+        {/* ⑨ Eingabe-Karte: eBike-Unterstützung */}
+        <View style={styles.inputCard}>
+          <Text style={styles.cardOverline}>⚡  eBIKE-UNTERSTÜTZUNG</Text>
+          <View style={styles.chipGroup}>
+            {EBIKE_OPTIONS.map((opt) => {
+              const active = ebikeSupport === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setEbikeSupport(opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.chipLabel, active && styles.chipLabelActive]}>{opt.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.ebikeHint}>
+            Starke Unterstützung reduziert den geschätzten Kalorienverbrauch deutlich.
+          </Text>
+        </View>
+
+        {/* ⑩ Inline-Fehler */}
+        {inlineError && (
+          <View style={styles.errorCard}>
+            <Icon lib="feather" name="alert-circle" size="sm" color={colors.negative} />
+            <Text style={styles.errorText}>{inlineError}</Text>
+          </View>
+        )}
       </ScrollView>
 
-      {/* ⑧ Speichern-Button */}
+      {/* ⑪ Speichern-Button */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.saveBtn, !canSubmit && styles.saveBtnDisabled]}
@@ -645,7 +683,7 @@ export default function HikingInputScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       </View>
 
-      {/* Gelände-Info Modal */}
+      {/* Untergrund-Info Modal */}
       <Modal
         visible={terrainInfoVisible}
         transparent
@@ -664,7 +702,7 @@ export default function HikingInputScreen({ navigation, route }: Props) {
                 <View style={styles.terrainInfoHandle} />
               </View>
             </GestureDetector>
-            <Text style={styles.terrainInfoTitle}>Geländetypen</Text>
+            <Text style={styles.terrainInfoTitle}>Untergrundtypen</Text>
             {TERRAIN_INFO.map((item) => (
               <View key={item.label} style={styles.terrainInfoItem}>
                 <Text style={styles.terrainInfoItemLabel}>{item.label}</Text>
@@ -789,7 +827,7 @@ const styles = StyleSheet.create({
     textAlign: 'center' as const,
     lineHeight: 18,
   },
-  // Input cards (③ ④ ⑤)
+  // Input cards
   inputCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -811,33 +849,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: spacing.sm,
   },
-  // ③ Time row
+  // Time row
   timeRow: {
     flexDirection: 'row' as const,
     gap: spacing.sm,
   },
-  timeField: {
-    flex: 1,
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
-  },
-  timeInput: {
-    ...typography.h3,
-    color: colors.text,
-    flex: 1,
-    minWidth: 40,
-  },
-  fieldUnit: {
-    ...typography.body2,
-    color: colors.textMuted,
-  },
+  // Speed row
   speedRow: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -847,50 +864,6 @@ const styles = StyleSheet.create({
   speedLabel: {
     ...typography.caption,
     flex: 1,
-  },
-  // ④ Two-column row
-  twoColumnRow: {
-    flexDirection: 'row' as const,
-    gap: spacing.sm,
-  },
-  columnField: {
-    flex: 1,
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.xs,
-  },
-  columnInput: {
-    ...typography.h3,
-    color: colors.text,
-    flex: 1,
-    minWidth: 40,
-  },
-  // ⑤ Switch row (kept for potential future use)
-  switchRow: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'space-between' as const,
-  },
-  switchLabel: {
-    ...typography.body2,
-    color: colors.textSecondary,
-    flex: 1,
-  },
-  backpackHint: {
-    ...typography.caption,
-    color: colors.primary,
-    backgroundColor: colors.primarySoft,
-    alignSelf: 'flex-start' as const,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    marginTop: spacing.xs,
   },
   // Rundweg button
   rundwegBtn: {
@@ -911,7 +884,48 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600' as const,
   },
-  // Chip group (terrain / pack selectors)
+  // Terrain sliders
+  terrainSliderBlock: {
+    marginBottom: spacing.sm,
+  },
+  terrainSliderHeader: {
+    flexDirection: 'row' as const,
+    justifyContent: 'space-between' as const,
+    alignItems: 'center' as const,
+    marginBottom: spacing.xs,
+  },
+  terrainSliderLabel: {
+    ...typography.body2,
+    color: colors.textSecondary,
+  },
+  terrainSliderValue: {
+    ...typography.body2,
+    fontWeight: '700' as const,
+    color: colors.primary,
+    backgroundColor: colors.primarySoft,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+  },
+  // Trail read-only bar
+  trailBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.border,
+    overflow: 'hidden' as const,
+  },
+  trailBarFill: {
+    height: 8,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: 4,
+  },
+  terrainHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+    textAlign: 'center' as const,
+  },
+  // eBike chips
   chipGroup: {
     flexDirection: 'row' as const,
     flexWrap: 'wrap' as const,
@@ -941,6 +955,11 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontWeight: '600' as const,
   },
+  ebikeHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+  },
   // Disclaimer
   disclaimerCard: {
     flexDirection: 'row' as const,
@@ -956,7 +975,7 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 18,
   },
-  // ⑥ Error card
+  // Error card
   errorCard: {
     flexDirection: 'row' as const,
     alignItems: 'center' as const,
@@ -996,7 +1015,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
   },
-  // ⑦ Footer & save button
+  // Footer & save button
   footer: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
@@ -1018,6 +1037,7 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: '700' as const,
   },
+  // Terrain info modal
   terrainModalRoot: {
     flex: 1,
     justifyContent: 'flex-end' as const,

@@ -93,6 +93,20 @@ export type SpecialActivityType = 'hiking' | 'running' | 'cycling' | 'other';
 export type PackCategory = 'none' | 'small' | 'medium' | 'heavy';
 export type TerrainType  = 'path' | 'trail' | 'alpine' | 'scramble';
 
+export type CyclingTerrainType = 'asphalt' | 'gravel' | 'trail';
+export type EbikeSupport = 'NONE' | 'LIGHT' | 'HIGH';
+
+export interface CyclingActivityInputs {
+  movementTimeMinutes: number;
+  distanceKm: number;
+  elevationGainM: number;
+  elevationLossM?: number;        // defaults to 0 if absent
+  asphaltShare: number;           // 0.0–1.0
+  gravelShare: number;            // 0.0–1.0
+  trailShare: number;             // 0.0–1.0
+  ebikeSupport: EbikeSupport;
+}
+
 export interface HikingActivityInputs {
   movementTimeMinutes: number;
   distanceKm: number;
@@ -106,22 +120,36 @@ export interface HikingActivityInputs {
 
 export interface ActivityBonusResult {
   estimatedMet: number;
-  hikingCalories: number;
+  activityCalories: number;         // renamed from hikingCalories
   alreadyAccountedCalories: number;
   activityBonus: number;
-  // V3 intermediates (optional, populated by new calculator)
+  // V3 hiking intermediates (optional)
   metBase?: number;
   metLocomotion?: number;
   terrainFactor?: number;
   deltaPack?: number;
+  // V1.1 cycling intermediates (optional)
+  speedMet?: number;
+  uphillBonusMet?: number;
+  terrainBonusMet?: number;
+  effectiveSupport?: number;
 }
 
-export interface SpecialActivity extends HikingActivityInputs, ActivityBonusResult {
-  type: SpecialActivityType;
+export type HikingSpecialActivity = HikingActivityInputs & ActivityBonusResult & {
+  type: 'hiking';
   bodyWeightKg: number;
   dailyCalorieTarget: number;
-  calculatedAt: string;             // ISO timestamp
-}
+  calculatedAt: string;
+};
+
+export type CyclingSpecialActivity = CyclingActivityInputs & ActivityBonusResult & {
+  type: 'cycling';
+  bodyWeightKg: number;
+  dailyCalorieTarget: number;
+  calculatedAt: string;
+};
+
+export type SpecialActivity = HikingSpecialActivity | CyclingSpecialActivity;
 
 /** Persisted per-day metadata document (id: "day:YYYY-MM-DD", _docType: "dayMeta"). */
 export interface DayMeta {

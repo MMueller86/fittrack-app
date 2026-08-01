@@ -15,6 +15,20 @@ function formatDuration(minutes: number): string {
   return `${h} h ${m} min`;
 }
 
+const ACTIVITY_TITLE: Record<string, string> = {
+  hiking:  'Wanderung',
+  cycling: 'Radfahrt',
+  running: 'Lauf',
+  other:   'Aktivität',
+};
+
+const ACTIVITY_ICON: Record<string, string> = {
+  hiking:  'hiking',
+  cycling: 'bike',
+  running: 'run',
+  other:   'lightning-bolt',
+};
+
 export interface ActivityCardProps {
   activity: SpecialActivity;
   onShowBreakdown: () => void;
@@ -35,8 +49,8 @@ export function ActivityCard({ activity, onShowBreakdown, onEdit, onDelete, cons
     <View style={styles.card}>
       {/* Header row: type label + bonus badge */}
       <View style={styles.header}>
-        <Icon lib="mci" name="hiking" size="lg" color={colors.primary} />
-        <Text style={styles.title}>Wanderung</Text>
+        <Icon lib="mci" name={(ACTIVITY_ICON[activity.type] ?? 'lightning-bolt') as any} size="lg" color={colors.primary} />
+        <Text style={styles.title}>{ACTIVITY_TITLE[activity.type] ?? 'Aktivität'}</Text>
         <View style={styles.bonus}>
           <Text style={styles.bonusText}>+{Math.round(activity.activityBonus)} kcal</Text>
         </View>

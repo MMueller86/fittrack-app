@@ -116,7 +116,11 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handleEditActivity = () => {
     if (!todayDiary?.specialActivity) return;
-    navigation.navigate('HikingInput', { date: todayDate, existing: todayDiary.specialActivity });
+    if (todayDiary.specialActivity.type === 'cycling') {
+      navigation.navigate('CyclingInput', { date: todayDate, existing: todayDiary.specialActivity });
+    } else {
+      navigation.navigate('HikingInput', { date: todayDate, existing: todayDiary.specialActivity });
+    }
   };
 
   const load = useCallback(async () => {
@@ -297,6 +301,10 @@ export default function HomeScreen({ navigation }: Props) {
         onSelectHiking={() => {
           setActivityPickerVisible(false);
           navigation.navigate('HikingInput', { date: todayDate });
+        }}
+        onSelectCycling={() => {
+          setActivityPickerVisible(false);
+          navigation.navigate('CyclingInput', { date: todayDate });
         }}
       />
 
