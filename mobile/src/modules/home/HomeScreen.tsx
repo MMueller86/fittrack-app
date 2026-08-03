@@ -184,7 +184,10 @@ export default function HomeScreen({ navigation }: Props) {
 
   const hint = getDayHint(
     todayDiary?.summary ?? null,
-    todayTargets ? { calories: todayTargets.calories, proteinG: todayTargets.proteinG } : null,
+    todayTargets ? {
+      calories: todayTargets.calories + (todayDiary?.activityBonus ?? 0),
+      proteinG: todayTargets.proteinG,
+    } : null,
     dayType,
     workoutType,
   );

@@ -458,6 +458,7 @@ export default function CyclingInputScreen({ navigation, route }: Props) {
             }}
             onSlidingStart={() => setSliderScrollEnabled(false)}
             onSlidingComplete={() => setSliderScrollEnabled(true)}
+            disableTrackPress
             theme={{
               maximumTrackTintColor: colors.border,
               minimumTrackTintColor: colors.primary,
@@ -489,6 +490,7 @@ export default function CyclingInputScreen({ navigation, route }: Props) {
             }}
             onSlidingStart={() => setSliderScrollEnabled(false)}
             onSlidingComplete={() => setSliderScrollEnabled(true)}
+            disableTrackPress
             theme={{
               maximumTrackTintColor: colors.border,
               minimumTrackTintColor: colors.primary,
@@ -520,6 +522,7 @@ export default function CyclingInputScreen({ navigation, route }: Props) {
             }}
             onSlidingStart={() => setSliderScrollEnabled(false)}
             onSlidingComplete={() => setSliderScrollEnabled(true)}
+            disableTrackPress
             theme={{
               maximumTrackTintColor: colors.border,
               minimumTrackTintColor: colors.primary,
@@ -575,6 +578,7 @@ export default function CyclingInputScreen({ navigation, route }: Props) {
               }}
               onSlidingStart={() => setSliderScrollEnabled(false)}
               onSlidingComplete={() => setSliderScrollEnabled(true)}
+              disableTrackPress
               theme={{
                 maximumTrackTintColor: colors.border,
                 minimumTrackTintColor: colors.primary,
@@ -605,6 +609,7 @@ export default function CyclingInputScreen({ navigation, route }: Props) {
               }}
               onSlidingStart={() => setSliderScrollEnabled(false)}
               onSlidingComplete={() => setSliderScrollEnabled(true)}
+              disableTrackPress
               theme={{
                 maximumTrackTintColor: colors.border,
                 minimumTrackTintColor: colors.primary,

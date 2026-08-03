@@ -143,5 +143,7 @@ export function calculateCyclingActivityBonus(
     uphillBonusMet,
     terrainBonusMet,
     effectiveSupport,
+    speedMetWithMotor,
+    uphillBonusWithMotor,
   };
 }

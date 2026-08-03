@@ -133,6 +133,9 @@ export interface ActivityBonusResult {
   uphillBonusMet?: number;
   terrainBonusMet?: number;
   effectiveSupport?: number;
+  // effective contributions after gravity + eBike (used for breakdown display)
+  speedMetWithMotor?: number;
+  uphillBonusWithMotor?: number;
 }
 
 export type HikingSpecialActivity = HikingActivityInputs & ActivityBonusResult & {

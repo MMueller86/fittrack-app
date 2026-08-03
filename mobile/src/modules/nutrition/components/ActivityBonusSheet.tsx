@@ -313,33 +313,27 @@ export function ActivityBonusSheet({ visible, onClose, activity }: ActivityBonus
             </View>
 
             {/* ⑤ MET Breakdown Card — cycling (V1.1) */}
-            {activity.type === 'cycling' && activity.speedMet != null && (
+            {activity.type === 'cycling' && activity.speedMetWithMotor != null && (
               <View style={styles.metBreakdownCard}>
                 <Text style={styles.metBreakdownTitle}>MET-Schätzung</Text>
                 <View style={styles.metBreakdownRow}>
-                  <Text style={styles.metBreakdownLabel}>Grundtempo</Text>
-                  <Text style={styles.metBreakdownValue}>{activity.speedMet.toFixed(1)}</Text>
+                  <Text style={styles.metBreakdownLabel}>
+                    {activity.speedMet != null && activity.speedMet - activity.speedMetWithMotor > 0.05
+                      ? 'Grundtempo (inkl. Korrekturen)'
+                      : 'Grundtempo'}
+                  </Text>
+                  <Text style={styles.metBreakdownValue}>{activity.speedMetWithMotor.toFixed(1)}</Text>
                 </View>
-                {activity.uphillBonusMet != null && activity.uphillBonusMet > 0 && (
+                {activity.uphillBonusWithMotor != null && activity.uphillBonusWithMotor > 0 && (
                   <View style={styles.metBreakdownRow}>
                     <Text style={styles.metBreakdownLabel}>+ Anstieg</Text>
-                    <Text style={styles.metBreakdownValue}>+{activity.uphillBonusMet.toFixed(1)}</Text>
+                    <Text style={styles.metBreakdownValue}>+{activity.uphillBonusWithMotor.toFixed(1)}</Text>
                   </View>
                 )}
                 {activity.terrainBonusMet != null && activity.terrainBonusMet > 0 && (
                   <View style={styles.metBreakdownRow}>
                     <Text style={styles.metBreakdownLabel}>+ Untergrund</Text>
                     <Text style={styles.metBreakdownValue}>+{activity.terrainBonusMet.toFixed(1)}</Text>
-                  </View>
-                )}
-                {activity.effectiveSupport != null && activity.effectiveSupport > 0 && (
-                  <View style={styles.metBreakdownRow}>
-                    <Text style={styles.metBreakdownLabel}>
-                      {`eBike-Reduktion (\u2212${Math.round(activity.effectiveSupport * 100)} %)`}
-                    </Text>
-                    <Text style={styles.metBreakdownValue}>
-                      \u2212{((activity.speedMet - 2.3) * activity.effectiveSupport).toFixed(1)}
-                    </Text>
                   </View>
                 )}
                 <View style={styles.metBreakdownDivider} />
