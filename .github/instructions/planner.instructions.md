@@ -20,6 +20,27 @@ Do not plan against assumed behaviour. Confirm current state from the repository
 
 ---
 
+## Terminal Usage (Read-Only)
+
+The Planner may run terminal commands exclusively to **gather information** for analysis and planning. This is permitted and sometimes necessary to confirm the current state of the repository.
+
+**Permitted commands** (read-only, no side effects):
+- `npm list [package]` — check installed package versions
+- `npm list --depth=0` — list top-level installed dependencies
+- `node -e "require('...')"` — inspect module metadata
+- `cat` / `Get-Content` on `package.json`, `package-lock.json`, `tsconfig.json` — read config files
+- `npx tsc --version`, `npx expo --version`, and similar `--version` / `--help` flags
+
+**Prohibited commands** (must not be run by the Planner):
+- Any command that installs, removes, or updates packages (`npm install`, `npm ci`, `npm update`, `npm uninstall`)
+- Any command that modifies files (`npm run build`, `npm run generate`, write scripts)
+- Any command that starts a server, emulator, or long-running process
+- Any command that publishes, deploys, or pushes to remote systems
+
+Implementation agents (Backend, Frontend, QA) are responsible for all commands that change state.
+
+---
+
 ## Requirement Assessment
 
 Before any technical planning, evaluate the requirement:
@@ -81,6 +102,19 @@ When a requirement involves AI, explicitly assess:
 - Are the intentionally shared Azure OpenAI and Document Intelligence services preserved across Development and Alpha?
 
 See `docs/kb/domain/07-ai-features.md` and `docs/kb/domain/08-quota-system.md`.
+
+---
+
+## Third-Party Dependencies
+
+When a plan introduces a new npm package or upgrades an existing one:
+
+1. **Always verify the latest stable version** before specifying a version in the plan. Run `npm view <package> dist-tags.latest` to confirm. Never specify a version based on memory or training data — these go stale.
+2. **Specify the latest stable version** in the work package (e.g. `"react-native-health-connect": "^4.1.2"`). Do not use older versions without documented justification.
+3. **Check for an Expo-specific wrapper** if the package is a native module. A maintained Expo config plugin (e.g. `expo-health-connect`) is always preferred over manual `withAndroidManifest` / `withMainActivity` patches.
+4. **Assess breaking changes** when upgrading across major versions. Run `npm view <package> versions --json` to see the version history. Call out API migration work explicitly in the Frontend Work Package.
+
+Rationale: specifying outdated versions forces implementation agents to work around known bugs that are already fixed in later releases, creating unnecessary debugging cycles.
 
 ---
 

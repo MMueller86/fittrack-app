@@ -18,6 +18,7 @@ mobile/src/
 ├── assets/                  Static assets (icons, images, brand)
 ├── modules/                 Feature modules
 │   ├── auth/                Login screen, auth guards
+│   ├── healthConnect/       HealthConnectScreen (Integrationen)
 │   ├── home/                HomeScreen
 │   ├── nutrition/           DiaryScreen, FoodEntryHub, AI flows
 │   ├── onboarding/          (planned — currently part of profile)
@@ -27,6 +28,12 @@ mobile/src/
 │   ├── scanner/             BarcodeScannerScreen
 │   └── weight/              WeightDetailScreen
 ├── services/
+│   ├── health/              Health platform abstraction (HC-1, HC-2a, HC-2b)
+│   │   ├── IHealthPlatformService.ts   Interface + types
+│   │   ├── MockHealthPlatformService.ts
+│   │   ├── HealthConnectService.ts     Android implementation
+│   │   ├── healthPlatformService.ts    Factory (Mock vs Real)
+│   │   └── healthSyncService.ts        Sync state machine (AsyncStorage)
 │   ├── authConfig.ts        CIAM OAuth config (from env vars)
 │   ├── authService.ts       Token storage, refresh, expiry check
 │   ├── imageService.ts      Image picker utility

@@ -49,6 +49,8 @@ export interface UserProfile {
   goalIntensity: GoalIntensity | null;
   /** Optional display name chosen by the user. Falls back to "Sportler" when absent. */
   displayName?: string;
+  /** Whether the user has enabled Health Connect weight sync. undefined = never configured. */
+  healthSyncEnabled?: boolean;
   targets: ProfileTargets;
   calculationMeta: CalculationMeta;
   createdAt: string;
@@ -71,4 +73,5 @@ export interface ProfileInput {
   goalIntensity: GoalIntensity | null;
   /** Optional display name chosen by the user. */
   displayName?: string;
+  healthSyncEnabled?: boolean;
 }

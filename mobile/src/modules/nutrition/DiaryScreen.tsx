@@ -10,12 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { diaryApi } from '../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { DayStoryCard } from '../../shared/components/DayStoryCard';
 import type { MealMacroSummary } from '../../shared/components/DayStoryCard';
 import type { MacroTarget } from '../../shared/components/MacroSummaryCard';
@@ -241,6 +241,8 @@ export default function DiaryScreen({ navigation }: Props) {
   const { dayType, targets, hydrateDayType } = useDayTypeStore();
   const todayTargets = targets ? (dayType === 'training' ? targets.trainingDay : targets.restDay) : null;
   const openHub = useFoodEntryHubStore((s) => s.open);
+  const insets = useSafeAreaInsets();
+  const [headerRowHeight, setHeaderRowHeight] = useState(0);
 
   // Snackbar
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
@@ -387,7 +389,7 @@ export default function DiaryScreen({ navigation }: Props) {
               void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
               setData((prev) => prev ? { ...prev, meals: prev.meals.filter((m) => m.id !== meal.id) } : prev);
             try {
-              await diaryApi.deleteMeal(meal.id);
+              await diaryApi.deleteMeal(meal);
               void loadDay(date);
             } catch {
               await loadDay(date);
@@ -434,6 +436,7 @@ export default function DiaryScreen({ navigation }: Props) {
       date,
       mealType: meal?.type,
       onSuccess: () => { void loadDay(date); },
+      topInset: insets.top + headerRowHeight,
     });
   };
 
@@ -489,7 +492,7 @@ export default function DiaryScreen({ navigation }: Props) {
           }
         })
       }>
-        <View style={styles.headerRow}>
+        <View style={styles.headerRow} onLayout={(e) => setHeaderRowHeight(e.nativeEvent.layout.height)}>
           {/* Left: screen eyebrow label */}
           <Text style={styles.headerEyebrow}>Ernährung</Text>
           {/* Center: date navigator */}

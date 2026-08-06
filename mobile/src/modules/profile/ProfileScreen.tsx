@@ -405,6 +405,19 @@ export default function ProfileScreen({ navigation }: Props) {
                 </>
               )}
 
+              {/* Integrationen */}
+              <Text style={[styles.cardTitle, styles.integrationHeader]}>Integrationen</Text>
+              <View style={styles.card}>
+                <TouchableOpacity
+                  style={styles.navRow}
+                  onPress={() => navigation.navigate('HealthConnect')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.navRowLabel}>Health Connect</Text>
+                  <Text style={styles.navRowChevron}>{'›'}</Text>
+                </TouchableOpacity>
+              </View>
+
             </>
           )}
         </ScrollView>
@@ -556,6 +569,17 @@ const styles = StyleSheet.create({
   infoValue: { ...typography.body2, color: colors.text, fontWeight: '600' },
 
   sectionHeader: { ...typography.h3, color: colors.text, marginTop: spacing.sm, marginBottom: spacing.sm },
+
+  integrationHeader: { marginTop: spacing.md, marginBottom: spacing.xs },
+
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  navRowLabel: { ...typography.body1, color: colors.text },
+  navRowChevron: { fontSize: 20, color: colors.textMuted, lineHeight: 24 },
 
   macroCard: {
     backgroundColor: colors.surface,

@@ -2,7 +2,7 @@
 // Shows LoginScreen when unauthenticated, main app when authenticated.
 
 import React, { useEffect } from 'react';
-import { ActivityIndicator, LogBox, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, LogBox, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -14,6 +14,8 @@ import LoginScreen from '../modules/auth/LoginScreen';
 import { useAuthStore } from '../modules/auth/useAuthStore';
 import { colors } from './theme';
 import ErrorBoundary from './ErrorBoundary';
+import { healthSyncService } from '../services/health/healthSyncService';
+import { nutritionSyncService } from '../services/health/nutritionSyncService';
 
 // Intercept native-reconciler errors that bypass ErrorBoundary (e.g. "Text strings must be rendered")
 // Logs the full call stack so the source is identifiable during debugging.
@@ -35,6 +37,16 @@ export default function App() {
 
   useEffect(() => {
     initialize();
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void healthSyncService.drainPendingQueue();
+        void nutritionSyncService.drainPendingQueue();
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   let content: React.ReactNode;

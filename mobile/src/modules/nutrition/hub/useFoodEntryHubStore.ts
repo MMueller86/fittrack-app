@@ -25,6 +25,8 @@ interface FoodEntryHubStore {
   /** If true, hub closes automatically after a subflow saves (HomeScreen use case) */
   autoCloseOnSave: boolean;
   onSuccess: (() => void) | null;
+  /** Pixel offset from screen top where the sheet's top edge should be pinned (HomeScreen use case) */
+  topInset: number;
 
   open: (params?: {
     mealId?: string;
@@ -37,6 +39,8 @@ interface FoodEntryHubStore {
     initialSubflow?: 'barcode' | 'ai';
     /** Close hub automatically after save (HomeScreen use case) */
     autoCloseOnSave?: boolean;
+    /** Pin sheet top to this pixel offset (safeAreaTop + header height) — HomeScreen only */
+    topInset?: number;
   }) => void;
 
   close: () => void;
@@ -49,6 +53,7 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   autoFocusSearch: false,
   initialSubflow: null,
   autoCloseOnSave: false,
+  topInset: 0,
   context: {
     date: TODAY(),
     mealType: getSuggestedMealType(),
@@ -63,6 +68,7 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
       autoFocusSearch: params?.autoFocusSearch ?? false,
       initialSubflow: params?.initialSubflow ?? null,
       autoCloseOnSave: params?.autoCloseOnSave ?? false,
+      topInset: params?.topInset ?? 0,
       context: {
         mealId: params?.mealId,
         date,
@@ -73,6 +79,6 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   },
 
   close: () => {
-    set({ isOpen: false, autoFocusSearch: false, initialSubflow: null, autoCloseOnSave: false, onSuccess: null });
+    set({ isOpen: false, autoFocusSearch: false, initialSubflow: null, autoCloseOnSave: false, topInset: 0, onSuccess: null });
   },
 }));

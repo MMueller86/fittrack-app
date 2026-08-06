@@ -26,6 +26,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { addWeight, deleteWeight, listWeights } from '../../services/weightsService';
+import { healthSyncService } from '../../services/health/healthSyncService';
 import type { WeightEntry, WeightUnit, GoalType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
@@ -110,6 +111,8 @@ export default function ProgressScreen() {
       const created = await addWeight({ value, unit });
       setEntries((prev) => [created, ...prev]);
       setInput('');
+      // fire-and-forget — FitTrack-Flow nicht blockieren
+      void healthSyncService.syncWeightUpsert(created);
     } catch (e) {
       Alert.alert('Fehler', formatApiError(e, 'Speichern fehlgeschlagen'));
     } finally {
@@ -131,6 +134,7 @@ export default function ProgressScreen() {
             setEntries((prev) => prev.filter((e) => e.id !== entry.id));
             try {
               await deleteWeight(entry.id);
+              void healthSyncService.syncWeightDelete(entry.id);
             } catch (e) {
               setEntries(snapshot);
               Alert.alert('Fehler', formatApiError(e, 'Löschen fehlgeschlagen'));

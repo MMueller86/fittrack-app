@@ -11,10 +11,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { DiaryDayResponse, MealType, Recipe } from '@fittrack/shared';
+import type { DiaryDayResponse, Meal, MealType, Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
 import { diaryApi } from '../../shared/api/diaryApi';
+import { nutritionSyncService } from '../../services/health/nutritionSyncService';
 
 interface Props {
   visible: boolean;
@@ -76,7 +77,8 @@ export default function LogRecipeModal({ visible, recipe, onClose, onLogged }: P
     }
     setLogging(true);
     try {
-      await recipeApi.log(recipe.id, { portions: effectivePortions, mealId: selectedMealId });
+      const result = await recipeApi.log(recipe.id, { portions: effectivePortions, mealId: selectedMealId });
+      void nutritionSyncService.syncNutritionUpsert(result as Meal);
       onLogged();
     } catch {
       Alert.alert('Fehler', 'Rezept konnte nicht eingetragen werden.');

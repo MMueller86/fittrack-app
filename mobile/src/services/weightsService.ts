@@ -20,8 +20,19 @@ export interface AddWeightInput {
   date?: string; // YYYY-MM-DD
 }
 
+// Returns today's date in the device's local timezone as YYYY-MM-DD.
+// The backend fallback (todayIso) uses UTC which misreports the date for
+// users in UTC+ timezones entering weights between midnight and 2 am.
+function localTodayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export async function addWeight(input: AddWeightInput): Promise<WeightEntry> {
-  const { data } = await apiClient.post<WeightEntry>('/weights', input);
+  const { data } = await apiClient.post<WeightEntry>('/weights', {
+    date: localTodayIso(),
+    ...input, // explicit date in input takes precedence
+  });
   return data;
 }
 

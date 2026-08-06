@@ -24,7 +24,7 @@ import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
 import { isQuotaExceededError } from '../../shared/api/client';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
-import { diaryApi } from '../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { foodApi } from '../../shared/api/foodApi';
 import { aiApi } from '../../shared/api/aiApi';
 import { calculateNutrition } from './nutritionUtils';

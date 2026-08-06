@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Meal, MealItem, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { diaryApi } from '../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { buildCopyPayload } from './diaryItemUtils';
 import { useSourceProduct } from './useSourceProduct';
 

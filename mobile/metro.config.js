@@ -11,7 +11,7 @@ const workspaceRoot = path.resolve(projectRoot, '..');
 const config = getDefaultConfig(projectRoot);
 
 // Watch the entire monorepo so Metro can find ../shared/ files
-config.watchFolders = [workspaceRoot];
+config.watchFolders = [workspaceRoot, ...(config.watchFolders ?? [])];
 
 // Resolve node_modules from both the mobile package and the workspace root
 config.resolver.nodeModulesPaths = [

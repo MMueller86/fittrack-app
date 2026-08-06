@@ -1,6 +1,6 @@
 ﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
 
-import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler, getDiaryHandler } from './diary';
+import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler, getDiaryHandler, listMealsHandler } from './diary';
 import { __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
 import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
@@ -637,5 +637,139 @@ describe('GET /api/diary — specialActivity response fields', () => {
     expect(res.status).toBe(200);
     const body = res.jsonBody as { previousDayHasActivity: boolean };
     expect(body.previousDayHasActivity).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/diary/meals — listMealsHandler
+// ---------------------------------------------------------------------------
+
+describe('GET /api/diary/meals — listMealsHandler', () => {
+  it('returns empty meals array for a new user', async () => {
+    const req = await makeAuthRequest({ query: {} });
+    const res = await listMealsHandler(req, makeContext());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { meals: unknown[]; cursor?: string };
+    expect(body.meals).toEqual([]);
+    expect(body.cursor).toBeUndefined();
+  });
+
+  it('returns meals in ascending date order', async () => {
+    // Create meals on different dates
+    await createMealHandler(
+      await makeAuthRequest({ body: { date: '2026-05-10', type: 'lunch' } }),
+      makeContext(),
+    );
+    await createMealHandler(
+      await makeAuthRequest({ body: { date: '2026-05-08', type: 'breakfast' } }),
+      makeContext(),
+    );
+    await createMealHandler(
+      await makeAuthRequest({ body: { date: '2026-05-09', type: 'dinner' } }),
+      makeContext(),
+    );
+
+    const req = await makeAuthRequest({ query: {} });
+    const res = await listMealsHandler(req, makeContext());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { meals: { date: string }[] };
+    expect(body.meals.map((m) => m.date)).toEqual(['2026-05-08', '2026-05-09', '2026-05-10']);
+  });
+
+  it('respects the limit query parameter', async () => {
+    for (let i = 1; i <= 5; i++) {
+      await createMealHandler(
+        await makeAuthRequest({ body: { date: `2026-05-${String(i).padStart(2, '0')}`, type: 'lunch' } }),
+        makeContext(),
+      );
+    }
+
+    const req = await makeAuthRequest({ query: { limit: '2' } });
+    const res = await listMealsHandler(req, makeContext());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { meals: unknown[]; cursor?: string };
+    expect(body.meals).toHaveLength(2);
+    expect(body.cursor).toBeDefined();
+  });
+
+  it('defaults to limit 50 when no limit is provided', async () => {
+    // Create 55 meals
+    for (let i = 1; i <= 55; i++) {
+      const month = i <= 28 ? '01' : '02';
+      const day = i <= 28 ? String(i).padStart(2, '0') : String(i - 28).padStart(2, '0');
+      await createMealHandler(
+        await makeAuthRequest({ body: { date: `2026-${month}-${day}`, type: 'breakfast' } }),
+        makeContext(),
+      );
+    }
+
+    const req = await makeAuthRequest({ query: {} });
+    const res = await listMealsHandler(req, makeContext());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { meals: unknown[]; cursor?: string };
+    expect(body.meals).toHaveLength(50);
+    expect(body.cursor).toBeDefined();
+  });
+
+  it('caps limit at 100', async () => {
+    for (let i = 1; i <= 5; i++) {
+      await createMealHandler(
+        await makeAuthRequest({ body: { date: `2026-05-${String(i).padStart(2, '0')}`, type: 'snack' } }),
+        makeContext(),
+      );
+    }
+
+    const req = await makeAuthRequest({ query: { limit: '200' } });
+    const res = await listMealsHandler(req, makeContext());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { meals: unknown[] };
+    // All 5 returned (capped at 100 but only 5 exist)
+    expect(body.meals).toHaveLength(5);
+  });
+
+  it('cursor from page N returns the correct next page', async () => {
+    for (let i = 1; i <= 4; i++) {
+      await createMealHandler(
+        await makeAuthRequest({ body: { date: `2026-06-${String(i).padStart(2, '0')}`, type: 'breakfast' } }),
+        makeContext(),
+      );
+    }
+
+    // Fetch page 1 (limit=2)
+    const req1 = await makeAuthRequest({ query: { limit: '2' } });
+    const res1 = await listMealsHandler(req1, makeContext());
+    const body1 = res1.jsonBody as { meals: { date: string }[]; cursor: string };
+    expect(body1.meals).toHaveLength(2);
+    expect(body1.cursor).toBeDefined();
+
+    // Fetch page 2 using cursor
+    const req2 = await makeAuthRequest({ query: { limit: '2', cursor: body1.cursor } });
+    const res2 = await listMealsHandler(req2, makeContext());
+    const body2 = res2.jsonBody as { meals: { date: string }[]; cursor?: string };
+    expect(body2.meals).toHaveLength(2);
+    // Pages should not overlap
+    const allDates = [...body1.meals.map((m) => m.date), ...body2.meals.map((m) => m.date)];
+    expect(new Set(allDates).size).toBe(4);
+  });
+
+  it('does not include cursor in response for the last page', async () => {
+    await createMealHandler(
+      await makeAuthRequest({ body: { date: '2026-07-01', type: 'dinner' } }),
+      makeContext(),
+    );
+
+    const req = await makeAuthRequest({ query: {} });
+    const res = await listMealsHandler(req, makeContext());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { meals: unknown[]; cursor?: string };
+    expect(body.meals).toHaveLength(1);
+    expect(body.cursor).toBeUndefined();
+  });
+
+  it('returns 401 when no auth token is provided', async () => {
+    const { makeRequest } = await import('../test-utils/http');
+    const req = makeRequest({ query: {} });
+    const res = await listMealsHandler(req, makeContext());
+    expect(res.status).toBe(401);
   });
 });

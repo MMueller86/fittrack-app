@@ -196,4 +196,28 @@ export class CosmosDiaryRepository implements DiaryRepository {
     }
     return count;
   }
+
+  async listAllMeals(
+    userId: string,
+    options?: { limit?: number; cursor?: string },
+  ): Promise<{ meals: Meal[]; cursor?: string }> {
+    const { containers } = await getCosmos();
+    const limit = Math.min(options?.limit ?? 50, 100);
+    const iterator = containers.nutritionDiaryMeals.items.query<Meal>(
+      {
+        query: 'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.date ASC',
+        parameters: [{ name: '@userId', value: userId }],
+      },
+      {
+        partitionKey: userId,
+        maxItemCount: limit,
+        ...(options?.cursor ? { continuationToken: options.cursor } : {}),
+      },
+    );
+    const page = await iterator.fetchNext();
+    return {
+      meals: page.resources,
+      cursor: page.hasMoreResults ? page.continuationToken : undefined,
+    };
+  }
 }

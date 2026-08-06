@@ -19,7 +19,7 @@ import { colors, radius, spacing, typography } from '../../../app/theme';
 import { formatApiError } from '../../../shared/api/apiError';
 import { isQuotaExceededError } from '../../../shared/api/client';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
-import { diaryApi } from '../../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import LabelScanReviewScreen from '../LabelScanReviewScreen';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 import type { MealType } from '@fittrack/shared';

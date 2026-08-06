@@ -26,7 +26,8 @@ RootNavigator (NavigationContainer)
         ├── ProfileMain → ProfileScreen
         ├── ProfileEdit → ProfileEditScreen (param: profile)
         ├── MyProducts → MyProductsScreen
-        └── Library → LibraryScreen
+        ├── Library → LibraryScreen
+        └── HealthConnect → HealthConnectScreen
 
 Modals (overlaid on top):
 ├── ProfileWizardScreen — shown on first launch (no SKIP_WIZARD_KEY in AsyncStorage)
@@ -106,6 +107,7 @@ ProfileStackParamList = {
   ProfileEdit: { profile: UserProfile | null };
   MyProducts: undefined;
   Library: undefined;
+  HealthConnect: undefined;
 }
 
 RecipeStackParamList = {

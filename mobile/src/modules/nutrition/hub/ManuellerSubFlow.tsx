@@ -5,7 +5,7 @@
 import React from 'react';
 import LabelScanReviewScreen from '../LabelScanReviewScreen';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
-import { diaryApi } from '../../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import type { MealType } from '@fittrack/shared';
 
 interface Props {

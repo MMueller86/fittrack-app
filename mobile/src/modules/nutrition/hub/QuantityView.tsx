@@ -22,7 +22,7 @@ import * as Haptics from 'expo-haptics';
 import type { FoodSearchResult, MealType } from '@fittrack/shared';
 import { calculateNutrition } from '../nutritionUtils';
 import { colors, radius, spacing, typography } from '../../../app/theme';
-import { diaryApi } from '../../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
@@ -329,15 +329,16 @@ export function QuantityView({ product, context, onBack, onAdded, prefill }: Qua
       ? parseFloat(quantityStr.replace(',', '.'))
       : undefined;
     try {
-      // Wenn kein mealId: existierende Mahlzeit suchen, sonst neu anlegen
+      // Wenn kein mealId oder temporäre ID (Kaltstart-Racebedingung): Mahlzeit per Typ suchen
       let mealId = context.mealId;
-      if (!mealId) {
+      if (!mealId || mealId.startsWith('temp-')) {
+        const targetType = context.mealType ?? selectedMeal;
         const dayData = await diaryApi.getDay(context.date);
-        const existing = dayData.meals.find((m) => m.type === selectedMeal);
+        const existing = dayData.meals.find((m) => m.type === targetType);
         if (existing) {
           mealId = existing.id;
         } else {
-          const created = await diaryApi.createMeal(context.date, selectedMeal);
+          const created = await diaryApi.createMeal(context.date, targetType);
           mealId = created.meal.id;
         }
       }

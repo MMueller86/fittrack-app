@@ -67,6 +67,7 @@ Beyond test execution, verify:
 - **Security-sensitive changes:** if `auth.ts`, `requireUser()`, or any endpoint auth is touched — verify the authentication contract is preserved and no secrets are introduced
 - **API contract changes:** if request/response shapes changed — verify shared types and `docs/kb/tech/09-api-reference.md` are updated
 - **Documentation:** if documented behaviour changed — verify the corresponding `docs/kb/` document was updated
+- **Dependency versions:** if a new package version is introduced (added or updated in any `package.json`), verify it is the latest stable version using `npm view <package> version`. If an older version was chosen, the Planner's plan must contain an explicit justification. Without that justification, classify the finding as **Blocking**.
 
 ## Coverage Expectations
 

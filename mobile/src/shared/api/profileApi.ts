@@ -54,6 +54,29 @@ export const profileApi = {
     return apiClient.delete('/profile').then(() => undefined);
   },
 
+  /** Persists healthSyncEnabled without requiring the caller to pass the full profile. */
+  async updateHealthSync(enabled: boolean): Promise<void> {
+    const res = await apiClient.get<ProfileResponse>('/profile/me');
+    const existing = res.data.profile;
+    if (!existing) return;
+    await apiClient.put('/profile', {
+      gender: existing.gender,
+      age: existing.age,
+      heightCm: existing.heightCm,
+      weightKg: existing.weightKg,
+      targetWeightKg: existing.targetWeightKg,
+      stepsPerDay: existing.stepsPerDay,
+      activityLevel: existing.activityLevel,
+      trainingFrequencyPerWeek: existing.trainingFrequencyPerWeek,
+      trainingDurationMinutes: existing.trainingDurationMinutes,
+      sports: existing.sports,
+      goal: existing.goal,
+      goalIntensity: existing.goalIntensity,
+      displayName: existing.displayName,
+      healthSyncEnabled: enabled,
+    });
+  },
+
   setDayType(date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<{ dayMeta: DayMeta }> {
     return apiClient
       .put<{ dayMeta: DayMeta }>(`/diary/${date}/day-type`, { dayType, workoutType: workoutType ?? undefined })

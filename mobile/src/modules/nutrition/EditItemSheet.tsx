@@ -27,7 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { Meal, MealItem } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { diaryApi } from '../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
 import { useSourceProduct } from './useSourceProduct';
 

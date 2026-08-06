@@ -78,6 +78,11 @@ export interface DiaryRepository {
     newNutritionPer100g: NutritionValues,
     newPortionWeightGrams?: number,
   ): Promise<number>;
+  /** Paginated list of all meals for a user, sorted by date ascending — used for Health Connect export */
+  listAllMeals(
+    userId: string,
+    options?: { limit?: number; cursor?: string },
+  ): Promise<{ meals: Meal[]; cursor?: string }>;
 }
 
 export function computeSummary(meals: Meal[]): DaySummary {
@@ -253,6 +258,24 @@ class InMemoryDiaryRepository implements DiaryRepository {
       }
     }
     return count;
+  }
+
+  async listAllMeals(
+    userId: string,
+    options?: { limit?: number; cursor?: string },
+  ): Promise<{ meals: Meal[]; cursor?: string }> {
+    const limit = Math.min(options?.limit ?? 50, 100);
+    const offset = options?.cursor ? parseInt(options.cursor, 10) : 0;
+    const all = [...this.mealsByDay.values()]
+      .flat()
+      .filter((m) => m.userId === userId)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const page = all.slice(offset, offset + limit);
+    const nextOffset = offset + limit;
+    return {
+      meals: page,
+      cursor: nextOffset < all.length ? String(nextOffset) : undefined,
+    };
   }
 }
 

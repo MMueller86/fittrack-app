@@ -211,6 +211,49 @@ describe('PUT /api/profile', () => {
     );
     expect(res.status).toBe(401);
   });
+
+  it('persists healthSyncEnabled: true', async () => {
+    await createProfileHandler(await makeAuthRequest({ body: validInput }), makeContext());
+
+    const res = await updateProfileHandler(
+      await makeAuthRequest({ body: { ...validInput, healthSyncEnabled: true } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { profile: UserProfile };
+    expect(body.profile.healthSyncEnabled).toBe(true);
+  });
+
+  it('persists healthSyncEnabled: false', async () => {
+    await createProfileHandler(await makeAuthRequest({ body: validInput }), makeContext());
+
+    const res = await updateProfileHandler(
+      await makeAuthRequest({ body: { ...validInput, healthSyncEnabled: false } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { profile: UserProfile };
+    expect(body.profile.healthSyncEnabled).toBe(false);
+  });
+
+  it('preserves existing healthSyncEnabled when field is absent from body', async () => {
+    await createProfileHandler(await makeAuthRequest({ body: validInput }), makeContext());
+    await updateProfileHandler(
+      await makeAuthRequest({ body: { ...validInput, healthSyncEnabled: true } }),
+      makeContext(),
+    );
+
+    const res = await updateProfileHandler(
+      await makeAuthRequest({ body: validInput }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { profile: UserProfile };
+    expect(body.profile.healthSyncEnabled).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------

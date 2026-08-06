@@ -25,7 +25,7 @@ import { formatApiError } from '../../../shared/api/apiError';
 import { isQuotaExceededError } from '../../../shared/api/client';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
-import { diaryApi } from '../../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import MealEstimateReviewScreen from '../MealEstimateReviewScreen';
 import MealParserReviewScreen from '../MealParserReviewScreen';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';

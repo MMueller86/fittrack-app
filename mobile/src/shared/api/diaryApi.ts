@@ -132,4 +132,13 @@ export const diaryApi = {
   removeSpecialActivity(date: string): Promise<void> {
     return apiClient.delete(`/diary/day/${date}/special-activity`).then(() => undefined);
   },
+
+  /** GET /api/diary/meals?limit=50&cursor=<token> */
+  listAllMeals(limit?: number, cursor?: string): Promise<{ meals: Meal[]; cursor?: string }> {
+    return apiClient
+      .get<{ meals: Meal[]; cursor?: string }>('/diary/meals', {
+        params: { limit: limit ?? 50, ...(cursor ? { cursor } : {}) },
+      })
+      .then((r) => r.data);
+  },
 };

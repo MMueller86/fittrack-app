@@ -20,6 +20,7 @@ import ProfileScreen from '../../modules/profile/ProfileScreen';
 import ProfileEditScreen from '../../modules/profile/ProfileEditScreen';
 import MyProductsScreen from '../../modules/profile/MyProductsScreen';
 import LibraryScreen from '../../modules/profile/LibraryScreen';
+import HealthConnectScreen from '../../modules/healthConnect/HealthConnectScreen';
 import ProfileWizardScreen, { SKIP_WIZARD_KEY } from '../../modules/profile/ProfileWizardScreen';
 import type { UserProfile } from '@fittrack/shared';
 import type { SpecialActivity } from '@fittrack/shared';
@@ -74,6 +75,7 @@ export type ProfileStackParamList = {
   ProfileEdit: { profile: UserProfile | null };
   MyProducts: undefined;
   Library: undefined;
+  HealthConnect: undefined;
 };
 
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
@@ -90,6 +92,7 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <ProfileStack.Screen name="MyProducts" component={MyProductsScreen} />
       <ProfileStack.Screen name="Library" component={LibraryScreen} />
+      <ProfileStack.Screen name="HealthConnect" component={HealthConnectScreen} />
     </ProfileStack.Navigator>
   );
 }

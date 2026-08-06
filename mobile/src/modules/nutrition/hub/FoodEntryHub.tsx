@@ -21,7 +21,7 @@ import { Icon } from '../../../shared/components/Icon';
 import type { ReusableItem } from '@fittrack/shared';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { foodApi } from '../../../shared/api/foodApi';
-import { diaryApi } from '../../../shared/api/diaryApi';
+import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import { reusableItemsApi } from '../../../shared/api/reusableItemsApi';
 import { recipeApi } from '../../../shared/api/recipeApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
@@ -40,7 +40,8 @@ import { LabelSubFlow } from './LabelSubFlow';
 import { getSuggestedMealType } from './mealTimeRules';
 
 // Einziger Snap Point -- Sheet bleibt bei 85%, Tastatur überlagert nur den unteren Inhalt
-const SNAP_POINTS = ['85%'];
+const DEFAULT_SNAP_POINTS = ['85%'];
+const FULL_SNAP_POINTS = ['100%'];
 
 // ---------------------------------------------------------------------------
 // Filter types + options
@@ -74,7 +75,7 @@ const MEAL_LABEL: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export function FoodEntryHub() {
-  const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave } = useFoodEntryHubStore();
+  const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave, topInset: hubTopInset } = useFoodEntryHubStore();
   const [hubState, dispatch] = useReducer(hubReducer, INITIAL_HUB_STATE);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -308,8 +309,9 @@ export function FoodEntryHub() {
     // Sheet hat sich selbst geschlossen (Swipe/onDismiss). Ref VOR close() setzen,
     // damit useEffect([isOpen]) kein doppeltes dismiss() ausführt.
     sheetIsOpenRef.current = false;
+    onSuccess?.();
     close();
-  }, [close]);
+  }, [close, onSuccess]);
 
   // ---------------------------------------------------------------------------
   // Header subtitle
@@ -547,24 +549,42 @@ export function FoodEntryHub() {
   }, [allFavorites]);
 
   const handleDirectAdd = useCallback(async (item: UserFoodRelation) => {
-    if (!context.mealId || !item.preferredInputAmount || !item.nutritionPer100g) {
-      // Fallback: open QuantityView
+    // Fehlende Nährwerte → kein Direkthinzufügen möglich
+    if (!item.preferredInputAmount || !item.nutritionPer100g) {
+      void handleSelectRelation(item);
+      return;
+    }
+    // Temporäre IDs (Kaltstart-Race) → QuantityView als Fallback
+    if (context.mealId?.startsWith('temp-')) {
       void handleSelectRelation(item);
       return;
     }
     setDirectAddLoadingRefs(prev => new Set(prev).add(item.foodRef));
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      // Kein mealId (z.B. HomeScreen): Mahlzeit per Tageszeit-Typ finden oder neu anlegen
+      let mealId = context.mealId;
+      if (!mealId) {
+        const dayData = await diaryApi.getDay(context.date);
+        const existing = dayData.meals.find((m) => m.type === context.mealType);
+        if (existing) {
+          mealId = existing.id;
+        } else {
+          const created = await diaryApi.createMeal(context.date, context.mealType);
+          mealId = created.meal.id;
+        }
+      }
       const amountGrams = item.preferredInputMode === 'portion'
         ? item.preferredInputAmount * (item.portion?.weightGrams ?? 100)
         : item.preferredInputAmount;
-      const result = await diaryApi.addItem(context.mealId, {
+      const result = await diaryApi.addItem(mealId, {
         productId: item.foodRef,
         productName: item.displayName,
         inputMode: item.preferredInputMode ?? 'grams',
         inputAmount: item.preferredInputAmount,
         amountGrams,
-        sourceType: item.foodRefType,
+        // foodRefType → backend sourceType enum mapping
+        sourceType: item.foodRefType === 'catalog' ? 'openFoodFacts' : item.foodRefType === 'personal' ? 'reusableItem' : item.foodRefType,
         imageUrl: item.imageUrl,
         calculatedNutrition: {
           calories: item.nutritionPer100g.calories * amountGrams / 100,
@@ -575,9 +595,10 @@ export function FoodEntryHub() {
       });
       const items = result.meal?.items ?? [];
       const itemId = items[items.length - 1]?.id ?? '';
-      handleQuantityAdded(item.displayName, context.mealId, itemId);
+      handleQuantityAdded(item.displayName, mealId, itemId);
     } catch {
-      // Silent — user can tap the row to open QuantityView
+      // API-Fehler → Fallback auf QuantityView
+      void handleSelectRelation(item);
     } finally {
       setDirectAddLoadingRefs(prev => {
         const next = new Set(prev);
@@ -651,7 +672,8 @@ export function FoodEntryHub() {
     <>
       <BottomSheetModal
         ref={sheetRef}
-        snapPoints={SNAP_POINTS}
+        snapPoints={hubTopInset > 0 ? FULL_SNAP_POINTS : DEFAULT_SNAP_POINTS}
+        topInset={hubTopInset}
         enableDynamicSizing={false}
         index={0}
         onDismiss={handleSheetDismiss}

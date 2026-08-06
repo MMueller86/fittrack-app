@@ -34,6 +34,7 @@ const ProfileInputSchema = z.object({
   goal: z.enum(['lose_weight', 'maintain', 'gain_muscle', 'recomposition']),
   goalIntensity: z.enum(['gentle', 'moderate', 'aggressive']).nullable(),
   displayName: z.string().max(50).optional(),
+  healthSyncEnabled: z.boolean().optional(),
 }).refine(
   (d) => d.stepsPerDay != null || d.activityLevel != null,
   { message: 'Either stepsPerDay or activityLevel must be provided', path: ['stepsPerDay'] },
@@ -47,6 +48,7 @@ async function buildAndSaveProfile(
   userId: string,
   input: ProfileInput,
   existingCreatedAt?: string,
+  existingHealthSyncEnabled?: boolean,
 ): Promise<UserProfile> {
   const { targets, meta } = calculateProfileTargets(input);
   const now = new Date().toISOString();
@@ -67,6 +69,11 @@ async function buildAndSaveProfile(
     goal: input.goal,
     goalIntensity: input.goalIntensity,
     ...(input.displayName !== undefined && { displayName: input.displayName }),
+    ...(input.healthSyncEnabled !== undefined
+      ? { healthSyncEnabled: input.healthSyncEnabled }
+      : existingHealthSyncEnabled !== undefined
+      ? { healthSyncEnabled: existingHealthSyncEnabled }
+      : {}),
     targets,
     calculationMeta: meta,
     createdAt: existingCreatedAt ?? now,
@@ -131,7 +138,7 @@ export const updateProfileHandler = withHandler(
 
     const repo = getProfileRepository();
     const existing = await repo.get(userId);
-    const profile = await buildAndSaveProfile(userId, parsed.data, existing?.createdAt);
+    const profile = await buildAndSaveProfile(userId, parsed.data, existing?.createdAt, existing?.healthSyncEnabled);
 
     logEvent(ctx, 'info', 'profile.updated', { goal: profile.goal });
     return { status: 200, jsonBody: { profile, targets: profile.targets } };

@@ -16,7 +16,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -61,6 +61,8 @@ function getGreeting(): string {
 
 export default function HomeScreen({ navigation }: Props) {
   const openHub = useFoodEntryHubStore((s) => s.open);
+  const insets = useSafeAreaInsets();
+  const [brandHeaderHeight, setBrandHeaderHeight] = useState(0);
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [todayDiary, setTodayDiary] = useState<DiaryDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -196,7 +198,7 @@ export default function HomeScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Sticky Header: Brand + Search Bar */}
       <View style={styles.stickyHeader}>
-        <View style={styles.brandHeader}>
+        <View style={styles.brandHeader} onLayout={(e) => setBrandHeaderHeight(e.nativeEvent.layout.height)}>
           <Text style={styles.brandLogo}>
             Fit<Text style={styles.brandAccent}>Track</Text>
           </Text>
@@ -206,7 +208,7 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.searchRow}>
           <TouchableOpacity
             style={styles.searchPill}
-            onPress={() => openHub()}
+            onPress={() => openHub({ onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Lebensmittel suchen"
@@ -216,7 +218,7 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.searchAction}
-            onPress={() => openHub({ initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh })}
+            onPress={() => openHub({ initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="KI-Analyse"
@@ -225,7 +227,7 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.searchAction}
-            onPress={() => openHub({ initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh })}
+            onPress={() => openHub({ initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Barcode scannen"

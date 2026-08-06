@@ -14,9 +14,10 @@ import { getHintStateRepository } from '../lib/repositories/hintStateRepository'
 import { evaluateHint } from '../lib/hintEngine';
 import type { DayTargets } from '../../../shared/types/nutrition';
 
-// GET    /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
+// GET /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
 // PUT    /api/diary/{date}/day-type             — set rest/training day type
 // POST   /api/diary/meals                        — create meal
+// GET    /api/diary/meals                        — list all meals (paginated, Health Connect export)
 // DELETE /api/diary/meals/:id                    — delete meal + items
 // POST   /api/diary/meals/:id/items              — add item (flat macros OR quantityMode+source)
 // DELETE /api/diary/meals/:id/items/:itemId      — remove item
@@ -239,6 +240,27 @@ export const createMealHandler = withHandler(
     });
     logEvent(ctx, 'info', 'diary.meal.created', { userId, mealId: meal.id, type: meal.type });
     return { status: 201, jsonBody: { meal } };
+  },
+);
+
+// GET /api/diary/meals
+export const listMealsHandler = withHandler(
+  'diary.meals.list',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const limitParam = parseInt(request.query.get('limit') ?? '50', 10);
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 100) : 50;
+    const cursor = request.query.get('cursor') ?? undefined;
+
+    const { meals, cursor: nextCursor } = await getDiaryRepository().listAllMeals(
+      userId,
+      { limit, cursor },
+    );
+    logEvent(ctx, 'info', 'diary.meals.list', { userId, count: meals.length });
+    return {
+      status: 200,
+      jsonBody: { meals, ...(nextCursor ? { cursor: nextCursor } : {}) },
+    };
   },
 );
 
@@ -527,6 +549,13 @@ app.http('diary-meals-create', {
   authLevel: 'anonymous',
   route: 'diary/meals',
   handler: createMealHandler,
+});
+
+app.http('diary-meals-list', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'diary/meals',
+  handler: listMealsHandler,
 });
 
 app.http('diary-meals-update', {
