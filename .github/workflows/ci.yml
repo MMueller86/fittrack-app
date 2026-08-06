@@ -26,14 +26,6 @@ concurrency:
 permissions:
   contents: read
 
-# Opt JavaScript actions (checkout, setup-node, ...) into the Node 24
-# runtime ahead of GitHub's June 2 2026 default switch. Suppresses the
-# "Node.js 20 actions are deprecated" warning. Only affects the runtime
-# the *action wrappers* execute under — the Node version we install for
-# our own tests is controlled by `actions/setup-node` below.
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   unit-tests:
     name: Tier 1 — Unit tests
@@ -41,12 +33,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           # `cache: npm` reads the root `package-lock.json` (npm workspaces)
           # and restores `~/.npm` keyed on its hash.
           cache: npm
@@ -97,12 +89,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies

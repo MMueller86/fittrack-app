@@ -118,26 +118,24 @@ describe('nutritionSyncService', () => {
       ['postworkout', 0],
     ])('maps %s to mealType=%i', (type, expectedMealType) => {
       const meal = makeMeal('m1', type);
-      const record = toNutritionRecord(meal);
+      const record = toNutritionRecord(meal, makeItem(0));
       expect(record.mealType).toBe(expectedMealType);
     });
 
-    it('aggregates macros across all items', () => {
-      const meal = makeMeal('m1', 'lunch', [
-        makeItem(300, 25, 40, 10, 5),
-        makeItem(200, 15, 20, 8, 3),
-      ]);
-      const record = toNutritionRecord(meal);
-      expect(record.energy?.value).toBeCloseTo(500);
-      expect(record.protein?.value).toBeCloseTo(40);
-      expect(record.totalCarbohydrate?.value).toBeCloseTo(60);
-      expect(record.totalFat?.value).toBeCloseTo(18);
-      expect(record.dietaryFiber?.value).toBeCloseTo(8);
+    it('maps single item macros to record fields', () => {
+      const meal = makeMeal('m1', 'lunch');
+      const item = makeItem(300, 25, 40, 10, 5);
+      const record = toNutritionRecord(meal, item);
+      expect(record.energy?.value).toBeCloseTo(300);
+      expect(record.protein?.value).toBeCloseTo(25);
+      expect(record.totalCarbohydrate?.value).toBeCloseTo(40);
+      expect(record.totalFat?.value).toBeCloseTo(10);
+      expect(record.dietaryFiber?.value).toBeCloseTo(5);
     });
 
-    it('emits no energy field for empty meal (0 calories)', () => {
+    it('emits no energy field when item has 0 calories', () => {
       const meal = makeMeal('m1', 'breakfast');
-      const record = toNutritionRecord(meal);
+      const record = toNutritionRecord(meal, makeItem(0));
       expect(record.energy).toBeUndefined();
       expect(record.protein).toBeUndefined();
       expect(record.totalCarbohydrate).toBeUndefined();
@@ -145,9 +143,9 @@ describe('nutritionSyncService', () => {
       expect(record.dietaryFiber).toBeUndefined();
     });
 
-    it('omits dietaryFiber when total fiber is 0', () => {
-      const meal = makeMeal('m1', 'lunch', [makeItem(500, 30, 60, 20, 0)]);
-      const record = toNutritionRecord(meal);
+    it('omits dietaryFiber when item fiber is 0', () => {
+      const meal = makeMeal('m1', 'lunch');
+      const record = toNutritionRecord(meal, makeItem(500, 30, 60, 20, 0));
       expect(record.energy?.value).toBeCloseTo(500);
       expect(record.dietaryFiber).toBeUndefined();
     });
@@ -162,23 +160,24 @@ describe('nutritionSyncService', () => {
         items: [],
         createdAt: '',
       };
-      const record = toNutritionRecord(meal);
+      const record = toNutritionRecord(meal, makeItem(0));
       const [y, m, d] = meal.date.split('-').map(Number);
       expect(record.startTime).toBe(new Date(y, m - 1, d, 12, 0, 0, 0).toISOString());
     });
 
-    it('uses clientRecordId = meal.id', () => {
-      const meal = makeMeal('unique-id');
-      const record = toNutritionRecord(meal);
-      expect(record.metadata.clientRecordId).toBe('unique-id');
+    it('uses clientRecordId = item.id', () => {
+      const meal = makeMeal('m1');
+      const item = makeItem(100);
+      const record = toNutritionRecord(meal, item);
+      expect(record.metadata.clientRecordId).toBe(item.id);
       expect(record.recordType).toBe('Nutrition');
       expect(typeof record.metadata.clientRecordVersion).toBe('number');
     });
 
-    it('sets endTime equal to startTime', () => {
+    it('sets endTime 1 second after startTime', () => {
       const meal = makeMeal('m1');
-      const record = toNutritionRecord(meal);
-      expect(record.endTime).toBe(record.startTime);
+      const record = toNutritionRecord(meal, makeItem(0));
+      expect(new Date(record.endTime).getTime()).toBe(new Date(record.startTime).getTime() + 1000);
     });
   });
 
@@ -212,8 +211,8 @@ describe('nutritionSyncService', () => {
 
     it('performs paginated export across 2 batches', async () => {
       mockListAllMeals
-        .mockResolvedValueOnce({ meals: [makeMeal('m1'), makeMeal('m2')], cursor: 'cursor-page2' })
-        .mockResolvedValueOnce({ meals: [makeMeal('m3')], cursor: undefined });
+        .mockResolvedValueOnce({ meals: [makeMeal('m1', 'breakfast', [makeItem(300)]), makeMeal('m2', 'lunch', [makeItem(400)])], cursor: 'cursor-page2' })
+        .mockResolvedValueOnce({ meals: [makeMeal('m3', 'dinner', [makeItem(200)])], cursor: undefined });
 
       await service.enableSync();
 
@@ -249,14 +248,14 @@ describe('nutritionSyncService', () => {
     it('calls upsertRecord when enabled', async () => {
       await service.enableSync();
       mockUpsertRecord.mockClear();
-      await service.syncNutritionUpsert(makeMeal('m1'));
+      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
       expect(mockUpsertRecord).toHaveBeenCalledTimes(1);
     });
 
     it('queues a pendingOp on upsert failure', async () => {
       await service.enableSync();
       mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1'));
+      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
       const status = service.getSyncStatus();
       expect(status.temporaryFailures.length).toBe(1);
     });
@@ -264,7 +263,7 @@ describe('nutritionSyncService', () => {
     it('retries queued op on drain after failure', async () => {
       await service.enableSync();
       mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1'));
+      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
       mockUpsertRecord.mockResolvedValue(undefined);
       await service.drainPendingQueue();
       expect(mockUpsertRecord.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -314,7 +313,7 @@ describe('nutritionSyncService', () => {
     it('disables sync on permission error during drain', async () => {
       await service.enableSync();
       mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1'));
+      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
       mockUpsertRecord.mockRejectedValueOnce(new Error('PERMISSION_DENIED'));
       await service.drainPendingQueue();
       const status = service.getSyncStatus();
@@ -325,7 +324,7 @@ describe('nutritionSyncService', () => {
     it('removes op from queue on successful retry', async () => {
       await service.enableSync();
       mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1'));
+      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
       expect(service.getSyncStatus().temporaryFailures.length).toBe(1);
       mockUpsertRecord.mockResolvedValue(undefined);
       await service.drainPendingQueue();
@@ -340,7 +339,10 @@ describe('nutritionSyncService', () => {
           {
             entryId: 'm-perm',
             type: 'upsert',
-            meal: makeMeal('m-perm'),
+            item: makeItem(300),
+            mealType: 'breakfast',
+            mealDate: '2026-08-01',
+            mealCreatedAt: '2026-08-01T10:00:00Z',
             retryCount: 9,
             sessionCount: 1,
             errorType: 'temporary',
