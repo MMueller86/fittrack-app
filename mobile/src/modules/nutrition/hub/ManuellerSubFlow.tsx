@@ -20,7 +20,8 @@ async function resolveOrCreateMealId(
   mealType: MealType,
   mealId?: string,
 ): Promise<string> {
-  if (mealId) return mealId;
+  // Temp IDs are optimistic placeholders — not real backend IDs
+  if (mealId && !mealId.startsWith('temp-')) return mealId;
   const dayData = await diaryApi.getDay(date);
   const existing = dayData.meals.find((m) => m.type === mealType);
   if (existing) return existing.id;
@@ -36,10 +37,10 @@ export function ManuellerSubFlow({ visible, context, onClose, onSaved }: Props) 
       setResolvedMealId(null);
       return;
     }
-    void resolveOrCreateMealId(context.date, context.mealType, context.mealId).then(
-      setResolvedMealId,
-    );
-  }, [visible, context.date, context.mealType, context.mealId]);
+    resolveOrCreateMealId(context.date, context.mealType, context.mealId)
+      .then(setResolvedMealId)
+      .catch(() => onClose());
+  }, [visible, context.date, context.mealType, context.mealId, onClose]);
 
   // LabelScanReviewScreen verwaltet sein eigenes Modal (visible-Prop steuert es direkt)
   return (

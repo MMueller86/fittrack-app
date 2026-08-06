@@ -50,7 +50,8 @@ async function resolveOrCreateMealId(
   mealType: MealType,
   mealId?: string,
 ): Promise<string> {
-  if (mealId) return mealId;
+  // Temp IDs are optimistic placeholders — not real backend IDs
+  if (mealId && !mealId.startsWith('temp-')) return mealId;
   const dayData = await diaryApi.getDay(date);
   const existing = dayData.meals.find((m) => m.type === mealType);
   if (existing) return existing.id;
@@ -72,9 +73,9 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
       setResolvedMealId(null);
       return;
     }
-    void resolveOrCreateMealId(context.date, context.mealType, context.mealId).then(
-      setResolvedMealId,
-    );
+    resolveOrCreateMealId(context.date, context.mealType, context.mealId)
+      .then(setResolvedMealId)
+      .catch((e) => setError(formatApiError(e, 'Mahlzeit konnte nicht geladen werden')));
   }, [visible, context.date, context.mealType, context.mealId]);
 
   async function handlePickImage(source: 'camera' | 'gallery') {
