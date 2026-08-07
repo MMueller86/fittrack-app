@@ -15,7 +15,7 @@ Azure OpenAI remains the Backend Agent's responsibility. This skill provides on-
 |---|---|
 | **Planner** | Requirement may involve AI; deciding AI vs. deterministic; scoping a new AI feature |
 | **Backend** | Implementing or modifying an AI endpoint, prompt, schema, validation, or quota |
-| **QA** | Reviewing any change that touches `ai.ts`, `openai.ts`, quota, or nutrition validation |
+| **QA** | Reviewing any change that touches `ai.ts`, `openai.ts`, `backend/src/lib/prompts/**`, quota, or nutrition validation |
 | **Frontend** | Does not load this skill — receives API contract and review screen requirements from the Planner plan and Backend summary |
 
 ---
@@ -86,6 +86,16 @@ These rules are non-negotiable. Violating any one of them is a QA-blocking findi
 - Store the version alongside any persisted AI-generated document in Cosmos
 - **When bumping a prompt version:** check whether a `*.eval.test.ts` exists for the feature. If it does, its version guard will fail until `TESTED_PROMPT_VERSION` in that file is updated and all fixture constraints are re-reviewed against the new prompt behaviour.
 
+### Prompt eval (Backend responsibility — blocks work package completion)
+Any change to a prompt text, JSON schema, or Structured Output that affects output interpretation requires:
+- New prompt → create corresponding `*.eval.test.ts` and `*.eval.fixtures.ts` (expectations derived from AC/KB, not from the prompt itself)
+- Semantically modified prompt or Structured Output → update eval coverage as required
+- Prompt version change → update `TESTED_PROMPT_VERSION` in the eval file consciously
+- Run `cd backend && npm run test:eval` — all assertions must pass
+- Include the eval result (pass/fail summary) in the work package handoff
+
+**The work package is not complete until the required evals pass.**
+
 For the full per-feature implementation checklist (including handler wiring, schema changes, prompt changes, and eval test obligations), see [references/implementation-checklist.md](./references/implementation-checklist.md).
 
 ---
@@ -115,8 +125,6 @@ For the full per-feature implementation checklist (including handler wiring, sch
 
 For any AI feature change, load [references/implementation-checklist.md](./references/implementation-checklist.md) and work through the **QA Review Checklist** section. The non-negotiable invariants are: quota ordering (`enforceQuota` before AI call, `trackUsage` after success only), Structured Outputs schema completeness (`strict: true`, `additionalProperties: false` everywhere), plausibility validation present for nutrition output, preview type enforcement, and exhaustive unit tests for classification logic.
 
-**Prompt and schema changes additionally require:** check whether a `*.eval.test.ts` exists for the affected feature. If it does, the QA verdict must confirm that the prompt version guard passes and that the Layer-2 fixture constraints still reflect the current prompt rules. If no eval test exists yet, note it as a gap.
-
 ---
 
 ## 7. Prompt Eval Tests
@@ -142,8 +150,8 @@ Prompt eval tests make real Azure OpenAI API calls and are intentionally exclude
 
 ### Fixture discipline
 
-- All category rules and amountGrams ranges **must be derivable from documented prompt rules** — never invented at test time.
-- Fixture files document their derivation basis (e.g. `"1 EL → ~15g"`) in inline comments.
+- All fixture expectations **must be derivable from approved sources: the User Story / Acceptance Criteria, the Knowledge Base, or reviewed domain rules** — never primarily from the prompt text being tested. Deriving expectations from the prompt creates circular tests that cannot detect prompt errors.
+- Fixture files document their derivation basis (e.g. `"1 EL → ~15g per KB tech/06"`) in inline comments, citing the authoritative source.
 - The prompt version guard (`TESTED_PROMPT_VERSION`) in each eval test must match the current prompt version constant. A mismatch fails immediately without making any API call.
 
 ### When to run

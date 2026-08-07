@@ -78,6 +78,19 @@ Beyond test execution, verify:
 - **Documentation:** if documented behaviour changed — verify the corresponding `docs/kb/` document was updated
 - **Dependency versions:** if a new package version is introduced (added or updated in any `package.json`), verify it is the latest stable version using `npm view <package> version`. If an older version was chosen, the Planner's plan must contain an explicit justification. Without that justification, classify the finding as **Blocking**.
 
+## Prompt Eval Verification
+
+Applies when the change touches any file under `backend/src/lib/prompts/**`, `backend/src/lib/openai.ts`, or a Structured Output schema.
+
+| Condition | Rule | Finding if violated |
+|---|---|---|
+| New prompt introduced | A corresponding `*.eval.test.ts` must exist | **Blocking** |
+| Prompt semantically modified | The corresponding eval must pass (`npm run test:eval`) | **Blocking** |
+| Prompt version constant changed | The `TESTED_PROMPT_VERSION` guard in the eval file must match the new version | **Blocking** |
+| Eval exists and is in scope | QA must run `cd backend && npm run test:eval` and confirm all assertions pass | **Blocking** if eval fails |
+
+QA verifies eval coverage and results only. QA must not create, modify, or fix prompt eval tests — a missing or failing eval is reported as a blocking finding and returned to the implementation agent.
+
 ## Coverage Expectations
 
 | Code type | Test requirement |
