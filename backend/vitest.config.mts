@@ -27,7 +27,7 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     include: ['src/**/*.test.ts'],
-    exclude: ['src/**/*.contract.test.ts', 'node_modules', 'dist'],
+    exclude: ['src/**/*.contract.test.ts', 'src/**/*.eval.test.ts', 'node_modules', 'dist'],
     clearMocks: true,
     restoreMocks: true,
   },

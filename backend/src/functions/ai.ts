@@ -12,7 +12,7 @@ import type { FoodSearchResult, ReusableItem, AiMealEstimatePreview } from '@fit
 // Types
 // ---------------------------------------------------------------------------
 
-export type ItemStatus = 'matched' | 'needsSelection' | 'unmatched';
+export type ItemStatus = 'matched' | 'needsSelection' | 'unmatched' | 'seasoning';
 
 export interface MealParserPreviewItem {
   rawText: string;
@@ -26,6 +26,7 @@ export interface MealParserPreviewItem {
   amountGrams: number | null;
   needsReview: boolean;
   warnings: string[];
+  category?: 'food' | 'seasoning';
 }
 
 export interface MealParserPreviewResponse {
@@ -480,18 +481,43 @@ export const recipeAnalyzeHandler = withHandler(
     // Track usage after successful AI call
     await trackUsage(userContext, 'recipe-analyze');
 
-    // 2. Parse ingredient lines via parseMeal, bundle duplicates, then resolve against catalog + library
+    // 2. Route ingredients: food → parseMeal + catalog; seasoning → direct construction
     let ingredients: MealParserPreviewItem[] = [];
-    if (recipeRaw.ingredientLines.length > 0) {
-      const joinedIngredients = recipeRaw.ingredientLines.join(', ');
-      let aiItems: AiParsedItem[];
-      try {
-        aiItems = await parseMeal(joinedIngredients);
-      } catch {
-        aiItems = [];
+    if (recipeRaw.ingredients.length > 0) {
+      // Items with an unrecognised category default to 'food' (safe guard)
+      const foodIngredients = recipeRaw.ingredients.filter((i) => i.category !== 'seasoning');
+      const seasoningIngredients = recipeRaw.ingredients.filter((i) => i.category === 'seasoning');
+
+      let resolvedFood: MealParserPreviewItem[] = [];
+      if (foodIngredients.length > 0) {
+        const joinedIngredients = foodIngredients.map((i) => i.line).join(', ');
+        let aiItems: AiParsedItem[];
+        try {
+          aiItems = await parseMeal(joinedIngredients);
+        } catch {
+          aiItems = [];
+        }
+        const bundledItems = bundleAiItems(aiItems);
+        const resolved = await resolveIngredients(userId, bundledItems);
+        resolvedFood = resolved.map((item) => ({ ...item, category: 'food' as const }));
       }
-      const bundledItems = bundleAiItems(aiItems);
-      ingredients = await resolveIngredients(userId, bundledItems);
+
+      const resolvedSeasonings: MealParserPreviewItem[] = seasoningIngredients.map((s) => ({
+        rawText: s.line,
+        displayName: s.displayName,
+        status: 'seasoning' as ItemStatus,
+        selectedProductId: null,
+        selectedProductName: null,
+        candidates: [],
+        inputMode: 'grams' as const,
+        inputAmount: s.amountGrams,
+        amountGrams: s.amountGrams,
+        needsReview: false,
+        warnings: [],
+        category: 'seasoning' as const,
+      }));
+
+      ingredients = [...resolvedFood, ...resolvedSeasonings];
     }
 
     const response: AiRecipeAnalysisResponse = {

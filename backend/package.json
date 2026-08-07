@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.mts",
+    "test:eval": "vitest run --config vitest.eval.config.mts",
     "emulator:start": "powershell -ExecutionPolicy Bypass -File scripts/start-cosmos-emulator.ps1",
     "emulator:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-cosmos-emulator.ps1"
   },

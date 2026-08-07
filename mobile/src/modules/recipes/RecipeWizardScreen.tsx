@@ -30,7 +30,7 @@ import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeWizard'>;
 
 type WizardPhase = 'input' | 'analyzing' | 'ingredients' | 'steps' | 'preview';
-type IngStatus = 'auto-matched' | 'needs-selection' | 'needs-ai' | 'ai-estimating' | 'confirmed';
+type IngStatus = 'auto-matched' | 'needs-selection' | 'needs-ai' | 'ai-estimating' | 'confirmed' | 'seasoning';
 
 interface WizardIngredient {
   id: string;
@@ -100,6 +100,25 @@ function buildIngFromCandidate(
   };
 }
 
+function buildIngFromSeasoning(id: string, item: MealParserPreviewItem): RecipeIngredient {
+  const amountGrams = item.amountGrams ?? 0;
+  const zero = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+  return {
+    id,
+    displayName: item.displayName,
+    inputMode: 'grams',
+    inputAmount: amountGrams,
+    amountGrams,
+    unit: 'g',
+    linkedProductId: null,
+    linkedReusableItemId: null,
+    isAiEstimate: false,
+    category: 'seasoning',
+    nutritionPer100g: zero,
+    nutritionContribution: zero,
+  };
+}
+
 function buildIngFromAiEstimate(
   id: string,
   item: MealParserPreviewItem,
@@ -148,6 +167,9 @@ function initWizardIngredient(item: MealParserPreviewItem): WizardIngredient {
         resolvedIngredient: buildIngFromCandidate(id, item, candidate),
       };
     }
+  }
+  if (item.status === 'seasoning') {
+    return { id, parserItem: item, status: 'seasoning', resolvedIngredient: buildIngFromSeasoning(id, item) };
   }
   if (item.status === 'needsSelection') {
     return { id, parserItem: item, status: 'needs-selection' };
@@ -422,26 +444,32 @@ export default function RecipeWizardScreen({ navigation }: Props) {
   };
 
   const handleAddManualIngredient = (ingredient: RecipeIngredient) => {
+    const replacingIsSeasoning = replacingIngId
+      ? ingredients.find((i) => i.id === replacingIngId)?.status === 'seasoning'
+      : false;
+    const finalIngredient = replacingIsSeasoning
+      ? { ...ingredient, category: 'food' as const }
+      : ingredient;
     const wi: WizardIngredient = {
-      id: ingredient.id,
+      id: finalIngredient.id,
       parserItem: {
-        rawText: ingredient.displayName,
-        displayName: ingredient.displayName,
+        rawText: finalIngredient.displayName,
+        displayName: finalIngredient.displayName,
         status: 'matched',
-        selectedProductId: ingredient.linkedProductId,
-        selectedProductName: ingredient.displayName,
+        selectedProductId: finalIngredient.linkedProductId,
+        selectedProductName: finalIngredient.displayName,
         candidates: [],
-        inputMode: ingredient.inputMode,
-        inputAmount: ingredient.inputAmount,
-        amountGrams: ingredient.amountGrams,
+        inputMode: finalIngredient.inputMode,
+        inputAmount: finalIngredient.inputAmount,
+        amountGrams: finalIngredient.amountGrams,
         needsReview: false,
         warnings: [],
       },
       status: 'confirmed',
-      resolvedIngredient: ingredient,
+      resolvedIngredient: finalIngredient,
     };
-    const newEdit = { mode: ingredient.inputMode, value: String(ingredient.inputAmount) };
-    setAmountEdits((e) => ({ ...e, [ingredient.id]: newEdit }));
+    const newEdit = { mode: finalIngredient.inputMode, value: String(finalIngredient.inputAmount) };
+    setAmountEdits((e) => ({ ...e, [finalIngredient.id]: newEdit }));
     if (replacingIngId) {
       setIngredients((prev) => prev.map((i) => i.id === replacingIngId ? wi : i));
       setReplacingIngId(null);
@@ -499,7 +527,7 @@ export default function RecipeWizardScreen({ navigation }: Props) {
       return;
     }
     const confirmedIngredients = ingredients
-      .filter((i) => i.status === 'confirmed' || i.status === 'auto-matched')
+      .filter((i) => i.status === 'confirmed' || i.status === 'auto-matched' || i.status === 'seasoning')
       .map((i) => i.resolvedIngredient!)
       .filter(Boolean);
 
@@ -566,13 +594,13 @@ export default function RecipeWizardScreen({ navigation }: Props) {
   // ---------------------------------------------------------------------------
 
   const confirmedIngredients = ingredients
-    .filter((i) => i.status === 'confirmed' || i.status === 'auto-matched')
+    .filter((i) => i.status === 'confirmed' || i.status === 'auto-matched' || i.status === 'seasoning')
     .map((i) => i.resolvedIngredient!)
     .filter(Boolean);
 
   const allIngredientsResolved =
     ingredients.length === 0 ||
-    ingredients.every((i) => i.status === 'confirmed' || i.status === 'auto-matched');
+    ingredients.every((i) => i.status === 'confirmed' || i.status === 'auto-matched' || i.status === 'seasoning');
 
   const liveNutrition =
     confirmedIngredients.length > 0 && portions > 0
@@ -677,7 +705,7 @@ export default function RecipeWizardScreen({ navigation }: Props) {
               {ingredients.map((ing) => {
                 const isExpanded = expandedIngId === ing.id;
                 const isResolved =
-                  ing.status === 'confirmed' || ing.status === 'auto-matched';
+                  ing.status === 'confirmed' || ing.status === 'auto-matched' || ing.status === 'seasoning';
 
                 return (
                   <View
@@ -687,7 +715,14 @@ export default function RecipeWizardScreen({ navigation }: Props) {
                     {/* Card header */}
                     <View style={styles.cardHeader}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.cardTitle}>{ing.parserItem.displayName}</Text>
+                        <View style={styles.cardTitleRow}>
+                          <Text style={styles.cardTitle}>{ing.parserItem.displayName}</Text>
+                          {ing.status === 'seasoning' && (
+                            <View style={styles.seasoningBadge}>
+                              <Text style={styles.seasoningBadgeText}>Gewürz</Text>
+                            </View>
+                          )}
+                        </View>
                         {ing.parserItem.inputAmount != null && (
                           <Text style={styles.cardMeta}>
                             {ing.parserItem.inputAmount}
@@ -722,9 +757,11 @@ export default function RecipeWizardScreen({ navigation }: Props) {
                             <TouchableOpacity onPress={() => { setReplacingIngId(ing.id); setAddIngredientVisible(true); }}>
                               <Text style={styles.changeLink}>Ersetzen</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => handleRemoveIngredient(ing.id)}>
-                              <Text style={styles.changeLink}>Entfernen</Text>
-                            </TouchableOpacity>
+                            {ing.status !== 'seasoning' && (
+                              <TouchableOpacity onPress={() => handleRemoveIngredient(ing.id)}>
+                                <Text style={styles.changeLink}>Entfernen</Text>
+                              </TouchableOpacity>
+                            )}
                           </View>
 
                           {/* g / Portion toggle — only when portion data is available */}
@@ -750,11 +787,12 @@ export default function RecipeWizardScreen({ navigation }: Props) {
                           {/* Amount input */}
                           <View style={styles.amountRow}>
                             <TextInput
-                              style={styles.amountInput}
+                              style={[styles.amountInput, ing.status === 'seasoning' && styles.amountInputReadOnly]}
                               value={edit.value}
                               onChangeText={(v) => handleUpdateIngredientAmount(ing.id, edit.mode, v)}
                               keyboardType="decimal-pad"
                               selectTextOnFocus
+                              editable={ing.status !== 'seasoning'}
                             />
                             <Text style={styles.amountUnit}>
                               {edit.mode === 'grams' ? 'g' : (ri.portionLabel ?? 'Portion')}
@@ -1216,8 +1254,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
+  cardTitleRow: { flexDirection: 'row' as const, alignItems: 'center' as const },
   cardTitle: { ...typography.body1, color: colors.text, fontWeight: '600' },
   cardMeta: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  seasoningBadge: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    marginLeft: spacing.xs,
+  },
+  seasoningBadgeText: { ...typography.overline, color: colors.textMuted },
+  amountInputReadOnly: { opacity: 0.5 },
   checkmark: { ...typography.h3, color: colors.primary, marginLeft: spacing.sm },
   removeText: {
     ...typography.body1,

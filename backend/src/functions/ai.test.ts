@@ -560,15 +560,16 @@ describe('POST /api/ai/meal-estimate/preview', () => {
 // ---------------------------------------------------------------------------
 
 function mockRecipeAnalyzeClient(recipe: AiRecipeRaw, ingredientItems?: AiParsedItem[]) {
-  // recipeAnalyzeHandler makes TWO OpenAI calls:
+  // recipeAnalyzeHandler makes TWO OpenAI calls when food items exist:
   // 1. analyzeRecipeText → returns AiRecipeRaw
-  // 2. parseMeal (for ingredientLines) → returns { items: AiParsedItem[] }
+  // 2. parseMeal (for food ingredient lines) → returns { items: AiParsedItem[] }
+  const foodIngredients = recipe.ingredients.filter((i) => i.category !== 'seasoning');
   const parsedIngredients: AiParsedItem[] = ingredientItems ??
-    recipe.ingredientLines.map((line) => ({
-      rawText: line,
-      displayName: line.replace(/^\d+\s*\w*\s+/, '').trim(),
+    foodIngredients.map((ing) => ({
+      rawText: ing.line,
+      displayName: ing.displayName,
       inputMode: 'grams' as const,
-      inputAmount: 100,
+      inputAmount: ing.amountGrams ?? 100,
     }));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -593,7 +594,10 @@ const VALID_RECIPE_RAW: AiRecipeRaw = {
   description: 'Eine einfache Hähnchenpfanne mit Gemüse.',
   suggestedPortions: 4,
   tags: ['Schnell', 'Familienrezept'],
-  ingredientLines: ['300g Hähnchenbrust', '1 Zwiebel'],
+  ingredients: [
+    { line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300 },
+    { line: '1 Zwiebel', displayName: 'Zwiebel', category: 'food', amountGrams: null },
+  ],
   steps: [
     { order: 1, title: 'Vorbereitung', description: 'Hähnchenbrust in Würfel schneiden.' },
     { order: 2, title: null, description: 'Zwiebel anbraten.' },
@@ -666,13 +670,13 @@ describe('POST /api/ai/recipe-analyze', () => {
   });
 
   it('returns empty ingredients array when AI extracts no ingredient lines', async () => {
-    // When ingredientLines is empty, parseMeal is not called → only one OpenAI call needed
+    // When ingredients is empty, parseMeal is not called → only one OpenAI call needed
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fakeClient: any = {
       chat: {
         completions: {
           create: vi.fn().mockResolvedValueOnce({
-            choices: [{ message: { content: JSON.stringify({ ...VALID_RECIPE_RAW, ingredientLines: [] }) } }],
+            choices: [{ message: { content: JSON.stringify({ ...VALID_RECIPE_RAW, ingredients: [] }) } }],
           }),
         },
       },
@@ -686,5 +690,146 @@ describe('POST /api/ai/recipe-analyze', () => {
     );
     const body = res.jsonBody as { ingredients: unknown[] };
     expect(body.ingredients).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recipeAnalyzeHandler — food/seasoning routing (AC-2, AC-3)
+// ---------------------------------------------------------------------------
+
+describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
+  it('routes food items through catalog and constructs seasoning items directly', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn()
+            .mockResolvedValueOnce({
+              choices: [{ message: { content: JSON.stringify({
+                ...VALID_RECIPE_RAW,
+                ingredients: [
+                  { line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300 },
+                  { line: '1 Prise Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 2 },
+                ],
+              }) } }],
+            })
+            .mockResolvedValueOnce({
+              choices: [{ message: { content: JSON.stringify({ items: [
+                makeParsed({ rawText: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', inputMode: 'grams', inputAmount: 300 }),
+              ] }) } }],
+            }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([makeCandidate('prod:1', 'Hähnchenbrust')]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Hähnchenpfanne mit Salz' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { ingredients: { displayName: string; status: string; category: string; candidates: unknown[]; needsReview: boolean }[] };
+
+    const chicken = body.ingredients.find((i) => i.displayName === 'Hähnchenbrust');
+    expect(chicken).toBeDefined();
+    expect(chicken!.status).toBe('matched');
+    expect(chicken!.category).toBe('food');
+
+    const salt = body.ingredients.find((i) => i.displayName === 'Salz');
+    expect(salt).toBeDefined();
+    expect(salt!.status).toBe('seasoning');
+    expect(salt!.candidates).toHaveLength(0);
+    expect(salt!.needsReview).toBe(false);
+    expect(salt!.category).toBe('seasoning');
+  });
+
+  it('does not call parseMeal when all ingredients are seasonings', async () => {
+    const createSpy = vi.fn().mockResolvedValueOnce({
+      choices: [{ message: { content: JSON.stringify({
+        ...VALID_RECIPE_RAW,
+        ingredients: [
+          { line: '1 Prise Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 1 },
+          { line: '1 TL Pfeffer', displayName: 'Pfeffer', category: 'seasoning', amountGrams: 3 },
+        ],
+      }) } }],
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    __setOpenAiClientForTests({ chat: { completions: { create: createSpy } } } as any);
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Salz und Pfeffer mischen' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    // Only one AI call (analyzeRecipeText), parseMeal must not have been invoked
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    const body = res.jsonBody as { ingredients: { status: string }[] };
+    expect(body.ingredients).toHaveLength(2);
+    expect(body.ingredients.every((i) => i.status === 'seasoning')).toBe(true);
+  });
+
+  it('treats an item with unrecognised category as food (safe-guard)', async () => {
+    // The AI schema constrains to 'food'|'seasoning' but runtime JSON can carry anything.
+    // We inject via raw JSON to bypass TypeScript's type guard.
+    const recipeWithBadCategory = {
+      ...VALID_RECIPE_RAW,
+      ingredients: [
+        { line: '100g Mystery', displayName: 'Mystery', category: 'unknown', amountGrams: 100 },
+      ],
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn()
+            .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(recipeWithBadCategory) } }] })
+            .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ items: [
+              makeParsed({ rawText: '100g Mystery', displayName: 'Mystery', inputMode: 'grams', inputAmount: 100 }),
+            ] }) } }] }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([makeCandidate('prod:x', 'Mystery')]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Mystery item test recipe' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { ingredients: { status: string; category: string }[] };
+    expect(body.ingredients).toHaveLength(1);
+    // Must NOT be seasoning — unknown category falls through to the food path
+    expect(body.ingredients[0]!.status).not.toBe('seasoning');
+    expect(body.ingredients[0]!.category).toBe('food');
+  });
+
+  it('preserves amountGrams from AI on seasoning items', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({
+              ...VALID_RECIPE_RAW,
+              ingredients: [{ line: '5g Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5 }],
+            }) } }],
+          }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Salz zum Abschmecken geben' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { ingredients: { amountGrams: number; inputAmount: number }[] };
+    expect(body.ingredients[0]!.amountGrams).toBe(5);
+    expect(body.ingredients[0]!.inputAmount).toBe(5);
   });
 });

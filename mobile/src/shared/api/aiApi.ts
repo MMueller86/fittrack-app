@@ -9,12 +9,13 @@ export type { AiFoodEstimatePreview, NutritionLabelScanResult, AiMealEstimatePre
 // Types — mirror backend MealParserPreviewItem
 // ---------------------------------------------------------------------------
 
-export type ItemStatus = 'matched' | 'needsSelection' | 'unmatched';
+export type ItemStatus = 'matched' | 'needsSelection' | 'unmatched' | 'seasoning';
 
 export interface MealParserPreviewItem {
   rawText: string;
   displayName: string;
   status: ItemStatus;
+  category?: 'food' | 'seasoning';
   selectedProductId: string | null;
   selectedProductName: string | null;
   candidates: FoodSearchResult[];

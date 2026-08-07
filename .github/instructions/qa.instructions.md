@@ -7,11 +7,20 @@ Test strategy: [`../docs/kb/tech/08-testing.md`](../docs/kb/tech/08-testing.md)
 
 ---
 
-## Planner Workflow
+## QA Review Workflow
 
-For medium or large features, look for an approved implementation plan in the task context.
+The Orchestrator passes the following inputs to QA — do not search for them independently:
+- Full approved plan (with Scope and Out of Scope sections)
+- All Acceptance Criteria (complete, numbered)
+- Original user story
+- Required Skills (as declared in the QA Work Package — load and apply each before reviewing)
+- `handoff_store` (all subtask summaries and deviations)
+- Which subtasks ran and which were skipped
+- Any known unverified areas or configuration notes
 
-The QA agent verifies the implementation **against** that plan:
+Do not re-plan, add missing requirements, or supplement the plan independently.
+
+Verify the implementation **against** the plan:
 - All acceptance criteria are met — not just the ones attempted, but all that were defined
 - No acceptance criteria were silently skipped or deferred without explicit acknowledgement
 - Implementation scope matches the approved plan (no unreviewed additions)
@@ -19,7 +28,7 @@ The QA agent verifies the implementation **against** that plan:
 
 If acceptance criteria are partially or fully missing from the implementation, the review verdict is **FAIL**.
 
-For small bug fixes, verify that a regression test exists and the stated issue is resolved.
+For small bug fixes (no Planner plan): verify that a regression test exists and the stated issue is resolved.
 
 ---
 
@@ -50,12 +59,12 @@ cd backend && npm run build:verify
 
 ## After Every Task — Test Checklist
 
-Before marking any backend or shared change as complete:
+Run only the commands for packages affected by the change. Exception: always run `build:verify` for any backend change, regardless of scope.
 
-1. `cd backend && npx vitest run` — all unit tests pass
-2. `cd shared && npx vitest run` — shared lib tests pass
-3. `cd backend && npm run build:verify` — no `require('@fittrack/shared')` in output
-4. `npx tsc --noEmit` (from `mobile/`) — no TypeScript errors
+1. `cd backend && npx vitest run` — all unit tests pass *(backend changes)*
+2. `cd shared && npx vitest run` — shared lib tests pass *(shared changes)*
+3. `cd backend && npm run build:verify` — no `require('@fittrack/shared')` in output *(all backend changes)*
+4. `npx tsc --noEmit` (from `mobile/`) — no TypeScript errors *(mobile or shared type changes)*
 
 ## Review Checklist
 
@@ -94,31 +103,9 @@ The Red → Green workflow is an **implementation practice**, not a QA verificat
 
 The workflow itself is documented in [`backend.instructions.md`](backend.instructions.md) for implementation agents.
 
-## Encoding Validation (Mobile Files)
+## Encoding Validation
 
-When reviewing changes to any file in `mobile/src/`, grep all modified files for mojibake sequences before issuing a verdict. Encoding corruption is a **blocking** finding.
-
-Mojibake occurs when a tool reads a UTF-8 file as Latin-1 and writes it back. Common corrupted sequences:
-
-| Mojibake | Should be |
-|---|---|
-| `Ã¤` | `ä` |
-| `Ã¼` | `ü` |
-| `ÃŸ` | `ß` |
-| `Ãœ` | `Ü` |
-| `Ã¶` | `ö` |
-| `â€"` | `—` |
-| `â€™` | `'` |
-| `â†'` | `→` |
-| `â‰¤` | `≤` |
-| `â¤ï¸` | `❤️` |
-
-**Check command:**
-```
-grep -rn "Ã¤\|Ã¼\|ÃŸ\|Ãœ\|â€"\|â€™\|â†'\|â¤\|â‰¤" mobile/src/
-```
-
-If any match is found in a file touched by the current change: **classify as Blocking**. The corrupted file must be fully restored to correct UTF-8 before the verdict can be PASS or PASS WITH ISSUES.
+CI enforces encoding via `check-encoding.mjs` — a PR cannot merge with mojibake sequences in source files. No manual check needed during QA review.
 
 ## Review Output
 

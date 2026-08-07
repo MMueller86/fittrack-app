@@ -35,6 +35,8 @@ export interface RecipeIngredient {
   linkedReusableItemId: string | null;
   /** True when nutrition was estimated by AI */
   isAiEstimate: boolean;
+  /** AI-assigned classification: food item or seasoning */
+  category?: 'food' | 'seasoning';
   /** Gram weight of one portion — present when the source product has portion info */
   portionWeightGrams?: number;
   /** Display label for the portion (e.g. "Portion", "Scheibe") */

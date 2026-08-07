@@ -348,16 +348,24 @@ export async function estimateMeal(input: {
 // Recipe text analyzer
 // ---------------------------------------------------------------------------
 
+/** One ingredient line extracted and classified by the recipe analyzer. */
+export interface AiRecipeIngredientLine {
+  line: string;
+  displayName: string;
+  category: 'food' | 'seasoning';
+  amountGrams: number | null;
+}
+
 /**
  * Raw recipe data extracted by the AI from free-text input.
- * ingredientLines are passed to parseMeal() afterward for catalog matching.
+ * ingredients (food items) are passed to catalog search afterward.
  */
 export interface AiRecipeRaw {
   suggestedName: string;
   description: string;
   suggestedPortions: number;
   tags: string[];
-  ingredientLines: string[];
+  ingredients: AiRecipeIngredientLine[];
   steps: Array<{
     order: number;
     title: string | null;
@@ -372,7 +380,20 @@ const RECIPE_ANALYZE_SCHEMA = {
     description: { type: 'string' as const },
     suggestedPortions: { type: 'number' as const },
     tags: { type: 'array' as const, items: { type: 'string' as const } },
-    ingredientLines: { type: 'array' as const, items: { type: 'string' as const } },
+    ingredients: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          line: { type: 'string' as const },
+          displayName: { type: 'string' as const },
+          category: { type: 'string' as const, enum: ['food', 'seasoning'] },
+          amountGrams: { type: ['number', 'null'] as const },
+        },
+        required: ['line', 'displayName', 'category', 'amountGrams'],
+        additionalProperties: false,
+      },
+    },
     steps: {
       type: 'array' as const,
       items: {
@@ -387,7 +408,7 @@ const RECIPE_ANALYZE_SCHEMA = {
       },
     },
   },
-  required: ['suggestedName', 'description', 'suggestedPortions', 'tags', 'ingredientLines', 'steps'],
+  required: ['suggestedName', 'description', 'suggestedPortions', 'tags', 'ingredients', 'steps'],
   additionalProperties: false,
 };
 

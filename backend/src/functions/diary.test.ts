@@ -222,13 +222,13 @@ describe('POST /api/diary/meals/:id/items â€” flat macros input', () => {
     const res = await addItemHandler(
       await makeAuthRequest({
         params: { id: mealId },
-        body: { name: 'RÃ¼hrei', calories: 180, protein: 14, carbs: 2, fat: 12, fiber: 0 },
+        body: { name: 'Rührei', calories: 180, protein: 14, carbs: 2, fat: 12, fiber: 0 },
       }),
       makeContext(),
     );
     expect(res.status).toBe(201);
     const body = res.jsonBody as { meal: { items: { name: string }[] } };
-    expect(body.meal.items[0]!.name).toBe('RÃ¼hrei');
+    expect(body.meal.items[0]!.name).toBe('Rührei');
   });
 
   it('returns 400 when calories is missing', async () => {
@@ -236,7 +236,7 @@ describe('POST /api/diary/meals/:id/items â€” flat macros input', () => {
     const res = await addItemHandler(
       await makeAuthRequest({
         params: { id: mealId },
-        body: { name: 'RÃ¼hrei', protein: 14, carbs: 2, fat: 12 },
+        body: { name: 'Rührei', protein: 14, carbs: 2, fat: 12 },
       }),
       makeContext(),
     );

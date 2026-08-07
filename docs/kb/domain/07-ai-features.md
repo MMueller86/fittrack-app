@@ -99,11 +99,59 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 ## 5. Recipe Analyzer
 
+**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v2'`
+
 **Input:** Free-text recipe (ingredients + steps)
 
-**AI output:** Structured ingredient list with amounts
-
 **Used in:** `RecipeWizardScreen` to speed up recipe creation.
+
+**AI output (`AiRecipeRaw`):**
+
+The AI returns a fully structured recipe including `suggestedName`, `description`, `suggestedPortions`, `tags`, `steps`, and an `ingredients` array. Each ingredient is an `AiRecipeIngredientLine`:
+
+```ts
+interface AiRecipeIngredientLine {
+  line: string;           // full original text, e.g. "300g Hähnchenbrust"
+  displayName: string;    // clean name without quantity, e.g. "Hähnchenbrust"
+  category: 'food' | 'seasoning';
+  amountGrams: number | null;
+}
+```
+
+**Ingredient classification rules:**
+
+- `food`: calorically or nutritionally relevant ingredients used in meaningful amounts (e.g. Hähnchenbrust, Pasta, Tomaten, Käse, Butter, Mehl, Zucker, Sahne).
+- `seasoning`: ingredients used in small amounts whose nutritional contribution is negligible (e.g. Salz, Pfeffer, Kräuter, Gewürze, Essig, Sojasauce, Worcestersauce, Paprikapulver). These do not meaningfully affect the recipe's nutrition profile.
+
+**Amount resolution:**
+
+The AI resolves all amounts to grams or millilitres. Standard conversions apply (`1 TL` → ~5g, `1 EL` → ~15g, `1 Prise` → ~1g). For piece-based quantities (e.g. "2 Eier"), the AI estimates total weight. When no amount is given, a plausible amount is estimated for the specified number of portions. `null` is returned only when the amount is truly indeterminate from context.
+
+**Backend routing logic:**
+
+After the AI call, ingredients are split into two groups and processed differently:
+
+1. **`food` items** — joined as a comma-separated string and passed to `parseMeal()`. Results are bundled via `bundleAiItems()`, then resolved against the food catalog via `resolveIngredients()` (catalog search + AI estimation fallback). Each resolved item gets `category: 'food'`.
+2. **`seasoning` items** — constructed directly as `MealParserPreviewItem` with `candidates: []`, `needsReview: false`, and `status: 'seasoning'`. No catalog search is performed.
+3. **Unknown/malformed category** — defaults to `'food'` (safe guard: `filter(i => i.category !== 'seasoning')`).
+
+The final `ingredients` array preserves the original order: food items first (as resolved), seasoning items appended.
+
+**`ItemStatus`** (`backend/src/functions/ai.ts`):
+
+```ts
+type ItemStatus = 'matched' | 'needsSelection' | 'unmatched' | 'seasoning';
+```
+
+- `seasoning` — assigned exclusively to seasoning-classified ingredients; bypasses catalog search.
+
+**`MealParserPreviewItem`** now carries an optional field:
+
+```ts
+category?: 'food' | 'seasoning';
+```
+
+This allows the review screen (`RecipeWizardScreen`) to render seasoning items differently from food items.
 
 ## 6. Daily Insight
 

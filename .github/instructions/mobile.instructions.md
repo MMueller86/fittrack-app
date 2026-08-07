@@ -8,15 +8,23 @@ Design system: [`../docs/kb/product/03-design-system.md`](../docs/kb/product/03-
 
 ---
 
-## Planner Workflow
+## Task Package Workflow
 
-For medium or large features, look for an approved implementation plan in the task context before writing code.
+The Frontend agent works exclusively from the **Task Package** provided by the Orchestrator. Do not read the full plan, supplement context independently, or deviate based on your own analysis.
 
-- Follow the planned UX flow and navigation architecture — do not redesign it independently
-- If the plan contains a technical error or is missing a required detail, explain the issue before deviating
-- For small, isolated changes (single component, single bug fix), a plan is not required
+The Task Package contains:
+- `Goal` — what to implement
+- `Required Knowledge Base` — read these before writing code
+- `Required Repository Context` — read these before writing code
+- `Required Skills` — load these before writing code
+- `Relevant Acceptance Criteria` — the completion bar
+- `Dependencies` — handoff outputs from prior agents (e.g. API contracts, shared types)
 
-See [`docs/kb/agents/02-agent-boundaries.md`](../docs/kb/agents/02-agent-boundaries.md) for the Planner role.
+If the Task Package is **incomplete**, **technically invalid**, or the declared API contract does not match the current implementation: **do not deviate or coordinate directly with the Backend agent**. Report the specific issue to the Orchestrator and stop.
+
+For small, isolated changes (single component, single bug fix) delivered outside the Orchestrator workflow, a Task Package is not required — work from the explicit request.
+
+See [`docs/kb/agents/02-agent-boundaries.md`](../docs/kb/agents/02-agent-boundaries.md) for agent roles.
 
 ---
 
@@ -93,7 +101,7 @@ const client = axios.create({ baseURL: '...' });
 
 Use the typed API clients per domain: `diaryApi`, `foodApi`, `profileApi`, etc. in `mobile/src/shared/api/`.
 
-Never use `any` or type assertions to work around an API shape mismatch. If the response type is wrong, fix the shared type or coordinate with the Backend agent.
+Never use `any` or type assertions to work around an API shape mismatch. If the response type is wrong and fixing the shared type is not within scope of your Task Package, report the mismatch to the Orchestrator. Do not coordinate directly with the Backend agent or silently diverge from the declared contract.
 
 ## State Management
 
@@ -127,9 +135,7 @@ All user-facing text must be in **German**. No exceptions.
 
 ## File Encoding
 
-All source files in `mobile/src/` must be saved as **UTF-8**. Never use PowerShell's `Set-Content` or `Out-File` without the explicit `-Encoding UTF8` flag — the default encoding on Windows corrupts non-ASCII characters.
-
-When editing files that contain German characters (`ä`, `ö`, `ü`, `ß`) or emoji: verify after saving that the characters render correctly. Corrupted sequences like `Ã¤`, `ÃŸ`, `â€"` indicate an encoding error — the file must be rewritten in UTF-8 immediately.
+Encoding is enforced by `.editorconfig` (UTF-8, LF) and verified by CI (`npm run check:encoding`). When writing files via PowerShell scripts, always use `-Encoding UTF8`.
 
 ## UX Patterns
 

@@ -22,6 +22,7 @@
     "test": "npm run test:shared ; npm run test:backend ; npm run test:mobile",
     "analyze:off": "npm run analyze:off:tsx --workspace=@fittrack/off-import",
     "export:off": "npm run export:off --workspace=@fittrack/off-import",
-    "import:cosmos": "npm run import:cosmos --workspace=@fittrack/off-import"
+    "import:cosmos": "npm run import:cosmos --workspace=@fittrack/off-import",
+    "check:encoding": "node scripts/check-encoding.mjs"
   }
 }

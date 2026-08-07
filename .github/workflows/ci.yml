@@ -27,6 +27,17 @@ permissions:
   contents: read
 
 jobs:
+  encoding-check:
+    name: Encoding check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: node scripts/check-encoding.mjs
+
   unit-tests:
     name: Tier 1 — Unit tests
     runs-on: ubuntu-latest
