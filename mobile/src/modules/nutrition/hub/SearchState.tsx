@@ -34,6 +34,10 @@ interface Props {
   onOpenSubflow: (flow: 'barcode' | 'ai' | 'label' | 'manual') => void;
   /** Callback wenn neue Ergebnisse geladen -- fuer Cache-Update in FoodEntryHub */
   onResultsChange?: (results: FoodSearchResult[]) => void;
+  /** Recipe mode: label for the quick-accept pill on each ResultRow */
+  quickAcceptLabel?: string;
+  /** Recipe mode: called when user taps the quick-accept pill */
+  onQuickAccept?: (product: FoodSearchResult) => void;
 }
 
 const THUMBNAIL_SIZE = 44;
@@ -182,13 +186,17 @@ function FallbackSection({
 // Zeile 3: Makros + Portionsreferenz (kombiniert)
 // ---------------------------------------------------------------------------
 
-interface ResultRowProps {
+export interface ResultRowProps {
   item: FoodSearchResult;
   onPress: (item: FoodSearchResult) => void;
   isFirst?: boolean;
+  /** Recipe mode: label shown on the quick-accept pill */
+  quickAcceptLabel?: string;
+  /** Recipe mode: called when user taps the quick-accept pill */
+  onQuickAccept?: (product: FoodSearchResult) => void;
 }
 
-const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst }: ResultRowProps) {
+export const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst, quickAcceptLabel, onQuickAccept }: ResultRowProps) {
   const [isFavorite, setIsFavorite] = useState(item.isFavorite ?? false);
 
   const handleFavoriteToggle = useCallback(async () => {
@@ -269,6 +277,23 @@ const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst }: Resu
           portion={item.portion}
           isAiEstimate={item.isAiEstimate}
         />
+
+        {/* Rezept-Modus: Schnellauswahl-Pill */}
+        {quickAcceptLabel && onQuickAccept ? (
+          <View style={styles.rowLineQuickAccept}>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity
+              style={styles.quickAcceptPill}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onQuickAccept(item); }}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              accessibilityRole="button"
+              accessibilityLabel={`Sofort hinzufügen: ${quickAcceptLabel}`}
+            >
+              <Icon lib="feather" name="plus" size={12} color={colors.primary} />
+              <Text style={styles.quickAcceptText}>{quickAcceptLabel}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -293,7 +318,7 @@ function relativeUsage(isoDate: string): string {
   return `Vor ${Math.floor(days / 7)} Wochen verwendet`;
 }
 
-export function SearchState({ query, recents, initialResults, onSelect, onSelectRelation, onOpenSubflow, onResultsChange }: Props) {
+export function SearchState({ query, recents, initialResults, onSelect, onSelectRelation, onOpenSubflow, onResultsChange, quickAcceptLabel, onQuickAccept }: Props) {
   const [results, setResults] = useState<FoodSearchResult[]>(initialResults ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,7 +376,7 @@ export function SearchState({ query, recents, initialResults, onSelect, onSelect
         <BottomSheetFlatList
           data={results}
           keyExtractor={(item) => `${item.source}-${item.id}`}
-          renderItem={({ item, index }) => <ResultRow item={item} onPress={onSelect} isFirst={index === 0} />}
+          renderItem={({ item, index }) => <ResultRow item={item} onPress={onSelect} isFirst={index === 0} quickAcceptLabel={quickAcceptLabel} onQuickAccept={onQuickAccept} />}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           nestedScrollEnabled={true}
@@ -561,4 +586,24 @@ const styles = StyleSheet.create({
 
   // Recents -- via BottomSheetFlatList (gleiche Gesture-Integration wie Suchergebnisse)
   recentsListContent: { paddingBottom: spacing.xl },
+
+  // Rezept-Modus: Schnellauswahl-Pill (visuell identisch zu RelationRow directAddPill)
+  rowLineQuickAccept: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickAcceptPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+  },
+  quickAcceptText: {
+    ...typography.caption,
+    fontWeight: '600',
+    color: colors.primary,
+  },
 });

@@ -24,6 +24,7 @@ export interface MealParserPreviewItem {
   amountGrams: number | null;
   needsReview: boolean;
   warnings: string[];
+  kitchenAmountText?: string | null;  // populated for seasoning items only
 }
 
 export interface MealParserPreviewResponse {

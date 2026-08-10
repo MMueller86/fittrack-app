@@ -123,4 +123,16 @@ describe('hubReducer', () => {
     const subflow: HubMode = { mode: 'subflow', flow: 'barcode', previousMode: 'search', previousQuery: 'test' };
     expect(hubReducer(subflow, { type: 'RESET' })).toEqual({ mode: 'idle' });
   });
+
+  // Recipe mode: hub opens with initialQuery → RESET then SET_QUERY
+  it('recipe mode init: RESET then SET_QUERY enters search mode with pre-filled query', () => {
+    const afterReset = hubReducer(INITIAL_HUB_STATE, { type: 'RESET' });
+    const afterSetQuery = hubReducer(afterReset, { type: 'SET_QUERY', query: 'Hähnchenbrust' });
+    expect(afterSetQuery).toEqual({ mode: 'search', query: 'Hähnchenbrust' });
+  });
+
+  it('recipe mode init: SET_QUERY from idle (single dispatch path) enters search mode', () => {
+    const next = hubReducer(INITIAL_HUB_STATE, { type: 'SET_QUERY', query: 'Lachs' });
+    expect(next).toEqual({ mode: 'search', query: 'Lachs' });
+  });
 });

@@ -354,6 +354,7 @@ export interface AiRecipeIngredientLine {
   displayName: string;
   category: 'food' | 'seasoning';
   amountGrams: number | null;
+  kitchenAmountText: string | null;  // populated for seasoning; null for food
 }
 
 /**
@@ -389,8 +390,9 @@ const RECIPE_ANALYZE_SCHEMA = {
           displayName: { type: 'string' as const },
           category: { type: 'string' as const, enum: ['food', 'seasoning'] },
           amountGrams: { type: ['number', 'null'] as const },
+          kitchenAmountText: { type: ['string', 'null'] as const },
         },
-        required: ['line', 'displayName', 'category', 'amountGrams'],
+        required: ['line', 'displayName', 'category', 'amountGrams', 'kitchenAmountText'],
         additionalProperties: false,
       },
     },

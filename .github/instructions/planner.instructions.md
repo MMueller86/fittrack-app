@@ -168,24 +168,22 @@ Required Knowledge Base:
 
 No Skill exists for Infrastructure & Release. Do not invent a Skill name.
 
-Every plan that affects backend or mobile source code must include a mandatory **Infrastructure Impact** section:
+Every plan that affects backend or mobile source code must include mandatory **structured assessment fields** placed as standalone lines near the top of the plan (directly after the Status line or at the start of the Requirement Assessment section):
 
 ```
 Infrastructure Impact: None | Dev | Alpha
-```
-
-- `None` — no deployment required (e.g. type-only change with no new deployed surface)
-- `Dev` — must be deployed to the Development environment
-- `Alpha` — must be deployed to Alpha; triggers a `Deploy to Alpha` direct operational command after merge
-
-For any plan that includes mobile/frontend changes, also include:
-
-```
 Mobile Build Impact: None | Potential Native Impact
 ```
 
-- `None` — JS-only changes; no new native modules, config plugin changes, or `app.config.js` modifications
-- `Potential Native Impact` — introduces native modules, config plugin changes, or `app.config.js` changes that may require a new Dev Build
+These fields must appear as explicit key-value lines — not embedded in prose, not inside a work package, not only mentioned in the Execution Order section.
+
+- `Infrastructure Impact: None` — no deployment required (e.g. type-only change with no new deployed surface)
+- `Infrastructure Impact: Dev` — must be deployed to the Development environment
+- `Infrastructure Impact: Alpha` — must be deployed to Alpha; triggers a `Deploy to Alpha` direct operational command after merge
+- `Mobile Build Impact: None` — JS-only changes; no new native modules, config plugin changes, or `app.config.js` modifications
+- `Mobile Build Impact: Potential Native Impact` — introduces native modules, config plugin changes, or `app.config.js` changes that may require a new Dev Build
+
+Include `Mobile Build Impact` for every plan that includes mobile/frontend changes. Omit it only when the plan contains no mobile changes whatsoever.
 
 Infrastructure & Release is responsible for the final `Dev Build Required: YES | NO` decision. The Planner provides the signal; it does not make the build decision.
 
@@ -215,6 +213,7 @@ After requirement assessment is complete:
 - Check authentication, authorisation, and security implications
 - Confirm compatibility with both Development and Alpha runtime environments
 - Define concrete, unambiguous work packages for Backend, Frontend, Infrastructure & Release, and QA agents
+- **QA must always be a dedicated work package** using the full schema defined in "Work Package and Subtask Structure". Do not represent QA as a prose bullet list, a note inside another work package, or an entry in the Execution Order section.
 - Write complete, testable Acceptance Criteria
 - Identify risks, assumptions, and open questions
 - Recommend execution order
@@ -280,9 +279,9 @@ When a work package is split into subtasks, define Required Knowledge Base, Requ
 
 When a work package is fully split into subtasks with no independently executed parent step, context fields belong only at the subtask level. Do not repeat them at the parent work package level — the parent heading exists only to establish the goal and dependencies.
 
-**Sequential execution only.** The Orchestrator executes subtasks strictly one at a time. Do not propose parallel subtasks.
+**Sequential execution only.** The Orchestrator executes work packages and subtasks strictly one at a time. Do not propose parallel work packages or parallel subtasks. Do not use language such as "can be developed in parallel", "parallel", or "simultaneously" anywhere in the plan.
 
-**Single owner.** Every work package and every subtask must name exactly one responsible agent: Backend, Frontend, or QA. Ambiguous assignments such as "Backend or whoever finishes Frontend" are not permitted.
+**Single owner.** Every work package and every subtask must name exactly one responsible agent: Backend, Frontend, or QA. Patterns such as `Frontend (or QA)`, `Backend (or whoever finishes Frontend)`, or any `(or X)` variant are not permitted. QA must not own implementation work.
 
 ### Relevant Acceptance Criteria
 
@@ -372,7 +371,7 @@ Expected Handoff:
 - <deliverable passed to the next subtask or agent>
 ```
 
-The Orchestrator uses these fields to route work packages without interpreting the implementation. Include only fields that are non-empty and provide routing or scoping value.
+The Orchestrator uses these fields to route work packages without interpreting the implementation. Always include all fields. Use `None` when a field is not required. Do not omit fields.
 
 ### Acceptance Criteria Quality
 

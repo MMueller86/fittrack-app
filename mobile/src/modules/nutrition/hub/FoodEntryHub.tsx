@@ -75,7 +75,7 @@ const MEAL_LABEL: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export function FoodEntryHub() {
-  const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave, topInset: hubTopInset } = useFoodEntryHubStore();
+  const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave, topInset: hubTopInset, initialQuery, prefillAmount, onSelectIngredient } = useFoodEntryHubStore();
   const [hubState, dispatch] = useReducer(hubReducer, INITIAL_HUB_STATE);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -220,6 +220,13 @@ export function FoodEntryHub() {
       favoritesApi.listRecent(20).then(setRecents).catch(() => setRecents([]));
       void loadFavorites();
 
+      // Recipe mode: pre-populate search on open
+      if (initialQuery) {
+        dispatch({ type: 'SET_QUERY', query: initialQuery });
+        setSearchQuery(initialQuery);
+        setSearchActive(true);
+      }
+
       if (autoCloseOnSave && initialSubflow) {
         // HomeScreen-Subflow: Bottom Sheet NICHT öffnen — kein sheetIsOpenRef setzen
         dispatch({ type: 'OPEN_SUBFLOW', flow: initialSubflow });
@@ -318,6 +325,7 @@ export function FoodEntryHub() {
   // ---------------------------------------------------------------------------
 
   const subtitle = useMemo(() => {
+    if (onSelectIngredient) return null;
     if (!context.mealId) return null;
     const labels: Record<string, string> = {
       breakfast: 'Frühstück',
@@ -329,7 +337,7 @@ export function FoodEntryHub() {
     };
     const label = labels[context.mealType] ?? context.mealType;
     return `Hinzufügen zu ${label}`;
-  }, [context.mealId, context.mealType]);
+  }, [onSelectIngredient, context.mealId, context.mealType]);
 
   // ---------------------------------------------------------------------------
   // Search field handlers
@@ -559,6 +567,30 @@ export function FoodEntryHub() {
       void handleSelectRelation(item);
       return;
     }
+
+    // Recipe mode: call back instead of saving to diary
+    if (onSelectIngredient) {
+      const product: FoodSearchResult = {
+        id: item.foodRef,
+        source: item.foodRefType === 'catalog' ? 'openFoodFacts' : 'library',
+        name: item.displayName,
+        brand: item.displayBrand,
+        displayLabel: '',
+        nutritionBasis: 'per100g',
+        nutritionPer100g: item.nutritionPer100g,
+        portion: item.portion ?? undefined,
+        isComplete: true,
+        imageUrl: item.imageUrl ?? undefined,
+        isFavorite: item.isFavorite,
+      };
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const mode = prefillAmount?.mode ?? (item.preferredInputMode ?? 'grams');
+      const amount = prefillAmount?.amount ?? item.preferredInputAmount;
+      onSelectIngredient(product, mode, amount);
+      close();
+      return;
+    }
+
     setDirectAddLoadingRefs(prev => new Set(prev).add(item.foodRef));
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -606,7 +638,7 @@ export function FoodEntryHub() {
         return next;
       });
     }
-  }, [context, handleSelectRelation, handleQuantityAdded]);
+  }, [context, handleSelectRelation, handleQuantityAdded, onSelectIngredient, prefillAmount, close]);
 
   const handleSubflowClose = useCallback(() => {
     dispatch({ type: 'RESET' });
@@ -870,10 +902,11 @@ export function FoodEntryHub() {
             {hubState.mode === 'product' ? (
               <QuantityView
                 product={hubState.product}
-                prefill={hubState.prefill}
+                prefill={hubState.prefill ?? (prefillAmount ? { inputMode: prefillAmount.mode, inputAmount: prefillAmount.amount } : undefined)}
                 context={context}
                 onBack={handleQuantityBack}
                 onAdded={handleQuantityAdded}
+                onSelectIngredient={onSelectIngredient ?? undefined}
               />
             ) : showSearch ? (
               <SearchState
@@ -884,6 +917,8 @@ export function FoodEntryHub() {
                 onSelectRelation={(relation) => void handleSelectRelation(relation)}
                 onOpenSubflow={handleOpenSubflow}
                 onResultsChange={setCachedResults}
+                quickAcceptLabel={prefillAmount ? `+ ${prefillAmount.amount} ${prefillAmount.mode === 'grams' ? 'g' : 'Stk.'}` : undefined}
+                onQuickAccept={onSelectIngredient && prefillAmount ? (product) => { onSelectIngredient(product, prefillAmount.mode, prefillAmount.amount); close(); } : undefined}
               />
             ) : (
               <Animated.View

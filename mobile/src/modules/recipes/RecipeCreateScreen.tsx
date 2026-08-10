@@ -21,7 +21,8 @@ import { randomUUID } from 'expo-crypto';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
-import AddIngredientModal from './AddIngredientModal';
+import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
+import { buildFromProduct } from './ingredientBuilders';
 import { QuantityInputRow } from '../../shared/components/QuantityInputRow';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeCreate'>;
@@ -52,9 +53,8 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
   const [pendingImageMime, setPendingImageMime] = useState<'image/jpeg' | 'image/png'>('image/jpeg');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEdit);
-  const [addIngredientVisible, setAddIngredientVisible] = useState(false);
   const [amountEdits, setAmountEdits] = useState<Record<string, { mode: 'grams' | 'portion'; value: string }>>({});
-  const [replacingIngId, setReplacingIngId] = useState<string | null>(null);
+  const openHub = useFoodEntryHubStore((s) => s.open);
 
   const load = useCallback(async () => {
     if (!editId) return;
@@ -104,12 +104,7 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
   // --- Ingredient management ---
   const handleAddIngredient = (ingredient: RecipeIngredient) => {
     setAmountEdits((prev) => ({ ...prev, [ingredient.id]: { mode: ingredient.inputMode, value: String(ingredient.inputAmount) } }));
-    if (replacingIngId) {
-      setIngredients((prev) => prev.map((ing) => ing.id === replacingIngId ? ingredient : ing));
-      setReplacingIngId(null);
-    } else {
-      setIngredients((prev) => [...prev, ingredient]);
-    }
+    setIngredients((prev) => [...prev, ingredient]);
   };
 
   const handleRemoveIngredient = (id: string) => {
@@ -306,7 +301,7 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
           {/* Ingredients */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Zutaten</Text>
-            <TouchableOpacity onPress={() => setAddIngredientVisible(true)}>
+            <TouchableOpacity onPress={() => openHub({ onSelectIngredient: (product, mode, amount) => handleAddIngredient(buildFromProduct(product, mode, amount)) })}>
               <Text style={styles.addLink}>+ Hinzufügen</Text>
             </TouchableOpacity>
           </View>
@@ -320,7 +315,20 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
                 <View style={styles.ingredientCardHeader}>
                   <Text style={styles.ingredientName} numberOfLines={1}>{ing.displayName}</Text>
                   <View style={styles.ingredientCardActions}>
-                    <TouchableOpacity onPress={() => { setReplacingIngId(ing.id); setAddIngredientVisible(true); }}>
+                    <TouchableOpacity onPress={() => {
+                      const idToReplace = ing.id;
+                      openHub({
+                        onSelectIngredient: (product, mode, amount) => {
+                          const replacement = buildFromProduct(product, mode, amount);
+                          setAmountEdits((prev) => {
+                            const next = { ...prev };
+                            delete next[idToReplace];
+                            return { ...next, [replacement.id]: { mode: replacement.inputMode, value: String(replacement.inputAmount) } };
+                          });
+                          setIngredients((prev) => prev.map((i) => i.id === idToReplace ? replacement : i));
+                        },
+                      });
+                    }}>
                       <Text style={styles.replaceText}>Ersetzen</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleRemoveIngredient(ing.id)}>
@@ -381,12 +389,6 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <AddIngredientModal
-        visible={addIngredientVisible}
-        onClose={() => { setAddIngredientVisible(false); setReplacingIngId(null); }}
-        onAdd={(ing) => { handleAddIngredient(ing); setAddIngredientVisible(false); }}
-        replacingIngId={replacingIngId}
-      />
     </SafeAreaView>
   );
 }

@@ -27,6 +27,7 @@ export interface MealParserPreviewItem {
   needsReview: boolean;
   warnings: string[];
   category?: 'food' | 'seasoning';
+  kitchenAmountText?: string | null;  // populated by backend for seasoning items
 }
 
 export interface MealParserPreviewResponse {
@@ -515,6 +516,7 @@ export const recipeAnalyzeHandler = withHandler(
         needsReview: false,
         warnings: [],
         category: 'seasoning' as const,
+        kitchenAmountText: s.kitchenAmountText ?? null,
       }));
 
       ingredients = [...resolvedFood, ...resolvedSeasonings];

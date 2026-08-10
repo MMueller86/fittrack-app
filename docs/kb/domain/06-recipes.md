@@ -24,7 +24,10 @@
 - `foodRef` — reference to a `FoodProduct` (catalog) or `ReusableItem` (library) by ID
 - `foodRefType: 'catalog' | 'personal'`
 - `name` — display name (snapshot at time of adding)
-- `amountGrams` — amount used in the recipe
+- `inputMode: 'grams' | 'portion'` — how the user entered the amount
+- `inputAmount` — amount as entered by the user (in grams or portions, depending on `inputMode`)
+- `amountGrams` — resolved gram weight used for nutrition calculation
+- `nutritionContribution` — pre-calculated nutrition contribution of this ingredient (`calories, protein, carbs, fat, fiber`)
 
 Nutrition for each ingredient is calculated from `amountGrams / 100 × nutritionPer100g`.
 
@@ -68,6 +71,20 @@ Uses the AI recipe analyzer (`analyzeRecipeText()`) to extract ingredients from 
 ## Recipe Create / Edit
 
 `RecipeCreateScreen` — form-based creation with ingredient search and step management.
+
+## Ingredient Picker (AddIngredientModal)
+
+`AddIngredientModal` is a `BottomSheetModal` (not a React Native `Modal`). It provides a search-first ingredient picking flow for `RecipeCreateScreen` and `RecipeWizardScreen`.
+
+Internal state machine (`SheetMode`): `'search' | 'amount' | 'ai' | 'label' | 'manual'`.
+
+- **search** — default view; uses `SearchState` (from the Food Entry Hub) for product search, including the bottom fallback section (KI · Scan · Manuell)
+- **amount** — `RecipeIngredientAmountView`; gram / portion toggle, live nutrition preview
+- **ai** — free-text AI estimate sub-flow
+- **label** — nutrition label scan sub-flow
+- **manual** — manual entry form
+
+Snap points: `['85%', '90%']`.
 
 ## Adding a Recipe to Diary
 

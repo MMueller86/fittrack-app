@@ -25,6 +25,7 @@ import { colors, spacing, typography, radius } from '../../app/theme';
 import { listWeights } from '../../services/weightsService';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { profileApi } from '../../shared/api/profileApi';
+import { syncLogger } from '../../services/health/syncLogger';
 import { useDayTypeStore } from '../nutrition/useDayTypeStore';
 import WorkoutTypePicker from './WorkoutTypePicker';
 import { getDayHint } from './getDayHint';
@@ -144,7 +145,9 @@ export default function HomeScreen({ navigation }: Props) {
         hydrateDayType(diaryData.dayType, today, diaryData.workoutType ?? null);
       }
     } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
       console.error('[HomeScreen] load failed:', err);
+      syncLogger.error('HomeScreen', 'load failed', detail);
       setEntries([]);
     }
     // Insight runs independently — does NOT block the screen from rendering

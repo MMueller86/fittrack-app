@@ -19,12 +19,17 @@ export type AmountGramsConstraint =
   | 'not-null'                     // must be non-null (estimated when no quantity given)
   | { min: number; max: number };  // must fall within this range
 
+/** null = must be null (food items); 'non-empty' = must be a non-empty string (seasoning items). */
+export type KitchenAmountTextConstraint = null | 'non-empty';
+
 export interface IngredientConstraint {
   /** Case-insensitive substring match against ingredient.displayName. */
   displayNameContains: string;
   category: 'food' | 'seasoning';
   /** When absent, amountGrams is not asserted. */
   amountGrams?: AmountGramsConstraint;
+  /** When absent, kitchenAmountText is not asserted. */
+  kitchenAmountText?: KitchenAmountTextConstraint;
 }
 
 export interface RecipeEvalFixture {
@@ -56,9 +61,9 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
         // Prompt: "Knoblauch und Zwiebeln sind ebenfalls food"
         { displayNameContains: 'zwiebel', category: 'food' },
         // Prompt: "Frische und getrocknete Küchenkräuter sind grundsätzlich seasoning"
-        { displayNameContains: 'petersilie', category: 'seasoning' },
-        { displayNameContains: 'salz', category: 'seasoning' },
-        { displayNameContains: 'pfeffer', category: 'seasoning' },
+        { displayNameContains: 'petersilie', category: 'seasoning', kitchenAmountText: 'non-empty' },
+        { displayNameContains: 'salz', category: 'seasoning', kitchenAmountText: 'non-empty' },
+        { displayNameContains: 'pfeffer', category: 'seasoning', kitchenAmountText: 'non-empty' },
       ],
     },
   },
@@ -75,10 +80,10 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
         { displayNameContains: 'knoblauch', category: 'food' },
         { displayNameContains: 'zwiebel', category: 'food' },
         // Basilikum = Küchenkraut = seasoning (not used in nutritionally dominant quantity here)
-        { displayNameContains: 'basilikum', category: 'seasoning' },
+        { displayNameContains: 'basilikum', category: 'seasoning', kitchenAmountText: 'non-empty' },
         // 30ml Olivenöl ≈ 27–30g (oil density ~0.9 g/ml); food (Öle und Fette)
         { displayNameContains: 'olivenöl', category: 'food', amountGrams: { min: 25, max: 35 } },
-        { displayNameContains: 'salz', category: 'seasoning' },
+        { displayNameContains: 'salz', category: 'seasoning', kitchenAmountText: 'non-empty' },
       ],
     },
   },
@@ -94,7 +99,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
         { displayNameContains: 'tomatenmark', category: 'food', amountGrams: { min: 40, max: 50 } },
         { displayNameContains: 'tomate', category: 'food', amountGrams: { min: 395, max: 405 } },
         // 1 TL × ~5g = 5g (prompt: "1 TL → ~5g"); Oregano = Gewürzkraut = seasoning
-        { displayNameContains: 'oregano', category: 'seasoning', amountGrams: { min: 4, max: 7 } },
+        { displayNameContains: 'oregano', category: 'seasoning', amountGrams: { min: 4, max: 7 }, kitchenAmountText: 'non-empty' },
       ],
     },
   },
@@ -111,8 +116,8 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
         { displayNameContains: 'knoblauch', category: 'food' },
         { displayNameContains: 'olivenöl', category: 'food', amountGrams: 'not-null' },
         // Herbs without quantity: amountGrams is unconstrained (null is acceptable)
-        { displayNameContains: 'rosmarin', category: 'seasoning' },
-        { displayNameContains: 'thymian', category: 'seasoning' },
+        { displayNameContains: 'rosmarin', category: 'seasoning', kitchenAmountText: 'non-empty' },
+        { displayNameContains: 'thymian', category: 'seasoning', kitchenAmountText: 'non-empty' },
       ],
     },
   },
@@ -129,13 +134,13 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
         // 2 Eier: Stückangabe → estimated weight; amountGrams not constrained here
         { displayNameContains: 'ei', category: 'food' },
         { displayNameContains: 'parmesan', category: 'food', amountGrams: { min: 45, max: 55 } },
-        { displayNameContains: 'salz', category: 'seasoning' },
-        { displayNameContains: 'pfeffer', category: 'seasoning' },
+        { displayNameContains: 'salz', category: 'seasoning', kitchenAmountText: 'non-empty' },
+        { displayNameContains: 'pfeffer', category: 'seasoning', kitchenAmountText: 'non-empty' },
       ],
     },
   },
   {
-    id: 'schema-valid-structured-output',
+    id: 'full-recipe-output-fields',
     description:
       'All required fields present, suggestedPortions positive, amountGrams non-negative',
     input:
@@ -150,7 +155,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
         // 7g stated explicitly; Hefe has non-trivial macronutrients → food
         { displayNameContains: 'hefe', category: 'food', amountGrams: { min: 6, max: 8 } },
         // 1 TL Salz ≈ 5g but category is seasoning; amountGrams unconstrained here
-        { displayNameContains: 'salz', category: 'seasoning' },
+        { displayNameContains: 'salz', category: 'seasoning', kitchenAmountText: 'non-empty' },
         // 2 EL × ~15g = 30g; food (Öle und Fette)
         { displayNameContains: 'olivenöl', category: 'food', amountGrams: { min: 25, max: 35 } },
       ],

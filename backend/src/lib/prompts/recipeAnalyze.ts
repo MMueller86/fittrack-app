@@ -1,4 +1,4 @@
-export const RECIPE_ANALYZE_PROMPT_VERSION = 'v4';
+export const RECIPE_ANALYZE_PROMPT_VERSION = 'v5';
 
 export const RECIPE_ANALYZE_SYSTEM_PROMPT = `Du bist ein Rezept-Assistent für eine deutsche Ernährungs-App.
 Der Nutzer gibt ein Rezept in freiem Text ein — mit möglichen Tippfehlern, Stichpunkten oder unvollständigen Sätzen.
@@ -21,6 +21,9 @@ Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahie
   - "food": Zutaten mit nennenswerten Kalorien oder Makronährstoffen. Dazu gehören immer: Fleisch, Fisch, Gemüse, Obst, Hülsenfrüchte, Getreideprodukte, Milchprodukte, Eier, Nüsse, Samen, Öle und Fette (Olivenöl, Butter, Margarine — unabhängig von der Menge, da sie kalorienreich sind), Zucker, Mehl, Sahne. Knoblauch und Zwiebeln sind ebenfalls food, da sie messbares Gewicht und Kalorien haben.
   - "seasoning": Zutaten, deren primäre Funktion das Würzen oder Aromatisieren ist: Salz, Pfeffer, alle Gewürze und Gewürzpulver, Essig, Sojasauce, Worcestersauce, Tabasco. Frische und getrocknete Küchenkräuter sind grundsätzlich "seasoning" — auch ohne explizite Mengenangabe: Petersilie, Basilikum, Schnittlauch, Thymian, Oregano, Rosmarin und alle anderen Kräuter. Ausnahme: Kräuter als Hauptzutat in nutritiv relevanter Menge (z.B. 100g Basilikum für Pesto).
 - **amountGrams**: Löse alle Mengenangaben in Gramm oder Milliliter auf. Umrechnungen: "1 TL" → ~5g, "1 EL" → ~15g, "1 Prise" → ~1g. Bei Stückangaben (z.B. "2 Eier") schätze das Gesamtgewicht. Gib null zurück, wenn keine Menge aus dem Kontext bestimmbar ist.
+- **kitchenAmountText**: Nur für Zutaten mit category "seasoning". Eine küchenübliche Mengenangabe auf Deutsch,
+  z. B. "1 TL", "½ TL", "1 Prise", "1 Msp.", "nach Geschmack", "1 Handvoll". Leite sie aus der Originalangabe
+  ab (z. B. "1 EL" bleibt "1 EL") oder schätze eine realistische Kücheneinheit. Für food-Zutaten: null.
 
 **steps**: Die Zubereitungsschritte als geordnete Liste. Schreibe jeden Schritt als vollständigen, klaren Satz oder kurzen Absatz auf Deutsch. Konvertiere Stichpunkte in lesbare Anleitungen. Schätze bei Bedarf realistische Zeitangaben (durationMinutes). title ist ein optionaler kurzer Überschrift pro Schritt (z.B. "Teig vorbereiten", "Anbraten"), null wenn kein sinnvoller Titel passt.
 

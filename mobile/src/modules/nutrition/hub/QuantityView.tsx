@@ -63,6 +63,8 @@ interface QuantityViewProps {
     inputMode?: 'grams' | 'portion';
     inputAmount?: number;
   };
+  /** Recipe mode: when set, hub calls back instead of saving to diary */
+  onSelectIngredient?: (product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +186,7 @@ function formatAmount(val: number, isPortion: boolean): string {
 // ---------------------------------------------------------------------------
 // QuantityView — Hauptkomponente
 // ---------------------------------------------------------------------------
-export function QuantityView({ product, context, onBack, onAdded, prefill }: QuantityViewProps) {
+export function QuantityView({ product, context, onBack, onAdded, prefill, onSelectIngredient }: QuantityViewProps) {
   // Mahlzeit-Auswahl (nur relevant wenn kein mealId im context)
   const defaultMeal: MealType =
     (context.mealId as MealType | null) ?? 'breakfast';
@@ -322,6 +324,14 @@ export function QuantityView({ product, context, onBack, onAdded, prefill }: Qua
   const handleAdd = useCallback(async () => {
     if (gramsValue <= 0 || loading) return;
     Keyboard.dismiss();
+
+    // Recipe mode: call back instead of saving to diary
+    if (onSelectIngredient) {
+      const amount = parseFloat(quantityStr.replace(',', '.'));
+      onSelectIngredient(product, unit === 'portion' ? 'portion' : 'grams', amount);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     const isPortion = unit === 'portion';
@@ -362,7 +372,7 @@ export function QuantityView({ product, context, onBack, onAdded, prefill }: Qua
     } finally {
       setLoading(false);
     }
-  }, [gramsValue, loading, context.mealId, selectedMeal, product, onAdded, unit, quantityStr]);
+  }, [gramsValue, loading, context.mealId, selectedMeal, product, onAdded, unit, quantityStr, onSelectIngredient]);
 
   const canAdd = gramsValue > 0 && !loading;
 
@@ -414,8 +424,8 @@ export function QuantityView({ product, context, onBack, onAdded, prefill }: Qua
         </TouchableOpacity>
       </View>
 
-      {/* ── Mahlzeit-Selektor (nur ohne festen mealId) ── */}
-      {!context.mealId && (
+      {/* ── Mahlzeit-Selektor (nur ohne festen mealId und nicht im Rezept-Modus) ── */}
+      {!context.mealId && !onSelectIngredient && (
         <View style={styles.mealRow}>
           <MealSelector selected={selectedMeal} onChange={setSelectedMeal} />
         </View>
@@ -512,7 +522,7 @@ export function QuantityView({ product, context, onBack, onAdded, prefill }: Qua
           {loading ? (
             <ActivityIndicator color={colors.white} size="small" />
           ) : (
-            <Text style={styles.addBtnText}>Hinzufügen</Text>
+            <Text style={styles.addBtnText}>{onSelectIngredient ? 'Zur Rezept hinzufügen' : 'Hinzufügen'}</Text>
           )}
         </TouchableOpacity>
       </View>

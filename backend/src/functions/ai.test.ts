@@ -595,8 +595,8 @@ const VALID_RECIPE_RAW: AiRecipeRaw = {
   suggestedPortions: 4,
   tags: ['Schnell', 'Familienrezept'],
   ingredients: [
-    { line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300 },
-    { line: '1 Zwiebel', displayName: 'Zwiebel', category: 'food', amountGrams: null },
+    { line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300, kitchenAmountText: null },
+    { line: '1 Zwiebel', displayName: 'Zwiebel', category: 'food', amountGrams: null, kitchenAmountText: null },
   ],
   steps: [
     { order: 1, title: 'Vorbereitung', description: 'Hähnchenbrust in Würfel schneiden.' },
@@ -814,7 +814,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
           create: vi.fn().mockResolvedValueOnce({
             choices: [{ message: { content: JSON.stringify({
               ...VALID_RECIPE_RAW,
-              ingredients: [{ line: '5g Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5 }],
+              ingredients: [{ line: '5g Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' }],
             }) } }],
           }),
         },
@@ -831,5 +831,57 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
     const body = res.jsonBody as { ingredients: { amountGrams: number; inputAmount: number }[] };
     expect(body.ingredients[0]!.amountGrams).toBe(5);
     expect(body.ingredients[0]!.inputAmount).toBe(5);
+  });
+
+  it('passes kitchenAmountText from AI response to seasoning item', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({
+              ...VALID_RECIPE_RAW,
+              ingredients: [{ line: '1 TL Oregano', displayName: 'Oregano', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' }],
+            }) } }],
+          }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Oregano hinzufügen' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { ingredients: { kitchenAmountText: string | null }[] };
+    expect(body.ingredients[0]!.kitchenAmountText).toBe('1 TL');
+  });
+
+  it('sets kitchenAmountText to null when AI returns null', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({
+              ...VALID_RECIPE_RAW,
+              ingredients: [{ line: 'Salz', displayName: 'Salz', category: 'seasoning', amountGrams: null, kitchenAmountText: null }],
+            }) } }],
+          }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Salz nach Geschmack' } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { ingredients: { kitchenAmountText: string | null }[] };
+    expect(body.ingredients[0]!.kitchenAmountText).toBeNull();
   });
 });

@@ -121,6 +121,8 @@ Shows when mode = `search`:
   - ≥1 results: "Nicht das passende dabei?"
   - Actions: KI-Schätzung · Label Scan · Manuell
 
+`SearchState` is not exclusive to `FoodEntryHub`. It is also used by `AddIngredientModal` (recipe ingredient picker). In that context, `onSelectRelation` is passed as a no-op (`() => {}`) and `recents` is passed as `[]` — both are acceptable patterns for non-diary consumers.
+
 ## Result Row Format
 
 Four lines per result:

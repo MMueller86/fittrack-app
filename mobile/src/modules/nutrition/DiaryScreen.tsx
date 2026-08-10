@@ -30,6 +30,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { runOnJS } from 'react-native-reanimated';
 import { SwipeableRow } from '../../shared/components/SwipeableRow';
+import { DiaryItemRow } from '../../shared/components/DiaryItemRow';
 import { useDayTypeStore } from './useDayTypeStore';
 import EditItemSheet from './EditItemSheet';
 import MoveItemSheet from './MoveItemSheet';
@@ -183,38 +184,19 @@ function MealCard({
       {items.map((item, index) => (
         <AnimatedItem key={item.id} index={index}>
           <SwipeableRow onDelete={() => onDeleteItem(meal.id, item.id, item.name)}>
-          <TouchableOpacity
-            style={styles.itemRow}
-            onPress={() => onEditItem(meal.id, item)}
-            activeOpacity={0.7}
-          >
-            <View style={{ flex: 1 }}>
-              {/* Line 1: Name + amount */}
-              <View style={styles.itemRowTop}>
-                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.itemAmount}>
-                  {item.unit === 'portion'
-                    ? `${item.quantity} Portion${item.quantity !== 1 ? 'en' : ''}`
-                    : `${Math.round(item.quantity)} g`}
-                </Text>
-              </View>
-              {/* Line 2: kcal + protein */}
-              <Text style={styles.itemMacros}>
-                {Math.round(item.macros.calories)} kcal · {Math.round(item.macros.protein)} g Eiweiß
-              </Text>
-              {/* AI-meal-estimate: badge only */}
-              {item.sourceType === 'ai-meal-estimate' && (
-                <View style={styles.aiItemRow}>
-                  <View style={styles.aiBadge}>
-                    <Text style={styles.aiBadgeText}>
-                      {item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '✨ KI-Schätzung'}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        </SwipeableRow>
+            <DiaryItemRow
+              name={item.name}
+              amountLabel={item.unit === 'portion'
+                ? `${item.quantity} Portion${item.quantity !== 1 ? 'en' : ''}`
+                : `${Math.round(item.quantity)} g`}
+              kcal={item.macros.calories}
+              protein={item.macros.protein}
+              aiBadgeLabel={item.sourceType === 'ai-meal-estimate'
+                ? (item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '✨ KI-Schätzung')
+                : undefined}
+              onPress={() => onEditItem(meal.id, item)}
+            />
+          </SwipeableRow>
         </AnimatedItem>
       ))}
       {/* Footer add row — slot-style, same rhythm as item rows */}
@@ -776,30 +758,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   moreBtnText: { fontSize: 16, color: colors.textSecondary, letterSpacing: 3, lineHeight: 18 },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: spacing.sm + 4,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  itemRowTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  itemName: { ...typography.body2, color: colors.text, fontWeight: '600' as const, flex: 1 },
-  itemAmount: { ...typography.caption, color: colors.textMuted, flexShrink: 0, marginLeft: spacing.xs, fontVariant: ['tabular-nums'] as const },
-  itemMacros: { ...typography.caption, color: colors.textSecondary, marginBottom: 2, fontVariant: ['tabular-nums'] as const },
-  aiItemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 4 },
-  aiBadge: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  aiBadgeText: { ...typography.caption, color: colors.primary, fontWeight: '600' as const },
   deleteItemText: { ...typography.body2, color: colors.textMuted },
 
   // Add meal section

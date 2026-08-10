@@ -18,6 +18,7 @@ import { RECIPE_ANALYZE_PROMPT_VERSION } from './recipeAnalyze';
 import {
   RECIPE_ANALYZE_EVAL_FIXTURES,
   type AmountGramsConstraint,
+  type KitchenAmountTextConstraint,
   type IngredientConstraint,
 } from './recipeAnalyze.eval.fixtures';
 
@@ -27,7 +28,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Update this constant whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-review all fixtures. */
-const TESTED_PROMPT_VERSION = 'v4';
+const TESTED_PROMPT_VERSION = 'v5';
 
 it('prompt version matches fixture expectations', () => {
   expect(RECIPE_ANALYZE_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);
@@ -67,6 +68,19 @@ function assertAmountGrams(
   }
 }
 
+function assertKitchenAmountText(
+  actual: string | null,
+  constraint: KitchenAmountTextConstraint,
+  label: string,
+): void {
+  if (constraint === null) {
+    expect(actual, `${label}: expected kitchenAmountText to be null`).toBeNull();
+  } else {
+    expect(actual, `${label}: expected kitchenAmountText to be a non-empty string`).toBeTruthy();
+    expect(typeof actual, `${label}: expected kitchenAmountText to be a string`).toBe('string');
+  }
+}
+
 function assertIngredientConstraint(
   ingredients: AiRecipeIngredientLine[],
   ic: IngredientConstraint,
@@ -85,6 +99,10 @@ function assertIngredientConstraint(
 
   if (ic.amountGrams !== undefined) {
     assertAmountGrams(found.amountGrams, ic.amountGrams, found.displayName);
+  }
+
+  if (ic.kitchenAmountText !== undefined) {
+    assertKitchenAmountText(found.kitchenAmountText, ic.kitchenAmountText, found.displayName);
   }
 }
 
@@ -120,6 +138,13 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () => 
       ).toBe(true);
       if (typeof ing.amountGrams === 'number') {
         expect(ing.amountGrams, `amountGrams must be >= 0`).toBeGreaterThanOrEqual(0);
+      }
+      // food items must never carry a kitchen amount text
+      if (ing.category === 'food') {
+        expect(
+          ing.kitchenAmountText,
+          `food ingredient "${ing.displayName}": kitchenAmountText must be null`,
+        ).toBeNull();
       }
     }
 
