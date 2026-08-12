@@ -57,6 +57,7 @@ const HomeStack = createNativeStackNavigator<HomeStackParamList>();
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator
+      id="HomeStack"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
@@ -83,6 +84,7 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 function ProfileStackNavigator() {
   return (
     <ProfileStack.Navigator
+      id="ProfileStack"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
@@ -109,6 +111,7 @@ const NutritionStack = createNativeStackNavigator<NutritionStackParamList>();
 function NutritionStackNavigator() {
   return (
     <NutritionStack.Navigator
+      id="NutritionStack"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
@@ -133,6 +136,7 @@ const RecipeStack = createNativeStackNavigator<RecipeStackParamList>();
 function RecipeStackNavigator() {
   return (
     <RecipeStack.Navigator
+      id="RecipeStack"
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
@@ -200,6 +204,7 @@ export function RootNavigator() {
       }}
     >
       <Tab.Navigator
+        id="RootTabs"
         screenOptions={{
           tabBarActiveTintColor: colors.primaryBright,
           tabBarInactiveTintColor: colors.textMuted,

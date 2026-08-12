@@ -110,14 +110,16 @@ func --version   # should be 4.x
    cd ..   # go to fittrack-app root
    npm install
    ```
-4. Build TypeScript:
+4. Build TypeScript (optional when using `npm run dev`):
    ```bash
    cd backend
    npm run build
    ```
-5. Start the Functions runtime:
+5. Start the local backend. Azurite stores its local data in `%TEMP%\fittrack-azurite` by default, which avoids file-locking issues in synchronized workspaces. To use another location, set `FITTRACK_AZURITE_LOCATION` before starting:
    ```bash
-   npm start   # runs: func start
+  npm run dev # builds, starts Azurite, waits for all storage services, then runs func start
+  # Or, when Azurite is already running:
+  npm start   # waits for storage, then runs func start
    ```
 6. Verify: `GET http://localhost:7071/api/health` → `{ "status": "ok" }`
 

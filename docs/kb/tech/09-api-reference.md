@@ -112,6 +112,34 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | PUT | `/api/recipes/{id}` | Yes | |
 | DELETE | `/api/recipes/{id}` | Yes | |
 
+### Recipe create/update body
+
+`POST /api/recipes` accepts the complete recipe body. `PUT /api/recipes/{id}` accepts a partial body; omitted fields keep their stored values. Both endpoints validate `ingredients` with the same Zod contract and return `400` with an `error` field when validation fails.
+
+Each ingredient contains the following fields:
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `id` | UUID string | Yes | Ingredient identity within the recipe |
+| `displayName` | string | Yes | Trimmed, 1-200 characters |
+| `inputMode` | `'grams'\| 'portion'` | Yes | Unit used for `inputAmount` |
+| `inputAmount` | `number \| null` | Yes | Finite, non-negative entered amount; `null` means indeterminate |
+| `amountGrams` | `number \| null` | Yes | Finite, non-negative resolved amount; `food` requires a positive value |
+| `unit` | string | Yes | Trimmed, 1-50 characters |
+| `linkedProductId` | string \| null | Yes | Catalog product reference |
+| `linkedReusableItemId` | string \| null | Yes | Personal library reference |
+| `isAiEstimate` | boolean | Yes | Whether the nutrition values were AI-estimated |
+| `category` | `'food' \| 'seasoning'` | No | Omitted on legacy payloads; omission is treated as `food` |
+| `amountLabel` | string | No | Persistent optional seasoning label, max. 100 characters |
+| `portionWeightGrams` | positive number | No | Weight of one source portion |
+| `portionLabel` | string | No | Optional portion display label, max. 50 characters |
+| `nutritionPer100g` | `RecipeNutrition` | Yes | All values must be finite and non-negative |
+| `nutritionContribution` | `RecipeNutrition` | Yes | All values must be finite and non-negative |
+
+For `food` ingredients, and for legacy ingredients without `category`, `amountGrams` must be greater than zero. `seasoning` ingredients may use `amountGrams: null` (or `0`); their nutrition contribution is zero. Negative, non-finite, or otherwise invalid food amounts are rejected on both create and update. Existing Cosmos recipe documents do not require a migration: missing optional ingredient fields remain missing and are read as legacy `food` ingredients.
+
+`amountLabel` is retained by the create/update and GET roundtrip. `kitchenAmountText` belongs exclusively to the AI recipe-analysis response and is not a persistent `RecipeIngredient` field.
+
 ## Food Search
 
 | Method | Route | Auth | Notes |
@@ -138,6 +166,7 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | POST | `/api/ai/food-estimate` | Yes | `food-estimate` | Food name → nutrition per 100g |
 | POST | `/api/ai/food-estimate/batch` | Yes | `food-estimate` | Batch food estimation |
 | POST | `/api/ai/label-scan` | Yes | `label-scan` | Multipart image → nutrition label data |
+| POST | `/api/ai/recipe-analyze` | Yes | `recipe-analyze` | Recipe text → structured metadata and ingredient preview |
 | GET | `/api/ai/daily-insight` | Yes | (tracked separately) | Once-daily AI briefing; never returns error to user |
 
 AI endpoints return `429` with `QuotaExceededResponse` when quota is exceeded.

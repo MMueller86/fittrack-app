@@ -28,7 +28,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Update this constant whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-review all fixtures. */
-const TESTED_PROMPT_VERSION = 'v5';
+const TESTED_PROMPT_VERSION = 'v8';
 
 it('prompt version matches fixture expectations', () => {
   expect(RECIPE_ANALYZE_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);
@@ -56,6 +56,7 @@ function assertAmountGrams(
     expect(actual, `${label}: expected amountGrams to be null`).toBeNull();
   } else if (constraint === 'not-null') {
     expect(actual, `${label}: expected amountGrams to be non-null (estimated)`).not.toBeNull();
+    expect(actual, `${label}: expected amountGrams to be positive`).toBeGreaterThan(0);
   } else {
     expect(
       actual,

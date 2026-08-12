@@ -148,7 +148,7 @@ Local values are in `backend/local.settings.json` (gitignored) — this is the *
 
 ## Build and Deploy
 
-- Local dev: `func start` (Azure Functions Core Tools) from `backend/`
+- Local dev: `npm run dev` from `backend/`; the launcher builds first, starts Azurite, waits until its Blob, Queue, and Table services answer over HTTP, and only then starts Azure Functions. Azurite data is stored in the OS temp directory by default to avoid sync-folder file locks; `FITTRACK_AZURITE_LOCATION` can override it. `npm run start` assumes Azurite is already running.
 - Build: `npm run build` (TypeScript → `dist/`)
 - Verify: `npm run build:verify` — compiles then runs `scripts/verify-build.mjs` which checks that `require('@fittrack/shared')` does not appear in the output
 - Deploy: always from `_deploy_staging/` with `--no-build` flag (used for all environments, not just staging)

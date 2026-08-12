@@ -50,6 +50,21 @@ Four levels only — no custom values:
 
 ---
 
+## Information Overlay
+
+Short contextual explanations use the shared mobile `InfoOverlay` pattern. The overlay is app-owned and follows the FitTrack visual language:
+
+- Full-screen backdrop using `colors.background` with controlled opacity
+- Centered panel using `colors.surfaceElevated`, `colors.border`, `radius.xl`, and `spacing.lg`
+- Title in `typography.h3`, explanation in `typography.body2`
+- One clear primary dismissal action such as `Verstanden` using `typography.button` and `colors.primary`
+- Dismissal by the action, the backdrop, or the platform back action
+- `animationType="fade"` for a quiet appearance without disrupting the current task
+
+[Rule] Never use standard Android alerts (`Alert.alert`) for FitTrack information, instructions, confirmations, or action choices. These must use an app-owned overlay such as `InfoOverlay` or the appropriate FitTrack bottom sheet.
+
+---
+
 ## Typography
 
 ```ts

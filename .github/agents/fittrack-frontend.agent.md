@@ -1,6 +1,7 @@
 ---
 name: FitTrack Frontend
 description: Frontend Engineer for FitTrack. Implements React Native screens, components, navigation flows, and mobile features. Follows the documented design system and UX patterns. Use for mobile feature implementation, new screens, UI components, and API integration. Always works from an approved FitTrack Planner implementation plan for medium or large features.
+model: GPT-5.6 Luna
 tools: [read, search, edit, execute]
 ---
 

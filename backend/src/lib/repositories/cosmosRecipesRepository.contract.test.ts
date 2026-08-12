@@ -114,6 +114,49 @@ describe('CosmosRecipesRepository (contract)', () => {
     expect(fetched!.name).toBe('Sauerteigbrot');
   });
 
+  it('reads a historical recipe without category and amountLabel', async () => {
+    const historicalRecipe = {
+      id: '00000000-0000-0000-0000-000000000101',
+      userId: USER_A,
+      ownerUserId: USER_A,
+      name: 'Historisches Rezept',
+      description: 'Vor der Erweiterung des Ingredient-Modells',
+      portions: 2,
+      ingredients: [{
+        id: '00000000-0000-0000-0000-000000000102',
+        displayName: 'Reis',
+        inputMode: 'grams' as const,
+        inputAmount: 200,
+        amountGrams: 200,
+        unit: 'g',
+        linkedProductId: null,
+        linkedReusableItemId: null,
+        isAiEstimate: false,
+        nutritionPer100g: { calories: 350, protein: 7, carbs: 78, fat: 1, fiber: 2 },
+        nutritionContribution: { calories: 700, protein: 14, carbs: 156, fat: 2, fiber: 4 },
+      }],
+      steps: [{ order: 1, description: 'Reis kochen.' }],
+      images: [],
+      nutritionTotal: { calories: 700, protein: 14, carbs: 156, fat: 2, fiber: 4 },
+      nutritionPerPortion: { calories: 350, protein: 7, carbs: 78, fat: 1, fiber: 2 },
+      visibility: 'private' as const,
+      sharedWithUserIds: [],
+      tags: ['Historisch'],
+      usageCount: 3,
+      createdAt: '2026-01-10T10:00:00.000Z',
+      updatedAt: '2026-01-11T10:00:00.000Z',
+    };
+
+    await ctx!.database.container('recipes').items.create(historicalRecipe);
+
+    const fetched = await repo.get(USER_A, historicalRecipe.id);
+
+    expect(fetched).not.toBeNull();
+    expect(fetched).toMatchObject(historicalRecipe);
+    expect(fetched!.ingredients[0]).not.toHaveProperty('category');
+    expect(fetched!.ingredients[0]).not.toHaveProperty('amountLabel');
+  });
+
   // ---- list uses correct query parameter --------------------------------
 
   it('list returns created recipes for the correct user', async () => {

@@ -445,7 +445,17 @@ export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
   const raw = response.choices[0]?.message?.content;
   if (!raw) throw new Error('Empty response from Azure OpenAI');
 
-  return JSON.parse(raw) as AiRecipeRaw;
+  const parsed = JSON.parse(raw) as AiRecipeRaw;
+
+  // Structured Outputs cannot express the category-dependent null rule for this field.
+  return {
+    ...parsed,
+    ingredients: parsed.ingredients.map((ingredient) =>
+      ingredient.category === 'food'
+        ? { ...ingredient, kitchenAmountText: null }
+        : ingredient,
+    ),
+  };
 }
 
 // ---------------------------------------------------------------------------

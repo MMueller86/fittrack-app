@@ -1,23 +1,27 @@
-// RecipeDetailScreen — shows recipe with image carousel, ingredients, steps + actions
-import React, { useCallback, useEffect, useState } from 'react';
+// RecipeDetailScreen — read-only recipe preview with logging and management actions
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
 import { favoritesApi } from '../../shared/api/favoritesApi';
+import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
 import { Icon } from '../../shared/components/Icon';
+import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { computeRecipeQuickEntryData } from './recipeUtils';
+import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
+import { RecipeIngredientGroup } from './RecipeIngredientGroup';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 import LogRecipeModal from './LogRecipeModal';
 
@@ -28,7 +32,7 @@ function MacroChip({ label, value, unit }: { label: string; value: number; unit:
     <View style={chipStyles.chip}>
       <Text style={chipStyles.value}>
         {Math.round(value)}
-        {unit}
+        <Text style={chipStyles.unit}> {unit}</Text>
       </Text>
       <Text style={chipStyles.label}>{label}</Text>
     </View>
@@ -40,54 +44,73 @@ const chipStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.surface,
     borderRadius: radius.md,
-    alignItems: 'center',
     paddingVertical: spacing.sm,
-    marginHorizontal: 3,
+    paddingHorizontal: spacing.xs,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  value: { ...typography.h3, color: colors.primaryBright },
-  label: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
+  value: { ...typography.body1, color: colors.text, fontWeight: '700' },
+  unit: { ...typography.caption, color: colors.textMuted, fontWeight: '400' },
+  label: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
 });
 
 export default function RecipeDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [logVisible, setLogVisible] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [seasoningsExpanded, setSeasoningsExpanded] = useState(false);
+  const [errorNotice, setErrorNotice] = useState<{ title: string; body: string } | null>(null);
+  const recipeRef = useRef<Recipe | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await recipeApi.get(id);
+      recipeRef.current = data;
       setRecipe(data);
+      setImgIndex(0);
+      setLoadError(false);
     } catch (err: unknown) {
       console.error('[RecipeDetail] Load failed for id', id, err);
-      let detail = '';
-      if (err != null && typeof err === 'object' && 'response' in err) {
-        const resp = (err as { response?: { status?: number; data?: unknown } }).response;
-        detail = ` (HTTP ${resp?.status ?? '?'})`;
-        console.error('[RecipeDetail] HTTP response:', resp?.status, resp?.data);
-      } else if (err instanceof Error) {
-        detail = `\n${err.message}`;
+      if (recipeRef.current == null) {
+        setLoadError(true);
+      } else {
+        setErrorNotice({
+          title: 'Rezept konnte nicht aktualisiert werden',
+          body: 'Die zuletzt geladenen Daten bleiben sichtbar. Bitte versuche es später erneut.',
+        });
       }
-      Alert.alert('Fehler', `Rezept konnte nicht geladen werden.${detail}`);
-      navigation.goBack();
     } finally {
       setLoading(false);
     }
-  }, [id, navigation]);
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
+    let cancelled = false;
     favoritesApi
       .listFavorites()
-      .then((favs) => setIsFavorite(favs.some((f) => f.foodRef === id)))
+      .then((favs) => {
+        if (!cancelled) setIsFavorite(favs.some((f) => f.foodRef === id));
+      })
       .catch(() => {
-        /* ignore — heart defaults to unfavorited */
+        // The heart remains unfavorited when favorites are unavailable.
       });
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
 
   const handleToggleFavorite = useCallback(async () => {
@@ -109,18 +132,42 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         await favoritesApi.removeFavorite(recipe.id);
       }
     } catch {
-      setIsFavorite(!next); // revert on error
+      setIsFavorite(!next);
     }
   }, [recipe, isFavorite]);
 
-  useEffect(() => {
-    if (!recipe) return;
-    navigation.setOptions({
-      headerRight: () => (
+  const handleDeleteConfirmed = async () => {
+    setDeleting(true);
+    try {
+      await recipeApi.delete(id);
+      navigation.goBack();
+    } catch (err: unknown) {
+      console.error('[RecipeDetail] Delete failed for id', id, err);
+      setErrorNotice({
+        title: 'Rezept konnte nicht gelöscht werden',
+        body: 'Bitte versuche es später erneut.',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const topBar = (
+    <View style={styles.topBar}>
+      <TouchableOpacity
+        style={styles.topBarAction}
+        onPress={() => navigation.goBack()}
+        accessibilityRole="button"
+        accessibilityLabel="Zurück"
+      >
+        <Icon lib="ion" name="chevron-back" size="lg" color={colors.text} />
+      </TouchableOpacity>
+      <Text style={styles.topBarTitle}>Rezept</Text>
+      {recipe ? (
         <TouchableOpacity
+          style={styles.topBarAction}
           onPress={() => void handleToggleFavorite()}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={{ marginRight: spacing.md }}
+          accessibilityRole="button"
           accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
         >
           <Icon
@@ -130,144 +177,179 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
             color={isFavorite ? colors.negative : colors.textMuted}
           />
         </TouchableOpacity>
-      ),
-    });
-  }, [recipe, isFavorite, navigation, handleToggleFavorite]);
+      ) : (
+        <View style={styles.topBarAction} />
+      )}
+    </View>
+  );
 
-  const handleDelete = () => {
-    Alert.alert('Rezept löschen', 'Möchtest du dieses Rezept wirklich löschen?', [
-      { text: 'Abbrechen', style: 'cancel' },
-      {
-        text: 'Löschen',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await recipeApi.delete(id);
-            navigation.goBack();
-          } catch (err: unknown) {
-            console.error('[RecipeDetail] Delete failed for id', id, err);
-            let detail = '';
-            if (err != null && typeof err === 'object' && 'response' in err) {
-              const resp = (err as { response?: { status?: number; data?: unknown } }).response;
-              detail = ` (HTTP ${resp?.status ?? '?'})`;
-              console.error('[RecipeDetail] Delete HTTP response:', resp?.status, resp?.data);
-            }
-            Alert.alert('Fehler', `Rezept konnte nicht gelöscht werden.${detail}`);
-          }
-        },
-      },
-    ]);
-  };
-
-  if (loading || !recipe) {
+  if (loading && !recipe && !loadError) {
     return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator color={colors.primary} />
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        {topBar}
+        <View style={styles.stateContent}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       </SafeAreaView>
     );
   }
 
-  const { nutritionPerPortion } = recipe;
+  if (!recipe) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        {topBar}
+        <View style={styles.stateContent}>
+          <Text style={styles.stateTitle}>Rezept konnte nicht geladen werden</Text>
+          <Text style={styles.stateText}>Bitte prüfe deine Verbindung und versuche es erneut.</Text>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={() => {
+              setLoadError(false);
+              void load();
+            }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.primaryButtonText}>Erneut versuchen</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const previewViewModel = buildRecipePreviewViewModel(recipe.ingredients);
+  const visibleIngredientGroups = previewViewModel.groups.filter((group) => group.ingredients.length > 0);
+  const foodGroups = visibleIngredientGroups.filter((group) => group.category !== 'seasoning');
+  const seasoningGroup = visibleIngredientGroups.find((group) => group.category === 'seasoning');
+  const visibleSteps = recipe.steps.filter((step) => step.description.trim().length > 0);
+  const imageUrls = recipe.images
+    .map((image) => image.url)
+    .filter((url): url is string => typeof url === 'string' && url.length > 0);
+  const currentImageUrl = imageUrls[imgIndex] ?? imageUrls[0];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Image carousel */}
-        {recipe.images.length > 0 && (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: recipe.images[imgIndex].url }}
-              style={styles.image}
-              resizeMode="cover"
-            />
-            {recipe.images.length > 1 && (
-              <View style={styles.imageDots}>
-                {recipe.images.map((_, i) => (
-                  <TouchableOpacity key={i} onPress={() => setImgIndex(i)}>
-                    <View style={[styles.dot, i === imgIndex && styles.dotActive]} />
-                  </TouchableOpacity>
-                ))}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {topBar}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+        <Text style={styles.title} accessibilityRole="header">{recipe.name}</Text>
+
+        {recipe.tags.length > 0 && (
+          <View style={styles.tagsRow}>
+            {recipe.tags.map((tag) => (
+              <View key={tag} style={styles.tagChip}>
+                <Text style={styles.tagText}>{tag}</Text>
               </View>
-            )}
+            ))}
           </View>
         )}
 
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>{recipe.name}</Text>
-            {recipe.description && (
-              <Text style={styles.description}>{recipe.description}</Text>
-            )}
-            <Text style={styles.portionsLabel}>
-              {recipe.portions} {recipe.portions === 1 ? 'Portion' : 'Portionen'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Nutrition per portion */}
-        <Text style={styles.sectionTitle}>Nährwerte pro Portion</Text>
-        <View style={styles.macrosRow}>
-          <MacroChip label="kcal" value={nutritionPerPortion.calories} unit="" />
-          <MacroChip label="Eiweiß" value={nutritionPerPortion.protein} unit="g" />
-          <MacroChip label="Kohlenhydr." value={nutritionPerPortion.carbs} unit="g" />
-          <MacroChip label="Fett" value={nutritionPerPortion.fat} unit="g" />
-        </View>
-
-        {/* Ingredients */}
-        {recipe.ingredients.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Zutaten</Text>
-            {recipe.ingredients.map((ing) => (
-              <View key={ing.id} style={styles.ingredientRow}>
-                <Text style={styles.ingredientName}>{ing.displayName}</Text>
-                <Text style={styles.ingredientAmount}>
-                  {ing.inputAmount}{ing.unit}
-                </Text>
-              </View>
-            ))}
-          </>
+        {recipe.description && (
+          <Text style={styles.description}>{recipe.description}</Text>
         )}
 
-        {/* Steps */}
-        {recipe.steps.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Zubereitung</Text>
-            {recipe.steps.map((step) => (
-              <View key={step.order} style={styles.stepRow}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>{step.order}</Text>
-                </View>
-                <View style={styles.stepContent}>
-                  {step.title && <Text style={styles.stepTitle}>{step.title}</Text>}
-                  <Text style={styles.stepDesc}>{step.description}</Text>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
-
-        {/* Actions */}
-        <View style={styles.actions}>
+        <View style={styles.portionsSection}>
+          <Text style={styles.portionsSentence}>
+            Dieses Rezept ergibt{' '}
+            <Text style={styles.portionValue}>{recipe.portions}</Text>{' '}
+            {recipe.portions === 1 ? 'Portion' : 'Portionen'}.
+          </Text>
           <TouchableOpacity
-            style={[styles.btn, styles.btnPrimary]}
+            style={[styles.actionButton, styles.actionButtonPrimary]}
             onPress={() => setLogVisible(true)}
             activeOpacity={0.8}
+            accessibilityRole="button"
           >
-            <Text style={styles.btnPrimaryText}>Portion eintragen</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnSecondary]}
-            onPress={() => navigation.navigate('RecipeCreate', { editId: id })}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.btnSecondaryText}>Bearbeiten</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, styles.btnDestructive]} onPress={handleDelete} activeOpacity={0.8}>
-            <Text style={styles.btnDestructiveText}>Löschen</Text>
+            <Text style={styles.actionButtonPrimaryText}>Portion eintragen</Text>
           </TouchableOpacity>
         </View>
+
+        <Text style={styles.sectionLabel}>Nährwerte pro Portion</Text>
+        <View style={styles.macroRow}>
+          <MacroChip label="Kalorien" value={recipe.nutritionPerPortion.calories} unit="kcal" />
+          <MacroChip label="Protein" value={recipe.nutritionPerPortion.protein} unit="g" />
+          <MacroChip label="Kohlenhydr." value={recipe.nutritionPerPortion.carbs} unit="g" />
+          <MacroChip label="Fett" value={recipe.nutritionPerPortion.fat} unit="g" />
+        </View>
+
+        {imageUrls.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>Fotos ({imageUrls.length})</Text>
+            <View style={styles.imageContainer}>
+              <Image source={{ uri: currentImageUrl }} style={styles.image} resizeMode="cover" />
+              {imageUrls.length > 1 && (
+                <View style={styles.imageDots}>
+                  {imageUrls.map((_, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => setImgIndex(index)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Foto ${index + 1} von ${imageUrls.length} anzeigen`}
+                    >
+                      <View style={[styles.dot, index === imgIndex && styles.dotActive]} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          </>
+        )}
+
+        {visibleIngredientGroups.length > 0 && (
+          <>
+            <Text style={styles.contentSectionLabel}>Zutaten</Text>
+            {foodGroups.map((group) => (
+              <RecipeIngredientGroup key={group.category} group={group} />
+            ))}
+            {seasoningGroup && (
+              <RecipeIngredientGroup
+                group={seasoningGroup}
+                collapsible
+                expanded={seasoningsExpanded}
+                onToggle={() => setSeasoningsExpanded((expanded) => !expanded)}
+              />
+            )}
+          </>
+        )}
+
+        {visibleSteps.length > 0 && (
+          <>
+            <Text style={styles.contentSectionLabel}>Zubereitung</Text>
+            {visibleSteps.map((step, index) => (
+              <View key={step.order} style={styles.stepRow}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>{index + 1}</Text>
+                </View>
+                <View style={styles.stepContent}>
+                  {step.title?.trim() && <Text style={styles.stepTitle}>{step.title}</Text>}
+                  <Text style={styles.stepDescription}>{step.description}</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
+
       </ScrollView>
+
+      <View style={styles.stickyFooter}>
+        <TouchableOpacity
+          style={styles.stickyAction}
+          onPress={() => navigation.navigate('RecipeCreate', { editId: id })}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+        >
+          <Icon lib="ion" name="create-outline" size="md" color={colors.textSecondary} />
+          <Text style={styles.stickyActionText}>Bearbeiten</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.stickyAction}
+          onPress={() => setDeleteConfirmVisible(true)}
+          disabled={deleting}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+        >
+          <Icon lib="ion" name="trash-outline" size="md" color={colors.negative} />
+          <Text style={styles.stickyDeleteText}>Löschen</Text>
+        </TouchableOpacity>
+      </View>
 
       <LogRecipeModal
         visible={logVisible}
@@ -275,8 +357,23 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         onClose={() => setLogVisible(false)}
         onLogged={() => {
           setLogVisible(false);
-          load();
+          void load();
         }}
+      />
+
+      <ConfirmSheet
+        visible={deleteConfirmVisible}
+        title="Rezept löschen?"
+        subtitle="Das Rezept und seine gespeicherten Daten werden dauerhaft gelöscht."
+        actions={[{ label: 'Löschen', destructive: true, onPress: () => void handleDeleteConfirmed() }]}
+        onClose={() => setDeleteConfirmVisible(false)}
+      />
+
+      <InfoOverlay
+        visible={errorNotice != null}
+        title={errorNotice?.title ?? 'Fehler'}
+        body={errorNotice?.body ?? ''}
+        onClose={() => setErrorNotice(null)}
       />
     </SafeAreaView>
   );
@@ -284,9 +381,100 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
-  scroll: { paddingBottom: spacing.xxl },
-  imageContainer: { position: 'relative' },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  topBarAction: {
+    width: spacing.xxl,
+    height: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topBarTitle: { ...typography.h3, color: colors.text, flex: 1, textAlign: 'center' },
+  scrollView: { flex: 1 },
+  scroll: { padding: spacing.md, paddingBottom: spacing.md },
+  stateContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  stateTitle: { ...typography.h3, color: colors.text, textAlign: 'center' },
+  stateText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  title: {
+    ...typography.h2,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  tagChip: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+  },
+  tagText: { ...typography.caption, color: colors.primaryBright, fontWeight: '600' },
+  description: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: spacing.lg,
+  },
+  portionsSection: {
+    paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
+    alignItems: 'stretch',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  portionsSentence: {
+    ...typography.body1,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  portionValue: {
+    ...typography.h1,
+    color: colors.primaryBright,
+    fontWeight: '800',
+  },
+  sectionLabel: {
+    ...typography.overline,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  imageContainer: {
+    position: 'relative',
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
   image: { width: '100%', height: 240 },
   imageDots: {
     position: 'absolute',
@@ -295,66 +483,76 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 6,
+    gap: spacing.xs,
   },
   dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    width: spacing.xs,
+    height: spacing.xs,
+    borderRadius: radius.full,
+    backgroundColor: colors.textMuted,
+    opacity: 0.65,
   },
-  dotActive: { backgroundColor: colors.white },
-  header: { padding: spacing.md },
-  headerText: { flex: 1 },
-  title: { ...typography.h1, color: colors.text },
-  description: { ...typography.body2, color: colors.textSecondary, marginTop: spacing.xs },
-  portionsLabel: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
-  sectionTitle: {
-    ...typography.overline,
-    color: colors.textMuted,
+  dotActive: { backgroundColor: colors.white, opacity: 1 },
+  contentSectionLabel: {
+    ...typography.h3,
+    color: colors.text,
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
-    paddingHorizontal: spacing.md,
   },
-  macrosRow: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  ingredientName: { ...typography.body2, color: colors.text },
-  ingredientAmount: { ...typography.body2, color: colors.textSecondary },
   stepRow: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    marginBottom: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  stepBadge: {
+    width: spacing.lg,
+    height: spacing.lg,
+    borderRadius: radius.full,
     backgroundColor: colors.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  stepNumberText: { ...typography.caption, color: colors.primaryBright, fontWeight: '700' },
-  stepContent: { flex: 1 },
-  stepTitle: { ...typography.body1, color: colors.text, fontWeight: '600' },
-  stepDesc: { ...typography.body2, color: colors.textSecondary, marginTop: 2 },
-  actions: { padding: spacing.md, gap: spacing.sm, marginTop: spacing.lg },
-  btn: { borderRadius: radius.md, paddingVertical: spacing.sm + 4, alignItems: 'center' },
-  btnPrimary: { backgroundColor: colors.primary },
-  btnPrimaryText: { ...typography.button, color: colors.white },
-  btnSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  btnSecondaryText: { ...typography.button, color: colors.text },
-  btnDestructive: { backgroundColor: 'transparent' },
-  btnDestructiveText: { ...typography.button, color: colors.negative },
+  stepBadgeText: { ...typography.body2, color: colors.primaryBright, fontWeight: '700' },
+  stepContent: { flex: 1, marginLeft: spacing.md },
+  stepTitle: { ...typography.body1, color: colors.text, fontWeight: '600', marginBottom: spacing.xs },
+  stepDescription: { ...typography.body2, color: colors.textSecondary, lineHeight: 22 },
+  actionButton: {
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  actionButtonPrimary: { backgroundColor: colors.primary },
+  actionButtonPrimaryText: { ...typography.button, color: colors.white },
+  stickyFooter: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 0,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  stickyAction: {
+    flex: 1,
+    minHeight: spacing.xxl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+  },
+  stickyActionText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
+  stickyDeleteText: { ...typography.caption, color: colors.negative, fontWeight: '600' },
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  primaryButtonText: { ...typography.button, color: colors.white },
 });

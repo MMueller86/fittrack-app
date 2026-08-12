@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import type { AiMealEstimatePreview } from '@fittrack/shared';
+import type { AiFoodEstimatePreview, AiMealEstimatePreview } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../../shared/api/aiApi';
 import { aiApi } from '../../../shared/api/aiApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
@@ -49,6 +49,9 @@ interface Props {
   context: FoodEntryHubContext;
   onClose: () => void;
   onSaved: (label: string) => void;
+  /** Recipe mode: run a single-food estimate instead of a meal estimate. */
+  onIngredientEstimated?: (estimate: AiFoodEstimatePreview, query: string) => void;
+  initialQuery?: string;
 }
 
 async function resolveOrCreateMealId(
@@ -65,7 +68,7 @@ async function resolveOrCreateMealId(
   return meal.id;
 }
 
-export function AISubFlow({ visible, context, onClose, onSaved }: Props) {
+export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEstimated, initialQuery }: Props) {
   const [text, setText] = useState('');
   const [mealPhoto, setMealPhoto] = useState<{
     uri: string;
@@ -97,9 +100,10 @@ export function AISubFlow({ visible, context, onClose, onSaved }: Props) {
       setShowFullReview(false);
       return;
     }
+    setText(initialQuery ?? '');
     // Mahlzeit-Selektor mit aktuellem context.mealType vorbelegen
     setSelectedMealType(context.mealType);
-  }, [visible, context.mealType]);
+  }, [visible, context.mealType, initialQuery]);
 
   async function handlePickPhoto(source: 'camera' | 'gallery') {
     setError(null);
@@ -156,6 +160,28 @@ export function AISubFlow({ visible, context, onClose, onSaved }: Props) {
         );
       } else {
         setError(formatApiError(e));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleIngredientEstimate() {
+    const query = text.trim();
+    if (!onIngredientEstimated || query.length < 2 || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const estimate = await aiApi.estimateFood({ name: query });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onIngredientEstimated(estimate, query);
+    } catch (e) {
+      if (isQuotaExceededError(e)) {
+        setError(
+          'Deine kostenlosen KI-Analysen für diesen Monat sind aufgebraucht. Das Kontingent wird am Monatsanfang zurückgesetzt.',
+        );
+      } else {
+        setError(formatApiError(e, 'KI-Schätzung fehlgeschlagen'));
       }
     } finally {
       setLoading(false);
@@ -230,6 +256,62 @@ export function AISubFlow({ visible, context, onClose, onSaved }: Props) {
   };
 
   if (!visible) return null;
+
+  if (onIngredientEstimated) {
+    return (
+      <Modal
+        visible={visible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={onClose}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.header}>
+            <Text style={styles.title}>✨ KI-Lebensmittelschätzung</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Text style={styles.closeBtn}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={styles.subtitle}>
+              Kein passendes Lebensmittel gefunden. Die KI kann eine einmalige Nährwertschätzung erstellen.
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              placeholder="Lebensmittel beschreiben…"
+              placeholderTextColor={colors.textMuted}
+              value={text}
+              onChangeText={setText}
+              multiline
+              numberOfLines={3}
+              returnKeyType="done"
+              blurOnSubmit
+            />
+            {error ? <ErrorBanner error={error} /> : null}
+            <TouchableOpacity
+              style={[styles.analyzeBtn, (loading || text.trim().length < 2) && styles.analyzeBtnDisabled]}
+              onPress={() => void handleIngredientEstimate()}
+              disabled={loading || text.trim().length < 2}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.background} />
+              ) : (
+                <Text style={styles.analyzeBtnText}>KI-Schätzung starten</Text>
+              )}
+            </TouchableOpacity>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+    );
+  }
 
   // ── Inline Estimate Preview ──────────────────────────────────────────────
   // Wird angezeigt wenn die KI-Schätzung vorliegt — KEIN nested Modal!

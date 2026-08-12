@@ -23,6 +23,7 @@ import { recipeApi } from '../../shared/api/recipeApi';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { buildFromProduct } from './ingredientBuilders';
+import { formatRecipeIngredientAmount } from './recipePreviewViewModel';
 import { QuantityInputRow } from '../../shared/components/QuantityInputRow';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeCreate'>;
@@ -310,10 +311,21 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
           )}
           {ingredients.map((ing) => {
             const edit = amountEdits[ing.id] ?? { mode: ing.inputMode, value: String(ing.inputAmount) };
+            const amountLabel = formatRecipeIngredientAmount(ing);
             return (
               <View key={ing.id} style={styles.ingredientCard}>
                 <View style={styles.ingredientCardHeader}>
-                  <Text style={styles.ingredientName} numberOfLines={1}>{ing.displayName}</Text>
+                  <View style={styles.ingredientNameBlock}>
+                    <Text style={styles.ingredientName} numberOfLines={1}>{ing.displayName}</Text>
+                    {ing.category === 'seasoning' && (
+                      <View style={styles.seasoningMeta}>
+                        <Text style={styles.seasoningLabel}>Gewürz</Text>
+                        {amountLabel != null && (
+                          <Text style={styles.seasoningAmount}>{amountLabel}</Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
                   <View style={styles.ingredientCardActions}>
                     <TouchableOpacity onPress={() => {
                       const idToReplace = ing.id;
@@ -336,14 +348,16 @@ export default function RecipeCreateScreen({ route, navigation }: Props) {
                     </TouchableOpacity>
                   </View>
                 </View>
-                <QuantityInputRow
-                  nutritionPer100g={ing.nutritionPer100g}
-                  portionWeightGrams={ing.portionWeightGrams}
-                  portionLabel={ing.portionLabel}
-                  mode={edit.mode}
-                  value={edit.value}
-                  onChange={(m, v) => handleUpdateIngredientAmount(ing.id, m, v)}
-                />
+                {ing.category === 'seasoning' ? null : (
+                  <QuantityInputRow
+                    nutritionPer100g={ing.nutritionPer100g}
+                    portionWeightGrams={ing.portionWeightGrams}
+                    portionLabel={ing.portionLabel}
+                    mode={edit.mode}
+                    value={edit.value}
+                    onChange={(m, v) => handleUpdateIngredientAmount(ing.id, m, v)}
+                  />
+                )}
               </View>
             );
           })}
@@ -456,7 +470,11 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
   },
   ingredientCardActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  ingredientName: { ...typography.body2, color: colors.text, fontWeight: '600', flex: 1 },
+  ingredientNameBlock: { flex: 1, minWidth: 0, paddingRight: spacing.sm },
+  ingredientName: { ...typography.body2, color: colors.text, fontWeight: '600' },
+  seasoningMeta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs },
+  seasoningLabel: { ...typography.caption, color: colors.textMuted },
+  seasoningAmount: { ...typography.caption, color: colors.primaryBright },
   replaceText: { ...typography.caption, color: colors.primary },
   removeText: { ...typography.body1, color: colors.negative, paddingHorizontal: spacing.sm },
   stepContainer: {

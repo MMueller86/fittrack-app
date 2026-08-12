@@ -99,7 +99,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 ## 5. Recipe Analyzer
 
-**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v2'`
+**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v8'`
 
 **Input:** Free-text recipe (ingredients + steps)
 
@@ -114,24 +114,24 @@ interface AiRecipeIngredientLine {
   line: string;           // full original text, e.g. "300g Hähnchenbrust"
   displayName: string;    // clean name without quantity, e.g. "Hähnchenbrust"
   category: 'food' | 'seasoning';
-  amountGrams: number | null;
+  amountGrams: number | null; // positive grams for food; null only allowed for indeterminate seasoning
 }
 ```
 
 **Ingredient classification rules:**
 
 - `food`: calorically or nutritionally relevant ingredients used in meaningful amounts (e.g. Hähnchenbrust, Pasta, Tomaten, Käse, Butter, Mehl, Zucker, Sahne).
-- `seasoning`: ingredients used in small amounts whose nutritional contribution is negligible (e.g. Salz, Pfeffer, Kräuter, Gewürze, Essig, Sojasauce, Worcestersauce, Paprikapulver). These do not meaningfully affect the recipe's nutrition profile.
+- `seasoning`: ingredients used in small amounts whose nutritional contribution is negligible (e.g. Salz, Pfeffer, fresh or dried herbs such as Basilikum, Gewürze, Essig, Sojasauce, Worcestersauce, Paprikapulver). Normal kitchen-herb quantities remain `seasoning` even when described as fresh; only an explicitly nutritionally dominant herb quantity becomes `food`. These do not meaningfully affect the recipe's nutrition profile.
 
 **Amount resolution:**
 
-The AI resolves all amounts to grams or millilitres. Standard conversions apply (`1 TL` → ~5g, `1 EL` → ~15g, `1 Prise` → ~1g). For piece-based quantities (e.g. "2 Eier"), the AI estimates total weight. When no amount is given, a plausible amount is estimated for the specified number of portions. `null` is returned only when the amount is truly indeterminate from context.
+For every `food` ingredient, the AI returns a positive total weight in grams. Standard conversions apply (`1 TL` → ~5g, `1 EL` → ~15g, `1 Prise` → ~1g); millilitres are converted to approximate grams, with density-sensitive ingredients such as dried herbs allowed to fall below the generic teaspoon estimate. For piece-based quantities (e.g. "2 Eier"), the AI estimates total weight. When no amount is given, a plausible gram amount is estimated for the specified number of portions. A `seasoning` with an explicit or reasonably convertible kitchen amount also receives a positive gram estimate; `null` is allowed only when its gram amount is genuinely indeterminate.
 
 **Backend routing logic:**
 
 After the AI call, ingredients are split into two groups and processed differently:
 
-1. **`food` items** — joined as a comma-separated string and passed to `parseMeal()`. Results are bundled via `bundleAiItems()`, then resolved against the food catalog via `resolveIngredients()` (catalog search + AI estimation fallback). Each resolved item gets `category: 'food'`.
+1. **`food` items** — the Recipe Analyzer's normalized ingredient names and positive `amountGrams` values are converted directly to gram-mode parser items, bundled via `bundleAiItems()`, then resolved against the food catalog via `resolveIngredients()`. The general `parseMeal()` flow is not called, so kitchen-unit conversions cannot be lost. Each resolved item gets `category: 'food'`.
 2. **`seasoning` items** — constructed directly as `MealParserPreviewItem` with `candidates: []`, `needsReview: false`, and `status: 'seasoning'`. No catalog search is performed.
 3. **Unknown/malformed category** — defaults to `'food'` (safe guard: `filter(i => i.category !== 'seasoning')`).
 

@@ -54,6 +54,22 @@ const baseIngredient = {
   nutritionContribution: { calories: 1870, protein: 55, carbs: 396, fat: 5.5, fiber: 16.5 },
 };
 
+const seasoningIngredient = {
+  id: '00000000-0000-0000-0000-000000000002',
+  displayName: 'Salz',
+  inputMode: 'grams',
+  inputAmount: null,
+  amountGrams: null,
+  unit: 'nach Geschmack',
+  amountLabel: 'nach Geschmack',
+  linkedProductId: null,
+  linkedReusableItemId: null,
+  isAiEstimate: false,
+  category: 'seasoning',
+  nutritionPer100g: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+  nutritionContribution: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+};
+
 const baseStep = {
   order: 1,
   description: 'Zutaten mischen.',
@@ -109,6 +125,95 @@ describe('POST /recipes — createRecipe', () => {
     const req = makeRequest({ body: { name: 'X', portions: 1, ingredients: [], steps: [], tags: [] } });
     const res = await createRecipeHandler(req, ctx);
     expect(res.status).toBe(401);
+  });
+
+  it('accepts a legacy ingredient payload without extension fields', async () => {
+    const recipe = await createTestRecipe();
+    const ingredients = recipe['ingredients'] as Array<Record<string, unknown>>;
+
+    expect(ingredients[0]?.['category']).toBeUndefined();
+    expect(ingredients[0]?.['amountLabel']).toBeUndefined();
+    expect(ingredients[0]?.['kitchenAmountText']).toBeUndefined();
+  });
+
+  it('accepts an indeterminate seasoning and preserves its display metadata', async () => {
+    const req = await makeAuthRequest({
+      body: {
+        name: 'Kartoffelsalat',
+        portions: 2,
+        ingredients: [seasoningIngredient],
+        steps: [baseStep],
+        tags: [],
+      },
+    });
+    const res = await createRecipeHandler(req, ctx);
+    expect(res.status).toBe(201);
+
+    const recipe = res.jsonBody as Record<string, unknown>;
+    const ingredient = (recipe['ingredients'] as Array<Record<string, unknown>>)[0]!;
+    expect(ingredient).toMatchObject({
+      category: 'seasoning',
+      inputAmount: null,
+      amountGrams: null,
+      amountLabel: 'nach Geschmack',
+    });
+    expect(ingredient['kitchenAmountText']).toBeUndefined();
+    expect(recipe['nutritionTotal']).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
+
+    const getRes = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: String(recipe['id']) } }),
+      ctx,
+    );
+    expect(getRes.status).toBe(200);
+    const roundTrippedIngredient = (
+      (getRes.jsonBody as Record<string, unknown>)['ingredients'] as Array<Record<string, unknown>>
+    )[0]!;
+    expect(roundTrippedIngredient['amountLabel']).toBe('nach Geschmack');
+    expect(roundTrippedIngredient['kitchenAmountText']).toBeUndefined();
+  });
+
+  it('preserves optional portion metadata on a food ingredient', async () => {
+    const req = await makeAuthRequest({
+      body: {
+        name: 'Toast',
+        portions: 1,
+        ingredients: [{
+          ...baseIngredient,
+          inputMode: 'portion',
+          inputAmount: 2,
+          amountGrams: 100,
+          unit: 'Scheibe',
+          category: 'food',
+          portionWeightGrams: 50,
+          portionLabel: 'Scheibe',
+        }],
+        steps: [],
+        tags: [],
+      },
+    });
+    const res = await createRecipeHandler(req, ctx);
+    expect(res.status).toBe(201);
+
+    const ingredient = ((res.jsonBody as Record<string, unknown>)['ingredients'] as Array<Record<string, unknown>>)[0]!;
+    expect(ingredient).toMatchObject({ portionWeightGrams: 50, portionLabel: 'Scheibe' });
+  });
+
+  it.each([
+    ['null', null],
+    ['zero', 0],
+    ['negative', -1],
+  ])('rejects a food ingredient with %s amountGrams', async (_label, amountGrams) => {
+    const req = await makeAuthRequest({
+      body: {
+        name: 'Ungültiges Rezept',
+        portions: 1,
+        ingredients: [{ ...baseIngredient, category: 'food', amountGrams }],
+        steps: [],
+        tags: [],
+      },
+    });
+    const res = await createRecipeHandler(req, ctx);
+    expect(res.status).toBe(400);
   });
 });
 
@@ -184,6 +289,30 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     });
     const res = await updateRecipeHandler(req, ctx);
     expect(res.status).toBe(404);
+  });
+
+  it('accepts an indeterminate seasoning on update', async () => {
+    const created = await createTestRecipe();
+    const req = await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: { ingredients: [seasoningIngredient] },
+    });
+    const res = await updateRecipeHandler(req, ctx);
+    expect(res.status).toBe(200);
+
+    const ingredient = ((res.jsonBody as Record<string, unknown>)['ingredients'] as Array<Record<string, unknown>>)[0]!;
+    expect(ingredient).toMatchObject({ category: 'seasoning', amountGrams: null, amountLabel: 'nach Geschmack' });
+    expect(ingredient['kitchenAmountText']).toBeUndefined();
+  });
+
+  it('rejects an invalid food amount on update', async () => {
+    const created = await createTestRecipe();
+    const req = await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: { ingredients: [{ ...baseIngredient, category: 'food', amountGrams: null }] },
+    });
+    const res = await updateRecipeHandler(req, ctx);
+    expect(res.status).toBe(400);
   });
 });
 

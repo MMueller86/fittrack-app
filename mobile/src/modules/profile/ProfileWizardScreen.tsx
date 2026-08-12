@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Modal,
   PanResponder,
   Platform,
   ScrollView,
@@ -38,6 +37,7 @@ import { colors, radius, spacing, typography } from '../../app/theme';
 import { profileApi, type CalculatePreviewResponse } from '../../shared/api/profileApi';
 import { listWeights } from '../../services/weightsService';
 import { BrandAsset } from '../../shared/components/BrandAsset';
+import { InfoOverlay } from '../../shared/components/InfoOverlay';
 
 export const SKIP_WIZARD_KEY = 'fittrack:skip_wizard';
 
@@ -283,32 +283,6 @@ function MacroItem({ label, value, highlight }: { label: string; value: string; 
       <Text style={highlight ? styles.macroValueHighlight : styles.macroValue}>{value}</Text>
       <Text style={styles.macroLabel}>{label}</Text>
     </View>
-  );
-}
-
-function TooltipModal({
-  visible,
-  title,
-  body,
-  onClose,
-}: {
-  visible: boolean;
-  title: string;
-  body: string;
-  onClose: () => void;
-}) {
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-        <View style={styles.tooltipBox}>
-          <Text style={styles.tooltipTitle}>{title}</Text>
-          <Text style={styles.tooltipBody}>{body}</Text>
-          <TouchableOpacity style={styles.tooltipClose} onPress={onClose} activeOpacity={0.7}>
-            <Text style={styles.tooltipCloseText}>Verstanden</Text>
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    </Modal>
   );
 }
 
@@ -862,7 +836,7 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
   return (
     <SafeAreaView style={styles.container}>
       {tooltip && (
-        <TooltipModal
+        <InfoOverlay
           visible
           title={tooltip.title}
           body={tooltip.body}
@@ -1226,43 +1200,6 @@ const styles = StyleSheet.create({
   infoIcon: {
     fontSize: 16,
     color: colors.primary,
-  },
-  // Tooltip modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-  },
-  tooltipBox: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.lg ?? radius.md,
-    padding: spacing.lg,
-    maxWidth: 360,
-    width: '100%',
-  },
-  tooltipTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.sm,
-  },
-  tooltipBody: {
-    ...typography.body2,
-    color: colors.textSecondary,
-    lineHeight: 20,
-    marginBottom: spacing.lg,
-  },
-  tooltipClose: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  tooltipCloseText: {
-    ...typography.body1,
-    color: colors.background,
-    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',

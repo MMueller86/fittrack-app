@@ -90,16 +90,18 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
   {
     id: 'explicit-quantities-with-unit-conversion',
     description: 'Gram values pass through unchanged; EL and TL convert to grams correctly',
-    input: '250g Rinderhack, 3 EL Tomatenmark, 400g Dosentomaten, 1 TL getrockneter Oregano',
+    input: '250g Rinderhack, 3 EL Tomatenmark, 400g Dosentomaten, 2 EL Frischkäse, 1 TL getrockneter Oregano',
     constraints: {
       ingredients: [
         // Gram values stated explicitly — must pass through as-is
         { displayNameContains: 'rinderhack', category: 'food', amountGrams: { min: 245, max: 255 } },
         // 3 EL × ~15g = 45g (prompt: "1 EL → ~15g")
         { displayNameContains: 'tomatenmark', category: 'food', amountGrams: { min: 40, max: 50 } },
-        { displayNameContains: 'tomate', category: 'food', amountGrams: { min: 395, max: 405 } },
-        // 1 TL × ~5g = 5g (prompt: "1 TL → ~5g"); Oregano = Gewürzkraut = seasoning
-        { displayNameContains: 'oregano', category: 'seasoning', amountGrams: { min: 4, max: 7 }, kitchenAmountText: 'non-empty' },
+        { displayNameContains: 'dosentomaten', category: 'food', amountGrams: { min: 395, max: 405 } },
+        // 2 EL × ~15g = 30g; dairy remains a food ingredient
+        { displayNameContains: 'frischkäse', category: 'food', amountGrams: { min: 25, max: 35 } },
+        // Explicit seasoning amount must become a positive estimate; dried-herb density can be well below 5g/TL.
+        { displayNameContains: 'oregano', category: 'seasoning', amountGrams: 'not-null', kitchenAmountText: 'non-empty' },
       ],
     },
   },

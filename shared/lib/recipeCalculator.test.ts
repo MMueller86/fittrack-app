@@ -57,6 +57,51 @@ describe('calculateIngredientContribution', () => {
     const result = calculateIngredientContribution(ing);
     expect(result).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
   });
+
+  it('returns zero for a seasoning even when nutrition data is present', () => {
+    const ing = makeIngredient({
+      category: 'seasoning',
+      amountGrams: 5,
+      nutritionPer100g: { calories: 300, protein: 10, carbs: 20, fat: 15, fiber: 4 },
+    });
+    expect(calculateIngredientContribution(ing)).toEqual({
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+    });
+  });
+
+  it('returns zero when the gram amount is indeterminate', () => {
+    const ing = makeIngredient({
+      category: 'seasoning',
+      amountLabel: 'nach Geschmack',
+      inputAmount: null,
+      amountGrams: null,
+      nutritionPer100g: { calories: 300, protein: 10, carbs: 20, fat: 15, fiber: 4 },
+    });
+    expect(calculateIngredientContribution(ing)).toEqual({
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+    });
+  });
+
+  it('treats a historical food ingredient without category as food', () => {
+    const ing = makeIngredient({ amountGrams: 100 });
+
+    expect(ing.category).toBeUndefined();
+    expect(calculateIngredientContribution(ing)).toEqual({
+      calories: 200,
+      protein: 10,
+      carbs: 30,
+      fat: 5,
+      fiber: 2,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -84,6 +129,22 @@ describe('calculateRecipeNutrition', () => {
     const { nutritionTotal, nutritionPerPortion } = calculateRecipeNutrition(ingredients, 1);
     expect(nutritionTotal.calories).toBe(300);
     expect(nutritionPerPortion.calories).toBe(300); // 1 portion
+  });
+
+  it('does not add an indeterminate seasoning to recipe nutrition', () => {
+    const ingredients = [
+      makeIngredient({ amountGrams: 100 }),
+      makeIngredient({
+        id: 'seasoning',
+        category: 'seasoning',
+        inputAmount: null,
+        amountGrams: null,
+        nutritionPer100g: { calories: 300, protein: 10, carbs: 20, fat: 15, fiber: 4 },
+      }),
+    ];
+    const { nutritionTotal, nutritionPerPortion } = calculateRecipeNutrition(ingredients, 2);
+    expect(nutritionTotal).toEqual({ calories: 200, protein: 10, carbs: 30, fat: 5, fiber: 2 });
+    expect(nutritionPerPortion).toEqual({ calories: 100, protein: 5, carbs: 15, fat: 2.5, fiber: 1 });
   });
 
   it('divides correctly for fractional portions (4 portions)', () => {

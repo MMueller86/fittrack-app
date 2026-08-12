@@ -17,26 +17,29 @@ export interface RecipeNutrition {
 // ---------------------------------------------------------------------------
 
 export type RecipeIngredientInputMode = 'grams' | 'portion';
+export type RecipeIngredientCategory = 'food' | 'seasoning';
 
 export interface RecipeIngredient {
   id: string;
   /** Human-readable name (may include brand/product qualifier) */
   displayName: string;
   inputMode: RecipeIngredientInputMode;
-  /** Amount as entered by the user (grams or portions) */
-  inputAmount: number;
-  /** Resolved gram weight for nutrition calculation */
-  amountGrams: number;
+  /** Amount as entered by the user (grams or portions); null when indeterminate */
+  inputAmount: number | null;
+  /** Resolved gram weight for nutrition calculation; null means indeterminate */
+  amountGrams: number | null;
   /** Display unit label (e.g. "g", "Scheibe", "Portion") */
   unit: string;
+  /** Optional persistent display label for a seasoning (e.g. "1 TL") */
+  amountLabel?: string;
   /** Link to food catalog product (null if custom/AI) */
   linkedProductId: string | null;
   /** Link to user's reusable item library (null if catalog/AI) */
   linkedReusableItemId: string | null;
   /** True when nutrition was estimated by AI */
   isAiEstimate: boolean;
-  /** AI-assigned classification: food item or seasoning */
-  category?: 'food' | 'seasoning';
+  /** AI-assigned classification; omitted on legacy documents and treated as food */
+  category?: RecipeIngredientCategory;
   /** Gram weight of one portion — present when the source product has portion info */
   portionWeightGrams?: number;
   /** Display label for the portion (e.g. "Portion", "Scheibe") */

@@ -12,6 +12,7 @@ import {
   buildFromScan,
   buildIngFromCandidate,
   buildIngFromAiEstimate,
+  buildWizardIngredientFromAiEstimate,
   buildIngFromSeasoning,
 } from './ingredientBuilders';
 
@@ -123,6 +124,7 @@ describe('buildFromProduct — gram mode', () => {
     const ing = buildFromProduct(makeProduct(), 'grams', 100);
     expect(ing.linkedProductId).toBe('prod-1');
     expect(ing.isAiEstimate).toBe(false);
+    expect(ing.category).toBe('food');
   });
 });
 
@@ -222,6 +224,7 @@ describe('buildFromAiEstimate', () => {
     expect(ing.inputMode).toBe('grams');
     expect(ing.unit).toBe('g');
     expect(ing.linkedProductId).toBeNull();
+    expect(ing.category).toBe('food');
   });
 });
 
@@ -234,6 +237,7 @@ describe('buildFromScan', () => {
     const ing = buildFromScan('Oat milk', 250, makeScan());
     // scale = 2.5
     expect(ing.amountGrams).toBe(250);
+    expect(ing.category).toBe('food');
     expect(ing.nutritionContribution.calories).toBe(Math.round(46 * 2.5 * 10) / 10);  // 115
     expect(ing.nutritionContribution.fiber).toBe(Math.round(0.8 * 2.5 * 10) / 10);    // 2
   });
@@ -265,6 +269,7 @@ describe('buildIngFromCandidate — gram mode', () => {
     const ing = buildIngFromCandidate('ing-id', item, product);
     expect(ing.amountGrams).toBe(150);
     expect(ing.inputMode).toBe('grams');
+    expect(ing.category).toBe('food');
     expect(ing.nutritionContribution.calories).toBe(Math.round(165 * 1.5 * 10) / 10); // 247.5
     expect(ing.nutritionContribution.protein).toBe(Math.round(31 * 1.5 * 10) / 10);   // 46.5
   });
@@ -350,6 +355,14 @@ describe('buildIngFromAiEstimate', () => {
   it('sets isAiEstimate=true', () => {
     const ing = buildIngFromAiEstimate('ing-id', makeParserItem(), makeAiEstimate());
     expect(ing.isAiEstimate).toBe(true);
+    expect(ing.category).toBe('food');
+  });
+
+  it('marks a wizard AI estimate as explicitly confirmed', () => {
+    const state = buildWizardIngredientFromAiEstimate('ing-id', makeParserItem(), makeAiEstimate());
+    expect(state.status).toBe('confirmed');
+    expect(state.userConfirmed).toBe(true);
+    expect(state.resolvedIngredient.isAiEstimate).toBe(true);
   });
 });
 
@@ -359,17 +372,20 @@ describe('buildIngFromAiEstimate', () => {
 
 describe('buildIngFromSeasoning', () => {
   it('produces zero nutrition contribution', () => {
-    const item = makeParserItem({ displayName: 'Salt', amountGrams: 5 });
+    const item = makeParserItem({ displayName: 'Salt', amountGrams: 5, kitchenAmountText: '1 TL' });
     const ing = buildIngFromSeasoning('ing-id', item);
     expect(ing.nutritionContribution).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
     expect(ing.nutritionPer100g).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
     expect(ing.category).toBe('seasoning');
+    expect(ing.amountLabel).toBe('1 TL');
   });
 
-  it('uses item.amountGrams as amountGrams (defaults to 0 when null)', () => {
+  it('preserves an indeterminate amount as null', () => {
     const itemNoGrams = makeParserItem({ amountGrams: null });
     const ing = buildIngFromSeasoning('ing-id', itemNoGrams);
-    expect(ing.amountGrams).toBe(0);
+    expect(ing.inputAmount).toBeNull();
+    expect(ing.amountGrams).toBeNull();
+    expect(ing.amountLabel).toBeUndefined();
   });
 });
 

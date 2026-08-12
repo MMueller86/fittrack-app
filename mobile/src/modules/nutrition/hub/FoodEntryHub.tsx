@@ -15,7 +15,7 @@ import Animated, {
   FadeIn,
   useReducedMotion,
 } from 'react-native-reanimated';
-import type { FoodSearchResult, UserFoodRelation, MealType } from '@fittrack/shared';
+import type { AiFoodEstimatePreview, FoodSearchResult, UserFoodRelation, MealType } from '@fittrack/shared';
 import { Icon } from '../../../shared/components/Icon';
 
 import type { ReusableItem } from '@fittrack/shared';
@@ -75,7 +75,7 @@ const MEAL_LABEL: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 export function FoodEntryHub() {
-  const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave, topInset: hubTopInset, initialQuery, prefillAmount, onSelectIngredient } = useFoodEntryHubStore();
+  const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave, topInset: hubTopInset, initialQuery, prefillAmount, onSelectIngredient, onEstimateIngredient } = useFoodEntryHubStore();
   const [hubState, dispatch] = useReducer(hubReducer, INITIAL_HUB_STATE);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -442,6 +442,11 @@ export function FoodEntryHub() {
     dispatch({ type: 'CLOSE_PRODUCT' });
   }, []);
 
+  const handleQuantitySelectIngredient = useCallback((product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => {
+    onSelectIngredient?.(product, mode, amount);
+    close();
+  }, [onSelectIngredient, close]);
+
   const handleQuantityAdded = useCallback((productName: string, mealId: string, itemId: string) => {
     if (autoCloseOnSave) {
       // HomeScreen-Modus: Hub sofort schließen, kein Snackbar
@@ -488,6 +493,12 @@ export function FoodEntryHub() {
     Keyboard.dismiss();
     dispatch({ type: 'OPEN_SUBFLOW', flow });
   }, []);
+
+  const handleIngredientAiEstimate = useCallback((estimate: AiFoodEstimatePreview, query: string) => {
+    onEstimateIngredient?.(estimate, query);
+    dispatch({ type: 'RESET' });
+    close();
+  }, [onEstimateIngredient, close]);
 
   // UX-1: Auto-focus search from IdleState when both lists empty
   const handleRequestFocus = useCallback(() => {
@@ -906,7 +917,7 @@ export function FoodEntryHub() {
                 context={context}
                 onBack={handleQuantityBack}
                 onAdded={handleQuantityAdded}
-                onSelectIngredient={onSelectIngredient ?? undefined}
+                onSelectIngredient={onSelectIngredient ? handleQuantitySelectIngredient : undefined}
               />
             ) : showSearch ? (
               <SearchState
@@ -1003,6 +1014,8 @@ export function FoodEntryHub() {
           context={context}
           onClose={handleSubflowClose}
           onSaved={handleSubflowSaved}
+          initialQuery={onEstimateIngredient ? (searchQuery.trim() || initialQuery) : undefined}
+          onIngredientEstimated={onEstimateIngredient ? handleIngredientAiEstimate : undefined}
         />
       )}
       {hubState.mode === 'subflow' && hubState.flow === 'label' && (

@@ -14,6 +14,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { Icon } from './Icon';
 
 const DELETE_THRESHOLD = 80;  // px to reveal delete area
 const CONFIRM_THRESHOLD = 220; // px to auto-confirm delete
@@ -21,9 +22,16 @@ const CONFIRM_THRESHOLD = 220; // px to auto-confirm delete
 interface Props {
   onDelete: () => void;
   children: React.ReactNode;
+  deleteIconOnly?: boolean;
+  allowOverflow?: boolean;
 }
 
-export function SwipeableRow({ onDelete, children }: Props) {
+export function SwipeableRow({
+  onDelete,
+  children,
+  deleteIconOnly = false,
+  allowOverflow = false,
+}: Props) {
   const translateX = useSharedValue(0);
   const deleteAreaOpacity = useSharedValue(0);
   const isDeleting = useSharedValue(false);
@@ -72,10 +80,14 @@ export function SwipeableRow({ onDelete, children }: Props) {
   }));
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, allowOverflow && styles.containerOverflowVisible]}>
       {/* Delete area behind the row */}
       <Animated.View style={[styles.deleteArea, deleteStyle]}>
-        <Text style={styles.deleteLabel}>Entfernen</Text>
+        {deleteIconOnly ? (
+          <Icon lib="ion" name="trash-outline" size="md" color={colors.white} />
+        ) : (
+          <Text style={styles.deleteLabel}>Entfernen</Text>
+        )}
       </Animated.View>
 
       {/* Swipeable row content */}
@@ -92,6 +104,9 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
     overflow: 'hidden',
+  },
+  containerOverflowVisible: {
+    overflow: 'visible',
   },
   deleteArea: {
     ...StyleSheet.absoluteFillObject,

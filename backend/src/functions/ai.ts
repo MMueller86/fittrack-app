@@ -1,11 +1,12 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import { parseMeal, estimateMeal, type AiParsedItem, analyzeRecipeText, type AiRecipeRaw } from '../lib/openai';
+import { parseMeal, estimateMeal, type AiParsedItem, analyzeRecipeText, type AiRecipeRaw, type AiRecipeIngredientLine } from '../lib/openai';
 import { getFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { requireUser } from '../lib/auth';
 import { withHandler } from '../lib/http';
 import { enforceQuota, trackUsage } from '../lib/quota';
+import { rankByQuery } from '../lib/searchRanking';
 import type { FoodSearchResult, ReusableItem, AiMealEstimatePreview } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
@@ -61,7 +62,7 @@ export function classifyItem(
     const c = candidates[0]!;
     // Look up searchTerms for this candidate from the library (if it's a library item)
     const libItem = libraryItems.find((li) => li.id === c.id);
-    const nameMatch = isStrongNameMatch(parsed.displayName, c.name, libItem?.searchTerms);
+    const nameMatch = isStrongNameMatch(parsed.displayName, c.name, libItem?.searchTerms, c.brand);
     if (nameMatch) {
       return { status: 'matched', selectedProductId: c.id, selectedProductName: c.name, needsReview: false, warnings };
     }
@@ -71,7 +72,7 @@ export function classifyItem(
   // Multiple candidates — check if any library item is a strong match and auto-select it
   for (const c of candidates) {
     const libItem = libraryItems.find((li) => li.id === c.id);
-    if (libItem && isStrongNameMatch(parsed.displayName, c.name, libItem.searchTerms)) {
+    if (libItem && isStrongNameMatch(parsed.displayName, c.name, libItem.searchTerms, c.brand)) {
       return { status: 'matched', selectedProductId: c.id, selectedProductName: c.name, needsReview: false, warnings };
     }
   }
@@ -83,18 +84,24 @@ export function classifyItem(
 /**
  * Returns true if the AI display name and the product name are similar enough
  * to auto-select without user confirmation.
- * Checks: normalized name equality/prefix, OR any searchTerm matches the display name token.
+ * Checks that every display-name token matches the product name, brand, or a stored search term.
  */
-function isStrongNameMatch(displayName: string, productName: string, searchTerms?: string[]): boolean {
-  const a = displayName.toLowerCase().trim();
-  const b = productName.toLowerCase().trim();
-  if (b === a || b.startsWith(a) || a.startsWith(b)) return true;
-  // Check if any stored searchTerm matches a word in the display name
-  if (searchTerms && searchTerms.length > 0) {
-    const displayTokens = a.split(/\s+/);
-    return searchTerms.some((t) => displayTokens.some((tok) => tok.startsWith(t) || t.startsWith(tok)));
+function isStrongNameMatch(
+  displayName: string,
+  productName: string,
+  searchTerms?: string[],
+  brand?: string,
+): boolean {
+  const normalizedDisplayName = displayName.toLowerCase().trim();
+  const normalizedProductName = productName.toLowerCase().trim();
+  if (
+    normalizedProductName === normalizedDisplayName ||
+    normalizedProductName.startsWith(normalizedDisplayName) ||
+    normalizedDisplayName.startsWith(normalizedProductName)
+  ) {
+    return true;
   }
-  return false;
+  return rankByQuery(productName, searchTerms ?? [], displayName, brand) >= 0;
 }
 
 /**
@@ -440,6 +447,21 @@ function bundleAiItems(items: AiParsedItem[]): AiParsedItem[] {
   return Array.from(map.values());
 }
 
+function mapRecipeFoodIngredientsToParsedItems(items: AiRecipeIngredientLine[]): AiParsedItem[] {
+  const parsedItems = items.map((item): AiParsedItem => {
+    if (typeof item.amountGrams !== 'number' || !Number.isFinite(item.amountGrams) || item.amountGrams <= 0) {
+      throw new Error(`Recipe analyzer returned invalid amountGrams for food ingredient "${item.displayName}"`);
+    }
+    return {
+      rawText: item.line,
+      displayName: item.displayName,
+      inputMode: 'grams',
+      inputAmount: item.amountGrams,
+    };
+  });
+  return bundleAiItems(parsedItems);
+}
+
 export interface AiRecipeAnalysisResponse {
   suggestedName: string;
   description: string;
@@ -479,27 +501,25 @@ export const recipeAnalyzeHandler = withHandler(
       return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${msg}` } };
     }
 
-    // Track usage after successful AI call
+    // 2. Route ingredients: food → catalog; seasoning → direct construction
+    const foodIngredients = recipeRaw.ingredients.filter((i) => i.category !== 'seasoning');
+    const seasoningIngredients = recipeRaw.ingredients.filter((i) => i.category === 'seasoning');
+    let parsedFoodIngredients: AiParsedItem[] = [];
+    try {
+      parsedFoodIngredients = mapRecipeFoodIngredientsToParsedItems(foodIngredients);
+    } catch (err) {
+      console.error('[AI] Recipe analyzer returned invalid food amount:', err);
+      return { status: 502, jsonBody: { error: 'AI recipe analysis returned an invalid food amount.' } };
+    }
+
+    // Track usage after a successful AI call and valid food amount contract.
     await trackUsage(userContext, 'recipe-analyze');
 
-    // 2. Route ingredients: food → parseMeal + catalog; seasoning → direct construction
     let ingredients: MealParserPreviewItem[] = [];
     if (recipeRaw.ingredients.length > 0) {
-      // Items with an unrecognised category default to 'food' (safe guard)
-      const foodIngredients = recipeRaw.ingredients.filter((i) => i.category !== 'seasoning');
-      const seasoningIngredients = recipeRaw.ingredients.filter((i) => i.category === 'seasoning');
-
       let resolvedFood: MealParserPreviewItem[] = [];
-      if (foodIngredients.length > 0) {
-        const joinedIngredients = foodIngredients.map((i) => i.line).join(', ');
-        let aiItems: AiParsedItem[];
-        try {
-          aiItems = await parseMeal(joinedIngredients);
-        } catch {
-          aiItems = [];
-        }
-        const bundledItems = bundleAiItems(aiItems);
-        const resolved = await resolveIngredients(userId, bundledItems);
+      if (parsedFoodIngredients.length > 0) {
+        const resolved = await resolveIngredients(userId, parsedFoodIngredients);
         resolvedFood = resolved.map((item) => ({ ...item, category: 'food' as const }));
       }
 

@@ -1,6 +1,7 @@
 ---
 name: FitTrack QA
 description: QA and Review Agent for FitTrack. Reviews implementations against the Planner's acceptance criteria, writes and runs tests, verifies completeness, scope, security-sensitive changes, and documentation updates. Use after Backend and Frontend implementation is complete. Produces a structured PASS / PASS WITH ISSUES / FAIL verdict with classified findings.
+model: GPT-5.6 Luna
 tools: [read, search, edit, execute]
 ---
 

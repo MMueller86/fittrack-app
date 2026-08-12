@@ -76,6 +76,10 @@ Within the same rank, `sourceQualityScore` is the tiebreaker. Higher score = bet
 
 Minimum query length: 2 characters for catalog-only endpoints.
 
+## Meal Parser Auto-Assignment
+
+The meal parser may automatically assign a candidate only when its normalized name is an exact or full-name prefix match, or when every query token is represented by the product name, brand, or a stored library search term. A candidate that matches only one token of a multi-word query stays in `needsSelection` so the user can review it.
+
 ## Favorites and Quick Entry
 
 `UserFoodRelation` (`shared/types/userFoodRelation.ts`) — tracks a user's relationship with a food item, including favorites and usage patterns.

@@ -121,6 +121,8 @@ Shows when mode = `search`:
   - ≥1 results: "Nicht das passende dabei?"
   - Actions: KI-Schätzung · Label Scan · Manuell
 
+In recipe-wizard mode, the KI action uses the current search text for a single-food estimate instead of the meal estimate flow. The result is returned to the wizard, the hub closes, and the ingredient is shown there as explicitly confirmed with a KI badge. No estimate is started automatically when a search has no result.
+
 `SearchState` is not exclusive to `FoodEntryHub`. It is also used by `AddIngredientModal` (recipe ingredient picker). In that context, `onSelectRelation` is passed as a no-op (`() => {}`) and `recents` is passed as `[]` — both are acceptable patterns for non-diary consumers.
 
 ## Result Row Format

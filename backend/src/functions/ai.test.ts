@@ -8,7 +8,7 @@ vi.mock('../lib/quota', () => ({
 
 import { classifyItem, resolveAmountGrams, mealParserPreviewHandler, mealEstimatePreviewHandler, recipeAnalyzeHandler } from './ai';
 import type { AiParsedItem } from '../lib/openai';
-import { __setOpenAiClientForTests } from '../lib/openai';
+import { analyzeRecipeText, __setOpenAiClientForTests } from '../lib/openai';
 import { _setFoodProductRepository, _resetFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { _setReusableItemsRepository, __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
 import type { FoodProductRepository } from '../lib/repositories/foodProductRepository';
@@ -439,6 +439,22 @@ describe('classifyItem — searchTerms matching', () => {
     expect(result.status).toBe('matched');
     expect(result.selectedProductId).toBe('lib-1');
   });
+
+  it('does not auto-select when only one token of a multi-word name matches', () => {
+    const libItem = makeLibItem({
+      id: 'lib-1',
+      name: 'Maggi Mexicana Salsa Tomaten Chilli Sauce',
+      searchTerms: ['tomaten'],
+    });
+    const result = classifyItem(
+      makeParsed({ displayName: 'passierte Tomaten' }),
+      [makeLibCandidate('lib-1', libItem.name)],
+      [libItem],
+    );
+    expect(result.status).toBe('needsSelection');
+    expect(result.selectedProductId).toBeNull();
+    expect(result.needsReview).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -559,30 +575,16 @@ describe('POST /api/ai/meal-estimate/preview', () => {
 // recipeAnalyzeHandler — unit tests
 // ---------------------------------------------------------------------------
 
-function mockRecipeAnalyzeClient(recipe: AiRecipeRaw, ingredientItems?: AiParsedItem[]) {
-  // recipeAnalyzeHandler makes TWO OpenAI calls when food items exist:
-  // 1. analyzeRecipeText → returns AiRecipeRaw
-  // 2. parseMeal (for food ingredient lines) → returns { items: AiParsedItem[] }
-  const foodIngredients = recipe.ingredients.filter((i) => i.category !== 'seasoning');
-  const parsedIngredients: AiParsedItem[] = ingredientItems ??
-    foodIngredients.map((ing) => ({
-      rawText: ing.line,
-      displayName: ing.displayName,
-      inputMode: 'grams' as const,
-      inputAmount: ing.amountGrams ?? 100,
-    }));
-
+function mockRecipeAnalyzeClient(recipe: AiRecipeRaw) {
+  // recipeAnalyzeHandler makes one OpenAI call: analyzeRecipeText returns the
+  // recipe structure and the already converted food ingredient amounts.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fakeClient: any = {
     chat: {
       completions: {
-        create: vi.fn()
-          .mockResolvedValueOnce({
-            choices: [{ message: { content: JSON.stringify(recipe) } }],
-          })
-          .mockResolvedValueOnce({
-            choices: [{ message: { content: JSON.stringify({ items: parsedIngredients }) } }],
-          }),
+        create: vi.fn().mockResolvedValueOnce({
+          choices: [{ message: { content: JSON.stringify(recipe) } }],
+        }),
       },
     },
   };
@@ -596,13 +598,30 @@ const VALID_RECIPE_RAW: AiRecipeRaw = {
   tags: ['Schnell', 'Familienrezept'],
   ingredients: [
     { line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300, kitchenAmountText: null },
-    { line: '1 Zwiebel', displayName: 'Zwiebel', category: 'food', amountGrams: null, kitchenAmountText: null },
+    { line: '1 Zwiebel', displayName: 'Zwiebel', category: 'food', amountGrams: 100, kitchenAmountText: null },
   ],
   steps: [
     { order: 1, title: 'Vorbereitung', description: 'Hähnchenbrust in Würfel schneiden.' },
     { order: 2, title: null, description: 'Zwiebel anbraten.' },
   ],
 };
+
+describe('analyzeRecipeText normalization', () => {
+  it('clears kitchenAmountText when Azure returns it for a food ingredient', async () => {
+    mockRecipeAnalyzeClient({
+      ...VALID_RECIPE_RAW,
+      ingredients: [
+        { ...VALID_RECIPE_RAW.ingredients[0]!, kitchenAmountText: '2 EL' },
+        { line: '1 TL Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' },
+      ],
+    });
+
+    const result = await analyzeRecipeText('2 EL Olivenöl und 1 TL Salz');
+
+    expect(result.ingredients[0]!.kitchenAmountText).toBeNull();
+    expect(result.ingredients[1]!.kitchenAmountText).toBe('1 TL');
+  });
+});
 
 describe('POST /api/ai/recipe-analyze', () => {
   it('returns 400 when text is missing', async () => {
@@ -698,6 +717,76 @@ describe('POST /api/ai/recipe-analyze', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
+  it('preserves recipe analyzer grams when the meal parser loses a kitchen-unit amount', async () => {
+    // The recipe analyzer has already converted 2 EL to 30g. Recipe food
+    // ingredients must use that value directly instead of a second parse.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn()
+            .mockResolvedValueOnce({
+              choices: [{ message: { content: JSON.stringify({
+                ...VALID_RECIPE_RAW,
+                ingredients: [{
+                  line: '2 EL Frischkäse',
+                  displayName: 'Frischkäse',
+                  category: 'food',
+                  amountGrams: 30,
+                  kitchenAmountText: null,
+                }],
+              }) } }],
+            })
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([makeCandidate('prod:frischkaese', 'Frischkäse')]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: '2 EL Frischkäse in die Sauce rühren' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+  expect(fakeClient.chat.completions.create).toHaveBeenCalledTimes(1);
+    const body = res.jsonBody as { ingredients: { amountGrams: number | null; inputMode: string; inputAmount: number | null }[] };
+    expect(body.ingredients[0]!.amountGrams).toBe(30);
+    expect(body.ingredients[0]!.inputMode).toBe('grams');
+    expect(body.ingredients[0]!.inputAmount).toBe(30);
+  });
+
+  it('rejects a food ingredient without a positive gram amount', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({
+              ...VALID_RECIPE_RAW,
+              ingredients: [{
+                line: 'Frischkäse',
+                displayName: 'Frischkäse',
+                category: 'food',
+                amountGrams: null,
+                kitchenAmountText: null,
+              }],
+            }) } }],
+          }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Frischkäse in die Sauce rühren' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(502);
+    expect((res.jsonBody as { error: string }).error).toContain('invalid food amount');
+  });
+
   it('routes food items through catalog and constructs seasoning items directly', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fakeClient: any = {

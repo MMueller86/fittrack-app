@@ -40,6 +40,7 @@ export function buildFromProduct(
     inputAmount: amount,
     amountGrams,
     unit: mode === 'portion' ? (portionLabel ?? 'Portion') : 'g',
+    category: 'food',
     linkedProductId: product.id,
     linkedReusableItemId: null,
     isAiEstimate: false,
@@ -69,6 +70,7 @@ export function buildFromAiEstimate(
     inputAmount: amountGrams,
     amountGrams,
     unit: 'g',
+    category: 'food',
     linkedProductId: null,
     linkedReusableItemId: null,
     isAiEstimate: true,
@@ -103,6 +105,7 @@ export function buildFromScan(
     inputAmount: amountGrams,
     amountGrams,
     unit: 'g',
+    category: 'food',
     linkedProductId: null,
     linkedReusableItemId: null,
     isAiEstimate: false,
@@ -156,6 +159,7 @@ export function buildIngFromCandidate(
     inputAmount,
     amountGrams,
     unit: inputMode === 'portion' ? (portionLabel ?? 'Portion') : 'g',
+    category: 'food',
     linkedProductId: candidate.id,
     linkedReusableItemId: null,
     isAiEstimate: false,
@@ -194,6 +198,7 @@ export function buildIngFromAiEstimate(
     inputAmount: item.inputAmount ?? amountGrams,
     amountGrams,
     unit: item.inputMode === 'grams' ? 'g' : 'Stück',
+    category: 'food',
     linkedProductId: null,
     linkedReusableItemId: null,
     isAiEstimate: true,
@@ -208,8 +213,24 @@ export function buildIngFromAiEstimate(
   };
 }
 
+export function buildWizardIngredientFromAiEstimate(
+  id: string,
+  item: MealParserPreviewItem,
+  estimate: AiFoodEstimatePreview,
+): {
+  status: 'confirmed';
+  userConfirmed: true;
+  resolvedIngredient: RecipeIngredient;
+} {
+  return {
+    status: 'confirmed',
+    userConfirmed: true,
+    resolvedIngredient: buildIngFromAiEstimate(id, item, estimate),
+  };
+}
+
 export function buildIngFromSeasoning(id: string, item: MealParserPreviewItem): RecipeIngredient {
-  const amountGrams = item.amountGrams ?? 0;
+  const amountGrams = item.amountGrams;
   const zero = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
   return {
     id,
@@ -218,6 +239,7 @@ export function buildIngFromSeasoning(id: string, item: MealParserPreviewItem): 
     inputAmount: amountGrams,
     amountGrams,
     unit: 'g',
+    amountLabel: item.kitchenAmountText ?? undefined,
     linkedProductId: null,
     linkedReusableItemId: null,
     isAiEstimate: false,

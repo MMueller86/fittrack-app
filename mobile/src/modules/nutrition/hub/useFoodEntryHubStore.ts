@@ -3,7 +3,7 @@
 // open() always resets state, even if the hub is already open.
 
 import { create } from 'zustand';
-import type { FoodSearchResult, MealType } from '@fittrack/shared';
+import type { AiFoodEstimatePreview, FoodSearchResult, MealType } from '@fittrack/shared';
 import { getSuggestedMealType } from './mealTimeRules';
 
 export interface FoodEntryHubContext {
@@ -33,6 +33,8 @@ interface FoodEntryHubStore {
   prefillAmount: { mode: 'grams' | 'portion'; amount: number } | null;
   /** Recipe mode: when set, hub calls back instead of saving to diary */
   onSelectIngredient: ((product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => void) | null;
+  /** Recipe mode: estimate the currently searched ingredient instead of saving to diary */
+  onEstimateIngredient: ((estimate: AiFoodEstimatePreview, query: string) => void) | null;
 
   open: (params?: {
     mealId?: string;
@@ -53,6 +55,8 @@ interface FoodEntryHubStore {
     prefillAmount?: { mode: 'grams' | 'portion'; amount: number } | null;
     /** Recipe mode: when set, hub calls back instead of saving to diary */
     onSelectIngredient?: (product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => void;
+    /** Recipe mode: estimate the currently searched ingredient instead of saving to diary */
+    onEstimateIngredient?: (estimate: AiFoodEstimatePreview, query: string) => void;
   }) => void;
 
   close: () => void;
@@ -69,6 +73,7 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   initialQuery: '',
   prefillAmount: null,
   onSelectIngredient: null,
+  onEstimateIngredient: null,
   context: {
     date: TODAY(),
     mealType: getSuggestedMealType(),
@@ -87,6 +92,7 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
       initialQuery: params?.initialQuery ?? '',
       prefillAmount: params?.prefillAmount ?? null,
       onSelectIngredient: params?.onSelectIngredient ?? null,
+      onEstimateIngredient: params?.onEstimateIngredient ?? null,
       context: {
         mealId: params?.mealId,
         date,
@@ -97,6 +103,6 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   },
 
   close: () => {
-    set({ isOpen: false, autoFocusSearch: false, initialSubflow: null, autoCloseOnSave: false, topInset: 0, onSuccess: null, initialQuery: '', prefillAmount: null, onSelectIngredient: null });
+    set({ isOpen: false, autoFocusSearch: false, initialSubflow: null, autoCloseOnSave: false, topInset: 0, onSuccess: null, initialQuery: '', prefillAmount: null, onSelectIngredient: null, onEstimateIngredient: null });
   },
 }));

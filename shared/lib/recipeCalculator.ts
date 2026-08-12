@@ -24,15 +24,23 @@ function divideNutrition(n: RecipeNutrition, divisor: number): RecipeNutrition {
   };
 }
 
+function zeroNutrition(): RecipeNutrition {
+  return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+}
+
 // ---------------------------------------------------------------------------
 // Ingredient contribution
 // ---------------------------------------------------------------------------
 
 /**
  * Calculate the nutrition contribution of a single ingredient.
- * Uses `amountGrams` and `nutritionPer100g` from the ingredient.
+ * Seasonings and ingredients without a resolved gram amount contribute zero.
  */
 export function calculateIngredientContribution(ingredient: RecipeIngredient): RecipeNutrition {
+  if (ingredient.category === 'seasoning' || ingredient.amountGrams == null) {
+    return zeroNutrition();
+  }
+
   const scaled = scaleNutritionToGrams(
     {
       calories: ingredient.nutritionPer100g.calories,
@@ -63,7 +71,8 @@ export interface RecipeNutritionResult {
 
 /**
  * Calculate total and per-portion nutrition from a list of ingredients.
- * Each ingredient must have `amountGrams` and `nutritionPer100g` populated.
+ * Food ingredients require a resolved gram amount; seasonings and indeterminate
+ * ingredients contribute zero.
  *
  * @param ingredients  Array of recipe ingredients.
  * @param portions     Number of portions the recipe yields (must be > 0).
@@ -74,7 +83,7 @@ export function calculateRecipeNutrition(
 ): RecipeNutritionResult {
   if (portions <= 0) throw new Error('portions must be greater than 0');
 
-  const total: RecipeNutrition = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+  const total = zeroNutrition();
 
   for (const ingredient of ingredients) {
     const contribution = calculateIngredientContribution(ingredient);

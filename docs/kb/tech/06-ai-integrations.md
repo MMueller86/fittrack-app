@@ -61,11 +61,13 @@ User photographs a prepared meal. AI estimates nutrition from the image.
 
 Mobile shows `MealEstimateReviewScreen`.
 
-### 6. Recipe Analyzer (`POST /api/ai/parse-meal` or similar)
+### 6. Recipe Analyzer (`POST /api/ai/recipe-analyze`)
 
-User provides free-text recipe. AI extracts ingredients with amounts.
+User provides a free-text recipe. The AI extracts ingredients and returns positive total gram weights for every `food` ingredient, including conversions such as `2 EL` → approximately `30 g`.
 
 **Used by:** `RecipeWizardScreen` on mobile.
+
+The backend resolves the analyzer's normalized food names directly against the catalog. It does not re-run the general meal parser, so the analyzer's kitchen-unit conversions remain attached to the matching food.
 
 ### 7. Reusable Item Enrichment (`POST /api/reusable-items/{id}/enrich`)
 

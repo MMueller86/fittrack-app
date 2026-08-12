@@ -32,31 +32,41 @@ import {
 // Zod schemas
 // ---------------------------------------------------------------------------
 
-const positiveNumber = z.coerce.number().refine(
-  (n) => Number.isFinite(n) && n >= 0,
-  { message: 'must be a non-negative number' },
-);
+const nonNegativeFiniteNumber = z.coerce.number().finite().nonnegative();
+const positiveFiniteNumber = z.coerce.number().finite().positive();
 
 const NutritionPer100gSchema = z.object({
-  calories: positiveNumber,
-  protein: positiveNumber,
-  carbs: positiveNumber,
-  fat: positiveNumber,
-  fiber: positiveNumber,
+  calories: nonNegativeFiniteNumber,
+  protein: nonNegativeFiniteNumber,
+  carbs: nonNegativeFiniteNumber,
+  fat: nonNegativeFiniteNumber,
+  fiber: nonNegativeFiniteNumber,
 });
 
 const RecipeIngredientSchema = z.object({
   id: z.string().uuid(),
   displayName: z.string().trim().min(1).max(200),
   inputMode: z.enum(['grams', 'portion']),
-  inputAmount: z.coerce.number().positive(),
-  amountGrams: z.coerce.number().positive(),
+  inputAmount: nonNegativeFiniteNumber.nullable(),
+  amountGrams: nonNegativeFiniteNumber.nullable(),
   unit: z.string().trim().min(1).max(50),
+  amountLabel: z.string().trim().max(100).optional(),
   linkedProductId: z.string().nullable(),
   linkedReusableItemId: z.string().nullable(),
   isAiEstimate: z.boolean(),
+  category: z.enum(['food', 'seasoning']).optional(),
+  portionWeightGrams: positiveFiniteNumber.optional(),
+  portionLabel: z.string().trim().max(50).optional(),
   nutritionPer100g: NutritionPer100gSchema,
   nutritionContribution: NutritionPer100gSchema,
+}).superRefine((ingredient, ctx) => {
+  if (ingredient.category !== 'seasoning' && (ingredient.amountGrams === null || ingredient.amountGrams <= 0)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['amountGrams'],
+      message: 'food ingredients require a positive amountGrams',
+    });
+  }
 });
 
 const RecipeStepSchema = z.object({

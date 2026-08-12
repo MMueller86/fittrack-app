@@ -229,7 +229,6 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
 
   // Refs
   const scrollRef = useRef<ScrollView>(null);
-  const addBtnRef = useRef<View>(null);
   const inputRef = useRef<TextInput>(null);
 
   // Android Back-Handler
@@ -246,14 +245,7 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {
       setTimeout(() => {
-        addBtnRef.current?.measureLayout(
-          // @ts-ignore
-          scrollRef.current?.getScrollableNode?.() ?? null,
-          (_x, y) => {
-            scrollRef.current?.scrollTo({ y: y - 16, animated: true });
-          },
-          () => {},
-        );
+        scrollRef.current?.scrollToEnd({ animated: true });
       }, 150);
     });
     return () => sub.remove();
@@ -322,7 +314,18 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
 
   // Hinzufügen
   const handleAdd = useCallback(async () => {
-    if (gramsValue <= 0 || loading) return;
+    if (gramsValue <= 0 || loading) {
+      if (gramsValue <= 0) {
+        console.warn('[QuantityView] Add blocked: invalid amount', {
+          productId: product.id,
+          productName: product.name,
+          quantity: quantityStr,
+          unit,
+          prefill,
+        });
+      }
+      return;
+    }
     Keyboard.dismiss();
 
     // Recipe mode: call back instead of saving to diary
@@ -512,20 +515,18 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
       {error && <ErrorBanner error={error} />}
 
       {/* ── Hinzufügen-Button ── */}
-      <View ref={addBtnRef} collapsable={false}>
-        <TouchableOpacity
-          style={[styles.addBtn, !canAdd && styles.addBtnDisabled]}
-          onPress={handleAdd}
-          disabled={!canAdd}
-          accessibilityRole="button"
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.white} size="small" />
-          ) : (
-            <Text style={styles.addBtnText}>{onSelectIngredient ? 'Zur Rezept hinzufügen' : 'Hinzufügen'}</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[styles.addBtn, !canAdd && styles.addBtnDisabled]}
+        onPress={handleAdd}
+        disabled={!canAdd}
+        accessibilityRole="button"
+      >
+        {loading ? (
+          <ActivityIndicator color={colors.white} size="small" />
+        ) : (
+          <Text style={styles.addBtnText}>{onSelectIngredient ? 'Zum Rezept hinzufügen' : 'Hinzufügen'}</Text>
+        )}
+      </TouchableOpacity>
     </ScrollView>
   );
 }

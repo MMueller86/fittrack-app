@@ -1,7 +1,8 @@
-// Tab bar icons — uses react-native-svg so they follow tabBarActiveTintColor / tabBarInactiveTintColor.
+// Tab bar icons — custom SVG paths plus Ionicons, all following the color and size from React Navigation.
 // Each component accepts a `color` prop passed by React Navigation and an optional `size`.
 
 import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 
 interface IconProps {
@@ -60,15 +61,7 @@ export function ProfileIcon({ color, size = 24 }: IconProps) {
 }
 
 export function RecipesIcon({ color, size = 24 }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path d="M3 10V14" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M6 8V16" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M9 11H15" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M18 8V16" stroke={color} strokeWidth="2" strokeLinecap="round" />
-      <Path d="M21 10V14" stroke={color} strokeWidth="2" strokeLinecap="round" />
-    </Svg>
-  );
+  return <Ionicons name="book-outline" size={size} color={color} />;
 }
 
 // Trending-up arrow: represents progress, development, and improvement across

@@ -27,6 +27,36 @@ Bottom sheets can be stacked (e.g., `QuantityView` previously used a `ProduktDia
 
 ---
 
+## Information Overlays
+
+Use the shared `InfoOverlay` for short, contextual explanations that do not require a decision or a list of actions.
+
+An information overlay must:
+- use a dark FitTrack backdrop and `surfaceElevated` for the panel
+- use token-based typography (`h3` for the title, `body2` for the explanation)
+- provide one clear dismissal action, normally `Verstanden`
+- close when the user taps the backdrop or presses the platform back action
+- preserve the current screen and use a quiet fade transition
+
+[Rule] Standard Android alerts must never be used for FitTrack product UI. In particular, do not use `Alert.alert` for information, instructions, confirmations, or action choices. Use `InfoOverlay`, `ConfirmSheet`, or the appropriate bottom-sheet pattern instead.
+
+## Wizard Back Confirmation
+
+Multi-phase flows use the shared `ConfirmSheet` for both the in-screen back action and the Android hardware back action. Returning from the initial input phase leaves the wizard immediately; back is blocked while an analysis is running. In later phases, the sheet explains that unsaved progress would be lost and offers one destructive `Zurück` action plus the standard dismissal. Both back entry points use the same phase transition, so the user receives identical navigation semantics.
+
+---
+
+## Swipe-to-Remove
+
+Use `SwipeableRow` when a removable row needs the same interaction language as an entry in the nutrition diary:
+
+- Swipe left to reveal the destructive `Entfernen` action
+- Keep the gesture one-sided unless the opposite direction has a distinct, useful action
+- Trigger the existing undo snackbar after removal
+- Do not use a second swipe direction only for visual symmetry or duplicate an action already available by tapping the row
+
+---
+
 ## Edit Sheets
 
 Lightweight bottom sheets for editing existing items without leaving the current screen.

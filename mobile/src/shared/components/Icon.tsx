@@ -12,6 +12,8 @@ type MCIName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 export type IconSize = 'sm' | 'md' | 'lg';
 
+export const CHECKMARK_OUTLINE_ICON = 'checkmark-circle-outline' as const;
+
 const SIZE_MAP: Record<IconSize, number> = {
   sm: 16,
   md: 20,
