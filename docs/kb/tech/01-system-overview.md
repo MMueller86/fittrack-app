@@ -63,10 +63,10 @@ shared  → (no internal dependencies)
 | Database | Local Cosmos Emulator (`scripts/start-cosmos-emulator.ps1`) or remote dev Cosmos (`cosmos-fittrack-dev-ppf5sc`) |
 | Azure OpenAI | **Shared Azure service** — same instance as Alpha |
 | Document Intelligence | **Shared Azure service** — same instance as Alpha |
-| Blob Storage | Azurite local emulator (`scripts/start-azurite.mjs`) or remote dev storage |
+| Blob Storage | Azurite local emulator (`scripts/storage.mjs`) or remote dev storage. `npm run dev` starts Azurite directly, polls HTTP-readiness on all three ports (2 min window), and only then starts Functions. If Azurite is already running, `dev` detects it and skips the start step. |
 | Auth (CIAM) | **Shared Azure service** — same tenant as Alpha |
 
-Mobile connects to backend via `EXPO_PUBLIC_API_URL=http://10.0.2.2:7071/api` (emulator) or local IP.
+Mobile connects to backend via `EXPO_PUBLIC_API_URL=http://10.0.2.2:7071/api` (emulator) or local IP. `npm run dev` checks port 7071 before starting its build and local services so duplicate Functions hosts fail early with an actionable message.
 
 Config: `backend/local.settings.json` (gitignored) + `mobile/.env` (gitignored).
 

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HOST = '127.0.0.1';
-const PORTS = [10000, 10001, 10002];
+export const AZURITE_PORTS = [10000, 10001, 10002];
 const MAX_ATTEMPTS = 240;
 const DELAY_MS = 250;
 export const AZURITE_WAIT_TIMEOUT_MS = MAX_ATTEMPTS * DELAY_MS;
@@ -24,7 +24,7 @@ export function isAzuriteServiceReady(port) {
 }
 
 export async function waitForAzurite({
-  ports = PORTS,
+  ports = AZURITE_PORTS,
   maxAttempts = MAX_ATTEMPTS,
   delayMs = DELAY_MS,
   probe = isAzuriteServiceReady,
@@ -50,7 +50,7 @@ async function main() {
   }
 
   console.error(
-    `[azurite] Services were not ready on ports ${PORTS.join(', ')} ` +
+    `[azurite] Services were not ready on ports ${AZURITE_PORTS.join(', ')} ` +
       `after ${AZURITE_WAIT_TIMEOUT_MS / 1000}s. Start Azurite with npm run storage:start.`,
   );
   process.exit(1);

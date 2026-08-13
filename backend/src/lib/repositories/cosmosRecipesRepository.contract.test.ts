@@ -157,6 +157,77 @@ describe('CosmosRecipesRepository (contract)', () => {
     expect(fetched!.ingredients[0]).not.toHaveProperty('amountLabel');
   });
 
+  it('stores image order without transient SAS URLs', async () => {
+    const created = await repo.create(USER_A, makeInput());
+    const images = [
+      {
+        id: 'image-a',
+        blobName: `${USER_A}/${created.id}/image-a.jpg`,
+        order: 1,
+        url: 'https://blob.example/image-a?sas=temporary',
+      },
+      {
+        id: 'image-b',
+        blobName: `${USER_A}/${created.id}/image-b.jpg`,
+        order: 2,
+        url: 'https://blob.example/image-b?sas=temporary',
+      },
+    ];
+
+    await repo.update(USER_A, created.id, { images });
+
+    const raw = await ctx!.database.container('recipes').item(created.id, USER_A).read<Record<string, unknown>>();
+    expect(raw.resource?.['images']).toEqual([
+      { id: 'image-a', blobName: `${USER_A}/${created.id}/image-a.jpg`, order: 1 },
+      { id: 'image-b', blobName: `${USER_A}/${created.id}/image-b.jpg`, order: 2 },
+    ]);
+
+    const fetched = await repo.get(USER_A, created.id);
+    expect(fetched?.images).toEqual([
+      { id: 'image-a', blobName: `${USER_A}/${created.id}/image-a.jpg`, order: 1 },
+      { id: 'image-b', blobName: `${USER_A}/${created.id}/image-b.jpg`, order: 2 },
+    ]);
+  });
+
+  it('does not expose or persist root-level notes or step notes', async () => {
+    const historicalRecipe = {
+      id: '00000000-0000-0000-0000-000000000103',
+      userId: USER_A,
+      ownerUserId: USER_A,
+      name: 'Notizen-Rezept',
+      portions: 2,
+      ingredients: [],
+      steps: [{ order: 1, description: 'Backen.', notes: 'Nicht zu dunkel werden lassen.' }],
+      images: [],
+      notes: 'Dieses Root-Feld darf nicht persistiert werden.',
+      nutritionTotal: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      nutritionPerPortion: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      visibility: 'private' as const,
+      sharedWithUserIds: [],
+      tags: [],
+      usageCount: 0,
+      createdAt: '2026-01-10T10:00:00.000Z',
+      updatedAt: '2026-01-10T10:00:00.000Z',
+    };
+
+    await ctx!.database.container('recipes').items.create(historicalRecipe);
+
+    await repo.update(USER_A, historicalRecipe.id, { name: 'Aktualisiertes Rezept' });
+
+    const raw = await ctx!.database.container('recipes').item(historicalRecipe.id, USER_A).read<Record<string, unknown>>();
+    expect(raw.resource).not.toHaveProperty('notes');
+    expect(raw.resource?.['steps']).toEqual([
+      { order: 1, description: 'Backen.' },
+    ]);
+
+    const fetched = await repo.get(USER_A, historicalRecipe.id);
+    expect(fetched).not.toHaveProperty('notes');
+    expect(fetched?.steps[0]).toEqual({
+      order: 1,
+      description: 'Backen.',
+    });
+  });
+
   // ---- list uses correct query parameter --------------------------------
 
   it('list returns created recipes for the correct user', async () => {

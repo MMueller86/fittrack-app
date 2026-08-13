@@ -59,7 +59,6 @@ export interface RecipeStep {
   order: number;
   title?: string;
   description: string;
-  notes?: string;
 }
 
 // ---------------------------------------------------------------------------

@@ -19,41 +19,15 @@ import { favoritesApi } from '../../shared/api/favoritesApi';
 import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
 import { Icon } from '../../shared/components/Icon';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
+import { NutritionTile } from '../../shared/components/NutritionTile';
 import { computeRecipeQuickEntryData } from './recipeUtils';
 import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
+import { consumeRecipeDetailNavigationIntent } from './recipeWizardNavigation';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 import LogRecipeModal from './LogRecipeModal';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeDetail'>;
-
-function MacroChip({ label, value, unit }: { label: string; value: number; unit: string }) {
-  return (
-    <View style={chipStyles.chip}>
-      <Text style={chipStyles.value}>
-        {Math.round(value)}
-        <Text style={chipStyles.unit}> {unit}</Text>
-      </Text>
-      <Text style={chipStyles.label}>{label}</Text>
-    </View>
-  );
-}
-
-const chipStyles = StyleSheet.create({
-  chip: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  value: { ...typography.body1, color: colors.text, fontWeight: '700' },
-  unit: { ...typography.caption, color: colors.textMuted, fontWeight: '400' },
-  label: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
-});
 
 export default function RecipeDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
@@ -68,6 +42,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [seasoningsExpanded, setSeasoningsExpanded] = useState(false);
   const [errorNotice, setErrorNotice] = useState<{ title: string; body: string } | null>(null);
   const recipeRef = useRef<Recipe | null>(null);
+  const logIntentConsumedRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +72,13 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       void load();
     }, [load]),
   );
+
+  useEffect(() => {
+    if (recipe == null) return;
+    if (!consumeRecipeDetailNavigationIntent(route.params.intent, logIntentConsumedRef)) return;
+    navigation.setParams({ intent: undefined });
+    setLogVisible(true);
+  }, [navigation, recipe, route.params.intent]);
 
   useEffect(() => {
     let cancelled = false;
@@ -264,10 +246,10 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
         <Text style={styles.sectionLabel}>Nährwerte pro Portion</Text>
         <View style={styles.macroRow}>
-          <MacroChip label="Kalorien" value={recipe.nutritionPerPortion.calories} unit="kcal" />
-          <MacroChip label="Protein" value={recipe.nutritionPerPortion.protein} unit="g" />
-          <MacroChip label="Kohlenhydr." value={recipe.nutritionPerPortion.carbs} unit="g" />
-          <MacroChip label="Fett" value={recipe.nutritionPerPortion.fat} unit="g" />
+          <NutritionTile label="Kalorien" value={recipe.nutritionPerPortion.calories} unit="kcal" />
+          <NutritionTile label="Protein" value={recipe.nutritionPerPortion.protein} unit="g" />
+          <NutritionTile label="Kohlenhydr." value={recipe.nutritionPerPortion.carbs} unit="g" />
+          <NutritionTile label="Fett" value={recipe.nutritionPerPortion.fat} unit="g" />
         </View>
 
         {imageUrls.length > 0 && (
@@ -332,7 +314,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       <View style={styles.stickyFooter}>
         <TouchableOpacity
           style={styles.stickyAction}
-          onPress={() => navigation.navigate('RecipeCreate', { editId: id })}
+          onPress={() => navigation.navigate('RecipeWizard', { editId: id })}
           activeOpacity={0.8}
           accessibilityRole="button"
         >

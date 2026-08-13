@@ -24,6 +24,7 @@ import {
 // PUT    /api/recipes/:id                    — update recipe
 // DELETE /api/recipes/:id                    — delete recipe + all blobs
 // POST   /api/recipes/:id/images             — upload image (multipart)
+// PUT    /api/recipes/:id/images/order       — reorder images
 // DELETE /api/recipes/:id/images/:imageId    — delete one image
 // POST   /api/recipes/:id/log               — log portion into diary
 // ---------------------------------------------------------------------------
@@ -73,7 +74,6 @@ const RecipeStepSchema = z.object({
   order: z.coerce.number().int().positive(),
   title: z.string().trim().max(200).optional(),
   description: z.string().trim().min(1).max(2000),
-  notes: z.string().trim().max(1000).optional(),
 });
 
 const CreateRecipeSchema = z.object({
@@ -90,6 +90,10 @@ const UpdateRecipeSchema = CreateRecipeSchema.partial();
 const LogRecipeSchema = z.object({
   portions: z.coerce.number().positive().max(50),
   mealId: z.string().min(1),
+});
+
+const ReorderImagesSchema = z.object({
+  imageIds: z.array(z.string().min(1)),
 });
 
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8 MB
@@ -290,7 +294,7 @@ export const uploadImageHandler = withHandler(
     const newImage: RecipeImage = {
       id: imageId,
       blobName,
-      order: recipe.images.length + 1,
+      order: recipe.images.reduce((maxOrder, image) => Math.max(maxOrder, image.order), 0) + 1,
     };
 
     const updatedImages = [...recipe.images, newImage];
@@ -329,6 +333,50 @@ export const deleteImageHandler = withHandler(
     await repo.update(userId, recipeId, { images: updatedImages });
     logEvent(ctx, 'info', 'recipe.imageDeleted', { userId, recipeId, imageId });
     return { status: 204 };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// PUT /recipes/:id/images/order
+// ---------------------------------------------------------------------------
+
+export const reorderImagesHandler = withHandler(
+  'recipes.reorderImages',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const recipeId = request.params['id'];
+    if (!recipeId) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+
+    const body = await request.json();
+    const parsed = ReorderImagesSchema.safeParse(body);
+    if (!parsed.success) {
+      return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
+    }
+
+    const repo = getRecipesRepository();
+    const recipe = await repo.get(userId, recipeId);
+    if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+
+    const { imageIds } = parsed.data;
+    const uniqueIds = new Set(imageIds);
+    const existingById = new Map(recipe.images.map((image) => [image.id, image]));
+    const isCompletePermutation =
+      imageIds.length === recipe.images.length &&
+      uniqueIds.size === imageIds.length &&
+      imageIds.every((imageId) => existingById.has(imageId));
+
+    if (!isCompletePermutation) {
+      return { status: 400, jsonBody: { error: 'imageIds must contain each recipe image exactly once' } };
+    }
+
+    const updatedImages = imageIds.map((imageId, index) => ({
+      ...existingById.get(imageId)!,
+      order: index + 1,
+    }));
+
+    await repo.update(userId, recipeId, { images: updatedImages });
+    logEvent(ctx, 'info', 'recipe.imagesReordered', { userId, recipeId, imageCount: updatedImages.length });
+    return { status: 200, jsonBody: { images: updatedImages } };
   },
 );
 
@@ -438,6 +486,13 @@ app.http('recipes-delete-image', {
   authLevel: 'anonymous',
   route: 'recipes/{id}/images/{imageId}',
   handler: deleteImageHandler,
+});
+
+app.http('recipes-reorder-images', {
+  methods: ['PUT'],
+  authLevel: 'anonymous',
+  route: 'recipes/{id}/images/order',
+  handler: reorderImagesHandler,
 });
 
 app.http('recipes-log', {

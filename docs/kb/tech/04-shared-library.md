@@ -64,9 +64,9 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `SpecialActivity` — discriminated union: `HikingSpecialActivity | CyclingSpecialActivity`
 
 ### `recipes.ts`
-- `RecipeIngredient` — linked food catalog or reusable item with optional `category?: 'food' | 'seasoning'` and persistent `amountLabel?: string`; `inputAmount` and `amountGrams` are `number | null` for indeterminate amounts. A missing category is the legacy-food fallback.
-- `RecipeStep` — ordered instruction
-- `RecipeImage` — blob reference + SAS URL
+- `RecipeIngredient` — resolved ingredient snapshot with `displayName`, `inputMode`, `inputAmount`, `amountGrams`, `unit`, optional product/library links (`linkedProductId`, `linkedReusableItemId`), `isAiEstimate`, optional `category?: 'food' | 'seasoning'`, persistent `amountLabel?: string`, optional source-portion display data, `nutritionPer100g`, and `nutritionContribution`. `inputAmount` and `amountGrams` are `number | null` for indeterminate amounts. A missing category is the legacy-food fallback.
+- `RecipeStep` — ordered instruction with `order`, optional `title`, and `description`; step-level `notes` are removed from the shared type/API contract.
+- `RecipeImage` — blob reference (`id`, `blobName`, `order`) plus transient response-only SAS `url?`
 - `RecipeNutrition` — `{ calories, protein, carbs, fat, fiber }` totals + per-portion; the recipe calculator gives seasonings and indeterminate amounts a zero contribution
 - `Recipe` — owner, ingredients, steps, images, nutrition, usage count
 

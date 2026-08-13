@@ -11,13 +11,14 @@ RootNavigator (NavigationContainer)
 │       └── HomeMain → HomeScreen
 ├── Tab: Nutrition
 │   └── (NutritionStack — DiaryScreen is the root)
-│       └── DiaryMain → DiaryScreen
+│       ├── DiaryMain → DiaryScreen
+│       ├── HikingInput → HikingInputScreen (param: date, existing?)
+│       └── CyclingInput → CyclingInputScreen (param: date, existing?)
 ├── Tab: Recipes
 │   └── RecipeStack
 │       ├── RecipeList → RecipeListScreen
-│       ├── RecipeDetail → RecipeDetailScreen (param: id)
-│       ├── RecipeCreate → RecipeCreateScreen (param: editId?)
-│       └── RecipeWizard → RecipeWizardScreen
+│       ├── RecipeDetail → RecipeDetailScreen (param: id, transient intent?)
+│       └── RecipeWizard → RecipeWizardScreen (param: editId?; create or edit)
 ├── Tab: Progress
 │   └── (ProgressStack)
 │       └── ProgressMain → ProgressScreen
@@ -31,9 +32,7 @@ RootNavigator (NavigationContainer)
 
 Modals (overlaid on top):
 ├── ProfileWizardScreen — shown on first launch (no SKIP_WIZARD_KEY in AsyncStorage)
-├── FoodEntryHub — BottomSheetModal, open from any screen via useFoodEntryHubStore
-├── BarcodeScannerScreen — full-screen camera, navigated from FoodEntryHub
-└── WeightDetailScreen — accessible from Home or Progress
+└── FoodEntryHub — BottomSheetModal, open from any screen via useFoodEntryHubStore
 ```
 
 ## Navigation Theme
@@ -73,6 +72,8 @@ open({
 
 The hub must be mounted in the root navigation tree so it overlays any tab.
 
+In recipe-ingredient mode the hub is opened with `purpose: 'recipeIngredient'` or ingredient callbacks. This keeps the hub as an overlay while disabling diary mutations and returning the selected product or explicit single-food AI estimate to `RecipeWizardScreen`.
+
 ## First Launch Flow
 
 ```
@@ -100,7 +101,17 @@ Navigation: swipe left/right (PanResponder) + Cancel (X) on steps 1–4 with con
 ## Navigation Parameter Types
 
 ```ts
-HomeStackParamList = { HomeMain: undefined }
+HomeStackParamList = {
+  HomeMain: undefined;
+  HikingInput: { date: string; existing?: SpecialActivity };
+  CyclingInput: { date: string; existing?: SpecialActivity };
+}
+
+NutritionStackParamList = {
+  DiaryMain: undefined;
+  HikingInput: { date: string; existing?: SpecialActivity };
+  CyclingInput: { date: string; existing?: SpecialActivity };
+}
 
 ProfileStackParamList = {
   ProfileMain: undefined;
@@ -112,23 +123,28 @@ ProfileStackParamList = {
 
 RecipeStackParamList = {
   RecipeList: undefined;
-  RecipeDetail: { id: string };
-  RecipeCreate: { editId?: string };
-  RecipeWizard: undefined;
+  RecipeDetail: { id: string; intent?: 'openLogRecipeModal' };
+  RecipeWizard: { editId?: string } | undefined;
 }
 
 RootTabParamList = {
   Home: undefined;
   Nutrition: undefined;
   Recipes: undefined;
-  Progress: undefined;
+  Weight: undefined;
   Profile: undefined;
 }
 ```
 
+### Recipe Create/Edit and transient logging intent
+
+For both recipe creation and editing, `RecipeWizardScreen` saves the recipe and then replaces the wizard with `RecipeDetail`, passing `{ id, intent: 'openLogRecipeModal' }`. Normal navigation from the recipe list passes only `{ id }`.
+
+`RecipeDetailScreen` loads the recipe first. Once the recipe is available, it consumes the transient intent once via a ref, clears the route parameter with `navigation.setParams({ intent: undefined })`, and opens `LogRecipeModal`. Focus refreshes and later returns to the detail screen therefore cannot open the modal again. After successful logging, the modal closes and the detail view reloads.
+
 ## Weight Screen
 
-`WeightDetailScreen` is accessible from the Home screen (not a dedicated tab). This follows the product decision from `docs/screen_flows.md`.
+The bottom tab route is named `Weight` and renders `ProgressScreen`; the visible tab label is `Progress`.
 
 ## Related Documents
 

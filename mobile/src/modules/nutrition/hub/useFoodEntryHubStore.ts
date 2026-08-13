@@ -7,6 +7,8 @@ import type { AiFoodEstimatePreview, FoodSearchResult, MealType } from '@fittrac
 import { getSuggestedMealType } from './mealTimeRules';
 
 export interface FoodEntryHubContext {
+  /** Explicit owner of the hub session. Recipe ingredient sessions must not mutate diary data. */
+  purpose: 'diary' | 'recipeIngredient';
   /** If set, the entry will be added to this specific meal. */
   mealId?: string;
   /** ISO date string (YYYY-MM-DD). Defaults to today. */
@@ -37,6 +39,7 @@ interface FoodEntryHubStore {
   onEstimateIngredient: ((estimate: AiFoodEstimatePreview, query: string) => void) | null;
 
   open: (params?: {
+    purpose?: 'diary' | 'recipeIngredient';
     mealId?: string;
     date?: string;
     mealType?: MealType;
@@ -75,6 +78,7 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   onSelectIngredient: null,
   onEstimateIngredient: null,
   context: {
+    purpose: 'diary',
     date: TODAY(),
     mealType: getSuggestedMealType(),
   },
@@ -83,10 +87,15 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   open: (params) => {
     const date = params?.date ?? TODAY();
     const mealType = params?.mealType ?? getSuggestedMealType();
+    const hasRecipeCallbacks = !!(params?.onSelectIngredient || params?.onEstimateIngredient);
+    const purpose = params?.purpose ?? (hasRecipeCallbacks ? 'recipeIngredient' : 'diary');
+    const initialSubflow = purpose === 'recipeIngredient'
+      ? (params?.initialSubflow === 'ai' ? 'ai' : null)
+      : (params?.initialSubflow ?? null);
     set({
       isOpen: true,
       autoFocusSearch: params?.autoFocusSearch ?? false,
-      initialSubflow: params?.initialSubflow ?? null,
+      initialSubflow,
       autoCloseOnSave: params?.autoCloseOnSave ?? false,
       topInset: params?.topInset ?? 0,
       initialQuery: params?.initialQuery ?? '',
@@ -94,6 +103,7 @@ export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
       onSelectIngredient: params?.onSelectIngredient ?? null,
       onEstimateIngredient: params?.onEstimateIngredient ?? null,
       context: {
+        purpose,
         mealId: params?.mealId,
         date,
         mealType,

@@ -73,10 +73,11 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
       setResolvedMealId(null);
       return;
     }
+    if (context.purpose !== 'diary') return;
     resolveOrCreateMealId(context.date, context.mealType, context.mealId)
       .then(setResolvedMealId)
       .catch((e) => setError(formatApiError(e, 'Mahlzeit konnte nicht geladen werden')));
-  }, [visible, context.date, context.mealType, context.mealId]);
+  }, [visible, context.purpose, context.date, context.mealType, context.mealId]);
 
   async function handlePickImage(source: 'camera' | 'gallery') {
     setError(null);

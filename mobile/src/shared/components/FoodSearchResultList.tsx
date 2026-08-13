@@ -1,4 +1,4 @@
-﻿// Shared search-result list — used by AddItemModal (diary) and AddIngredientModal (recipes).
+﻿// Shared food search-result list.
 import React from 'react';
 import {
   ActivityIndicator,

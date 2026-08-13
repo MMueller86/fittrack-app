@@ -1,17 +1,16 @@
-// Builder functions for RecipeIngredient — used by AddIngredientModal and RecipeWizardScreen.
+// Builder functions for RecipeIngredient — used by RecipeWizardScreen.
 // Extracted to this module so they can be unit-tested independently of React Native.
 import { randomUUID } from 'expo-crypto';
 import type {
   AiFoodEstimatePreview,
   FoodSearchResult,
-  NutritionLabelScanResult,
   RecipeIngredient,
   RecipeIngredientInputMode,
 } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
 
 // ---------------------------------------------------------------------------
-// AddIngredientModal builders
+// Recipe ingredient builders
 // ---------------------------------------------------------------------------
 
 export function buildFromProduct(
@@ -46,69 +45,6 @@ export function buildFromProduct(
     isAiEstimate: false,
     portionWeightGrams: hasPortion ? portionWeightGrams : undefined,
     portionLabel: hasPortion ? (portionLabel ?? 'Portion') : undefined,
-    nutritionPer100g: n,
-    nutritionContribution: {
-      calories: Math.round(n.calories * scale * 10) / 10,
-      protein: Math.round(n.protein * scale * 10) / 10,
-      carbs: Math.round(n.carbs * scale * 10) / 10,
-      fat: Math.round(n.fat * scale * 10) / 10,
-      fiber: Math.round(n.fiber * scale * 10) / 10,
-    },
-  };
-}
-
-export function buildFromAiEstimate(
-  name: string,
-  amountGrams: number,
-  n: { calories: number; protein: number; carbs: number; fat: number; fiber: number },
-): RecipeIngredient {
-  const scale = amountGrams / 100;
-  return {
-    id: randomUUID(),
-    displayName: name,
-    inputMode: 'grams',
-    inputAmount: amountGrams,
-    amountGrams,
-    unit: 'g',
-    category: 'food',
-    linkedProductId: null,
-    linkedReusableItemId: null,
-    isAiEstimate: true,
-    nutritionPer100g: n,
-    nutritionContribution: {
-      calories: Math.round(n.calories * scale * 10) / 10,
-      protein: Math.round(n.protein * scale * 10) / 10,
-      carbs: Math.round(n.carbs * scale * 10) / 10,
-      fat: Math.round(n.fat * scale * 10) / 10,
-      fiber: Math.round(n.fiber * scale * 10) / 10,
-    },
-  };
-}
-
-export function buildFromScan(
-  name: string,
-  amountGrams: number,
-  scan: NutritionLabelScanResult,
-): RecipeIngredient {
-  const n = {
-    calories: scan.nutrition.calories ?? 0,
-    protein: scan.nutrition.protein ?? 0,
-    carbs: scan.nutrition.carbs ?? 0,
-    fat: scan.nutrition.fat ?? 0,
-    fiber: scan.nutrition.fiber ?? 0,
-  };
-  const scale = amountGrams / 100;
-  return {
-    id: randomUUID(),
-    displayName: name,
-    inputMode: 'grams',
-    inputAmount: amountGrams,
-    amountGrams,
-    unit: 'g',
-    category: 'food',
-    linkedProductId: null,
-    linkedReusableItemId: null,
-    isAiEstimate: false,
     nutritionPer100g: n,
     nutritionContribution: {
       calories: Math.round(n.calories * scale * 10) / 10,

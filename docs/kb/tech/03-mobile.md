@@ -24,7 +24,7 @@ mobile/src/
 │   ├── onboarding/          (planned — currently part of profile)
 │   ├── profile/             ProfileScreen, ProfileWizard, Library
 │   ├── progress/            ProgressScreen, weight chart
-│   ├── recipes/             RecipeListScreen, detail, create, wizard
+│   ├── recipes/             RecipeListScreen, detail, wizard create/edit flow
 │   ├── scanner/             BarcodeScannerScreen
 │   └── weight/              WeightDetailScreen
 ├── services/
@@ -41,7 +41,8 @@ mobile/src/
 │   └── weightsService.ts    Weights data service
 └── shared/
     ├── api/                 Typed API clients (per domain)
-    └── components/          Shared UI components (WeightChart, etc.)
+    ├── components/          Shared UI components (WeightChart, NutritionTile, MealChip, etc.)
+    └── viewModels/          Pure view-model helpers for shared mobile flows
 ```
 
 ## Navigation
@@ -54,14 +55,14 @@ Built with React Navigation. Architecture: one bottom tab navigator containing a
 |---|---|---|
 | Home | `HomeScreen` | Entry point; weight detail accessible from here |
 | Nutrition | `DiaryScreen` | FoodEntryHub overlays from here |
-| Recipes | `RecipeListScreen` | Full CRUD in stack |
-| Progress | `ProgressScreen` | Weight chart, trend indicators |
+| Recipes | `RecipeListScreen` | Full CRUD through detail + wizard stack |
+| Weight | `ProgressScreen` | Visible tab label: `Progress`; weight chart, trend indicators |
 | Profile | `ProfileScreen` | Settings, library, my products |
 
 ### Additional Screens (inside stacks)
 
 - `WeightDetailScreen` — from Home or Progress
-- `RecipeDetailScreen`, `RecipeCreateScreen`, `RecipeWizardScreen` — in Recipes stack
+- `RecipeDetailScreen`, `RecipeWizardScreen` — in Recipes stack; `RecipeWizardScreen` handles both create and edit (`editId?`)
 - `ProfileEditScreen`, `MyProductsScreen`, `LibraryScreen` — in Profile stack
 - `ProfileWizardScreen` — shown as full-screen modal on first launch (no profile exists)
 - `BarcodeScannerScreen` — camera barcode scanner, navigated to from FoodEntryHub
@@ -123,6 +124,18 @@ See [tech/05-authentication.md](05-authentication.md) for full flow.
 - `EditItemSheet.tsx`, `CopyItemSheet.tsx`, `MoveItemSheet.tsx` — item management sheets
 
 See [product/04-food-entry-hub.md](../product/04-food-entry-hub.md) for Hub architecture.
+
+In recipe-ingredient context the same hub is opened as an ingredient picker. `useFoodEntryHubStore` carries `purpose: 'recipeIngredient'`, optional initial query/prefilled amount, and ingredient callbacks; successful product selection or explicit single-food AI estimation returns to `RecipeWizardScreen` instead of adding a diary item.
+
+### Recipes Module (`modules/recipes/`)
+
+- `RecipeListScreen.tsx` — recipe overview
+- `RecipeDetailScreen.tsx` — recipe detail, diary logging, image display
+- `RecipeWizardScreen.tsx` — single create/edit wizard; replaces the removed `RecipeCreateScreen`
+- `RecipeWizardInputPhase.tsx`, `RecipeWizardIngredientsPhase.tsx`, `RecipeWizardStepsPhase.tsx`, `RecipeWizardPreviewPhase.tsx` — phase views controlled by `RecipeWizardScreen`
+- `recipeWizardImageMutations.ts` — client-side sequencing for image delete/upload/reorder after recipe save
+
+`RecipeCreateScreen` and the `RecipeCreate` navigation route are removed. New recipe creation and existing recipe editing both use `RecipeWizardScreen`; edit mode is selected by passing `editId`.
 
 ### Progress Module (`modules/progress/`)
 

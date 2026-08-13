@@ -3,13 +3,10 @@ import { calculateRecipeNutrition } from '@fittrack/shared';
 import type {
   AiFoodEstimatePreview,
   FoodSearchResult,
-  NutritionLabelScanResult,
 } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
 import {
   buildFromProduct,
-  buildFromAiEstimate,
-  buildFromScan,
   buildIngFromCandidate,
   buildIngFromAiEstimate,
   buildWizardIngredientFromAiEstimate,
@@ -69,30 +66,6 @@ function makeAiEstimate(overrides: Partial<AiFoodEstimatePreview> = {}): AiFoodE
     searchTerms: [],
     confidence: 0.9,
     warnings: [],
-    ...overrides,
-  };
-}
-
-function makeScan(overrides: Partial<NutritionLabelScanResult> = {}): NutritionLabelScanResult {
-  return {
-    productName: 'Oat milk',
-    brand: null,
-    baseUnit: '100g',
-    servingSize: null,
-    nutrition: {
-      calories: 46,
-      protein: 1,
-      carbs: 6.6,
-      fat: 1.5,
-      sugar: null,
-      saturatedFat: null,
-      fiber: 0.8,
-      salt: null,
-    },
-    ocrConfidence: 0.95,
-    aiConfidence: 0.9,
-    warnings: [],
-    rawOcrText: '',
     ...overrides,
   };
 }
@@ -200,60 +173,6 @@ describe('buildFromProduct — isComplete: false guard', () => {
     const incompleteProduct = makeProduct({ nutritionPer100g: undefined, isComplete: false });
     const ing = buildFromProduct(incompleteProduct, 'grams', 100);
     expect(ing.nutritionPer100g).toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildFromAiEstimate
-// ---------------------------------------------------------------------------
-
-describe('buildFromAiEstimate', () => {
-  const n = { calories: 200, protein: 10, carbs: 25, fat: 6, fiber: 3 };
-
-  it('scales nutritionContribution correctly for 200g', () => {
-    const ing = buildFromAiEstimate('Porridge', 200, n);
-    expect(ing.amountGrams).toBe(200);
-    expect(ing.nutritionContribution.calories).toBe(Math.round(200 * 2 * 10) / 10); // 400
-    expect(ing.nutritionContribution.protein).toBe(Math.round(10 * 2 * 10) / 10);   // 20
-    expect(ing.nutritionContribution.fiber).toBe(Math.round(3 * 2 * 10) / 10);      // 6
-  });
-
-  it('sets isAiEstimate=true and inputMode=grams', () => {
-    const ing = buildFromAiEstimate('Porridge', 100, n);
-    expect(ing.isAiEstimate).toBe(true);
-    expect(ing.inputMode).toBe('grams');
-    expect(ing.unit).toBe('g');
-    expect(ing.linkedProductId).toBeNull();
-    expect(ing.category).toBe('food');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// buildFromScan
-// ---------------------------------------------------------------------------
-
-describe('buildFromScan', () => {
-  it('derives nutritionContribution from scan nutrition × amountGrams', () => {
-    const ing = buildFromScan('Oat milk', 250, makeScan());
-    // scale = 2.5
-    expect(ing.amountGrams).toBe(250);
-    expect(ing.category).toBe('food');
-    expect(ing.nutritionContribution.calories).toBe(Math.round(46 * 2.5 * 10) / 10);  // 115
-    expect(ing.nutritionContribution.fiber).toBe(Math.round(0.8 * 2.5 * 10) / 10);    // 2
-  });
-
-  it('defaults null nutrition fields to 0', () => {
-    const scanWithNulls = makeScan({
-      nutrition: {
-        calories: 100, protein: null, carbs: null, fat: 5,
-        sugar: null, saturatedFat: null, fiber: null, salt: null,
-      },
-    });
-    const ing = buildFromScan('Unknown', 100, scanWithNulls);
-    expect(ing.nutritionPer100g.protein).toBe(0);
-    expect(ing.nutritionPer100g.carbs).toBe(0);
-    expect(ing.nutritionPer100g.fiber).toBe(0);
-    expect(ing.nutritionContribution.calories).toBe(100);
   });
 });
 
@@ -410,14 +329,6 @@ describe('cross-check: builder nutritionContribution matches calculateRecipeNutr
       'portion',
       3,
     );
-    const { nutritionTotal } = calculateRecipeNutrition([ing], 1);
-    expect(nutritionTotal.calories).toBe(ing.nutritionContribution.calories);
-    expect(nutritionTotal.protein).toBe(ing.nutritionContribution.protein);
-  });
-
-  it('buildFromAiEstimate', () => {
-    const n = { calories: 350, protein: 12, carbs: 55, fat: 9, fiber: 4 };
-    const ing = buildFromAiEstimate('Granola', 80, n);
     const { nutritionTotal } = calculateRecipeNutrition([ing], 1);
     expect(nutritionTotal.calories).toBe(ing.nutritionContribution.calories);
     expect(nutritionTotal.protein).toBe(ing.nutritionContribution.protein);

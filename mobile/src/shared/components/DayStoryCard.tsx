@@ -10,6 +10,7 @@ import type { DiaryDayResponse, MealType } from '@fittrack/shared';
 import type { HintResult } from '../../../../shared/types/hint';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import type { MacroTarget } from './MacroSummaryCard';
+import { MealChip } from './MealChip';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 export type MacroKey = 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber';
@@ -133,28 +134,6 @@ const MEAL_SHORT: Partial<Record<MealType, string>> = {
   lunch: 'Mittag',
   dinner: 'Abend',
 };
-
-function MealChip({
-  label,
-  filled,
-  onPress,
-}: {
-  label: string;
-  filled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.chip, filled ? styles.chipFilled : styles.chipEmpty]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.chipText, filled ? styles.chipTextFilled : styles.chipTextEmpty]}>
-        {filled ? '✓ ' : '○ '}{label}
-      </Text>
-    </TouchableOpacity>
-  );
-}
 
 // ─── Macro line ───────────────────────────────────────────────────────────────
 // isCalorie: kcal row keeps its ring-colour on the value; all others use colors.text
@@ -826,31 +805,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     marginTop: spacing.xs,
     marginBottom: spacing.xs,
-  },
-  chip: {
-    flex: 1,
-    paddingVertical: 6,
-    paddingHorizontal: spacing.xs,
-    borderRadius: radius.md,
-    alignItems: 'center',
-  },
-  chipFilled: {
-    backgroundColor: colors.primarySoft,
-  },
-  chipEmpty: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  chipText: {
-    ...typography.caption,
-    fontWeight: '600',
-  },
-  chipTextFilled: {
-    color: colors.primary,
-  },
-  chipTextEmpty: {
-    color: colors.textMuted,
   },
   // Context text
   contextText: {

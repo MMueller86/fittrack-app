@@ -8,13 +8,13 @@
 //   - Probing via Node + fetch means: if this script exits 0, the SDK
 //     will be able to reach the emulator too.
 //
-// Exits 0 once the emulator responds to a real HTTPS request, 1 on
+// Exits 0 once the emulator responds to a real HTTP request, 1 on
 // timeout. Used by `.github/workflows/ci.yml`.
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 // vnext-preview Linux emulator listens on plain HTTP. See cosmosEmulator.ts.
-const ENDPOINT = process.env.COSMOS_ENDPOINT ?? 'http://127.0.0.1:8081';
+const ENDPOINT = process.env.COSMOS_ENDPOINT ?? 'http://127.0.0.1:18081';
 const MAX_ATTEMPTS = 90;
 const DELAY_MS = 2_000;
 

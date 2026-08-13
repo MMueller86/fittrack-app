@@ -14,7 +14,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 | Food Estimator | POST /api/ai/food-estimate | `food-estimate` | `FoodEstimateReviewScreen` |
 | Label Scan | POST /api/ai/label-scan | `label-scan` | `LabelScanReviewScreen` |
 | Meal Estimator | POST /api/ai/estimate-meal | `meal-estimate` | `MealEstimateReviewScreen` |
-| Recipe Analyzer | (via ai.ts) | `recipe-analyze` | `RecipeWizardScreen` |
+| Recipe Analyzer | POST /api/ai/recipe-analyze | `recipe-analyze` | `RecipeWizardScreen` |
 | Daily Insight | GET /api/ai/daily-insight | (special) | Inline on `HomeScreen` |
 
 ## 1. Meal Parser
@@ -105,6 +105,8 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 **Used in:** `RecipeWizardScreen` to speed up recipe creation.
 
+The Recipe Analyzer is separate from the Food Estimator. It parses a complete recipe into metadata, ordered steps, food ingredients, and seasoning ingredients. It does not create reusable foods and it does not save diary data. The Food Estimator (`POST /api/ai/food-estimate`) remains the single-food nutrition-estimation workflow; in recipe-ingredient search it can be invoked explicitly for one unresolved ingredient and its result is returned to `RecipeWizardScreen` for user confirmation.
+
 **AI output (`AiRecipeRaw`):**
 
 The AI returns a fully structured recipe including `suggestedName`, `description`, `suggestedPortions`, `tags`, `steps`, and an `ingredients` array. Each ingredient is an `AiRecipeIngredientLine`:
@@ -152,6 +154,8 @@ category?: 'food' | 'seasoning';
 ```
 
 This allows the review screen (`RecipeWizardScreen`) to render seasoning items differently from food items.
+
+`RecipeStep` persistence contains only `order`, optional `title`, and `description`. Step-level `notes` are not part of the shared recipe type or API contract; historical notes are cleaned lazily on recipe update rather than by a Cosmos migration.
 
 ## 6. Daily Insight
 

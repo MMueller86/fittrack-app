@@ -15,6 +15,7 @@ import {
   deleteRecipeHandler,
   uploadImageHandler,
   deleteImageHandler,
+  reorderImagesHandler,
   logRecipeHandler,
 } from './recipes';
 import { __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
@@ -134,6 +135,25 @@ describe('POST /recipes — createRecipe', () => {
     expect(ingredients[0]?.['category']).toBeUndefined();
     expect(ingredients[0]?.['amountLabel']).toBeUndefined();
     expect(ingredients[0]?.['kitchenAmountText']).toBeUndefined();
+  });
+
+  it('strips step notes and ignores a root-level notes field', async () => {
+    const req = await makeAuthRequest({
+      body: {
+        name: 'Notizen-Rezept',
+        portions: 2,
+        ingredients: [baseIngredient],
+        steps: [{ ...baseStep, notes: 'Bei niedriger Hitze arbeiten.' }],
+        tags: [],
+        notes: 'Kein persistentes Rezeptfeld',
+      },
+    });
+    const res = await createRecipeHandler(req, ctx);
+    expect(res.status).toBe(201);
+
+    const recipe = res.jsonBody as Record<string, unknown>;
+    expect(recipe['notes']).toBeUndefined();
+    expect((recipe['steps'] as Array<Record<string, unknown>>)[0]).not.toHaveProperty('notes');
   });
 
   it('accepts an indeterminate seasoning and preserves its display metadata', async () => {
@@ -305,6 +325,23 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     expect(ingredient['kitchenAmountText']).toBeUndefined();
   });
 
+  it('strips step notes and ignores a root-level notes field', async () => {
+    const created = await createTestRecipe();
+    const req = await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: {
+        steps: [{ ...baseStep, notes: 'Mit Ruhe backen.' }],
+        notes: 'Kein persistentes Rezeptfeld',
+      },
+    });
+    const res = await updateRecipeHandler(req, ctx);
+    expect(res.status).toBe(200);
+
+    const recipe = res.jsonBody as Record<string, unknown>;
+    expect(recipe['notes']).toBeUndefined();
+    expect((recipe['steps'] as Array<Record<string, unknown>>)[0]).not.toHaveProperty('notes');
+  });
+
   it('rejects an invalid food amount on update', async () => {
     const created = await createTestRecipe();
     const req = await makeAuthRequest({
@@ -427,6 +464,7 @@ describe('POST /recipes/:id/images — uploadImage', () => {
     expect(res.status).toBe(201);
     const body = res.jsonBody as Record<string, unknown>;
     expect(body['id']).toBe('img1');
+    expect(body['order']).toBe(1);
     expect(typeof body['url']).toBe('string');
 
     // Recipe should now have 1 image
@@ -448,7 +486,30 @@ describe('POST /recipes/:id/images — uploadImage', () => {
     expect(res.status).toBe(201);
 
     const getRes = await getRecipeHandler(await makeAuthRequest({ params: { id } }), ctx);
-    expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toHaveLength(3);
+    expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toMatchObject([
+      { order: 1 },
+      { order: 2 },
+      { order: 3 },
+    ]);
+  });
+
+  it('appends after the highest persisted image order', async () => {
+    const created = await createTestRecipe();
+    const id = String(created['id']);
+    const repo = (await import('../lib/repositories/recipesRepository')).getRecipesRepository();
+    await repo.update(TEST_USER_ID, id, {
+      images: [
+        { id: 'img1', blobName: 'u1/r1/img1.jpg', order: 2 },
+        { id: 'img2', blobName: 'u1/r1/img2.jpg', order: 5 },
+      ],
+    });
+
+    const res = await uploadImageHandler(
+      await makeAuthRequest({ params: { id }, formData: makeImageFormData() }),
+      ctx,
+    );
+    expect(res.status).toBe(201);
+    expect((res.jsonBody as Record<string, unknown>)['order']).toBe(6);
   });
 
   it('returns 400 when no image field in form data', async () => {
@@ -498,13 +559,25 @@ describe('DELETE /recipes/:id/images/:imageId — deleteImage', () => {
   }
 
   it('removes image and re-orders remaining images', async () => {
-    const { recipeId, imageId } = await createRecipeWithImage();
-    const req = await makeAuthRequest({ params: { id: recipeId, imageId } });
+    const { recipeId } = await createRecipeWithImage();
+    const repo = (await import('../lib/repositories/recipesRepository')).getRecipesRepository();
+    await repo.update(TEST_USER_ID, recipeId, {
+      images: [
+        { id: 'img1', blobName: 'u1/r1/img1.jpg', order: 1 },
+        { id: 'img2', blobName: 'u1/r1/img2.jpg', order: 2 },
+        { id: 'img3', blobName: 'u1/r1/img3.jpg', order: 3 },
+      ],
+    });
+
+    const req = await makeAuthRequest({ params: { id: recipeId, imageId: 'img2' } });
     const res = await deleteImageHandler(req, ctx);
     expect(res.status).toBe(204);
 
     const getRes = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
-    expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toHaveLength(0);
+    expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toMatchObject([
+      { id: 'img1', order: 1 },
+      { id: 'img3', order: 2 },
+    ]);
   });
 
   it('returns 404 for unknown imageId', async () => {
@@ -525,5 +598,84 @@ describe('DELETE /recipes/:id/images/:imageId — deleteImage', () => {
     const req = makeRequest({ params: { id: 'any', imageId: 'img1' } });
     const res = await deleteImageHandler(req, ctx);
     expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PUT /recipes/:id/images/order — reorderImages
+// ---------------------------------------------------------------------------
+
+describe('PUT /recipes/:id/images/order — reorderImages', () => {
+  async function createRecipeWithImages() {
+    const created = await createTestRecipe();
+    const recipeId = String(created['id']);
+    const repo = (await import('../lib/repositories/recipesRepository')).getRecipesRepository();
+    await repo.update(TEST_USER_ID, recipeId, {
+      images: [
+        { id: 'img1', blobName: 'u1/r1/img1.jpg', order: 1 },
+        { id: 'img2', blobName: 'u1/r1/img2.jpg', order: 2 },
+        { id: 'img3', blobName: 'u1/r1/img3.jpg', order: 3 },
+      ],
+    });
+    return recipeId;
+  }
+
+  it('reorders images when imageIds are a complete permutation', async () => {
+    const recipeId = await createRecipeWithImages();
+    const req = await makeAuthRequest({
+      params: { id: recipeId },
+      body: { imageIds: ['img3', 'img1', 'img2'] },
+    });
+
+    const res = await reorderImagesHandler(req, ctx);
+
+    expect(res.status).toBe(200);
+    expect((res.jsonBody as { images: Array<Record<string, unknown>> }).images).toMatchObject([
+      { id: 'img3', order: 1 },
+      { id: 'img1', order: 2 },
+      { id: 'img2', order: 3 },
+    ]);
+
+    const getRes = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
+    expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toMatchObject([
+      { id: 'img3', order: 1 },
+      { id: 'img1', order: 2 },
+      { id: 'img2', order: 3 },
+    ]);
+  });
+
+  it('returns 400 when imageIds omit an existing image', async () => {
+    const recipeId = await createRecipeWithImages();
+    const res = await reorderImagesHandler(
+      await makeAuthRequest({ params: { id: recipeId }, body: { imageIds: ['img3', 'img1'] } }),
+      ctx,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when imageIds contain duplicates or unknown images', async () => {
+    const recipeId = await createRecipeWithImages();
+
+    const duplicateRes = await reorderImagesHandler(
+      await makeAuthRequest({ params: { id: recipeId }, body: { imageIds: ['img1', 'img1', 'img3'] } }),
+      ctx,
+    );
+    const unknownRes = await reorderImagesHandler(
+      await makeAuthRequest({ params: { id: recipeId }, body: { imageIds: ['img1', 'img2', 'missing'] } }),
+      ctx,
+    );
+
+    expect(duplicateRes.status).toBe(400);
+    expect(unknownRes.status).toBe(400);
+  });
+
+  it('returns 404 for an unknown recipe id', async () => {
+    const res = await reorderImagesHandler(
+      await makeAuthRequest({ params: { id: 'nonexistent' }, body: { imageIds: [] } }),
+      ctx,
+    );
+
+    expect(res.status).toBe(404);
   });
 });

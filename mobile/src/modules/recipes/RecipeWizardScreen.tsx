@@ -39,9 +39,16 @@ import { RecipeWizardInputPhase } from './RecipeWizardInputPhase';
 import { RecipeWizardIngredientsPhase } from './RecipeWizardIngredientsPhase';
 import { RecipeWizardPreviewPhase } from './RecipeWizardPreviewPhase';
 import { RecipeWizardStepsPhase } from './RecipeWizardStepsPhase';
+import { buildRecipeWizardEditBootstrapState } from './recipeWizardEditBootstrap';
+import { persistRecipeWizardImages } from './recipeWizardImageMutations';
+import {
+  buildRecipeDetailAfterSaveParams,
+  canRunRecipeWizardAnalysis,
+  getRecipeWizardPreviousPhase,
+} from './recipeWizardNavigation';
 import type {
   AmountEdit,
-  PendingWizardImage,
+  WizardImageDraft,
   WizardIngredient,
   WizardPhase,
   WizardStepItem,
@@ -124,14 +131,6 @@ function initWizardIngredient(item: MealParserPreviewItem): WizardIngredient {
 // Main component
 // ---------------------------------------------------------------------------
 
-const PHASE_PREV: Record<WizardPhase, WizardPhase> = {
-  input: 'input',
-  analyzing: 'input',
-  ingredients: 'input',
-  steps: 'ingredients',
-  preview: 'steps',
-};
-
 const PHASE_TITLES: Record<WizardPhase, string> = {
   input: 'Rezept beschreiben',
   analyzing: 'KI analysiert…',
@@ -140,7 +139,13 @@ const PHASE_TITLES: Record<WizardPhase, string> = {
   preview: 'Rezeptvorschau',
 };
 
-export default function RecipeWizardScreen({ navigation }: Props) {
+function normalizeTags(values: string[]): string[] {
+  return Array.from(new Set(values.map((tag) => tag.trim()).filter(Boolean)));
+}
+
+export default function RecipeWizardScreen({ route, navigation }: Props) {
+  const editId = route.params?.editId ?? null;
+  const isEdit = editId != null;
   const [phase, setPhase] = useState<WizardPhase>('input');
   const [inputText, setInputText] = useState('');
   const [reviewHelpVisible, setReviewHelpVisible] = useState(false);
@@ -174,10 +179,13 @@ export default function RecipeWizardScreen({ navigation }: Props) {
   const { height: windowHeight } = useWindowDimensions();
 
   // Image
-  const [pendingImages, setPendingImages] = useState<PendingWizardImage[]>([]);
+  const [imageDrafts, setImageDrafts] = useState<WizardImageDraft[]>([]);
+  const [initialImageIds, setInitialImageIds] = useState<string[]>([]);
 
   // Save
   const [saving, setSaving] = useState(false);
+  const [loadingRecipe, setLoadingRecipe] = useState(isEdit);
+  const [loadRecipeError, setLoadRecipeError] = useState(false);
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
   const openHub = useFoodEntryHubStore((s) => s.open);
 
@@ -186,6 +194,38 @@ export default function RecipeWizardScreen({ navigation }: Props) {
 
   // Amount editor state per resolved ingredient: { mode, value }
   const [amountEdits, setAmountEdits] = useState<Record<string, AmountEdit>>({});
+
+  const bootstrapEditRecipe = useCallback(async () => {
+    if (!editId) return;
+    setLoadingRecipe(true);
+    setLoadRecipeError(false);
+    try {
+      const recipe = await recipeApi.get(editId);
+      const bootstrapState = buildRecipeWizardEditBootstrapState(recipe);
+      setRecipeName(recipe.name);
+      setRecipeDescription(recipe.description ?? '');
+      setTags(normalizeTags(recipe.tags));
+      setPortions(recipe.portions);
+      setIngredients(bootstrapState.ingredients);
+      setAmountEdits(bootstrapState.amountEdits);
+      setSteps(bootstrapState.steps);
+      setImageDrafts(bootstrapState.images);
+      setInitialImageIds(bootstrapState.images
+        .filter((image): image is Extract<WizardImageDraft, { source: 'existing' }> => image.source === 'existing')
+        .map((image) => image.imageId));
+      setInputText(recipe.description ?? recipe.name);
+      setPhase('ingredients');
+    } catch (err: unknown) {
+      console.error('[RecipeWizard] Edit bootstrap failed for id', editId, err);
+      setLoadRecipeError(true);
+    } finally {
+      setLoadingRecipe(false);
+    }
+  }, [editId]);
+
+  useEffect(() => {
+    void bootstrapEditRecipe();
+  }, [bootstrapEditRecipe]);
 
   // ---------------------------------------------------------------------------
   // Back handling
@@ -212,13 +252,14 @@ export default function RecipeWizardScreen({ navigation }: Props) {
   // ---------------------------------------------------------------------------
 
   const runAnalysis = useCallback(async () => {
+    if (isEdit) return;
     setPhase('analyzing');
     try {
       const result = await aiApi.analyzeRecipe(inputText.trim());
       setRecipeName(result.suggestedName);
       setRecipeDescription(result.description);
       setPortions(Math.max(1, result.suggestedPortions));
-      setTags(result.tags);
+      setTags(normalizeTags(result.tags));
       const wizardIngredients = result.ingredients.map(initWizardIngredient);
       setIngredients(wizardIngredients);
       // Initialize amount editors for all auto-matched ingredients
@@ -254,15 +295,15 @@ export default function RecipeWizardScreen({ navigation }: Props) {
       Alert.alert('Fehler', `Rezept konnte nicht analysiert werden.${detail}`);
       setPhase('input');
     }
-  }, [inputText]);
+  }, [inputText, isEdit]);
 
   const handleAnalyzePress = useCallback(() => {
-    if (!hasMeaningfulRecipeText) return;
+    if (!canRunRecipeWizardAnalysis(isEdit, hasMeaningfulRecipeText)) return;
     Keyboard.dismiss();
     setTimeout(() => {
       void runAnalysis();
     }, 0);
-  }, [hasMeaningfulRecipeText, runAnalysis]);
+  }, [hasMeaningfulRecipeText, isEdit, runAnalysis]);
 
   // ---------------------------------------------------------------------------
   // Ingredient actions
@@ -425,6 +466,7 @@ export default function RecipeWizardScreen({ navigation }: Props) {
 
   const handleOpenIngredient = (ingredient: WizardIngredient) => {
     openHub({
+      purpose: 'recipeIngredient',
       initialQuery: ingredient.parserItem.displayName,
       prefillAmount: ingredient.parserItem.inputAmount != null && ingredient.parserItem.inputMode !== 'unknown'
         ? { mode: ingredient.parserItem.inputMode as 'grams' | 'portion', amount: ingredient.parserItem.inputAmount }
@@ -436,6 +478,7 @@ export default function RecipeWizardScreen({ navigation }: Props) {
 
   const handleOpenAddIngredient = () => {
     openHub({
+      purpose: 'recipeIngredient',
       onSelectIngredient: (product, mode, amount) => handleAddManualViaHub(product, mode, amount),
       onEstimateIngredient: (estimate, query) => handleAddAiEstimateViaHub(estimate, query),
     });
@@ -651,8 +694,25 @@ export default function RecipeWizardScreen({ navigation }: Props) {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       const mime = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-      setPendingImages((prev) => [...prev, { uri: asset.uri, mime }]);
+      setImageDrafts((prev) => [...prev, { draftId: randomUUID(), source: 'local', uri: asset.uri, mime }]);
     }
+  };
+
+  const handleRemoveImage = (draftId: string) => {
+    setImageDrafts((prev) => prev.filter((image) => image.draftId !== draftId));
+  };
+
+  const handleMoveImage = (draftId: string, direction: -1 | 1) => {
+    setImageDrafts((prev) => {
+      const currentIndex = prev.findIndex((image) => image.draftId === draftId);
+      const targetIndex = currentIndex + direction;
+      if (currentIndex < 0 || targetIndex < 0 || targetIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [image] = next.splice(currentIndex, 1);
+      if (!image) return prev;
+      next.splice(targetIndex, 0, image);
+      return next;
+    });
   };
 
   // ---------------------------------------------------------------------------
@@ -676,17 +736,27 @@ export default function RecipeWizardScreen({ navigation }: Props) {
         title: s.title.trim() || undefined,
         description: s.description.trim(),
       }));
+    const finalTags = normalizeTags(tags);
 
     setSaving(true);
     let savedRecipeId: string | null = null;
     try {
-      const recipe = await recipeApi.create({
+      const recipe = isEdit && editId
+        ? await recipeApi.update(editId, {
+          name: recipeName.trim(),
+          description: recipeDescription.trim() || undefined,
+          portions,
+          ingredients: confirmedIngredients,
+          steps: finalSteps,
+          tags: finalTags,
+        })
+        : await recipeApi.create({
         name: recipeName.trim(),
         description: recipeDescription.trim() || undefined,
         portions,
         ingredients: confirmedIngredients,
         steps: finalSteps,
-        tags,
+        tags: finalTags,
       });
       savedRecipeId = recipe.id;
     } catch (err: unknown) {
@@ -704,25 +774,31 @@ export default function RecipeWizardScreen({ navigation }: Props) {
       return;
     }
 
-    // Upload images sequentially — non-blocking: navigate even if some fail
-    const failedUploads: number[] = [];
-    for (let i = 0; i < pendingImages.length; i++) {
-      const img = pendingImages[i]!;
-      try {
-        await recipeApi.uploadImage(savedRecipeId, img.uri, img.mime);
-      } catch (err) {
-        console.error(`[RecipeWizard] Image upload ${i + 1} failed:`, err);
-        failedUploads.push(i + 1);
-      }
-    }
+    const imageMutationResult = await persistRecipeWizardImages(
+      savedRecipeId,
+      isEdit ? initialImageIds : [],
+      imageDrafts,
+      recipeApi,
+    );
 
     setSaving(false);
-    navigation.replace('RecipeDetail', { id: savedRecipeId });
+    navigation.replace('RecipeDetail', buildRecipeDetailAfterSaveParams(savedRecipeId));
 
-    if (failedUploads.length > 0) {
+    if (
+      imageMutationResult.failedDeleteImageIds.length > 0
+      || imageMutationResult.failedUploadPositions.length > 0
+      || imageMutationResult.reorderFailed
+    ) {
+      const details = [
+        imageMutationResult.failedDeleteImageIds.length > 0 ? 'Einige Fotos konnten nicht gelöscht werden.' : null,
+        imageMutationResult.failedUploadPositions.length > 0
+          ? `Foto ${imageMutationResult.failedUploadPositions.join(', ')} konnte nicht hochgeladen werden.`
+          : null,
+        imageMutationResult.reorderFailed ? 'Die Fotoreihenfolge konnte nicht gespeichert werden.' : null,
+      ].filter(Boolean).join('\n');
       Alert.alert(
-        'Fotos nicht hochgeladen',
-        `Foto ${failedUploads.join(', ')} konnte nicht hochgeladen werden. Prüfe die Speicher-Konfiguration (STORAGE_CONNECTION_STRING).`,
+        'Fotos nicht vollständig gespeichert',
+        details,
       );
     }
   };
@@ -772,6 +848,57 @@ export default function RecipeWizardScreen({ navigation }: Props) {
   // ---------------------------------------------------------------------------
   // Main render
   // ---------------------------------------------------------------------------
+
+  if (loadingRecipe) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={styles.headerBack}>‹ Zurück</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>Rezept laden</Text>
+          <View style={styles.headerSide} />
+        </View>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.analyzingTitle}>Rezept wird geladen…</Text>
+          <Text style={styles.analyzingSubtext}>Danach startest du direkt bei den Zutaten.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadRecipeError) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={styles.headerBack}>‹ Zurück</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>Rezept laden</Text>
+          <View style={styles.headerSide} />
+        </View>
+        <View style={styles.center}>
+          <Text style={styles.stateTitle}>Rezept konnte nicht geladen werden</Text>
+          <Text style={styles.stateText}>Bitte prüfe deine Verbindung und versuche es erneut.</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => void bootstrapEditRecipe()}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryButtonText}>Erneut versuchen</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -865,16 +992,16 @@ export default function RecipeWizardScreen({ navigation }: Props) {
               recipeDescription={recipeDescription}
               tags={tags}
               portions={portions}
-              pendingImages={pendingImages}
+              imageDrafts={imageDrafts}
               steps={steps}
               liveNutrition={liveNutrition}
               previewViewModel={previewViewModel}
-              saving={saving}
               onRecipeNameChange={setRecipeName}
+              onRecipeDescriptionChange={setRecipeDescription}
               onPortionsChange={setPortions}
               onPickImage={handlePickImage}
-              onRemoveImage={(index) => setPendingImages((prev) => prev.filter((_, i) => i !== index))}
-              onSave={handleSave}
+              onRemoveImage={handleRemoveImage}
+              onMoveImage={handleMoveImage}
             />
           )}
         </ScrollView>
@@ -907,20 +1034,45 @@ export default function RecipeWizardScreen({ navigation }: Props) {
             </TouchableOpacity>
           </View>
         )}
+        {phase === 'preview' && (
+          <View style={styles.stickyFooter}>
+            <TouchableOpacity
+              style={[styles.primaryBtn, styles.stickyPrimaryBtn, (saving || !recipeName.trim()) && styles.primaryBtnDisabled]}
+              onPress={() => void handleSave()}
+              disabled={saving || !recipeName.trim()}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Rezept speichern"
+            >
+              {saving ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.primaryBtnText}>Rezept speichern</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </KeyboardAvoidingView>
       </>}
 
       <ConfirmSheet
         visible={backConfirmVisible}
         title="Zurück?"
-        subtitle={phase === 'ingredients'
+        subtitle={phase === 'ingredients' && !isEdit
           ? 'Die KI-Analyse geht verloren. Fortfahren?'
           : 'Nicht gespeicherter Fortschritt geht verloren.'}
         actions={[
           {
             label: 'Zurück',
             destructive: true,
-            onPress: () => setPhase(PHASE_PREV[phase]),
+            onPress: () => {
+              const previousPhase = getRecipeWizardPreviousPhase(phase, isEdit);
+              if (previousPhase == null) {
+                navigation.goBack();
+                return;
+              }
+              setPhase(previousPhase);
+            },
           },
         ]}
         onClose={() => setBackConfirmVisible(false)}
@@ -955,12 +1107,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    position: 'relative',
     padding: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
   headerBack: { ...typography.body1, color: colors.primary, minWidth: spacing.xxl + spacing.md },
-  headerTitle: { ...typography.h3, color: colors.text, flex: 1, textAlign: 'center' },
+  headerTitle: {
+    ...typography.h3,
+    color: colors.text,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+  },
   headerSide: { width: spacing.xxl + spacing.md },
 
   // Scroll
@@ -984,6 +1144,26 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     textAlign: 'center',
   },
+  stateTitle: {
+    ...typography.h3,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  stateText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  retryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  retryButtonText: { ...typography.button, color: colors.white },
 
   primaryBtn: {
     backgroundColor: colors.primary,

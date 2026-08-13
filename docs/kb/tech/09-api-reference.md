@@ -111,10 +111,16 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | GET | `/api/recipes/{id}` | Yes | |
 | PUT | `/api/recipes/{id}` | Yes | |
 | DELETE | `/api/recipes/{id}` | Yes | |
+| POST | `/api/recipes/{id}/images` | Yes | Multipart upload; returns one `RecipeImage` |
+| PUT | `/api/recipes/{id}/images/order` | Yes | Reorders existing images; returns `{ images: RecipeImage[] }` |
+| DELETE | `/api/recipes/{id}/images/{imageId}` | Yes | Deletes the blob and compacts remaining image order; `204` with no body |
+| POST | `/api/recipes/{id}/log` | Yes | Logs a portion snapshot into a diary meal |
 
 ### Recipe create/update body
 
-`POST /api/recipes` accepts the complete recipe body. `PUT /api/recipes/{id}` accepts a partial body; omitted fields keep their stored values. Both endpoints validate `ingredients` with the same Zod contract and return `400` with an `error` field when validation fails.
+`POST /api/recipes` accepts the complete recipe body. `PUT /api/recipes/{id}` accepts a partial recipe body with any subset of `name`, `description`, `portions`, `ingredients`, `steps`, and `tags`; omitted fields keep their stored values. When `ingredients` or `portions` are supplied, nutrition is recalculated server-side from the stored/supplied combination. Both endpoints validate `ingredients` with the same Zod contract and return `400` with an `error` field when validation fails.
+
+The update endpoint always writes recalculated `nutritionTotal` and `nutritionPerPortion` using the effective ingredient list and portion count. This also covers updates that only change metadata: stored nutrition is normalized from the current recipe ingredients/portions before the response is returned.
 
 Each ingredient contains the following fields:
 
@@ -139,6 +145,18 @@ Each ingredient contains the following fields:
 For `food` ingredients, and for legacy ingredients without `category`, `amountGrams` must be greater than zero. `seasoning` ingredients may use `amountGrams: null` (or `0`); their nutrition contribution is zero. Negative, non-finite, or otherwise invalid food amounts are rejected on both create and update. Existing Cosmos recipe documents do not require a migration: missing optional ingredient fields remain missing and are read as legacy `food` ingredients.
 
 `amountLabel` is retained by the create/update and GET roundtrip. `kitchenAmountText` belongs exclusively to the AI recipe-analysis response and is not a persistent `RecipeIngredient` field.
+
+### Recipe steps
+
+Each step contains `order` (positive integer), `description` (1-2000 characters), and optional `title` (max. 200 characters). There is no top-level recipe `notes` field and no step-level `notes` field in the shared type, request schema, or API response contract. Historical notes remain readable as raw Cosmos data but are stripped from API responses and removed from the stored document the next time the recipe is updated; no global Cosmos migration is required.
+
+### Recipe images
+
+`RecipeImage` persistence contains `id`, `blobName`, and a 1-based `order`. `url` is response-only: the backend creates a read-only SAS URL with a one-hour TTL for `GET /api/recipes/{id}` (all images) and for the first image in `GET /api/recipes` (thumbnail). The upload response is one image object with a fresh `url`; it is not a complete `Recipe` response.
+
+`POST /api/recipes/{id}/images` accepts multipart field `image`, only `image/jpeg` and `image/png`, up to 8 MB. The new image is appended at `max existing order + 1`. `DELETE /api/recipes/{id}/images/{imageId}` deletes the blob and renumbers remaining images from 1.
+
+`PUT /api/recipes/{id}/images/order` accepts `{ "imageIds": string[] }`. The array must contain every existing image ID exactly once, with no duplicates or unknown IDs. The backend normalizes `order` to `1..n` in the supplied sequence and returns `{ images: RecipeImage[] }`. The endpoint only changes image metadata in the recipe document; it does not move or rewrite blob data.
 
 ## Food Search
 

@@ -14,7 +14,6 @@ import HikingInputScreen from '../../modules/nutrition/HikingInputScreen';
 import CyclingInputScreen from '../../modules/nutrition/CyclingInputScreen';
 import RecipeListScreen from '../../modules/recipes/RecipeListScreen';
 import RecipeDetailScreen from '../../modules/recipes/RecipeDetailScreen';
-import RecipeCreateScreen from '../../modules/recipes/RecipeCreateScreen';
 import RecipeWizardScreen from '../../modules/recipes/RecipeWizardScreen';
 import ProfileScreen from '../../modules/profile/ProfileScreen';
 import ProfileEditScreen from '../../modules/profile/ProfileEditScreen';
@@ -28,6 +27,7 @@ import { colors } from '../theme';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, ProgressIcon } from '../../assets/icons/TabIcons';
 import { profileApi } from '../../shared/api/profileApi';
 import { useFoodEntryHubStore } from '../../modules/nutrition/hub/useFoodEntryHubStore';
+import type { RecipeDetailNavigationIntent } from '../../modules/recipes/recipeWizardNavigation';
 
 // React Navigation needs a theme that matches our dark palette so that
 // transient surfaces (e.g. screen background flashes between renders)
@@ -125,10 +125,10 @@ function NutritionStackNavigator() {
 }
 
 // --- Recipe stack ---
-export type RecipeStackParamList = {  RecipeList: undefined;
-  RecipeDetail: { id: string };
-  RecipeCreate: { editId?: string };
-  RecipeWizard: undefined;
+export type RecipeStackParamList = {
+  RecipeList: undefined;
+  RecipeDetail: { id: string; intent?: RecipeDetailNavigationIntent };
+  RecipeWizard: { editId?: string } | undefined;
 };
 
 const RecipeStack = createNativeStackNavigator<RecipeStackParamList>();
@@ -144,7 +144,6 @@ function RecipeStackNavigator() {
     >
       <RecipeStack.Screen name="RecipeList" component={RecipeListScreen} />
       <RecipeStack.Screen name="RecipeDetail" component={RecipeDetailScreen} />
-      <RecipeStack.Screen name="RecipeCreate" component={RecipeCreateScreen} />
       <RecipeStack.Screen name="RecipeWizard" component={RecipeWizardScreen} />
     </RecipeStack.Navigator>
   );

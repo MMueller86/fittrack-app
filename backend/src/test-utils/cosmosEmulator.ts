@@ -33,7 +33,7 @@ export const EMULATOR_KEY =
 // Use 127.0.0.1 (not `localhost`) so Node's fetch / undici doesn't resolve
 // to ::1 and miss the IPv4-only port binding.
 export const EMULATOR_ENDPOINT =
-  process.env.COSMOS_ENDPOINT ?? 'http://127.0.0.1:8081';
+  process.env.COSMOS_ENDPOINT ?? 'http://127.0.0.1:18081';
 
 export interface EmulatorContext {
   client: CosmosClient;
@@ -143,7 +143,7 @@ async function ensureEmulatorReachable(): Promise<void> {
       '',
       'Contract tests need a running emulator. Pick one:',
       '  • Local Docker:    npm run emulator:start  (in backend/)',
-      '  • Local Podman:    podman run -d -p 8081:8081 \\',
+      '  • Local Podman:    podman run -d -p 18081:8081 \\',
       '                       mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview',
       '  • CI:              GitHub Actions runs the emulator as a service container',
       '',

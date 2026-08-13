@@ -19,7 +19,7 @@ Located in `backend/src/functions/`. Each file owns one domain.
 | `reusableItems.ts` | CRUD /reusable-items | Yes | |
 | `reusableItemsEnrich.ts` | POST /reusable-items/{id}/enrich | Yes | AI enrichment |
 | `reusableItemsEnrichScheduler.ts` | Timer trigger | — | Background enrichment |
-| `recipes.ts` | CRUD /recipes | Yes | |
+| `recipes.ts` | CRUD /recipes, image upload/delete/reorder, recipe logging | Yes | Image upload appends; delete and reorder normalize image order. |
 | `ai.ts` | POST /ai/parse-meal, /ai/estimate-meal | Yes | Quota enforced |
 | `foodEstimate.ts` | POST /ai/food-estimate | Yes | Quota enforced |
 | `foodEstimateBatch.ts` | POST /ai/food-estimate/batch | Yes | Quota enforced |
@@ -148,7 +148,7 @@ Local values are in `backend/local.settings.json` (gitignored) — this is the *
 
 ## Build and Deploy
 
-- Local dev: `npm run dev` from `backend/`; the launcher builds first, starts Azurite, waits until its Blob, Queue, and Table services answer over HTTP, and only then starts Azure Functions. Azurite data is stored in the OS temp directory by default to avoid sync-folder file locks; `FITTRACK_AZURITE_LOCATION` can override it. `npm run start` assumes Azurite is already running.
+- Local dev: `npm run dev` from `backend/`; the launcher checks port 7071, builds, starts Azurite, waits until its Blob, Queue, and Table services answer over HTTP, provisions the `reusable-items-enrich` queue, and only then starts Azure Functions. It fails early with an actionable message if another Functions host already owns port 7071. Azurite data is stored in the OS temp directory by default to avoid sync-folder file locks; `FITTRACK_AZURITE_LOCATION` can override it. `npm run start` assumes Azurite is already running.
 - Build: `npm run build` (TypeScript → `dist/`)
 - Verify: `npm run build:verify` — compiles then runs `scripts/verify-build.mjs` which checks that `require('@fittrack/shared')` does not appear in the output
 - Deploy: always from `_deploy_staging/` with `--no-build` flag (used for all environments, not just staging)

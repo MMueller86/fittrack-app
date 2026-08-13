@@ -1,19 +1,25 @@
 import { execFileSync, spawn } from 'node:child_process';
+import { createConnection } from 'node:net';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { waitForAzurite } from './wait-for-azurite.mjs';
+import {
+  AZURITE_PORTS,
+  ensureLocalEnrichmentQueue,
+  getAzuriteLocation,
+  isAzuriteReady,
+  pollUntilReady,
+} from './storage.mjs';
 
+const require = createRequire(import.meta.url);
 const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const storageScript = resolve(backendRoot, 'scripts', 'start-azurite.mjs');
+export const FUNCTIONS_PORT = 7071;
 
 const children = new Set();
 let shuttingDown = false;
 
 function startChild(command, args) {
-  const child = spawn(command, args, {
-    cwd: backendRoot,
-    stdio: 'inherit',
-  });
+  const child = spawn(command, args, { cwd: backendRoot, stdio: 'inherit' });
   children.add(child);
   child.once('close', () => children.delete(child));
   return child;
@@ -26,20 +32,32 @@ function waitForExit(child) {
   });
 }
 
+export function isPortInUse(port) {
+  return new Promise((resolvePromise) => {
+    const probe = createConnection({ host: '127.0.0.1', port });
+    let settled = false;
+    const finish = (v) => {
+      if (settled) return;
+      settled = true;
+      probe.destroy();
+      resolvePromise(v);
+    };
+    probe.once('connect', () => finish(true));
+    probe.once('error', () => finish(false));
+    probe.setTimeout(250, () => finish(false));
+  });
+}
+
 async function stopChild(child) {
   if (!child || child.exitCode !== null || child.killed) return;
-
   if (process.platform === 'win32') {
     await new Promise((resolvePromise) => {
-      const killer = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
-        stdio: 'ignore',
-      });
+      const killer = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore' });
       killer.once('error', resolvePromise);
       killer.once('close', resolvePromise);
     });
     return;
   }
-
   child.kill('SIGTERM');
 }
 
@@ -48,55 +66,74 @@ async function stopAllChildren() {
 }
 
 function getBuildCommand() {
-  if (process.platform !== 'win32') {
-    return ['npm', ['run', 'build']];
-  }
-
+  if (process.platform !== 'win32') return ['npm', ['run', 'build']];
   const npmCli = resolve(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
   return [process.execPath, [npmCli, 'run', 'build']];
 }
 
 function getFunctionsCommand() {
-  if (process.platform !== 'win32') {
-    return ['func', ['start']];
-  }
-
+  if (process.platform !== 'win32') return ['func', ['start']];
   const funcShim = execFileSync('where.exe', ['func.cmd'], { encoding: 'utf8' })
     .split(/\r?\n/)
     .find((line) => line.trim());
-  if (!funcShim) throw new Error('Azure Functions Core Tools executable not found on PATH');
-
-  const funcMain = resolve(
-    dirname(funcShim.trim()),
-    'node_modules',
-    'azure-functions-core-tools',
-    'lib',
-    'main.js',
-  );
-  return [process.execPath, [funcMain, 'start']];
+  if (!funcShim) throw new Error('Azure Functions Core Tools not found on PATH');
+  return [
+    process.execPath,
+    [resolve(dirname(funcShim.trim()), 'node_modules', 'azure-functions-core-tools', 'lib', 'main.js'), 'start'],
+  ];
 }
 
 async function main() {
-  const [buildCommand, buildArgs] = getBuildCommand();
-  const build = startChild(buildCommand, buildArgs);
-  const buildResult = await waitForExit(build);
-  if (buildResult.code !== 0) {
-    process.exit(buildResult.code ?? 1);
+  if (await isPortInUse(FUNCTIONS_PORT)) {
+    throw new Error(
+      `[functions] Port ${FUNCTIONS_PORT} is already in use. ` +
+        'Stop the existing Azure Functions host before running npm run dev again.',
+    );
   }
 
-  const storage = startChild(process.execPath, [storageScript]);
-  const storageResult = await waitForAzurite();
-  if (!storageResult) {
-    console.error('[azurite] Services were not ready. Start Azurite with npm run storage:start.');
-    await stopAllChildren();
-    process.exit(1);
+  const [buildCmd, buildArgs] = getBuildCommand();
+  const build = startChild(buildCmd, buildArgs);
+  const { code: buildCode } = await waitForExit(build);
+  if (buildCode !== 0) process.exit(buildCode ?? 1);
+
+  // Skip starting Azurite if it is already HTTP-ready (e.g. started via npm run storage:start)
+  const httpStates = await Promise.all(AZURITE_PORTS.map(isAzuriteReady));
+  let azurite = null;
+
+  if (httpStates.every(Boolean)) {
+    console.log('[azurite] Already running.');
+  } else {
+    const anyBound = (await Promise.all(AZURITE_PORTS.map((p) => isPortInUse(p)))).some(Boolean);
+    if (anyBound) {
+      throw new Error(
+        '[azurite] One or more ports are in use but Azurite is not responding. ' +
+          'Stop the conflicting process and retry.',
+      );
+    }
+    azurite = startChild(process.execPath, [
+      require.resolve('azurite/dist/src/azurite.js'),
+      '--location', getAzuriteLocation(),
+      '--skipApiVersionCheck',
+    ]);
+    azurite.once('error', (err) => {
+      throw new Error(`[azurite] Failed to start: ${err.message}`);
+    });
+    if (!(await pollUntilReady(azurite))) {
+      await stopAllChildren();
+      process.exit(1);
+    }
+    console.log('[azurite] Blob, queue, and table services are ready.');
   }
 
-  const [functionsCommand, functionsArgs] = getFunctionsCommand();
-  const functions = startChild(functionsCommand, functionsArgs);
-  const functionsResult = await waitForExit(functions);
-  await stopChild(storage);
-  process.exit(functionsResult.code ?? 1);
+  const queueName = await ensureLocalEnrichmentQueue();
+  console.log(`[azurite] Queue "${queueName}" is ready.`);
+
+  const [funcCmd, funcArgs] = getFunctionsCommand();
+  const functions = startChild(funcCmd, funcArgs);
+  const { code: funcCode } = await waitForExit(functions);
+
+  if (azurite) await stopChild(azurite);
+  process.exit(funcCode ?? 1);
 }
 
 async function handleShutdown(exitCode) {
@@ -109,10 +146,12 @@ async function handleShutdown(exitCode) {
 process.once('SIGINT', () => { void handleShutdown(130); });
 process.once('SIGTERM', () => { void handleShutdown(143); });
 
-try {
-  await main();
-} catch (error) {
-  console.error(`[dev] Failed to start: ${error instanceof Error ? error.message : String(error)}`);
-  await stopAllChildren();
-  process.exit(1);
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`[dev] Failed to start: ${error instanceof Error ? error.message : String(error)}`);
+    await stopAllChildren();
+    process.exit(1);
+  }
 }

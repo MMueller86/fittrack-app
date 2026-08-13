@@ -121,6 +121,11 @@ func --version   # should be 4.x
   # Or, when Azurite is already running:
   npm start   # waits for storage, then runs func start
    ```
+  `npm run dev` checks port 7071 first, then builds, starts Azurite directly
+  (via `storage.mjs`), waits up to 120 s for all three HTTP services, and only
+  then starts Functions. Each failure step prints an actionable message.
+  When Azurite was already started via `npm run storage:start`, `dev` detects
+  it (HTTP-ready check) and skips the start step.
 6. Verify: `GET http://localhost:7071/api/health` → `{ "status": "ok" }`
 
 ## Key Rules
@@ -186,8 +191,9 @@ Runs the real `CosmosWeightsRepository` against the Cosmos DB **Linux
 Emulator**. Catches SQL-dialect bugs (reserved keywords like `value`,
 missing composite indexes for `ORDER BY`, partition-key behaviour) that
 unit tests with mocks cannot find. **Never** points at real Azure Cosmos
-DB — the endpoint is hard-coded to `http://127.0.0.1:8081` with the
-well-known emulator master key.
+DB. CI uses `http://127.0.0.1:8081`; local runs use
+`http://127.0.0.1:18081` so Expo/Metro can keep its default port 8081.
+Both use the well-known emulator master key.
 
 #### Where these tests run
 
@@ -228,7 +234,7 @@ scripts and CI both target the same Linux image
 cd backend
 npm run emulator:start
 
-# 2. run only the contract tests
+# 2. run only the contract tests (local endpoint defaults to port 18081)
 npm run test:contract
 
 # 3. stop + remove the emulator container when done
@@ -267,7 +273,8 @@ covers it on every push.
 | `WARNING: Failed to detect the Azure Functions runtime ... test mode` while running tests | Expected. `@azure/functions` v4 detects no host and skips `app.http()` registration. Tests call the exported handler functions directly. |
 | `Cannot find module './cosmosWeightsRepository'` | Means tests are still on the old `require()`-based factory. Pull latest. |
 | Vitest can't resolve `@fittrack/shared` | The alias in `vitest.config.mts` must mirror `tsconfig.json` paths. |
-| `Cosmos DB Emulator is not reachable at http://127.0.0.1:8081` from `npm run test:contract` | No container runtime running. Either start the emulator (`npm run emulator:start`) or skip Tier 2 locally — CI covers it. |
+| `Cosmos DB Emulator is not reachable at http://127.0.0.1:18081` from `npm run test:contract` | No local emulator is running. Start it with `npm run emulator:start`, or skip Tier 2 locally — CI covers it. |
+| The emulator cannot bind port 8081 while Expo/Metro is running | This is expected to be avoided locally: the helper publishes Cosmos on host port 18081 and keeps the container's internal port 8081. |
 | `ERR_SSL_WRONG_VERSION_NUMBER` connecting to the emulator | The vnext-preview emulator listens on plain HTTP, not HTTPS. Make sure `COSMOS_ENDPOINT` starts with `http://`, not `https://`. |
 | Contract tests time out on first run | First-time image pull (~1 GB) plus emulator boot. Increase `testTimeout` in `vitest.contract.config.mts` if needed. |
 

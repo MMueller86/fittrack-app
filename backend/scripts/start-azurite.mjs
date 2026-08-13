@@ -6,8 +6,8 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { AZURITE_PORTS } from './wait-for-azurite.mjs';
 
-const AZURITE_PORTS = [10000, 10001, 10002];
 const AZURITE_LOCATION_ENV = 'FITTRACK_AZURITE_LOCATION';
 const require = createRequire(import.meta.url);
 

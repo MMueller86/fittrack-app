@@ -176,6 +176,20 @@ Every UI element belongs to one of three levels:
 
 ---
 
+## Reusable Recipe Components
+
+Recipe creation, detail, and logging reuse shared mobile components instead of defining parallel visual patterns:
+
+| Component | Reusable behaviour |
+|---|---|
+| `MealChip` | Two-state selectable tag for meal types. The selected state uses a check mark and `colors.primarySoft`; the unselected state uses the surface and border tokens. |
+| `NutritionTile` | Compact bordered tile for a nutrient value and unit. It is reused by recipe detail and the logging preview. |
+| `InfoOverlay` | App-owned contextual and error dialog with a dark backdrop, elevated panel, fade transition, and a single `Verstanden` action. It is used for wizard guidance and recipe loading/logging errors. |
+| `ConfirmSheet` | Shared bottom-sheet confirmation pattern for leaving the wizard and destructive recipe actions. |
+| `Snackbar` | Shared transient feedback at the bottom of the screen with optional `Rückgängig` action; the wizard uses it when ingredients or steps are removed. |
+
+[Rule] New recipe screens should compose these shared components and theme tokens rather than introducing screen-local copies of chips, nutrition tiles, overlays, confirmations, or undo feedback.
+
 ## Forbidden Patterns
 
 | Pattern | Reason |

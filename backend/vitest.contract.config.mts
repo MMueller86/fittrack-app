@@ -13,11 +13,11 @@ import { dirname, resolve } from 'node:path';
 //   - Sequential execution and a longer timeout fit Cosmos Emulator startup
 //     and the `createIfNotExists` calls that happen on first connect.
 //
-// Required env (set automatically by `npm run test:contract`):
-//   COSMOS_ENDPOINT      https://localhost:8081
+// Endpoint defaults to the local host port 18081. CI overrides it with:
+//   COSMOS_ENDPOINT      http://127.0.0.1:8081
 //   COSMOS_KEY           well-known emulator master key
 //   COSMOS_DATABASE_ID   fittrack-test-<random>  (per-run, isolated)
-//   NODE_TLS_REJECT_UNAUTHORIZED=0   the emulator uses a self-signed cert.
+//   NODE_TLS_REJECT_UNAUTHORIZED=0   set for emulator compatibility.
 
 const here = dirname(fileURLToPath(import.meta.url));
 

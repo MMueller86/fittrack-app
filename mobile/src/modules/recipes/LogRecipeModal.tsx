@@ -1,7 +1,7 @@
 // LogRecipeModal — Portion picker + meal selector + live kcal preview
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Modal,
   StyleSheet,
   Text,
@@ -11,10 +11,21 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import type { DiaryDayResponse, Meal, MealType, Recipe } from '@fittrack/shared';
+import type { DiaryDayResponse, MealType, Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
 import { diaryApi } from '../../shared/api/diaryApi';
+import { InfoOverlay } from '../../shared/components/InfoOverlay';
+import { MealChip } from '../../shared/components/MealChip';
+import { NutritionTile } from '../../shared/components/NutritionTile';
+import {
+  LOGGABLE_MEAL_TYPES,
+  resolvePortionInput,
+  scaleNutritionByPortions,
+  submitRecipeLog,
+  type PortionInput,
+} from '../../shared/viewModels/recipeLoggingViewModel';
+import { getSuggestedMealType } from '../nutrition/hub/mealTimeRules';
 import { nutritionSyncService } from '../../services/health/nutritionSyncService';
 
 interface Props {
@@ -35,6 +46,11 @@ const MEAL_LABELS: Record<MealType, string> = {
   postworkout: 'Post-Workout',
 };
 
+const MEAL_OPTIONS = LOGGABLE_MEAL_TYPES.map((type) => ({
+  type,
+  label: MEAL_LABELS[type],
+}));
+
 function isoToday(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -44,62 +60,109 @@ export default function LogRecipeModal({ visible, recipe, onClose, onLogged }: P
   const [customPortions, setCustomPortions] = useState('');
   const [useCustom, setUseCustom] = useState(false);
   const [diary, setDiary] = useState<DiaryDayResponse | null>(null);
-  const [selectedMealId, setSelectedMealId] = useState<string | null>(null);
+  const [selectedMealType, setSelectedMealType] = useState<MealType>(() => getSuggestedMealType());
+  const [diaryLoading, setDiaryLoading] = useState(false);
   const [logging, setLogging] = useState(false);
+  const [errorNotice, setErrorNotice] = useState<{ title: string; body: string } | null>(null);
 
-  const effectivePortions = useCustom
-    ? parseFloat(customPortions) || 0
-    : portions;
+  const portionInput: PortionInput = useCustom ? customPortions : portions;
+  const parsedPortions = resolvePortionInput(portionInput);
+  const effectivePortions = parsedPortions ?? 0;
+  const hasValidPortions = parsedPortions !== null;
 
-  const kcalPreview = Math.round(recipe.nutritionPerPortion.calories * effectivePortions);
+  const nutritionPreview = scaleNutritionByPortions(recipe.nutritionPerPortion, effectivePortions);
+  const canSubmit = hasValidPortions && !diaryLoading && diary !== null && !logging;
 
   useEffect(() => {
     if (!visible) return;
+
+    let cancelled = false;
     const today = isoToday();
-    diaryApi.getDay(today).then((data) => {
-      setDiary(data);
-      // auto-select first meal
-      if (data.meals.length > 0 && selectedMealId === null) {
-        setSelectedMealId(data.meals[0].id);
-      }
-    }).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPortions(1);
+    setCustomPortions('');
+    setUseCustom(false);
+    setSelectedMealType(getSuggestedMealType());
+    setDiary(null);
+    setDiaryLoading(true);
+    setErrorNotice(null);
+
+    diaryApi.getDay(today)
+      .then((data) => {
+        if (!cancelled) setDiary(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setErrorNotice({
+            title: 'Tagebuch konnte nicht geladen werden',
+            body: 'Bitte versuche es später erneut.',
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDiaryLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [visible]);
 
   const handleLog = async () => {
-    if (!selectedMealId) {
-      Alert.alert('Mahlzeit wählen', 'Bitte wähle eine Mahlzeit aus.');
+    if (!hasValidPortions) {
+      setErrorNotice({
+        title: 'Portion prüfen',
+        body: 'Bitte gib eine gültige Portionszahl ein.',
+      });
       return;
     }
-    if (effectivePortions <= 0) {
-      Alert.alert('Portion', 'Bitte gib eine gültige Portionszahl ein.');
+    if (!diary) {
+      setErrorNotice({
+        title: 'Tagebuch noch nicht bereit',
+        body: 'Bitte warte kurz und versuche es erneut.',
+      });
       return;
     }
+
     setLogging(true);
     try {
-      const result = await recipeApi.log(recipe.id, { portions: effectivePortions, mealId: selectedMealId });
-      void nutritionSyncService.syncNutritionUpsert(result as Meal);
+      const today = isoToday();
+      const submission = await submitRecipeLog(
+        {
+          date: today,
+          recipeId: recipe.id,
+          mealType: selectedMealType,
+          portions: portionInput,
+        },
+        {
+          getDiary: diaryApi.getDay,
+          createMeal: diaryApi.createMeal,
+          logRecipe: recipeApi.log,
+        },
+      );
+      setDiary(submission.diary);
+      void nutritionSyncService.syncNutritionUpsert(submission.result);
       onLogged();
     } catch {
-      Alert.alert('Fehler', 'Rezept konnte nicht eingetragen werden.');
+      setErrorNotice({
+        title: 'Rezept konnte nicht eingetragen werden',
+        body: 'Bitte versuche es später erneut.',
+      });
     } finally {
       setLogging(false);
     }
   };
-
-  const meals = diary?.meals ?? [];
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={onClose} disabled={logging}>
             <Text style={styles.cancel}>Abbrechen</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Portion eintragen</Text>
-          <TouchableOpacity onPress={handleLog} disabled={logging || effectivePortions <= 0}>
-            <Text style={[styles.save, (logging || effectivePortions <= 0) && styles.saveDisabled]}>
+          <TouchableOpacity onPress={handleLog} disabled={!canSubmit}>
+            <Text style={[styles.save, !canSubmit && styles.saveDisabled]}>
               {logging ? '…' : 'Eintragen'}
             </Text>
           </TouchableOpacity>
@@ -108,7 +171,13 @@ export default function LogRecipeModal({ visible, recipe, onClose, onLogged }: P
         <ScrollView contentContainerStyle={styles.scroll}>
           {/* Recipe name */}
           <Text style={styles.recipeName}>{recipe.name}</Text>
-          <Text style={styles.kcalPreview}>{kcalPreview} kcal</Text>
+          <Text style={styles.sectionLabel}>Nährwerte für {effectivePortions || 0} Portionen</Text>
+          <View style={styles.nutritionRow}>
+            <NutritionTile label="Kalorien" value={nutritionPreview.calories} unit="kcal" />
+            <NutritionTile label="Protein" value={nutritionPreview.protein} unit="g" />
+            <NutritionTile label="Kohlenhydr." value={nutritionPreview.carbs} unit="g" />
+            <NutritionTile label="Fett" value={nutritionPreview.fat} unit="g" />
+          </View>
 
           {/* Quick portion picker */}
           <Text style={styles.label}>Portionen</Text>
@@ -136,33 +205,50 @@ export default function LogRecipeModal({ visible, recipe, onClose, onLogged }: P
             <TextInput
               style={styles.input}
               keyboardType="decimal-pad"
-              placeholder="z. B. 1.5"
+              placeholder="z. B. 1,5"
               placeholderTextColor={colors.textMuted}
               value={customPortions}
               onChangeText={setCustomPortions}
             />
           )}
 
-          {/* Meal selector */}
+          {/* Meal type selector */}
           <Text style={styles.label}>Mahlzeit</Text>
-          {meals.length === 0 ? (
-            <Text style={styles.noMeals}>Keine Mahlzeiten heute gefunden.</Text>
-          ) : (
-            meals.map((meal) => (
-              <TouchableOpacity
-                key={meal.id}
-                style={[styles.mealRow, meal.id === selectedMealId && styles.mealRowActive]}
-                onPress={() => setSelectedMealId(meal.id)}
-              >
-                <Text style={[styles.mealName, meal.id === selectedMealId && styles.mealNameActive]}>
-                  {meal.name ?? MEAL_LABELS[meal.type]}
-                </Text>
-                {meal.id === selectedMealId && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-            ))
+          <View style={styles.mealChipRow}>
+            {MEAL_OPTIONS.slice(0, 3).map((option) => (
+              <MealChip
+                key={option.type}
+                label={option.label}
+                filled={selectedMealType === option.type}
+                onPress={() => setSelectedMealType(option.type)}
+              />
+            ))}
+          </View>
+          <View style={styles.mealChipRow}>
+            {MEAL_OPTIONS.slice(3).map((option) => (
+              <MealChip
+                key={option.type}
+                label={option.label}
+                filled={selectedMealType === option.type}
+                onPress={() => setSelectedMealType(option.type)}
+              />
+            ))}
+          </View>
+
+          {diaryLoading && (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.loadingText}>Tagebuch wird geladen …</Text>
+            </View>
           )}
         </ScrollView>
       </SafeAreaView>
+      <InfoOverlay
+        visible={errorNotice != null}
+        title={errorNotice?.title ?? 'Fehler'}
+        body={errorNotice?.body ?? ''}
+        onClose={() => setErrorNotice(null)}
+      />
     </Modal>
   );
 }
@@ -183,7 +269,8 @@ const styles = StyleSheet.create({
   saveDisabled: { color: colors.textDisabled },
   scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
   recipeName: { ...typography.h2, color: colors.text, marginBottom: spacing.xs },
-  kcalPreview: { ...typography.h1, color: colors.primaryBright, marginBottom: spacing.lg },
+  sectionLabel: { ...typography.overline, color: colors.textMuted, marginTop: spacing.md, marginBottom: spacing.sm },
+  nutritionRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   label: { ...typography.overline, color: colors.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
   quickRow: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   quickChip: {
@@ -199,26 +286,15 @@ const styles = StyleSheet.create({
   input: {
     ...typography.body1,
     color: colors.text,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    padding: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     marginTop: spacing.sm,
   },
-  mealRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  mealRowActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  mealName: { ...typography.body1, color: colors.text },
-  mealNameActive: { color: colors.primaryBright, fontWeight: '600' },
-  checkmark: { ...typography.body1, color: colors.primary },
-  noMeals: { ...typography.body2, color: colors.textMuted },
+  mealChipRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  loadingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md },
+  loadingText: { ...typography.body2, color: colors.textMuted },
 });

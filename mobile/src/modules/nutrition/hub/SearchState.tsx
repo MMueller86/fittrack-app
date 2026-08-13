@@ -32,6 +32,7 @@ interface Props {
   onSelect: (item: FoodSearchResult) => void;
   onSelectRelation: (relation: UserFoodRelation) => void;
   onOpenSubflow: (flow: 'barcode' | 'ai' | 'label' | 'manual') => void;
+  allowedSubflows?: ReadonlyArray<'barcode' | 'ai' | 'label' | 'manual'>;
   /** Callback wenn neue Ergebnisse geladen -- fuer Cache-Update in FoodEntryHub */
   onResultsChange?: (results: FoodSearchResult[]) => void;
   /** Recipe mode: label for the quick-accept pill on each ResultRow */
@@ -132,11 +133,17 @@ function FallbackSection({
   hasResults,
   query,
   onOpenSubflow,
+  allowedSubflows,
 }: {
   hasResults: boolean;
   query: string;
   onOpenSubflow: (flow: 'barcode' | 'ai' | 'label' | 'manual') => void;
+  allowedSubflows: ReadonlyArray<'barcode' | 'ai' | 'label' | 'manual'>;
 }) {
+  const canUseAi = allowedSubflows.includes('ai');
+  const canUseLabel = allowedSubflows.includes('label');
+  const canUseManual = allowedSubflows.includes('manual');
+
   return (
     <View style={styles.fallback}>
       <Text style={styles.fallbackTitle}>
@@ -147,33 +154,39 @@ function FallbackSection({
       ) : null}
       <View style={styles.fallbackActions}>
         {/* KI als bevorzugter Workflow — primary hervorgehoben */}
-        <TouchableOpacity
-          style={[styles.fallbackAction, styles.fallbackActionPrimary]}
-          onPress={() => onOpenSubflow('ai')}
-          accessibilityRole="button"
-          accessibilityLabel="KI-Schaetzung"
-        >
-          <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
-          <Text style={[styles.fallbackActionLabel, styles.fallbackActionLabelPrimary]}>KI-Schätzung</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.fallbackAction}
-          onPress={() => onOpenSubflow('label')}
-          accessibilityRole="button"
-          accessibilityLabel="Label scannen"
-        >
-          <Icon lib="mci" name="text-recognition" size="md" color={colors.textSecondary} />
-          <Text style={styles.fallbackActionLabel}>Label scannen</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.fallbackAction}
-          onPress={() => onOpenSubflow('manual')}
-          accessibilityRole="button"
-          accessibilityLabel="Manuell erfassen"
-        >
-          <Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />
-          <Text style={styles.fallbackActionLabel}>Manuell</Text>
-        </TouchableOpacity>
+        {canUseAi ? (
+          <TouchableOpacity
+            style={[styles.fallbackAction, styles.fallbackActionPrimary]}
+            onPress={() => onOpenSubflow('ai')}
+            accessibilityRole="button"
+            accessibilityLabel="KI-Schaetzung"
+          >
+            <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
+            <Text style={[styles.fallbackActionLabel, styles.fallbackActionLabelPrimary]}>KI-Schätzung</Text>
+          </TouchableOpacity>
+        ) : null}
+        {canUseLabel ? (
+          <TouchableOpacity
+            style={styles.fallbackAction}
+            onPress={() => onOpenSubflow('label')}
+            accessibilityRole="button"
+            accessibilityLabel="Label scannen"
+          >
+            <Icon lib="mci" name="text-recognition" size="md" color={colors.textSecondary} />
+            <Text style={styles.fallbackActionLabel}>Label scannen</Text>
+          </TouchableOpacity>
+        ) : null}
+        {canUseManual ? (
+          <TouchableOpacity
+            style={styles.fallbackAction}
+            onPress={() => onOpenSubflow('manual')}
+            accessibilityRole="button"
+            accessibilityLabel="Manuell erfassen"
+          >
+            <Icon lib="feather" name="edit-2" size="md" color={colors.textSecondary} />
+            <Text style={styles.fallbackActionLabel}>Manuell</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );
@@ -318,7 +331,7 @@ function relativeUsage(isoDate: string): string {
   return `Vor ${Math.floor(days / 7)} Wochen verwendet`;
 }
 
-export function SearchState({ query, recents, initialResults, onSelect, onSelectRelation, onOpenSubflow, onResultsChange, quickAcceptLabel, onQuickAccept }: Props) {
+export function SearchState({ query, recents, initialResults, onSelect, onSelectRelation, onOpenSubflow, allowedSubflows = ['barcode', 'ai', 'label', 'manual'], onResultsChange, quickAcceptLabel, onQuickAccept }: Props) {
   const [results, setResults] = useState<FoodSearchResult[]>(initialResults ?? []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -388,6 +401,7 @@ export function SearchState({ query, recents, initialResults, onSelect, onSelect
                 hasResults={hasResults}
                 query={searchedQuery || query}
                 onOpenSubflow={onOpenSubflow}
+                allowedSubflows={allowedSubflows}
               />
             ) : null
           }

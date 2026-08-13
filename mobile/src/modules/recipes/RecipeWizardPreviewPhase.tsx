@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
@@ -12,7 +11,7 @@ import {
 import type { RecipeNutrition } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import type { RecipePreviewViewModel } from './recipePreviewViewModel';
-import type { PendingWizardImage, WizardStepItem } from './recipeWizardTypes';
+import type { WizardImageDraft, WizardStepItem } from './recipeWizardTypes';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
 
 interface Props {
@@ -20,16 +19,16 @@ interface Props {
   recipeDescription: string;
   tags: string[];
   portions: number;
-  pendingImages: PendingWizardImage[];
+  imageDrafts: WizardImageDraft[];
   steps: WizardStepItem[];
   liveNutrition: { nutritionPerPortion: RecipeNutrition } | null;
   previewViewModel: RecipePreviewViewModel;
-  saving: boolean;
   onRecipeNameChange: (value: string) => void;
+  onRecipeDescriptionChange: (value: string) => void;
   onPortionsChange: (value: number) => void;
   onPickImage: () => void;
-  onRemoveImage: (index: number) => void;
-  onSave: () => void;
+  onRemoveImage: (draftId: string) => void;
+  onMoveImage: (draftId: string, direction: -1 | 1) => void;
 }
 
 export function RecipeWizardPreviewPhase({
@@ -37,16 +36,16 @@ export function RecipeWizardPreviewPhase({
   recipeDescription,
   tags,
   portions,
-  pendingImages,
+  imageDrafts,
   steps,
   liveNutrition,
   previewViewModel,
-  saving,
   onRecipeNameChange,
+  onRecipeDescriptionChange,
   onPortionsChange,
   onPickImage,
   onRemoveImage,
-  onSave,
+  onMoveImage,
 }: Props) {
   const [seasoningsExpanded, setSeasoningsExpanded] = useState(false);
   const visibleSteps = steps.filter((step) => step.description.trim().length > 0);
@@ -65,6 +64,18 @@ export function RecipeWizardPreviewPhase({
         multiline
         numberOfLines={2}
         scrollEnabled={false}
+        textAlign="center"
+        textAlignVertical="top"
+      />
+
+      <TextInput
+        style={styles.descriptionInput}
+        value={recipeDescription}
+        onChangeText={onRecipeDescriptionChange}
+        placeholder="Beschreibung (optional)"
+        placeholderTextColor={colors.textMuted}
+        multiline
+        scrollEnabled={false}
         textAlignVertical="top"
       />
 
@@ -76,10 +87,6 @@ export function RecipeWizardPreviewPhase({
             </View>
           ))}
         </View>
-      )}
-
-      {recipeDescription.length > 0 && (
-        <Text style={styles.description}>{recipeDescription}</Text>
       )}
 
       <View style={styles.portionsRow}>
@@ -143,19 +150,39 @@ export function RecipeWizardPreviewPhase({
         </>
       )}
 
-      <Text style={styles.sectionLabel}>Fotos ({pendingImages.length})</Text>
+      <Text style={styles.sectionLabel}>Fotos ({imageDrafts.length})</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageStrip}>
-        {pendingImages.map((image, index) => (
-          <View key={image.uri} style={styles.imageThumbnailContainer}>
+        {imageDrafts.map((image, index) => (
+          <View key={image.draftId} style={styles.imageThumbnailContainer}>
             <Image source={{ uri: image.uri }} style={styles.imageThumbnail} resizeMode="cover" />
             <TouchableOpacity
               style={styles.imageThumbnailRemove}
-              onPress={() => onRemoveImage(index)}
+              onPress={() => onRemoveImage(image.draftId)}
               accessibilityRole="button"
               accessibilityLabel={`Foto ${index + 1} entfernen`}
             >
               <Text style={styles.imageThumbnailRemoveText}>✕</Text>
             </TouchableOpacity>
+            <View style={styles.imageOrderControls}>
+              <TouchableOpacity
+                style={[styles.imageOrderButton, index === 0 && styles.imageOrderButtonDisabled]}
+                onPress={() => onMoveImage(image.draftId, -1)}
+                disabled={index === 0}
+                accessibilityRole="button"
+                accessibilityLabel={`Foto ${index + 1} nach links verschieben`}
+              >
+                <Text style={[styles.imageOrderButtonText, index === 0 && styles.imageOrderButtonTextDisabled]}>‹</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.imageOrderButton, index === imageDrafts.length - 1 && styles.imageOrderButtonDisabled]}
+                onPress={() => onMoveImage(image.draftId, 1)}
+                disabled={index === imageDrafts.length - 1}
+                accessibilityRole="button"
+                accessibilityLabel={`Foto ${index + 1} nach rechts verschieben`}
+              >
+                <Text style={[styles.imageOrderButtonText, index === imageDrafts.length - 1 && styles.imageOrderButtonTextDisabled]}>›</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         ))}
         <TouchableOpacity style={styles.imagePickerThumb} onPress={onPickImage}>
@@ -198,19 +225,6 @@ export function RecipeWizardPreviewPhase({
           ))}
         </>
       )}
-
-      <TouchableOpacity
-        style={[styles.primaryButton, (saving || !recipeName.trim()) && styles.primaryButtonDisabled]}
-        onPress={onSave}
-        disabled={saving || !recipeName.trim()}
-        activeOpacity={0.8}
-      >
-        {saving ? (
-          <ActivityIndicator color={colors.white} />
-        ) : (
-          <Text style={styles.primaryButtonText}>Rezept speichern</Text>
-        )}
-      </TouchableOpacity>
     </View>
   );
 }
@@ -243,11 +257,16 @@ const styles = StyleSheet.create({
     color: colors.primaryBright,
     fontWeight: '600',
   },
-  description: {
+  descriptionInput: {
     ...typography.body2,
-    color: colors.textSecondary,
+    color: colors.text,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    minHeight: spacing.xxl,
     lineHeight: 22,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.sm,
   },
   portionsRow: {
     flexDirection: 'row',
@@ -340,6 +359,7 @@ const styles = StyleSheet.create({
   imageThumbnailContainer: {
     position: 'relative',
     marginRight: spacing.sm,
+    paddingBottom: spacing.xl,
   },
   imageThumbnail: {
     width: 100,
@@ -361,6 +381,36 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.white,
     lineHeight: 14,
+  },
+  imageOrderControls: {
+    position: 'absolute',
+    left: spacing.xs,
+    right: spacing.xs,
+    bottom: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+  },
+  imageOrderButton: {
+    flex: 1,
+    height: spacing.lg,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  imageOrderButtonDisabled: {
+    opacity: 0.35,
+  },
+  imageOrderButtonText: {
+    ...typography.body2,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  imageOrderButtonTextDisabled: {
+    color: colors.textDisabled,
   },
   imagePickerThumb: {
     width: 100,
@@ -412,19 +462,5 @@ const styles = StyleSheet.create({
     ...typography.body2,
     color: colors.textSecondary,
     lineHeight: 22,
-  },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.xl,
-  },
-  primaryButtonDisabled: {
-    backgroundColor: colors.border,
-  },
-  primaryButtonText: {
-    ...typography.button,
-    color: colors.white,
   },
 });

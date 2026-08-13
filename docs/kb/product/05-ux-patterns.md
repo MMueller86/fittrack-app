@@ -18,7 +18,8 @@ Library: `@gorhom/bottom-sheet` v5
 
 | Context | Snap Points | Notes |
 |---|---|---|
-| FoodEntryHub | `['85%', '90%']` | Expands slightly on keyboard |
+| FoodEntryHub | `['85%']` | Default hub sheet height |
+| FoodEntryHub direct subflow | `['100%']` | Used when a Home-screen direct subflow needs the visible sheet to occupy the full screen |
 | Edit / action sheets | `['50%', '92%']` | Stacked over hub when needed |
 
 ### Stacking
@@ -43,6 +44,10 @@ An information overlay must:
 ## Wizard Back Confirmation
 
 Multi-phase flows use the shared `ConfirmSheet` for both the in-screen back action and the Android hardware back action. Returning from the initial input phase leaves the wizard immediately; back is blocked while an analysis is running. In later phases, the sheet explains that unsaved progress would be lost and offers one destructive `Zurück` action plus the standard dismissal. Both back entry points use the same phase transition, so the user receives identical navigation semantics.
+
+## Sticky Wizard Actions
+
+Wizard phases with a primary action keep the scrollable content and the action footer as sibling areas inside the keyboard-avoiding layout. The primary button is rendered only inside that footer, with no content-level bottom CTA or inherited top margin. On screens whose footer owns the bottom action area, the outer `SafeAreaView` uses the top edge only; applying a bottom edge there introduces a visible gap below the footer on devices with a bottom safe-area inset.
 
 ---
 

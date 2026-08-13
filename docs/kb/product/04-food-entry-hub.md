@@ -2,7 +2,7 @@
 
 ## Concept
 
-The Food Entry Hub is a temporary **workspace** for the single task: adding food to the diary.
+The Food Entry Hub is a temporary **workspace** for food selection and nutrition entry. Its default purpose is adding food to the diary; in recipe-ingredient context it reuses the same search and single-food AI affordances without mutating diary data.
 
 It is not a screen, a dialog, or a menu. It is a bottom sheet that overlays the current context. The user works inside it until the task is complete, then dismisses it.
 
@@ -13,8 +13,9 @@ Key UX principle: the user never thinks about which feature to use — they just
 Any part of the app can open the Hub:
 - Diary screen → meal button (mealId + mealType known)
 - Home screen → quick-add button (no mealId, mealType from time)
+- Recipe wizard ingredient row → ingredient search context (`purpose: 'recipeIngredient'`)
 
-All entry points open the same hub with the same workflow.
+Diary entry points open the same hub with the same diary workflow. Recipe entry points open the hub as an ingredient picker: product selection and explicit single-food AI estimation call back into `RecipeWizardScreen`, and diary mutations are disabled.
 
 ## State Machine (`hubReducer.ts`)
 
@@ -56,21 +57,30 @@ Zustand store. Global — mountable from any screen.
 
 ```ts
 open(params?: {
+  purpose?: 'diary' | 'recipeIngredient'
   mealId?: string         // undefined from Home
   date?: string           // default: today
   mealType?: MealType     // default: getSuggestedMealType() (time-based)
   onSuccess?: () => void
   autoFocusSearch?: boolean
+  initialSubflow?: 'barcode' | 'ai'
+  initialQuery?: string
+  prefillAmount?: { mode: 'grams' | 'portion'; amount: number } | null
+  onSelectIngredient?: (product, mode, amount) => void
+  onEstimateIngredient?: (estimate, query) => void
 })
 ```
+
+If ingredient callbacks are supplied and `purpose` is omitted, the store infers `purpose: 'recipeIngredient'`. In recipe mode, only the AI subflow can be opened directly; barcode, label scan, manual entry, and direct diary saves remain diary-only behaviours.
 
 ## Bottom Sheet Configuration
 
 Library: `@gorhom/bottom-sheet` v5
 
-- Hub snap points: `['85%', '90%']`
+- Default hub snap point: `['85%']`
+- Full-height snap point: `['100%']` when the Home-screen direct subflow needs the sheet to occupy the full screen after it becomes visible
 - Backdrop: `BottomSheetBackdrop` with opacity 0.10 (8–12% dimming)
-- `ProduktDialog` (superseded by `QuantityView`) snap points: `['50%', '92%']`
+- `QuantityView` is inline hub content, not a separate product dialog.
 
 ## IdleState
 
@@ -123,7 +133,9 @@ Shows when mode = `search`:
 
 In recipe-wizard mode, the KI action uses the current search text for a single-food estimate instead of the meal estimate flow. The result is returned to the wizard, the hub closes, and the ingredient is shown there as explicitly confirmed with a KI badge. No estimate is started automatically when a search has no result.
 
-`SearchState` is not exclusive to `FoodEntryHub`. It is also used by `AddIngredientModal` (recipe ingredient picker). In that context, `onSelectRelation` is passed as a no-op (`() => {}`) and `recents` is passed as `[]` — both are acceptable patterns for non-diary consumers.
+`SearchState` is not exclusive to diary entry. It also supports FoodEntryHub's recipe-ingredient context, where ingredient callbacks are used and diary mutations remain disabled.
+
+Recipe-ingredient context deliberately separates Recipe AI from Food AI: recipe analysis happens in `RecipeWizardScreen` through `POST /api/ai/recipe-analyze`; the hub's AI action estimates exactly one unresolved food through the food-estimate flow and returns that estimate to the wizard.
 
 ## Result Row Format
 
@@ -194,7 +206,7 @@ These UX decisions are final and must not be reversed without explicit product d
 - Barcode + AI icon color: `colors.primary` (green, not muted)
 - Quick actions in IdleState: removed (barcode + AI in search row is sufficient)
 - Sticky CompactActionBar above results: removed (replaced by bottom fallback section)
-- Snap points: `['85%', '90%']`
+- Snap point: `['85%']` for the default hub sheet
 - Recents loading: moved from `IdleState` to `FoodEntryHub` level (passed as props)
 - `RecentItem` extracted to `hub/RecentItem.tsx`
 

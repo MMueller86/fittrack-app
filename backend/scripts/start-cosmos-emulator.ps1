@@ -6,7 +6,8 @@
 #   - Safe: never touches real Azure resources.
 #
 # Endpoint after start:
-#   http://127.0.0.1:8081   (vnext-preview emulator uses plain HTTP)
+#   http://127.0.0.1:18081  (container port 8081, local host port 18081)
+#   Set FITTRACK_COSMOS_EMULATOR_PORT to override the local host port.
 #   key: C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==
 #   (the well-known emulator master key — never use against real Cosmos)
 
@@ -14,6 +15,15 @@ $ErrorActionPreference = 'Stop'
 
 $ContainerName = 'fittrack-cosmos-emulator'
 $Image = 'mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview'
+$HostPort = 18081
+if (-not [string]::IsNullOrWhiteSpace($env:FITTRACK_COSMOS_EMULATOR_PORT)) {
+    $HostPort = [int]$env:FITTRACK_COSMOS_EMULATOR_PORT
+}
+if ($HostPort -lt 1 -or $HostPort -gt 65535) {
+    Write-Error 'FITTRACK_COSMOS_EMULATOR_PORT must be between 1 and 65535.'
+    exit 1
+}
+$Endpoint = "http://127.0.0.1:$HostPort"
 
 # Verify Docker is available.
 try {
@@ -26,9 +36,18 @@ try {
 # Already running?
 $existing = docker ps --filter "name=^/$ContainerName$" --format '{{.Names}}'
 if ($existing -eq $ContainerName) {
-    Write-Host "Cosmos Emulator is already running as '$ContainerName'." -ForegroundColor Green
-    Write-Host '  Endpoint: http://127.0.0.1:8081'
-    exit 0
+    $publishedOnExpectedPort = @(
+        docker port $ContainerName 8081/tcp 2>$null |
+            Where-Object { $_ -match ":$HostPort$" }
+    )
+    if ($publishedOnExpectedPort.Count -gt 0) {
+        Write-Host "Cosmos Emulator is already running as '$ContainerName'." -ForegroundColor Green
+        Write-Host "  Endpoint: $Endpoint"
+        exit 0
+    }
+
+    Write-Host "Existing Cosmos Emulator uses a different host port; recreating '$ContainerName'..."
+    docker rm --force $ContainerName | Out-Null
 }
 
 # Stopped container with same name? Remove it.
@@ -41,8 +60,8 @@ if ($stopped -eq $ContainerName) {
 Write-Host "Pulling $Image (first run may take a minute)..."
 docker pull $Image | Out-Null
 
-Write-Host "Starting Cosmos Emulator on port 8081..."
-docker run --detach --name $ContainerName --publish 8081:8081 $Image | Out-Null
+Write-Host "Starting Cosmos Emulator on host port $HostPort..."
+docker run --detach --name $ContainerName --publish "$($HostPort):8081" $Image | Out-Null
 
 Write-Host 'Waiting for emulator to become ready (up to 240s — first boot does a Postgres/Citus init)...'
 $ready = $false
@@ -51,7 +70,7 @@ while (-not $ready -and (Get-Date) -lt $deadline) {
     try {
         # vnext-preview emulator listens on plain HTTP; any non-503 response
         # means the data plane is up.
-        $resp = Invoke-WebRequest -Uri 'http://127.0.0.1:8081/' `
+        $resp = Invoke-WebRequest -Uri "$Endpoint/" `
             -Headers @{ Authorization = 'type=master&ver=1.0&sig=' } `
             -UseBasicParsing -TimeoutSec 3 -ErrorAction Stop
         if ($resp.StatusCode -ne 503) { $ready = $true }
@@ -73,7 +92,7 @@ if (-not $ready) {
 
 Write-Host ''
 Write-Host 'Cosmos Emulator is ready.' -ForegroundColor Green
-Write-Host '  Endpoint: http://127.0.0.1:8081'
+Write-Host "  Endpoint: $Endpoint"
 Write-Host '  Key:      (well-known emulator master key — see backend/README.md)'
 Write-Host ''
 Write-Host 'Run contract tests with:  npm run test:contract'

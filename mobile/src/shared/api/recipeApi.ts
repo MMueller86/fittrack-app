@@ -1,7 +1,9 @@
 // Recipe API — full CRUD + image upload + diary logging
 import { apiClient } from './client';
 import type {
+  Meal,
   Recipe,
+  RecipeImage,
   RecipeIngredient,
   RecipeStep,
 } from '@fittrack/shared';
@@ -28,6 +30,10 @@ export interface RecipeListResponse {
 export interface LogRecipeInput {
   portions: number;
   mealId: string;
+}
+
+export interface ReorderRecipeImagesResponse {
+  images: RecipeImage[];
 }
 
 // ---------------------------------------------------------------------------
@@ -64,7 +70,7 @@ export const recipeApi = {
    * POST /api/recipes/:id/images — upload a recipe image.
    * Sends as multipart/form-data with an `image` field.
    */
-  uploadImage(recipeId: string, imageUri: string, mimeType: 'image/jpeg' | 'image/png'): Promise<Recipe> {
+  uploadImage(recipeId: string, imageUri: string, mimeType: 'image/jpeg' | 'image/png'): Promise<RecipeImage> {
     const formData = new FormData();
     formData.append('image', {
       uri: imageUri,
@@ -73,7 +79,7 @@ export const recipeApi = {
     } as unknown as Blob);
 
     return apiClient
-      .post<Recipe>(`/recipes/${recipeId}/images`, formData, {
+      .post<RecipeImage>(`/recipes/${recipeId}/images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60_000,
       })
@@ -81,9 +87,16 @@ export const recipeApi = {
   },
 
   /** DELETE /api/recipes/:id/images/:imageId — remove a single image */
-  deleteImage(recipeId: string, imageId: string): Promise<Recipe> {
+  deleteImage(recipeId: string, imageId: string): Promise<void> {
     return apiClient
-      .delete<Recipe>(`/recipes/${recipeId}/images/${imageId}`)
+      .delete(`/recipes/${recipeId}/images/${imageId}`)
+      .then(() => undefined);
+  },
+
+  /** PUT /api/recipes/:id/images/order — reorder all recipe images by ID permutation */
+  reorderImages(recipeId: string, imageIds: string[]): Promise<ReorderRecipeImagesResponse> {
+    return apiClient
+      .put<ReorderRecipeImagesResponse>(`/recipes/${recipeId}/images/order`, { imageIds })
       .then((r) => r.data);
   },
 
@@ -91,7 +104,7 @@ export const recipeApi = {
    * POST /api/recipes/:id/log — log a recipe portion into the diary.
    * Returns the updated Meal object containing the new diary item.
    */
-  log(recipeId: string, input: LogRecipeInput): Promise<unknown> {
-    return apiClient.post(`/recipes/${recipeId}/log`, input).then((r) => r.data);
+  log(recipeId: string, input: LogRecipeInput): Promise<Meal> {
+    return apiClient.post<Meal>(`/recipes/${recipeId}/log`, input).then((r) => r.data);
   },
 };

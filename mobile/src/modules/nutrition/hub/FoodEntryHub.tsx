@@ -76,6 +76,11 @@ const MEAL_LABEL: Record<string, string> = {
 
 export function FoodEntryHub() {
   const { isOpen, context, onSuccess, close, autoFocusSearch, initialSubflow, autoCloseOnSave, topInset: hubTopInset, initialQuery, prefillAmount, onSelectIngredient, onEstimateIngredient } = useFoodEntryHubStore();
+  const isRecipeContext = context.purpose === 'recipeIngredient';
+  const allowedSubflows = useMemo<ReadonlyArray<'barcode' | 'ai' | 'label' | 'manual'>>(
+    () => isRecipeContext ? ['ai'] : ['barcode', 'ai', 'label', 'manual'],
+    [isRecipeContext],
+  );
   const [hubState, dispatch] = useReducer(hubReducer, INITIAL_HUB_STATE);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
@@ -325,7 +330,7 @@ export function FoodEntryHub() {
   // ---------------------------------------------------------------------------
 
   const subtitle = useMemo(() => {
-    if (onSelectIngredient) return null;
+    if (isRecipeContext) return null;
     if (!context.mealId) return null;
     const labels: Record<string, string> = {
       breakfast: 'Frühstück',
@@ -337,7 +342,7 @@ export function FoodEntryHub() {
     };
     const label = labels[context.mealType] ?? context.mealType;
     return `Hinzufügen zu ${label}`;
-  }, [onSelectIngredient, context.mealId, context.mealType]);
+  }, [isRecipeContext, context.mealId, context.mealType]);
 
   // ---------------------------------------------------------------------------
   // Search field handlers
@@ -490,9 +495,10 @@ export function FoodEntryHub() {
   // ---------------------------------------------------------------------------
 
   const handleOpenSubflow = useCallback((flow: 'barcode' | 'ai' | 'label' | 'manual') => {
+    if (!allowedSubflows.includes(flow)) return;
     Keyboard.dismiss();
     dispatch({ type: 'OPEN_SUBFLOW', flow });
-  }, []);
+  }, [allowedSubflows]);
 
   const handleIngredientAiEstimate = useCallback((estimate: AiFoodEstimatePreview, query: string) => {
     onEstimateIngredient?.(estimate, query);
@@ -795,15 +801,17 @@ export function FoodEntryHub() {
                 <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
               </TouchableOpacity>
               {/* Barcode-Einstieg */}
-              <TouchableOpacity
-                style={styles.searchAction}
-                onPress={() => handleOpenSubflow('barcode')}
-                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                accessibilityRole="button"
-                accessibilityLabel="Barcode scannen"
-              >
-                <Icon lib="mci" name="barcode-scan" size="md" color={colors.primary} />
-              </TouchableOpacity>
+              {!isRecipeContext ? (
+                <TouchableOpacity
+                  style={styles.searchAction}
+                  onPress={() => handleOpenSubflow('barcode')}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Barcode scannen"
+                >
+                  <Icon lib="mci" name="barcode-scan" size="md" color={colors.primary} />
+                </TouchableOpacity>
+              ) : null}
             </View>
 
           {/* Single filter pill — compact selector above content */}
@@ -927,6 +935,7 @@ export function FoodEntryHub() {
                 onSelect={handleSelectProduct}
                 onSelectRelation={(relation) => void handleSelectRelation(relation)}
                 onOpenSubflow={handleOpenSubflow}
+                allowedSubflows={allowedSubflows}
                 onResultsChange={setCachedResults}
                 quickAcceptLabel={prefillAmount ? `+ ${prefillAmount.amount} ${prefillAmount.mode === 'grams' ? 'g' : 'Stk.'}` : undefined}
                 onQuickAccept={onSelectIngredient && prefillAmount ? (product) => { onSelectIngredient(product, prefillAmount.mode, prefillAmount.amount); close(); } : undefined}
@@ -1000,7 +1009,7 @@ export function FoodEntryHub() {
            sind native Module, die beim Mount initialisiert werden. Wenn sie immer
            im Tree sitzen (visible=false), crashen sie beim App-Start außerhalb
            eines EAS-Builds. Konditionelles Mounten löst das Problem. */}
-      {hubState.mode === 'subflow' && hubState.flow === 'manual' && (
+      {hubState.mode === 'subflow' && hubState.flow === 'manual' && !isRecipeContext && (
         <ManuellerSubFlow
           visible
           context={context}
@@ -1018,7 +1027,7 @@ export function FoodEntryHub() {
           onIngredientEstimated={onEstimateIngredient ? handleIngredientAiEstimate : undefined}
         />
       )}
-      {hubState.mode === 'subflow' && hubState.flow === 'label' && (
+      {hubState.mode === 'subflow' && hubState.flow === 'label' && !isRecipeContext && (
         <LabelSubFlow
           visible
           context={context}
@@ -1027,7 +1036,7 @@ export function FoodEntryHub() {
           onProductFound={handleLabelProductFound}
         />
       )}
-      {hubState.mode === 'subflow' && hubState.flow === 'barcode' && (
+      {hubState.mode === 'subflow' && hubState.flow === 'barcode' && !isRecipeContext && (
         <BarcodeSubFlow
           visible
           context={context}

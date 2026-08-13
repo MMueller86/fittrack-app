@@ -7,28 +7,38 @@
 | Field | Type | Notes |
 |---|---|---|
 | `id` | `string` | UUID |
-| `userId` | `string` | Owner |
+| `ownerUserId` | `string` | Owner; Cosmos partition key is stored separately as `userId` |
 | `name` | `string` | Recipe name |
 | `description` | `string?` | Optional |
-| `servings` | `number` | Number of portions |
+| `portions` | `number` | Number of portions |
 | `ingredients` | `RecipeIngredient[]` | |
 | `steps` | `RecipeStep[]` | Ordered instructions |
 | `images` | `RecipeImage[]` | Blob references |
-| `nutrition` | `RecipeNutrition` | Totals + per-portion |
+| `nutritionTotal` | `RecipeNutrition` | Aggregate nutrition for the full recipe |
+| `nutritionPerPortion` | `RecipeNutrition` | Nutrition for one portion |
+| `visibility` | `'private'` | Current recipes are private |
+| `sharedWithUserIds` | `string[]` | Reserved for future sharing; currently empty |
+| `tags` | `string[]` | Recipe tags |
 | `usageCount` | `number` | How many times added to diary |
+| `lastUsedAt` | `string?` | ISO timestamp of last diary log |
 | `createdAt`, `updatedAt` | `string` | ISO timestamps |
 
 ## Ingredients
 
 `RecipeIngredient`:
-- `foodRef` — reference to a `FoodProduct` (catalog) or `ReusableItem` (library) by ID
-- `foodRefType: 'catalog' | 'personal'`
-- `name` — display name (snapshot at time of adding)
+- `id` — ingredient identity within the recipe
+- `displayName` — human-readable ingredient name (snapshot at time of adding)
 - `inputMode: 'grams' | 'portion'` — how the user entered the amount
 - `inputAmount` — amount as entered by the user (in grams or portions, depending on `inputMode`); `null` when indeterminate
 - `amountGrams` — resolved gram weight used for nutrition calculation; `null` when indeterminate
+- `unit` — display unit label such as `g`, `Scheibe`, or `Portion`
 - `amountLabel?` — persistent optional display label for a seasoning (for example `1 TL` or `nach Geschmack`)
+- `linkedProductId` — reference to a catalog product, or `null`
+- `linkedReusableItemId` — reference to a reusable item, or `null`
+- `isAiEstimate` — true when nutrition was estimated by AI
 - `category?: 'food' | 'seasoning'` — optional classification; omitted on historical food documents and treated as `food`
+- `portionWeightGrams?`, `portionLabel?` — optional source-portion display data
+- `nutritionPer100g` — nutrient basis used for recalculation on edit
 - `nutritionContribution` — pre-calculated nutrition contribution of this ingredient (`calories, protein, carbs, fat, fiber`)
 
 Nutrition for each ingredient is calculated from `amountGrams / 100 × nutritionPer100g`. A seasoning or any ingredient with `amountGrams: null` contributes zero.
@@ -52,35 +62,46 @@ The backend validates recipe ingredients with the same contract for `POST /api/r
 `RecipeNutrition`:
 ```ts
 interface RecipeNutrition {
-  total: { calories, protein, carbs, fat, fiber };
-  perPortion: { calories, protein, carbs, fat, fiber };
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
 }
 ```
 
-Calculated via `shared/lib/recipeCalculator.ts`.
+`Recipe.nutritionTotal` and `Recipe.nutritionPerPortion` are calculated via `shared/lib/recipeCalculator.ts`.
 
-[Rule] `perPortion` = `total / servings`. When `servings` changes, nutrition must be recalculated.
+[Rule] `perPortion` = `total / portions`. When `portions` changes, nutrition must be recalculated.
+
+`PUT /api/recipes/{id}` recalculates `nutritionTotal` and `nutritionPerPortion` server-side from the supplied/stored ingredient and portion combination. Clients do not own persisted recipe nutrition after create/update.
 
 ## Recipe Steps
 
 `RecipeStep`:
 - `order: number` — step sequence
-- `instruction: string` — description
+- `title?: string` — optional step title
+- `description: string` — instruction text
+
+There is no top-level recipe notes field and no step-level notes field in the persistent recipe contract. Historical notes are stripped from API responses and cleaned lazily on the next recipe update. No global Cosmos migration is required.
 
 ## Recipe Images
 
 `RecipeImage`:
-- `blobPath` — path in Azure Blob Storage container
-- `sasUrl` — time-limited SAS URL for display
-- `uploadedAt` — ISO timestamp
+- `id` — image identity within the recipe
+- `blobName` — path in Azure Blob Storage container
+- `order` — 1-based display order
+- `url?` — transient read-only SAS URL, returned by the API but never stored in Cosmos
 
-[Rule] Only SAS URLs are stored in Cosmos metadata. Binary image data goes to Blob Storage.
+[Rule] Only `blobName` and `order` are stored in Cosmos metadata. Binary image data goes to Blob Storage; SAS URLs are generated per request.
+
+The current API supports upload, delete, and reorder. Upload appends the image at the next order value. Delete removes the blob and renumbers remaining images. Reorder accepts a complete image-ID permutation and normalizes `order` to `1..n`; it does not move blob data.
 
 SAS tokens are generated **per request** by the backend (`backend/src/lib/storage.ts`), read-only, with a **1-hour TTL**. The mobile app never holds permanent storage credentials. If a SAS URL expires between receiving it and displaying it, the client should re-fetch the recipe to get a fresh URL.
 
 ## Recipe Wizard
 
-`RecipeWizardScreen` — guided flow for creating a recipe from a text description or by searching for ingredients individually.
+`RecipeWizardScreen` — guided flow for creating a recipe from a text description or by searching for ingredients individually. When opened with `editId`, it loads the existing recipe, maps persisted ingredients and steps into wizard state, and starts at the ingredient confirmation phase.
 
 Uses the AI recipe analyzer (`analyzeRecipeText()`) to extract ingredients from free-text input.
 
@@ -90,41 +111,33 @@ Automatic food matches are suggestions, not user confirmations. The ingredient o
 
 The preparation-step review uses the same restrained card hierarchy. Each step has a multiline, content-sized title and instruction editor so longer text remains readable. A left swipe reveals a trash icon and removes the step with undo; a long press anywhere in the step header lifts the step above the list, gives haptic feedback when a new target position is crossed, and shows a compact `Hier einfügen` insertion marker at the live target position so the list does not reserve a full-card gap. Holding the step near the top or bottom edge auto-scrolls the list and continues updating the target position. After release, the step immediately rejoins the normal list flow without leaving a source gap. The vertical arrow handle is a visual affordance, not a precise hit target.
 
-The mobile wizard is composed of separate input, ingredient, step, and preview phase components. `RecipeWizardScreen` remains the state and navigation orchestrator, so phase changes, API calls, Hub callbacks, saving, and undo behaviour stay in one flow. The preview uses the shared `recipePreviewViewModel` and renders ingredients as quiet rows without bullet markers; food ingredients show their resolved amount, while seasonings show their kitchen label such as `1 TL` or `nach Geschmack` and never fall back to `0 g`. The same formatting is used in the recipe detail and edit views.
+The mobile wizard is composed of separate input, ingredient, step, and preview phase components. `RecipeWizardScreen` remains the state and navigation orchestrator for creating and editing recipes, so phase changes, API calls, Hub callbacks, saving, and undo behaviour stay in one flow. The preview uses the shared `recipePreviewViewModel` and renders ingredients as quiet rows without bullet markers; food ingredients show their resolved amount, while seasonings show their kitchen label such as `1 TL` or `nach Geschmack` and never fall back to `0 g`. The same formatting is used in the recipe detail and edit views.
 
-## Recipe Create / Edit
+Recipe tags are generated by the AI analysis for new recipes or loaded from the existing recipe during editing. They are displayed as read-only chips in the preview and are persisted unchanged; the preview does not provide a tag text input.
 
-`RecipeCreateScreen` — form-based creation with ingredient search and step management.
-
-Food ingredients keep the gram/portion quantity editor in the edit view. Seasonings are shown with a `Gewürz` label and their kitchen amount, when available, without a nutrition amount editor because they do not contribute nutrition.
-
-## Ingredient Picker (AddIngredientModal)
-
-`AddIngredientModal` is a `BottomSheetModal` (not a React Native `Modal`). It provides a search-first ingredient picking flow for `RecipeCreateScreen` and `RecipeWizardScreen`.
-
-Internal state machine (`SheetMode`): `'search' | 'amount' | 'ai' | 'label' | 'manual'`.
-
-- **search** — default view; uses `SearchState` (from the Food Entry Hub) for product search, including the bottom fallback section (KI · Scan · Manuell)
-- **amount** — `RecipeIngredientAmountView`; gram / portion toggle, live nutrition preview
-- **ai** — free-text AI estimate sub-flow
-- **label** — nutrition label scan sub-flow
-- **manual** — manual entry form
-
-Snap points: `['85%', '90%']`.
+Recipe ingredient search is handled through the global FoodEntryHub in explicit `recipeIngredient` context. Successful product selection or single-food AI estimation returns the ingredient to `RecipeWizardScreen`; diary mutations remain disabled in this context.
 
 ## Adding a Recipe to Diary
 
-A recipe can be added as a diary entry. The `servings` count determines how many portions are logged. Nutrition values are snapshotted at logging time.
+A recipe can be added as a diary entry. The logging dialog starts at one portion, offers quick values `0.5`, `1`, `1.5`, and `2`, and accepts another positive decimal through `Andere`. The nutrition preview scales `nutritionPerPortion` live with the selected value; nutrition values are snapshotted at logging time.
 
 `MealItemSourceType = 'recipe'` marks items that came from a recipe.
+
+The mobile logging dialog uses six selectable `MealType` tags in this order: `breakfast` (Frühstück), `preworkout` (Pre-Workout), `lunch` (Mittagessen), `dinner` (Abendessen), `postworkout` (Post-Workout), and `snack` (Snack).
+
+Opening the dialog reads the current diary day but does not mutate it. On final submit, the client reads the current day again, filters meals to the selected type, and deterministically uses the oldest matching meal with a valid `createdAt`; equal timestamps or invalid/missing timestamps fall back to the lexicographically smallest meal ID. If no matching meal exists, it lazily creates one for the current date and selected type immediately before posting the recipe log. No meal is created while the dialog is being edited or abandoned. Loading and logging failures are shown with the app-owned `InfoOverlay`, not a system alert. After success, the returned meal is passed to the existing Health Connect nutrition sync and the recipe detail is refreshed.
 
 ## API
 
 - `GET /api/recipes` — list all user recipes
 - `POST /api/recipes` — create recipe
 - `GET /api/recipes/{id}` — get by ID
-- `PUT /api/recipes/{id}` — update
+- `PUT /api/recipes/{id}` — partial update; server recalculates nutrition from ingredients/portions
 - `DELETE /api/recipes/{id}` — delete
+- `POST /api/recipes/{id}/images` — upload one JPEG/PNG image and append it
+- `PUT /api/recipes/{id}/images/order` — reorder existing images by complete unique image-ID permutation
+- `DELETE /api/recipes/{id}/images/{imageId}` — delete one image and compact order
+- `POST /api/recipes/{id}/log` — log one or more recipe portions into a diary meal
 
 ## Related Documents
 

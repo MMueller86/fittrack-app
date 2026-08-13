@@ -37,10 +37,11 @@ export function ManuellerSubFlow({ visible, context, onClose, onSaved }: Props) 
       setResolvedMealId(null);
       return;
     }
+    if (context.purpose !== 'diary') return;
     resolveOrCreateMealId(context.date, context.mealType, context.mealId)
       .then(setResolvedMealId)
       .catch(() => onClose());
-  }, [visible, context.date, context.mealType, context.mealId, onClose]);
+  }, [visible, context.purpose, context.date, context.mealType, context.mealId, onClose]);
 
   // LabelScanReviewScreen verwaltet sein eigenes Modal (visible-Prop steuert es direkt)
   return (

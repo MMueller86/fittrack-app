@@ -106,6 +106,12 @@ Uses the **Azure Cosmos DB Linux Emulator** (`vnext-preview`) as a GitHub Action
 
 Readiness check: `node backend/scripts/wait-for-cosmos.mjs` — probes with the same Node/undici stack the tests use. A curl-based probe gave false positives and was replaced.
 
+For local runs, `backend/scripts/start-cosmos-emulator.ps1` maps the
+container's port 8081 to host port 18081. This leaves Expo/Metro's default
+host port 8081 available. Local contract tests default to
+`http://127.0.0.1:18081`; CI sets `COSMOS_ENDPOINT` explicitly to its service
+container at `http://127.0.0.1:8081`.
+
 [Rule] Contract tests **never** run against real Azure Cosmos DB. The emulator key is hard-coded in `backend/src/test-utils/cosmosEmulator.ts` as a defence-in-depth safeguard.
 
 ### What CI Does Not Include

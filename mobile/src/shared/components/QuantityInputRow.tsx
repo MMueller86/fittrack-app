@@ -1,5 +1,4 @@
 ﻿// Shared amount input row — segmented g/Portion control + TextInput + optional live kcal preview.
-// Used by AddIngredientModal, RecipeCreateScreen, RecipeWizardScreen.
 // No API calls — pure UI + calculation only.
 import React from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';

@@ -9,10 +9,10 @@
     "build:watch": "tsc --project tsconfig.json --watch",
     "start": "node scripts/wait-for-azurite.mjs && func start",
     "dev": "node scripts/dev.mjs",
-    "storage:start": "node scripts/start-azurite.mjs",
+    "storage:start": "node scripts/storage.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:startup": "node --test scripts/start-azurite.test.mjs scripts/wait-for-azurite.test.mjs",
+    "test:startup": "node --test scripts/dev.test.mjs scripts/storage.test.mjs scripts/wait-for-azurite.test.mjs",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.mts",
     "test:eval": "vitest run --config vitest.eval.config.mts",
@@ -34,7 +34,6 @@
     "@types/node": "^20.17.0",
     "@types/sharp": "^0.31.1",
     "azurite": "^3.35.0",
-    "npm-run-all2": "^9.0.1",
     "typescript": "^5.8.0",
     "vitest": "^2.1.9"
   }

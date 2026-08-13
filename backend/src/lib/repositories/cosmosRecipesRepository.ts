@@ -5,7 +5,7 @@
 // (blobName + order only — no transient SAS URLs stored).
 
 import { randomUUID } from 'node:crypto';
-import type { Recipe } from '@fittrack/shared';
+import type { Recipe, RecipeImage, RecipeStep } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
 import type {
   CreateRecipeInput,
@@ -16,8 +16,71 @@ import type {
 
 // Cosmos stores ownerUserId as the partition key field.
 // The document shape mirrors Recipe exactly, plus a `userId` field
-// that Cosmos uses as the physical partition key (/userId).
-type CosmosRecipeDoc = Recipe & { userId: string };
+// that Cosmos uses as the physical partition key (/userId). SAS URLs are
+// response-only and are deliberately excluded from stored image metadata.
+type StoredRecipeImage = Pick<RecipeImage, 'id' | 'blobName' | 'order'>;
+type CosmosRecipeDoc = Omit<Recipe, 'images'> & { images: StoredRecipeImage[]; userId: string };
+
+function isCosmosRecipeDoc(resource: CosmosRecipeDoc | undefined): resource is CosmosRecipeDoc {
+  return Boolean(resource?.id && resource.ownerUserId && resource.userId && resource.name);
+}
+
+function toStoredImages(images: RecipeImage[] | undefined): StoredRecipeImage[] {
+  return (images ?? []).map(({ id, blobName, order }) => ({ id, blobName, order }));
+}
+
+function toRecipeSteps(steps: RecipeStep[] | undefined): RecipeStep[] {
+  return (steps ?? []).map(({ order, title, description }) => ({
+    order,
+    ...(title !== undefined ? { title } : {}),
+    description,
+  }));
+}
+
+function toRecipe(doc: CosmosRecipeDoc): Recipe {
+  return {
+    id: doc.id,
+    ownerUserId: doc.ownerUserId,
+    name: doc.name,
+    description: doc.description,
+    portions: doc.portions,
+    ingredients: doc.ingredients,
+    steps: toRecipeSteps(doc.steps),
+    images: toStoredImages(doc.images),
+    nutritionTotal: doc.nutritionTotal,
+    nutritionPerPortion: doc.nutritionPerPortion,
+    visibility: doc.visibility,
+    sharedWithUserIds: doc.sharedWithUserIds,
+    tags: doc.tags,
+    lastUsedAt: doc.lastUsedAt,
+    usageCount: doc.usageCount,
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+  };
+}
+
+function toStoredRecipe(recipe: Recipe, userId: string): CosmosRecipeDoc {
+  return {
+    id: recipe.id,
+    ownerUserId: recipe.ownerUserId,
+    name: recipe.name,
+    description: recipe.description,
+    portions: recipe.portions,
+    ingredients: recipe.ingredients,
+    steps: toRecipeSteps(recipe.steps),
+    images: toStoredImages(recipe.images),
+    nutritionTotal: recipe.nutritionTotal,
+    nutritionPerPortion: recipe.nutritionPerPortion,
+    visibility: recipe.visibility,
+    sharedWithUserIds: recipe.sharedWithUserIds,
+    tags: recipe.tags,
+    lastUsedAt: recipe.lastUsedAt,
+    usageCount: recipe.usageCount,
+    createdAt: recipe.createdAt,
+    updatedAt: recipe.updatedAt,
+    userId,
+  };
+}
 
 export class CosmosRecipesRepository implements RecipesRepository {
   async list(userId: string, opts?: ListRecipesOptions): Promise<Recipe[]> {
@@ -37,13 +100,13 @@ export class CosmosRecipesRepository implements RecipesRepository {
       const bKey = b.lastUsedAt ?? b.updatedAt;
       return bKey.localeCompare(aKey);
     });
-    return opts?.limit ? sorted.slice(0, opts.limit) : sorted;
+    return (opts?.limit ? sorted.slice(0, opts.limit) : sorted).map(toRecipe);
   }
 
   async get(userId: string, id: string): Promise<Recipe | null> {
     const { containers } = await getCosmos();
     const { resource } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    return resource ?? null;
+    return isCosmosRecipeDoc(resource) ? toRecipe(resource) : null;
   }
 
   async create(userId: string, input: CreateRecipeInput): Promise<Recipe> {
@@ -67,31 +130,32 @@ export class CosmosRecipesRepository implements RecipesRepository {
       createdAt: now,
       updatedAt: now,
     };
-    // Store with `userId` field so Cosmos can use it as partition key (/userId)
-    const doc: CosmosRecipeDoc = { ...recipe, userId };
+    const doc = toStoredRecipe(recipe, userId);
     const { resource } = await containers.recipes.items.create<CosmosRecipeDoc>(doc);
-    return resource ?? recipe;
+    return isCosmosRecipeDoc(resource) ? toRecipe(resource) : recipe;
   }
 
   async update(userId: string, id: string, input: UpdateRecipeInput): Promise<Recipe | null> {
     const { containers } = await getCosmos();
     const { resource: existing } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!existing) return null;
+    if (!isCosmosRecipeDoc(existing)) return null;
 
-    const updated: CosmosRecipeDoc = {
-      ...existing,
+    const existingRecipe = toRecipe(existing);
+    const updatedRecipe: Recipe = {
+      ...existingRecipe,
       ...input,
-      userId,
+      images: input.images ?? existingRecipe.images,
       updatedAt: new Date().toISOString(),
     };
+    const updated = toStoredRecipe(updatedRecipe, userId);
     const { resource } = await containers.recipes.item(id, userId).replace<CosmosRecipeDoc>(updated);
-    return resource ?? updated;
+    return isCosmosRecipeDoc(resource) ? toRecipe(resource) : updatedRecipe;
   }
 
   async delete(userId: string, id: string): Promise<boolean> {
     const { containers } = await getCosmos();
     const { resource: existing } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!existing) return false;
+    if (!isCosmosRecipeDoc(existing)) return false;
     await containers.recipes.item(id, userId).delete();
     return true;
   }
@@ -99,14 +163,13 @@ export class CosmosRecipesRepository implements RecipesRepository {
   async incrementUsage(userId: string, id: string): Promise<void> {
     const { containers } = await getCosmos();
     const { resource: existing } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!existing) return;
-    const updated: CosmosRecipeDoc = {
-      ...existing,
-      userId,
+    if (!isCosmosRecipeDoc(existing)) return;
+    const updatedRecipe: Recipe = {
+      ...toRecipe(existing),
       usageCount: existing.usageCount + 1,
       lastUsedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await containers.recipes.item(id, userId).replace<CosmosRecipeDoc>(updated);
+    await containers.recipes.item(id, userId).replace<CosmosRecipeDoc>(toStoredRecipe(updatedRecipe, userId));
   }
 }
