@@ -13,6 +13,7 @@ import { colors, radius, spacing, typography } from '../../app/theme';
 import type { RecipePreviewViewModel } from './recipePreviewViewModel';
 import type { WizardImageDraft, WizardStepItem } from './recipeWizardTypes';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
+import { stepRecipeWizardPortions } from './recipeWizardPortions';
 
 interface Props {
   recipeName: string;
@@ -94,7 +95,7 @@ export function RecipeWizardPreviewPhase({
         <View style={styles.stepper}>
           <TouchableOpacity
             style={styles.stepperButton}
-            onPress={() => onPortionsChange(Math.max(1, portions - 1))}
+            onPress={() => onPortionsChange(stepRecipeWizardPortions(portions, -1))}
             accessibilityRole="button"
             accessibilityLabel="Portionen verringern"
           >
@@ -103,7 +104,7 @@ export function RecipeWizardPreviewPhase({
           <Text style={styles.stepperValue}>{portions}</Text>
           <TouchableOpacity
             style={styles.stepperButton}
-            onPress={() => onPortionsChange(portions + 1)}
+            onPress={() => onPortionsChange(stepRecipeWizardPortions(portions, 1))}
             accessibilityRole="button"
             accessibilityLabel="Portionen erhöhen"
           >

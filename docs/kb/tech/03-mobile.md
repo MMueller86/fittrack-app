@@ -81,7 +81,7 @@ On app start, `RootNavigator` checks for an existing profile via `AsyncStorage` 
 - **429 handling:** surfaces `isQuotaExceededError` flag with quota metadata
 
 Typed API clients (one per domain):
-- `aiApi.ts` — AI features (parse meal, estimate food, label scan, estimate meal, daily insight)
+- `aiApi.ts` — AI features (parse meal, estimate food, label scan, estimate meal, recipe analysis, recipe scale preview, daily insight)
 - `diaryApi.ts` — diary CRUD
 - `favoritesApi.ts` — favorites + recents
 - `foodApi.ts` — food search
@@ -99,6 +99,8 @@ Typed API clients (one per domain):
 | `useDayTypeStore` | Day type (rest/training) selection for diary |
 
 No global state library for server data — screens fetch on mount and refresh on focus.
+
+`RecipeDetailScreen` keeps recipe scaling local to the screen. `targetPortions` is temporary and starts at the saved recipe value; the saved `Recipe`, its nutrition, and the independent diary logging flow are never replaced by the preview. Ingredients are projected synchronously with the shared pure `scaleRecipeIngredients()` function. Text preview requests use a roughly 400 ms debounce, an `AbortController`, and a monotone revision plus recipe `id`/`updatedAt` guard. Reset to the original portions, recipe reload, and unmount invalidate timers and requests. While debounce or loading is active, the old description and steps are hidden; a single atomic text state either accepts the complete response or restores the original texts on error.
 
 ## Authentication (Mobile Side)
 
@@ -130,7 +132,7 @@ In recipe-ingredient context the same hub is opened as an ingredient picker. `us
 ### Recipes Module (`modules/recipes/`)
 
 - `RecipeListScreen.tsx` — recipe overview
-- `RecipeDetailScreen.tsx` — recipe detail, diary logging, image display
+- `RecipeDetailScreen.tsx` — recipe detail, temporary portion scaling, diary logging, image display
 - `RecipeWizardScreen.tsx` — single create/edit wizard; replaces the removed `RecipeCreateScreen`
 - `RecipeWizardInputPhase.tsx`, `RecipeWizardIngredientsPhase.tsx`, `RecipeWizardStepsPhase.tsx`, `RecipeWizardPreviewPhase.tsx` — phase views controlled by `RecipeWizardScreen`
 - `recipeWizardImageMutations.ts` — client-side sequencing for image delete/upload/reorder after recipe save

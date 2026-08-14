@@ -50,6 +50,18 @@ function makeRecipe(overrides: Partial<Recipe> = {}): Recipe {
 }
 
 describe('buildRecipeWizardEditBootstrapState', () => {
+  it.each([1, 50])('keeps valid persisted portions at %s', (portions) => {
+    const state = buildRecipeWizardEditBootstrapState(makeRecipe({ portions }));
+
+    expect(state.portions).toBe(portions);
+  });
+
+  it.each([0, 51, 2.5])('normalizes invalid persisted portions %s', (portions) => {
+    const state = buildRecipeWizardEditBootstrapState(makeRecipe({ portions }));
+
+    expect(state.portions).toBe(4);
+  });
+
   it('maps persisted food ingredients to confirmed wizard ingredients and amount edits', () => {
     const state = buildRecipeWizardEditBootstrapState(makeRecipe());
 

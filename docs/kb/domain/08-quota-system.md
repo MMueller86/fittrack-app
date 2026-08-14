@@ -28,26 +28,29 @@ See [tech/05-authentication.md](../tech/05-authentication.md) for how `isAdmin` 
 ## AI Features Subject to Quota
 
 `AiFeature`:
+
 - `'meal-parser'` — free-text meal parsing
 - `'food-estimate'` — food name → nutrition estimate
 - `'label-scan'` — nutrition label OCR + AI
 - `'meal-estimate'` — meal image → nutrition estimate
 - `'recipe-analyze'` — recipe text analysis
+- `'recipe-scale'` — transient recipe description and step preview
 
-Daily insight is tracked but uses a separate per-day mechanism (max 3 regenerations, not monthly).
-
-## Monthly Limits (Current Values)
+## Monthly Limits (Documented Baseline)
 
 | Feature | Free | Premium | Internal |
-|---|---|---|---|
+|---|---:|---:|---:|
 | `meal-parser` | 50/month | 500/month | ∞ |
 | `food-estimate` | 50/month | 500/month | ∞ |
 | `label-scan` | 30/month | 300/month | ∞ |
 | `meal-estimate` | 30/month | 300/month | ∞ |
 | `recipe-analyze` | 30/month | 300/month | ∞ |
+| `recipe-scale` | 30/month | 30/month | ∞ |
 
 [Open] Exact values are in `backend/src/lib/quotaConfig.ts` — verify before publishing authoritative limits.
+[Rule] `recipe-scale` uses exactly `30/month` for both `free` and `premium`; `internal` remains unlimited. The independent `isAdmin = true` bypass is applied before tier checks and remains unlimited even for a `free` tier user.
 
+[Known repository divergence] The table above retains the documented baseline for existing features. The current repository uses different values for `food-estimate` (`30/300`) and `recipe-analyze` (`10/100`) in `backend/src/lib/quotaConfig.ts`; this existing conflict is not reused for `recipe-scale` and is not silently changed by US-05.
 ## Period
 
 `period` = `YYYY-MM` format (current calendar month). Resets on the 1st of each month.
@@ -107,7 +110,7 @@ interface QuotaExceededResponse {
   used: number;
   limit: number;
   period: string;
-  resetAt: string;  // ISO timestamp of period reset
+  resetsAt: string;  // ISO timestamp of period reset
 }
 ```
 

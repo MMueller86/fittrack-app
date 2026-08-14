@@ -1,13 +1,34 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import { parseMeal, estimateMeal, type AiParsedItem, analyzeRecipeText, type AiRecipeRaw, type AiRecipeIngredientLine } from '../lib/openai';
+import {
+  parseMeal,
+  estimateMeal,
+  type AiParsedItem,
+  analyzeRecipeText,
+  type AiRecipeRaw,
+  type AiRecipeIngredientLine,
+  scaleRecipeText,
+  type AiRecipeScaleInput,
+  type AiRecipeScaleIngredientContext,
+} from '../lib/openai';
 import { getFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
+import { getRecipesRepository } from '../lib/repositories/recipesRepository';
 import { requireUser } from '../lib/auth';
-import { withHandler } from '../lib/http';
+import { parseBody, withHandler } from '../lib/http';
 import { enforceQuota, trackUsage } from '../lib/quota';
 import { rankByQuery } from '../lib/searchRanking';
-import type { FoodSearchResult, ReusableItem, AiMealEstimatePreview } from '@fittrack/shared';
+import type {
+  FoodSearchResult,
+  ReusableItem,
+  AiMealEstimatePreview,
+  Recipe,
+  RecipeIngredient,
+  RecipeScalePreviewResponse,
+  RecipeStep,
+} from '@fittrack/shared';
+import { scaleRecipeIngredients } from '../../../shared/lib/recipeCalculator';
+import { RECIPE_PORTION_MAX, RECIPE_PORTION_MIN } from '../../../shared/types/recipeScale';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -560,5 +581,141 @@ app.http('recipe-analyze', {
   authLevel: 'anonymous',
   route: 'ai/recipe-analyze',
   handler: recipeAnalyzeHandler,
+});
+
+// ---------------------------------------------------------------------------
+// Recipe scale text preview — server-owned recipe projection
+// ---------------------------------------------------------------------------
+
+const RecipeScaleBodySchema = z.object({
+  recipeId: z.string().uuid('recipeId must be a valid UUID'),
+  targetPortions: z.number()
+    .int('targetPortions must be a whole number')
+    .min(RECIPE_PORTION_MIN, `targetPortions must be at least ${RECIPE_PORTION_MIN}`)
+    .max(RECIPE_PORTION_MAX, `targetPortions must be at most ${RECIPE_PORTION_MAX}`),
+});
+
+const RecipeScaleResponseSchema = z.object({
+  description: z.string().max(2000).nullable(),
+  steps: z.array(z.object({
+    order: z.number().int().positive(),
+    title: z.string().max(200).nullable(),
+    description: z.string().min(1).max(2000),
+  }).strict()).max(50),
+}).strict();
+
+function toRecipeScaleIngredientContext(ingredient: RecipeIngredient): AiRecipeScaleIngredientContext {
+  return {
+    displayName: ingredient.displayName,
+    category: ingredient.category ?? 'food',
+    inputMode: ingredient.inputMode,
+    unit: ingredient.unit,
+    inputAmount: ingredient.inputAmount,
+    amountGrams: ingredient.amountGrams,
+    amountLabel: ingredient.amountLabel ?? null,
+  };
+}
+
+function buildRecipeScaleInput(recipe: Recipe, targetPortions: number): AiRecipeScaleInput {
+  const targetIngredients = scaleRecipeIngredients(
+    recipe.ingredients,
+    recipe.portions,
+    targetPortions,
+  );
+
+  return {
+    originalPortions: recipe.portions,
+    targetPortions,
+    originalDescription: recipe.description ?? null,
+    originalIngredients: recipe.ingredients.map(toRecipeScaleIngredientContext),
+    targetIngredients: targetIngredients.map(toRecipeScaleIngredientContext),
+    originalSteps: recipe.steps.map((step) => ({
+      order: step.order,
+      title: step.title ?? null,
+      description: step.description,
+    })),
+  };
+}
+
+/**
+ * Validate the provider response against both the JSON contract and the
+ * server-owned recipe structure before returning it to the client.
+ */
+export function validateRecipeScaleResponse(
+  raw: unknown,
+  originalDescription: string | null,
+  originalSteps: RecipeStep[],
+  targetPortions: number,
+): RecipeScalePreviewResponse | null {
+  const parsed = RecipeScaleResponseSchema.safeParse(raw);
+  if (!parsed.success) return null;
+
+  if ((parsed.data.description === null) !== (originalDescription === null)) {
+    return null;
+  }
+
+  if (parsed.data.steps.length !== originalSteps.length) {
+    return null;
+  }
+
+  const hasExpectedOrder = parsed.data.steps.every(
+    (step, index) => step.order === originalSteps[index]?.order,
+  );
+  if (!hasExpectedOrder) return null;
+
+  return {
+    targetPortions,
+    description: parsed.data.description,
+    steps: parsed.data.steps.map(({ order, title, description }) => ({
+      order,
+      ...(title !== null ? { title } : {}),
+      description,
+    })),
+  };
+}
+
+export const recipeScalePreviewHandler = withHandler(
+  'ai.recipe-scale.preview',
+  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const userContext = await requireUser(request);
+    const parsed = await parseBody(request, RecipeScaleBodySchema);
+    if (!parsed.ok) return parsed.response;
+
+    const { userId } = userContext;
+    const { recipeId, targetPortions } = parsed.data;
+    const recipeRepository = getRecipesRepository();
+    const recipe = await recipeRepository.get(userId, recipeId);
+    if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+
+    const quotaBlock = await enforceQuota(userContext, 'recipe-scale');
+    if (quotaBlock) return quotaBlock;
+
+    let rawResponse: unknown;
+    try {
+      rawResponse = await scaleRecipeText(buildRecipeScaleInput(recipe, targetPortions));
+    } catch {
+      return { status: 502, jsonBody: { error: 'KI-Rezeptskalierung ist derzeit nicht verfügbar' } };
+    }
+
+    const preview = validateRecipeScaleResponse(
+      rawResponse,
+      recipe.description ?? null,
+      recipe.steps,
+      targetPortions,
+    );
+    if (!preview) {
+      return { status: 422, jsonBody: { error: 'KI-Antwort für die Rezeptskalierung ist ungültig' } };
+    }
+
+    await trackUsage(userContext, 'recipe-scale');
+    return { status: 200, jsonBody: preview };
+  },
+);
+
+app.http('ai-recipe-scale-preview', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'ai/recipe-scale/preview',
+  handler: recipeScalePreviewHandler,
 });
 

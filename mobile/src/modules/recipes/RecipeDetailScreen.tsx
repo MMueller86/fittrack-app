@@ -9,11 +9,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  RECIPE_PORTION_MAX,
+  RECIPE_PORTION_MIN,
+  scaleRecipeIngredients,
+} from '@fittrack/shared';
 import type { Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { aiApi } from '../../shared/api/aiApi';
 import { recipeApi } from '../../shared/api/recipeApi';
 import { favoritesApi } from '../../shared/api/favoritesApi';
 import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
@@ -23,11 +30,24 @@ import { NutritionTile } from '../../shared/components/NutritionTile';
 import { computeRecipeQuickEntryData } from './recipeUtils';
 import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
+import {
+  createRecipeScalePreviewController,
+  type RecipeScalePreviewController,
+  type RecipeScalePreviewErrorNotice,
+  type RecipeTextPreviewState,
+} from './recipeScalePreviewState';
 import { consumeRecipeDetailNavigationIntent } from './recipeWizardNavigation';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 import LogRecipeModal from './LogRecipeModal';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeDetail'>;
+
+const RECIPE_SCALE_LOADING_MESSAGE =
+  'Die KI passt die Texte an die neuen Rezeptmengen an. Die KI kann Fehler machen.';
+
+function clampTargetPortions(value: number): number {
+  return Math.min(RECIPE_PORTION_MAX, Math.max(RECIPE_PORTION_MIN, value));
+}
 
 export default function RecipeDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
@@ -40,16 +60,47 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [imgIndex, setImgIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [seasoningsExpanded, setSeasoningsExpanded] = useState(false);
-  const [errorNotice, setErrorNotice] = useState<{ title: string; body: string } | null>(null);
+  const [errorNotice, setErrorNotice] = useState<RecipeScalePreviewErrorNotice | null>(null);
+  const [scaleInfoVisible, setScaleInfoVisible] = useState(false);
+  const [targetPortions, setTargetPortions] = useState(RECIPE_PORTION_MIN);
+  const [textPreview, setTextPreview] = useState<RecipeTextPreviewState>({
+    status: 'original',
+    description: null,
+    steps: [],
+  });
   const recipeRef = useRef<Recipe | null>(null);
   const logIntentConsumedRef = useRef(false);
+  const targetPortionsRef = useRef(RECIPE_PORTION_MIN);
+  const recipeIdRef = useRef(id);
+  recipeIdRef.current = id;
+  const setTargetPortionsValue = useCallback((value: number) => {
+    targetPortionsRef.current = value;
+    setTargetPortions(value);
+  }, []);
+
+  const scalePreviewControllerRef = useRef<RecipeScalePreviewController | null>(null);
+  if (scalePreviewControllerRef.current === null) {
+    scalePreviewControllerRef.current = createRecipeScalePreviewController({
+      getScreenRecipeId: () => recipeIdRef.current,
+      getCurrentRecipe: () => recipeRef.current,
+      getTargetPortions: () => targetPortionsRef.current,
+      setTargetPortions: setTargetPortionsValue,
+      setTextPreview,
+      setErrorNotice,
+      previewRecipeScale: aiApi.previewRecipeScale,
+    });
+  }
+  const scalePreviewController = scalePreviewControllerRef.current;
 
   const load = useCallback(async () => {
+    const currentRecipe = recipeRef.current;
+    scalePreviewController.resetForReload(currentRecipe);
     setLoading(true);
     try {
       const data = await recipeApi.get(id);
       recipeRef.current = data;
       setRecipe(data);
+      scalePreviewController.restoreOriginalPreview(data);
       setImgIndex(0);
       setLoadError(false);
     } catch (err: unknown) {
@@ -65,13 +116,37 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, scalePreviewController]);
 
   useFocusEffect(
     useCallback(() => {
       void load();
     }, [load]),
   );
+
+  const requestScalePreview = useCallback(
+    (nextTargetPortions: number, currentRecipe: Recipe) => {
+      scalePreviewController.requestScalePreview(nextTargetPortions, currentRecipe);
+    },
+    [scalePreviewController],
+  );
+
+  const handleTargetPortionsChange = useCallback(
+    (delta: number) => {
+      const currentRecipe = recipeRef.current;
+      if (!currentRecipe) return;
+
+      const nextTargetPortions = clampTargetPortions(targetPortionsRef.current + delta);
+      if (nextTargetPortions === targetPortionsRef.current) return;
+
+      targetPortionsRef.current = nextTargetPortions;
+      setTargetPortions(nextTargetPortions);
+      requestScalePreview(nextTargetPortions, currentRecipe);
+    },
+    [requestScalePreview],
+  );
+
+  useEffect(() => () => scalePreviewController.dispose(), [scalePreviewController]);
 
   useEffect(() => {
     if (recipe == null) return;
@@ -198,11 +273,18 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     );
   }
 
-  const previewViewModel = buildRecipePreviewViewModel(recipe.ingredients);
+  const displayedIngredients =
+    targetPortions === recipe.portions
+      ? recipe.ingredients
+      : scaleRecipeIngredients(recipe.ingredients, recipe.portions, targetPortions);
+  const previewViewModel = buildRecipePreviewViewModel(displayedIngredients);
   const visibleIngredientGroups = previewViewModel.groups.filter((group) => group.ingredients.length > 0);
   const foodGroups = visibleIngredientGroups.filter((group) => group.category !== 'seasoning');
   const seasoningGroup = visibleIngredientGroups.find((group) => group.category === 'seasoning');
-  const visibleSteps = recipe.steps.filter((step) => step.description.trim().length > 0);
+  const isTextPreviewLoading = textPreview.status === 'loading';
+  const visibleSteps = isTextPreviewLoading
+    ? []
+    : textPreview.steps.filter((step) => step.description.trim().length > 0);
   const imageUrls = recipe.images
     .map((image) => image.url)
     .filter((url): url is string => typeof url === 'string' && url.length > 0);
@@ -224,16 +306,74 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           </View>
         )}
 
-        {recipe.description && (
-          <Text style={styles.description}>{recipe.description}</Text>
-        )}
+        {recipe.description && <Text style={styles.description}>{recipe.description}</Text>}
 
         <View style={styles.portionsSection}>
-          <Text style={styles.portionsSentence}>
-            Dieses Rezept ergibt{' '}
-            <Text style={styles.portionValue}>{recipe.portions}</Text>{' '}
-            {recipe.portions === 1 ? 'Portion' : 'Portionen'}.
-          </Text>
+          <View style={styles.portionSummaryRow}>
+            <View style={styles.portionSummary}>
+              <Text style={styles.portionLabel}>Portionen</Text>
+              <Text style={styles.portionValue}>{recipe.portions}</Text>
+              <Text style={styles.portionMeta}>gespeichert</Text>
+            </View>
+            <View style={[styles.portionSummary, styles.targetPortionSummary]}>
+              <View style={[styles.portionLabelRow, styles.targetPortionLabelRow]}>
+                <Text style={styles.portionLabel}>Nachkochen für</Text>
+                <TouchableOpacity
+                  style={styles.infoButton}
+                  onPress={() => setScaleInfoVisible(true)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Erklärung zum Skalieren öffnen"
+                >
+                  <Icon lib="ion" name="information-circle-outline" size="md" color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.stepper}>
+                <TouchableOpacity
+                  style={[
+                    styles.stepperButton,
+                    targetPortions <= RECIPE_PORTION_MIN && styles.stepperButtonDisabled,
+                  ]}
+                  onPress={() => handleTargetPortionsChange(-1)}
+                  disabled={targetPortions <= RECIPE_PORTION_MIN}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Portionszahl verringern"
+                >
+                  <Text
+                    style={[
+                      styles.stepperButtonText,
+                      targetPortions <= RECIPE_PORTION_MIN && styles.stepperButtonTextDisabled,
+                    ]}
+                  >
+                    −
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.targetPortionValue}>{targetPortions}</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.stepperButton,
+                    targetPortions >= RECIPE_PORTION_MAX && styles.stepperButtonDisabled,
+                  ]}
+                  onPress={() => handleTargetPortionsChange(1)}
+                  disabled={targetPortions >= RECIPE_PORTION_MAX}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Portionszahl erhöhen"
+                >
+                  <Text
+                    style={[
+                      styles.stepperButtonText,
+                      targetPortions >= RECIPE_PORTION_MAX && styles.stepperButtonTextDisabled,
+                    ]}
+                  >
+                    +
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[styles.portionMeta, styles.targetPortionMeta]}>temporär</Text>
+            </View>
+          </View>
           <TouchableOpacity
             style={[styles.actionButton, styles.actionButtonPrimary]}
             onPress={() => setLogVisible(true)}
@@ -243,6 +383,10 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
             <Text style={styles.actionButtonPrimaryText}>Portion eintragen</Text>
           </TouchableOpacity>
         </View>
+
+        {targetPortions !== recipe.portions && !isTextPreviewLoading && (
+          <Text style={styles.scaleWarning}>Die KI kann Fehler machen.</Text>
+        )}
 
         <Text style={styles.sectionLabel}>Nährwerte pro Portion</Text>
         <View style={styles.macroRow}>
@@ -292,8 +436,29 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           </>
         )}
 
-        {visibleSteps.length > 0 && (
-          <>
+        {isTextPreviewLoading ? (
+          <Animated.View
+            key="recipe-scale-loading"
+            entering={FadeIn.duration(180)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(300)}
+          >
+            <Text style={styles.contentSectionLabel}>Zubereitung</Text>
+            <View style={styles.scaleLoading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <View style={styles.scaleLoadingCopy}>
+                <Text style={styles.scaleLoadingTitle}>Zubereitung wird angepasst</Text>
+                <Text style={styles.scaleLoadingText}>{RECIPE_SCALE_LOADING_MESSAGE}</Text>
+              </View>
+            </View>
+          </Animated.View>
+        ) : visibleSteps.length > 0 ? (
+          <Animated.View
+            key={`recipe-steps-${textPreview.status}`}
+            entering={FadeIn.duration(180)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(300)}
+          >
             <Text style={styles.contentSectionLabel}>Zubereitung</Text>
             {visibleSteps.map((step, index) => (
               <View key={step.order} style={styles.stepRow}>
@@ -306,8 +471,8 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
                 </View>
               </View>
             ))}
-          </>
-        )}
+          </Animated.View>
+        ) : null}
 
       </ScrollView>
 
@@ -349,6 +514,13 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         subtitle="Das Rezept und seine gespeicherten Daten werden dauerhaft gelöscht."
         actions={[{ label: 'Löschen', destructive: true, onPress: () => void handleDeleteConfirmed() }]}
         onClose={() => setDeleteConfirmVisible(false)}
+      />
+
+      <InfoOverlay
+        visible={scaleInfoVisible}
+        title="Für wie viele kochst du?"
+        body="Zutatenmengen und Zubereitung werden automatisch an die gewählte Portionszahl angepasst. Dein Originalrezept bleibt unverändert."
+        onClose={() => setScaleInfoVisible(false)}
       />
 
       <InfoOverlay
@@ -429,15 +601,113 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  portionsSentence: {
+  scaleLoading: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  scaleLoadingCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xs,
+  },
+  scaleLoadingTitle: {
     ...typography.body1,
     color: colors.text,
+    fontWeight: '600',
+  },
+  scaleLoadingText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  portionSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  portionSummary: {
+    flex: 1,
+    minWidth: 0,
+  },
+  targetPortionSummary: {
+    alignItems: 'flex-end',
+  },
+  portionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  targetPortionLabelRow: {
+    width: '100%',
+    justifyContent: 'flex-end',
+  },
+  portionLabel: {
+    ...typography.overline,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+  },
+  portionMeta: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  targetPortionMeta: {
+    alignSelf: 'flex-end',
+    marginTop: spacing.xs,
+  },
+  infoButton: {
+    width: spacing.lg,
+    height: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  stepperButton: {
+    width: spacing.xl,
+    height: spacing.xl,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperButtonDisabled: {
+    backgroundColor: colors.surface,
+  },
+  stepperButtonText: {
+    ...typography.h2,
+    color: colors.primaryBright,
+  },
+  stepperButtonTextDisabled: {
+    color: colors.textDisabled,
+  },
+  targetPortionValue: {
+    ...typography.h2,
+    color: colors.primaryBright,
+    minWidth: spacing.xl,
     textAlign: 'center',
   },
   portionValue: {
     ...typography.h1,
     color: colors.primaryBright,
     fontWeight: '800',
+  },
+  scaleWarning: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
   },
   sectionLabel: {
     ...typography.overline,

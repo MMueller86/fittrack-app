@@ -1,20 +1,35 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import type { AiRecipeRaw } from '../lib/openai';
+import type { AiRecipeRaw, AiRecipeScaleRaw } from '../lib/openai';
 
 vi.mock('../lib/quota', () => ({
   enforceQuota: vi.fn().mockResolvedValue(null),
   trackUsage: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { classifyItem, resolveAmountGrams, mealParserPreviewHandler, mealEstimatePreviewHandler, recipeAnalyzeHandler } from './ai';
+import {
+  classifyItem,
+  resolveAmountGrams,
+  mealParserPreviewHandler,
+  mealEstimatePreviewHandler,
+  recipeAnalyzeHandler,
+  recipeScalePreviewHandler,
+} from './ai';
 import type { AiParsedItem } from '../lib/openai';
 import { analyzeRecipeText, __setOpenAiClientForTests } from '../lib/openai';
+import { enforceQuota, trackUsage } from '../lib/quota';
 import { _setFoodProductRepository, _resetFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { _setReusableItemsRepository, __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
 import type { FoodProductRepository } from '../lib/repositories/foodProductRepository';
 import type { ReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
-import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
+import {
+  makeContext,
+  makeAuthRequest,
+  setupTestAuth,
+  teardownTestAuth,
+  TEST_USER_ID,
+} from '../test-utils/http';
+import { getRecipesRepository, __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
 
 beforeAll(async () => {
   await setupTestAuth();
@@ -143,11 +158,13 @@ describe('resolveAmountGrams', () => {
 let originalEnv: Record<string, string | undefined>;
 
 beforeEach(() => {
+  vi.clearAllMocks();
   if (!originalEnv) originalEnv = { ...process.env };
   delete process.env.COSMOS_ENDPOINT;
   delete process.env.COSMOS_KEY;
   _resetFoodProductRepository();
   __resetReusableItemsRepositoryForTests();
+  __resetRecipesRepositoryForTests();
 });
 
 afterEach(() => {
@@ -161,6 +178,7 @@ afterEach(() => {
   __setOpenAiClientForTests(null);
   _resetFoodProductRepository();
   __resetReusableItemsRepositoryForTests();
+  __resetRecipesRepositoryForTests();
 });
 
 /** Build a fake AzureOpenAI client that returns a preset list of parsed items. */
@@ -972,5 +990,371 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
     expect(res.status).toBe(200);
     const body = res.jsonBody as { ingredients: { kitchenAmountText: string | null }[] };
     expect(body.ingredients[0]!.kitchenAmountText).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recipeScalePreviewHandler — authenticated, server-projected text preview
+// ---------------------------------------------------------------------------
+
+const VALID_RECIPE_SCALE_RAW: AiRecipeScaleRaw = {
+  description: 'Eine angepasste Beschreibung.',
+  steps: [
+    { order: 1, title: 'Vorbereiten', description: 'Bereite die Zutaten vor.' },
+    { order: 2, title: null, description: 'Mische alles gründlich.' },
+  ],
+};
+
+function mockRecipeScaleClient(response: AiRecipeScaleRaw | string) {
+  const create = vi.fn().mockResolvedValue({
+    choices: [{ message: { content: typeof response === 'string' ? response : JSON.stringify(response) } }],
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  __setOpenAiClientForTests({ chat: { completions: { create } } } as any);
+  return create;
+}
+
+function mockRecipeScaleFailure(error = new Error('provider unavailable')) {
+  const create = vi.fn().mockRejectedValue(error);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  __setOpenAiClientForTests({ chat: { completions: { create } } } as any);
+  return create;
+}
+
+async function createRecipeForScale(userId = TEST_USER_ID) {
+  return getRecipesRepository().create(userId, {
+    name: 'Tomatensauce',
+    description: 'Eine einfache Sauce.',
+    portions: 4,
+    ingredients: [
+      {
+        id: '00000000-0000-0000-0000-000000000011',
+        displayName: 'Tomaten',
+        inputMode: 'grams',
+        inputAmount: 200,
+        amountGrams: 200,
+        unit: 'g',
+        linkedProductId: null,
+        linkedReusableItemId: null,
+        isAiEstimate: false,
+        category: 'food',
+        nutritionPer100g: { calories: 18, protein: 0.9, carbs: 3.9, fat: 0.2, fiber: 1.2 },
+        nutritionContribution: { calories: 36, protein: 1.8, carbs: 7.8, fat: 0.4, fiber: 2.4 },
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000012',
+        displayName: 'Salz',
+        inputMode: 'grams',
+        inputAmount: null,
+        amountGrams: null,
+        unit: 'nach Geschmack',
+        amountLabel: '1 TL',
+        linkedProductId: null,
+        linkedReusableItemId: null,
+        isAiEstimate: false,
+        category: 'seasoning',
+        nutritionPer100g: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+        nutritionContribution: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      },
+    ],
+    steps: [
+      { order: 1, title: 'Vorbereiten', description: 'Bereite die Zutaten vor.' },
+      { order: 2, description: 'Mische alles gründlich.' },
+    ],
+    tags: ['Schnell'],
+    nutritionTotal: { calories: 36, protein: 1.8, carbs: 7.8, fat: 0.4, fiber: 2.4 },
+    nutritionPerPortion: { calories: 9, protein: 0.45, carbs: 1.95, fat: 0.1, fiber: 0.6 },
+  });
+}
+
+describe('POST /api/ai/recipe-scale/preview', () => {
+  beforeEach(() => {
+    vi.mocked(enforceQuota).mockResolvedValue(null);
+    vi.mocked(trackUsage).mockResolvedValue(undefined);
+  });
+
+  it.each([
+    ['a non-integer targetPortions', 2.5],
+    ['a targetPortions below the lower bound', 0],
+    ['a targetPortions above the upper bound', 51],
+  ])('returns 400 for %s', async (_caseName, targetPortions) => {
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({
+        body: {
+          recipeId: '00000000-0000-0000-0000-000000000001',
+          targetPortions,
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(create).not.toHaveBeenCalled();
+    expect(enforceQuota).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for an invalid recipeId', async () => {
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: 'not-a-uuid', targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(create).not.toHaveBeenCalled();
+    expect(enforceQuota).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a recipe not owned by the authenticated user', async () => {
+    const recipe = await createRecipeForScale('another-user');
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(404);
+    expect(create).not.toHaveBeenCalled();
+    expect(enforceQuota).not.toHaveBeenCalled();
+  });
+
+  it('projects stored ingredients on the server and does not persist the preview', async () => {
+    const recipe = await createRecipeForScale();
+    const originalSnapshot = JSON.parse(JSON.stringify(recipe));
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({
+        body: {
+          recipeId: recipe.id,
+          targetPortions: 2,
+          originalPortions: 999,
+          originalIngredients: [{ displayName: 'Manipulierte Zutat', amountGrams: 99999 }],
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toEqual({
+      targetPortions: 2,
+      description: VALID_RECIPE_SCALE_RAW.description,
+      steps: [
+        { order: 1, title: 'Vorbereiten', description: 'Bereite die Zutaten vor.' },
+        { order: 2, description: 'Mische alles gründlich.' },
+      ],
+    });
+
+    const request = create.mock.calls[0]?.[0] as {
+      messages: Array<{ role: string; content: string }>;
+      response_format: {
+        type: string;
+        json_schema: {
+          name: string;
+          strict: boolean;
+          schema: {
+            additionalProperties: boolean;
+            properties: {
+              steps: { items: { additionalProperties: boolean } };
+            };
+          };
+        };
+      };
+    };
+    expect(request.response_format).toMatchObject({
+      type: 'json_schema',
+      json_schema: {
+        name: 'recipe_scale_preview',
+        strict: true,
+      },
+    });
+    expect(request.response_format.json_schema.schema.additionalProperties).toBe(false);
+    expect(request.response_format.json_schema.schema.properties.steps.items.additionalProperties).toBe(false);
+    const aiInput = JSON.parse(request.messages[1]!.content) as {
+      originalPortions: number;
+      originalIngredients: Array<{ displayName: string; inputAmount: number | null; amountGrams: number | null; amountLabel: string | null }>;
+      targetIngredients: Array<{ displayName: string; inputAmount: number | null; amountGrams: number | null; amountLabel: string | null }>;
+    };
+    expect(aiInput.originalPortions).toBe(4);
+    expect(aiInput.originalIngredients[0]).toMatchObject({ displayName: 'Tomaten', inputAmount: 200, amountGrams: 200 });
+    expect(aiInput.targetIngredients[0]).toMatchObject({ displayName: 'Tomaten', inputAmount: 100, amountGrams: 100 });
+    expect(aiInput.targetIngredients[1]).toMatchObject({ displayName: 'Salz', amountLabel: '0.5 TL' });
+    expect(aiInput.originalIngredients[0]?.displayName).not.toBe('Manipulierte Zutat');
+
+    const storedAfter = await getRecipesRepository().get(TEST_USER_ID, recipe.id);
+    expect(storedAfter).toEqual(originalSnapshot);
+    expect(res.jsonBody).not.toHaveProperty('nutritionTotal');
+    expect(res.jsonBody).not.toHaveProperty('meal');
+  });
+
+  it('enforces quota before AI and tracks only after a valid response', async () => {
+    const recipe = await createRecipeForScale();
+    const order: string[] = [];
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+    create.mockImplementation(async () => {
+      order.push('ai');
+      return { choices: [{ message: { content: JSON.stringify(VALID_RECIPE_SCALE_RAW) } }] };
+    });
+    vi.mocked(enforceQuota).mockImplementation(async () => {
+      order.push('quota');
+      return null;
+    });
+    vi.mocked(trackUsage).mockImplementation(async () => {
+      order.push('track');
+    });
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(order).toEqual(['quota', 'ai', 'track']);
+    expect(enforceQuota).toHaveBeenCalledWith(
+      { userId: TEST_USER_ID, tier: 'free', isAdmin: false },
+      'recipe-scale',
+    );
+    expect(trackUsage).toHaveBeenCalledWith(
+      { userId: TEST_USER_ID, tier: 'free', isAdmin: false },
+      'recipe-scale',
+    );
+  });
+
+  it('returns 429 without calling AI or tracking usage when quota is exceeded', async () => {
+    const recipe = await createRecipeForScale();
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+    vi.mocked(enforceQuota).mockResolvedValue({
+      status: 429,
+      jsonBody: {
+        error: 'quota_exceeded',
+        feature: 'recipe-scale',
+        used: 30,
+        limit: 30,
+        resetsAt: '2026-09-01T00:00:00.000Z',
+      },
+    });
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(429);
+    expect((res.jsonBody as Record<string, unknown>).feature).toBe('recipe-scale');
+    expect(create).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 for an AI failure without consuming quota', async () => {
+    const recipe = await createRecipeForScale();
+    mockRecipeScaleFailure();
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(502);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 for an empty or non-parseable AI response without consuming quota', async () => {
+    const recipe = await createRecipeForScale();
+    mockRecipeScaleClient('');
+
+    const emptyRes = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+    expect(emptyRes.status).toBe(502);
+    expect(trackUsage).not.toHaveBeenCalled();
+
+    mockRecipeScaleClient('{not-json');
+    const malformedRes = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+    expect(malformedRes.status).toBe(502);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 for a parseable response with the wrong step order', async () => {
+    const recipe = await createRecipeForScale();
+    mockRecipeScaleClient({
+      ...VALID_RECIPE_SCALE_RAW,
+      steps: [
+        VALID_RECIPE_SCALE_RAW.steps[0]!,
+        { ...VALID_RECIPE_SCALE_RAW.steps[1]!, order: 1 },
+      ],
+    });
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 for a parseable response with the wrong step count', async () => {
+    const recipe = await createRecipeForScale();
+    mockRecipeScaleClient({
+      ...VALID_RECIPE_SCALE_RAW,
+      steps: [VALID_RECIPE_SCALE_RAW.steps[0]!],
+    });
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 for a parseable response with an unexpected field', async () => {
+    const recipe = await createRecipeForScale();
+    mockRecipeScaleClient({
+      ...VALID_RECIPE_SCALE_RAW,
+      extra: 'must be rejected',
+    } as AiRecipeScaleRaw & { extra: string });
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('preserves a missing recipe description as null', async () => {
+    const recipe = await createRecipeForScale();
+    await getRecipesRepository().update(TEST_USER_ID, recipe.id, { description: undefined });
+    mockRecipeScaleClient({
+      description: null,
+      steps: VALID_RECIPE_SCALE_RAW.steps,
+    });
+
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toMatchObject({ targetPortions: 2, description: null });
+  });
+
+  it('returns 401 without authentication', async () => {
+    const { makeRequest } = await import('../test-utils/http');
+    const res = await recipeScalePreviewHandler(
+      makeRequest({ body: { recipeId: '00000000-0000-0000-0000-000000000001', targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(401);
   });
 });

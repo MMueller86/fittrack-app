@@ -185,9 +185,49 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 | POST | `/api/ai/food-estimate/batch` | Yes | `food-estimate` | Batch food estimation |
 | POST | `/api/ai/label-scan` | Yes | `label-scan` | Multipart image → nutrition label data |
 | POST | `/api/ai/recipe-analyze` | Yes | `recipe-analyze` | Recipe text → structured metadata and ingredient preview |
+| POST | `/api/ai/recipe-scale/preview` | Yes | `recipe-scale` | Stored recipe → transient scaled description and steps |
 | GET | `/api/ai/daily-insight` | Yes | (tracked separately) | Once-daily AI briefing; never returns error to user |
 
 AI endpoints return `429` with `QuotaExceededResponse` when quota is exceeded.
+
+### POST /api/ai/recipe-scale/preview
+
+Authenticated preview endpoint. The backend loads the recipe by the authenticated `userId` and `recipeId`; the request contains no trusted original recipe data.
+
+**Request body:**
+
+```json
+{
+	"recipeId": "uuid",
+	"targetPortions": 2
+}
+```
+
+`targetPortions` must be a whole number from `1` through `50`. The endpoint calculates target ingredients server-side with the shared projection and sends the original and target context to Azure OpenAI. Ingredient quantities are not included in the response.
+
+**Response body (200):**
+
+```json
+{
+	"targetPortions": 2,
+	"description": "...",
+	"steps": [
+		{ "order": 1, "title": "...", "description": "..." }
+	]
+}
+```
+
+`description` is `string | null`. `steps` preserve the stored step count and order. The response is transient: the endpoint does not update the recipe, its nutrition, or diary data.
+
+**Error responses:**
+
+- `400` — invalid JSON, invalid UUID, or `targetPortions` outside the whole-number range `1–50`
+- `401` — missing or invalid Bearer token
+- `404` — recipe does not exist for the authenticated user
+- `422` — provider response is parseable but violates the response or step contract
+- `429` — `QuotaExceededResponse` with `feature: "recipe-scale"`, limit `30` for `free` and `premium`, and `resetsAt`
+- `502` — Azure OpenAI unavailable, empty output, or non-parseable provider output
+- `500` — unexpected backend error
 
 ## Common Response Patterns
 
@@ -196,6 +236,6 @@ AI endpoints return `429` with `QuotaExceededResponse` when quota is exceeded.
 - **401** — missing or invalid Bearer token
 - **404** — resource not found
 - **422** — AI plausibility check failed (hallucinated values)
-- **429** — quota exceeded: `QuotaExceededResponse` with `resetAt` date
+- **429** — quota exceeded: `QuotaExceededResponse` with `resetsAt` date
 - **500** — internal error (stack never leaked to client)
 - **501** — not yet implemented

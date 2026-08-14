@@ -15,6 +15,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 | Label Scan | POST /api/ai/label-scan | `label-scan` | `LabelScanReviewScreen` |
 | Meal Estimator | POST /api/ai/estimate-meal | `meal-estimate` | `MealEstimateReviewScreen` |
 | Recipe Analyzer | POST /api/ai/recipe-analyze | `recipe-analyze` | `RecipeWizardScreen` |
+| Recipe Scale Preview | POST /api/ai/recipe-scale/preview | `recipe-scale` | Transient recipe detail preview |
 | Daily Insight | GET /api/ai/daily-insight | (special) | Inline on `HomeScreen` |
 
 ## 1. Meal Parser
@@ -157,7 +158,19 @@ This allows the review screen (`RecipeWizardScreen`) to render seasoning items d
 
 `RecipeStep` persistence contains only `order`, optional `title`, and `description`. Step-level `notes` are not part of the shared recipe type or API contract; historical notes are cleaned lazily on recipe update rather than by a Cosmos migration.
 
-## 6. Daily Insight
+## 6. Recipe Scale Preview
+
+**Prompt version:** `RECIPE_SCALE_PROMPT_VERSION = 'v1'`
+
+**Input:** `{ recipeId, targetPortions }`, where `targetPortions` is a whole number from `1` through `50`.
+
+The authenticated backend loads the recipe by `userId` and `recipeId`, verifies ownership through the repository, and calculates original and target ingredient contexts with the shared deterministic projection. The client cannot supply the original quantities used for the AI context. The AI receives the original description, ordered steps, original ingredient snapshot, server-calculated target ingredient snapshot, and both portion counts.
+
+**Output:** `{ targetPortions, description, steps }`, where `description` is a string or `null` and `steps` contain only `order`, optional `title`, and `description`. The AI response contains no ingredient quantities. Strict Structured Output is used with `additionalProperties: false` at every object level. The backend validates the response shape and rejects any response whose step count or order differs from the stored recipe with `422`.
+
+The preview is advisory and transient. Per the US-05 product decision, this workflow has no additional manual confirmation screen; the mobile view keeps the warning `Die KI kann Fehler machen.` visible. No recipe, nutrition, or diary document is written. Quota is enforced before the AI call and tracked only after a fully valid response. Provider/parse failures return `502`; invalid structured responses return `422`; quota exhaustion returns `429`.
+
+## 7. Daily Insight
 
 **Trigger:** `GET /api/ai/daily-insight` (once per day per user)
 

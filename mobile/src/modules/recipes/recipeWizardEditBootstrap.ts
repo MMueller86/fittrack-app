@@ -8,8 +8,10 @@ import {
   type WizardIngredient,
   type WizardStepItem,
 } from './recipeWizardTypes';
+import { normalizeRecipeWizardPortions } from './recipeWizardPortions';
 
 export interface RecipeWizardEditBootstrapState {
+  portions: number;
   ingredients: WizardIngredient[];
   amountEdits: Record<string, AmountEdit>;
   steps: WizardStepItem[];
@@ -73,6 +75,7 @@ export function buildWizardStepsFromRecipe(recipe: Recipe): WizardStepItem[] {
 
 export function buildRecipeWizardEditBootstrapState(recipe: Recipe): RecipeWizardEditBootstrapState {
   return {
+    portions: normalizeRecipeWizardPortions(recipe.portions),
     ingredients: recipe.ingredients.map(buildWizardIngredientFromRecipeIngredient),
     amountEdits: buildAmountEditsFromIngredients(recipe.ingredients),
     steps: buildWizardStepsFromRecipe(recipe),

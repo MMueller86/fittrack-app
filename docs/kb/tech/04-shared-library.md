@@ -70,6 +70,11 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `RecipeNutrition` — `{ calories, protein, carbs, fat, fiber }` totals + per-portion; the recipe calculator gives seasonings and indeterminate amounts a zero contribution
 - `Recipe` — owner, ingredients, steps, images, nutrition, usage count
 
+### `recipeScale.ts`
+- `RECIPE_PORTION_MIN` / `RECIPE_PORTION_MAX` — shared target portion bounds (`1`–`50`)
+- `RecipeScalePreviewRequest` — `{ recipeId, targetPortions }`
+- `RecipeScalePreviewResponse` — transient `{ targetPortions, description, steps }` response
+
 ### `foodProduct.ts`
 - `FoodProduct` — Open Food Facts catalog entry
   - `id` = `openFoodFacts:<barcode>`
@@ -79,7 +84,7 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
   - `qualityFlags` — optional quality annotations
 
 ### `quota.ts`
-- `AiFeature` — `'meal-parser' | 'food-estimate' | 'label-scan' | 'meal-estimate' | 'recipe-analyze'`
+- `AiFeature` — `'meal-parser' | 'food-estimate' | 'label-scan' | 'meal-estimate' | 'recipe-analyze' | 'recipe-scale'`
 - `UserTier` — `'free' | 'premium' | 'internal'`
 - `AiUsageCounter` — Cosmos document tracking monthly AI usage per user/feature
 - `QuotaCheckResult` — `{ allowed, used, limit, remaining, feature, period }`
@@ -121,7 +126,7 @@ All functions are pure (no I/O, no state).
 | `nutritionCalculator.ts` | `calculateNutrition(item, mode, amount)` | Scales per-100g values to portion/grams |
 | `goalContext.ts` | `evaluateWeightDelta()`, `progressGrowsOnDecrease()` | Goal-relative progress direction |
 | `plateauDetector.ts` | `computePlateauSignal(entries)` | Std-dev plateau detection over 28-day window |
-| `recipeCalculator.ts` | `calculateRecipeNutrition(ingredients)` | Recipe totals + per-portion |
+| `recipeCalculator.ts` | `calculateRecipeNutrition(ingredients)`, `scaleRecipeIngredients(ingredients, originalPortions, targetPortions)` | Recipe totals + per-portion and pure target-ingredient projection |
 | `activityBonusCalculator.ts` | `calculateActivityBonus(inputs, weightKg, dailyCalorieTarget)` | V3 piecewise-linear MET model for hiking; returns `ActivityBonusResult` including V3 intermediates |
 | `cyclingBonusCalculator.ts` | `calculateCyclingActivityBonus(inputs, weightKg, dailyCalorieTarget)` | `cycling-met-estimator@1.1.0` — speed + elevation + terrain + eBike MET model for cycling; 250 spec test cases |
 
@@ -161,6 +166,12 @@ Implements the `cycling-met-estimator@1.1.0` model. Spec source: `docs/kb/Specs/
 10. `activityBonus = max(0, activityCalories − normalCalories)`, rounded to nearest 50 kcal
 
 **eBike support levels:** NONE=0%, LIGHT=35% speed / 40% uphill reduction, HIGH=75% / 75%.
+
+### Recipe ingredient projection
+
+`scaleRecipeIngredients()` is pure and returns new ingredient objects without mutating the original array or its ingredient objects. It scales finite `inputAmount` and `amountGrams` values by `targetPortions / originalPortions`, while preserving null and non-finite values and all ingredient metadata. `amountLabel` is changed only for an unambiguous positive decimal prefix using `.` or `,`; ranges, fractions, negative/non-finite values, and indeterminate labels remain unchanged.
+
+The function is shared by the mobile preview and the backend AI context. It does not calculate nutrition and never changes `nutritionPer100g` or `nutritionContribution`.
 
 ## Import Pattern for Backend
 

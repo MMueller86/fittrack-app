@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { calculateRecipeNutrition, calculateIngredientContribution } from './recipeCalculator';
+import {
+  calculateRecipeNutrition,
+  calculateIngredientContribution,
+  scaleRecipeIngredients,
+} from './recipeCalculator';
 import type { RecipeIngredient } from '../types/recipes';
 
 // ---------------------------------------------------------------------------
@@ -179,5 +183,88 @@ describe('calculateRecipeNutrition', () => {
     const ingredients = [makeIngredient({ amountGrams: 100 })]; // 200 kcal
     const { nutritionPerPortion } = calculateRecipeNutrition(ingredients, 0.5);
     expect(nutritionPerPortion.calories).toBe(400);
+  });
+});
+
+describe('scaleRecipeIngredients', () => {
+  it('scales structured amounts and returns new ingredients without changing metadata', () => {
+    const ingredient = makeIngredient({
+      inputAmount: 1.5,
+      amountGrams: 200,
+      unit: 'Scheibe',
+      amountLabel: '1 TL',
+      category: 'seasoning',
+      portionWeightGrams: 40,
+      portionLabel: 'Scheibe',
+    });
+
+    const [scaledIngredient] = scaleRecipeIngredients([ingredient], 4, 2);
+
+    expect(scaledIngredient).toMatchObject({
+      inputAmount: 0.75,
+      amountGrams: 100,
+      amountLabel: '0.5 TL',
+      unit: 'Scheibe',
+      inputMode: 'grams',
+      category: 'seasoning',
+      portionWeightGrams: 40,
+      portionLabel: 'Scheibe',
+      linkedProductId: null,
+      linkedReusableItemId: null,
+      isAiEstimate: false,
+    });
+    expect(scaledIngredient).not.toBe(ingredient);
+    expect(scaledIngredient?.nutritionPer100g).toBe(ingredient.nutritionPer100g);
+    expect(scaledIngredient?.nutritionContribution).toBe(ingredient.nutritionContribution);
+    expect(ingredient.inputAmount).toBe(1.5);
+    expect(ingredient.amountGrams).toBe(200);
+    expect(ingredient.amountLabel).toBe('1 TL');
+  });
+
+  it('keeps null and non-finite structured amounts unchanged', () => {
+    const ingredient = makeIngredient({
+      inputAmount: null,
+      amountGrams: Number.POSITIVE_INFINITY,
+      amountLabel: '1 TL',
+    });
+
+    const [scaledIngredient] = scaleRecipeIngredients([ingredient], 1, 2);
+
+    expect(scaledIngredient?.inputAmount).toBeNull();
+    expect(scaledIngredient?.amountGrams).toBe(Number.POSITIVE_INFINITY);
+    expect(scaledIngredient?.amountLabel).toBe('2 TL');
+  });
+
+  it('formats decimal label prefixes without floating-point artifacts', () => {
+    const ingredients = [
+      makeIngredient({ id: 'comma', amountLabel: '1,5 EL' }),
+      makeIngredient({ id: 'point', amountLabel: '0.1 TL' }),
+    ];
+
+    const scaledIngredients = scaleRecipeIngredients(ingredients, 1, 2);
+
+    expect(scaledIngredients.map((ingredient) => ingredient.amountLabel)).toEqual(['3 EL', '0.2 TL']);
+  });
+
+  it('keeps indeterminate and unsafe labels unchanged', () => {
+    const labels = ['nach Geschmack', '1-2 TL', '1–2 TL', '1/2 TL'];
+    const ingredients = labels.map((amountLabel, index) =>
+      makeIngredient({ id: `label-${index}`, amountLabel }),
+    );
+
+    const scaledIngredients = scaleRecipeIngredients(ingredients, 1, 2);
+
+    expect(scaledIngredients.map((ingredient) => ingredient.amountLabel)).toEqual(labels);
+  });
+
+  it('keeps negative and non-finite label prefixes unchanged', () => {
+    const labels = ['-1 TL', 'Infinity TL', '-Infinity TL', 'NaN TL'];
+    const ingredients = labels.map((amountLabel, index) =>
+      makeIngredient({ id: `unsafe-label-${index}`, amountLabel }),
+    );
+
+    const scaledIngredients = scaleRecipeIngredients(ingredients, 1, 2);
+
+    expect(scaledIngredients.map((ingredient) => ingredient.amountLabel)).toEqual(labels);
   });
 });

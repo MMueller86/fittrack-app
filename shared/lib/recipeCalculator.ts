@@ -28,6 +28,37 @@ function zeroNutrition(): RecipeNutrition {
   return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
 }
 
+function scaleNumericAmount(value: number | null, factor: number): number | null {
+  if (value == null || !Number.isFinite(value)) return value;
+
+  const scaledValue = value * factor;
+  return Number.isFinite(scaledValue) ? scaledValue : value;
+}
+
+function formatScaledLabelNumber(value: number): string {
+  return String(Number(value.toFixed(10)));
+}
+
+function scaleAmountLabel(label: string | undefined, factor: number): string | undefined {
+  if (label === undefined) return undefined;
+
+  const match = /^(\d+(?:[.,]\d+)?)(.*)$/.exec(label);
+  if (!match) return label;
+
+  const originalValue = Number(match[1].replace(',', '.'));
+  if (!Number.isFinite(originalValue) || originalValue <= 0) return label;
+
+  const suffix = match[2];
+  if (/^\s*(?:(?:[-/\u2013\u2014])\s*\d|\d+\s*\/\s*\d|(?:bis|to)\b)/i.test(suffix)) {
+    return label;
+  }
+
+  const scaledValue = originalValue * factor;
+  if (!Number.isFinite(scaledValue) || scaledValue <= 0) return label;
+
+  return `${formatScaledLabelNumber(scaledValue)}${suffix}`;
+}
+
 // ---------------------------------------------------------------------------
 // Ingredient contribution
 // ---------------------------------------------------------------------------
@@ -106,4 +137,26 @@ export function calculateRecipeNutrition(
   const nutritionPerPortion = divideNutrition(nutritionTotal, portions);
 
   return { nutritionTotal, nutritionPerPortion };
+}
+
+export function scaleRecipeIngredients(
+  ingredients: RecipeIngredient[],
+  originalPortions: number,
+  targetPortions: number,
+): RecipeIngredient[] {
+  const factor = targetPortions / originalPortions;
+
+  return ingredients.map((ingredient) => {
+    const scaledIngredient: RecipeIngredient = {
+      ...ingredient,
+      inputAmount: scaleNumericAmount(ingredient.inputAmount, factor),
+      amountGrams: scaleNumericAmount(ingredient.amountGrams, factor),
+    };
+
+    if (ingredient.amountLabel !== undefined) {
+      scaledIngredient.amountLabel = scaleAmountLabel(ingredient.amountLabel, factor);
+    }
+
+    return scaledIngredient;
+  });
 }

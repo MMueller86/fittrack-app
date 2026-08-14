@@ -15,9 +15,15 @@ describe('quotaConfig', () => {
       expect(getLimit('premium', 'meal-parser')).toBe(500);
     });
 
+    it('returns 30 recipe-scale calls for free and premium tiers', () => {
+      expect(getLimit('free', 'recipe-scale')).toBe(30);
+      expect(getLimit('premium', 'recipe-scale')).toBe(30);
+    });
+
     it('returns Infinity for internal tier', () => {
       expect(getLimit('internal', 'meal-parser')).toBe(Infinity);
       expect(getLimit('internal', 'food-estimate')).toBe(Infinity);
+      expect(getLimit('internal', 'recipe-scale')).toBe(Infinity);
     });
   });
 

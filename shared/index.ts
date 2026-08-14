@@ -8,6 +8,7 @@ export * from './types/nutrition';
 export * from './types/diary';
 export * from './types/aiMealEstimate';
 export * from './types/recipes';
+export * from './types/recipeScale';
 export * from './types/weights';
 export * from './types/foodProduct';
 export * from './types/quota';

@@ -7,6 +7,7 @@ import { MEAL_PARSER_SYSTEM_PROMPT } from './prompts/mealParser';
 import { FOOD_ESTIMATE_SYSTEM_PROMPT } from './prompts/foodEstimate';
 import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
 import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
+import { RECIPE_SCALE_SYSTEM_PROMPT } from './prompts/recipeScale';
 import { DAILY_INSIGHT_SYSTEM_PROMPT, DAILY_INSIGHT_PROMPT_VERSION } from './prompts/dailyInsightV9';
 import type { InsightInputContext, InsightResponse } from '@fittrack/shared';
 
@@ -456,6 +457,97 @@ export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
         : ingredient,
     ),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Recipe scale text preview
+// ---------------------------------------------------------------------------
+
+export interface AiRecipeScaleIngredientContext {
+  displayName: string;
+  category: 'food' | 'seasoning';
+  inputMode: 'grams' | 'portion';
+  unit: string;
+  inputAmount: number | null;
+  amountGrams: number | null;
+  amountLabel: string | null;
+}
+
+export interface AiRecipeScaleInput {
+  originalPortions: number;
+  targetPortions: number;
+  originalDescription: string | null;
+  originalIngredients: AiRecipeScaleIngredientContext[];
+  targetIngredients: AiRecipeScaleIngredientContext[];
+  originalSteps: Array<{
+    order: number;
+    title: string | null;
+    description: string;
+  }>;
+}
+
+export interface AiRecipeScaleRaw {
+  description: string | null;
+  steps: Array<{
+    order: number;
+    title: string | null;
+    description: string;
+  }>;
+}
+
+const RECIPE_SCALE_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    description: { type: ['string', 'null'] as const },
+    steps: {
+      type: 'array' as const,
+      items: {
+        type: 'object' as const,
+        properties: {
+          order: { type: 'number' as const },
+          title: { type: ['string', 'null'] as const },
+          description: { type: 'string' as const },
+        },
+        required: ['order', 'title', 'description'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['description', 'steps'],
+  additionalProperties: false,
+};
+
+/**
+ * Adapt recipe description and steps for a target portion count.
+ * Ingredient quantities are calculated by the server and are included only
+ * as context; they are never taken from the AI response.
+ */
+export async function scaleRecipeText(input: AiRecipeScaleInput): Promise<AiRecipeScaleRaw> {
+  const client = getClient();
+  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+
+  const response = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      { role: 'system', content: RECIPE_SCALE_SYSTEM_PROMPT },
+      { role: 'user', content: JSON.stringify(input) },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'recipe_scale_preview',
+        strict: true,
+        schema: RECIPE_SCALE_SCHEMA,
+      },
+    },
+    temperature: 0,
+    max_tokens: 2048,
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI');
+
+  return JSON.parse(raw) as AiRecipeScaleRaw;
 }
 
 // ---------------------------------------------------------------------------

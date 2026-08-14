@@ -46,6 +46,11 @@ import {
   canRunRecipeWizardAnalysis,
   getRecipeWizardPreviousPhase,
 } from './recipeWizardNavigation';
+import {
+  DEFAULT_RECIPE_WIZARD_PORTIONS,
+  isValidRecipeWizardPortions,
+  normalizeRecipeWizardPortions,
+} from './recipeWizardPortions';
 import type {
   AmountEdit,
   WizardImageDraft,
@@ -155,7 +160,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   const [recipeName, setRecipeName] = useState('');
   const [recipeDescription, setRecipeDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [portions, setPortions] = useState(4);
+  const [portions, setPortions] = useState(DEFAULT_RECIPE_WIZARD_PORTIONS);
 
   // Ingredients
   const [ingredients, setIngredients] = useState<WizardIngredient[]>([]);
@@ -205,7 +210,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       setRecipeName(recipe.name);
       setRecipeDescription(recipe.description ?? '');
       setTags(normalizeTags(recipe.tags));
-      setPortions(recipe.portions);
+      setPortions(bootstrapState.portions);
       setIngredients(bootstrapState.ingredients);
       setAmountEdits(bootstrapState.amountEdits);
       setSteps(bootstrapState.steps);
@@ -258,7 +263,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       const result = await aiApi.analyzeRecipe(inputText.trim());
       setRecipeName(result.suggestedName);
       setRecipeDescription(result.description);
-      setPortions(Math.max(1, result.suggestedPortions));
+      setPortions(normalizeRecipeWizardPortions(result.suggestedPortions));
       setTags(normalizeTags(result.tags));
       const wizardIngredients = result.ingredients.map(initWizardIngredient);
       setIngredients(wizardIngredients);
@@ -724,6 +729,10 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       Alert.alert('Name fehlt', 'Bitte gib dem Rezept einen Namen.');
       return;
     }
+    if (!isValidRecipeWizardPortions(portions)) {
+      Alert.alert('Ungültige Portionszahl', 'Bitte verwende eine ganze Zahl zwischen 1 und 50.');
+      return;
+    }
     const confirmedIngredients = ingredients
       .filter((i) => i.status === 'confirmed' || i.status === 'auto-matched' || i.status === 'seasoning')
       .map((i) => i.resolvedIngredient!)
@@ -802,6 +811,12 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       );
     }
   };
+
+  const handlePortionsChange = useCallback((value: number) => {
+    if (isValidRecipeWizardPortions(value)) {
+      setPortions(value);
+    }
+  }, []);
 
   // ---------------------------------------------------------------------------
   // Derived
@@ -998,7 +1013,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
               previewViewModel={previewViewModel}
               onRecipeNameChange={setRecipeName}
               onRecipeDescriptionChange={setRecipeDescription}
-              onPortionsChange={setPortions}
+              onPortionsChange={handlePortionsChange}
               onPickImage={handlePickImage}
               onRemoveImage={handleRemoveImage}
               onMoveImage={handleMoveImage}

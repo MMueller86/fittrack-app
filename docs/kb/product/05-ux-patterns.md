@@ -41,6 +41,12 @@ An information overlay must:
 
 [Rule] Standard Android alerts must never be used for FitTrack product UI. In particular, do not use `Alert.alert` for information, instructions, confirmations, or action choices. Use `InfoOverlay`, `ConfirmSheet`, or the appropriate bottom-sheet pattern instead.
 
+## Recipe Scale Preview
+
+The recipe detail view presents the saved `Portionen` and the temporary `Nachkochen für` value separately. The target uses a one-step `−`/`+` control within the shared `1–50` bounds. A separate information trigger opens an `InfoOverlay` with the title `Für wie viele kochst du?` and explains that ingredients and preparation are adapted temporarily while the original recipe remains unchanged.
+
+Changing the target projects ingredients immediately and leaves them visible during the approximately 400 ms debounce and the AI request. The old description and steps are hidden in both states; the screen shows exactly: `Die KI passt die Texte an die neuen Rezeptmengen an. Die KI kann Fehler machen.` A complete response replaces both text sections atomically. If the request fails, the projected ingredients remain, the original texts return, and a friendly German `InfoOverlay` explains the fallback. Returning to the saved portion count restores the original view without an AI request. Pending debounce timers and requests are invalidated on a new target, reset, reload, or unmount.
+
 ## Wizard Back Confirmation
 
 Multi-phase flows use the shared `ConfirmSheet` for both the in-screen back action and the Android hardware back action. Returning from the initial input phase leaves the wizard immediately; back is blocked while an analysis is running. In later phases, the sheet explains that unsaved progress would be lost and offers one destructive `Zurück` action plus the standard dismissal. Both back entry points use the same phase transition, so the user receives identical navigation semantics.

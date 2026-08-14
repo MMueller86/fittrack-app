@@ -1,9 +1,21 @@
 // AI API — meal parser + food nutrition estimator + label scan + meal estimate
 import { apiClient } from './client';
-import type { FoodSearchResult, AiFoodEstimatePreview, NutritionLabelScanResult, AiMealEstimatePreview } from '@fittrack/shared';
+import type {
+  FoodSearchResult,
+  AiFoodEstimatePreview,
+  NutritionLabelScanResult,
+  AiMealEstimatePreview,
+  RecipeScalePreviewRequest,
+  RecipeScalePreviewResponse,
+} from '@fittrack/shared';
 
 // Re-export for convenience so callers don't need to import from @fittrack/shared directly
-export type { AiFoodEstimatePreview, NutritionLabelScanResult, AiMealEstimatePreview };
+export type {
+  AiFoodEstimatePreview,
+  NutritionLabelScanResult,
+  AiMealEstimatePreview,
+  RecipeScalePreviewResponse,
+};
 
 // ---------------------------------------------------------------------------
 // Types — mirror backend MealParserPreviewItem
@@ -126,6 +138,20 @@ export const aiApi = {
   analyzeRecipe(text: string): Promise<AiRecipeAnalysis> {
     return apiClient
       .post<AiRecipeAnalysis>('/ai/recipe-analyze', { text }, { timeout: 90_000 })
+      .then((r) => r.data);
+  },
+
+  /** POST /api/ai/recipe-scale/preview — adapt recipe text for a temporary target portion count */
+  previewRecipeScale(
+    request: RecipeScalePreviewRequest,
+    signal?: AbortSignal,
+  ): Promise<RecipeScalePreviewResponse> {
+    return apiClient
+      .post<RecipeScalePreviewResponse>(
+        '/ai/recipe-scale/preview',
+        request,
+        { timeout: 90_000, signal },
+      )
       .then((r) => r.data);
   },
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { scaleRecipeIngredients } from '@fittrack/shared';
 import type { RecipeIngredient } from '@fittrack/shared';
 import {
   buildRecipePreviewViewModel,
@@ -71,5 +72,40 @@ describe('recipePreviewViewModel', () => {
     const ingredient = makeIngredient({ inputAmount: 0, amountGrams: 125 });
 
     expect(formatRecipeIngredientAmount(ingredient)).toBe('125 g');
+  });
+
+  it('renders an immediate projected amount without mutating the saved ingredients', () => {
+    const food = makeIngredient({ id: 'food-1', inputAmount: 100, amountGrams: 100, unit: 'g' });
+    const seasoning = makeIngredient({
+      id: 'seasoning-1',
+      category: 'seasoning',
+      inputAmount: null,
+      amountGrams: null,
+      amountLabel: '1 TL',
+    });
+    const originalIngredients = [food, seasoning];
+
+    const projectedIngredients = scaleRecipeIngredients(originalIngredients, 1, 2);
+    const viewModel = buildRecipePreviewViewModel(projectedIngredients);
+
+    expect(viewModel.groups[0]?.ingredients[0]?.amountLabel).toBe('200 g');
+    expect(viewModel.groups[1]?.ingredients[0]?.amountLabel).toBe('2 TL');
+    expect(originalIngredients[0]).toBe(food);
+    expect(originalIngredients[1]).toBe(seasoning);
+    expect(food.inputAmount).toBe(100);
+    expect(seasoning.amountLabel).toBe('1 TL');
+  });
+
+  it('keeps an indeterminate seasoning label unchanged during projection', () => {
+    const ingredient = makeIngredient({
+      category: 'seasoning',
+      inputAmount: null,
+      amountGrams: null,
+      amountLabel: 'nach Geschmack',
+    });
+
+    const projectedIngredient = scaleRecipeIngredients([ingredient], 1, 2)[0];
+
+    expect(projectedIngredient?.amountLabel).toBe('nach Geschmack');
   });
 });
