@@ -8,7 +8,12 @@
 //   - Otherwise → InMemoryInsightRepository (process-local, lost on restart)
 
 import { createHash } from 'node:crypto';
-import type { InsightDocument, InsightInputContext } from '@fittrack/shared';
+import type {
+  InsightDocument,
+  InsightInputContext,
+  WeeklyEvaluation,
+  WeeklyEvaluationStatus,
+} from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
 import { getCosmos } from '../cosmos';
 
@@ -21,6 +26,32 @@ export const MAX_DAILY_GENERATIONS = 3;
 
 /** Minimum time between regenerations in milliseconds (30 minutes). */
 export const MIN_REGEN_INTERVAL_MS = 30 * 60 * 1000;
+
+export type WeeklyInsightStoredStatus = Exclude<WeeklyEvaluationStatus, 'cached'>;
+
+/** Persisted weekly insight document in the existing aiInsights container. */
+export interface WeeklyInsightDocument {
+  id: string;
+  userId: string;
+  _docType: 'weeklyInsight';
+  referenceDate: string;
+  periodStart: string;
+  periodEnd: string;
+  inputHash: string;
+  promptVersion: string;
+  model: string;
+  response: WeeklyEvaluation;
+  status: WeeklyInsightStoredStatus;
+  generatedAt: string | null;
+  lastAttemptAt: string;
+  expiresAt: string;
+  ttl: number;
+  tokensUsed: number;
+}
+
+export function makeWeeklyInsightId(userId: string, periodEnd: string): string {
+  return `${userId}:weekly:${periodEnd}`;
+}
 
 // ---------------------------------------------------------------------------
 // Input hash — used to detect meaningful data changes
@@ -133,6 +164,10 @@ export interface InsightRepository {
   get(userId: string, date: string): Promise<InsightDocument | null>;
   /** Create or replace the insight document (upsert). */
   upsert(doc: InsightDocument): Promise<void>;
+  /** Get the weekly insight document for the user and completed period. */
+  getWeekly(userId: string, periodEnd: string): Promise<WeeklyInsightDocument | null>;
+  /** Create or replace a weekly insight document. */
+  upsertWeekly(doc: WeeklyInsightDocument): Promise<void>;
   /** List recent insight documents (newest first) within the last N calendar days up to and including referenceDate. */
   listRecent(userId: string, days: number, referenceDate?: string): Promise<InsightDocument[]>;
 }
@@ -143,6 +178,7 @@ export interface InsightRepository {
 
 export class InMemoryInsightRepository implements InsightRepository {
   private readonly docs = new Map<string, InsightDocument>();
+  private readonly weeklyDocs = new Map<string, WeeklyInsightDocument>();
 
   private makeKey(userId: string, date: string): string {
     return `${userId}:${date}`;
@@ -154,6 +190,14 @@ export class InMemoryInsightRepository implements InsightRepository {
 
   async upsert(doc: InsightDocument): Promise<void> {
     this.docs.set(this.makeKey(doc.userId, doc.date), doc);
+  }
+
+  async getWeekly(userId: string, periodEnd: string): Promise<WeeklyInsightDocument | null> {
+    return this.weeklyDocs.get(makeWeeklyInsightId(userId, periodEnd)) ?? null;
+  }
+
+  async upsertWeekly(doc: WeeklyInsightDocument): Promise<void> {
+    this.weeklyDocs.set(makeWeeklyInsightId(doc.userId, doc.periodEnd), doc);
   }
 
   async listRecent(userId: string, days: number, referenceDate?: string): Promise<InsightDocument[]> {
@@ -189,6 +233,25 @@ export class CosmosInsightRepository implements InsightRepository {
   async upsert(doc: InsightDocument): Promise<void> {
     const { containers } = await getCosmos();
     await containers.aiInsights.items.upsert<InsightDocument>(doc);
+  }
+
+  async getWeekly(userId: string, periodEnd: string): Promise<WeeklyInsightDocument | null> {
+    const { containers } = await getCosmos();
+    const id = makeWeeklyInsightId(userId, periodEnd);
+    try {
+      const { resource } = await containers.aiInsights.item(id, userId).read<WeeklyInsightDocument>();
+      return resource?._docType === 'weeklyInsight' ? resource : null;
+    } catch (e) {
+      if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  async upsertWeekly(doc: WeeklyInsightDocument): Promise<void> {
+    const { containers } = await getCosmos();
+    await containers.aiInsights.items.upsert<WeeklyInsightDocument>(doc);
   }
 
   async listRecent(userId: string, days: number, referenceDate?: string): Promise<InsightDocument[]> {

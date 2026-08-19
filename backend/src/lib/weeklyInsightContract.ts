@@ -1,0 +1,1 @@
+export const WEEKLY_INSIGHT_TEXT_MAX_LENGTH = 750;

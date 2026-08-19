@@ -27,6 +27,7 @@ Located in `backend/src/functions/`. Each file owns one domain.
 | `foodSearch.ts` | GET /food-search | Yes | Fan-out search |
 | `foodProducts.ts` | GET /food-products/search, /food-products/{id} | Yes | Catalog only |
 | `dailyInsight.ts` | GET /ai/daily-insight | Yes | Cached, quota-aware |
+| `weeklyInsight.ts` | GET /ai/weekly-insight | Yes | Seven completed days, cached, quota-aware |
 | `favorites.ts` | GET/POST/DELETE /favorites, GET /food-relations/recent | Yes | |
 
 Health check: `GET /api/health` — anonymous, always returns `{ status: 'ok' }`.
@@ -53,6 +54,7 @@ Health check: `GET /api/health` — anonymous, always returns `{ status: 'ok' }`
 | `searchRanking.ts` | Ranking logic for food search results |
 | `tokenize.ts` | Text tokenization for food product search keywords |
 | `log.ts` | `logEvent()` structured logging |
+| `weeklyInsight.ts` | Server-side weekly aggregation, sanitized AI context, and cache decisions |
 | `openFoodFactsClient.ts` | (Unused at runtime — kept for reference) |
 | `repositories/` | Repository pattern implementations |
 | `prompts/` | System prompt strings for each AI feature |
@@ -116,6 +118,33 @@ if (quotaResponse) return quotaResponse; // 429
 // ... perform AI call ...
 await trackUsage(user, 'food-estimate');
 ```
+
+`GET /api/ai/weekly-insight` reuses the existing `daily-insight` feature key as
+the shared personal-insight budget. It checks quota before Azure OpenAI and tracks
+usage only after a response passes server-side Structured Output validation. Quota
+exhaustion is converted to a `200` weekly response with usable deterministic week
+data and `evaluation.text: null`; it is not exposed as a standalone `429`.
+
+The weekly handler reads exactly seven completed date-only days relative to the
+validated local `date` query parameter. It calculates nutrition, historical target
+snapshots, profile fallbacks for days without an explicit stored target, effective
+activity targets, percentages, missing-data states, and totals server-side. A
+profile fallback uses the stored training target for an explicitly marked training
+day and the stored rest target otherwise; it is read-only and never persisted as a
+historical snapshot. The AI receives only the sanitized aggregate context. Meal names,
+product text, user IDs, tokens, cache IDs, and raw diary documents are not sent to
+the provider or written to weekly handler logs.
+
+Weekly documents use `_docType: 'weeklyInsight'` and the key
+`${userId}:weekly:${periodEnd}` in the existing `aiInsights` container. Their hash
+includes the seven days' meal/item identities and stored macros, DayMeta/activity
+snapshots, profile fallback calorie targets, the reference date, and the prompt
+version. A hash change never returns
+the previous evaluation text; a short regeneration interval may return a neutral
+evaluation until a new generation is allowed. A generated `evaluation.text` is
+trimmed and limited to 750 characters at every backend contract boundary. A
+provider response with `finish_reason: 'length'` is treated as unavailable, is
+stored with `evaluation.text: null`, and does not consume quota.
 
 ## Import Rules
 

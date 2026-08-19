@@ -44,13 +44,20 @@ Key fields:
 
 ## Day Meta
 
-`DayMeta` — per-day metadata stored in a separate Cosmos container.
+`DayMeta` — per-day metadata stored as `_docType: 'dayMeta'` in the existing `nutritionDiaryMeals` Cosmos container.
 
 - `dayType: 'rest' | 'training'` — determines which targets apply
 - `workoutType` — optional label for training days
 - `specialActivity?: SpecialActivity` — persisted result of a special activity calculation (see below)
+- `calorieTargetSnapshot?` — optional historical base-target snapshot captured on an explicit day-context write; contains `calories`, `capturedAt`, `source: 'profile'` and an optional `profileUpdatedAt`
 
 The diary GET endpoint assembles `DayMeta` and selects the correct `DayTargets` accordingly.
+
+### Historical target read rules
+
+The weekly read resolves targets snapshot-first. A valid `DayMeta.calorieTargetSnapshot.calories` is used before the existing `specialActivity.dailyCalorieTarget`, which remains a compatible historical source for older activity documents. If neither exists, the read uses the current profile's `trainingDay` target for an explicitly stored training day and `restDay` otherwise, including a day without `DayMeta`. This is a read-only `profile_fallback`, not a historical snapshot, and is never written into the diary. If a special activity exists but has no usable stored target, the activity target remains unavailable rather than being replaced by a profile value.
+
+An absent `calorieTargetSnapshot` is expected on legacy documents and requires no migration. Explicitly setting a historical day type may write or replace that day's snapshot. Profile updates do not touch existing DayMeta documents. Removing a special activity preserves an explicit day snapshot; the special-activity PUT/DELETE contract and its existing `422` cases remain unchanged.
 
 ## Special Activity
 
@@ -115,6 +122,10 @@ In addition to `activityBonus`, the calculation returns intermediates for displa
 ## Day Summary
 
 Computed on every diary GET — never stored. Sum of all `MealItem.nutrition` values across all meals for the day.
+
+## Weekly nutrition review data
+
+The shared weekly DTO contains exactly seven completed days, `consumedCalories`, `consumedMacros`, the resolved base and effective targets, `targetPercent`, a target-band classification, a missing-data status, the day type and a special-activity label. An explicitly stored `DayMeta` keeps its `dayType` and optional `workoutType` in the weekly result even when the calorie target comes from the read-only `profile_fallback`; target resolution must not erase the day context. The activity label and activity bonus remain available from the stored special activity. A `rest` context synthesized only because a special activity was stored without an explicit day context remains implicit and is not exposed as a historical day type. `consumedMacros` has the shape `{ protein, carbs, fat } | null` and sums the authoritative `MealItem.macros` snapshots across all Meals and Items for the day. A day with an empty Meal or no Items has `consumedMacros: null`; a present MealItem whose calories or macro values are `0` has valid nutrition and valid zero values. The raw sums are not rounded. Missing days remain visible but are excluded from totals and averages. No historical protein, carbohydrate, or fat targets are reconstructed.
 
 ## Hint System
 

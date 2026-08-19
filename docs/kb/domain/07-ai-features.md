@@ -17,6 +17,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 | Recipe Analyzer | POST /api/ai/recipe-analyze | `recipe-analyze` | `RecipeWizardScreen` |
 | Recipe Scale Preview | POST /api/ai/recipe-scale/preview | `recipe-scale` | Transient recipe detail preview |
 | Daily Insight | GET /api/ai/daily-insight | (special) | Inline on `HomeScreen` |
+| Weekly Insight | GET /api/ai/weekly-insight?date=YYYY-MM-DD | `daily-insight` (shared personal-insight budget) | Backend endpoint; Mobile integration in F-1 |
 
 ## 1. Meal Parser
 
@@ -191,6 +192,41 @@ The preview is advisory and transient. Per the US-05 product decision, this work
 - AI unavailable → `status: 'unavailable'` with friendly German copy
 
 **Output:** `InsightResponse` — title + summary (60–120 words) + optional recommendation/CTA
+
+## 8. Weekly Insight
+
+**Trigger:** `GET /api/ai/weekly-insight?date=YYYY-MM-DD`
+
+The authenticated endpoint returns seven completed local calendar days,
+`date - 7` through `date - 1`, with deterministic server-side nutrition and
+target metrics. The current day is excluded. Each day reports consumed calories,
+historical base/effective target, target percentage, target-band state, data
+availability, day type, and a neutral label for a known hiking or cycling activity.
+
+The backend never reconstructs an old target from the current profile. It uses a
+stored `DayMeta.calorieTargetSnapshot` first and a valid stored
+`specialActivity.dailyCalorieTarget` as a compatible legacy source. Missing
+nutrition and missing targets are independent states. A present MealItem is valid
+nutrition even when its stored calories are `0`; an empty Meal is missing nutrition.
+Only days with both nutrition and a positive effective target contribute to totals.
+
+The AI receives only sanitized aggregate values for these seven days and the
+calculated totals. Meal names, product text, user IDs, tokens, and cache details
+are excluded. The prompt is versioned (`WEEKLY_INSIGHT_PROMPT_VERSION = 'v2'`)
+and uses Strict Structured Outputs with one validated `text` field. The generated
+text is trimmed and limited to exactly 750 characters at most; it is advisory and
+interpretive and must not invent missing data or make medical, deficit, or diagnosis
+claims. A length-truncated provider response is unavailable and is not counted
+toward the shared insight quota.
+
+Weekly results are cached separately from daily insights in the existing
+`aiInsights` container under `_docType: 'weeklyInsight'`. The cache is invalidated
+when meal/item macros or identities, DayMeta/activity/target snapshots, or the
+prompt version changes. The old text is never returned after a hash change,
+including the v1-to-v2 prompt bump.
+Quota is checked with the shared `daily-insight` key before AI and usage is tracked
+only after a fully valid AI response. Quota, provider, parse, and schema failures
+keep the deterministic chart data available and return `evaluation.text: null`.
 
 ## Confidence & Warnings Pattern
 

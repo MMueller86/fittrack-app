@@ -4,13 +4,25 @@
 //   - COSMOS configured → CosmosDayMetaRepository (same nutritionDiaryMeals container)
 //   - Otherwise → InMemoryDayMetaRepository
 
-import type { DayMeta, DayType, WorkoutType, SpecialActivity } from '@fittrack/shared';
+import type {
+  CalorieTargetSnapshot,
+  DayMeta,
+  DayType,
+  WorkoutType,
+  SpecialActivity,
+} from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosDayMetaRepository } from './cosmosDayMetaRepository';
 
 export interface DayMetaRepository {
   get(userId: string, date: string): Promise<DayMeta | null>;
-  upsert(userId: string, date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<DayMeta>;
+  upsert(
+    userId: string,
+    date: string,
+    dayType: DayType,
+    workoutType?: WorkoutType | null,
+    calorieTargetSnapshot?: CalorieTargetSnapshot | null,
+  ): Promise<DayMeta>;
   setSpecialActivity(userId: string, date: string, activity: SpecialActivity): Promise<DayMeta>;
   removeSpecialActivity(userId: string, date: string): Promise<DayMeta>;
 }
@@ -26,7 +38,13 @@ class InMemoryDayMetaRepository implements DayMetaRepository {
     return this.store.get(this.key(userId, date)) ?? null;
   }
 
-  async upsert(userId: string, date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<DayMeta> {
+  async upsert(
+    userId: string,
+    date: string,
+    dayType: DayType,
+    workoutType?: WorkoutType | null,
+    calorieTargetSnapshot?: CalorieTargetSnapshot | null,
+  ): Promise<DayMeta> {
     const existing = this.store.get(this.key(userId, date));
     const meta: DayMeta = {
       ...(existing ?? {}),
@@ -41,6 +59,11 @@ class InMemoryDayMetaRepository implements DayMetaRepository {
       delete meta.workoutType;
     } else if (workoutType != null) {
       meta.workoutType = workoutType;
+    }
+    if (calorieTargetSnapshot === null) {
+      delete meta.calorieTargetSnapshot;
+    } else if (calorieTargetSnapshot !== undefined) {
+      meta.calorieTargetSnapshot = calorieTargetSnapshot;
     }
     this.store.set(this.key(userId, date), meta);
     return meta;

@@ -31,7 +31,7 @@ Request body for POST/PUT: `ProfileInput` — validated with Zod.
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/diary/day/{date}` | Yes | Full day: meals + summary + hint + dayMeta |
+| GET | `/api/diary?date=YYYY-MM-DD` | Yes | Full day: meals + summary + hint + dayMeta |
 | POST | `/api/diary/meals` | Yes | Create meal for a date |
 | PUT | `/api/diary/meals/{mealId}` | Yes | Update meal metadata |
 | DELETE | `/api/diary/meals/{mealId}` | Yes | |
@@ -187,8 +187,101 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 | POST | `/api/ai/recipe-analyze` | Yes | `recipe-analyze` | Recipe text → structured metadata and ingredient preview |
 | POST | `/api/ai/recipe-scale/preview` | Yes | `recipe-scale` | Stored recipe → transient scaled description and steps |
 | GET | `/api/ai/daily-insight` | Yes | (tracked separately) | Once-daily AI briefing; never returns error to user |
+| GET | `/api/ai/weekly-insight?date=YYYY-MM-DD` | Yes | `daily-insight` | Seven completed days plus optional AI evaluation; deterministic data remains usable on AI failure |
 
 AI endpoints return `429` with `QuotaExceededResponse` when quota is exceeded.
+
+The weekly insight endpoint is the exception: it uses the existing `daily-insight`
+quota key but converts quota exhaustion into a `200` response with
+`evaluation.status: "quota_exceeded"` and `evaluation.text: null`, so the weekly
+data stays available.
+
+### GET /api/ai/weekly-insight?date=YYYY-MM-DD
+
+The endpoint requires a valid Bearer token and a required real local calendar date.
+The server loads data only for the authenticated user and returns the seven
+completed dates `date - 7` through `date - 1` in ascending order. The current day
+is never included, and missing days are retained in the response.
+
+**Response body (200):**
+
+```json
+{
+	"referenceDate": "2026-08-14",
+	"periodStart": "2026-08-07",
+	"periodEnd": "2026-08-13",
+	"days": [
+		{
+			"date": "2026-08-07",
+			"consumedCalories": 2185,
+			"consumedMacros": { "protein": 132.5, "carbs": 245.25, "fat": 78.75 },
+			"baseTargetCalories": 2300,
+			"effectiveTargetCalories": 2300,
+			"activityBonusCalories": 0,
+			"targetPercent": 95,
+			"targetBand": "in_range",
+			"dataStatus": "available",
+			"targetSource": "day_target_snapshot",
+			"dayType": "rest",
+			"workoutType": null,
+			"activity": null,
+			"hasMealItem": true,
+			"mealItemCount": 2
+		}
+	],
+	"totals": {
+		"includedDayCount": 6,
+		"totalConsumedCalories": 16890,
+		"totalTargetCalories": 17620,
+		"averageConsumedCalories": 2815,
+		"averageTargetCalories": 2936.6666666667,
+		"overallTargetPercent": 95.857
+	},
+	"evaluation": {
+		"status": "fresh",
+		"text": "Deine Woche zeigt ...",
+		"generatedAt": "2026-08-14T10:00:00.000Z"
+	}
+}
+```
+
+`days` always contains exactly seven entries. `dataStatus` distinguishes
+`available`, `missing_nutrition`, `missing_target`, and
+`missing_nutrition_and_target`. A day with an existing MealItem and `0` kcal is
+valid nutrition data. `consumedMacros` is `null` when no MealItem exists; otherwise
+it contains the unrounded sums of `protein`, `carbs`, and `fat` from all
+`MealItem.macros` snapshots across all meals. Present `0` kcal or `0` g values
+remain valid data and are not converted to missing values. Missing values are
+`null`, not invented zeros. No historical macro targets are added. Totals include
+only days with both nutrition data and a valid positive effective target; the total
+percentage is `sum(consumed) / sum(target) * 100`, not an average of daily
+percentages. Target resolution is snapshot-first: the API uses a valid DayMeta
+snapshot, then a compatible stored special-activity target, and finally the current
+ profile's rest target by default or training target for an explicitly stored
+ training day. The final case is reported as `targetSource: "profile_fallback"` and
+ is read-only; it is not persisted as historical data. An explicitly stored
+ `DayMeta` still supplies `dayType` and optional `workoutType` in the response when
+ this fallback is used. A stored snapshot remains authoritative after later profile
+ changes. The activity label and bonus remain in the response when a stored special
+ activity exists; the default `rest` context created only for an activity-only day
+ remains implicit.
+
+`evaluation.status` is `fresh`, `cached`, `quota_exceeded`, or `unavailable`.
+Quota, provider, parse, and Structured Output failures return `200` with
+`evaluation.text: null`; they do not create a deterministic replacement text.
+When present, `evaluation.text` is the trimmed AI response and is limited to
+750 characters. Exactly 750 characters remain unchanged through a fresh response
+and a cache hit; a provider response truncated with `finish_reason: 'length'` is
+returned as `unavailable` with `text: null` and is not quota-tracked.
+Identical weekly input is served from the weekly cache without an AI call. Meal,
+macro, DayMeta, activity, target-snapshot, or prompt-version changes invalidate the
+hash, and old evaluation text is not returned after invalidation.
+
+**Errors:**
+
+- `400` — missing, malformed, or non-calendar `date`
+- `401` — missing or invalid Bearer token
+- `500` — unexpected backend or persistence failure outside the neutral AI failure contract
 
 ### POST /api/ai/recipe-scale/preview
 

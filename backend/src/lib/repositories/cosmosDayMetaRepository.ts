@@ -2,7 +2,13 @@
 // DayMeta documents are stored in the nutritionDiaryMeals container,
 // discriminated by _docType: 'dayMeta'.
 
-import type { DayMeta, DayType, WorkoutType, SpecialActivity } from '@fittrack/shared';
+import type {
+  CalorieTargetSnapshot,
+  DayMeta,
+  DayType,
+  WorkoutType,
+  SpecialActivity,
+} from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
 import type { DayMetaRepository } from './dayMetaRepository';
 
@@ -20,7 +26,13 @@ export class CosmosDayMetaRepository implements DayMetaRepository {
     }
   }
 
-  async upsert(userId: string, date: string, dayType: DayType, workoutType?: WorkoutType | null): Promise<DayMeta> {
+  async upsert(
+    userId: string,
+    date: string,
+    dayType: DayType,
+    workoutType?: WorkoutType | null,
+    calorieTargetSnapshot?: CalorieTargetSnapshot | null,
+  ): Promise<DayMeta> {
     const { containers } = await getCosmos();
     // Read existing doc first to preserve any fields not being updated
     const existing = await this.get(userId, date);
@@ -38,6 +50,11 @@ export class CosmosDayMetaRepository implements DayMetaRepository {
       delete meta.workoutType;
     } else if (workoutType != null) {
       meta.workoutType = workoutType;
+    }
+    if (calorieTargetSnapshot === null) {
+      delete meta.calorieTargetSnapshot;
+    } else if (calorieTargetSnapshot !== undefined) {
+      meta.calorieTargetSnapshot = calorieTargetSnapshot;
     }
     const { resource } = await containers.nutritionDiaryMeals.items.upsert<DayMeta>(meta);
     if (!resource) throw new Error('Cosmos upsert returned no resource');

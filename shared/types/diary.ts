@@ -88,6 +88,16 @@ export interface DaySummary {
 export type DayType = 'rest' | 'training';
 export type WorkoutType = 'gym' | 'bouldering' | 'running' | 'cycling' | 'other';
 
+export type CalorieTargetSnapshotSource = 'profile';
+
+/** Historical base-calorie target captured when the day context was explicitly set. */
+export interface CalorieTargetSnapshot {
+  calories: number;
+  capturedAt: string;
+  source: CalorieTargetSnapshotSource;
+  profileUpdatedAt?: string;
+}
+
 export type SpecialActivityType = 'hiking' | 'running' | 'cycling' | 'other';
 
 export type PackCategory = 'none' | 'small' | 'medium' | 'heavy';
@@ -164,6 +174,8 @@ export interface DayMeta {
   dayType: DayType;
   workoutType?: WorkoutType;
   specialActivity?: SpecialActivity;
+  /** Optional Class-0 field; absent on legacy documents means the historical target is unknown. */
+  calorieTargetSnapshot?: CalorieTargetSnapshot;
   updatedAt: string;
   _docType: 'dayMeta';
 }

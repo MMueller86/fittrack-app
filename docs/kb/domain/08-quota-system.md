@@ -35,6 +35,7 @@ See [tech/05-authentication.md](../tech/05-authentication.md) for how `isAdmin` 
 - `'meal-estimate'` — meal image → nutrition estimate
 - `'recipe-analyze'` — recipe text analysis
 - `'recipe-scale'` — transient recipe description and step preview
+- `'daily-insight'` — personal daily and weekly insight budget
 
 ## Monthly Limits (Documented Baseline)
 
@@ -46,6 +47,7 @@ See [tech/05-authentication.md](../tech/05-authentication.md) for how `isAdmin` 
 | `meal-estimate` | 30/month | 300/month | ∞ |
 | `recipe-analyze` | 30/month | 300/month | ∞ |
 | `recipe-scale` | 30/month | 30/month | ∞ |
+| `daily-insight` | 30/month | 300/month | ∞ |
 
 [Open] Exact values are in `backend/src/lib/quotaConfig.ts` — verify before publishing authoritative limits.
 [Rule] `recipe-scale` uses exactly `30/month` for both `free` and `premium`; `internal` remains unlimited. The independent `isAdmin = true` bypass is applied before tier checks and remains unlimited even for a `free` tier user.
@@ -73,6 +75,15 @@ See [tech/05-authentication.md](../tech/05-authentication.md) for how `isAdmin` 
 ```
 
 [Rule] `enforceQuota()` does NOT increment usage. `trackUsage()` must be called separately after a successful AI response. This ensures failed AI calls are not counted.
+
+The weekly insight endpoint reuses `daily-insight` as the shared personal-insight
+budget. It calls `enforceQuota()` before Azure OpenAI and calls `trackUsage()` only
+after the response passes server-side Structured Output validation. Quota exhaustion
+is returned inside the weekly `200` response as `evaluation.status: 'quota_exceeded'`
+with `evaluation.text: null`; no new monthly limit or feature key exists for weekly
+insights. The deterministic seven-day values remain usable. Invalid weekly output,
+including `finish_reason: 'length'` or a trimmed text over the 750-character
+contract, is returned as `unavailable` and never calls `trackUsage()`.
 
 ## Cosmos Storage
 

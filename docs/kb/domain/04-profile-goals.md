@@ -137,6 +137,12 @@ If the calorie target is very low (e.g., at the minimum guardrail), carbs can re
 - `createdAt`, `updatedAt`
 - `id` = `'profile'` (one profile per user, `userId` is the partition key)
 
+### Historical target boundary
+
+The profile document contains the current `restDay` and `trainingDay` targets only. Updating the profile recalculates and replaces those current targets, but never updates historical `DayMeta.calorieTargetSnapshot` fields. This keeps completed-day targets stable across later weight, goal, activity or intensity changes. The weekly read may use the current matching profile target as a non-persisted fallback for a day that has no explicit snapshot; such legacy/default days are not historical snapshots and can therefore follow later profile changes.
+
+When a user explicitly changes a historical day type, the backend may capture the currently selected profile target into that day's optional snapshot. If no usable profile target exists, the snapshot remains unavailable; no fallback target is invented.
+
 ## Profile Wizard
 
 `ProfileWizardScreen` — shown on first app launch if no profile exists. Multi-step guided form. On completion, calls `POST /api/profile` and stores `SKIP_WIZARD_KEY` in `AsyncStorage` to prevent re-showing.

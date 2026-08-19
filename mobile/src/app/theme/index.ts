@@ -22,8 +22,10 @@ const palette = {
   textDisabled: '#4A5249',
 
   positive: '#67B23E', // weight loss reads as "good" — reuse primary green
+  warning: '#F59E0B',
   negative: '#E26B6B',
   neutral: '#A6B0A4',
+  specialActivityOutline: '#C4A1FF', // Reserved for the later special-activity badge outline.
 
   white: '#FFFFFF',
 } as const;
@@ -46,6 +48,7 @@ export const colors = {
   textDisabled: palette.textDisabled,
 
   positive: palette.positive,
+  warning: palette.warning,
   negative: palette.negative,
   neutral: palette.neutral,
 
@@ -55,6 +58,7 @@ export const colors = {
   chart: {
     line: palette.primaryBright,
     average: '#8FA9CB',
+    specialActivityOutline: palette.specialActivityOutline,
     grid: palette.border,
     gradientFrom: 'rgba(143, 209, 87, 0.35)',
     gradientTo: 'rgba(143, 209, 87, 0)',

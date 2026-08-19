@@ -31,11 +31,14 @@ textMuted:       '#7E8B7C'   // Labels, timestamps, placeholders
 textDisabled:    '#4A5249'   // Near-invisible elements
 
 positive:        '#67B23E'   // = primary
+warning:         '#F59E0B'   // outside weekly target range
 negative:        '#E26B6B'   // Errors, active heart icon
 neutral:         '#A6B0A4'
 ```
 
 [Rule] Never hardcode hex values in components. Always use `colors.*` tokens from the theme.
+
+`colors.chart.average` bleibt unverändert `#8FA9CB`. `colors.chart.specialActivityOutline` ist `#C4A1FF` und wird ausschließlich als Outline eines Sonderaktivitätsmarkers im Wochenrückblick verwendet. Trainingsmarker, Balkenfüllungen und Spaltenkonturen verwenden diesen lila Token nicht.
 
 ---
 
@@ -57,13 +60,28 @@ Short contextual explanations use the shared mobile `InfoOverlay` pattern. The o
 - Full-screen backdrop using `colors.background` with controlled opacity
 - Centered panel using `colors.surfaceElevated`, `colors.border`, `radius.xl`, and `spacing.lg`
 - Title in `typography.h3`, explanation in `typography.body2`
-- One clear primary dismissal action such as `Verstanden` using `typography.button` and `colors.primary`
+- One clear primary dismissal action `Schließen` using `typography.button` and `colors.primary`
+- Optional scrollable content slot for longer contextual detail with intrinsic height until the panel maximum is reached; the content `ScrollView` is the sole scroll owner, and the footer places `Schließen` below it with a small bottom-panel gap. The panel respects the device safe area. An optional secondary link action remains in the shared header beside the title, separate from the `Schließen` dismissal CTA; link, retry and dismissal actions provide an effective 48pt touch target
 - Dismissal by the action, the backdrop, or the platform back action
 - `animationType="fade"` for a quiet appearance without disrupting the current task
 
 [Rule] Never use standard Android alerts (`Alert.alert`) for FitTrack information, instructions, confirmations, or action choices. These must use an app-owned overlay such as `InfoOverlay` or the appropriate FitTrack bottom sheet.
 
 ---
+
+## Wochenrückblick-Karte
+
+Die `WeeklyReviewCard` steht direkt nach `DayNutritionCard` auf dem Homescreen. Sie folgt der Card-DNA mit Theme-Tokens und zeigt genau sieben feste, flexible Tagescontainer ohne horizontales Scrollen. Das Diagramm steht vor genau zwei kompakten vollbreiten Bilanzzeilen: `7-Tage-Ziel` mit sichtbar `<Gegessen> / <Ziel>` und `Ø Ziel / Tag` mit sichtbar `<Gegessen> / <Ziel>` im bestehenden Zahlenformat; die sichtbaren Wörter `Gegessen` und `Ziel` entfallen, bleiben aber im Accessibility-Label zur Bedeutungs- und Reihenfolgesicherung. `Zielerreichung in Prozent` steht genau einmal rechts oben im Header; bei fehlenden Totals bleibt der Wert neutral. Gegessene Aggregate verwenden die bestehende Gesamt-Zielbandsemantik einschließlich gültiger `0`-Werte, Zielwerte bleiben neutral. Textuelle Diagrammüberschriften links/rechts und die sichtbare Tageszählung entfallen. Jeder Balken ist ein zugänglicher Trigger für das bestehende `InfoOverlay`; nur der darin enthaltene Link `Tagebuch öffnen` navigiert für das ausgewählte date-only-Datum nach `Nutrition -> DiaryMain({ date })`. Zeitraum im Header und Wochentag bleiben sichtbar; das einzelne Tagesdatum sowie Tagesziel-, Ziel- und Statuszeilen werden nicht im engen Raster gezeigt. Die Balkenhöhe basiert auf dem serverseitig gelieferten Tagesprozentsatz; eine gemeinsame `100 %`-Referenz und genau ein Marker-Slot pro Tag machen das individuelle Ziel sichtbar. Training und besondere Aktivitäten erhalten kompakte, platzstabile Marker innerhalb der Spalte; bei einer Kombination werden beide nebeneinander gerendert. Der Sonderaktivitätstag erhält einen transparenten Rahmen mit `colors.chart.specialActivityOutline` um Wertzeile, Chart-/Balkenbereich, Wochentag und Markerbereich, ohne Legenden, Nachbarspalten oder die Karte zu umfassen. Bei fehlendem Ziel bleibt der Marker neutral und es werden keine Zielzahl oder Zielerreichung erfunden.
+
+Die zentrale Shared-Farbklasse `in_range` wird für `95–105 %` inklusive auf `colors.primary` abgebildet. `outside_range` verwendet den semantischen Token `colors.warning`; die Grenze wird nicht in der React-Native-Komponente neu berechnet. Fehlende Ernährung, fehlendes Ziel und fehlende beides werden als neutrale diagonale Schraffur ohne Höhen-Semantik dargestellt und nicht als `0 kcal`-Balken interpretiert. Ein vorhandener MealItem mit `0 kcal` bleibt ein solider normaler Balken. Die links ausgerichtete Legende zeigt drei responsive, kontrolliert umbrechende Einträge: `Im Ziel (95–105 %)`, `Nicht im Ziel` und `Keine Daten`; die neutrale Schraffur bleibt als Marker unterscheidbar.
+
+Die reale Reihenfolge im Diagrammraster lautet `Balken -> Wochentag -> Markerbereich -> Markerlegende -> Farblegende`; die Markerlegende wird nur bei mindestens einer Sonderaktivität gerendert. Die sieben flexiblen Tagescontainer und ihre Markerzellen liegen stabil unterhalb der Wochentagslabels; die Markerzellen liegen außerhalb von `barTrack`. Bekannte Trainingsmarker verwenden den gemeinsamen monochromen Katalog aus `mobile/src/modules/home/homeTrainingPresentation.ts`: `Gym`/`weight-lifter`, `Bouldern / Klettern`/`human-handsup`, `Laufen`/`run`, `Radfahren`/`bike` und `Sonstiges`/`dots-horizontal`. Ein fehlender oder unbekannter Workout-Wert fällt neutral auf `Training`/`activity` zurück; ein Ruhetag ohne Sonderaktivität erhält keinen Marker. Sonderaktivitäten verwenden `Radtour`/`bike` für `cycling`, `Wanderung`/`hiking` für `hiking` und neutral `Sonderaktivität`/`info` für unbekannte Werte. `cycling` als Training bleibt mit `Radfahren` und der Markerart `training` vom Sonderaktivitätsmarker `Radtour` mit der Markerart `activity` unterscheidbar. Training plus Sonderaktivität zeigt beide Marker in dieser Reihenfolge nebeneinander; nur der Tagescontainer erhält den lila Rahmen, Trainingsmarker und Balkenfüllungen bleiben neutral. Ein konkretes Datum wird nicht unter den Balken gerendert, sondern nur im Tagesdetail-Overlay verwendet. Markerzellen und Marker-Symbole bleiben dekorativ und bieten keine eigenen TalkBack-Aktionsziele. Die Markerlegende wird unabhängig vom konkreten Sonderaktivitätstyp auf genau einen Eintrag `Sonderaktivität` dedupliziert. Die vollständige Farblegende mit `Im Ziel`, `Nicht im Ziel` und `Keine Daten` bleibt links ausgerichtet, vertikal zentriert und bricht ihre Einträge kontrolliert responsiv mit flexiblen Breiten um.
+
+Der Bewertungsbereich unter dem Diagramm zeigt ausschließlich `evaluation.text`, initial mit höchstens zwei sichtbaren Textzeilen. Die Überlaufentscheidung basiert auf einer unbeschränkten, nicht zugänglichen Messung mit identischer Typografie, realer Containerbreite und aktueller Font Scale; nur bei tatsächlichem Überlauf erscheinen `Mehr anzeigen` und ein Chevron. Der vollständig geöffnete Text hat keine native Zeilenbegrenzung und kann mit `Weniger anzeigen` wieder eingeklappt werden. Bei neuem Review, Text, verfügbarer Breite oder Font Scale wird Messung und Expand-Zustand zurückgesetzt; bei `null` bleibt er neutral und ohne Toggle. Die Tagesdetails inklusive vorhandener Aktivitäts-, Basisziel-, Bonus-, Workout- und Makroinformationen werden im begrenzt scrollbaren `InfoOverlay` erklärt. Bei einem Refresh-Fehler bleibt eine vorhandene Karte sichtbar und bietet dezent `Erneut versuchen`; ohne Review bleibt der bestehende Fehlerzustand erhalten. Die PNG-Referenz ist nur eine visuelle Orientierung für Hierarchie, Dichte, Marker und Anordnung; Beispielzahlen sowie die dort grün dargestellten Werte über `105 %` werden nicht als Design- oder Produktlogik übernommen.
+
+Im Tages-Overlay ist der Kalorienzielvergleich eine kompakte Fortschrittsleiste mit Verbrauch, effektivem Ziel und Zielprozentsatz. Diese Werte bleiben aus dem erklärenden Body entfernt und werden nur in der Visualisierung beziehungsweise ihrer Accessibility-Beschreibung angeboten. Die Leiste verwendet die bestehenden Zielbandfarben, hält den Zielmarker sichtbar und fällt neutral zurück, wenn Ernährung und Ziel nicht vergleichbar sind. Makrowerte bleiben absolut und unabhängig zugänglich; `0 g` ist ein gültiger Anzeigewert und historische Makroziele werden nicht gezeigt. Special-Activity- und Trainingdetails erscheinen als kompakte Label-/Wert-Gruppen ausschließlich in der Reihenfolge `Basisziel`, `Aktivitätsbonus`, `Effektives Ziel`, `Sonderaktivität` im Sonderaktivitätskontext (`Aktivität` nur bei Training ohne Sonderaktivität); `Tagestyp`, `Workout-Typ` und `Datenstatus` sind weder sichtbar noch accessibility-relevant. Fehlende Werte sind `Nicht verfügbar`, gültige Nullen bleiben sichtbar. `Tagebuch öffnen` ist ein sekundärer Header-Link; `Schließen` bleibt der separate Dismiss-CTA unterhalb des einzigen Content-ScrollViews mit 48-dp-Touchhöhe und geringem Abstand zum unteren Panelrand.
+
+Der Home-Katalog wird in Picker, Coachingkarte und Wochenmarkern monochrom mit neutraler Icon-Farbe verwendet. `rest` ist dort `Ruhetag` mit `sleep`; `gym`, `bouldering`, `running`, `cycling` und `other` sind `Gym`, `Bouldern / Klettern`, `Laufen`, `Radfahren` und `Sonstiges` mit den jeweils katalogisierten MCI-Icons. Nur der Sonderaktivitätstag erhält den transparenten Rahmen `colors.chart.specialActivityOutline`; Trainingsmarker, Balkenfüllungen und Nachbarspalten bleiben ohne lila Hervorhebung.
 
 ## Typography
 
@@ -184,7 +202,7 @@ Recipe creation, detail, and logging reuse shared mobile components instead of d
 |---|---|
 | `MealChip` | Two-state selectable tag for meal types. The selected state uses a check mark and `colors.primarySoft`; the unselected state uses the surface and border tokens. |
 | `NutritionTile` | Compact bordered tile for a nutrient value and unit. It is reused by recipe detail and the logging preview. |
-| `InfoOverlay` | App-owned contextual and error dialog with a dark backdrop, elevated panel, fade transition, and a single `Verstanden` action. It is used for wizard guidance and recipe loading/logging errors. |
+| `InfoOverlay` | App-owned contextual and error dialog with a dark backdrop, elevated panel, fade transition, a `Schließen` action, optional scrollable content, and an optional secondary link. It is used for wizard guidance, recipe loading/logging errors, and the weekly macro detail. |
 | `ConfirmSheet` | Shared bottom-sheet confirmation pattern for leaving the wizard and destructive recipe actions. |
 | `Snackbar` | Shared transient feedback at the bottom of the screen with optional `Rückgängig` action; the wizard uses it when ingredients or steps are removed. |
 

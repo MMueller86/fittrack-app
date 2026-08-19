@@ -6,22 +6,8 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import type { WeightEntry, WorkoutType } from '@fittrack/shared';
-
-const WORKOUT_LABELS: Record<WorkoutType, string> = {
-  gym: 'Gym',
-  bouldering: 'Bouldern / Klettern',
-  running: 'Laufen',
-  cycling: 'Radfahren',
-  other: 'Sonstiges',
-};
-
-const WORKOUT_ICONS: Record<WorkoutType, string> = {
-  gym: '🏋️',
-  bouldering: '🧗',
-  running: '🏃',
-  cycling: '🚴',
-  other: '💡',
-};
+import { Icon } from '../../shared/components/Icon';
+import { HOME_TRAINING_PRESENTATION } from './homeTrainingPresentation';
 
 interface Props {
   displayName: string;
@@ -90,12 +76,12 @@ export function CoachingHeroCard({
   previous,
   entries,
 }: Props) {
-  const trainingLabel =
+  const trainingPresentation =
     dayType === 'rest'
-      ? '😴  Ruhetag'
+      ? HOME_TRAINING_PRESENTATION.rest
       : workoutType && dayType === 'training'
-        ? `${WORKOUT_ICONS[workoutType]}  ${WORKOUT_LABELS[workoutType]}`
-        : '💪  Training';
+        ? HOME_TRAINING_PRESENTATION[workoutType]
+        : null;
 
   const delta = latest && previous ? latest.value - previous.value : null;
   const deltaGood = delta !== null && delta <= 0;
@@ -116,7 +102,19 @@ export function CoachingHeroCard({
             onPress={onTrainingPress}
             activeOpacity={0.7}
           >
-            <Text style={styles.trainingChipText}>{trainingLabel}</Text>
+            {trainingPresentation ? (
+              <>
+                <Icon
+                  lib="mci"
+                  name={trainingPresentation.icon}
+                  size="sm"
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.trainingChipText}>{trainingPresentation.label}</Text>
+              </>
+            ) : (
+              <Text style={styles.trainingChipText}>Training</Text>
+            )}
             <Text style={styles.trainingChipChevron}>  ▾</Text>
           </TouchableOpacity>
         </View>

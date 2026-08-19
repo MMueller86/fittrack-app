@@ -12,6 +12,7 @@ import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelat
 import { getProfileRepository } from '../lib/repositories/profileRepository';
 import { getHintStateRepository } from '../lib/repositories/hintStateRepository';
 import { evaluateHint } from '../lib/hintEngine';
+import { resolveCalorieTargetSnapshot } from '../lib/weeklyTargetSnapshot';
 import type { DayTargets } from '../../../shared/types/nutrition';
 
 // GET /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
@@ -217,7 +218,15 @@ export const setDayTypeHandler = withHandler(
     const { dayType, workoutType } = parsed.data;
     // When switching to rest, clear workoutType
     const resolvedWorkoutType = dayType === 'rest' ? null : (workoutType ?? undefined);
-    const dayMeta = await getDayMetaRepository().upsert(userId, date, dayType, resolvedWorkoutType);
+    const profile = await getProfileRepository().get(userId);
+    const calorieTargetSnapshot = resolveCalorieTargetSnapshot(profile, dayType);
+    const dayMeta = await getDayMetaRepository().upsert(
+      userId,
+      date,
+      dayType,
+      resolvedWorkoutType,
+      calorieTargetSnapshot,
+    );
     logEvent(ctx, 'info', 'diary.dayType.set', { userId, date, dayType, workoutType: resolvedWorkoutType ?? null });
     return { status: 200, jsonBody: { dayMeta } };
   },

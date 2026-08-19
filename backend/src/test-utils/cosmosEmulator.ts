@@ -90,6 +90,7 @@ export async function createTestDatabase(databaseId: string): Promise<EmulatorCo
     },
     { id: 'foodProducts', partitionKey: '/id' },
     { id: 'aiUsage', partitionKey: '/userId' },
+    { id: 'aiInsights', partitionKey: '/userId' },
   ];
 
   for (const def of containerDefs) {

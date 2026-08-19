@@ -5,9 +5,11 @@
 //   1. BrandHeader: FitTrack-Logo + Name
 //   2. CoachingHeroCard: Begrüßung + Hint + Gewicht (2-Spalten) + Sparkline
 //   3. DayNutritionCard: Donut-Ring + animierte Kalorien + Makro-Balken
-//   4. InsightCard: KI-Tagesanalyse (async, non-blocking)
+//   4. WeeklyReviewCard: sieben abgeschlossene Tage + KI-Wochenbewertung
+//   5. ActivityCard / ActivityCtaCard: besondere Aktivität
+//   6. InsightCard: KI-Tagesanalyse (async, non-blocking)
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -18,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import type { HomeStackParamList, RootTabParamList } from '../../app/navigation/RootNavigator';
@@ -33,9 +36,18 @@ import { Icon } from '../../shared/components/Icon';
 import { CoachingHeroCard } from './CoachingHeroCard';
 import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { DayNutritionCard } from './DayNutritionCard';
+import { WeeklyReviewCard } from './WeeklyReviewCard';
 import { InsightCard } from './InsightCard';
 import { getInsight } from '../../services/insightService';
-import type { WeightEntry, DiaryDayResponse, WorkoutType, InsightResponse } from '@fittrack/shared';
+import { aiApi } from '../../shared/api/aiApi';
+import { getLocalIsoDate } from '../../shared/date/localDate';
+import type {
+  WeightEntry,
+  DiaryDayResponse,
+  WorkoutType,
+  InsightResponse,
+  WeeklyNutritionReviewResponse,
+} from '@fittrack/shared';
 import { ActivityCtaCard } from '../nutrition/components/ActivityCtaCard';
 import { ActivityCard } from '../nutrition/components/ActivityCard';
 import { ActivityPickerSheet } from '../nutrition/components/ActivityPickerSheet';
@@ -72,6 +84,10 @@ export default function HomeScreen({ navigation }: Props) {
   const [displayName, setDisplayName] = useState<string | undefined>(undefined);
   // Insight — null = loading (shows skeleton), InsightResponse = content arrived
   const [insight, setInsight] = useState<InsightResponse | null>(null);
+  const [weeklyReview, setWeeklyReview] = useState<WeeklyNutritionReviewResponse | null>(null);
+  const [weeklyLoading, setWeeklyLoading] = useState(true);
+  const [weeklyError, setWeeklyError] = useState(false);
+  const weeklyRequestId = useRef(0);
 
   const { dayType, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
   const [workoutPickerVisible, setWorkoutPickerVisible] = useState(false);
@@ -126,6 +142,24 @@ export default function HomeScreen({ navigation }: Props) {
     }
   };
 
+  const loadWeeklyReview = useCallback(async () => {
+    const requestId = ++weeklyRequestId.current;
+    const referenceDate = getLocalIsoDate();
+    setWeeklyLoading(true);
+    setWeeklyError(false);
+
+    try {
+      const result = await aiApi.getWeeklyInsight(referenceDate);
+      if (requestId !== weeklyRequestId.current) return;
+      setWeeklyReview(result);
+    } catch {
+      if (requestId !== weeklyRequestId.current) return;
+      setWeeklyError(true);
+    } finally {
+      if (requestId === weeklyRequestId.current) setWeeklyLoading(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     // Compute today's date inside the callback so it's always current,
     // even if the app was backgrounded overnight (module-level constants freeze at load time).
@@ -160,20 +194,25 @@ export default function HomeScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      void loadWeeklyReview();
       (async () => {
         setLoading(true);
         await load();
         if (!cancelled) setLoading(false);
       })();
-      return () => { cancelled = true; };
-    }, [load]),
+      return () => {
+        cancelled = true;
+        weeklyRequestId.current += 1;
+      };
+    }, [load, loadWeeklyReview]),
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    void loadWeeklyReview();
     await load();
     setRefreshing(false);
-  }, [load]);
+  }, [load, loadWeeklyReview]);
 
   const latest = entries[0];
   const previous = entries[1];
@@ -183,8 +222,20 @@ export default function HomeScreen({ navigation }: Props) {
       : targets.restDay
     : null;
 
-  function navToTab(tab: keyof RootTabParamList) {
-    navigation.getParent<any>()?.navigate(tab);
+  function navToTab(tab: 'Nutrition' | 'Weight') {
+    const rootNavigation = navigation.getParent<NavigationProp<RootTabParamList>>();
+    if (tab === 'Nutrition') {
+      rootNavigation?.navigate('Nutrition', { screen: 'DiaryMain' });
+    } else {
+      rootNavigation?.navigate('Weight');
+    }
+  }
+
+  function openDiaryDay(date: string) {
+    navigation.getParent<NavigationProp<RootTabParamList>>()?.navigate('Nutrition', {
+      screen: 'DiaryMain',
+      params: { date },
+    });
   }
 
   const hint = getDayHint(
@@ -265,6 +316,14 @@ export default function HomeScreen({ navigation }: Props) {
           target={todayTargets}
           onPress={() => navToTab('Nutrition')}
           activityBonus={todayDiary?.activityBonus ?? 0}
+        />
+
+        <WeeklyReviewCard
+          review={weeklyReview}
+          loading={weeklyLoading}
+          error={weeklyError}
+          onRetry={loadWeeklyReview}
+          onOpenDiary={openDiaryDay}
         />
 
         {/* ── Besondere Aktivität ── */}

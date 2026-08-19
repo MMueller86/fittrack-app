@@ -7,6 +7,7 @@ import type {
   AiMealEstimatePreview,
   RecipeScalePreviewRequest,
   RecipeScalePreviewResponse,
+  WeeklyNutritionReviewResponse,
 } from '@fittrack/shared';
 
 // Re-export for convenience so callers don't need to import from @fittrack/shared directly
@@ -160,6 +161,13 @@ export const aiApi = {
     return apiClient
       .post<{ results: AiFoodEstimatePreview[] }>('/ai/food-estimate/batch', { items }, { timeout: 60_000 })
       .then((r) => r.data.results);
+  },
+
+  /** GET /api/ai/weekly-insight?date=YYYY-MM-DD */
+  getWeeklyInsight(referenceDate: string): Promise<WeeklyNutritionReviewResponse> {
+    return apiClient
+      .get<WeeklyNutritionReviewResponse>('/ai/weekly-insight', { params: { date: referenceDate } })
+      .then((r) => r.data);
   },
 };
 

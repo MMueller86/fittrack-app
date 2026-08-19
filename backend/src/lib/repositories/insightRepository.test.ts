@@ -12,8 +12,10 @@ import {
   InMemoryInsightRepository,
   MAX_DAILY_GENERATIONS,
   MIN_REGEN_INTERVAL_MS,
+  makeWeeklyInsightId,
 } from './insightRepository';
-import type { InsightDocument, InsightInputContext, InsightResponse } from '@fittrack/shared';
+import type { InsightDocument, InsightInputContext, InsightResponse, WeeklyEvaluation } from '@fittrack/shared';
+import type { WeeklyInsightDocument } from './insightRepository';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -74,6 +76,33 @@ function makeDocument(overrides: Partial<InsightDocument> = {}): InsightDocument
     tokensUsed: 280,
     goalAtCalculation: 'maintain',
     intelligenceVersion: 'v1',
+    ...overrides,
+  };
+}
+
+function makeWeeklyDocument(overrides: Partial<WeeklyInsightDocument> = {}): WeeklyInsightDocument {
+  const response: WeeklyEvaluation = {
+    status: 'fresh',
+    text: 'Deine Woche liegt insgesamt nah an deinen individuellen Zielen.',
+    generatedAt: '2026-06-30T10:00:00Z',
+  };
+  return {
+    id: makeWeeklyInsightId('user1', '2026-06-29'),
+    userId: 'user1',
+    _docType: 'weeklyInsight',
+    referenceDate: '2026-06-30',
+    periodStart: '2026-06-23',
+    periodEnd: '2026-06-29',
+    inputHash: 'weekly-hash',
+    promptVersion: 'v1',
+    model: 'gpt4o-mini',
+    response,
+    status: 'fresh',
+    generatedAt: response.generatedAt,
+    lastAttemptAt: response.generatedAt!,
+    expiresAt: '2026-07-07T10:00:00Z',
+    ttl: 604800,
+    tokensUsed: 120,
     ...overrides,
   };
 }
@@ -335,5 +364,37 @@ describe('InMemoryInsightRepository.listRecent', () => {
     await repo.upsert(doc);
     const result = await repo.listRecent('user1', 7, '2026-06-30');
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('InMemoryInsightRepository weekly documents', () => {
+  let repo: InMemoryInsightRepository;
+
+  beforeEach(() => {
+    repo = new InMemoryInsightRepository();
+  });
+
+  it('stores weekly documents under a separate key and discriminator', async () => {
+    const daily = makeDocument();
+    const weekly = makeWeeklyDocument();
+    await repo.upsert(daily);
+    await repo.upsertWeekly(weekly);
+
+    expect(await repo.get('user1', '2026-06-30')).toEqual(daily);
+    expect(await repo.getWeekly('user1', '2026-06-29')).toEqual(weekly);
+    expect(await repo.getWeekly('user1', '2026-06-30')).toBeNull();
+  });
+
+  it('replaces only the matching weekly period', async () => {
+    const first = makeWeeklyDocument();
+    const second = makeWeeklyDocument({
+      periodEnd: '2026-07-06',
+      id: makeWeeklyInsightId('user1', '2026-07-06'),
+    });
+    await repo.upsertWeekly(first);
+    await repo.upsertWeekly(second);
+
+    expect((await repo.getWeekly('user1', '2026-06-29'))?.periodEnd).toBe('2026-06-29');
+    expect((await repo.getWeekly('user1', '2026-07-06'))?.periodEnd).toBe('2026-07-06');
   });
 });

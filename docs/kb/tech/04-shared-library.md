@@ -63,6 +63,13 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `CyclingSpecialActivity` — `CyclingActivityInputs & ActivityBonusResult & { type: 'cycling', bodyWeightKg, dailyCalorieTarget, calculatedAt }`
 - `SpecialActivity` — discriminated union: `HikingSpecialActivity | CyclingSpecialActivity`
 
+### `weeklyReview.ts`
+- `WeeklyNutritionReviewResponse` — gemeinsamer Wochen-Response mit Zeitraum, exakt sieben Tageswerten, Totals und Evaluationsstatus
+- `WeeklyNutritionDay` — Verbrauch, konsumierte Makros, historisches Basis-/Effektivziel, Aktivitätsbonus, Prozentwert, Zielband und Datenstatus
+- `WeeklyDayDataStatus` — `'available' | 'missing_nutrition' | 'missing_target' | 'missing_nutrition_and_target'`
+- `WeeklyTargetSource` — `'day_target_snapshot' | 'special_activity_snapshot' | 'profile_fallback' | 'unavailable'`
+- `WEEKLY_TARGET_MIN_PERCENT` / `WEEKLY_TARGET_MAX_PERCENT` — zentrale inklusive Zielgrenzen `95` und `105`
+
 ### `recipes.ts`
 - `RecipeIngredient` — resolved ingredient snapshot with `displayName`, `inputMode`, `inputAmount`, `amountGrams`, `unit`, optional product/library links (`linkedProductId`, `linkedReusableItemId`), `isAiEstimate`, optional `category?: 'food' | 'seasoning'`, persistent `amountLabel?: string`, optional source-portion display data, `nutritionPer100g`, and `nutritionContribution`. `inputAmount` and `amountGrams` are `number | null` for indeterminate amounts. A missing category is the legacy-food fallback.
 - `RecipeStep` — ordered instruction with `order`, optional `title`, and `description`; step-level `notes` are removed from the shared type/API contract.
@@ -129,6 +136,20 @@ All functions are pure (no I/O, no state).
 | `recipeCalculator.ts` | `calculateRecipeNutrition(ingredients)`, `scaleRecipeIngredients(ingredients, originalPortions, targetPortions)` | Recipe totals + per-portion and pure target-ingredient projection |
 | `activityBonusCalculator.ts` | `calculateActivityBonus(inputs, weightKg, dailyCalorieTarget)` | V3 piecewise-linear MET model for hiking; returns `ActivityBonusResult` including V3 intermediates |
 | `cyclingBonusCalculator.ts` | `calculateCyclingActivityBonus(inputs, weightKg, dailyCalorieTarget)` | `cycling-met-estimator@1.1.0` — speed + elevation + terrain + eBike MET model for cycling; 250 spec test cases |
+| `weeklyReviewCalculator.ts` | `calculateWeeklyNutritionReview(input)`, `getWeeklyReviewPeriod()`, `getWeeklyTargetBand()` | Pure Wochenzeitraum, Tagesprozente, Zielband sowie Summen/Durchschnitte |
+
+### Weekly review calculation contract
+
+`calculateWeeklyNutritionReview()` erzeugt aus einem lokalen `referenceDate` immer die sieben abgeschlossenen date-only Tage `referenceDate - 7` bis `referenceDate - 1` in chronologischer Reihenfolge. Nicht gelieferte Tage bleiben im Ergebnis erhalten.
+
+- Ein Tag zählt als Ernährungstag, sobald mindestens ein `MealItem` in einer Meal vorhanden ist. Eine leere Meal zählt nicht.
+- `0` kcal bleibt ein gültiger Verbrauch, wenn ein `MealItem` vorhanden ist. Ohne `MealItem` ist `consumedCalories: null`.
+- `consumedMacros` ist bei fehlendem `MealItem` `null`. Bei vorhandenen Items summiert die Funktion Protein, Kohlenhydrate und Fett aus allen `MealItem.macros`-Snapshots über alle Meals; `0` bleibt ein gültiger Summenwert. Die Rohsummen bleiben ungerundet. Fiber und historische Makro-Ziele sind nicht Teil dieses Wochenvertrags.
+- Ziele werden in der Reihenfolge `DayMeta.calorieTargetSnapshot`, rückwärtskompatibel `specialActivity.dailyCalorieTarget` und zuletzt als nicht persistierter Profil-Fallback aufgelöst. Ohne expliziten Tageskontext gilt das gespeicherte Ruhetagsziel; bei `dayType: 'training'` das gespeicherte Trainingsziel. Der Profil-Fallback wird mit `targetSource: 'profile_fallback'` kenntlich gemacht und überschreibt niemals einen vorhandenen historischen Snapshot. Ein explizit gespeicherter `DayMeta`-Kontext (`dayType`, optional `workoutType`) bleibt dabei im Wochenresultat erhalten, auch wenn das Ziel nur aus dem Profil-Fallback stammt; der synthetische `rest`-Kontext einer allein gespeicherten Special Activity bleibt implizit.
+- Ein Profil-Fallback ist keine historische Rekonstruktion: Er wird nur im Read-Path verwendet und nicht in `DayMeta` geschrieben. Explizite historische Snapshots bleiben bei späteren Profiländerungen unverändert; Tage ohne gespeicherten Zielkontext verwenden den aktuellen passenden Profilwert.
+- `targetPercent = consumedCalories / effectiveTargetCalories * 100` und alle Totals bleiben intern ungerundet.
+- Totals berücksichtigen nur Tage mit Ernährung und positivem effektivem Ziel. Bei keinem solchen Tag sind Summen, Durchschnitte und Gesamtquote `null`, nicht `0`.
+- `95 <= targetPercent <= 105` ergibt `in_range`; Werte außerhalb ergeben `outside_range`.
 
 ### `activityBonusCalculator.ts` — V3 Algorithm (Hiking)
 

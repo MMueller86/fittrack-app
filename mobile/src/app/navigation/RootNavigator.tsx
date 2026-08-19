@@ -3,6 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -101,7 +102,7 @@ function ProfileStackNavigator() {
 
 // --- Nutrition stack ---
 export type NutritionStackParamList = {
-  DiaryMain: undefined;
+  DiaryMain: { date?: string } | undefined;
   HikingInput: { date: string; existing?: SpecialActivity };
   CyclingInput: { date: string; existing?: SpecialActivity };
 };
@@ -152,7 +153,7 @@ function RecipeStackNavigator() {
 // --- Bottom tabs ---
 export type RootTabParamList = {
   Home: undefined;
-  Nutrition: undefined;
+  Nutrition: NavigatorScreenParams<NutritionStackParamList> | undefined;
   Recipes: undefined;
   Weight: undefined;
   Profile: undefined;

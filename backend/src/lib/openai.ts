@@ -9,6 +9,12 @@ import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
 import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
 import { RECIPE_SCALE_SYSTEM_PROMPT } from './prompts/recipeScale';
 import { DAILY_INSIGHT_SYSTEM_PROMPT, DAILY_INSIGHT_PROMPT_VERSION } from './prompts/dailyInsightV9';
+import { WEEKLY_INSIGHT_TEXT_MAX_LENGTH } from './weeklyInsightContract';
+import {
+  WEEKLY_INSIGHT_SYSTEM_PROMPT,
+  WEEKLY_INSIGHT_PROMPT_VERSION,
+  type WeeklyInsightPromptContext,
+} from './prompts/weeklyInsightV1';
 import type { InsightInputContext, InsightResponse } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
@@ -566,6 +572,15 @@ const FOOD_ESTIMATE_BATCH_SCHEMA = {
   additionalProperties: false,
 };
 
+const WEEKLY_INSIGHT_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    text: { type: 'string' as const, minLength: 1, maxLength: WEEKLY_INSIGHT_TEXT_MAX_LENGTH },
+  },
+  required: ['text'],
+  additionalProperties: false,
+};
+
 /**
  * Estimate the nutritional values of multiple food items in a single AI call.
  * Returns results in the same order as the input names array.
@@ -606,6 +621,84 @@ export async function estimateFoodBatch(names: string[]): Promise<AiFoodEstimate
 
   const parsed = JSON.parse(raw) as { items: AiFoodEstimate[] };
   return parsed.items;
+}
+
+// ---------------------------------------------------------------------------
+// Weekly Insight generator
+// ---------------------------------------------------------------------------
+
+export interface GenerateWeeklyInsightResult {
+  text: string;
+  tokensUsed: number;
+}
+
+/**
+ * Generate a weekly AI evaluation from server-calculated, sanitized data.
+ * The caller owns caching, quota enforcement, and persistence.
+ */
+export async function generateWeeklyInsight(
+  context: WeeklyInsightPromptContext,
+): Promise<GenerateWeeklyInsightResult> {
+  const client = getClient();
+  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+
+  const completion = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      { role: 'system', content: WEEKLY_INSIGHT_SYSTEM_PROMPT },
+      { role: 'user', content: JSON.stringify(context) },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'weekly_insight',
+        strict: true,
+        schema: WEEKLY_INSIGHT_SCHEMA,
+      },
+    },
+    temperature: 0.3,
+    max_tokens: 1024,
+  });
+
+  const choice = completion.choices[0];
+  if (choice?.finish_reason === 'length') {
+    throw new Error('Weekly insight response was truncated by the provider');
+  }
+
+  const raw = choice?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI (weekly-insight)');
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Invalid JSON response from Azure OpenAI (weekly-insight)');
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    Array.isArray(parsed) ||
+    Object.keys(parsed).length !== 1 ||
+    !Object.prototype.hasOwnProperty.call(parsed, 'text')
+  ) {
+    throw new Error('Weekly insight response has an invalid schema');
+  }
+
+  const text = (parsed as { text?: unknown }).text;
+  if (typeof text !== 'string') {
+    throw new Error('Weekly insight response text must be a string');
+  }
+
+  const normalizedText = text.trim();
+  if (normalizedText.length === 0 || normalizedText.length > WEEKLY_INSIGHT_TEXT_MAX_LENGTH) {
+    throw new Error('Weekly insight response text has an invalid length');
+  }
+
+  return {
+    text: normalizedText,
+    tokensUsed: completion.usage?.total_tokens ?? 0,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -677,4 +770,8 @@ export async function generateDailyInsight(
 }
 
 /** Exposed for mocking in tests. */
-export { DAILY_INSIGHT_PROMPT_VERSION };
+export {
+  DAILY_INSIGHT_PROMPT_VERSION,
+  WEEKLY_INSIGHT_PROMPT_VERSION,
+  WEEKLY_INSIGHT_TEXT_MAX_LENGTH,
+};

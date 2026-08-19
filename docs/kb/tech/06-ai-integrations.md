@@ -93,6 +93,41 @@ Once-daily AI-generated personal briefing. Never returns 4xx/5xx to the user —
 
 **Prompt versioning:** `DAILY_INSIGHT_PROMPT_VERSION` constant (e.g., `'v6'`). Version is stored with each generated insight for reproducibility.
 
+### 9. Weekly Insight (`GET /api/ai/weekly-insight?date=YYYY-MM-DD`)
+
+The authenticated weekly endpoint returns exactly the seven completed local
+calendar days from `date - 7` through `date - 1`. The current day is excluded.
+The backend reads meals and DayMeta documents for the authenticated user and
+calculates consumed calories, historical base/effective targets, target
+percentages, target-band state, missing-data state, activity labels, and totals.
+The current profile is never used to reconstruct a historical target.
+
+The deterministic review remains available when AI is unavailable. The
+`evaluation` object has status `fresh`, `cached`, `quota_exceeded`, or
+`unavailable`; quota, provider, parse, and Structured Output failures return
+`text: null` rather than a deterministic replacement assessment.
+
+Weekly evaluations are cached in the existing `aiInsights` container as
+`_docType: 'weeklyInsight'`, keyed by `${userId}:weekly:${periodEnd}`. The cache
+input hash covers meal/item identities and stored macros, DayMeta/activity and
+target snapshots, the reference date, and the prompt version. Identical input is
+served without an AI call. After a hash change, the old text is never shown; a
+30-minute regeneration interval may produce a neutral response while the chart
+remains usable.
+
+The weekly prompt is `WEEKLY_INSIGHT_PROMPT_VERSION = 'v2'` in
+`backend/src/lib/prompts/weeklyInsightV1.ts`. It receives only sanitized aggregate
+data for the seven days and totals: no meal/product raw text, user IDs, tokens, or
+technical cache data. The generator uses Strict Structured Outputs with
+`strict: true`, `additionalProperties: false`, and a single `text` property
+(1–750 characters). The canonical backend limit is
+`WEEKLY_INSIGHT_TEXT_MAX_LENGTH = 750`; the generated text is trimmed before the
+server-side length check. The request allows `max_tokens: 1024` output tokens,
+which is a token budget rather than a character limit. A provider response with
+`finish_reason: 'length'` is rejected before any valid text is persisted or
+`daily-insight` usage is tracked; the handler may persist only a neutral
+`unavailable` cache entry with `text: null`.
+
 ## Hint Engine (Rule-Based, Not AI)
 
 `backend/src/lib/hintEngine.ts` — evaluates a declarative rule array against the current diary state. No AI calls. Returns the first matching `HintResult`.
@@ -120,6 +155,7 @@ Located in `backend/src/lib/prompts/`:
 - `foodEstimate.ts` — system prompt for food estimation
 - `mealEstimate.ts` — system prompt for meal image estimation
 - `recipeAnalyze.ts` — system prompt for recipe text analysis
-- `dailyInsightV6.ts` — current daily insight system prompt (versioned)
+- `dailyInsightV9.ts` — current daily insight system prompt (versioned)
+- `weeklyInsightV1.ts` — weekly insight system prompt and sanitized context contract (versioned)
 
 [Rule] Prompt files are versioned. When a prompt changes in ways that would alter output format or interpretation, increment the version (e.g., `V6` → `V7`). Store the version constant alongside the prompt.

@@ -8,7 +8,7 @@ import { colors } from '../../app/theme';
 
 type FeatherName = React.ComponentProps<typeof Feather>['name'];
 type IonName = React.ComponentProps<typeof Ionicons>['name'];
-type MCIName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+export type MCIName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 export type IconSize = 'sm' | 'md' | 'lg';
 

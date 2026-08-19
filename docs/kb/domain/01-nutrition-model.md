@@ -37,18 +37,48 @@ interface DayTargets {
 
 ```ts
 interface ProfileTargets {
-  rest: DayTargets;
-  training: DayTargets;
+  restDay: DayTargets;
+  trainingDay: DayTargets;
 }
 ```
 
 The correct `DayTargets` to use for a given day is determined by the day's `dayType` field in `DayMeta`.
+
+### Historical day-target snapshots
+
+When a user explicitly sets a historical day context, the backend captures the selected profile calorie target in the optional `DayMeta.calorieTargetSnapshot` field. The snapshot stores the calories, capture timestamp, source (`profile`) and, when available, the profile update timestamp. It is an additive field in the existing diary document shape; legacy documents without it remain readable and have no reconstructable historical target.
+
+Profile updates only replace the current profile document. They do not rewrite existing day snapshots. An explicit historical day-context change may capture a new snapshot for that day.
+
+For the weekly read, a day without a valid day snapshot or compatible special-activity
+target uses the current profile target as a read-only fallback: `restDay` when no
+training context is stored, `trainingDay` for an explicitly stored training day.
+This fallback is not written back to the diary, so it does not turn a current profile
+value into historical data.
 
 ## Day Summary
 
 `DaySummary` — on-the-fly aggregation of all `MealItem.nutrition` values across all meals for the day.
 
 [Rule] Day summaries are **never stored in Cosmos** — they are recalculated from meal items on every diary GET request. This ensures consistency if items are edited or deleted.
+
+### Weekly review aggregation
+
+The pure shared weekly calculation uses exactly the seven completed local calendar days before the supplied reference date. It preserves missing days in the response, but includes a day in totals only when it has at least one `MealItem` and a positive effective target.
+
+Each weekly day also exposes `consumedMacros: { protein, carbs, fat } | null`. The values are the unrounded sums of the authoritative `MealItem.macros` snapshots across every meal and item for that day. The field is `null` when no `MealItem` exists; a present item with `0` kcal or `0` g produces valid zero macro values. No fiber field or historical macro targets are added by this contract.
+
+For included days:
+
+```text
+totalConsumedCalories = sum(consumedCalories)
+totalTargetCalories = sum(effectiveTargetCalories)
+averageConsumedCalories = totalConsumedCalories / includedDayCount
+averageTargetCalories = totalTargetCalories / includedDayCount
+overallTargetPercent = totalConsumedCalories / totalTargetCalories * 100
+```
+
+The daily percentage and overall percentage are not rounded before aggregation. A missing target or missing nutrition data produces `null` values and is not interpreted as zero consumption or as a deficit.
 
 ## Calculation Meta
 

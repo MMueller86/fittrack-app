@@ -12,22 +12,17 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { WorkoutType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { Icon } from '../../shared/components/Icon';
+import {
+  HOME_TRAINING_KEYS,
+  HOME_TRAINING_PRESENTATION,
+} from './homeTrainingPresentation';
 
 interface Props {
   visible: boolean;
   onSelect: (type: WorkoutType | null) => void;
   onClose: () => void;
 }
-
-const REST_OPTION = { type: null as null, icon: '😴', label: 'Ruhetag' };
-
-const WORKOUT_OPTIONS: { type: WorkoutType; icon: string; label: string }[] = [
-  { type: 'gym', icon: '🏋️', label: 'Gym' },
-  { type: 'bouldering', icon: '🧗', label: 'Bouldern / Klettern' },
-  { type: 'running', icon: '🏃', label: 'Laufen' },
-  { type: 'cycling', icon: '🚴', label: 'Radfahren' },
-  { type: 'other', icon: '💡', label: 'Sonstiges' },
-];
 
 export default function WorkoutTypePicker({ visible, onSelect, onClose }: Props) {
   const insets = useSafeAreaInsets();
@@ -48,28 +43,22 @@ export default function WorkoutTypePicker({ visible, onSelect, onClose }: Props)
         <Text style={styles.question}>Wie ist dein heutiger Tag?</Text>
 
         <View style={styles.optionList}>
-          {/* Ruhetag zuerst */}
-          <TouchableOpacity
-            key="rest"
-            style={styles.option}
-            onPress={() => onSelect(REST_OPTION.type)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.optionIcon}>{REST_OPTION.icon}</Text>
-            <Text style={styles.optionLabel}>{REST_OPTION.label}</Text>
-          </TouchableOpacity>
-
-          {WORKOUT_OPTIONS.map(({ type, icon, label }) => (
-            <TouchableOpacity
-              key={type}
-              style={styles.option}
-              onPress={() => onSelect(type)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.optionIcon}>{icon}</Text>
-              <Text style={styles.optionLabel}>{label}</Text>
-            </TouchableOpacity>
-          ))}
+          {HOME_TRAINING_KEYS.map((key) => {
+            const option = HOME_TRAINING_PRESENTATION[key];
+            return (
+              <TouchableOpacity
+                key={key}
+                style={styles.option}
+                onPress={() => onSelect(option.workoutType)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.optionIcon}>
+                  <Icon lib="mci" name={option.icon} size="md" color={colors.textSecondary} />
+                </View>
+                <Text style={styles.optionLabel}>{option.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -121,7 +110,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  optionIcon: { fontSize: 22 },
+  optionIcon: {
+    width: spacing.lg,
+    alignItems: 'center',
+  },
   optionLabel: { ...typography.body1, color: colors.text },
   cancelBtn: {
     alignItems: 'center',

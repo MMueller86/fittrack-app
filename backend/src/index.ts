@@ -19,6 +19,7 @@ import './functions/foodProducts';
 import './functions/reusableItemsEnrich';
 import './functions/reusableItemsEnrichScheduler';
 import './functions/dailyInsight';
+import './functions/weeklyInsight';
 import './functions/favorites';
 import './functions/specialActivity';
 

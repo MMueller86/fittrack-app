@@ -39,6 +39,7 @@ import { useFoodEntryHubStore } from './hub/useFoodEntryHubStore';
 import { applyAddMeal } from './diaryItemUtils';
 import { ActivityBonusSheet } from './components/ActivityBonusSheet';
 import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
+import { isValidDateOnly } from '../../shared/date/localDate';
 
 type Props = NativeStackScreenProps<NutritionStackParamList, 'DiaryMain'>;
 
@@ -213,8 +214,10 @@ function MealCard({
 
 // --- Main Screen ---
 
-export default function DiaryScreen({ navigation }: Props) {
-  const [date, setDate] = useState(isoToday());
+export default function DiaryScreen({ navigation, route }: Props) {
+  const initialRouteDate = isValidDateOnly(route.params?.date) ? route.params.date : null;
+  const [date, setDate] = useState(initialRouteDate ?? isoToday());
+  const consumedRouteDate = useRef<string | null>(null);
   const [data, setData] = useState<DiaryDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -236,6 +239,24 @@ export default function DiaryScreen({ navigation }: Props) {
   // Day-transition fade animation
   const contentOpacity = useSharedValue(1);
   const contentAnimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
+
+  const routeDate = route.params?.date;
+  useEffect(() => {
+    if (routeDate == null) {
+      consumedRouteDate.current = null;
+      return;
+    }
+
+    if (!isValidDateOnly(routeDate)) {
+      navigation.setParams({ date: undefined });
+      return;
+    }
+
+    if (consumedRouteDate.current === routeDate) return;
+    consumedRouteDate.current = routeDate;
+    navigation.setParams({ date: undefined });
+    setDate((currentDate) => currentDate === routeDate ? currentDate : routeDate);
+  }, [navigation, routeDate]);
 
   // ConfirmSheet state
   const [confirmSheet, setConfirmSheet] = useState<{
