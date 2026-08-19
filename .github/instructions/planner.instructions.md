@@ -40,6 +40,8 @@ Example: User Story `US-01_Intelligente_Zutatenklassifizierung.md` → plan file
 
 The plan file may be updated as the plan evolves (e.g. after PO decisions are resolved). The User Story file must not be modified.
 
+Before handing a plan to the Orchestrator, persist the complete planning artifact in the repository at the required `PLAN_*.md` path. Do not rely on temporary Copilot session files, `chat-session-resources` paths, or an unresolved path outside the workspace as the only copy of a plan. If the plan cannot be written or verified at that path, report a process error and stop the handoff.
+
 ---
 
 ## Terminal Usage (Read-Only)

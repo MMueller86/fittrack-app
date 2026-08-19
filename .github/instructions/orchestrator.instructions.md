@@ -83,6 +83,7 @@ Track the following across all execution steps:
 subtask_queue: []    ← ordered list of subtasks derived from the Recommended Execution Order
 handoff_store: {}    ← keyed by subtask name; stores each agent's output/deliverables
 retry_counts: {}     ← keyed by subtask name; tracks correction attempts per subtask
+finding_store: {}   ← keyed by finding ID; mirrors docs/qa/findings.md
 ```
 
 ### Step 1: Build the execution queue
@@ -113,6 +114,8 @@ For each subtask in `subtask_queue` (strictly in order):
 2. Resolve any declared `Dependencies` by retrieving the matching entries from `handoff_store`.
 3. Build the Task Package using **only** the declared fields (see **Task Package Format** below).
 4. Call the responsible agent with this package — **never the full plan**.
+   - If the subagent invocation or routing fails, stop and report a process error to the user. Do not substitute a standard agent, another role, or an unscoped fallback. Preserve the task package and current workflow state for an intentional retry after user direction.
+   - This rule applies to invocation failure. If an agent starts successfully and reports a technical error in the approved plan, follow **Detect plan invalidity** below.
 5. After the agent completes, verify handoff completeness:
    - Check that every artefact listed in the subtask's `Expected Handoff` is present in the agent's response
    - Do **not** assess technical correctness or quality — that is QA's responsibility
@@ -157,8 +160,47 @@ Call **FitTrack QA** with:
 | Verdict | Action |
 |---|---|
 | **PASS** | Report success to user. Workflow complete. |
-| **PASS WITH ISSUES** | Report full verdict + all findings to user. Workflow complete. |
+| **PASS WITH ISSUES** | Persist every actionable finding, ask the user how each should be handled, and follow the Non-blocking Finding Decision Flow below. Do not complete the workflow before that decision. |
 | **FAIL** | Proceed to correction loop below. |
+
+### Central Findings Register
+
+The durable register is `docs/qa/findings.md`. The Orchestrator is the single writer.
+
+When QA returns findings:
+
+1. Assign a stable ID to every actionable finding in the format `FT-QA-YYYY-NNN`.
+2. Write each finding to `docs/qa/findings.md` before presenting the QA result as complete.
+3. Preserve QA's description, evidence, criticality, affected plan or acceptance criterion, and proposed owner. Add routing and status metadata without changing the technical meaning.
+4. Never delete a finding. Update its status and append a history entry instead.
+5. Keep missing credentials, unavailable emulators, missing devices, and other manual validation limits in the register's verification-notes section, not as actionable findings, unless a defect is demonstrated.
+
+The QA agent supplies structured finding data but does not write the central register. This keeps one writer responsible for durable workflow state.
+
+The Orchestrator may edit only `docs/qa/findings.md` for this purpose. It must not use this permission to modify production code, tests, infrastructure, plans, or unrelated documentation.
+
+### Non-blocking Finding Decision Flow
+
+`PASS WITH ISSUES` is not an automatic end state. After persistence, present every actionable finding with its ID, criticality, owner, and plan reference. Ask the user to choose per finding:
+
+- **Fix requested** — route it to the declared owner with a focused correction package, then run targeted QA and update the register to `Resolved` or `Closed`.
+- **Accepted** — record the user's acceptance and rationale; do not start correction work.
+- **Deferred** — record the user's decision and optional follow-up context; do not start correction work.
+
+Route a finding to the Planner only when it identifies a plan error, architectural contradiction, or unresolved product decision. Normal Backend, Frontend, Infrastructure, documentation, and test findings go directly to the declared owner after the user's choice.
+
+If every selected correction is closed and no actionable findings remain open, QA may issue a final `PASS`. If any finding is accepted or deferred, complete with `PASS WITH ISSUES` and link the central register entry in the report. If the user has not decided, pause with status `Awaiting decision`.
+
+### Process Errors
+
+Report these immediately instead of silently recovering:
+
+- subagent invocation or routing failure;
+- missing or unreadable approved Planner artifact;
+- reliance on an unresolved or out-of-workspace session-file path for a plan or handoff;
+- inability to write `docs/qa/findings.md`.
+
+Do not reconstruct an approved plan from temporary `chat-session-resources` files. A plan-driven execution requires a verified repository artifact under `docs/User Stories/**/PLAN_*.md`.
 
 ### Step 7: QA Correction Loop
 
@@ -266,6 +308,7 @@ The current plan replaces all previous Planner responses. It is already the cons
 - Implement any code
 - Make product decisions
 - Let agents interact with the user — the Orchestrator is the sole user-facing interface
+- Use a standard or unrelated agent as a fallback after a subagent invocation failure
 - Skip QA
 - Execute subtasks in parallel
 - Proceed to execution without explicit user APPROVE

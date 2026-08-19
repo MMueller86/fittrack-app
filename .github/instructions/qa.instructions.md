@@ -2,14 +2,13 @@
 
 These instructions apply to the **QA agent** reviewing and writing tests across all packages.
 
-Global rules: [`../.github/copilot-instructions.md`](../copilot-instructions.md)  
-Test strategy: [`../docs/kb/tech/08-testing.md`](../docs/kb/tech/08-testing.md)
+Global rules: [`../copilot-instructions.md`](../copilot-instructions.md)
+Test strategy: [`../../docs/kb/tech/08-testing.md`](../../docs/kb/tech/08-testing.md)
 
----
 
 ## QA Review Workflow
 
-The Orchestrator passes the following inputs to QA — do not search for them independently:
+The review input contains the following — do not search for them independently:
 - Full approved plan (with Scope and Out of Scope sections)
 - All Acceptance Criteria (complete, numbered)
 - Original user story
@@ -29,6 +28,32 @@ Verify the implementation **against** the plan:
 If acceptance criteria are partially or fully missing from the implementation, the review verdict is **FAIL**.
 
 For small bug fixes (no Planner plan): verify that a regression test exists and the stated issue is resolved.
+
+### Manual and Environment-Limited Verification
+
+Separate executable QA findings from checks that cannot be run in the current environment.
+
+- Missing Azure credentials, a stopped Cosmos emulator, unavailable `adb`, missing real devices, and unavailable viewport or screen-reader tooling are verification limitations, not findings.
+- Deliver those checks as a manual validation checklist with prerequisites, steps, expected result, and a result field for the user.
+- Do not classify an unperformed manual or environment-limited check as `Blocking`, `Non-blocking`, or `Suggestion`.
+- Do not lower the verdict because such a check could not be executed. Report it as `UNVERIFIED` or `MANUAL VALIDATION REQUIRED` outside the findings list.
+
+### Structured Finding Output
+
+For each actionable finding, return all of the following fields:
+
+```text
+Finding key: local stable key for this QA run
+Plan reference: repository plan path or N/A
+Acceptance criterion: AC identifier or N/A
+Description: concrete observed problem
+Criticality: Blocking | Non-blocking | Suggestion
+Owner: Backend | Frontend | Infrastructure | Documentation | Planner | QA
+Evidence: tests, file paths, commands, or reproducible steps
+Recommendation: proposed next action
+```
+
+Report each finding as an observed result of the review. Do not make the user's prioritisation decision or mark a finding as accepted, deferred, or closed.
 
 ---
 
@@ -125,13 +150,15 @@ CI enforces encoding via `check-encoding.mjs` — a PR cannot merge with mojibak
 After completing a review, summarise findings using one of these verdicts:
 
 - **PASS** — implementation is complete, tests pass, acceptance criteria met
-- **PASS WITH ISSUES** — non-blocking issues noted; can merge after acknowledgement
+- **PASS WITH ISSUES** — actionable non-blocking findings exist; list them with their evidence and recommendations
 - **FAIL** — one or more blocking issues; must be resolved before merging
 
 Classify each finding as:
 - **Blocking** — prevents merge (missing tests, broken behaviour, security issue, scope violation)
 - **Non-blocking** — should be addressed but does not prevent merge
 - **Suggestion** — optional improvement
+
+`UNVERIFIED` and `MANUAL VALIDATION REQUIRED` are verification states, not finding criticalities.
 
 ## Registrations Test
 
