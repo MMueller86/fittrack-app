@@ -12,7 +12,8 @@ import { dirname, resolve } from 'node:path';
 //   - Unit tests (*.test.ts) — see vitest.config.mts
 //   - Cosmos contract tests (*.contract.test.ts) — see vitest.contract.config.mts
 //
-// Run explicitly: npm run test:eval
+// Run explicitly: npm run test:eval. The wrapper loads local.settings.json
+// for local runs and preserves explicitly provided process environment values.
 // Never include in default `npm test`.
 //
 // Required env:
@@ -20,7 +21,8 @@ import { dirname, resolve } from 'node:path';
 //   AZURE_OPENAI_API_KEY
 //   AZURE_OPENAI_DEPLOYMENT_NAME   (optional, defaults to 'gpt4o-mini')
 //
-// Tests without credentials are skipped automatically (describe.skipIf).
+// Direct Vitest invocations still skip tests without credentials. The wrapper
+// reports that situation as UNVERIFIED so the explicit command cannot look green.
 // Tests run sequentially (singleFork) to avoid rate-limit pressure.
 
 const here = dirname(fileURLToPath(import.meta.url));

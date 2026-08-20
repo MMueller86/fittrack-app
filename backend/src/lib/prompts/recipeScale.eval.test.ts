@@ -31,7 +31,9 @@ describe.skipIf(!hasCredentials)('recipeScale: live prompt evaluation', () => {
       expect(result.description).toBeNull();
     }
 
-    for (const [index, requiredText] of fixture.constraints.unchangedTextByStep.entries()) {
+    for (const [index, requiredText] of (
+      fixture.constraints.unchangedTextByStep ?? []
+    ).entries()) {
       if (requiredText !== undefined) {
         expect(result.steps[index]?.description).toContain(requiredText);
       }

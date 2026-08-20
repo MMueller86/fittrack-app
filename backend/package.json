@@ -12,10 +12,10 @@
     "storage:start": "node scripts/storage.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:startup": "node --test scripts/dev.test.mjs scripts/storage.test.mjs scripts/wait-for-azurite.test.mjs",
+    "test:startup": "node --test scripts/dev.test.mjs scripts/storage.test.mjs scripts/wait-for-azurite.test.mjs scripts/run-eval.test.mjs",
     "test:watch": "vitest",
     "test:contract": "vitest run --config vitest.contract.config.mts",
-    "test:eval": "vitest run --config vitest.eval.config.mts",
+    "test:eval": "node scripts/run-eval.mjs",
     "emulator:start": "powershell -ExecutionPolicy Bypass -File scripts/start-cosmos-emulator.ps1",
     "emulator:stop": "powershell -ExecutionPolicy Bypass -File scripts/stop-cosmos-emulator.ps1"
   },

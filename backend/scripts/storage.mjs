@@ -46,7 +46,7 @@ export function isAzuriteReady(port) {
   });
 }
 
-function isPortBound(port) {
+export function isPortBound(port) {
   return new Promise((resolve) => {
     const probe = createServer();
     probe.listen(port, '127.0.0.1');

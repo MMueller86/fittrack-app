@@ -152,10 +152,10 @@ imports them yet.
 
 ## Testing
 
-The backend uses a two-tier test strategy. Both tiers run **without** any
-real Azure resources, so unit tests stay fast and CI-friendly while
-contract tests still surface Cosmos-specific bugs (reserved keywords,
-indexing requirements) before deployment.
+The backend uses a three-tier test strategy. Unit tests stay fast and
+offline, contract tests surface Cosmos-specific bugs (reserved keywords,
+indexing requirements) before deployment, and explicit live prompt evals
+verify real Azure OpenAI behaviour during prompt development and QA.
 
 ### Tier 1 — Unit tests (Vitest)
 
@@ -243,6 +243,35 @@ npm run emulator:stop
 
 If you don't have a container runtime, just skip Tier 2 locally — CI
 covers it on every push.
+
+### Tier 3 — Azure OpenAI prompt evals
+
+Live prompt evals are opt-in and call the shared Azure OpenAI service. They
+are not part of the default `npm test` command or the CI pipeline.
+
+Run them during development after changing a prompt, its Structured Output
+schema, related AI generation logic, or the corresponding eval fixtures.
+Run them again during QA validation whenever the reviewed scope includes
+one of those files. Execute the command from the backend directory:
+
+```powershell
+cd backend
+npm run test:eval
+```
+
+The command loads `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`,
+`AZURE_OPENAI_API_VERSION`, and `AZURE_OPENAI_DEPLOYMENT_NAME` from
+`local.settings.json` when they are not already present in the process
+environment. Explicit environment values take precedence, which keeps the
+same command usable in CI. Credential values are never printed.
+
+Exit code `0` means the live evals ran and passed. Exit code `2` means the
+required credentials were unavailable and the result is `UNVERIFIED`; other
+non-zero exit codes indicate an eval or runner failure.
+
+Live evals remain separate from `npm test` because they require network
+access, incur Azure usage, and can be affected by provider behaviour. Azure
+OpenAI credentials are a prerequisite for execution, not an automatic trigger.
 
 #### What is covered today
 

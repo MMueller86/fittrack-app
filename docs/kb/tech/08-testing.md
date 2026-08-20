@@ -54,6 +54,9 @@ cd backend && npx vitest run
 # Backend contract tests (requires Cosmos emulator)
 cd backend && npx vitest run --config vitest.contract.config.mts
 
+# Azure OpenAI prompt evals (requires configured credentials)
+cd backend && npm run test:eval
+
 # Shared unit tests
 cd shared && npx vitest run
 
@@ -76,6 +79,9 @@ npx tsc --noEmit  # from mobile/ or shared/
 - `backend/src/lib/auth.ts` exports `_setJwksForTesting()` for unit test JWKS injection
 - Repository tests use the in-memory implementations unless testing Cosmos-specific behavior
 - Contract tests should be isolated from unit test runs (separate config + CI step)
+- Prompt evals are explicit live checks. `npm run test:eval` loads local Azure
+	settings without printing secrets; exit code `2` means `UNVERIFIED` because
+	required credentials are unavailable.
 
 ## Coverage Target
 

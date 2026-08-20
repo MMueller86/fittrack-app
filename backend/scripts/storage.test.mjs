@@ -9,6 +9,7 @@ import {
   getAzuriteLocation,
   getEnrichmentQueueName,
   isAzuriteReady,
+  isPortBound,
   pollUntilReady,
 } from './storage.mjs';
 
@@ -101,18 +102,12 @@ test('pollUntilReady resolves immediately for a mock-ready process', async () =>
 
 test('isPortBound logic detects a server already listening on a port', async () => {
   const blocker = createNetServer((socket) => socket.on('error', () => {}));
-  await listenTcp(blocker, 10001);
+  await listenTcp(blocker, 0);
+  const address = blocker.address();
+  assert.ok(address && typeof address === 'object');
 
   try {
-    // Mirrors the isPortBound check inside storage.mjs
-    const bound = await Promise.all(AZURITE_PORTS.map((port) => new Promise((resolve) => {
-      const probe = createNetServer();
-      probe.listen(port, '127.0.0.1');
-      probe.on('listening', () => { probe.close(); resolve(false); });
-      probe.on('error', () => resolve(true));
-    })));
-    const occupied = AZURITE_PORTS.filter((_, i) => bound[i]);
-    assert.deepEqual(occupied, [10001]);
+    assert.equal(await isPortBound(address.port), true);
   } finally {
     await closeServer(blocker);
   }
