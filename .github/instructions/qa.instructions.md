@@ -16,6 +16,7 @@ The review input contains the following — do not search for them independently
 - `handoff_store` (all subtask summaries and deviations)
 - Which subtasks ran and which were skipped
 - Any known unverified areas or configuration notes
+- The expected workspace-relative QA report path under `docs/qa/reports/`
 
 Do not re-plan, add missing requirements, or supplement the plan independently.
 
@@ -54,6 +55,37 @@ Recommendation: proposed next action
 ```
 
 Report each finding as an observed result of the review. Do not make the user's prioritisation decision or mark a finding as accepted, deferred, or closed.
+
+### Durable QA Report
+
+Every review must write a report to the exact expected path supplied by the
+Orchestrator. Use the report contract and template in
+[`docs/qa/reports/README.md`](../../docs/qa/reports/README.md).
+
+The report must:
+
+- use format `fittrack-qa-v1`;
+- contain exactly one verdict: `PASS`, `PASS WITH ISSUES`, or `FAIL`;
+- include every Acceptance Criterion from the supplied plan in a criteria
+	matrix with result and evidence;
+- record each relevant test command, exit code, and result;
+- separate `UNVERIFIED` and `MANUAL VALIDATION REQUIRED` checks from
+	actionable findings;
+- include all required fields for every actionable finding, or explicitly
+	state that there are no actionable findings.
+
+Return a non-empty response manifest after writing the report:
+
+```text
+QA report: docs/qa/reports/<report-name>.md
+Verdict: PASS | PASS WITH ISSUES | FAIL
+```
+
+The report and response must contain summaries and workspace-relative
+evidence. Never refer the Orchestrator to terminal output, `AppData`, `%TEMP%`,
+`chat-session-resources`, `copilot-terminal-output`, or another external path.
+Do not write `docs/qa/findings.md`; the Orchestrator is the sole writer of the
+central findings register.
 
 ---
 

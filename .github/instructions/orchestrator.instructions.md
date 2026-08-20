@@ -154,8 +154,52 @@ Call **FitTrack QA** with:
 - `handoff_store` (all subtask summaries and deviations)
 - Which subtasks ran and which were skipped
 - Any known unverified areas or configuration notes
+- The expected workspace-relative QA report path. For a plan-driven review,
+   derive it from the plan filename as
+   `docs/qa/reports/<plan-file-stem>.md`. For a small bug fix without a plan,
+   choose a stable task slug under the same directory.
+
+### QA Artifact Contract
+
+QA has two required outputs:
+
+1. A durable report at the expected path under `docs/qa/reports/`.
+2. A non-empty response manifest containing the same report path and the
+    report verdict.
+
+The report is the durable source for the review result. The response manifest
+is the routing acknowledgement; it must not point to or depend on terminal
+output, `chat-session-resources`, `copilot-terminal-output`, `%TEMP%`,
+`AppData`, or any other path outside the workspace.
+
+Before accepting the QA handoff, validate all of the following:
+
+- the response is non-empty and contains the expected report path;
+- the report path is workspace-relative, stays under `docs/qa/reports/`, and
+   is not an absolute path or an external/session path;
+- the report exists and uses format `fittrack-qa-v1`;
+- the report contains exactly one verdict: `PASS`, `PASS WITH ISSUES`, or
+   `FAIL`;
+- every Acceptance Criterion from the approved plan appears in the report's
+   criteria matrix with a result and evidence;
+- the test table records each relevant command, exit code, and result;
+- verification limits are listed separately as `UNVERIFIED` or
+   `MANUAL VALIDATION REQUIRED`;
+- every actionable finding contains the required structured fields, or the
+   report explicitly states that there are no actionable findings.
+
+Do not recover missing report content from terminal output or temporary files.
+If the response or report is missing or invalid, request completion from the
+same QA agent and list the exact missing fields. If the second handoff is still
+missing or invalid, stop with a process error. Do not substitute another
+agent, infer a verdict, or continue to the findings decision flow.
 
 ### Step 6: Handle QA verdict
+
+Only use the validated QA report from the preceding section to determine the
+verdict. Persist actionable findings in `docs/qa/findings.md` as described
+below; the QA report remains the durable review evidence and the findings
+register remains the durable decision/status record.
 
 | Verdict | Action |
 |---|---|
@@ -198,9 +242,12 @@ Report these immediately instead of silently recovering:
 - subagent invocation or routing failure;
 - missing or unreadable approved Planner artifact;
 - reliance on an unresolved or out-of-workspace session-file path for a plan or handoff;
+- missing or invalid QA report or response manifest after one completion request;
 - inability to write `docs/qa/findings.md`.
 
 Do not reconstruct an approved plan from temporary `chat-session-resources` files. A plan-driven execution requires a verified repository artifact under `docs/User Stories/**/PLAN_*.md`.
+Do not reconstruct QA results from terminal output or temporary files. QA
+results require the validated repository report described above.
 
 ### Step 7: QA Correction Loop
 
@@ -309,6 +356,7 @@ The current plan replaces all previous Planner responses. It is already the cons
 - Make product decisions
 - Let agents interact with the user — the Orchestrator is the sole user-facing interface
 - Use a standard or unrelated agent as a fallback after a subagent invocation failure
+- Read terminal-output, session-resource, or other temporary files as plan or QA sources
 - Skip QA
 - Execute subtasks in parallel
 - Proceed to execution without explicit user APPROVE
