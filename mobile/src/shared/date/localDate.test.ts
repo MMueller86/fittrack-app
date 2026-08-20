@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { getLocalIsoDate, isValidDateOnly } from './localDate';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getLocalIsoDate, getLocalTimezoneOffsetMinutes, isValidDateOnly } from './localDate';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('getLocalIsoDate', () => {
   it('uses the local calendar date without a UTC conversion', () => {
@@ -26,5 +30,19 @@ describe('isValidDateOnly', () => {
     expect(isValidDateOnly('2026-02-30')).toBe(false);
     expect(isValidDateOnly('2026-13-01')).toBe(false);
     expect(isValidDateOnly(undefined)).toBe(false);
+  });
+});
+
+describe('getLocalTimezoneOffsetMinutes', () => {
+  it('normalizes the native offset to local-minus-UTC minutes', () => {
+    vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(120);
+
+    expect(getLocalTimezoneOffsetMinutes(new Date())).toBe(-120);
+  });
+
+  it('rejects offsets outside the supported timezone range', () => {
+    vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(900);
+
+    expect(getLocalTimezoneOffsetMinutes(new Date())).toBeNull();
   });
 });

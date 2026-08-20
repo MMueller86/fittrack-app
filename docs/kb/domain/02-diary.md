@@ -61,9 +61,50 @@ An absent `calorieTargetSnapshot` is expected on legacy documents and requires n
 
 ## Special Activity
 
-A **special activity** represents a single high-intensity physical effort (hiking or cycling) that meaningfully exceeds the activity level already baked into the user's daily calorie target.
+A **special activity** represents a logged single high-intensity physical
+effort (hiking or cycling) that meaningfully exceeds the activity level already
+baked into the user's daily calorie target. The stored activity remains a
+`SpecialActivity` record; it does not contain a completion-status field.
 
 `SpecialActivity` is a discriminated union: `HikingSpecialActivity | CyclingSpecialActivity`. The `type` field determines which input fields and intermediates are present.
+
+### Daily Insight activity-status boundary
+
+The Daily Insight derives a temporary language context from the requested
+current-day `localHour`; it does not change the diary activity contract or
+persist a new status:
+
+| Condition with a present `specialActivity` | Daily status | Meaning |
+|---|---|---|
+| Valid `localHour` `0..19` for the current day | `planned` | Logged/planned, not treated as completed |
+| Valid `localHour` `20..23` for the current day | `likely_completed` | Probabilistic or conditional language only |
+| Missing, non-integer, or out-of-range hour | `unknown` | No completion statement |
+| Requested date is not the current day | `unknown` | Current local time is not applied retrospectively |
+
+Without a special activity, the status and its source are `null`. The source is
+`local_time_heuristic` for valid current-day hours and `unavailable` for an
+unknown status. There is deliberately no `completed` value: the activity
+entry has no confirmed completion source. `likely_completed` must never be
+worded as a confirmed fact, and `planned`/`unknown` must not use completed-
+activity language.
+
+The status is used only by the Daily Insight context and prompt. Historical
+activity snapshots remain available for their own target and activity data;
+the current request hour does not manufacture a historical completion fact.
+The current Mobile client sends `timezoneOffsetMinutes` as local time minus UTC.
+Integer values from `-840` through `840` are normalized and used to determine
+the requested local current day and the safety boundary for this heuristic.
+Missing or invalid values normalize to `null`: the request remains usable with
+the legacy UTC fallback, but an activity is not treated as current-day evidence
+and therefore remains `unknown`; Daily expiry also falls back to UTC midnight.
+See [tech/09-api-reference.md](../tech/09-api-reference.md) for the complete
+cache, local-midnight, and TTL contract.
+
+The v11 Daily Insight also applies one global stale-weight safety rule across
+all intents: day 14 is current, day 15 is stale, stale-as-current wording is
+rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
+accepted. The full prompt and failure contract is documented in
+[domain/07-ai-features.md](07-ai-features.md).
 
 ### Activity Bonus
 

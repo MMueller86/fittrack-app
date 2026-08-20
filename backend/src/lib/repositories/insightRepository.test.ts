@@ -9,12 +9,23 @@ import {
   computeInputHash,
   shouldRegenerate,
   computeTtlUntilMidnight,
+  getCurrentLocalDate,
+  getNextLocalMidnightUtc,
+  isCurrentDayForOffset,
+  normalizeTimezoneOffsetMinutes,
   InMemoryInsightRepository,
   MAX_DAILY_GENERATIONS,
   MIN_REGEN_INTERVAL_MS,
+  makeFeedbackId,
   makeWeeklyInsightId,
 } from './insightRepository';
-import type { InsightDocument, InsightInputContext, InsightResponse, WeeklyEvaluation } from '@fittrack/shared';
+import type {
+  InsightDocument,
+  InsightFeedbackDocument,
+  InsightInputContext,
+  InsightResponse,
+  WeeklyEvaluation,
+} from '@fittrack/shared';
 import type { WeeklyInsightDocument } from './insightRepository';
 
 // ---------------------------------------------------------------------------
@@ -26,18 +37,48 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
     date: '2026-06-30',
     dayType: 'training',
     workoutType: 'gym',
+    currentHourLocal: 10,
+    specialActivity: null,
+    activityCompletionStatus: null,
+    activityStatusSource: null,
     weight: {
       latestKg: 83.0,
       previousKg: 83.2,
       targetKg: 80.0,
       trend7d: 'losing',
       last7Values: [83.0, 83.2, 83.5, 83.4, 83.6, 83.7, 83.8],
+      isOutlierPrevious: false,
+      isOutlierLatest: false,
+      daysSinceLastMeasurement: 0,
+      lastMeasurementDate: '2026-06-30',
     },
     nutrition: {
-      today: { calories: 1600, protein: 120, carbs: 160, fat: 55, fiber: 22 },
-      targets: { calories: 2100, proteinG: 160, carbsG: 220, fatG: 70, fiberG: 30 },
+      today: { calories: 1600, protein: 120, carbs: 160, fat: 55, fiber: 22, hasMealItem: true },
+      targets: {
+        calories: 2100,
+        proteinG: 160,
+        carbsG: 220,
+        fatG: 70,
+        fiberG: 30,
+        baseCalories: 2100,
+        activityBonusCalories: 0,
+        targetSource: 'profile_fallback',
+      },
+      remainingCalories: 500,
+      remainingProteinG: 40,
       last3Days: [
-        { date: '2026-06-29', calories: 2050, protein: 155 },
+        {
+          date: '2026-06-29',
+          calories: 2050,
+          protein: 155,
+          carbs: 210,
+          fat: 65,
+          hasMealItem: true,
+          baseTargetCalories: 2100,
+          effectiveTargetCalories: 2100,
+          activityBonusCalories: 0,
+          targetSource: 'profile_fallback',
+        },
         { date: '2026-06-28', calories: 1980, protein: 148 },
         { date: '2026-06-27', calories: 2100, protein: 162 },
       ],
@@ -67,7 +108,7 @@ function makeDocument(overrides: Partial<InsightDocument> = {}): InsightDocument
     ttl: 50400,
     promptVersion: 'v1',
     model: 'gpt4o-mini',
-    inputHash: computeInputHash(ctx),
+    inputHash: computeInputHash(ctx, 'v1'),
     inputContext: ctx,
     response: makeResponse(),
     dailyGenerations: 1,
@@ -107,6 +148,36 @@ function makeWeeklyDocument(overrides: Partial<WeeklyInsightDocument> = {}): Wee
   };
 }
 
+function makeFeedbackDocument(overrides: Partial<InsightFeedbackDocument> = {}): InsightFeedbackDocument {
+  const insight = makeDocument({
+    _docType: 'dailyInsight',
+    intent: 'general',
+    promptSnapshot: { system: 'system', user: 'user' },
+  });
+  return {
+    id: makeFeedbackId('user1', '11111111-1111-4111-8111-111111111111'),
+    userId: 'user1',
+    _docType: 'insightFeedback',
+    insightId: insight.id,
+    date: insight.date,
+    insightGeneratedAt: insight.generatedAt,
+    submittedAt: '2026-06-30T11:00:00Z',
+    submissionId: '11111111-1111-4111-8111-111111111111',
+    score: 'negative',
+    userComment: 'Nicht korrekt.',
+    response: insight.response,
+    promptSnapshot: insight.promptSnapshot!,
+    promptVersion: insight.promptVersion,
+    intent: insight.intent!,
+    inputContext: insight.inputContext,
+    inputHash: insight.inputHash,
+    model: insight.model,
+    intelligenceVersion: insight.intelligenceVersion,
+    tokensUsed: insight.tokensUsed,
+    ...overrides,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // computeInputHash
 // ---------------------------------------------------------------------------
@@ -136,6 +207,64 @@ describe('computeInputHash', () => {
     expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
   });
 
+  it('returns different hash when the activity status or local-time bucket changes', () => {
+    const a = makeContext({
+      currentHourLocal: 19,
+      activityCompletionStatus: 'planned',
+      activityStatusSource: 'local_time_heuristic',
+    });
+    const b = makeContext({
+      currentHourLocal: 20,
+      activityCompletionStatus: 'likely_completed',
+      activityStatusSource: 'local_time_heuristic',
+    });
+    expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
+  });
+
+  it('returns different hash when the current target source changes', () => {
+    const nutrition = makeContext().nutrition;
+    const a = makeContext({
+      nutrition: {
+        ...nutrition,
+        targets: { ...nutrition.targets!, targetSource: 'profile_fallback' },
+      },
+    });
+    const b = makeContext({
+      nutrition: {
+        ...nutrition,
+        targets: { ...nutrition.targets!, targetSource: 'day_target_snapshot' },
+      },
+    });
+    expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
+  });
+
+  it('returns different hash when a historical target changes', () => {
+    const nutrition = makeContext().nutrition;
+    const a = makeContext({ nutrition });
+    const b = makeContext({
+      nutrition: {
+        ...nutrition,
+        last3Days: [
+          { ...nutrition.last3Days[0]!, effectiveTargetCalories: 1900 },
+          ...nutrition.last3Days.slice(1),
+        ],
+      },
+    });
+    expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
+  });
+
+  it('distinguishes a valid zero-kcal day from a day without meal items', () => {
+    const nutrition = makeContext().nutrition;
+    const withZeroKcalItem = makeContext({
+      nutrition: {
+        ...nutrition,
+        today: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, hasMealItem: true },
+      },
+    });
+    const withoutMealItems = makeContext({ nutrition: { ...nutrition, today: null } });
+    expect(computeInputHash(withZeroKcalItem, 'v4')).not.toBe(computeInputHash(withoutMealItems, 'v4'));
+  });
+
   it('returns same hash when weight changes by < 0.25 kg (same rounding bucket)', () => {
     const a = makeContext();
     // +0.2 kg — both round to 83.0 in 0.5-buckets
@@ -157,6 +286,109 @@ describe('computeInputHash', () => {
   it('returns different hash when promptVersion changes', () => {
     const ctx = makeContext();
     expect(computeInputHash(ctx, 'v4')).not.toBe(computeInputHash(ctx, 'v5'));
+  });
+
+  it('includes the selected intent and activity status bucket in the hash', () => {
+    const ctx = makeContext({
+      specialActivity: {} as InsightInputContext['specialActivity'],
+      activityCompletionStatus: 'planned',
+      activityStatusSource: 'local_time_heuristic',
+    });
+    const planned = computeInputHash(ctx, 'v10', 'activity_focus');
+    const unknown = computeInputHash({ ...ctx, activityCompletionStatus: 'unknown', activityStatusSource: 'unavailable' }, 'v10', 'activity_focus');
+    const otherIntent = computeInputHash(ctx, 'v10', 'general');
+    expect(planned).not.toBe(unknown);
+    expect(planned).not.toBe(otherIntent);
+  });
+
+  it('does not hash an unvalidated offset value', () => {
+    const withoutOffset = makeContext({ timezoneOffsetMinutes: null });
+    const invalidOffset = makeContext({ timezoneOffsetMinutes: 900 });
+
+    expect(computeInputHash(withoutOffset, 'v10', 'general'))
+      .toBe(computeInputHash(invalidOffset, 'v10', 'general'));
+  });
+
+  it('invalidates changes to complete prompt-relevant nutrition and progress inputs', () => {
+    const base = makeContext({
+      progressIntelligence: {
+        version: 'v1',
+        primarySignal: { type: 'daily_context', confidence: 0.5, freshnessScore: 0 },
+        contextSignals: [],
+        progress: null,
+        phase: null,
+        plateau: null,
+        milestone: null,
+        monthlyTrend: null,
+        dayCompleteness: 1,
+        goalAtCalculation: 'maintain',
+      },
+    });
+    const nutritionChanged = makeContext({
+      nutrition: {
+        ...base.nutrition,
+        today: { ...base.nutrition.today!, carbs: 190, fat: 70, fiber: 28 },
+      },
+    });
+    const progressChanged = makeContext({
+      progressIntelligence: {
+        ...base.progressIntelligence,
+        primarySignal: { ...base.progressIntelligence.primarySignal, type: 'phase_context' },
+      },
+    });
+    expect(computeInputHash(base, 'v10', 'general')).not.toBe(computeInputHash(nutritionChanged, 'v10', 'general'));
+    expect(computeInputHash(base, 'v10', 'general')).not.toBe(computeInputHash(progressChanged, 'v10', 'general'));
+  });
+});
+
+describe('Daily timezone offset helpers', () => {
+  it.each([
+    ['-840', -840],
+    ['0', 0],
+    ['840', 840],
+    [null, null],
+    ['', null],
+    ['1.5', null],
+    ['not-a-number', null],
+    ['841', null],
+    ['-841', null],
+  ] as const)('normalizes %s to %s without clamping', (value, expected) => {
+    expect(normalizeTimezoneOffsetMinutes(value)).toBe(expected);
+  });
+
+  it.each([
+    [new Date('2026-08-20T23:30:00.000Z'), 120, '2026-08-21'],
+    [new Date('2026-08-20T00:30:00.000Z'), -840, '2026-08-19'],
+    [new Date('2026-08-20T23:30:00.000Z'), 0, '2026-08-20'],
+    [new Date('2026-08-20T10:30:00.000Z'), 840, '2026-08-21'],
+  ] as const)('computes the local date for offset %s', (now, offset, expected) => {
+    expect(getCurrentLocalDate(now, offset)).toBe(expected);
+  });
+
+  it.each([
+    ['2026-08-21', new Date('2026-08-20T23:30:00.000Z'), 120, true],
+    ['2026-08-20', new Date('2026-08-20T23:30:00.000Z'), 120, false],
+    ['2026-08-19', new Date('2026-08-20T00:30:00.000Z'), -840, true],
+    ['2026-08-21', new Date('2026-08-20T10:30:00.000Z'), 840, true],
+    ['2026-08-20', new Date('2026-08-20T23:30:00.000Z'), null, false],
+  ] as const)('checks current local day for %s', (requestedDate, now, offset, expected) => {
+    expect(isCurrentDayForOffset(requestedDate, now, offset)).toBe(expected);
+  });
+
+  it.each([
+    [new Date('2026-08-20T23:30:00.000Z'), 120, '2026-08-21T22:00:00.000Z'],
+    [new Date('2026-08-20T00:30:00.000Z'), -840, '2026-08-20T14:00:00.000Z'],
+    [new Date('2026-08-20T23:30:00.000Z'), 840, '2026-08-21T10:00:00.000Z'],
+    [new Date('2026-08-20T12:00:00.000Z'), null, '2026-08-21T00:00:00.000Z'],
+    [new Date('2026-08-20T12:00:00.000Z'), 900, '2026-08-21T00:00:00.000Z'],
+  ] as const)('computes the next midnight boundary for offset %s', (now, offset, expected) => {
+    expect(getNextLocalMidnightUtc(now, offset).toISOString()).toBe(expected);
+  });
+
+  it('rounds TTL upward so it cannot expire before the boundary', () => {
+    const now = new Date('2026-08-20T23:59:58.100Z');
+
+    expect(computeTtlUntilMidnight(now, 0)).toBe(2);
   });
 });
 
@@ -226,6 +458,34 @@ describe('shouldRegenerate', () => {
     });
     expect(shouldRegenerate(doc, 'newhash', now, false)).toBe(true);
   });
+
+  it('hard-invalidates a legacy or older prompt instance regardless of cache limits', () => {
+    const recentLegacy = makeDocument({
+      promptVersion: 'v9',
+      inputHash: 'newhash',
+      lastGeneratedAt: now.toISOString(),
+      dailyGenerations: MAX_DAILY_GENERATIONS,
+    });
+    expect(shouldRegenerate(recentLegacy, 'newhash', now, false, 'v10')).toBe(true);
+
+    const incompleteV10 = makeDocument({
+      promptVersion: 'v10',
+      inputHash: baseHash,
+      intent: undefined,
+      promptSnapshot: undefined,
+    });
+    expect(shouldRegenerate(incompleteV10, baseHash, now, false, 'v10')).toBe(true);
+  });
+
+  it('serves a complete current prompt instance when its hash is unchanged', () => {
+    const doc = makeDocument({
+      promptVersion: 'v10',
+      inputHash: baseHash,
+      intent: 'general',
+      promptSnapshot: { system: 'system', user: 'user' },
+    });
+    expect(shouldRegenerate(doc, baseHash, now, false, 'v10')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -291,6 +551,15 @@ describe('InMemoryInsightRepository', () => {
     await repo.upsert(doc2);
     expect((await repo.get('user1', '2026-06-30'))?.userId).toBe('user1');
     expect((await repo.get('user2', '2026-06-30'))?.userId).toBe('user2');
+  });
+
+  it('does not interpret a foreign document discriminator as a daily insight', async () => {
+    await repo.upsert({
+      ...makeDocument(),
+      _docType: 'feedback' as never,
+    });
+    expect(await repo.get('user1', '2026-06-30')).toBeNull();
+    expect(await repo.listRecent('user1', 7, '2026-06-30')).toEqual([]);
   });
 });
 
@@ -364,6 +633,42 @@ describe('InMemoryInsightRepository.listRecent', () => {
     await repo.upsert(doc);
     const result = await repo.listRecent('user1', 7, '2026-06-30');
     expect(result).toHaveLength(0);
+  });
+});
+
+describe('InMemoryInsightRepository feedback documents', () => {
+  let repo: InMemoryInsightRepository;
+
+  beforeEach(() => {
+    repo = new InMemoryInsightRepository();
+  });
+
+  it('creates a feedback document only once for a submission id', async () => {
+    const first = makeFeedbackDocument();
+    const second = makeFeedbackDocument({ userComment: 'Anderer Kommentar.' });
+
+    await expect(repo.createFeedbackIfAbsent(first)).resolves.toEqual({ created: true, document: first });
+    await expect(repo.createFeedbackIfAbsent(second)).resolves.toEqual({ created: false, document: first });
+    await expect(repo.getFeedbackBySubmissionId('user1', first.submissionId)).resolves.toEqual(first);
+  });
+
+  it('isolates feedback lookups by user and discriminator', async () => {
+    const feedback = makeFeedbackDocument();
+    await repo.createFeedbackIfAbsent(feedback);
+
+    await expect(repo.getFeedbackBySubmissionId('user2', feedback.submissionId)).resolves.toBeNull();
+    await expect(repo.get('user1', feedback.date)).resolves.toBeNull();
+  });
+
+  it('marks only the exact Daily instance as negative', async () => {
+    const daily = makeDocument({ feedbackScore: null });
+    await repo.upsert(daily);
+
+    await expect(repo.markNegativeFeedback(daily.userId, daily.date, 'wrong-generation')).resolves.toBe(false);
+    expect((await repo.get(daily.userId, daily.date))?.feedbackScore).toBeNull();
+
+    await expect(repo.markNegativeFeedback(daily.userId, daily.date, daily.generatedAt)).resolves.toBe(true);
+    expect((await repo.get(daily.userId, daily.date))?.feedbackScore).toBe('negative');
   });
 });
 

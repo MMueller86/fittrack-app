@@ -9,14 +9,28 @@ import { FOOD_ESTIMATE_SYSTEM_PROMPT } from './prompts/foodEstimate';
 import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
 import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
 import { RECIPE_SCALE_SYSTEM_PROMPT } from './prompts/recipeScale';
-import { DAILY_INSIGHT_SYSTEM_PROMPT, DAILY_INSIGHT_PROMPT_VERSION } from './prompts/dailyInsightV9';
+import {
+  DAILY_INSIGHT_SYSTEM_PROMPT,
+  DAILY_INSIGHT_PROMPT_VERSION,
+  buildDailyInsightPrompt,
+  type DailyInsightPromptSnapshot,
+} from './prompts/dailyInsightV10';
 import {
   WEEKLY_INSIGHT_SYSTEM_PROMPT,
   WEEKLY_INSIGHT_PROMPT_VERSION,
   WEEKLY_INSIGHT_TEXT_MAX_LENGTH,
   type WeeklyInsightPromptContext,
 } from './prompts/weeklyInsightV2';
-import type { InsightInputContext, InsightResponse } from '@fittrack/shared';
+import type { InsightInputContext, InsightIntent, InsightResponse } from '@fittrack/shared';
+import { selectInsightIntent } from './dailyInsightIntent';
+import {
+  DAILY_INSIGHT_CTA_MAX_LENGTH,
+  DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH,
+  DAILY_INSIGHT_SUMMARY_MAX_LENGTH,
+  DAILY_INSIGHT_TITLE_MAX_LENGTH,
+  toInsightResponse,
+  validateDailyInsightResponse,
+} from './dailyInsightValidation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -698,7 +712,41 @@ export async function generateWeeklyInsight(
 export interface GenerateInsightResult {
   response: Omit<InsightResponse, 'generatedAt' | 'promptVersion' | 'status'>;
   tokensUsed: number;
+  intent: InsightIntent;
+  promptSnapshot: DailyInsightPromptSnapshot;
 }
+
+export const DAILY_INSIGHT_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    title: {
+      type: 'string' as const,
+      minLength: 1,
+      maxLength: DAILY_INSIGHT_TITLE_MAX_LENGTH,
+    },
+    summary: {
+      type: 'string' as const,
+      minLength: 1,
+      maxLength: DAILY_INSIGHT_SUMMARY_MAX_LENGTH,
+    },
+    recommendation: {
+      type: ['string', 'null'] as const,
+      minLength: 1,
+      maxLength: DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH,
+    },
+    cta: {
+      type: ['string', 'null'] as const,
+      minLength: 1,
+      maxLength: DAILY_INSIGHT_CTA_MAX_LENGTH,
+    },
+    ctaTarget: {
+      type: ['string', 'null'] as const,
+      enum: ['Nutrition', 'Weight', 'Training', 'Recipe', null] as const,
+    },
+  },
+  required: ['title', 'summary', 'recommendation', 'cta', 'ctaTarget'],
+  additionalProperties: false,
+};
 
 /**
  * Generate a daily AI insight from a structured input context.
@@ -707,61 +755,61 @@ export interface GenerateInsightResult {
  */
 export async function generateDailyInsight(
   context: InsightInputContext,
+  intent: InsightIntent = selectInsightIntent(context),
+  promptSnapshot: DailyInsightPromptSnapshot = buildDailyInsightPrompt(intent, context),
 ): Promise<GenerateInsightResult> {
   const client = getClient();
   const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
 
-  const userMessage = JSON.stringify(context);
-
   const completion = await client.chat.completions.create({
     model: deployment,
     messages: [
-      { role: 'system', content: DAILY_INSIGHT_SYSTEM_PROMPT },
-      { role: 'user', content: userMessage },
+      { role: 'system', content: promptSnapshot.system },
+      { role: 'user', content: promptSnapshot.user },
     ],
-    response_format: { type: 'json_object' },
-    temperature: 0.4,   // slight creativity for natural phrasing, but still predictable
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'daily_insight',
+        strict: true,
+        schema: DAILY_INSIGHT_SCHEMA,
+      },
+    },
+    temperature: 0.4,
     max_tokens: 400,
   });
 
-  const raw = completion.choices[0]?.message?.content;
-  if (!raw) throw new Error('Empty response from Azure OpenAI (daily-insight)');
-
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
-
-  // Validate required fields
-  if (typeof parsed['title'] !== 'string' || typeof parsed['summary'] !== 'string') {
-    throw new Error('Daily insight response missing required fields: title, summary');
+  const choice = completion.choices[0];
+  if (choice?.finish_reason === 'length' || choice?.finish_reason === 'content_filter') {
+    throw new Error(`Daily insight response rejected by provider: ${choice.finish_reason}`);
   }
 
-  const response: Omit<InsightResponse, 'generatedAt' | 'promptVersion' | 'status'> = {
-    title: String(parsed['title']).slice(0, 80),
-    summary: String(parsed['summary']).slice(0, 600),
-    recommendation:
-      typeof parsed['recommendation'] === 'string' && parsed['recommendation'].length > 0
-        ? parsed['recommendation']
-        : undefined,
-    cta:
-      typeof parsed['cta'] === 'string' && parsed['cta'].length > 0
-        ? parsed['cta']
-        : undefined,
-    ctaTarget:
-      parsed['ctaTarget'] === 'Nutrition' ||
-      parsed['ctaTarget'] === 'Weight' ||
-      parsed['ctaTarget'] === 'Training' ||
-      parsed['ctaTarget'] === 'Recipe'
-        ? parsed['ctaTarget']
-        : undefined,
-  };
+  const raw = choice?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI (daily-insight)');
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Invalid JSON response from Azure OpenAI (daily-insight)');
+  }
+
+  const validated = validateDailyInsightResponse(parsed, context, intent);
 
   const tokensUsed = completion.usage?.total_tokens ?? 0;
 
-  return { response, tokensUsed };
+  return {
+    response: toInsightResponse(validated),
+    tokensUsed,
+    intent,
+    promptSnapshot,
+  };
 }
 
 /** Exposed for mocking in tests. */
 export {
   DAILY_INSIGHT_PROMPT_VERSION,
+  DAILY_INSIGHT_SYSTEM_PROMPT,
   WEEKLY_INSIGHT_PROMPT_VERSION,
   WEEKLY_INSIGHT_TEXT_MAX_LENGTH,
 };

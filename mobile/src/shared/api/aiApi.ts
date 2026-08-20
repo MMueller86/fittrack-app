@@ -1,4 +1,5 @@
 // AI API — meal parser + food nutrition estimator + label scan + meal estimate
+import axios from 'axios';
 import { apiClient } from './client';
 import type {
   FoodSearchResult,
@@ -7,8 +8,47 @@ import type {
   AiMealEstimatePreview,
   RecipeScalePreviewRequest,
   RecipeScalePreviewResponse,
+  InsightFeedbackRequest,
+  InsightFeedbackResponse,
   WeeklyNutritionReviewResponse,
 } from '@fittrack/shared';
+
+const INSIGHT_FEEDBACK_ERROR_CODES = [
+  'insight_not_found',
+  'insight_generation_changed',
+  'feedback_snapshot_unavailable',
+  'feedback_submission_conflict',
+] as const;
+
+export type InsightFeedbackErrorCode = typeof INSIGHT_FEEDBACK_ERROR_CODES[number];
+
+export interface InsightFeedbackApiError {
+  status: number;
+  code: InsightFeedbackErrorCode | null;
+}
+
+function toInsightFeedbackErrorCode(value: unknown): InsightFeedbackErrorCode | null {
+  switch (value) {
+    case 'insight_not_found':
+    case 'insight_generation_changed':
+    case 'feedback_snapshot_unavailable':
+    case 'feedback_submission_conflict':
+      return value;
+    default:
+      return null;
+  }
+}
+
+export function getInsightFeedbackApiError(error: unknown): InsightFeedbackApiError | null {
+  if (!axios.isAxiosError(error) || typeof error.response?.status !== 'number') return null;
+
+  const body: unknown = error.response.data;
+  const code = typeof body === 'object' && body !== null && 'code' in body
+    ? toInsightFeedbackErrorCode(body.code)
+    : null;
+
+  return { status: error.response.status, code };
+}
 
 // Re-export for convenience so callers don't need to import from @fittrack/shared directly
 export type {
@@ -161,6 +201,13 @@ export const aiApi = {
     return apiClient
       .post<{ results: AiFoodEstimatePreview[] }>('/ai/food-estimate/batch', { items }, { timeout: 60_000 })
       .then((r) => r.data.results);
+  },
+
+  /** POST /api/ai/daily-insight/feedback — submit feedback for one exact Daily instance */
+  submitDailyInsightFeedback(request: InsightFeedbackRequest): Promise<InsightFeedbackResponse> {
+    return apiClient
+      .post<InsightFeedbackResponse>('/ai/daily-insight/feedback', request)
+      .then((r) => r.data);
   },
 
   /** GET /api/ai/weekly-insight?date=YYYY-MM-DD */

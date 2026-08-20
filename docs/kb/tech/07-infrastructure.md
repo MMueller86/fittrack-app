@@ -53,8 +53,26 @@ All user-data containers use `/userId` as partition key.
 | `foodProducts` | `/id` | Open Food Facts catalog (partition key = id) |
 | `dayMeta` | `/userId` | Per-day metadata (dayType, workoutType) |
 | `hintState` | `/userId` | Hint cooldown tracking |
-| `insights` | `/userId` | Cached daily insight documents |
+| `aiInsights` | `/userId` | Heterogeneous AI documents: Daily cache, Weekly cache, and durable feedback snapshots |
 | `userFoodRelations` | `/userId` | Favorites + recents tracking |
+
+`aiInsights` is the existing `/userId`-partitioned container for Daily Insight
+documents (`_docType: 'dailyInsight'`), Weekly Insight documents
+(`_docType: 'weeklyInsight'`), and durable negative-feedback snapshots
+(`_docType: 'insightFeedback'`). Repository reads filter these discriminators;
+the container is not a separate feedback API surface.
+
+The container is configured with `defaultTtl: -1` so Daily and Weekly
+documents can use per-document TTL values. Feedback documents deliberately
+omit both `ttl` and `expiresAt`, so they are not automatically deleted. They
+remain available for later analysis until a manual database cleanup, which is
+an operational follow-up outside the feature.
+
+The existing authorized administrative/operational direct-read access may read
+feedback snapshots directly from this container. This feature introduces no
+new application role, permission model, Admin UI, read endpoint, or cleanup
+endpoint; it also grants no implicit database access to normal users or
+arbitrary JWT admins.
 
 ## Resource Naming Convention
 

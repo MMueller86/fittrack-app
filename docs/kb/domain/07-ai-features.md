@@ -17,6 +17,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 | Recipe Analyzer | POST /api/ai/recipe-analyze | `recipe-analyze` | `RecipeWizardScreen` |
 | Recipe Scale Preview | POST /api/ai/recipe-scale/preview | `recipe-scale` | Transient recipe detail preview |
 | Daily Insight | GET /api/ai/daily-insight | (special) | Inline on `HomeScreen` |
+| Daily Insight Feedback | POST /api/ai/daily-insight/feedback | None | Required-comment Bottom Sheet in `InsightCard` |
 | Weekly Insight | GET /api/ai/weekly-insight?date=YYYY-MM-DD | `daily-insight` (shared personal-insight budget) | Backend endpoint; Mobile integration in F-1 |
 
 ## 1. Meal Parser
@@ -175,23 +176,158 @@ The preview is advisory and transient. Per the US-05 product decision, this work
 
 **Trigger:** `GET /api/ai/daily-insight` (once per day per user)
 
-**Input context (`InsightInputContext`):**
-- Last 7 days of nutrition diary summaries
-- Weight history + progress intelligence signals (plateau, trend, milestones)
-- User profile (goal type, target weight)
-- Current quota usage
+The backend builds a server-owned `InsightInputContext` from the current diary
+and DayMeta, the last three completed diary days, profile/goal data, weight
+history, and deterministic progress-intelligence signals. A present MealItem
+is valid nutrition data even when its calories or macros are `0`; a day without
+a MealItem remains missing (`null`) and is not represented as an invented
+zero. Historical calorie resolution is snapshot-first:
 
-**Cache strategy:**
-- Cosmos document: `id = ${userId}:${date}` (date in user's local timezone)
-- Served from cache when input hash matches or min regeneration interval not elapsed
-- Max 3 regenerations/day for normal users; always regenerates for `internal` tier
-- Input hash stored alongside document for change detection
+1. valid `DayMeta.calorieTargetSnapshot.calories`;
+2. compatible stored `specialActivity.dailyCalorieTarget` for older activity
+  documents;
+3. read-only `profile_fallback` using the stored training target for an
+  explicitly stored training day, otherwise the rest target;
+4. unavailable when a special activity exists without a usable stored target.
 
-**Failure modes (never shows error to user):**
-- Quota exceeded → `status: 'quota_exceeded'` with friendly German copy
-- AI unavailable → `status: 'unavailable'` with friendly German copy
+The profile fallback is never persisted as historical data or presented as a
+historical fact. Historical activity, target source, activity bonus, day type,
+and workout type remain attached to their own day context.
 
-**Output:** `InsightResponse` — title + summary (60–120 words) + optional recommendation/CTA
+### Daily intent and activity status
+
+The backend selects exactly one `InsightIntent` deterministically. The priority
+is:
+
+1. `activity_focus` for any present special activity;
+2. `weight_signal` for a strong plateau, milestone, or recovered-phase signal;
+3. `phase_progress` for `phase_context`;
+4. `morning_orientation` before local hour 10 when today has no MealItem;
+5. `nutrition_guidance` when current nutrition and targets are available;
+6. `general` otherwise.
+
+The AI receives the selected intent but cannot change it. For a present current-
+day activity, `localHour` `0..19` yields `planned` and `20..23` yields
+`likely_completed`. Missing, invalid, or non-current-day hour data yields
+`unknown`; without an activity, status and source are `null`. The source is
+`local_time_heuristic` for valid hours and `unavailable` for unknown status.
+There is no confirmed `completed` status. `planned` and `unknown` forbid
+completed-activity language; `likely_completed` permits only probabilistic or
+conditional wording. Long/intensive endurance activity is handled with
+qualitative fueling (including carbohydrates or energy), fluids, and recovery
+language, without adding unapproved numeric nutrition thresholds.
+
+The current Mobile Daily request also sends `timezoneOffsetMinutes`, interpreted
+as local time minus UTC (for example, UTC+2 is `120`). Only integer values in
+`[-840,840]` are valid. Missing or invalid values normalize to `null` and use a
+tolerant legacy fallback: the date default remains the backend UTC date,
+current-day activity evidence remains unknown, and expiry falls back to UTC
+midnight. A valid offset compares the requested date with the offset-adjusted
+local date, enables the validated `localHour` activity heuristic only for that
+current day, and sets new Daily documents to expire at the next local midnight
+represented as UTC. The Cosmos `ttl` is the ceiling of the remaining seconds.
+The normalized offset is part of the input hash, so a changed normalized offset
+follows the normal cache regeneration rules.
+
+### v11 prompt, output, and failure contract
+
+`DAILY_INSIGHT_PROMPT_VERSION = 'v11'`. The selected focused module is combined
+with the shared German tone/output contract. The backend stores the exact
+`promptSnapshot.system` and serialized `promptSnapshot.user` sent to Azure
+OpenAI. Strict Structured Outputs use `json_schema`, `strict: true`, required
+properties, nullable optional values, and `additionalProperties: false`.
+
+The server validates the parsed response and rejects provider truncation or
+content filtering, empty/invalid/schema-invalid responses, CTA/target
+mismatches, budget/protein contradictions, definitive activity claims,
+stale-as-current weight claims, and forbidden technical wording. The public contract is
+character-based: `title` is at most 40 characters, `summary` at most 600,
+`recommendation` at most 240, and `cta` at most 80. There is no server-side
+60-120-word summary validator. A failed context read, provider failure,
+truncation/content-filter result, or server validation failure returns friendly
+`unavailable` as HTTP `200`, is not persisted, and does not consume or track
+Daily quota. Quota exhaustion is also a friendly HTTP `200` with
+`status: 'quota_exceeded'` and no tracking.
+
+The v11 stale-weight safety contract is global because the shared tone guard is
+included in every selected intent, not only the weight-focused modules. For
+`daysSinceLastMeasurement > 14`, weight or trend language is allowed only with
+an explicit stale marker such as `veraltet` or `nicht aktuell`; day 14 remains
+current and day 15 is stale. A stale-as-current sentence such as
+`Dein Gewicht ist heute klar gesunken.` is rejected, while explicit stale
+wording such as `Der Trend deines Gewichts ist nicht aktuell.` is accepted.
+The runtime root cause was that the stale rules had previously existed only in
+`promptWeight`, while deterministic `nutrition_guidance` selected
+`promptNutrition`; v11 applies the shared guard to that path and all other
+intents. Server-side validation remains strict and was not weakened.
+
+Negative calorie budget is authoritative. A `remainingProteinG` value of
+`null` is unknown; a value at most 20 is treated as nearly complete. Neither
+state creates an additional protein action, and a negative calorie budget
+blocks further same-day food recommendations.
+
+### Daily cache and persistence
+
+New Daily documents use `_docType: 'dailyInsight'` and
+`id = ${userId}:${date}` in the existing `aiInsights` container. They persist
+the input context/hash, selected intent, prompt version and exact prompt
+snapshot, model, response, token usage, and intelligence version. The hash
+includes prompt version, intent, local-hour bucket, activity/status data,
+current and historical nutrition/targets, weight/progress signals, and the
+other prompt inputs. Missing v11 provenance (`intent` or `promptSnapshot`) also
+invalidates an older Daily cache; an old v10 response is never returned as a
+new v11 result.
+
+An unchanged hash returns `cached`. A changed hash is subject to a 30-minute
+minimum interval and a maximum of three generations for non-admin users;
+admin users bypass these gates in the current handler. Daily documents keep
+their per-document `ttl` and `expiresAt` until the existing Daily expiry.
+
+### Negative feedback and traceability
+
+Negative feedback is submitted through
+`POST /api/ai/daily-insight/feedback`. The authenticated server accepts only
+`date`, canonical UTC `insightGeneratedAt`, UUID `submissionId`, and a trimmed
+1-500 character `userComment`. The request is bound to the exact stored Daily
+instance; a missing instance returns `404`, a changed generation returns
+`409`, and a legacy Daily without required provenance returns
+`feedback_snapshot_unavailable`. The idempotency lookup happens before the
+Daily read, so an identical retry remains `200 created: false` after Daily
+expiry. A changed body with the same ID is rejected.
+
+Each new submission creates one durable `_docType: 'insightFeedback'` document
+under the authenticated user's `/userId` partition. The server-owned
+traceability contract is:
+
+| Persisted field | Source / meaning |
+|---|---|
+| `insightId` | Exact matched Daily document ID |
+| `date` / `insightGeneratedAt` | Exact Daily date and stored generation timestamp |
+| `userComment` | Exact server-trimmed negative comment |
+| `response` | Complete generated/displayed Daily response |
+| `promptSnapshot.system` / `.user` | Exact provider system prompt and serialized user message |
+| `promptVersion` / `intent` | Stored v11 version and deterministic server intent |
+| `inputContext` / `inputHash` | Complete server input and its cache hash |
+| `model` / `intelligenceVersion` / `tokensUsed` | Server deployment, intelligence schema, provider token usage |
+| `submittedAt` | Server-generated submission timestamp |
+
+Feedback is not quota-tracked, has neither `ttl` nor `expiresAt`, and is not
+automatically deleted. The existing authorized administrative/operational
+direct-read access may read these documents directly in `aiInsights` for later
+analysis. PO-6A is resolved at this boundary: this feature introduces no new
+application role, permission model, Admin UI, read endpoint, or cleanup
+endpoint, and it gives no implicit database access to normal users or arbitrary
+admins. Any later manual database cleanup remains an operational follow-up
+outside the feature. Updating the compatibility `feedbackScore` marker is
+conditional on the same Daily identity and does not extend the Daily
+document's existing TTL or expiry.
+
+The backend Daily GET emits the server-owned boolean `feedbackAvailable`.
+It is `true` only for a stored Daily with complete feedback provenance and
+`false` for legacy or incomplete instances. The Mobile type keeps the field
+optional for compatibility; the feedback POST remains authoritative and
+returns `feedback_snapshot_unavailable` when the stored Daily lacks the
+required snapshot.
 
 ## 8. Weekly Insight
 
@@ -244,4 +380,4 @@ Required: API version ≥ `2024-07-01`, model ≥ `gpt-4o-mini 2024-07-18`.
 
 ## Prompt Versioning
 
-Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v6'`). This version is stored with each generated insight document in Cosmos. When prompts change in ways affecting output interpretation, the version must be incremented.
+Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v11'`). This version is stored with each generated insight document in Cosmos. When prompts change in ways affecting output interpretation, the version must be incremented.

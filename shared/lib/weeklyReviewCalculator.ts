@@ -19,7 +19,7 @@ import {
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-interface ResolvedWeeklyTarget {
+export interface ResolvedWeeklyTarget {
   baseTargetCalories: number | null;
   effectiveTargetCalories: number | null;
   activityBonusCalories: number | null;
@@ -84,7 +84,7 @@ function getActivityLabel(type: 'hiking' | 'cycling'): WeeklyActivityLabel {
     : { type, label: 'Wanderung' };
 }
 
-function resolveWeeklyTarget(
+export function resolveWeeklyTarget(
   day: WeeklyNutritionDayInput['dayMeta'],
   profileTargets: WeeklyNutritionCalculationInput['profileTargets'],
 ): ResolvedWeeklyTarget {
@@ -133,10 +133,13 @@ function resolveWeeklyTarget(
   };
 }
 
-function hasExplicitDayContext(day: WeeklyNutritionDayInput['dayMeta']): boolean {
+export function hasExplicitDayContext(day: WeeklyNutritionDayInput['dayMeta']): boolean {
   if (day?.dayType == null) return false;
   return day.specialActivity == null || day.dayType === 'training' || day.workoutType != null;
 }
+
+/** Shared alias for non-weekly consumers that resolve a historical day target. */
+export const resolveHistoricalTarget = resolveWeeklyTarget;
 
 function getMealStats(meals: readonly WeeklyNutritionMealInput[]): {
   hasMealItem: boolean;

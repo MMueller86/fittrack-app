@@ -38,14 +38,13 @@ import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { DayNutritionCard } from './DayNutritionCard';
 import { WeeklyReviewCard } from './WeeklyReviewCard';
 import { InsightCard } from './InsightCard';
-import { getInsight } from '../../services/insightService';
+import { getInsight, type DailyInsightResponse } from '../../services/insightService';
 import { aiApi } from '../../shared/api/aiApi';
 import { getLocalIsoDate } from '../../shared/date/localDate';
 import type {
   WeightEntry,
   DiaryDayResponse,
   WorkoutType,
-  InsightResponse,
   WeeklyNutritionReviewResponse,
 } from '@fittrack/shared';
 import { ActivityCtaCard } from '../nutrition/components/ActivityCtaCard';
@@ -53,9 +52,10 @@ import { ActivityCard } from '../nutrition/components/ActivityCard';
 import { ActivityPickerSheet } from '../nutrition/components/ActivityPickerSheet';
 import { ActivityBonusSheet } from '../nutrition/components/ActivityBonusSheet';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
+import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 
 // Shown when the insight could not be loaded (network error, backend unavailable, etc.)
-const INSIGHT_UNAVAILABLE: InsightResponse = {
+const INSIGHT_UNAVAILABLE: DailyInsightResponse = {
   title: 'Analyse nicht verfügbar',
   summary: 'Sobald wieder eine Verbindung besteht, aktualisiere ich deine persönliche Analyse automatisch.',
   generatedAt: new Date().toISOString(),
@@ -83,10 +83,12 @@ export default function HomeScreen({ navigation }: Props) {
   const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
   const [displayName, setDisplayName] = useState<string | undefined>(undefined);
   // Insight — null = loading (shows skeleton), InsightResponse = content arrived
-  const [insight, setInsight] = useState<InsightResponse | null>(null);
+  const [insight, setInsight] = useState<DailyInsightResponse | null>(null);
+  const [insightDate, setInsightDate] = useState<string | null>(null);
   const [weeklyReview, setWeeklyReview] = useState<WeeklyNutritionReviewResponse | null>(null);
   const [weeklyError, setWeeklyError] = useState(false);
   const weeklyRequestId = useRef(0);
+  const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
   const { dayType, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
   const [workoutPickerVisible, setWorkoutPickerVisible] = useState(false);
@@ -181,8 +183,10 @@ export default function HomeScreen({ navigation }: Props) {
       setEntries([]);
     }
     // Insight runs independently — does NOT block the screen from rendering
+    const dailyInsightDate = getLocalIsoDate();
+    setInsightDate(dailyInsightDate);
     setInsight(null);
-    getInsight(today)
+    getInsight(dailyInsightDate)
       .then((result) => setInsight(result ?? INSIGHT_UNAVAILABLE))
       .catch(() => setInsight(INSIGHT_UNAVAILABLE));
   }, [setTargets, hydrateDayType]);
@@ -342,6 +346,8 @@ export default function HomeScreen({ navigation }: Props) {
         {/* ── FitTrack Insight — async, non-blocking ── */}
         <InsightCard
           insight={insight}
+          date={insightDate}
+          onFeedbackSuccess={() => showSnackbar({ message: 'Feedback gesendet' })}
           onCtaPress={(target) => {
             if (target === 'Nutrition') navToTab('Nutrition');
             else if (target === 'Weight') navToTab('Weight');
@@ -385,6 +391,8 @@ export default function HomeScreen({ navigation }: Props) {
         actions={confirmSheet.actions}
         onClose={() => setConfirmSheet((s) => ({ ...s, visible: false }))}
       />
+
+      <Snackbar ref={snackbarRef} />
     </SafeAreaView>
   );
 }

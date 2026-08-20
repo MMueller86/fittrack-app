@@ -27,6 +27,7 @@ Located in `backend/src/functions/`. Each file owns one domain.
 | `foodSearch.ts` | GET /food-search | Yes | Fan-out search |
 | `foodProducts.ts` | GET /food-products/search, /food-products/{id} | Yes | Catalog only |
 | `dailyInsight.ts` | GET /ai/daily-insight | Yes | Cached, quota-aware |
+| `dailyInsightFeedback.ts` | POST /ai/daily-insight/feedback | Yes | Exact Daily-instance feedback; durable server-owned snapshot; no quota |
 | `weeklyInsight.ts` | GET /ai/weekly-insight | Yes | Seven completed days, cached, quota-aware |
 | `favorites.ts` | GET/POST/DELETE /favorites, GET /food-relations/recent | Yes | |
 

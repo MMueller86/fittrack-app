@@ -2,10 +2,30 @@
 // Shared between backend (generation) and mobile (display).
 
 import type { GoalType, GoalIntensity } from './profile';
-import type { SpecialActivity } from './diary';
+import type { DayType, SpecialActivity, WorkoutType } from './diary';
+import type { WeeklyTargetSource } from './weeklyReview';
 
 /** How fresh the insight is and whether it could be generated at all. */
 export type InsightStatus = 'fresh' | 'cached' | 'quota_exceeded' | 'unavailable';
+
+/** Server-selected focus for a Daily Insight generation. */
+export type InsightIntent =
+  | 'activity_focus'
+  | 'weight_signal'
+  | 'phase_progress'
+  | 'morning_orientation'
+  | 'nutrition_guidance'
+  | 'general';
+
+/** Activity completion is inferred only when a local-time heuristic is available. */
+export type ActivityCompletionStatus = 'planned' | 'likely_completed' | 'unknown';
+
+export type ActivityStatusSource = 'local_time_heuristic' | 'unavailable';
+
+export interface InsightPromptSnapshot {
+  system: string;
+  user: string;
+}
 
 /** Which tab/screen the CTA button should navigate to. */
 export type InsightCtaTarget = 'Nutrition' | 'Weight' | 'Training' | 'Recipe' | null;
@@ -32,6 +52,20 @@ export interface InsightResponse {
   promptVersion: string;
   /** Whether this is freshly generated, served from cache, etc. */
   status: InsightStatus;
+  /** Server-owned feedback capability; emitted by the Daily GET response. */
+  feedbackAvailable?: boolean;
+}
+
+export interface InsightFeedbackRequest {
+  date: string;
+  insightGeneratedAt: string;
+  submissionId: string;
+  userComment: string;
+}
+
+export interface InsightFeedbackResponse {
+  feedbackId: string;
+  created: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -73,8 +107,22 @@ export interface InsightWeightContext {
 
 export interface InsightNutritionDay {
   date: string;       // YYYY-MM-DD
-  calories: number;
-  protein: number;
+  calories: number | null;
+  protein: number | null;
+  /** Optional historical macro snapshots; absent on legacy daily contexts. */
+  carbs?: number | null;
+  fat?: number | null;
+  /** Distinguishes a real zero-kcal item from a day without meal items. */
+  hasMealItem?: boolean;
+  mealItemCount?: number;
+  dayType?: DayType | null;
+  workoutType?: WorkoutType | null;
+  baseTargetCalories?: number | null;
+  effectiveTargetCalories?: number | null;
+  activityBonusCalories?: number | null;
+  targetSource?: WeeklyTargetSource;
+  /** Historical activity snapshot; it is never a completion fact. */
+  specialActivity?: SpecialActivity | null;
 }
 
 export interface InsightNutritionContext {
@@ -84,6 +132,7 @@ export interface InsightNutritionContext {
     carbs: number;
     fat: number;
     fiber: number;
+    hasMealItem?: boolean;
   } | null;
   targets: {
     calories: number;
@@ -91,6 +140,10 @@ export interface InsightNutritionContext {
     carbsG: number;
     fatG: number;
     fiberG: number;
+    /** Current base target before a special-activity bonus, when resolvable. */
+    baseCalories?: number | null;
+    activityBonusCalories?: number | null;
+    targetSource?: WeeklyTargetSource;
   } | null;
   /**
    * Remaining daily budget: target − logged so far (can be negative when over budget).
@@ -125,8 +178,13 @@ export interface InsightInputContext {
    * Used to determine whether the day is still in progress.
    */
   currentHourLocal: number | null;
+  /** Normalized local-minus-UTC offset used for local-day and cache semantics. */
+  timezoneOffsetMinutes?: number | null;
   /** Special activity logged for this day (e.g. hiking), or null when absent. */
   specialActivity?: SpecialActivity | null;
+  /** Server-owned status derived from the local-time heuristic. */
+  activityCompletionStatus: ActivityCompletionStatus | null;
+  activityStatusSource: ActivityStatusSource | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -134,6 +192,8 @@ export interface InsightInputContext {
 // ---------------------------------------------------------------------------
 
 export interface InsightDocument {
+  /** New Daily documents use this discriminator; absent is a legacy Daily document. */
+  _docType?: 'dailyInsight';
   /** Partition + logical key: `${userId}:${date}` */
   id: string;
   /** Partition key */
@@ -142,12 +202,16 @@ export interface InsightDocument {
   date: string;
   /** ISO timestamp of most recent generation */
   generatedAt: string;
-  /** ISO timestamp — next midnight UTC (informational) */
+  /** ISO timestamp — next local midnight as UTC, or next UTC midnight for legacy requests. */
   expiresAt: string;
-  /** Cosmos native TTL in seconds — document auto-deletes at next midnight UTC */
+  /** Cosmos native TTL in seconds — document auto-deletes at the matching midnight boundary */
   ttl: number;
   /** e.g. "v1" */
   promptVersion: string;
+  /** Server-selected focus of the generation; absent on legacy documents. */
+  intent?: InsightIntent;
+  /** Exact prompts sent to the provider; absent on legacy documents. */
+  promptSnapshot?: InsightPromptSnapshot;
   /** e.g. "gpt-4o-mini" */
   model: string;
   /** SHA-256 of rounded input context — used to detect meaningful data changes */
@@ -160,7 +224,7 @@ export interface InsightDocument {
   dailyGenerations: number;
   /** ISO timestamp of most recent generation attempt */
   lastGeneratedAt: string;
-  /** Prepared for future feedback feature — not yet implemented in UI */
+  /** Compatibility marker set when a matching negative feedback is stored. */
   feedbackScore: 'positive' | 'negative' | null;
   /** Tokens consumed — for cost observability */
   tokensUsed: number;
@@ -174,6 +238,28 @@ export interface InsightDocument {
   intelligenceVersion: string;
   /** Pre-computed behavioural signals used for AI prompt construction */
   progressIntelligence?: ProgressIntelligence;
+}
+
+export interface InsightFeedbackDocument {
+  id: string;
+  userId: string;
+  _docType: 'insightFeedback';
+  insightId: string;
+  date: string;
+  insightGeneratedAt: string;
+  submittedAt: string;
+  submissionId: string;
+  score: 'negative';
+  userComment: string;
+  response: InsightResponse;
+  promptSnapshot: InsightPromptSnapshot;
+  promptVersion: string;
+  intent: InsightIntent;
+  inputContext: InsightInputContext;
+  inputHash: string;
+  model: string;
+  intelligenceVersion: string;
+  tokensUsed: number;
 }
 
 // ---------------------------------------------------------------------------

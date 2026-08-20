@@ -17,22 +17,21 @@ import { generateDailyInsight, DAILY_INSIGHT_PROMPT_VERSION } from '../lib/opena
 import {
   getInsightRepository,
   computeInputHash,
+  getNextLocalMidnightUtc,
+  isCurrentDayForOffset,
+  normalizeTimezoneOffsetMinutes,
   shouldRegenerate,
   computeTtlUntilMidnight,
 } from '../lib/repositories/insightRepository';
-import { computeProgressIntelligence } from '../lib/progressIntelligence';
-import { getDiaryRepository } from '../lib/repositories/diaryRepository';
-import { getWeightsRepository } from '../lib/repositories/weightsRepository';
-import { getProfileRepository } from '../lib/repositories/profileRepository';
-import { getDayMetaRepository } from '../lib/repositories/dayMetaRepository';
 import { getAiUsageRepository } from '../lib/repositories/aiUsageRepository';
-import { getLimit, getCurrentPeriod } from '../lib/quotaConfig';
+import { buildDailyInsightContext } from '../lib/dailyInsightContext';
+import { selectInsightIntent } from '../lib/dailyInsightIntent';
+import { buildDailyInsightPrompt } from '../lib/prompts/dailyInsightV10';
+import { hasFeedbackSnapshot } from '../lib/insightFeedback';
 import type {
   InsightDocument,
   InsightInputContext,
-  InsightNutritionDay,
   InsightResponse,
-  InsightWeightContext,
 } from '@fittrack/shared';
 import { PROGRESS_INTELLIGENCE_VERSION } from '../../../shared/types/insight';
 
@@ -47,6 +46,7 @@ const QUOTA_RESPONSE: InsightResponse = {
   generatedAt: new Date().toISOString(),
   promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
   status: 'quota_exceeded',
+  feedbackAvailable: false,
 };
 
 const UNAVAILABLE_RESPONSE: InsightResponse = {
@@ -56,170 +56,10 @@ const UNAVAILABLE_RESPONSE: InsightResponse = {
   generatedAt: new Date().toISOString(),
   promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
   status: 'unavailable',
+  feedbackAvailable: false,
 };
 
-// ---------------------------------------------------------------------------
-// Context builder helpers
-// ---------------------------------------------------------------------------
-
-function computeWeightTrend7d(values: number[]): InsightWeightContext['trend7d'] {
-  if (values.length < 3) return null;
-  // Compare average of oldest 3 vs newest 3
-  const recent = values.slice(0, 3).reduce((s, v) => s + v, 0) / 3;
-  const older = values.slice(-3).reduce((s, v) => s + v, 0) / 3;
-  const diff = recent - older;
-  if (diff > 0.3) return 'gaining';
-  if (diff < -0.3) return 'losing';
-  return 'stable';
-}
-
-/**
- * Returns true when `candidate` is a statistical outlier in `values`
- * (deviates more than 1.5× the standard deviation from the mean).
- * With fewer than 3 values there is no reliable baseline → returns false.
- */
-function isOutlier(candidate: number, values: number[]): boolean {
-  if (values.length < 3) return false;
-  const mean = values.reduce((s, v) => s + v, 0) / values.length;
-  const variance = values.reduce((s, v) => s + (v - mean) ** 2, 0) / values.length;
-  const sd = Math.sqrt(variance);
-  if (sd < 0.01) return false; // effectively constant series
-  return Math.abs(candidate - mean) > 1.5 * sd;
-}
-
-async function buildInputContext(
-  userId: string,
-  date: string,
-  insightRepo: ReturnType<typeof getInsightRepository>,
-  localHour: number | null,
-): Promise<InsightInputContext> {
-  const diaryRepo = getDiaryRepository();
-  const weightsRepo = getWeightsRepository();
-  const profileRepo = getProfileRepository();
-  const dayMetaRepo = getDayMetaRepository();
-
-  // Load in parallel
-  const [dayMeta, diaryToday, weightEntries, profile, insightHistory] = await Promise.all([
-    dayMetaRepo.get(userId, date),
-    diaryRepo.getDay(userId, date),
-    weightsRepo.list(userId),
-    profileRepo.get(userId),
-    insightRepo.listRecent(userId, 7, date),
-  ]);
-
-  // Last 3 completed diary days (excluding today)
-  const last3Days: InsightNutritionDay[] = [];
-  const today = new Date(date + 'T00:00:00Z');
-  for (let i = 1; i <= 3; i++) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    const dateStr = d.toISOString().split('T')[0]!;
-    try {
-      const day = await diaryRepo.getDay(userId, dateStr);
-      if (day.summary.calories > 0) {
-        last3Days.push({
-          date: dateStr,
-          calories: Math.round(day.summary.calories),
-          protein: Math.round(day.summary.protein),
-        });
-      }
-    } catch {
-      // Missing diary day is not an error — just skip
-    }
-  }
-
-  // Weight context
-  const last7Values = weightEntries.slice(0, 7).map((e) => e.value);
-  const lastWeightDate = weightEntries[0]?.date ?? null;
-  const daysSinceLastMeasurement = lastWeightDate != null
-    ? Math.floor(
-        (new Date(date + 'T00:00:00Z').getTime() - new Date(lastWeightDate + 'T00:00:00Z').getTime())
-        / (1000 * 60 * 60 * 24),
-      )
-    : null;
-  const isWeightStale = daysSinceLastMeasurement !== null && daysSinceLastMeasurement > 14;
-
-  // Nutrition targets from profile
-  const targets = profile?.targets
-    ? dayMeta?.dayType === 'training'
-      ? profile.targets.trainingDay
-      : profile.targets.restDay
-    : null;
-
-  // Remaining daily budget (never negative; null when no target or nothing logged yet)
-  const todayCalories = diaryToday.summary.calories > 0 ? diaryToday.summary.calories : null;
-  const todayProtein  = diaryToday.summary.protein  > 0 ? diaryToday.summary.protein  : null;
-  // Effective calorie target = base target + activity bonus (if any)
-  const activityBonus = dayMeta?.specialActivity?.activityBonus ?? 0;
-  const effectiveCalorieTarget = targets ? targets.calories + activityBonus : null;
-  // Allow negative values so the AI knows when calories are exceeded (not just "at zero")
-  const remainingCalories = effectiveCalorieTarget != null && todayCalories != null
-    ? Math.round(effectiveCalorieTarget - todayCalories)
-    : null;
-  const remainingProteinG = targets && todayProtein != null
-    ? Math.max(0, Math.round(targets.proteinG - todayProtein))
-    : null;
-
-  const context: InsightInputContext = {
-    date,
-    dayType: dayMeta?.dayType ?? null,
-    workoutType: dayMeta?.workoutType ?? null,
-    weight: {
-      latestKg: isWeightStale ? null : (last7Values[0] ?? null),
-      previousKg: isWeightStale ? null : (last7Values[1] ?? null),
-      targetKg: profile?.targetWeightKg ?? null,
-      trend7d: isWeightStale ? null : computeWeightTrend7d(last7Values),
-      last7Values: isWeightStale ? [] : last7Values,
-      isOutlierPrevious: isWeightStale ? false : (last7Values[1] != null ? isOutlier(last7Values[1], last7Values) : false),
-      isOutlierLatest:   isWeightStale ? false : (last7Values[0] != null ? isOutlier(last7Values[0], last7Values) : false),
-      daysSinceLastMeasurement,
-      lastMeasurementDate: lastWeightDate,
-    },
-    nutrition: {
-      today:
-        diaryToday.summary.calories > 0
-          ? {
-              calories: Math.round(diaryToday.summary.calories),
-              protein: Math.round(diaryToday.summary.protein),
-              carbs: Math.round(diaryToday.summary.carbs),
-              fat: Math.round(diaryToday.summary.fat),
-              fiber: Math.round(diaryToday.summary.fiber),
-            }
-          : null,
-      targets: targets
-        ? {
-            calories: effectiveCalorieTarget ?? targets.calories,
-            proteinG: targets.proteinG,
-            carbsG: targets.carbsG,
-            fatG: targets.fatG,
-            fiberG: targets.fiberG,
-          }
-        : null,
-      remainingCalories,
-      remainingProteinG,
-      last3Days,
-    },
-    userGoal: profile?.goal ?? 'maintain',
-    userGoalIntensity: profile?.goalIntensity ?? null,
-    displayName: profile?.displayName ?? 'Sportler',
-    progressIntelligence: computeProgressIntelligence({
-      entries: weightEntries,
-      targetWeightKg: profile?.targetWeightKg,
-      goal: profile?.goal ?? 'maintain',
-      todayIso: date,
-      unit: (weightEntries[0]?.unit ?? 'kg') as 'kg' | 'lbs',
-      hasWeightToday: weightEntries.some((e) => e.date === date),
-      hasMealsToday: (diaryToday.summary.calories ?? 0) > 0,
-      isTrainingDay: dayMeta?.dayType === 'training',
-      hasTrainingLogged: dayMeta?.workoutType != null,
-      insightHistory,
-    }),
-    currentHourLocal: localHour,
-    specialActivity: dayMeta?.specialActivity ?? null,
-  };
-
-  return context;
-}
+export { buildDailyInsightContext as buildInputContext } from '../lib/dailyInsightContext';
 
 // ---------------------------------------------------------------------------
 // Handler — exported for tests
@@ -243,29 +83,57 @@ export const dailyInsightHandler = withHandler(
     // timezone issues. Used by the AI to determine whether the day is still
     // in progress. Null when not provided — treated as "unknown/end-of-day".
     const rawHour = url.searchParams.get('localHour');
-    const localHour =
-      rawHour !== null && /^\d{1,2}$/.test(rawHour)
-        ? Math.min(23, Math.max(0, parseInt(rawHour, 10)))
-        : null;
+    const parsedHour = rawHour !== null && /^\d+$/.test(rawHour) ? Number(rawHour) : null;
+    const localHour = parsedHour != null && Number.isInteger(parsedHour) && parsedHour >= 0 && parsedHour <= 23
+      ? parsedHour
+      : null;
+    const timezoneOffsetMinutes = normalizeTimezoneOffsetMinutes(
+      url.searchParams.get('timezoneOffsetMinutes'),
+    );
 
     const insightRepo = getInsightRepository();
     const now = new Date();
+    const isCurrentDay = isCurrentDayForOffset(date, now, timezoneOffsetMinutes);
 
     // Load cached document
     const cached = await insightRepo.get(userId, date);
 
     // Build current input context + hash
-    const context = await buildInputContext(userId, date, insightRepo, localHour);
-    const newHash = computeInputHash(context, DAILY_INSIGHT_PROMPT_VERSION);
+    let context: InsightInputContext;
+    try {
+      context = await buildDailyInsightContext({
+        userId,
+        date,
+        localHour,
+        timezoneOffsetMinutes,
+        isCurrentDay,
+        insightRepository: insightRepo,
+        now,
+      });
+    } catch (err) {
+      console.error('[daily-insight] Failed to build input context:', err);
+      return {
+        status: 200,
+        jsonBody: { ...UNAVAILABLE_RESPONSE, generatedAt: now.toISOString() } satisfies InsightResponse,
+      };
+    }
+    context = { ...context, timezoneOffsetMinutes };
+    const intent = selectInsightIntent(context);
+    const promptSnapshot = buildDailyInsightPrompt(intent, context);
+    const newHash = computeInputHash(context, DAILY_INSIGHT_PROMPT_VERSION, intent);
 
     // Check whether we can/should regenerate
-    const regen = shouldRegenerate(cached, newHash, now, isAdmin);
+    const regen = shouldRegenerate(cached, newHash, now, isAdmin, DAILY_INSIGHT_PROMPT_VERSION);
 
     if (!regen && cached) {
       // Return from cache
       return {
         status: 200,
-        jsonBody: { ...cached.response, status: 'cached' } satisfies InsightResponse,
+        jsonBody: {
+          ...cached.response,
+          status: 'cached',
+          feedbackAvailable: hasFeedbackSnapshot(cached),
+        } satisfies InsightResponse,
       };
     }
 
@@ -286,7 +154,7 @@ export const dailyInsightHandler = withHandler(
     // Generate new insight
     let generateResult;
     try {
-      generateResult = await generateDailyInsight(context);
+      generateResult = await generateDailyInsight(context, intent, promptSnapshot);
     } catch (err) {
       // AI call failed — return unavailable message, do NOT throw (never expose errors)
       console.error('[daily-insight] AI generation failed:', err);
@@ -302,19 +170,22 @@ export const dailyInsightHandler = withHandler(
       generatedAt,
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
       status: 'fresh',
+      feedbackAvailable: true,
     };
 
     // Persist to Cosmos
+    const expiresAt = getNextLocalMidnightUtc(now, timezoneOffsetMinutes).toISOString();
     const doc: InsightDocument = {
+      _docType: 'dailyInsight',
       id: `${userId}:${date}`,
       userId,
       date,
       generatedAt,
-      expiresAt: new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
-      ).toISOString(),
-      ttl: computeTtlUntilMidnight(now),
+      expiresAt,
+      ttl: computeTtlUntilMidnight(now, timezoneOffsetMinutes),
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
+      intent,
+      promptSnapshot,
       model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
       inputHash: newHash,
       inputContext: context,

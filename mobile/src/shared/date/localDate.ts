@@ -5,6 +5,13 @@ export function getLocalIsoDate(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+export function getLocalTimezoneOffsetMinutes(date: Date = new Date()): number | null {
+  const offsetMinutes = -date.getTimezoneOffset();
+  return Number.isInteger(offsetMinutes) && offsetMinutes >= -840 && offsetMinutes <= 840
+    ? offsetMinutes
+    : null;
+}
+
 export function isValidDateOnly(value: unknown): value is string {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
 

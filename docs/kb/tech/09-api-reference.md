@@ -187,6 +187,7 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 | POST | `/api/ai/recipe-analyze` | Yes | `recipe-analyze` | Recipe text → structured metadata and ingredient preview |
 | POST | `/api/ai/recipe-scale/preview` | Yes | `recipe-scale` | Stored recipe → transient scaled description and steps |
 | GET | `/api/ai/daily-insight` | Yes | (tracked separately) | Once-daily AI briefing; never returns error to user |
+| POST | `/api/ai/daily-insight/feedback` | Yes | None | Negative feedback for one exact Daily instance; no snapshot is returned |
 | GET | `/api/ai/weekly-insight?date=YYYY-MM-DD` | Yes | `daily-insight` | Seven completed days plus optional AI evaluation; deterministic data remains usable on AI failure |
 
 AI endpoints return `429` with `QuotaExceededResponse` when quota is exceeded.
@@ -195,6 +196,145 @@ The weekly insight endpoint is the exception: it uses the existing `daily-insigh
 quota key but converts quota exhaustion into a `200` response with
 `evaluation.status: "quota_exceeded"` and `evaluation.text: null`, so the weekly
 data stays available.
+
+### GET /api/ai/daily-insight
+
+The endpoint requires a valid Bearer token and normally returns HTTP `200`,
+including when the Daily quota or the AI/context build is unavailable. The
+current handler uses the following query parameters:
+
+| Parameter | Type | Required | Implemented behaviour |
+|---|---|---|---|
+| `date` | `YYYY-MM-DD` string | No | Cache/context date; absent or non-matching shape falls back to the current backend UTC date. The handler does not additionally validate that the date is a real calendar date. |
+| `localHour` | integer `0..23` | No | Used for the current-day activity-language heuristic. Missing, non-integer, or out-of-range values become unknown. |
+| `timezoneOffsetMinutes` | integer | No | Normalized as `local - UTC`; valid range `[-840,840]`. Missing or invalid values become `null` and use the tolerant legacy UTC fallback. A valid offset drives local current-day/activity safety, local-midnight expiry/TTL, and cache hashing. |
+
+The current Mobile service sends its local date, `localHour`, and
+`timezoneOffsetMinutes`. The offset means local time minus UTC (for example,
+UTC+2 is `120`) and only integer values from `-840` through `840` are valid.
+Missing or invalid values normalize to `null`: the request remains usable with
+the legacy UTC fallback, the date default remains the backend UTC date, the
+current-day activity heuristic is treated as unknown, and expiry falls back to
+UTC midnight. With a valid offset, current-day detection compares the requested
+date with the offset-adjusted local date; a present activity may then use the
+validated `localHour` heuristic. A newly generated Daily document expires at
+the next local midnight represented as UTC, and its Cosmos `ttl` is the
+ceiling of the remaining seconds. The normalized offset is included in the
+input hash, so a changed normalized offset follows the normal cache
+regeneration rules.
+
+**Response body (200):**
+
+```json
+{
+	"title": "Dein Tagesfokus",
+	"summary": "Eine kurze, serverseitig validierte Tagesanalyse.",
+	"recommendation": "Eine optionale nächste Handlung.",
+	"cta": "Ernährung öffnen",
+	"ctaTarget": "Nutrition",
+	"generatedAt": "2026-08-20T08:30:00.000Z",
+	"promptVersion": "v11",
+	"status": "fresh",
+	"feedbackAvailable": true
+}
+```
+
+`title` is limited to 40 characters and `summary` to 600 characters.
+`recommendation`, `cta`, and `ctaTarget` are optional and are omitted when the
+server-side structured response contains `null`. `status` is `fresh`,
+`cached`, `quota_exceeded`, or `unavailable`. The Daily response emits the
+server-owned boolean `feedbackAvailable`. It is `true` only when the
+stored Daily instance contains complete feedback provenance and `false` for a
+legacy or incomplete instance, including friendly quota/unavailable responses.
+The POST guard remains authoritative and rejects incomplete provenance with
+`feedback_snapshot_unavailable`.
+
+Daily documents are stored as `_docType: "dailyInsight"` under the existing
+`aiInsights` container with `id = ${userId}:${date}`. The selected v11 intent,
+input context, input hash, exact system/user prompt snapshot, model, token
+usage, and intelligence version are server-owned persistence fields. Daily
+quota is checked before Azure OpenAI and tracked only after a valid response;
+quota exhaustion remains a friendly HTTP `200` response and is not tracked.
+The active v11 prompt and server validator apply the stale-weight guard to all
+intents: day 14 remains current, day 15 is stale, stale-as-current wording is
+rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
+accepted. Context, provider, truncation/content-filter, or validation failures
+return HTTP `200` with `status: "unavailable"`; the failed result is not
+persisted and does not consume or track Daily quota.
+
+### POST /api/ai/daily-insight/feedback
+
+The endpoint requires a Bearer token and accepts only the authenticated user's
+Daily identity plus a required comment. `date` must be a real `YYYY-MM-DD`
+calendar date, `insightGeneratedAt` must be the exact canonical UTC timestamp
+stored on the displayed Daily document, `submissionId` must be a UUID, and the
+server trims `userComment` to 1–500 characters. Client-provided user IDs,
+responses, prompts, contexts, hashes, models, and version fields are rejected.
+
+**Request body:**
+
+```json
+{
+	"date": "2026-08-20",
+	"insightGeneratedAt": "2026-08-20T08:30:00.000Z",
+	"submissionId": "11111111-1111-4111-8111-111111111111",
+	"userComment": "Die Aktivität war nur geplant."
+}
+```
+
+**Responses:**
+
+- `201` — `{ "feedbackId": "...", "created": true }` for a new feedback document
+- `200` — `{ "feedbackId": "...", "created": false }` for an identical retry, including after Daily expiry
+- `400` — invalid JSON, unknown fields, invalid date/timestamp/UUID, or a trimmed comment outside 1–500 characters
+- `401` — missing or invalid Bearer token
+- `404` — `{ "code": "insight_not_found" }`
+- `409` — `{ "code": "insight_generation_changed" }`, `{ "code": "feedback_snapshot_unavailable" }`, or `{ "code": "feedback_submission_conflict" }`
+- `500` — unexpected backend or persistence failure
+
+Each new submission is stored as `_docType: "insightFeedback"` in the existing
+`aiInsights` container, partitioned by the JWT `userId`. The document copies the
+complete server-owned Daily response, prompt snapshot, input context, intent,
+versions, hash, model, token usage, exact Insight identity, trimmed comment,
+and server-side `submittedAt`. Feedback performs no quota check or tracking,
+has neither `ttl` nor `expiresAt`, returns no snapshot to Mobile, and adds no
+read or cleanup endpoint.
+
+The idempotency lookup happens before the Daily read. Therefore an identical
+retry returns `200 created: false` even after the Daily document has expired;
+the same `submissionId` with a different normalized request returns
+`feedback_submission_conflict` without changing either document. For a new
+submission, the compatibility `feedbackScore` marker is patched only on the
+matching Daily identity and the patch preserves the Daily document's original
+TTL/expiry.
+
+**Feedback traceability matrix:**
+
+| Persisted field | Authoritative source and meaning |
+|---|---|
+| `insightId` | Exact `InsightDocument.id` of the matched Daily instance |
+| `date` | Exact Daily date selected by the authenticated request |
+| `insightGeneratedAt` | Exact stored Daily `generatedAt`; no rebinding to a later generation |
+| `userComment` | Server-trimmed request comment, 1-500 characters |
+| `response` | Complete server-generated/displayed Daily response |
+| `promptSnapshot.system` | Exact selected v11 system prompt sent to Azure OpenAI |
+| `promptSnapshot.user` | Exact serialized user message sent to Azure OpenAI |
+| `promptVersion` | Stored Daily prompt version, currently `v11` |
+| `intent` | Deterministic server-selected `InsightIntent` |
+| `inputContext` | Complete server-built `InsightInputContext` used for generation |
+| `inputHash` | Server-computed hash for the Daily input and active prompt |
+| `model` | Server-side Azure OpenAI deployment identifier |
+| `intelligenceVersion` | Server-side progress-intelligence schema version |
+| `tokensUsed` | Provider-reported token usage from the Daily generation |
+| `submittedAt` | Server-generated canonical submission timestamp |
+
+The existing authorized administrative/operational direct-read access may read
+these documents directly in the existing `aiInsights` container. This feature
+introduces no new application role, permission model, Admin UI, read endpoint,
+or cleanup endpoint. Normal users and arbitrary JWT admins receive no implicit
+database access from this persistence contract. Feedback is not automatically
+deleted; a later manual database cleanup is an operational follow-up outside
+this feature.
 
 ### GET /api/ai/weekly-insight?date=YYYY-MM-DD
 

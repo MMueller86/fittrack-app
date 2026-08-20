@@ -4,6 +4,7 @@ import {
   calculateWeeklyNutritionReview,
   getWeeklyReviewPeriod,
   getWeeklyTargetBand,
+  resolveHistoricalTarget,
 } from './weeklyReviewCalculator';
 
 interface TestMacros {
@@ -374,6 +375,49 @@ describe('calculateWeeklyNutritionReview', () => {
       averageConsumedCalories: null,
       averageTargetCalories: null,
       overallTargetPercent: null,
+    });
+  });
+});
+
+describe('resolveHistoricalTarget', () => {
+  const targets = profileTargets(2000, 2400);
+
+  it('prefers a valid day snapshot over activity and profile values', () => {
+    expect(resolveHistoricalTarget({
+      dayType: 'training',
+      calorieTargetSnapshot: {
+        calories: 2300,
+        capturedAt: '2026-08-13T08:00:00.000Z',
+        source: 'profile',
+      },
+      specialActivity: { dailyCalorieTarget: 2200, activityBonus: 400, type: 'hiking' } as never,
+    }, targets)).toMatchObject({
+      baseTargetCalories: 2300,
+      effectiveTargetCalories: 2700,
+      activityBonusCalories: 400,
+      targetSource: 'day_target_snapshot',
+    });
+  });
+
+  it('uses the legacy special-activity target before profile fallback', () => {
+    expect(resolveHistoricalTarget({
+      dayType: 'rest',
+      specialActivity: { dailyCalorieTarget: 2200, activityBonus: 300, type: 'hiking' } as never,
+    }, targets)).toMatchObject({
+      baseTargetCalories: 2200,
+      effectiveTargetCalories: 2500,
+      targetSource: 'special_activity_snapshot',
+    });
+  });
+
+  it('does not invent a profile fallback for an activity without a usable target', () => {
+    expect(resolveHistoricalTarget({
+      dayType: 'training',
+      specialActivity: { activityBonus: 300, type: 'hiking' } as never,
+    }, targets)).toMatchObject({
+      baseTargetCalories: null,
+      effectiveTargetCalories: null,
+      targetSource: 'unavailable',
     });
   });
 });

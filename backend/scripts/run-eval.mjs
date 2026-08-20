@@ -96,7 +96,8 @@ async function main() {
       `Live prompt evals are UNVERIFIED: missing ${missingKeys.join(', ')}. ` +
         'Set them in backend/local.settings.json or the process environment.',
     );
-    process.exitCode = EVAL_UNVERIFIED_EXIT_CODE;
+    const vitestExitCode = await runVitest(environment);
+    process.exitCode = vitestExitCode === 0 ? EVAL_UNVERIFIED_EXIT_CODE : vitestExitCode;
     return;
   }
 

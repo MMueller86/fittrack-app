@@ -3,13 +3,22 @@
 **User Story:** `US_Home-Screen-Insights_Feedback_Review.md`  
 **Planner:** FitTrack Planner  
 **Datum:** 2026-08-20  
-**Status:** [Planned] Planner-Review aktualisiert - nicht genehmigt; Orchestrator-Approval ist vor der Implementierung erforderlich.  
+**Status:** [Correction Approved] Korrekturplanung genehmigt; die Korrekturimplementierung ist noch nicht erfolgt.  
+**Approval Traceability:** Die Nutzerfreigabe in der aktuellen Korrekturrunde lautet: "3 ist approved. Behebe die Punkte. Dazu diesen Problem aus dem Log. Das Feature funktioniert nicht mal. Ich will dies per Unit test abgedeckt haben, solche gravierenden Fehler dürfen nicht durch den Prozess durchgehen." Diese Freigabe wird als Zustimmung zur Korrektur von F-04, F-05, F-06 und der stale-weight-Regression interpretiert, nicht als Behauptung einer abgeschlossenen Implementierung.  
 **Classification:** Accept with modifications; Requires domain validation before Alpha.  
 **Infrastructure Impact: Dev**  
 **Mobile Build Impact: None**
 
-Dieser Plan bleibt ein Planungsartefakt. Es werden keine Produktionsdateien,
-Tests, Infrastrukturdateien oder Mobile-Dateien durch den Planner geändert.
+Dieser Plan bleibt ein Planungsartefakt. Es werden in dieser Runde keine
+Produktionsdateien, Tests, Infrastrukturdateien, Knowledge-Base-Dateien,
+QA-Findings oder QA-Reports durch den Planner geändert. Die Korrektur ist für
+die spätere Implementierung freigegeben, aber nicht als umgesetzt zu melden.
+
+**Baseline-Erhaltung:** Der bereits dokumentierte Feature-Plan, WP1-WP7 und
+AC-1 bis AC-27 bleiben vollständig als fachliche und technische Baseline
+erhalten. Die folgenden Korrekturabschnitte öffnen das abgeschlossene Feature
+nicht erneut, sondern supersedieren nur widersprüchliche Aussagen zu F-04,
+F-05, F-06 und dem stale-weight-Laufzeitfehler.
 
 ## 1. Requirement Assessment
 
@@ -524,7 +533,8 @@ ausgeben; Mobile zeigt den Trigger nicht, wenn der Server es ausdrücklich auf
   stattgefundene körperliche Leistung. Diese Aussage reicht für die aktuelle
   User-Story nicht aus, weil der PO die temporäre lokale Zeitheuristik
   bestätigt hat. Die neue `planned`-/`likely_completed`-Semantik wird in WP6
-  als [Planned] bzw. nach Umsetzung als aktuelle Regel dokumentiert.
+  als ausstehende Dokumentationsänderung und nach Umsetzung als aktuelle Regel
+  dokumentiert.
 
 ## 9. Assumptions and Open Questions
 
@@ -891,7 +901,8 @@ Prompt-Snapshot und vollständige Cache-Invalidierung umsetzen.
 Pflichtkommentar, mehreren Dokumenten, atomarer Idempotenz und vollständigem
 server-owned Snapshot umsetzen.
 
-**Status:** [Planned] Feedback-Erfassung ist umsetzbar. Die spätere manuelle
+**Status:** Baseline-Workpackage für die bereits geplante Feedback-Erfassung;
+durch die Korrekturrunde nicht erneut zu planen. Die spätere manuelle
 DB-Bereinigung ist ein operativer Vorgang außerhalb dieses Features. Die
 Feedback-Dokumente sind nach der Persistierung durch bestehende autorisierte
 administrative/operative Zugänge direkt im `aiInsights`-Container lesbar; eine
@@ -1196,10 +1207,12 @@ Infrastrukturentscheidung erforderlich.
   keine automatische Löschung.
 - Vor Alpha muss Infrastructure & Release die konfigurierte Azure-OpenAI-
   API-Version für Strict Structured Outputs verifizieren.
-- Es gibt kein Infrastructure-&-Release-Feature-Workpackage, weil weder Bicep,
-  Container, Ressourcentyp, Environment-Strategie noch EAS-Native-
-  Konfiguration geändert wird. Nach QA bleiben Dev-/Alpha-Deployments
-  bestehende operative Befehle.
+- Für die ursprüngliche Feature-Revision gibt es kein Bicep- oder Ressourcen-
+  Workpackage, weil weder Container, Ressourcentyp, Environment-Strategie noch
+  EAS-Native-Konfiguration geändert wird. Die genehmigte Korrektur ergänzt
+  jedoch ein operatives Infrastructure-&-Release-Handoff (CWP-I1): Der
+  Backend-Code wird nach QA gegen Dev validiert/deployed, und Infrastructure &
+  Release trifft die abschließende Entscheidung `Dev Build Required: NO`.
 
 ## 17. Documentation Updates
 
@@ -1229,6 +1242,8 @@ dargestellt.
 ### Backend Unit- und Handler-Tests
 
 - reale Kalenderdaten, lokales Datum und lokale Stunden `0..23`;
+- normalisierter `timezoneOffsetMinutes`-Vertrag, lokale Tagesgrenzen,
+  lokale nächste Mitternacht und Offset-/Cache-Invalidierung;
 - Activity-Grenze `19/20`, `23`, `0`, fehlend, nicht ganzzahlig und außerhalb
   des Bereichs;
 - `planned`, `likely_completed`, `unknown` und `null` bei fehlender Activity;
@@ -1276,8 +1291,9 @@ keine Domain-Validation.
 
 ### Mobile-Validierung
 
-Mobile-Typecheck sowie Service-/Request-Tests decken lokales Datum, `localHour`,
-Offset, Kebab-Sichtbarkeit, Snapshot-Identität, `submissionId`, Trim,
+Mobile-Typecheck sowie Service-/Request-Tests decken lokales Datum, `localHour`
+und Offset ab. Ein ausgeführter `InsightCard.test.tsx`-Component-Test deckt
+Kebab-Sichtbarkeit, Sheet-Öffnung, Snapshot-Identität, `submissionId`, Trim,
 Submit-Lock, `created: false`, mehrere Kommentare, Success-Snackbar,
 Fehlerzustände und Kommentarerhalt ab. Manuelle Dev-/Preview-Prüfung deckt
 Skeleton, `fresh`/`cached`, Quota/Unavailable, Keyboard, Bottom Sheet, 404/409,
@@ -1439,7 +1455,7 @@ Accessibility und keine Änderung an Activity-Entry-/Health-Connect-Flows ab.
 - **Shared-Resolver-Regression:** Weekly- und Daily-Tests müssen nach der
   Extraktion gemeinsam ausgeführt werden.
 
-## 21. Recommended Execution Order
+## 21. Original Feature Execution Order (Baseline)
 
 Die Orchestrierung ist strikt sequenziell. Kein nachfolgender Agent beginnt,
 bevor der erwartete Handoff des vorherigen Pakets geprüft wurde.
@@ -1466,5 +1482,742 @@ bevor der erwartete Handoff des vorherigen Pakets geprüft wurde.
   Zugriffsvoraussetzung dokumentiert. Eine spätere manuelle Bereinigung und
   ihre operative Auditierung bleiben außerhalb dieses Plans.
 
-Der Plan ist damit vollständig als `[Planned]` persistiert und noch nicht für
-die Implementierungsphase freigegeben.
+Diese Reihenfolge bleibt als historische Baseline des ursprünglichen Feature-
+Plans erhalten. Sie ist für die Korrekturrunde nicht maßgeblich; die
+verbindliche Reihenfolge für F-04, F-05, F-06 und die stale-weight-Regression
+steht in Abschnitt 23.
+
+## 22. Focused Correction Addendum (authoritative)
+
+### 22.1 Correction boundary and approval
+
+Dieses Addendum ist für die Korrekturrunde die maßgebliche Ergänzung zum
+Baseline-Plan. Es supersediert ausschließlich Aussagen, nach denen
+`timezoneOffsetMinutes` bereits serverseitig wirksam wäre, die Mobile-
+Komponentenabdeckung bereits durch Service-Tests erbracht wäre, der Plan einen
+veralteten Freigabestatus trüge oder der stale-weight-Laufzeitfehler als erledigt gelten
+könnte.
+
+Nicht neu geplant werden die fachlich abgeschlossene Daily-/Feedback-
+Refaktorierung, der bestehende API- und Cosmos-Vertrag außerhalb des
+Timezone-/TTL-Punkts, die ursprünglichen WPs 1-7 und AC-1 bis AC-27. QA muss
+weiterhin alle AC-1 bis AC-27 sowie die neuen AC-28 bis AC-43 prüfen.
+
+F-06 ist eine Plan- und Traceability-Korrektur. Die Aktualisierung dieses
+Dokuments ist dafür die einzige aktuelle Artefaktänderung. Es werden weder
+`docs/qa/findings.md` noch der bestehende QA-Report in dieser Planungsrunde
+geändert. Nach der späteren Korrekturvalidierung liefert QA die Evidenz, und
+der Orchestrator reconciliiert die Findings gemäß seinem Registerprozess.
+
+Es gibt für F-04 keine offene Product-Owner-Entscheidung. Die lokale-minus-
+UTC-Bedeutung, der gültige Bereich, die sichere Behandlung ungültiger Werte
+und die lokale Mitternachtsgrenze sind Bestandteil dieses freigegebenen
+technischen Korrekturvertrags.
+
+### 22.2 Authoritative correction facts
+
+| Finding / Regression | Verifizierter aktueller Zustand | Korrekturgrenze |
+|---|---|---|
+| F-04 / FT-QA-2026-012 | Mobile sendet `timezoneOffsetMinutes`, der Daily-Handler verwendet ihn nicht. Current-Day-Ermittlung und Daily-TTL folgen dadurch weiterhin der Backend-UTC-Grenze. Die API-/KB-Dokumentation benennt diese Divergenz. | Backend normalisiert und verwendet den Offset für validierte lokale Tages- und TTL-Semantik; Mobile bestätigt nur den bestehenden Request-Vertrag; API-/AI-/Domain-Dokumentation wird danach korrigiert. |
+| F-05 / FT-QA-2026-013 | `InsightCard.tsx` enthält die Feedback-State-Machine, aber es gibt keine `InsightCard.test.tsx`. `mobile/vitest.config.mts` nimmt derzeit nur `.test.ts` auf. | Ein echter Component-Test über den Render-/Interaktionspfad wird hinzugefügt und ausgeführt. Kein Service-only- und kein ausschließlich manueller Ersatz. |
+| F-06 / FT-QA-2026-014 | Der Planheader und das Ende des Dokuments trugen noch einen veralteten Freigabestatus, obwohl die Korrektur beauftragt wurde. | Header, Approval-Traceability, Baseline-Hinweis und finaler Korrekturhandoff dieses Dokuments sind aktualisiert. Keine Feature-Replanung. |
+| Stale-weight runtime regression / FT-QA-2026-015 | `validateWeightSemantics()` weist bestimmte stale-as-current-Aussagen korrekt zurück, aber der vollständige Provider-/Generatorpfad war nicht deterministisch mit stale Context getestet. Der neue Laufzeitlog zeigt erneut stale-as-current-Providerausgabe; ein einmaliger Live-Eval kann diese Regression nicht ausreichend absichern. | Der Safety-Validator bleibt autoritativ. Prompt-/Intent-/Marker-Ausrichtung wird untersucht und mit credential-freien Generator- und Handler-Regressionstests abgesichert. Die alte `Closed`-Markierung wird nach der Prüfung mit der neuen Evidenz reconciliiert. |
+
+### 22.3 F-04: validated timezone, current day and local-midnight TTL
+
+#### Request and normalization contract
+
+`timezoneOffsetMinutes` ist ein vom Mobile-Client gesendeter Offset in der
+Richtung `local - UTC`. Der Backend-Handler liest den Querywert einmal und
+führt eine zentrale Normalisierung durch:
+
+| Eingang | Normalisierter Wert | Verbindliches Verhalten |
+|---|---:|---|
+| Ganzzahliger Wert in `[-840, 840]` | derselbe Integer | Lokales Datum, Current-Day-Status und lokale nächste Mitternacht werden aus diesem Offset berechnet. |
+| Fehlender Wert | `null` | Der GET bleibt für Legacy-Clients tolerant. Es wird keine lokale Abschlussaussage aus `localHour` abgeleitet; für den Ablauf gilt der bestehende UTC-Fallback. |
+| Nicht-ganzzahliger, nicht numerischer oder außerhalb liegender Wert | `null` | Kein Clamping und kein `likely_completed` aus dem ungültigen Offset. Der GET bleibt tolerant, verwendet den sicheren Legacy-UTC-Fallback und behandelt den lokalen Activity-Status als `unknown`/nicht verfügbar. |
+
+Der Offset wird nicht als Authentifizierungs-, Berechtigungs- oder
+Benutzeridentitätsinformation verwendet. Ein fehlender oder ungültiger Offset
+ist kein alleiniger HTTP-400-Grund, damit der bestehende Legacy-GET-Vertrag
+erhalten bleibt. `localHour` bleibt separat auf einen ganzzahligen Wert `0..23`
+validiert; ein valider `localHour` darf ohne valides Offset aber keine lokale
+Current-Day-Aussage erzwingen.
+
+#### Current-Day calculation
+
+Bei einem validierten Offset wird das Backend-`now` für die lokale
+date-only-Berechnung um `offsetMinutes * 60_000` Millisekunden verschoben:
+
+```text
+currentLocalDate = dateOnly(backendNow + offsetMinutes * 60_000)
+isCurrentDay = requestedDate === currentLocalDate
+```
+
+`planned`/`likely_completed` darf nur entstehen, wenn `isCurrentDay` wahr ist,
+eine `specialActivity` vorhanden ist und `localHour` gültig ist. Die
+einschließenden Grenzen bleiben `0..19 -> planned` und `20..23 ->
+likely_completed`. Ein nicht aktuelles Datum, fehlender/ungültiger Offset,
+fehlender/ungültiger `localHour` oder fehlende Activity führt zu `unknown` bzw.
+`null` entsprechend dem bestehenden Shared-Vertrag. Die UTC-Fallback-Logik
+für alte Clients dient damit nur der kompatiblen Daily-Anforderung und erzeugt
+keine unbelegte lokale Abschlussaussage.
+
+Die Implementierung nutzt den Backend-Zeitpunkt als injizierbare Testzeit.
+Tests müssen mindestens UTC-Mitternacht, lokale Mitternacht nahe einer
+UTC-Grenze, `-840`, `0`, `840`, ein vergangenes Datum und ein zukünftiges
+Datum abdecken.
+
+#### Local-midnight expiration
+
+Bei validiertem Offset wird die nächste lokale Mitternacht als UTC-Zeitpunkt
+berechnet. Für lokale date-only-Komponenten `nextLocalDate 00:00:00` gilt:
+
+```text
+nextLocalMidnightUtc = nextLocalDateAtMidnight - offsetMinutes * 60_000
+expiresAt = nextLocalMidnightUtc.toISOString()
+ttl = max(1, ceil((nextLocalMidnightUtc - backendNow) / 1000))
+```
+
+`expiresAt` und `ttl` müssen dieselbe Grenze beschreiben; ein positiver,
+mindestens ein Sekunde langer TTL-Wert darf nicht durch Rundung vor der Grenze
+ablaufen. Falls `backendNow` bereits an der Grenze liegt, wird die nächste
+lokale Mitternacht verwendet. Bei fehlendem/ungültigem Offset bleiben die
+bisherige UTC-Mitternachtsgrenze und der sichere UTC-TTL-Fallback erhalten.
+Feedback-Dokumente bleiben unverändert ohne `ttl` und `expiresAt`.
+
+Die Pure-Helper sollen die vorhandene Repository-Funktion
+`computeTtlUntilMidnight()` ersetzen oder dort zentral verwendet werden; es
+gibt keine zweite TTL-Berechnung im Handler. Geeignete Helper sind eine
+Normalisierung, offset-adjustierte date-only-Berechnung, Current-Day-Prüfung,
+nächste lokale Mitternacht und TTL-Berechnung. Unit-Tests prüfen die Werte und
+nicht nur, dass ein Feld vorhanden ist.
+
+#### Cache and persistence boundary
+
+Der Input-Hash enthält den normalisierten Offset und/oder eine äquivalente,
+ausgaberelevante lokale Tagesgrenze. Eine Änderung des Offsets darf bei
+gleichem `date` keinen Cache ausliefern, dessen Status, lokale Tagesgrenze oder
+`expiresAt` für den vorherigen Offset berechnet wurde. Der Hash darf nicht den
+rohen, unvalidierten Querystring übernehmen. Der bestehende `aiInsights`-
+Container, `_docType`, Partition Key `/userId` und die Feedback-No-TTL-
+Semantik bleiben unverändert.
+
+#### Documentation handoff
+
+Nach der Implementierung müssen mindestens folgende Dokumente die Divergenz
+nicht mehr behaupten:
+
+- `docs/kb/tech/09-api-reference.md`: Queryvertrag, Offsetrichtung,
+  Wertebereich, Legacy-Fallback, Current-Day- und TTL-Semantik;
+- `docs/kb/tech/06-ai-integrations.md`: serverseitige Kontext- und Cache-
+  Auswirkungen sowie Fehler-/Quota-Vertrag;
+- `docs/kb/domain/07-ai-features.md` und gegebenenfalls
+  `docs/kb/domain/02-diary.md`: lokale Activity-Statusgrenze und die Grenze
+  zwischen Client-Uhrzeit und serverseitiger Validierung.
+
+Diese Dokumente werden jetzt nicht geändert. Die spätere Aktualisierung ist
+Bestandteil von CWP-D1.
+
+### 22.4 Blocking stale-weight correction
+
+Die bestehende Sicherheitsgrenze bleibt unverändert: Bei
+`daysSinceLastMeasurement > 14` darf eine Antwort Gewicht oder Gewichtstrend
+nicht als aktuell darstellen. Eine Providerantwort mit aktueller
+Gewichtssprache wird deterministisch abgewiesen. Die Korrektur darf weder die
+Stale-Grenze erhöhen noch Marker-Regexe lockern, nur damit ein Live-Eval
+grün wird.
+
+Der Backend-Agent muss die Ursache zwischen den tatsächlich beteiligten
+Grenzen unterscheiden und im Handoff festhalten:
+
+1. Welcher `InsightIntent` und welches Promptmodul für den stale Fixture-
+   Context tatsächlich gewählt werden;
+2. welche Stale-Anweisung im exakten System-/User-Prompt landet;
+3. welche Providerformulierung den Validatorfehler aus dem Laufzeitlog
+   auslöst;
+4. ob die akzeptierten Stale-Marker die beabsichtigte Promptsprache
+   vollständig abdecken, ohne aktuelle Stale-Aussagen zu erlauben;
+5. ob der Eval bisher nur den Providerlauf, nicht aber den vollständigen
+   `generateDailyInsight()`- und Handlervertrag abgesichert hat.
+
+Die deterministische Regression verwendet den vorhandenen Test-Provider-
+Injection-Pfad und benötigt keine Azure-Credentials:
+
+- stale Context (`daysSinceLastMeasurement: 15` oder älter) plus aktuelle
+  Gewicht-/Trendformulierung -> `validateDailyInsightResponse()` weist ab;
+- derselbe stale Context plus explizite Marker wie `veraltet`/`nicht aktuell`
+  -> Validierung akzeptiert;
+- `generateDailyInsight()` mit gemockter Providerantwort deckt beide Fälle
+  über den vollständigen Strict-Output-/Semantic-Validation-Pfad ab;
+- der Daily-Handler liefert bei der semantischen Ablehnung HTTP 200 mit
+  `status: unavailable`, persistiert kein Daily-Dokument und ruft kein
+  `trackUsage()` auf;
+- eine akzeptierte stale-markierte Antwort darf normal persistiert und nach
+  dem bestehenden Quota-Vertrag getrackt werden.
+
+Die bestehende `stale-weight`-Fixture bleibt ein credential-abhängiger
+Provider-/Prompt-Check und ersetzt die Unit-Regression nicht. Nach einer
+Prompt-/Semantikänderung muss der Agent begründen, ob v10 als Hardening-
+Vertrag gültig bleibt oder ob die Promptversion erhöht und der Daily-Cache
+invalidiert werden muss. `npm run test:eval` ist danach vollständig
+auszuführen; fehlende Credentials ergeben `UNVERIFIED`, nie einen
+erfolgreichen Regression-Nachweis.
+
+### 22.5 F-05: InsightCard component-test contract
+
+Die bestehende `InsightCard`-State-Machine bleibt fachlich erhalten. Die
+Korrektur liefert einen echten Test über den React-Render- und
+Interaktionspfad in:
+
+```text
+mobile/src/modules/home/InsightCard.test.tsx
+```
+
+`mobile/vitest.config.mts` muss `.test.tsx` aufnehmen, zum Beispiel über ein
+Include-Muster für `src/**/*.test.{ts,tsx}`. Der Test läuft im vorhandenen
+Vitest-Setup ohne App-Start, Device oder Azure.
+
+Der Harness muss native Laufzeitabhängigkeiten mocken, unter anderem React
+Native-Primitives, `@gorhom/bottom-sheet`, `expo-crypto`, `Icon`, `Snackbar`
+falls im Pfad verwendet und `aiApi.submitDailyInsightFeedback`. Für den
+Component-Render ist ein JS-only React-Test-Renderer bzw. ein ebenso
+begründeter JS-only Test-Seam zulässig. Eine native Runtime-Abhängigkeit,
+Config-Plugin-Änderung oder `app.config.js`-Änderung ist verboten. Falls ein
+Renderer als Dev-Dependency fehlt, muss seine React-Peer-Kompatibilität vor
+der Auswahl geprüft werden; die aktuelle React-Version `19.1.0` darf nicht
+blind mit einer inkompatiblen neuesten Renderer-Version kombiniert werden.
+
+Ein reiner Test von `insightService`, `localDate` oder einer extrahierten
+Pure-Function erfüllt AC-38 bis AC-41 nicht. Der Test muss den gerenderten
+Trigger, das Sheet, Eingabeänderungen, Submit und die sichtbaren Fehler-/
+Erfolgszustände aus der `InsightCard` heraus auslösen.
+
+Verbindliche Testmatrix:
+
+- Trigger sichtbar bei `fresh`/`cached` mit Datum und verfügbarer Provenienz;
+  verborgen bei Skeleton, `quota_exceeded`, `unavailable`, fehlendem Datum
+  und `feedbackAvailable: false`;
+- Kebab-Menü öffnet das Feedback-Sheet, das Kommentarfeld trimmt logisch,
+  lehnt leer/>500 ab und sperrt Submit während des Requests;
+- unveränderter Kommentar nach Netzwerkfehler verwendet dieselbe
+  `submissionId` erneut;
+- geänderter, getrimmter Kommentar erzeugt eine neue ID;
+- Erfolg schließt das Sheet, zeigt die bestehende Success-Snackbar und ruft
+  `onFeedbackSuccess` auf; `created: false` ist ebenfalls Erfolg;
+- `insight_not_found`, `insight_generation_changed`,
+  `feedback_snapshot_unavailable` und `feedback_submission_conflict` zeigen
+  den passenden Fehler, behalten den Kommentar und sperren nur den jeweils
+  fachlich erforderlichen weiteren Submit-Pfad;
+- 404/409-Fehler werden nicht als erfolgreicher Callback behandelt.
+
+### 22.6 F-06: persisted plan status and finding traceability
+
+Die F-06-Korrektur ist mit diesem Plan dokumentiert:
+
+- Status ist `[Correction Approved]` mit der Nutzerfreigabe und ihrer
+  Interpretation;
+- die ursprüngliche Feature-Baseline und AC-1 bis AC-27 bleiben auffindbar,
+  werden aber nicht erneut als neue Implementierungsarbeit eingeplant;
+- der finale Abschnitt beschreibt den Korrekturhandoff statt eines weiterhin
+  veralteten Freigabestatus;
+- der bestehende QA-Report und `docs/qa/findings.md` bleiben in dieser Runde
+  unverändert.
+
+Nach erfolgreicher Implementierung und QA müssen die Finding-Einträge
+FT-QA-2026-012, FT-QA-2026-013 und FT-QA-2026-014 mit der tatsächlichen
+Korrekturevidenz aktualisiert werden. FT-QA-2026-015 darf wegen des neuen
+Laufzeitlogs nicht ohne neue Evidenz als erledigt stehen bleiben: Der
+Orchestrator muss seinen Status und die Historie mit QA-Evidenz
+reconciliieren, gegebenenfalls wieder öffnen und erst nach einem bestandenen
+deterministischen Regressionstest schließen.
+
+### 22.7 Correction work packages
+
+#### CWP-B1 - Backend F-04 timezone and TTL correction
+
+**Agent:** Backend  
+**Goal:** Den validierten Offsetvertrag, lokale Current-Day-Ermittlung,
+lokale Mitternachtsgrenze, sichere Legacy-Fallbacks und Hash-/TTL-Verhalten im
+bestehenden Daily-Pfad implementieren.
+
+**Required Knowledge Base:**
+- `docs/kb/tech/01-system-overview.md`
+- `docs/kb/tech/02-backend.md`
+- `docs/kb/tech/08-testing.md`
+- `docs/kb/tech/09-api-reference.md`
+- `docs/kb/domain/02-diary.md`
+
+**Required Repository Context:**
+- `backend/src/functions/dailyInsight.ts`
+- `backend/src/lib/dailyInsightContext.ts`
+- `backend/src/lib/repositories/insightRepository.ts`
+- `backend/src/functions/dailyInsight.test.ts`
+- `backend/src/lib/repositories/insightRepository.test.ts`
+- `mobile/src/services/insightService.ts`
+- `mobile/src/shared/date/localDate.ts`
+- `shared/types/insight.ts`
+
+**Required Skills:**
+- `cosmos-data-model-and-migration`
+
+**Relevant Acceptance Criteria:**
+- AC-6
+- AC-16
+- AC-27
+- AC-28 bis AC-32
+
+**Dependencies:** Baseline-Daily-Implementierung und die in diesem Addendum
+festgelegte F-04-Vertragsentscheidung.
+
+**Expected Handoff:**
+- zentrale Offset-Normalisierung ohne Clamping;
+- Pure-Helper für lokale Tagesgrenze, Current-Day-Prüfung, nächste lokale
+  Mitternacht und TTL;
+- Handler-/Repository-Tests für gültige, fehlende, ungültige und extreme
+  Offsets sowie UTC-/lokale Mitternachtsgrenzen;
+- Hash-Test gegen falsche Cache-Wiederverwendung bei Offsetwechsel;
+- Nachweis, dass Cosmos-Container, Partition Key, Discriminator und
+  Feedback-No-TTL unverändert bleiben;
+- präziser API-/Fallback-Vertrag für CWP-D1.
+
+#### CWP-B2 - Backend stale-weight generator and handler regression
+
+**Agent:** Backend  
+**Goal:** Den im Laufzeitlog reproduzierten stale-weight-Fehler über direkte
+Validierung, Provider-/Generatorpfad und Daily-Handler deterministisch
+absichern und die Ursache beheben, ohne die Sicherheitsgrenze zu lockern.
+
+**Required Knowledge Base:**
+- `docs/kb/tech/02-backend.md`
+- `docs/kb/tech/06-ai-integrations.md`
+- `docs/kb/tech/08-testing.md`
+- `docs/kb/domain/05-weight-tracking.md`
+- `docs/kb/domain/07-ai-features.md`
+- `docs/kb/domain/08-quota-system.md`
+
+**Required Repository Context:**
+- `backend/src/lib/dailyInsightValidation.ts`
+- `backend/src/lib/dailyInsightValidation.test.ts`
+- `backend/src/lib/openai.ts`
+- `backend/src/lib/openai.daily.test.ts`
+- `backend/src/functions/dailyInsight.ts`
+- `backend/src/functions/dailyInsight.test.ts`
+- `backend/src/lib/prompts/promptWeight.ts`
+- `backend/src/lib/prompts/dailyInsightV10.ts`
+- `backend/src/lib/prompts/dailyInsight.eval.fixtures.ts`
+- `backend/src/lib/prompts/dailyInsight.eval.test.ts`
+
+**Required Skills:**
+- `azure-openai-feature-integration`
+
+**Relevant Acceptance Criteria:**
+- AC-2
+- AC-14
+- AC-15
+- AC-33 bis AC-37
+
+**Dependencies:** CWP-B1 Handoff für den finalen Handler-Testaufbau; die
+stale-weight-Regression darf unabhängig von Azure-Credentials laufen.
+
+**Expected Handoff:**
+- Root-Cause-Befund für Intent, Prompt, Providerantwort, Marker und Eval-
+  Lücke;
+- Red/Green-Unit-Tests für stale-as-current und stale-markierte Antworten;
+- `generateDailyInsight()`-Tests mit gemocktem Provider;
+- Handler-Test für HTTP 200 `unavailable` ohne Persistierung und Quota-
+  Tracking;
+- dokumentierte Entscheidung zu v10-Hardening oder Promptversions-
+  invalidierung;
+- vollständiger Eval-Status mit `VERIFIED` oder `UNVERIFIED` bei fehlenden
+  Credentials.
+
+#### CWP-F1 - Frontend testability seam for InsightCard
+
+**Agent:** Frontend  
+**Goal:** Den vorhandenen `InsightCard`-Render-/Feedbackpfad für einen
+deterministischen JS-only Component-Test zugänglich machen, ohne sichtbare
+Feedbacksemantik zu ändern oder eine native Abhängigkeit einzuführen.
+
+**Required Knowledge Base:**
+- `docs/kb/tech/03-mobile.md`
+- `docs/kb/tech/08-testing.md`
+- `docs/kb/tech/09-api-reference.md`
+- `docs/kb/product/03-design-system.md`
+- `docs/kb/product/05-ux-patterns.md`
+
+**Required Repository Context:**
+- `mobile/src/modules/home/InsightCard.tsx`
+- `mobile/src/shared/api/aiApi.ts`
+- `mobile/src/services/insightService.ts`
+- `mobile/src/shared/components/Snackbar.tsx`
+- `mobile/src/shared/components/Icon.tsx`
+- `mobile/vitest.config.mts`
+- `mobile/package.json`
+- `mobile/src/modules/nutrition/hub/FoodEntryHub.test.ts`
+
+**Required Skills:** None.
+
+**Relevant Acceptance Criteria:**
+- AC-25
+- AC-26
+- AC-38 bis AC-41
+
+**Dependencies:** CWP-B2 Handoff für die endgültigen API-Fehlercodes; die
+vorhandene UI-State-Machine ist die Verhaltensbaseline.
+
+**Expected Handoff:**
+- minimaler, dokumentierter Test-Seam oder Mock-Grenzen für den echten
+  `InsightCard`-Renderpfad;
+- keine sichtbare Änderung an Trigger-, Submit-, Retry- oder Fehlersemantik;
+- Entscheidung, ob ein JS-only Dev-Renderer benötigt wird, einschließlich
+  React-Peer-Kompatibilitätsprüfung;
+- Übergabe der auswählbaren Accessibility-Labels und Events an CWP-F2;
+- Bestätigung von `Mobile Build Impact: None`.
+
+#### CWP-F2 - Focused InsightCard component test
+
+**Agent:** Frontend  
+**Goal:** Die vollständige Finding-F-05-Interaktionsmatrix als ausgeführten
+Component-Test abdecken und sicherstellen, dass Vitest `.test.tsx` nicht
+überspringt.
+
+**Required Knowledge Base:**
+- `docs/kb/tech/03-mobile.md`
+- `docs/kb/tech/08-testing.md`
+- `docs/kb/tech/09-api-reference.md`
+- `docs/kb/product/05-ux-patterns.md`
+
+**Required Repository Context:**
+- `mobile/src/modules/home/InsightCard.tsx`
+- `mobile/src/modules/home/InsightCard.test.tsx`
+- `mobile/src/shared/api/aiApi.ts`
+- `mobile/src/services/insightService.ts`
+- `mobile/vitest.config.mts`
+- `mobile/package.json`
+- CWP-F1 Test-Seam-Handoff
+
+**Required Skills:** None.
+
+**Relevant Acceptance Criteria:**
+- AC-25
+- AC-26
+- AC-38 bis AC-41
+
+**Dependencies:** CWP-F1 Handoff und der bestehende Backend-Feedbackvertrag.
+
+**Expected Handoff:**
+- `mobile/src/modules/home/InsightCard.test.tsx` mit echter Render-/
+  Interaktionsausführung;
+- Vitest-Konfigurationsnachweis, dass `.test.tsx` ausgeführt wird;
+- Assertions für Triggerzustände, Sheet, Trim/Länge/Submit-Lock, stabile und
+  rotierende IDs, Success/Callback/`created: false`, 404/409 und
+  Snapshot-Unavailable mit Kommentarerhalt;
+- Testausgabe ohne neue native Dependency, Config-Plugin oder App-Config-
+  Änderung.
+
+#### CWP-D1 - Correction documentation and implementation handoff
+
+**Agent:** Backend  
+**Goal:** Nach der Implementierung die API-, AI- und Domain-Dokumentation auf
+den tatsächlich gelieferten F-04- und stale-weight-Vertrag aktualisieren und
+keine bekannte Offset-Divergenz zurücklassen.
+
+**Required Knowledge Base:**
+- `docs/kb/README.md`
+- `docs/kb/tech/06-ai-integrations.md`
+- `docs/kb/tech/09-api-reference.md`
+- `docs/kb/domain/02-diary.md`
+- `docs/kb/domain/07-ai-features.md`
+
+**Required Repository Context:**
+- CWP-B1 Handoff
+- CWP-B2 Handoff
+- CWP-F2 Handoff
+- `docs/kb/tech/09-api-reference.md`
+- `docs/kb/tech/06-ai-integrations.md`
+- `docs/kb/domain/02-diary.md`
+- `docs/kb/domain/07-ai-features.md`
+- dieser Plan
+
+**Required Skills:**
+- `azure-openai-feature-integration`
+- `cosmos-data-model-and-migration`
+
+**Relevant Acceptance Criteria:**
+- AC-12
+- AC-14 bis AC-16
+- AC-27
+- AC-30
+- AC-33
+- AC-37
+
+**Dependencies:** CWP-B1, CWP-B2 und CWP-F2 Handoffs. Diese
+Dokumentationsänderungen erfolgen erst im späteren Implementierungsdurchlauf;
+in der aktuellen Planner-Runde bleibt die KB unverändert.
+
+**Expected Handoff:**
+- aktualisierte API-Dokumentation ohne Aussage, dass der Offset ignoriert
+  wird;
+- dokumentierter Wertebereich, Richtung, Fallback, Current-Day- und
+  Local-Midnight-TTL-Vertrag;
+- dokumentierter stale-weight-Safety-/Quota-/Unavailable-Vertrag und
+  gegebenenfalls Promptversionsänderung;
+- Abweichungsbericht zwischen Implementierung und KB, falls vorhanden.
+
+#### CWP-Q1 - Dedicated correction QA and finding reconciliation
+
+**Agent:** QA  
+**Goal:** AC-1 bis AC-27 sowie AC-28 bis AC-43 vollständig gegen die
+Implementierung prüfen, die blocking stale-weight-Regression beweisen und die
+vier Findings mit reproduzierbarer Evidenz bewerten.
+
+**Required Knowledge Base:**
+- `docs/kb/tech/01-system-overview.md`
+- `docs/kb/tech/02-backend.md`
+- `docs/kb/tech/03-mobile.md`
+- `docs/kb/tech/06-ai-integrations.md`
+- `docs/kb/tech/08-testing.md`
+- `docs/kb/tech/09-api-reference.md`
+- `docs/kb/domain/02-diary.md`
+- `docs/kb/domain/05-weight-tracking.md`
+- `docs/kb/domain/07-ai-features.md`
+- `docs/kb/domain/08-quota-system.md`
+
+**Required Repository Context:**
+- CWP-B1 Handoff
+- CWP-B2 Handoff
+- CWP-F1 Handoff
+- CWP-F2 Handoff
+- CWP-D1 Handoff
+- `backend/src/functions/dailyInsight.test.ts`
+- `backend/src/lib/openai.daily.test.ts`
+- `backend/src/lib/dailyInsightValidation.test.ts`
+- `mobile/src/modules/home/InsightCard.test.tsx`
+- `mobile/vitest.config.mts`
+- `docs/qa/reports/PLAN_US_Home-Screen-Insights_Feedback_Review.md`
+- `docs/qa/findings.md`
+
+**Required Skills:**
+- `azure-openai-feature-integration`
+- `cosmos-data-model-and-migration`
+
+**Relevant Acceptance Criteria:**
+- AC-1 bis AC-43
+
+**Dependencies:** CWP-D1 Handoff; alle Korrekturimplementierungen und die
+Dokumentationsänderungen müssen vor dem abschließenden QA-Lauf vorliegen.
+
+**Expected Handoff:**
+- aktualisierter QA-Report unter
+  `docs/qa/reports/PLAN_US_Home-Screen-Insights_Feedback_Review.md` im Format
+  `fittrack-qa-v1`;
+- Matrix für AC-1 bis AC-43 mit Ergebnis und Evidence;
+- Testtabelle mit Exit-Code für jeden relevanten Befehl;
+- expliziter Nachweis der lokalen Offset-/TTL-Grenzen, Cache-Invalidierung,
+  stale-weight-Generator-/Handler-Regression und no-persist/no-track-Verhalten;
+- Nachweis, dass `InsightCard.test.tsx` tatsächlich ausgeführt wurde;
+- getrennte `VERIFIED`, `UNVERIFIED` und `MANUAL VALIDATION REQUIRED`-Angaben;
+- strukturierte Reconciliation-Empfehlung für FT-QA-2026-012, -013, -014 und
+  insbesondere den Konflikt zwischen FT-QA-2026-015 `Closed` und dem neuen
+  Laufzeitlog. Der Orchestrator schreibt das zentrale Register nach seinem
+  Findings-Prozess.
+
+#### CWP-I1 - Infrastructure and Release Dev handoff
+
+**Agent:** Infrastructure  
+**Goal:** Die korrigierte Backend-Funktion nach bestandenem QA-Lauf im Dev-
+Umfeld validieren/deployen, den Staging-Sync nach dem dokumentierten Workflow
+sicherstellen und die abschließende Build-Entscheidung treffen.
+
+**Required Knowledge Base:**
+- `docs/kb/tech/07-infrastructure.md`
+- `docs/kb/tech/01-system-overview.md`
+
+**Required Repository Context:**
+- `infra/main.bicep`
+- `infra/modules/cosmos.bicep`
+- `_deploy_staging/`
+- `backend/package.json`
+- `mobile/package.json`
+- `mobile/app.config.js`
+- CWP-Q1 QA Handoff
+
+**Required Skills:** None.
+
+**Relevant Acceptance Criteria:**
+- AC-27
+- AC-43
+
+**Dependencies:** CWP-Q1 muss ohne offenen blocking Finding abgeschlossen
+sein. Ein Alpha-Deploy ist kein Bestandteil dieses Handoffs und benötigt
+weiterhin einen ausdrücklichen operativen Auftrag.
+
+**Expected Handoff:**
+- Dev-Deploy-/Smoke-Check-Evidence gemäß bestehendem Windows-zu-Linux-
+  Staging-Workflow;
+- Bestätigung, dass kein Bicep-, Cosmos-, Config-Plugin- oder Native-Change
+  erforderlich ist;
+- finale Entscheidung `Dev Build Required: NO`;
+- Alpha-Gate-Status mit Verweis auf QA, Evals, Emulator-/manuelle Grenzen und
+  DV-1 bis DV-3;
+- kein automatisch ausgelöstes Alpha-Deployment.
+
+### 22.8 Correction test commands and evidence rules
+
+Die folgenden Befehle gehören zum späteren Implementierungs-/QA-Handoff. In
+dieser Planner-Runde werden sie nicht ausgeführt:
+
+```text
+cd backend && npx vitest run src/lib/dailyInsightValidation.test.ts src/lib/openai.daily.test.ts src/functions/dailyInsight.test.ts
+cd backend && npx vitest run --reporter=dot --silent
+cd backend && npx tsc --noEmit
+cd backend && npm run build:verify
+cd backend && npm run test:eval
+cd backend && npx vitest run --config vitest.contract.config.mts
+cd shared && npx vitest run
+cd shared && npx tsc --noEmit
+cd mobile && npx vitest run src/modules/home/InsightCard.test.tsx
+cd mobile && npx vitest run
+cd mobile && npx tsc --noEmit
+node scripts/check-encoding.mjs
+git diff --check
+```
+
+`npm run test:eval` ist ein Provider-/Prompt-Nachweis, kein Ersatz für die
+credential-freien stale-weight-Unit-Tests. Fehlende Azure-Credentials werden
+als `UNVERIFIED` erfasst. Cosmos-Contract-Tests benötigen den Emulator; ein
+nicht verfügbarer Emulator wird getrennt als `UNVERIFIED` erfasst. Ein
+fehlender Component-Test oder ein nicht ausgeführtes `.test.tsx` ist dagegen
+ein actionable Finding und keine manuelle Validierungsgrenze.
+
+### 22.9 Additive correction acceptance criteria
+
+28. **F-04 Offset-Vertrag:** Der Backend-Handler akzeptiert als wirksamen
+    `timezoneOffsetMinutes` ausschließlich einen Integer im Bereich `-840..840`
+    mit der Bedeutung `local - UTC`. Fehlende, nicht-ganzzahlige, nicht-
+    numerische oder außerhalb liegende Werte werden zu `null` normalisiert,
+    nicht geklemmt und lösen keinen alleinigen 400-Fehler aus.
+29. **F-04 Current Day:** Bei validem Offset entspricht das serverseitig
+    berechnete lokale date-only-Datum `dateOnly(backendNow + offset)`. Nur bei
+    Übereinstimmung von Request-Datum und diesem Datum darf `localHour` den
+    Activity-Status bestimmen; lokale/UTC-Grenzfälle und `-840/840` sind
+    getestet.
+30. **F-04 Invalid/Missing Safety:** Bei fehlendem oder ungültigem Offset
+    bleibt der Daily-GET legacy-tolerant, verwendet den UTC-Fallback für den
+    Ablauf und erzeugt keine unbelegte lokale Activity-Abschlussaussage. Ein
+    ungültiger Wert wird nicht als gültiger Randwert interpretiert.
+31. **F-04 Local TTL:** Bei validem Offset zeigen `expiresAt` und der
+    positive, aufgerundete TTL-Wert auf dieselbe nächste lokale Mitternacht in
+    UTC. Der UTC-Fallback bleibt für fehlende/ungültige Offsets bestehen;
+    Feedback-Dokumente erhalten weiterhin kein `ttl`/`expiresAt`.
+32. **F-04 Cache:** Der Input-Hash enthält den normalisierten Offset oder eine
+    gleichwertige lokale Ablaufgrenze. Ein Offsetwechsel kann kein Daily mit
+    falscher lokaler Status-/TTL-Semantik aus dem Cache liefern.
+33. **F-04 API-Dokumentation:** `docs/kb/tech/09-api-reference.md` und die
+    relevanten AI-/Domain-Dokumente beschreiben nach dem Implementierungs-
+    Handoff die Offsetrichtung, den Wertebereich, Fallbacks, Current-Day-
+    Ermittlung und Local-Midnight-TTL; sie behaupten nicht mehr, dass der
+    Backend-Offset ignoriert wird.
+34. **Stale direct validator regression:** Bei stale Context über 14 Tagen
+    wird aktuelle Gewicht-/Trend-Sprache deterministisch abgewiesen; explizite
+    Stale-Sprache wird akzeptiert. Die bestehende Grenze `14 aktuell, 15
+    stale` bleibt erhalten.
+35. **Stale generator regression:** `generateDailyInsight()` wird mit
+    gemockten Providerantworten für beide stale-Fälle ausgeführt. Die Tests
+    laufen ohne Azure-Credentials und decken Strict Output plus semantische
+    Validierung gemeinsam ab.
+36. **Stale handler failure contract:** Eine semantisch abgewiesene
+    stale-as-current-Antwort ergibt HTTP 200 `unavailable`, erzeugt kein
+    Daily-Dokument und ruft kein Quota-Tracking auf. Eine akzeptierte
+    stale-markierte Antwort folgt dem normalen Persistenz-/Quota-Vertrag.
+37. **Stale prompt/eval alignment:** Der Handoff benennt Intent, Promptmodul,
+    exakte Stale-Anweisung, Providerabweichung und Markerentscheidung. Eine
+    Promptänderung wird mit v10-Hardening oder neuer Version plus Cache-
+    Invalidierung begründet; die Sicherheitsprüfung wird nicht gelockert.
+38. **Component test execution:** `mobile/src/modules/home/InsightCard.test.tsx`
+    wird vom Mobile-Vitest-Befehl ausgeführt. Ein reiner Service-, Date- oder
+    manuell dokumentierter Test gilt nicht als Erfüllung.
+39. **Component trigger states:** Der Component-Test beweist Trigger-
+    sichtbarkeit für `fresh`/`cached` mit Datum und Provenienz sowie deren
+    Unsichtbarkeit für Skeleton, Quota, Unavailable, fehlendes Datum und
+    `feedbackAvailable: false`.
+40. **Component submission states:** Der Component-Test beweist Sheet-
+    Öffnung, Trim-/1-500-Zeichen-Regel, Submit-Lock, unveränderte Retry-ID,
+    ID-Wechsel nach geändertem Kommentar, Erfolg/Callback/Snackbar und
+    `created: false` als Erfolg.
+41. **Component error retention:** `insight_not_found`,
+    `insight_generation_changed`, `feedback_snapshot_unavailable` und
+    `feedback_submission_conflict` werden mit passender UX, Kommentarerhalt
+    und korrektem weiteren Submit-Verhalten geprüft. 404/409 sind kein
+    Erfolgs-Callback.
+42. **F-06 Traceability:** Der persistierte Plan trägt den Status
+    `[Correction Approved]`, die Nutzerfreigabe und die Interpretation, hält
+    AC-1 bis AC-27 als Baseline vor und endet mit dem Korrekturhandoff. Kein
+    veralteter Nicht-Freigabestatus bleibt maßgeblich.
+43. **Correction QA and release:** QA validiert AC-1 bis AC-43 und liefert
+    Report-/Finding-Evidence. Infrastructure & Release validiert Dev, trifft
+    final `Dev Build Required: NO`, bestätigt `Infrastructure Impact: Dev` und
+    `Mobile Build Impact: None`; Alpha bleibt durch QA, Evals, DV-Gates und
+    den bestehenden operativen Auftrag geschützt.
+
+### 22.10 Correction-specific risks and residual boundaries
+
+- **Fixed offset versus IANA timezone:** Der aktuelle API-Vertrag übermittelt
+  einen Offset, keine Zeitzonen-ID. Die lokale nächste Mitternacht wird daher
+  mit dem beim Request validierten Offset berechnet; eine zukünftige
+  DST-Änderung innerhalb dieses Tages ist eine bekannte Vertragsgrenze und
+  kein Anlass, in dieser Korrektur einen neuen Zeitzonenvertrag zu erfinden.
+- **Legacy fallback:** Fehlende/ungültige Offsets bleiben abrufbar, erhalten
+  aber keine erfundene lokale Completion-Aussage. Diese Kombination muss in
+  Handler- und Context-Tests ausdrücklich sichtbar sein.
+- **TTL boundary race:** `expiresAt`/TTL werden aus demselben injizierten
+  `backendNow` und derselben lokalen Grenze berechnet. Feedback bleibt durch
+  den bestehenden Submission-ID-Lookup unabhängig vom Daily-TTL retrybar.
+- **Cache correctness:** Offset ist Teil des ausgaberelevanten Inputs. Ein
+  Test muss einen Cache-Hit mit identischem Offset von einem Hash-Mismatch nach
+  Offsetwechsel unterscheiden.
+- **AI safety versus availability:** Ein stale-as-current-Text bleibt ein
+  Sicherheitsfehler und wird `unavailable`; der Fix darf den Validator nicht
+  abschalten. Die akzeptierte stale-markierte Providerantwort beweist,
+  dass der korrigierte Prompt-/Generatorvertrag wieder einen nutzbaren
+  Insight erzeugen kann.
+- **Renderer compatibility:** Die Mobile-Tests dürfen keine native
+  Dependency, keinen Config-Plugin- oder App-Config-Change erzeugen. Ein
+  erforderlicher JS-only Renderer muss zur vorhandenen React-Version passen
+  und darf nicht ungeprüft aktualisiert werden.
+- **Closed finding conflict:** FT-QA-2026-015 wird erst nach der neuen
+  deterministischen Evidenz geschlossen. Ein alter Live-Eval-Pass ist dafür
+  nicht ausreichend.
+
+## 23. Updated Correction Execution Order
+
+Die Korrekturrunde wird strikt sequenziell ausgeführt. Das ursprüngliche
+Feature wird nicht erneut implementiert; jeder Schritt liefert genau den im
+jeweiligen Workpackage genannten Handoff.
+
+1. **CWP-B1:** Backend validiert `timezoneOffsetMinutes`, Current-Day,
+   Local-Midnight-TTL, Hash und Legacy-Fallback.
+2. **CWP-B2:** Backend reproduziert und korrigiert die stale-weight-
+   Generator-/Handler-Regression mit credential-freien Unit-Tests und führt
+   danach den vollständigen Live-Eval mit `VERIFIED`/`UNVERIFIED`-Status aus.
+3. **CWP-F1:** Frontend stellt den minimalen, verhaltensneutralen
+   `InsightCard`-Test-Seam und die Mock-Grenzen bereit.
+4. **CWP-F2:** Frontend fügt den ausführbaren `.test.tsx`-Component-Test hinzu und
+   weist die vollständige F-05-Interaktionsmatrix nach.
+5. **CWP-D1:** Backend aktualisiert API-, AI- und Domain-Dokumentation auf den
+   tatsächlich implementierten Korrekturvertrag.
+6. **CWP-Q1:** QA validiert AC-1 bis AC-43, aktualisiert den QA-Report und
+   liefert die Reconciliation-Empfehlung für FT-QA-2026-012 bis -015. Der
+   Orchestrator persistiert die Finding-Status gemäß seinem Prozess.
+7. **CWP-I1:** Infrastructure & Release validiert/deployed ausschließlich
+   gegen Dev, prüft den Staging-Sync und entscheidet final
+   `Dev Build Required: NO`. Kein Alpha-Deploy und kein EAS-Build wird durch
+   diesen Plan automatisch ausgelöst.
+
+**Final correction handoff:** Dieser Plan ist mit der Nutzerfreigabe als
+Korrekturplanung persistiert. Er behauptet weder, dass die Korrekturen bereits
+implementiert sind, noch dass der stale-weight-Fehler bereits geschlossen
+ist. Die spätere Implementierung wird erst nach den oben genannten
+deterministischen Tests, der vollständigen QA-Matrix, der Finding-Reconciliation
+und dem Dev-Handoff als abgeschlossen bewertet.
