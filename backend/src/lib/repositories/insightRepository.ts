@@ -17,6 +17,16 @@ import type {
 import { isCosmosConfigured } from '../cosmos';
 import { getCosmos } from '../cosmos';
 
+const COSMOS_SYSTEM_FIELDS = ['_attachments', '_etag', '_lsn', '_rid', '_self', '_ts'] as const;
+
+function stripCosmosSystemFields<T extends object>(document: T): T {
+  const cleanDocument = { ...document } as Record<string, unknown>;
+  for (const field of COSMOS_SYSTEM_FIELDS) {
+    delete cleanDocument[field];
+  }
+  return cleanDocument as T;
+}
+
 // ---------------------------------------------------------------------------
 // Cache constants
 // ---------------------------------------------------------------------------
@@ -221,7 +231,7 @@ export class CosmosInsightRepository implements InsightRepository {
     const id = `${userId}:${date}`;
     try {
       const { resource } = await containers.aiInsights.item(id, userId).read<InsightDocument>();
-      return resource ?? null;
+      return resource ? stripCosmosSystemFields(resource) : null;
     } catch (e) {
       if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
         return null;
@@ -240,7 +250,7 @@ export class CosmosInsightRepository implements InsightRepository {
     const id = makeWeeklyInsightId(userId, periodEnd);
     try {
       const { resource } = await containers.aiInsights.item(id, userId).read<WeeklyInsightDocument>();
-      return resource?._docType === 'weeklyInsight' ? resource : null;
+      return resource?._docType === 'weeklyInsight' ? stripCosmosSystemFields(resource) : null;
     } catch (e) {
       if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
         return null;
@@ -271,7 +281,7 @@ export class CosmosInsightRepository implements InsightRepository {
         ],
       })
       .fetchAll();
-    return resources;
+    return resources.map((resource) => stripCosmosSystemFields(resource));
   }
 }
 

@@ -152,7 +152,10 @@ describe('CosmosRecipesRepository (contract)', () => {
     const fetched = await repo.get(USER_A, historicalRecipe.id);
 
     expect(fetched).not.toBeNull();
-    expect(fetched).toMatchObject(historicalRecipe);
+    const { userId: partitionKey, ...expectedRecipe } = historicalRecipe;
+    expect(partitionKey).toBe(USER_A);
+    expect(fetched).toMatchObject(expectedRecipe);
+    expect(fetched).not.toHaveProperty('userId');
     expect(fetched!.ingredients[0]).not.toHaveProperty('category');
     expect(fetched!.ingredients[0]).not.toHaveProperty('amountLabel');
   });
