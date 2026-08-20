@@ -173,9 +173,38 @@ describe('decideWeeklyCache', () => {
     });
   });
 
-  it('returns neutral data and replaces the cache after a recent hash change', () => {
-    const decision = decideWeeklyCache(makeCached(), 'new', now, false);
+  it('uses nested response fields when legacy top-level fields disagree', () => {
+    const legacy = makeCached({ status: 'unavailable', generatedAt: null });
+
+    expect(decideWeeklyCache(legacy, 'same', now, false)).toEqual({
+      kind: 'cached',
+      evaluation: {
+        status: 'cached',
+        text: 'Alte Bewertung darf bei Hashwechsel nicht erscheinen.',
+        generatedAt: '2026-08-14T10:00:00.000Z',
+      },
+    });
+  });
+
+  it('returns neutral data without replacing a fresh cache after a recent hash change', () => {
+    const cached = makeCached();
+    const decision = decideWeeklyCache(cached, 'new', now, false);
     expect(decision).toEqual({
+      kind: 'neutral',
+      evaluation: { status: 'unavailable', text: null, generatedAt: null },
+      replaceCache: false,
+    });
+    expect(decision.evaluation.text).not.toBe(cached.response.text);
+  });
+
+  it('keeps replacing a non-fresh neutral cache after a recent hash change', () => {
+    const cached = makeCached({
+      response: { status: 'unavailable', text: null, generatedAt: null },
+      status: 'unavailable',
+      generatedAt: null,
+    });
+
+    expect(decideWeeklyCache(cached, 'new', now, false)).toEqual({
       kind: 'neutral',
       evaluation: { status: 'unavailable', text: null, generatedAt: null },
       replaceCache: true,

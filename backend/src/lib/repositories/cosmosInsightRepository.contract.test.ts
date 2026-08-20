@@ -49,11 +49,12 @@ async function clearInsights(userIds: string[]): Promise<void> {
 function makeWeeklyDocument(
   userId = USER_A,
   periodEnd = '2026-08-13',
-): WeeklyInsightDocument {
+): WeeklyInsightDocument & { date: string } {
   return {
     id: makeWeeklyInsightId(userId, periodEnd),
     userId,
     _docType: 'weeklyInsight',
+    date: periodEnd,
     referenceDate: '2026-08-14',
     periodStart: '2026-08-07',
     periodEnd,
@@ -68,6 +69,14 @@ function makeWeeklyDocument(
     ttl: 604800,
     tokensUsed: 12,
   };
+}
+
+async function seedDailyDocument(id: string, date: string): Promise<void> {
+  await ctx!.database.container('aiInsights').items.upsert({
+    id,
+    userId: USER_A,
+    date,
+  });
 }
 
 beforeEach(async () => {
@@ -88,6 +97,29 @@ describe('CosmosInsightRepository weekly documents (contract)', () => {
     await expect(repo.get(USER_A, '2026-08-13')).resolves.toBeNull();
   });
 
+  it('reads a legacy weekly document with redundant top-level fields', async () => {
+    const document = makeWeeklyDocument();
+    await ctx!.database.container('aiInsights').items.upsert({
+      ...document,
+      response: {
+        ...document.response,
+        status: 'fresh',
+        generatedAt: '2026-08-14T10:00:00.000Z',
+      },
+      status: 'unavailable',
+      generatedAt: null,
+    });
+
+    await expect(repo.getWeekly(USER_A, '2026-08-13')).resolves.toMatchObject({
+      response: {
+        status: 'fresh',
+        generatedAt: '2026-08-14T10:00:00.000Z',
+      },
+      status: 'unavailable',
+      generatedAt: null,
+    });
+  });
+
   it('scopes weekly documents by user and period', async () => {
     await repo.upsertWeekly(makeWeeklyDocument(USER_A, '2026-08-13'));
     await repo.upsertWeekly(makeWeeklyDocument(USER_B, '2026-08-13'));
@@ -96,5 +128,21 @@ describe('CosmosInsightRepository weekly documents (contract)', () => {
     expect((await repo.getWeekly(USER_A, '2026-08-13'))?.userId).toBe(USER_A);
     expect((await repo.getWeekly(USER_B, '2026-08-13'))?.userId).toBe(USER_B);
     expect((await repo.getWeekly(USER_A, '2026-08-12'))?.periodEnd).toBe('2026-08-12');
+  });
+});
+
+describe('CosmosInsightRepository.listRecent (contract)', () => {
+  it('excludes weekly documents in the date window and keeps legacy daily documents sorted', async () => {
+    await seedDailyDocument(`${USER_A}:2026-08-14`, '2026-08-14');
+    await seedDailyDocument(`${USER_A}:2026-08-12`, '2026-08-12');
+    await repo.upsertWeekly(makeWeeklyDocument(USER_A, '2026-08-13'));
+
+    const result = await repo.listRecent(USER_A, 7, '2026-08-14');
+
+    expect(result.map((document) => document.id)).toEqual([
+      `${USER_A}:2026-08-14`,
+      `${USER_A}:2026-08-12`,
+    ]);
+    expect(result.map((document) => document.date)).toEqual(['2026-08-14', '2026-08-12']);
   });
 });

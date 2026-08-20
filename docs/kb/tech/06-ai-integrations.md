@@ -116,7 +116,7 @@ served without an AI call. After a hash change, the old text is never shown; a
 remains usable.
 
 The weekly prompt is `WEEKLY_INSIGHT_PROMPT_VERSION = 'v2'` in
-`backend/src/lib/prompts/weeklyInsightV1.ts`. It receives only sanitized aggregate
+`backend/src/lib/prompts/weeklyInsightV2.ts`. It receives only sanitized aggregate
 data for the seven days and totals: no meal/product raw text, user IDs, tokens, or
 technical cache data. The generator uses Strict Structured Outputs with
 `strict: true`, `additionalProperties: false`, and a single `text` property
@@ -156,6 +156,6 @@ Located in `backend/src/lib/prompts/`:
 - `mealEstimate.ts` — system prompt for meal image estimation
 - `recipeAnalyze.ts` — system prompt for recipe text analysis
 - `dailyInsightV9.ts` — current daily insight system prompt (versioned)
-- `weeklyInsightV1.ts` — weekly insight system prompt and sanitized context contract (versioned)
+- `weeklyInsightV2.ts` — weekly insight system prompt and sanitized context contract (versioned)
 
 [Rule] Prompt files are versioned. When a prompt changes in ways that would alter output format or interpretation, increment the version (e.g., `V6` → `V7`). Store the version constant alongside the prompt.

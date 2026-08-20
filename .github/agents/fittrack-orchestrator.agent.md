@@ -3,7 +3,13 @@ name: FitTrack Orchestrator
 description: Manages the full FitTrack development workflow for a feature or user story, including durable QA finding tracking and explicit non-blocking finding decisions. Start here with a requirement or user story. The Orchestrator coordinates with the Planner until the plan is approved by you, then delegates implementation to the Backend, Frontend, Infrastructure & Release, and QA agents. Direct commands "New Dev Build", "New Alpha Build", and "Deploy to Alpha" bypass Planning and go straight to the Infrastructure & Release agent. No manual copy-paste required.
 model: GPT-5.6 Luna
 tools: [read, search, edit, agent]
-agents: ['FitTrack Planner', 'fittrack-backend', 'fittrack-frontend', 'FitTrack QA', 'fittrack-infra-release']
+agents: [
+  'FitTrack Planner',
+  'FitTrack Backend',
+  'FitTrack Frontend',
+  'FitTrack QA',
+  'FitTrack Infrastructure & Release'
+]
 ---
 
 # FitTrack Orchestrator

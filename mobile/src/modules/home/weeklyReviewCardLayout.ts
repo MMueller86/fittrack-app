@@ -11,7 +11,6 @@ export const WEEKLY_REVIEW_MARKER_SLOT_HEIGHT = spacing.lg;
 export const WEEKLY_REVIEW_BAR_SLOT_TOP_MARGIN = spacing.xs;
 export const WEEKLY_REVIEW_WEEKDAY_SLOT_TOP_MARGIN = spacing.sm;
 export const WEEKLY_REVIEW_MARKER_SLOT_TOP_MARGIN = spacing.xs;
-export const WEEKLY_REVIEW_SPECIAL_ACTIVITY_FRAME_TOP_OFFSET = -spacing.xs;
 
 export interface WeeklyReviewDaySlot {
   top: number;
@@ -67,6 +66,18 @@ export function getWeeklyReviewMetricAccessibilityLabel(
   return `${label}: Gegessen ${consumed ?? 'Nicht verfügbar'} / Ziel ${target ?? 'Nicht verfügbar'}`;
 }
 
+export function getWeeklyReviewMissingLegendMarkerGeometry(patternSize: number) {
+  const patternEnd = patternSize * 2;
+
+  return {
+    viewBox: [0, 0, patternEnd, patternEnd] as const,
+    lineSegments: [
+      [0, patternSize, patternSize, 0],
+      [0, patternEnd, patternEnd, 0],
+    ] as const,
+  };
+}
+
 export function getWeeklyReviewTargetBandColor(targetBand: WeeklyTargetBand | null): string {
   if (targetBand === 'in_range') return colors.primary;
   if (targetBand === 'outside_range') return colors.warning;
@@ -96,10 +107,10 @@ export function isWeeklyReviewSpecialActivityMarker(
   return marker.kind === 'activity';
 }
 
-export function isWeeklyReviewSpecialActivityDay(
-  day: Pick<WeeklyReviewDayViewModel, 'markers' | 'activityBonusValueLabel'>,
-): boolean {
-  return day.activityBonusValueLabel != null || day.markers.some(isWeeklyReviewSpecialActivityMarker);
+export function getWeeklyReviewMarkerColor(marker: WeeklyReviewDayMarker): string {
+  return isWeeklyReviewSpecialActivityMarker(marker)
+    ? colors.chart.specialActivityOutline
+    : colors.textSecondary;
 }
 
 export function getWeeklyReviewMarkerLegend(

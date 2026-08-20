@@ -5,7 +5,7 @@ import {
   generateWeeklyInsight,
   WEEKLY_INSIGHT_TEXT_MAX_LENGTH,
 } from './openai';
-import type { WeeklyInsightPromptContext } from './prompts/weeklyInsightV1';
+import type { WeeklyInsightPromptContext } from './prompts/weeklyInsightV2';
 
 const context: WeeklyInsightPromptContext = {
   periodStart: '2026-08-07',
@@ -93,7 +93,7 @@ describe('generateWeeklyInsight', () => {
   it('accepts exactly the 750-character boundary and preserves the sentinel', async () => {
     const sentinel = '__END_OF_WEEKLY_REVIEW__';
     const text = `${'x'.repeat(WEEKLY_INSIGHT_TEXT_MAX_LENGTH - sentinel.length)}${sentinel}`;
-    mockClient(JSON.stringify({ text }));
+    mockClient(JSON.stringify({ text: `  ${text}  ` }));
 
     await expect(generateWeeklyInsight(context)).resolves.toMatchObject({
       text,
@@ -110,13 +110,20 @@ describe('generateWeeklyInsight', () => {
   });
 
   it.each([
-    ['text above the maximum length', JSON.stringify({ text: 'x'.repeat(WEEKLY_INSIGHT_TEXT_MAX_LENGTH + 1) })],
+    ['zero-length text', JSON.stringify({ text: '' })],
     ['whitespace-only text', JSON.stringify({ text: '   ' })],
+    ['751-character text', JSON.stringify({ text: 'x'.repeat(WEEKLY_INSIGHT_TEXT_MAX_LENGTH + 1) })],
     ['additional properties', JSON.stringify({ text: 'Gültiger Text.', extra: 'nicht erlaubt' })],
     ['non-string text', JSON.stringify({ text: 42 })],
   ])('rejects %s after the provider response', async (_caseName, content) => {
     mockClient(content);
     await expect(generateWeeklyInsight(context)).rejects.toThrow();
+  });
+
+  it('rejects invalid JSON from the provider', async () => {
+    mockClient('{"text":');
+
+    await expect(generateWeeklyInsight(context)).rejects.toThrow('Invalid JSON response');
   });
 
   it('rejects a provider response truncated by the output token limit', async () => {

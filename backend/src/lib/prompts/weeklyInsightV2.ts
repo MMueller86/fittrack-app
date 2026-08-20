@@ -1,7 +1,7 @@
-import { WEEKLY_INSIGHT_TEXT_MAX_LENGTH } from '../weeklyInsightContract';
 import type { WeeklyActivityLabel, WeeklyNutritionTotals } from '@fittrack/shared';
 
 export const WEEKLY_INSIGHT_PROMPT_VERSION = 'v2';
+export const WEEKLY_INSIGHT_TEXT_MAX_LENGTH = 750;
 
 export interface WeeklyInsightPromptDay {
   date: string;

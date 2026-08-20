@@ -1,4 +1,4 @@
-import type { WeeklyInsightPromptContext } from './weeklyInsightV1';
+import type { WeeklyInsightPromptContext } from './weeklyInsightV2';
 
 export interface WeeklyInsightEvalFixture {
   id: string;

@@ -14,7 +14,7 @@ import {
 import type {
   WeeklyInsightPromptContext,
   WeeklyInsightPromptDay,
-} from './prompts/weeklyInsightV1';
+} from './prompts/weeklyInsightV2';
 
 export const WEEKLY_INSIGHT_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60;
 
@@ -144,25 +144,25 @@ export function decideWeeklyCache(
       return {
         kind: 'neutral',
         evaluation: neutralEvaluation('unavailable'),
-        replaceCache: true,
+        replaceCache: cached.response.status !== 'fresh',
       };
     }
     return { kind: 'generate' };
   }
 
-  if (cached.status === 'fresh' && cached.response.text != null) {
+  if (cached.response.status === 'fresh' && cached.response.text != null) {
     return {
       kind: 'cached',
       evaluation: {
         status: 'cached',
         text: cached.response.text,
-        generatedAt: cached.generatedAt,
+        generatedAt: cached.response.generatedAt,
       },
     };
   }
 
   if (recent) {
-    const status = cached.status === 'quota_exceeded' ? 'quota_exceeded' : 'unavailable';
+    const status = cached.response.status === 'quota_exceeded' ? 'quota_exceeded' : 'unavailable';
     return { kind: 'neutral', evaluation: neutralEvaluation(status), replaceCache: false };
   }
 

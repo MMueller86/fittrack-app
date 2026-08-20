@@ -6,6 +6,7 @@ import type {
 import {
   createWeeklyReviewViewModel,
   formatWeeklyReviewDayCalorieSummary,
+  getWeeklyReviewErrorState,
 } from './weeklyReviewViewModel';
 
 function makeDay(overrides: Partial<WeeklyNutritionDay> = {}): WeeklyNutritionDay {
@@ -76,7 +77,6 @@ describe('createWeeklyReviewViewModel', () => {
     });
     expect(viewModel.days[0]?.overlayDetails).toEqual({
       title: 'Fr 7. Aug.',
-      body: '',
       detailGroups: [],
       calorieSummary: {
         isAvailable: true,
@@ -124,7 +124,7 @@ describe('createWeeklyReviewViewModel', () => {
     });
   });
 
-  it('keeps calorie details out of the overlay body while retaining them in structured summaries', () => {
+  it('keeps calorie details in structured overlay summaries', () => {
     const viewModel = createWeeklyReviewViewModel(makeReview([
       makeDay({
         consumedMacros: { protein: 120, carbs: 240, fat: 80 },
@@ -136,7 +136,7 @@ describe('createWeeklyReviewViewModel', () => {
     ]));
     const overlay = viewModel.days[0]?.overlayDetails;
 
-    expect(overlay?.body).toBe('');
+    expect(overlay).not.toHaveProperty('body');
     expect(overlay?.detailGroups).toEqual([
       { label: 'Basisziel', value: '2.300 kcal' },
       { label: 'Aktivitätsbonus', value: '500 kcal' },
@@ -250,6 +250,7 @@ describe('createWeeklyReviewViewModel', () => {
     expect(viewModel.days[0]).toMatchObject({
       consumedLabel: null,
       percentLabel: null,
+      hasTarget: true,
       targetLabel: 'Ziel 2.300 kcal',
       contextLabel: 'Ruhetag',
       statusLabel: 'Keine Einträge',
@@ -258,6 +259,7 @@ describe('createWeeklyReviewViewModel', () => {
     expect(viewModel.days[1]).toMatchObject({
       consumedLabel: '0 kcal',
       percentLabel: '0 %',
+      hasTarget: true,
       missingState: null,
     });
     expect(viewModel.days[1]?.overlayDetails.detailGroups).toEqual([]);
@@ -267,6 +269,7 @@ describe('createWeeklyReviewViewModel', () => {
     expect(viewModel.days[2]).toMatchObject({
       consumedLabel: '1.800 kcal',
       percentLabel: null,
+      hasTarget: false,
       targetLabel: null,
       contextLabel: null,
       statusLabel: 'Ziel nicht verfügbar',
@@ -277,6 +280,7 @@ describe('createWeeklyReviewViewModel', () => {
       { label: 'Tagestyp', value: 'Ruhetag' },
     );
     expect(viewModel.days[3]).toMatchObject({
+      hasTarget: false,
       statusLabel: 'Keine Daten',
       missingState: 'missing_nutrition_and_target',
     });
@@ -497,6 +501,20 @@ describe('createWeeklyReviewViewModel', () => {
     expect(day?.activityLabel).toBe('Sonderaktivität');
   });
 
+  it('provides a generic special-activity marker for a bonus-only activity context', () => {
+    const day = createWeeklyReviewViewModel(makeReview([
+      makeDay({ activityBonusCalories: 500 }),
+    ])).days[0];
+
+    expect(day?.markers).toEqual([
+      {
+        kind: 'activity',
+        icon: { lib: 'feather', name: 'info' },
+        label: 'Sonderaktivität',
+      },
+    ]);
+  });
+
   it('does not create markers for a day without training or supported activity', () => {
     const day = createWeeklyReviewViewModel(makeReview([
       makeDay({ dayType: 'rest', activity: null }),
@@ -505,7 +523,7 @@ describe('createWeeklyReviewViewModel', () => {
     expect(day?.markers).toEqual([]);
   });
 
-  it('keeps calorie accessibility data while allowing a context-free overlay body to stay empty', () => {
+  it('keeps calorie accessibility data without context detail groups', () => {
     const viewModel = createWeeklyReviewViewModel(makeReview([
       makeDay({
         dayType: null,
@@ -515,7 +533,15 @@ describe('createWeeklyReviewViewModel', () => {
       }),
     ]));
 
-    expect(viewModel.days[0]?.overlayDetails.body).toBe('');
+    expect(viewModel.days[0]?.overlayDetails).toMatchObject({
+      detailGroups: [],
+      calorieSummary: {
+        isAvailable: true,
+        consumedLabel: '2.185 kcal',
+        targetLabel: '2.300 kcal',
+        percentLabel: '95 %',
+      },
+    });
     expect(viewModel.days[0]?.accessibilityLabel).toContain(
       'Kalorien: 2.185 kcal von 2.300 kcal, Zielerreichung 95 %',
     );
@@ -539,5 +565,20 @@ describe('createWeeklyReviewViewModel', () => {
 
     expect(zeroViewModel.overallTargetBand).toBe('outside_range');
     expect(missingViewModel.overallTargetBand).toBeNull();
+  });
+});
+
+describe('getWeeklyReviewErrorState', () => {
+  it('keeps an existing review visible and exposes a stale refresh error', () => {
+    expect(getWeeklyReviewErrorState(true, true)).toBe('stale');
+  });
+
+  it('keeps the existing full error state when no review is available', () => {
+    expect(getWeeklyReviewErrorState(false, true)).toBe('initial');
+  });
+
+  it('does not show an error while the weekly request is healthy', () => {
+    expect(getWeeklyReviewErrorState(true, false)).toBe('none');
+    expect(getWeeklyReviewErrorState(false, false)).toBe('none');
   });
 });

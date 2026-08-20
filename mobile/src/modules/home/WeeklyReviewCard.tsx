@@ -19,8 +19,8 @@ import {
   type WeeklyReviewDayMacroSummary,
   type WeeklyReviewDayMarker,
   type WeeklyReviewDayViewModel,
+  getWeeklyReviewErrorState,
 } from './weeklyReviewViewModel';
-import { getWeeklyReviewErrorState } from './weeklyReviewCardState';
 import {
   getWeeklyReviewEvaluationText,
   getWeeklyReviewEvaluationRenderContract,
@@ -32,16 +32,15 @@ import {
 import {
   getWeeklyReviewMarkerCells,
   getWeeklyReviewMarkerLegend,
-  getWeeklyReviewMetricAccessibilityLabel,
+  getWeeklyReviewMarkerColor,
   getWeeklyReviewMetricDisplayValue,
   getWeeklyReviewTargetBandColor,
   getWeeklyReviewVisibleWeekdayLabel,
+  getWeeklyReviewMissingLegendMarkerGeometry,
   WEEKLY_REVIEW_BAR_SLOT_HEIGHT,
   WEEKLY_REVIEW_BAR_SLOT_TOP_MARGIN,
   WEEKLY_REVIEW_MARKER_SLOT_HEIGHT,
   WEEKLY_REVIEW_MARKER_SLOT_TOP_MARGIN,
-  isWeeklyReviewSpecialActivityDay,
-  WEEKLY_REVIEW_SPECIAL_ACTIVITY_FRAME_TOP_OFFSET,
   WEEKLY_REVIEW_VALUE_SLOT_HEIGHT,
   WEEKLY_REVIEW_WEEKDAY_SLOT_HEIGHT,
   WEEKLY_REVIEW_WEEKDAY_SLOT_TOP_MARGIN,
@@ -53,7 +52,6 @@ type Percentage = `${number}%`;
 
 interface Props {
   review: WeeklyNutritionReviewResponse | null;
-  loading: boolean;
   error: boolean;
   onRetry: () => void;
   onOpenDiary: (date: string) => void;
@@ -96,7 +94,7 @@ function WeeklyReviewError({ onRetry }: { onRetry: () => void }) {
     <View style={[styles.card, styles.stateCard]}>
       <View style={styles.stateContent} accessible accessibilityLabel="Wochenrückblick nicht verfügbar">
         <View style={styles.stateIcon}>
-          <Icon lib="feather" name="info" size="md" color={colors.textMuted} />
+          <Icon lib="feather" name="alert-circle" size="md" color={colors.textMuted} />
         </View>
         <View style={styles.stateCopy}>
           <Text style={styles.stateTitle}>Wochenrückblick nicht geladen</Text>
@@ -153,42 +151,40 @@ function getBarHeight(day: WeeklyReviewDayViewModel, scaleMaxPercent: number): P
   return `${(visiblePercent / scaleMaxPercent) * 100}%` as Percentage;
 }
 
-function WeeklyMetricRow({
-  label,
+function WeeklyTargetSummary({
   consumed,
   target,
   targetBand,
 }: {
-  label: string;
   consumed: string | null;
   target: string | null;
   targetBand: WeeklyTargetBand | null;
 }) {
   const consumedColor = getWeeklyReviewTargetBandColor(targetBand);
+  const accessibilityLabel = `7-Tage-Ziel: Gegessen ${consumed ?? 'Nicht verfügbar'} / Ziel ${target ?? 'Nicht verfügbar'}`;
 
   return (
     <View
-      style={styles.metricRow}
+      style={styles.headerTargetSummary}
       accessible
       accessibilityRole="text"
-      accessibilityLabel={getWeeklyReviewMetricAccessibilityLabel(label, consumed, target)}
+      accessibilityLabel={accessibilityLabel}
     >
-      <Text style={styles.metricLabel} numberOfLines={2}>{label}</Text>
-      <View style={styles.metricValueRow}>
+      <View style={styles.headerTargetValueRow}>
         <Text
-          style={[styles.metricValue, { color: consumedColor }]}
+          style={[styles.headerTargetValue, { color: consumedColor }]}
           numberOfLines={1}
           adjustsFontSizeToFit
-          minimumFontScale={0.75}
+          minimumFontScale={0.8}
         >
           {getWeeklyReviewMetricDisplayValue(consumed, { omitUnit: true })}
         </Text>
-        <Text style={styles.metricSeparator}> / </Text>
+        <Text style={styles.headerTargetSeparator}> / </Text>
         <Text
-          style={[styles.metricValue, styles.metricTargetValue]}
+          style={[styles.headerTargetValue, styles.headerTargetTargetValue]}
           numberOfLines={1}
           adjustsFontSizeToFit
-          minimumFontScale={0.75}
+          minimumFontScale={0.8}
         >
           {getWeeklyReviewMetricDisplayValue(target)}
         </Text>
@@ -210,8 +206,13 @@ function DayValues({ day }: { day: WeeklyReviewDayViewModel }) {
       >
         {day.percentLabel ?? '—'}
       </Text>
-      <Text style={styles.calorieText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-        {day.consumedLabel ?? '—'}
+      <Text
+        style={styles.calorieText}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
+        {getWeeklyReviewMetricDisplayValue(day.consumedLabel, { omitUnit: true })}
       </Text>
     </View>
   );
@@ -242,11 +243,14 @@ function MissingPatternBar() {
 
 function MissingLegendMarker() {
   const patternSize = spacing.sm;
-  const path = `M 0 ${patternSize} L ${patternSize} 0 M 0 ${patternSize * 2} L ${patternSize * 2} 0`;
+  const { viewBox, lineSegments } = getWeeklyReviewMissingLegendMarkerGeometry(patternSize);
+  const path = lineSegments
+    .map(([startX, startY, endX, endY]) => `M ${startX} ${startY} L ${endX} ${endY}`)
+    .join(' ');
 
   return (
     <View style={styles.legendPattern} pointerEvents="none">
-      <Svg width={patternSize} height={patternSize} viewBox={`0 0 ${patternSize} ${patternSize}`}>
+      <Svg width={patternSize} height={patternSize} viewBox={viewBox.join(' ')}>
         <Rect width="100%" height="100%" fill={colors.surfaceMuted} />
         <Path d={path} stroke={colors.textMuted} strokeWidth={spacing.xs / 2} opacity={0.8} />
       </Svg>
@@ -272,7 +276,7 @@ function DayMarkers({ markers }: { markers: readonly WeeklyReviewDayMarker[] }) 
           <Icon
             {...marker.icon}
             size={spacing.sm + spacing.xs / 2}
-            color={colors.textSecondary}
+            color={getWeeklyReviewMarkerColor(marker)}
           />
         </View>
       ))}
@@ -301,10 +305,15 @@ function MarkerLegend({ markers }: { markers: WeeklyReviewDayMarker[] }) {
             <Icon
               {...marker.icon}
               size={spacing.sm + spacing.xs / 2}
-              color={colors.textSecondary}
+              color={colors.chart.specialActivityOutline}
             />
           </View>
-          <Text style={styles.markerLegendText} numberOfLines={2}>{marker.label}</Text>
+          <Text
+            style={[styles.markerLegendText, { color: colors.chart.specialActivityOutline }]}
+            numberOfLines={2}
+          >
+            {marker.label}
+          </Text>
         </View>
       ))}
     </View>
@@ -332,21 +341,15 @@ function DayBar({
       accessibilityHint="Öffnet informative Tagesdetails."
     >
       <View style={styles.barTrack}>
-        <View
-          style={[styles.referenceLine, { bottom: `${(100 / scaleMaxPercent) * 100}%` as Percentage }]}
-          pointerEvents="none"
-        />
         <View style={styles.barBaseline} />
         {hasBarData ? (
           <View style={[styles.bar, { height: getBarHeight(day, scaleMaxPercent), backgroundColor: getBarColor(day) }]} />
         ) : <MissingPatternBar />}
-        <View
-          style={[
-            styles.targetMarker,
-            { bottom: `${(100 / scaleMaxPercent) * 100}%` },
-            !day.hasTarget && styles.targetMarkerUnavailable,
-          ]}
-        />
+        {day.hasTarget ? (
+          <View
+            style={[styles.targetMarker, { bottom: `${(100 / scaleMaxPercent) * 100}%` }]}
+          />
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -371,8 +374,6 @@ function DayColumn({
   scaleMaxPercent: number;
   onPress: () => void;
 }) {
-  const hasSpecialActivity = isWeeklyReviewSpecialActivityDay(day);
-
   return (
     <View style={styles.dayColumn}>
       <DayValues day={day} />
@@ -387,7 +388,6 @@ function DayColumn({
       >
         <DayMarkers markers={markers} />
       </View>
-      {hasSpecialActivity ? <View style={styles.specialActivityDayFrame} pointerEvents="none" /> : null}
     </View>
   );
 }
@@ -446,7 +446,7 @@ function EvaluationSection({
   return (
     <View style={styles.evaluationSection}>
       <View style={styles.evaluationHeader}>
-        <Icon lib="feather" name="activity" size="md" color={colors.primaryBright} />
+        <Icon lib="feather" name="zap" size="md" color={colors.primaryBright} />
         <Text style={styles.evaluationTitle}>Deine Wochenbewertung</Text>
       </View>
       <View
@@ -646,25 +646,6 @@ function WeeklyDayMacroSummary({
   );
 }
 
-function WeeklyMetrics({ viewModel }: { viewModel: ReturnType<typeof createWeeklyReviewViewModel> }) {
-  return (
-    <View style={styles.metricsSection}>
-      <WeeklyMetricRow
-        label="7-Tage-Ziel"
-        consumed={viewModel.totalConsumedLabel}
-        target={viewModel.totalTargetLabel}
-        targetBand={viewModel.overallTargetBand}
-      />
-      <WeeklyMetricRow
-        label="Ø Ziel / Tag"
-        consumed={viewModel.averageConsumedLabel}
-        target={viewModel.averageTargetLabel}
-        targetBand={viewModel.overallTargetBand}
-      />
-    </View>
-  );
-}
-
 function WeeklyReviewContent({
   review,
   error,
@@ -713,22 +694,31 @@ function WeeklyReviewContent({
           <Text style={styles.period}>{viewModel.periodLabel}</Text>
         </View>
         <View
-          style={styles.headerPercent}
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={`Zielerreichung in Prozent: ${viewModel.overallPercentLabel ?? 'Nicht verfügbar'}`}
+          style={styles.headerMetrics}
         >
-          <Text style={styles.headerPercentLabel} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-            Zielerreichung in Prozent
-          </Text>
-          <Text
-            style={[styles.headerPercentValue, { color: getWeeklyReviewTargetBandColor(viewModel.overallTargetBand) }]}
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}
+          <View
+            style={styles.headerPercentRow}
+            accessible
+            accessibilityRole="text"
+            accessibilityLabel={`Zielerreichung: ${viewModel.overallPercentLabel ?? 'Nicht verfügbar'}`}
           >
-            {viewModel.overallPercentLabel ?? '—'}
-          </Text>
+            <Text style={styles.headerPercentLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              Zielerreichung:
+            </Text>
+            <Text
+              style={[styles.headerPercentValue, { color: getWeeklyReviewTargetBandColor(viewModel.overallTargetBand) }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
+              {viewModel.overallPercentLabel ?? '—'}
+            </Text>
+          </View>
+          <WeeklyTargetSummary
+            consumed={viewModel.totalConsumedLabel}
+            target={viewModel.totalTargetLabel}
+            targetBand={viewModel.overallTargetBand}
+          />
         </View>
       </View>
 
@@ -763,8 +753,6 @@ function WeeklyReviewContent({
         </View>
       </View>
 
-      <WeeklyMetrics viewModel={viewModel} />
-
       <EvaluationSection
         text={review.evaluation.text}
         review={review}
@@ -774,7 +762,7 @@ function WeeklyReviewContent({
       <InfoOverlay
         visible={selectedDay != null}
         title={selectedDay?.overlayDetails.title ?? ''}
-        body={selectedDay?.overlayDetails.body ?? ''}
+        body=""
         onClose={() => setSelectedDay(null)}
         secondaryAction={{
           label: 'Tagebuch öffnen',
@@ -797,12 +785,11 @@ function WeeklyReviewContent({
   );
 }
 
-export function WeeklyReviewCard({ review, loading, error, onRetry, onOpenDiary }: Props) {
+export function WeeklyReviewCard({ review, error, onRetry, onOpenDiary }: Props) {
   const errorState = getWeeklyReviewErrorState(review != null, error);
 
   if (!review) {
     if (errorState === 'initial') return <WeeklyReviewError onRetry={onRetry} />;
-    if (loading) return <WeeklyReviewSkeleton />;
     return <WeeklyReviewSkeleton />;
   }
 
@@ -853,24 +840,61 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.xs,
   },
-  headerPercent: {
-    flexBasis: spacing.xxl * 2,
+  headerMetrics: {
+    flexBasis: spacing.xxl * 2 + spacing.lg,
     flexGrow: 0,
     flexShrink: 1,
     minWidth: 0,
     alignItems: 'flex-end',
     gap: spacing.xs,
+    paddingRight: spacing.xs,
+  },
+  headerPercentRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'flex-end',
+    gap: spacing.xs,
+    minWidth: 0,
   },
   headerPercentLabel: {
     ...typography.caption,
     color: colors.textMuted,
-    textAlign: 'right',
     flexShrink: 1,
+    textAlign: 'right',
   },
   headerPercentValue: {
-    ...typography.body1,
+    ...typography.body2,
     fontWeight: '700' as const,
+    flexShrink: 0,
     textAlign: 'right',
+  },
+  headerTargetSummary: {
+    width: '100%',
+    minWidth: 0,
+    alignItems: 'flex-end',
+  },
+  headerTargetValueRow: {
+    width: '100%',
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  headerTargetValue: {
+    ...typography.caption,
+    fontWeight: '600' as const,
+    flexShrink: 1,
+    minWidth: 0,
+    textAlign: 'right',
+  },
+  headerTargetTargetValue: {
+    color: colors.neutral,
+  },
+  headerTargetSeparator: {
+    ...typography.body2,
+    color: colors.textMuted,
+    flexShrink: 0,
   },
   dayGrid: {
     flexDirection: 'row',
@@ -885,22 +909,13 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'visible',
   },
-  specialActivityDayFrame: {
-    position: 'absolute',
-    top: WEEKLY_REVIEW_SPECIAL_ACTIVITY_FRAME_TOP_OFFSET,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderWidth: 1,
-    borderColor: colors.chart.specialActivityOutline,
-    borderRadius: radius.sm,
-  },
   valueColumn: {
     width: '100%',
     minWidth: 0,
     height: WEEKLY_REVIEW_VALUE_SLOT_HEIGHT,
     flexShrink: 0,
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.xs,
   },
   percentText: {
@@ -914,15 +929,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: typography.caption.fontSize,
-  },
-  referenceLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    borderTopWidth: 1,
-    borderTopColor: colors.textSecondary,
-    borderStyle: 'dashed',
-    zIndex: 3,
   },
   barColumn: {
     width: '100%',
@@ -951,7 +957,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   bar: {
-    width: '72%',
+    width: '100%',
     borderRadius: radius.sm,
   },
   markerContent: {
@@ -974,7 +980,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   missingBar: {
-    width: '72%',
+    width: '100%',
     height: '100%',
     borderRadius: radius.sm,
     overflow: 'hidden',
@@ -987,10 +993,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: colors.text,
     zIndex: 2,
-  },
-  targetMarkerUnavailable: {
-    backgroundColor: colors.textMuted,
-    opacity: 0.75,
   },
   metaColumn: {
     width: '100%',
@@ -1082,7 +1084,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    gap: spacing.sm,
+    gap: spacing.xs,
     minWidth: 0,
     overflow: 'visible',
   },
@@ -1117,8 +1119,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
     gap: spacing.xs,
-    minHeight: spacing.xxl,
-    paddingVertical: spacing.xs,
+    minHeight: WEEKLY_REVIEW_MIN_TOUCH_HEIGHT,
+    paddingVertical: 0,
   },
   evaluationToggleText: {
     ...typography.button,
@@ -1227,47 +1229,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   macroMissingText: {
-    ...typography.body2,
-    color: colors.textMuted,
-  },
-  metricsSection: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  metricRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    minWidth: 0,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-  },
-  metricLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
-    flex: 1,
-    minWidth: 0,
-  },
-  metricValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  metricValue: {
-    ...typography.body2,
-    fontWeight: '700' as const,
-    flexShrink: 1,
-    minWidth: 0,
-  },
-  metricTargetValue: {
-    color: colors.neutral,
-  },
-  metricSeparator: {
     ...typography.body2,
     color: colors.textMuted,
   },

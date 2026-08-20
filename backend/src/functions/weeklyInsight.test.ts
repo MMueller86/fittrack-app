@@ -417,6 +417,28 @@ describe('GET /api/ai/weekly-insight', () => {
     expect(trackUsage).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps dual-write fields while nested response fields remain canonical', async () => {
+    mockOpenAi('Kompatible Wochenbewertung.');
+
+    const response = await weeklyInsightHandler(
+      await makeAuthRequest({ query: { date: '2026-08-14' } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    const document = await getInsightRepository().getWeekly(TEST_USER_ID, '2026-08-13');
+    expect(document).toMatchObject({
+      response: {
+        status: 'fresh',
+        text: 'Kompatible Wochenbewertung.',
+        generatedAt: expect.any(String),
+      },
+      status: 'fresh',
+      generatedAt: expect.any(String),
+    });
+    expect(document?.generatedAt).toBe(document?.response.generatedAt);
+  });
+
   it('invalidates a v1 cache entry after the prompt version bump', async () => {
     const create = mockOpenAi('Neue v2 Bewertung.');
     const periodDates = [
@@ -481,6 +503,8 @@ describe('GET /api/ai/weekly-insight', () => {
       makeContext(),
     );
     expect(bodyOf(first).evaluation.text).toBe('Alte Bewertung.');
+    const cachedBeforeChange = await getInsightRepository().getWeekly(TEST_USER_ID, '2026-08-13');
+    expect(cachedBeforeChange?.response.status).toBe('fresh');
 
     await getDiaryRepository().addItem(TEST_USER_ID, meal.id, {
       name: 'New item', calories: 1800, protein: 10, carbs: 20, fat: 5, fiber: 2,
@@ -492,6 +516,14 @@ describe('GET /api/ai/weekly-insight', () => {
 
     expect(bodyOf(changed).evaluation).toEqual({ status: 'unavailable', text: null, generatedAt: null });
     expect(create).toHaveBeenCalledTimes(1);
+    await expect(getInsightRepository().getWeekly(TEST_USER_ID, '2026-08-13')).resolves.toMatchObject({
+      inputHash: cachedBeforeChange?.inputHash,
+      response: {
+        status: 'fresh',
+        text: 'Alte Bewertung.',
+        generatedAt: cachedBeforeChange?.response.generatedAt,
+      },
+    });
   });
 
   it('checks quota before AI and tracks only after a valid response', async () => {

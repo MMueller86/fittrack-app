@@ -3,18 +3,19 @@
 // Uses Structured Outputs (API version >= 2024-07-01, model >= gpt-4o-mini 2024-07-18).
 
 import { AzureOpenAI } from 'openai';
+import { z } from 'zod';
 import { MEAL_PARSER_SYSTEM_PROMPT } from './prompts/mealParser';
 import { FOOD_ESTIMATE_SYSTEM_PROMPT } from './prompts/foodEstimate';
 import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
 import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
 import { RECIPE_SCALE_SYSTEM_PROMPT } from './prompts/recipeScale';
 import { DAILY_INSIGHT_SYSTEM_PROMPT, DAILY_INSIGHT_PROMPT_VERSION } from './prompts/dailyInsightV9';
-import { WEEKLY_INSIGHT_TEXT_MAX_LENGTH } from './weeklyInsightContract';
 import {
   WEEKLY_INSIGHT_SYSTEM_PROMPT,
   WEEKLY_INSIGHT_PROMPT_VERSION,
+  WEEKLY_INSIGHT_TEXT_MAX_LENGTH,
   type WeeklyInsightPromptContext,
-} from './prompts/weeklyInsightV1';
+} from './prompts/weeklyInsightV2';
 import type { InsightInputContext, InsightResponse } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
@@ -581,6 +582,10 @@ const WEEKLY_INSIGHT_SCHEMA = {
   additionalProperties: false,
 };
 
+const WEEKLY_INSIGHT_RESPONSE_SCHEMA = z.object({
+  text: z.string().trim().min(1).max(WEEKLY_INSIGHT_TEXT_MAX_LENGTH),
+}).strict();
+
 /**
  * Estimate the nutritional values of multiple food items in a single AI call.
  * Returns results in the same order as the input names array.
@@ -675,28 +680,13 @@ export async function generateWeeklyInsight(
     throw new Error('Invalid JSON response from Azure OpenAI (weekly-insight)');
   }
 
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    Array.isArray(parsed) ||
-    Object.keys(parsed).length !== 1 ||
-    !Object.prototype.hasOwnProperty.call(parsed, 'text')
-  ) {
+  const parsedResponse = WEEKLY_INSIGHT_RESPONSE_SCHEMA.safeParse(parsed);
+  if (!parsedResponse.success) {
     throw new Error('Weekly insight response has an invalid schema');
   }
 
-  const text = (parsed as { text?: unknown }).text;
-  if (typeof text !== 'string') {
-    throw new Error('Weekly insight response text must be a string');
-  }
-
-  const normalizedText = text.trim();
-  if (normalizedText.length === 0 || normalizedText.length > WEEKLY_INSIGHT_TEXT_MAX_LENGTH) {
-    throw new Error('Weekly insight response text has an invalid length');
-  }
-
   return {
-    text: normalizedText,
+    text: parsedResponse.data.text,
     tokensUsed: completion.usage?.total_tokens ?? 0,
   };
 }

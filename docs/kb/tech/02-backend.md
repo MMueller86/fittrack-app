@@ -146,6 +146,12 @@ trimmed and limited to 750 characters at every backend contract boundary. A
 provider response with `finish_reason: 'length'` is treated as unavailable, is
 stored with `evaluation.text: null`, and does not consume quota.
 
+WeeklyInsight cache reads use `response.status` and `response.generatedAt` as
+the canonical fields. The top-level `status` and `generatedAt` remain optional
+legacy fields and are dual-written during the compatibility rollout, so old
+documents and rollbacks remain readable without a migration or a container or
+partition-key change.
+
 ## Import Rules
 
 [Rule] Value imports from `@fittrack/shared` compile to `require('@fittrack/shared')` in output JS. At runtime, Node cannot execute `shared/index.ts`, causing `ERR_MODULE_NOT_FOUND`.

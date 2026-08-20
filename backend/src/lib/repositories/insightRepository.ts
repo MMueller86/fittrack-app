@@ -41,8 +41,8 @@ export interface WeeklyInsightDocument {
   promptVersion: string;
   model: string;
   response: WeeklyEvaluation;
-  status: WeeklyInsightStoredStatus;
-  generatedAt: string | null;
+  status?: WeeklyInsightStoredStatus;
+  generatedAt?: string | null;
   lastAttemptAt: string;
   expiresAt: string;
   ttl: number;
@@ -263,7 +263,7 @@ export class CosmosInsightRepository implements InsightRepository {
     const { resources } = await containers.aiInsights.items
       .query<InsightDocument>({
         query:
-          'SELECT * FROM c WHERE c.userId = @userId AND c.date >= @cutoffDate AND c.date <= @refDate ORDER BY c.date DESC',
+          "SELECT * FROM c WHERE c.userId = @userId AND c.date >= @cutoffDate AND c.date <= @refDate AND (NOT IS_DEFINED(c._docType) OR c._docType != 'weeklyInsight') ORDER BY c.date DESC",
         parameters: [
           { name: '@userId', value: userId },
           { name: '@cutoffDate', value: cutoffIso },

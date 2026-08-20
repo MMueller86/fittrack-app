@@ -25,7 +25,7 @@ const palette = {
   warning: '#F59E0B',
   negative: '#E26B6B',
   neutral: '#A6B0A4',
-  specialActivityOutline: '#C4A1FF', // Reserved for the later special-activity badge outline.
+  specialActivityOutline: '#C4A1FF', // Lila Akzentfarbe fuer Sonderaktivitaetsmarker.
 
   white: '#FFFFFF',
 } as const;

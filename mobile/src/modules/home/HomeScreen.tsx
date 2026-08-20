@@ -85,7 +85,6 @@ export default function HomeScreen({ navigation }: Props) {
   // Insight — null = loading (shows skeleton), InsightResponse = content arrived
   const [insight, setInsight] = useState<InsightResponse | null>(null);
   const [weeklyReview, setWeeklyReview] = useState<WeeklyNutritionReviewResponse | null>(null);
-  const [weeklyLoading, setWeeklyLoading] = useState(true);
   const [weeklyError, setWeeklyError] = useState(false);
   const weeklyRequestId = useRef(0);
 
@@ -145,7 +144,6 @@ export default function HomeScreen({ navigation }: Props) {
   const loadWeeklyReview = useCallback(async () => {
     const requestId = ++weeklyRequestId.current;
     const referenceDate = getLocalIsoDate();
-    setWeeklyLoading(true);
     setWeeklyError(false);
 
     try {
@@ -155,8 +153,6 @@ export default function HomeScreen({ navigation }: Props) {
     } catch {
       if (requestId !== weeklyRequestId.current) return;
       setWeeklyError(true);
-    } finally {
-      if (requestId === weeklyRequestId.current) setWeeklyLoading(false);
     }
   }, []);
 
@@ -320,7 +316,6 @@ export default function HomeScreen({ navigation }: Props) {
 
         <WeeklyReviewCard
           review={weeklyReview}
-          loading={weeklyLoading}
           error={weeklyError}
           onRetry={loadWeeklyReview}
           onOpenDiary={openDiaryDay}

@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { generateWeeklyInsight } from '../openai';
-import { WEEKLY_INSIGHT_TEXT_MAX_LENGTH } from '../weeklyInsightContract';
-import { WEEKLY_INSIGHT_PROMPT_VERSION } from './weeklyInsightV1';
+import { WEEKLY_INSIGHT_PROMPT_VERSION, WEEKLY_INSIGHT_TEXT_MAX_LENGTH } from './weeklyInsightV2';
 import { WEEKLY_INSIGHT_EVAL_FIXTURES } from './weeklyInsight.eval.fixtures';
 
 /** Update this constant whenever WEEKLY_INSIGHT_PROMPT_VERSION changes and re-review the fixtures. */

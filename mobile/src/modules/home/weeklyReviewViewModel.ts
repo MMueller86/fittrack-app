@@ -75,7 +75,6 @@ export interface WeeklyReviewDayMacroSummary {
 
 export interface WeeklyReviewDayOverlayDetails {
   title: string;
-  body: string;
   detailGroups: WeeklyReviewDayDetailGroup[];
   calorieSummary: WeeklyReviewDayCalorieSummary;
   macroSummary: WeeklyReviewDayMacroSummary;
@@ -121,6 +120,16 @@ export interface WeeklyReviewViewModel {
   totalTargetLabel: string | null;
   overallPercentLabel: string | null;
   overallTargetBand: WeeklyTargetBand | null;
+}
+
+export type WeeklyReviewErrorState = 'none' | 'initial' | 'stale';
+
+export function getWeeklyReviewErrorState(
+  hasReview: boolean,
+  hasError: boolean,
+): WeeklyReviewErrorState {
+  if (!hasError) return 'none';
+  return hasReview ? 'stale' : 'initial';
 }
 
 function formatInteger(value: number): string {
@@ -215,7 +224,11 @@ const SPECIAL_ACTIVITY_FALLBACK_MARKER: WeeklyReviewDayMarker = {
 };
 
 function getActivityMarker(day: WeeklyNutritionDay): WeeklyReviewDayMarker | null {
-  if (!day.activity) return null;
+  if (!day.activity) {
+    return day.activityBonusCalories != null && day.activityBonusCalories > 0
+      ? SPECIAL_ACTIVITY_FALLBACK_MARKER
+      : null;
+  }
   if (day.activity.type === 'cycling') {
     return {
       kind: 'activity',
@@ -351,7 +364,6 @@ export function formatWeeklyReviewDayOverlay(day: WeeklyNutritionDay): WeeklyRev
 
   return {
     title: `${dateParts.weekdayLabel} ${dateParts.dateLabel}`,
-    body: '',
     detailGroups,
     calorieSummary,
     macroSummary,
