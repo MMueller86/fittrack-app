@@ -12,6 +12,10 @@ import {
   hasExplicitDayContext,
   resolveHistoricalTarget,
 } from '../../../shared/lib/weeklyReviewCalculator';
+import {
+  calculateWeightTrendPerWeek,
+  classifyWeightTrend,
+} from '../../../shared/lib/weightTrend';
 import { computeProgressIntelligence } from './progressIntelligence';
 import { getDiaryRepository, type DiaryRepository, type DiaryDayResult } from './repositories/diaryRepository';
 import { getDayMetaRepository, type DayMetaRepository } from './repositories/dayMetaRepository';
@@ -147,16 +151,6 @@ function toHistoricalNutritionDay(
   };
 }
 
-function computeWeightTrend7d(values: number[]): InsightWeightContext['trend7d'] {
-  if (values.length < 3) return null;
-  const recent = values.slice(0, 3).reduce((sum, value) => sum + value, 0) / 3;
-  const older = values.slice(-3).reduce((sum, value) => sum + value, 0) / 3;
-  const difference = recent - older;
-  if (difference > 0.3) return 'gaining';
-  if (difference < -0.3) return 'losing';
-  return 'stable';
-}
-
 function isOutlier(candidate: number, values: number[]): boolean {
   if (values.length < 3) return false;
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -197,6 +191,12 @@ export async function buildDailyInsightContext(
   );
 
   const last7Values = weightEntries.slice(0, 7).map((entry) => entry.value);
+  const trendReferenceDate = new Date(`${input.date}T12:00:00.000Z`);
+  const weeklyTrend30d = classifyWeightTrend(calculateWeightTrendPerWeek(
+    weightEntries,
+    'kg',
+    trendReferenceDate,
+  ));
   const lastWeightDate = weightEntries[0]?.date ?? null;
   const daysSinceLastMeasurement = lastWeightDate == null
     ? null
@@ -254,7 +254,7 @@ export async function buildDailyInsightContext(
       latestKg: isWeightStale ? null : (last7Values[0] ?? null),
       previousKg: isWeightStale ? null : (last7Values[1] ?? null),
       targetKg: profile?.targetWeightKg ?? null,
-      trend7d: isWeightStale ? null : computeWeightTrend7d(last7Values),
+      weeklyTrend30d: isWeightStale ? null : weeklyTrend30d,
       last7Values: isWeightStale ? [] : last7Values,
       isOutlierPrevious: isWeightStale || last7Values[1] == null
         ? false

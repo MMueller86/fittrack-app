@@ -101,6 +101,11 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `WeightUnit` — `'kg' | 'lbs'`
 - `WeightEntry` — date-stamped weight measurement
 
+### `weightTrend.ts`
+- `calculateWeightTrendPerWeek` — linear regression over the last 30 calendar days, projected to a weekly change
+- `classifyWeightTrend` — shared `gaining | losing | stable` classification using the chart thresholds
+- Used by both the mobile weight chart and the backend Daily Insight context
+
 ### `hint.ts`
 - `HintId` — `H1`–`H28` situational hints + `M0`–`M9` motivational hints
 - `HintCategory` — `'orientation' | 'daycontext' | 'positive' | 'motivation'`
@@ -110,7 +115,7 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 ### `insight.ts`
 - `InsightStatus` — `'fresh' | 'cached' | 'quota_exceeded' | 'unavailable'`
 - `InsightResponse` — daily AI briefing payload
-- `InsightWeightContext` — weight data sent to the AI; includes `latestKg`, `previousKg`, `targetKg`, `trend7d`, `last7Values`, `isOutlierPrevious`, `isOutlierLatest`, `daysSinceLastMeasurement`, `lastMeasurementDate: string | null` (ISO date of last measurement)
+- `InsightWeightContext` — weight data sent to the AI; includes `latestKg`, `previousKg`, `targetKg`, the 30-day regression direction projected per week as `weeklyTrend30d`, `last7Values`, `isOutlierPrevious`, `isOutlierLatest`, `daysSinceLastMeasurement`, `lastMeasurementDate: string | null` (ISO date of last measurement)
 - `InsightNutritionDay`, `InsightInputContext` — AI input context
 
 ### `aiMealEstimate.ts`

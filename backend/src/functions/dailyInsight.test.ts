@@ -35,6 +35,11 @@ import { selectInsightIntent } from '../lib/dailyInsightIntent';
 import type { InsightDocument, InsightInputContext, InsightResponse } from '@fittrack/shared';
 import { DAILY_INSIGHT_PROMPT_VERSION, generateDailyInsight } from '../lib/openai';
 import type { GenerateInsightResult } from '../lib/openai';
+import {
+  buildDailyInsightPrompt,
+  computeDailyInsightSystemPromptHash,
+  DAILY_INSIGHT_PROMPT_FINGERPRINT,
+} from '../lib/prompts/dailyInsightPrompt';
 import { DailyInsightValidationError } from '../lib/dailyInsightValidation';
 import {
   makeAuthRequest,
@@ -96,7 +101,7 @@ function makeInputContext(): InsightInputContext {
       latestKg: 80,
       previousKg: 80.5,
       targetKg: 78,
-      trend7d: 'losing',
+      weeklyTrend30d: 'losing',
       last7Values: [80, 80.5],
       isOutlierPrevious: false,
       isOutlierLatest: false,
@@ -153,9 +158,6 @@ function makeGenerationResult(overrides: Partial<GenerateInsightResult> = {}): G
     response: {
       title: 'Dein Fokus heute',
       summary: 'Dein Tag entwickelt sich in die richtige Richtung.',
-      recommendation: null,
-      cta: null,
-      ctaTarget: null,
     },
     tokensUsed: 17,
     intent: 'phase_progress',
@@ -168,7 +170,10 @@ function makeDaily(
   context: InsightInputContext,
   overrides: Partial<InsightDocument> = {},
 ): InsightDocument {
-  const intent = selectInsightIntent(context);
+  const normalizedContext = { ...context, timezoneOffsetMinutes: context.timezoneOffsetMinutes ?? null };
+  const intent = selectInsightIntent(normalizedContext);
+  const promptSnapshot = buildDailyInsightPrompt(intent, normalizedContext);
+  const systemPromptHash = computeDailyInsightSystemPromptHash(promptSnapshot.system);
   return {
     _docType: 'dailyInsight',
     id: `${TEST_USER_ID}:${DATE}`,
@@ -178,11 +183,19 @@ function makeDaily(
     expiresAt: '2026-08-21T00:00:00.000Z',
     ttl: 3600,
     promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
+    promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
+    systemPromptHash,
     intent,
-    promptSnapshot: { system: 'server system prompt', user: JSON.stringify({ intent }) },
+    promptSnapshot,
     model: 'gpt4o-mini',
-    inputHash: computeInputHash(context, DAILY_INSIGHT_PROMPT_VERSION, intent),
-    inputContext: context,
+    inputHash: computeInputHash(
+      normalizedContext,
+      DAILY_INSIGHT_PROMPT_VERSION,
+      intent,
+      DAILY_INSIGHT_PROMPT_FINGERPRINT,
+      systemPromptHash,
+    ),
+    inputContext: normalizedContext,
     response: makeResponse(),
     dailyGenerations: 1,
     lastGeneratedAt: GENERATED_AT,
@@ -191,6 +204,43 @@ function makeDaily(
     intelligenceVersion: 'v1',
     ...overrides,
   };
+}
+
+function getIdentityMismatch(
+  identity: 'intent' | 'system' | 'user',
+  current: InsightDocument,
+): Partial<InsightDocument> {
+  if (identity === 'intent') return { intent: 'general' };
+
+  const promptSnapshot = current.promptSnapshot!;
+  return {
+    promptSnapshot: identity === 'system'
+      ? { ...promptSnapshot, system: `${promptSnapshot.system} changed` }
+      : { ...promptSnapshot, user: `${promptSnapshot.user} changed` },
+  };
+}
+
+async function expectFreshForIdentityMismatch(
+  identity: 'intent' | 'system' | 'user',
+  lastGeneratedAt: string,
+  dailyGenerations: number,
+): Promise<void> {
+  const context = makeInputContext();
+  const current = makeDaily(context);
+  await getInsightRepository().upsert(makeDaily(context, {
+    ...getIdentityMismatch(identity, current),
+    inputHash: current.inputHash,
+    lastGeneratedAt,
+    dailyGenerations,
+  }));
+
+  const response = await dailyInsightHandler(
+    await makeDailyRequest(),
+    makeContext(),
+  );
+
+  expect(response.jsonBody).toMatchObject({ status: 'fresh', feedbackAvailable: true });
+  expect(generateDailyInsight).toHaveBeenCalledTimes(1);
 }
 
 async function makeDailyRequest(query: Record<string, string> = { date: DATE }) {
@@ -344,6 +394,67 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     });
   });
 
+  it('hard-invalidates a current-version Daily missing prompt identities despite cache limits', async () => {
+    const context = makeInputContext();
+    await getInsightRepository().upsert(makeDaily(context, {
+      promptFingerprint: undefined,
+      systemPromptHash: undefined,
+      dailyGenerations: 3,
+      lastGeneratedAt: new Date().toISOString(),
+      response: makeResponse({ title: 'Unvollständige alte Analyse' }),
+    }));
+
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({ status: 'fresh', feedbackAvailable: true });
+    expect((response.jsonBody as InsightResponse).title).not.toBe('Unvollständige alte Analyse');
+    expect(generateDailyInsight).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['intent', 'system', 'user'] as const)(
+    'hard-invalidates a current Daily with a mismatched %s snapshot identity during the recent-cache interval',
+    async (identity) => {
+      await expectFreshForIdentityMismatch(
+        identity,
+        new Date(Date.now() - MIN_REGEN_INTERVAL_MS + 60_000).toISOString(),
+        1,
+      );
+    },
+  );
+
+  it.each(['intent', 'system', 'user'] as const)(
+    'hard-invalidates a current Daily with a mismatched %s snapshot identity at the generation limit',
+    async (identity) => {
+      await expectFreshForIdentityMismatch(
+        identity,
+        new Date(Date.now() - MIN_REGEN_INTERVAL_MS - 1_000).toISOString(),
+        3,
+      );
+    },
+  );
+
+  it('serves an unchanged complete current identity from cache despite cache limits', async () => {
+    const context = makeInputContext();
+    const current = makeDaily(context, {
+      dailyGenerations: 3,
+      lastGeneratedAt: new Date().toISOString(),
+    });
+    await getInsightRepository().upsert(current);
+
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(),
+      makeContext(),
+    );
+
+    expect(response.jsonBody).toMatchObject({ status: 'cached', feedbackAvailable: true });
+    expect(generateDailyInsight).not.toHaveBeenCalled();
+    expect(quotaCheckMock).not.toHaveBeenCalled();
+  });
+
   it('returns HTTP 200 unavailable when context construction fails without quota or persistence side effects', async () => {
     vi.mocked(buildDailyInsightContext).mockRejectedValue(new Error('context unavailable'));
 
@@ -492,6 +603,8 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       userId: TEST_USER_ID,
       date: DATE,
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
+      promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
+      systemPromptHash: expect.any(String),
       intent: 'phase_progress',
       inputContext: makeInputContext(),
       response: {
@@ -504,6 +617,28 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       },
       tokensUsed: 42,
     });
+  });
+
+  it('does not advertise feedback when persistence fails after a valid generation', async () => {
+    const repository = getInsightRepository();
+    vi.spyOn(repository, 'upsert').mockRejectedValue(new Error('storage unavailable'));
+
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({
+      status: 'fresh',
+      promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
+      feedbackAvailable: false,
+    });
+    expect(trackUsageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: TEST_USER_ID }),
+      'daily-insight',
+    );
+    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toBeNull();
   });
 
   it('persists an explicitly stale-marked response and tracks usage normally', async () => {
@@ -521,9 +656,6 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       response: {
         title: 'Gewichtsdaten im Blick',
         summary: 'Deine Gewichtsdaten sind veraltet. Ein neuer Eintrag würde die Analyse verbessern.',
-        recommendation: null,
-        cta: null,
-        ctaTarget: null,
       },
     }));
 

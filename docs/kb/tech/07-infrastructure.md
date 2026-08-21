@@ -68,6 +68,36 @@ omit both `ttl` and `expiresAt`, so they are not automatically deleted. They
 remain available for later analysis until a manual database cleanup, which is
 an operational follow-up outside the feature.
 
+### One-off Daily Insight snapshot migration
+
+The Class 3 rename of the persisted weight trend key is handled by the
+one-off script `backend/scripts/migrate-insight-weight-trend.mjs`. It requires
+`COSMOS_ENDPOINT` and `COSMOS_KEY` from the operator environment and uses
+`COSMOS_DATABASE_ID` when supplied, defaulting to `fittrack-db`. No credential
+is embedded in the script or repository.
+
+The script pages through Daily and feedback documents in `aiInsights`, patches
+the legacy nested trend key to `inputContext.weight.weeklyTrend30d`, and never
+deletes and recreates a document. It preserves IDs, partition keys,
+discriminators, Daily `ttl`/`expiresAt`, and feedback fields. Weekly documents
+are excluded. Documents without the legacy key are counted as skipped. A
+document containing both keys with the same value is also skipped; differing
+values are reported as conflicts and are never overwritten.
+
+Each run prints `scanned`, `migrated`, `skipped`, `conflict`, and `failed`
+counts. A non-zero `conflict` or `failed` count causes a non-zero process exit;
+write failures are reported with their document ID. Resolve every conflict
+before considering the run successful. The migration is safe to repeat after
+the backend with the new field is deployed: migrated documents become
+skipped, and a clean repeat has zero writes.
+
+Infrastructure runs and validates the migration against the Dev Cosmos
+environment first, then runs it separately against Alpha after the explicit
+Alpha release command. Contract coverage uses only the local Cosmos emulator;
+the migration must never target a real account during tests. No Bicep,
+container, partition-key, or application dual-read/dual-write change is part
+of this migration.
+
 The existing authorized administrative/operational direct-read access may read
 feedback snapshots directly from this container. This feature introduces no
 new application role, permission model, Admin UI, read endpoint, or cleanup

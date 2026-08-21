@@ -10,6 +10,7 @@ import {
 } from '../lib/repositories/insightRepository';
 import type {
   InsightFeedbackDocument,
+  InsightFeedbackProcessingStatus,
   InsightFeedbackRequest,
   InsightFeedbackResponse,
 } from '@fittrack/shared';
@@ -41,6 +42,12 @@ const FeedbackRequestSchema = z.object({
   userComment: z.string().trim().min(1, 'must not be empty').max(500, 'must be at most 500 characters'),
 }).strict();
 
+const FeedbackStatusUpdateRequestSchema = z.object({
+  userId: z.string().trim().min(1, 'must not be empty'),
+  feedbackId: z.string().trim().min(1, 'must not be empty'),
+  processingStatus: z.enum(['Open', 'Done', 'Rejected']),
+}).strict();
+
 function errorResponse(status: 404 | 409, code: string): HttpResponseInit {
   return { status, jsonBody: { code } };
 }
@@ -65,6 +72,7 @@ function makeFeedbackDocument(
     id: makeFeedbackId(userId, request.submissionId),
     userId,
     _docType: 'insightFeedback',
+    processingStatus: 'Open',
     insightId: insight.id,
     date: insight.date,
     insightGeneratedAt: insight.generatedAt,
@@ -75,6 +83,8 @@ function makeFeedbackDocument(
     response: insight.response,
     promptSnapshot: insight.promptSnapshot,
     promptVersion: insight.promptVersion,
+    promptFingerprint: insight.promptFingerprint,
+    systemPromptHash: insight.systemPromptHash,
     intent: insight.intent,
     inputContext: insight.inputContext,
     inputHash: insight.inputHash,
@@ -82,6 +92,13 @@ function makeFeedbackDocument(
     intelligenceVersion: insight.intelligenceVersion,
     tokensUsed: insight.tokensUsed,
   };
+}
+
+interface InsightFeedbackStatusUpdateResponse {
+  userId: string;
+  feedbackId: string;
+  processingStatus: InsightFeedbackProcessingStatus;
+  changed: boolean;
 }
 
 export const dailyInsightFeedbackHandler = withHandler(
@@ -152,9 +169,57 @@ export const dailyInsightFeedbackHandler = withHandler(
   },
 );
 
+export const dailyInsightFeedbackStatusUpdateHandler = withHandler(
+  'ai.daily-insight.feedback.status-update',
+  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const auth = await requireUser(request);
+    if (!auth.isAdmin) {
+      return { status: 403, jsonBody: { error: 'Forbidden' } };
+    }
+
+    const parsed = await parseBody(request, FeedbackStatusUpdateRequestSchema);
+    if (!parsed.ok) return parsed.response;
+
+    const { userId, feedbackId, processingStatus } = parsed.data;
+    const result = await getInsightRepository().updateFeedbackProcessingStatus(
+      userId,
+      feedbackId,
+      processingStatus,
+    );
+
+    if (result.outcome === 'not_found') {
+      return { status: 404, jsonBody: { code: 'feedback_not_found' } };
+    }
+    if (result.outcome === 'invalid_transition') {
+      return {
+        status: 409,
+        jsonBody: {
+          code: 'feedback_status_transition_forbidden',
+          processingStatus: result.status,
+        },
+      };
+    }
+
+    const response: InsightFeedbackStatusUpdateResponse = {
+      userId,
+      feedbackId,
+      processingStatus: result.status,
+      changed: result.outcome === 'updated',
+    };
+    return { status: 200, jsonBody: response };
+  },
+);
+
 app.http('daily-insight-feedback', {
   methods: ['POST'],
   authLevel: 'anonymous',
   route: 'ai/daily-insight/feedback',
   handler: dailyInsightFeedbackHandler,
+});
+
+app.http('daily-insight-feedback-status', {
+  methods: ['PATCH'],
+  authLevel: 'anonymous',
+  route: 'ai/daily-insight/feedback/status',
+  handler: dailyInsightFeedbackStatusUpdateHandler,
 });

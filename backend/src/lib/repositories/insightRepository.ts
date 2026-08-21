@@ -11,8 +11,10 @@ import { createHash } from 'node:crypto';
 import type {
   InsightDocument,
   InsightFeedbackDocument,
+  InsightFeedbackProcessingStatus,
   InsightIntent,
   InsightInputContext,
+  InsightPromptSnapshot,
   WeeklyEvaluation,
   WeeklyEvaluationStatus,
 } from '@fittrack/shared';
@@ -28,6 +30,36 @@ function stripCosmosSystemFields<T extends object>(document: T): T {
   }
   return cleanDocument as T;
 }
+
+export const DEFAULT_FEEDBACK_PROCESSING_STATUS: InsightFeedbackProcessingStatus = 'Open';
+
+export function getEffectiveFeedbackProcessingStatus(
+  document: Pick<InsightFeedbackDocument, 'processingStatus'>,
+): InsightFeedbackProcessingStatus {
+  return document.processingStatus ?? DEFAULT_FEEDBACK_PROCESSING_STATUS;
+}
+
+function normalizeFeedbackDocument(document: InsightFeedbackDocument): InsightFeedbackDocument {
+  return {
+    ...document,
+    processingStatus: getEffectiveFeedbackProcessingStatus(document),
+  };
+}
+
+function canTransitionFeedbackProcessingStatus(
+  current: InsightFeedbackProcessingStatus,
+  next: InsightFeedbackProcessingStatus,
+): boolean {
+  if (current === next) return true;
+  if (current !== 'Open') return false;
+  return next === 'Done' || next === 'Rejected';
+}
+
+export type UpdateFeedbackProcessingStatusResult =
+  | { outcome: 'updated'; status: InsightFeedbackProcessingStatus }
+  | { outcome: 'noop'; status: InsightFeedbackProcessingStatus }
+  | { outcome: 'invalid_transition'; status: InsightFeedbackProcessingStatus }
+  | { outcome: 'not_found' };
 
 // ---------------------------------------------------------------------------
 // Cache constants
@@ -130,6 +162,25 @@ export function getLocalHourBucket(hour: number | null): string | null {
   return 'late';
 }
 
+export type RemainingCaloriesBucket = 'unknown' | 'negative' | 'zero' | 'positive';
+export type RemainingProteinBucket = 'unknown' | 'nearly_complete_below' | 'nearly_complete_at' | 'gap';
+
+/** Preserve the semantic zero boundary that numeric rounding would otherwise erase. */
+export function getRemainingCaloriesBucket(value: number | null | undefined): RemainingCaloriesBucket {
+  if (value == null || !Number.isFinite(value)) return 'unknown';
+  if (value < 0) return 'negative';
+  if (value > 0) return 'positive';
+  return 'zero';
+}
+
+/** Preserve the prompt's 20 g protein boundary while retaining null as unknown. */
+export function getRemainingProteinBucket(value: number | null | undefined): RemainingProteinBucket {
+  if (value == null || !Number.isFinite(value)) return 'unknown';
+  if (value < 20) return 'nearly_complete_below';
+  if (value === 20) return 'nearly_complete_at';
+  return 'gap';
+}
+
 /**
  * Compute a stable hash of the insight input context.
  * Uses rounded values so minor fluctuations (< 100 kcal, < 10g protein,
@@ -142,6 +193,8 @@ export function computeInputHash(
   ctx: InsightInputContext,
   promptVersion: string,
   intent: InsightIntent | null = null,
+  promptFingerprint: string | null = null,
+  systemPromptHash: string | null = null,
 ): string {
   const roundCalories = (value: number | null | undefined): number | null =>
     value == null ? null : Math.round(value / 100);
@@ -153,6 +206,8 @@ export function computeInputHash(
   const stable = {
     promptVersion,
     intent,
+    promptFingerprint: promptFingerprint ?? null,
+    systemPromptHash: systemPromptHash ?? null,
     date: ctx.date,
     timezoneOffsetMinutes: normalizeTimezoneOffsetMinutes(ctx.timezoneOffsetMinutes),
     dayType: ctx.dayType,
@@ -170,7 +225,7 @@ export function computeInputHash(
       latestKg: roundWeight(ctx.weight.latestKg),
       previousKg: roundWeight(ctx.weight.previousKg),
       targetKg: roundWeight(ctx.weight.targetKg),
-      trend7d: ctx.weight.trend7d,
+      weeklyTrend30d: ctx.weight.weeklyTrend30d,
       last7Values: ctx.weight.last7Values.map(roundWeight),
       isOutlierPrevious: ctx.weight.isOutlierPrevious,
       isOutlierLatest: ctx.weight.isOutlierLatest,
@@ -202,6 +257,8 @@ export function computeInputHash(
         : null,
       remainingCalories: roundCalories(ctx.nutrition.remainingCalories),
       remainingProteinG: roundMacro(ctx.nutrition.remainingProteinG),
+      remainingCaloriesBucket: getRemainingCaloriesBucket(ctx.nutrition.remainingCalories),
+      remainingProteinBucket: getRemainingProteinBucket(ctx.nutrition.remainingProteinG),
       last3Days: ctx.nutrition.last3Days.map((day) => ({
         date: day.date,
         calories: roundCalories(day.calories),
@@ -248,20 +305,47 @@ export function shouldRegenerate(
   now: Date,
   isAdmin: boolean,
   activePromptVersion?: string,
+  activePromptFingerprint?: string,
+  activeSystemPromptHash?: string,
+  activeIntent?: InsightIntent,
+  activePromptSnapshot?: InsightPromptSnapshot,
 ): boolean {
   if (!cached) return true;
 
+  if (activePromptVersion != null && cached.promptVersion !== activePromptVersion) {
+    return true;
+  }
+  if (activePromptVersion != null && (cached.intent == null || cached.promptSnapshot == null)) {
+    return true;
+  }
+
+  // Prompt identities are hard invalidation gates. Missing legacy values are
+  // intentionally treated as mismatches when the active identity is known.
   if (
-    activePromptVersion != null
+    activePromptFingerprint != null
+    && cached.promptFingerprint !== activePromptFingerprint
+  ) {
+    return true;
+  }
+  if (
+    activeSystemPromptHash != null
+    && cached.systemPromptHash !== activeSystemPromptHash
+  ) {
+    return true;
+  }
+  if (activeIntent != null && cached.intent !== activeIntent) {
+    return true;
+  }
+  if (
+    activePromptSnapshot != null
     && (
-      cached.promptVersion !== activePromptVersion
-      || cached.intent == null
-      || cached.promptSnapshot == null
+      cached.promptSnapshot == null
+      || cached.promptSnapshot.system !== activePromptSnapshot.system
+      || cached.promptSnapshot.user !== activePromptSnapshot.user
     )
   ) {
     return true;
   }
-
   // Hash unchanged → serve cache as-is
   if (cached.inputHash === newHash) return false;
 
@@ -312,6 +396,12 @@ export interface InsightRepository {
     created: boolean;
     document: InsightFeedbackDocument;
   }>;
+  /** Update processing status with exact partition/id + discriminator guard and terminal-state semantics. */
+  updateFeedbackProcessingStatus(
+    userId: string,
+    feedbackId: string,
+    nextStatus: InsightFeedbackProcessingStatus,
+  ): Promise<UpdateFeedbackProcessingStatusResult>;
   /** Mark the exact Daily instance as negatively reviewed without changing its identity. */
   markNegativeFeedback(userId: string, date: string, insightGeneratedAt: string): Promise<boolean>;
   /** List recent insight documents (newest first) within the last N calendar days up to and including referenceDate. */
@@ -351,18 +441,41 @@ export class InMemoryInsightRepository implements InsightRepository {
 
   async getFeedbackBySubmissionId(userId: string, submissionId: string): Promise<InsightFeedbackDocument | null> {
     const document = this.feedbackDocs.get(makeFeedbackId(userId, submissionId));
-    return document?._docType === 'insightFeedback' ? document : null;
+    return document?._docType === 'insightFeedback' ? normalizeFeedbackDocument(document) : null;
   }
 
   async createFeedbackIfAbsent(doc: InsightFeedbackDocument): Promise<{
     created: boolean;
     document: InsightFeedbackDocument;
   }> {
-    const key = makeFeedbackId(doc.userId, doc.submissionId);
+    const normalized = normalizeFeedbackDocument(doc);
+    const key = makeFeedbackId(normalized.userId, normalized.submissionId);
     const existing = this.feedbackDocs.get(key);
-    if (existing) return { created: false, document: existing };
-    this.feedbackDocs.set(key, doc);
-    return { created: true, document: doc };
+    if (existing) return { created: false, document: normalizeFeedbackDocument(existing) };
+    this.feedbackDocs.set(key, normalized);
+    return { created: true, document: normalized };
+  }
+
+  async updateFeedbackProcessingStatus(
+    userId: string,
+    feedbackId: string,
+    nextStatus: InsightFeedbackProcessingStatus,
+  ): Promise<UpdateFeedbackProcessingStatusResult> {
+    const existing = this.feedbackDocs.get(feedbackId);
+    if (!existing || existing.userId !== userId || existing._docType !== 'insightFeedback') {
+      return { outcome: 'not_found' };
+    }
+
+    const currentStatus = getEffectiveFeedbackProcessingStatus(existing);
+    if (!canTransitionFeedbackProcessingStatus(currentStatus, nextStatus)) {
+      return { outcome: 'invalid_transition', status: currentStatus };
+    }
+    if (currentStatus === nextStatus) {
+      return { outcome: 'noop', status: currentStatus };
+    }
+
+    existing.processingStatus = nextStatus;
+    return { outcome: 'updated', status: nextStatus };
   }
 
   async markNegativeFeedback(userId: string, date: string, insightGeneratedAt: string): Promise<boolean> {
@@ -443,7 +556,9 @@ export class CosmosInsightRepository implements InsightRepository {
     const id = makeFeedbackId(userId, submissionId);
     try {
       const { resource } = await containers.aiInsights.item(id, userId).read<InsightFeedbackDocument>();
-      return resource?._docType === 'insightFeedback' ? stripCosmosSystemFields(resource) : null;
+      return resource?._docType === 'insightFeedback'
+        ? normalizeFeedbackDocument(stripCosmosSystemFields(resource))
+        : null;
     } catch (e) {
       if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
         return null;
@@ -457,16 +572,79 @@ export class CosmosInsightRepository implements InsightRepository {
     document: InsightFeedbackDocument;
   }> {
     const { containers } = await getCosmos();
+    const normalized = normalizeFeedbackDocument(doc);
     try {
-      const { resource } = await containers.aiInsights.items.create<InsightFeedbackDocument>(doc);
-      return { created: true, document: stripCosmosSystemFields(resource ?? doc) };
+      const { resource } = await containers.aiInsights.items.create<InsightFeedbackDocument>(normalized);
+      return { created: true, document: normalizeFeedbackDocument(stripCosmosSystemFields(resource ?? normalized)) };
     } catch (e) {
       if (!(typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 409)) {
         throw e;
       }
-      const existing = await this.getFeedbackBySubmissionId(doc.userId, doc.submissionId);
+      const existing = await this.getFeedbackBySubmissionId(normalized.userId, normalized.submissionId);
       if (!existing) throw e;
       return { created: false, document: existing };
+    }
+  }
+
+  async updateFeedbackProcessingStatus(
+    userId: string,
+    feedbackId: string,
+    nextStatus: InsightFeedbackProcessingStatus,
+  ): Promise<UpdateFeedbackProcessingStatusResult> {
+    const { containers } = await getCosmos();
+    const item = containers.aiInsights.item(feedbackId, userId);
+
+    const readFeedback = async (): Promise<InsightFeedbackDocument | null> => {
+      try {
+        const { resource } = await item.read<InsightFeedbackDocument>();
+        if (!resource || resource._docType !== 'insightFeedback') return null;
+        return normalizeFeedbackDocument(stripCosmosSystemFields(resource));
+      } catch (e) {
+        if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
+          return null;
+        }
+        throw e;
+      }
+    };
+
+    const current = await readFeedback();
+    if (!current) return { outcome: 'not_found' };
+
+    const currentStatus = getEffectiveFeedbackProcessingStatus(current);
+    if (!canTransitionFeedbackProcessingStatus(currentStatus, nextStatus)) {
+      return { outcome: 'invalid_transition', status: currentStatus };
+    }
+    if (currentStatus === nextStatus) {
+      return { outcome: 'noop', status: currentStatus };
+    }
+
+    const expectedStatusCondition = currentStatus === 'Open'
+      ? "(NOT IS_DEFINED(c.processingStatus) OR c.processingStatus = 'Open')"
+      : `c.processingStatus = ${JSON.stringify(currentStatus)}`;
+    const condition = `FROM c WHERE c._docType = 'insightFeedback' AND ${expectedStatusCondition}`;
+
+    try {
+      await item.patch({
+        operations: [{ op: 'set', path: '/processingStatus', value: nextStatus }],
+        condition,
+      });
+      return { outcome: 'updated', status: nextStatus };
+    } catch (e) {
+      if (
+        typeof e === 'object'
+        && e !== null
+        && 'code' in e
+        && [404, 412].includes((e as { code?: number }).code ?? 0)
+      ) {
+        const refreshed = await readFeedback();
+        if (!refreshed) return { outcome: 'not_found' };
+        const refreshedStatus = getEffectiveFeedbackProcessingStatus(refreshed);
+        if (refreshedStatus === nextStatus) return { outcome: 'noop', status: refreshedStatus };
+        if (!canTransitionFeedbackProcessingStatus(refreshedStatus, nextStatus)) {
+          return { outcome: 'invalid_transition', status: refreshedStatus };
+        }
+      }
+      throw e;
     }
   }
 

@@ -5,7 +5,7 @@ import {
   DAILY_INSIGHT_SCHEMA,
   generateDailyInsight,
 } from './openai';
-import { buildDailyInsightPrompt } from './prompts/dailyInsightV10';
+import { buildDailyInsightPrompt } from './prompts/dailyInsightPrompt';
 
 function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInputContext {
   return {
@@ -16,7 +16,7 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
       latestKg: null,
       previousKg: null,
       targetKg: null,
-      trend7d: null,
+      weeklyTrend30d: null,
       last7Values: [],
       isOutlierPrevious: false,
       isOutlierLatest: false,
@@ -154,7 +154,7 @@ describe('generateDailyInsight', () => {
         ...baseContext.weight,
         latestKg: 80,
         previousKg: 80.2,
-        trend7d: 'losing' as const,
+        weeklyTrend30d: 'losing' as const,
         last7Values: [80, 80.2, 80.4],
         daysSinceLastMeasurement: 15,
         lastMeasurementDate: '2026-08-05',

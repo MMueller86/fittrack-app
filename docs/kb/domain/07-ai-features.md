@@ -229,13 +229,31 @@ represented as UTC. The Cosmos `ttl` is the ceiling of the remaining seconds.
 The normalized offset is part of the input hash, so a changed normalized offset
 follows the normal cache regeneration rules.
 
-### v11 prompt, output, and failure contract
+### v14 prompt, output, and failure contract
 
-`DAILY_INSIGHT_PROMPT_VERSION = 'v11'`. The selected focused module is combined
+`DAILY_INSIGHT_PROMPT_VERSION = 'v14'`. The selected focused module is combined
 with the shared German tone/output contract. The backend stores the exact
 `promptSnapshot.system` and serialized `promptSnapshot.user` sent to Azure
 OpenAI. Strict Structured Outputs use `json_schema`, `strict: true`, required
 properties, nullable optional values, and `additionalProperties: false`.
+
+The active composition root is `backend/src/lib/prompts/dailyInsightPrompt.ts`.
+The shared Strict Structured Output schema is defined in
+`backend/src/lib/dailyInsightSchema.ts`, and the append-only v14 release lock
+is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`. The computed
+global v14 content identity is
+`sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`.
+The root relocation kept the v14 provider-facing system and user prompt bytes
+unchanged; offline compatibility tests lock the six system-prompt hashes.
+
+The release identity is dual: `promptVersion` is the human-readable release
+identifier and `promptFingerprint` is the SHA-256 identity of the canonical
+complete prompt bundle, including prompt fragments, guard policy, assembly
+version, and Strict Structured Output schema. In addition, each generated
+Daily instance stores `systemPromptHash`, the SHA-256 hash of the exact,
+intent- and context-dependent `promptSnapshot.system` sent to Azure OpenAI.
+This third value distinguishes the concrete provider system prompt even when
+the global bundle identity and release version are unchanged.
 
 The server validates the parsed response and rejects provider truncation or
 content filtering, empty/invalid/schema-invalid responses, CTA/target
@@ -249,7 +267,7 @@ truncation/content-filter result, or server validation failure returns friendly
 Daily quota. Quota exhaustion is also a friendly HTTP `200` with
 `status: 'quota_exceeded'` and no tracking.
 
-The v11 stale-weight safety contract is global because the shared tone guard is
+The v14 stale-weight safety contract is global because the shared tone guard is
 included in every selected intent, not only the weight-focused modules. For
 `daysSinceLastMeasurement > 14`, weight or trend language is allowed only with
 an explicit stale marker such as `veraltet` or `nicht aktuell`; day 14 remains
@@ -258,7 +276,7 @@ current and day 15 is stale. A stale-as-current sentence such as
 wording such as `Der Trend deines Gewichts ist nicht aktuell.` is accepted.
 The runtime root cause was that the stale rules had previously existed only in
 `promptWeight`, while deterministic `nutrition_guidance` selected
-`promptNutrition`; v11 applies the shared guard to that path and all other
+`promptNutrition`; the fix introduced in v11 remains active in v14 and applies the shared guard to that path and all other
 intents. Server-side validation remains strict and was not weakened.
 
 Negative calorie budget is authoritative. A `remainingProteinG` value of
@@ -266,22 +284,48 @@ Negative calorie budget is authoritative. A `remainingProteinG` value of
 state creates an additional protein action, and a negative calorie budget
 blocks further same-day food recommendations.
 
+The cache hash preserves the prompt's semantic boundaries instead of relying
+only on rounded numeric values. `remainingCalories` is bucketed as
+`unknown` for `null`, undefined, or non-finite values, `negative` for values
+below zero, `zero` for exactly zero, and `positive` for values above zero.
+`remainingProteinG` is bucketed as `unknown` for `null`, undefined, or
+non-finite values, `nearly_complete_below` for values below 20,
+`nearly_complete_at` for exactly 20, and `gap` for values above 20. Therefore
+the cache distinguishes `-0.01`, `0`, and `0.01`, as well as `19.99`, `20`,
+and `20.01`, while retaining the existing rounding stability outside a
+controlling boundary.
+
 ### Daily cache and persistence
 
 New Daily documents use `_docType: 'dailyInsight'` and
 `id = ${userId}:${date}` in the existing `aiInsights` container. They persist
-the input context/hash, selected intent, prompt version and exact prompt
-snapshot, model, response, token usage, and intelligence version. The hash
-includes prompt version, intent, local-hour bucket, activity/status data,
-current and historical nutrition/targets, weight/progress signals, and the
-other prompt inputs. Missing v11 provenance (`intent` or `promptSnapshot`) also
-invalidates an older Daily cache; an old v10 response is never returned as a
-new v11 result.
+the input context/hash, selected intent, prompt version, global prompt
+fingerprint, concrete system-prompt hash, and exact prompt snapshot, model,
+response, token usage, and intelligence version. The hash includes the release
+version, both prompt identities, intent, local-hour bucket, activity/status
+data, semantic nutrition buckets, current and historical nutrition/targets,
+weight/progress signals, and the other prompt inputs. Missing or mismatched
+prompt version, `promptFingerprint`, `systemPromptHash`, `intent`, or
+`promptSnapshot` is a hard cache invalidation, independent of the regeneration
+interval, daily limit, or admin status. An old response is never returned as a
+new v14 result.
 
 An unchanged hash returns `cached`. A changed hash is subject to a 30-minute
 minimum interval and a maximum of three generations for non-admin users;
 admin users bypass these gates in the current handler. Daily documents keep
 their per-document `ttl` and `expiresAt` until the existing Daily expiry.
+
+The relevant provenance fields are additive Class 0/read-compatible schema
+changes in the existing `aiInsights` container. `promptFingerprint` and
+`systemPromptHash` remain optional legacy-compatible fields on both Daily and
+Feedback documents. `intent` and `promptSnapshot` are optional on the Daily
+document type so documents written before this release remain readable; new
+Daily documents set the complete provenance. No global backfill, migration,
+new container, or partition-key change is used for this prompt-provenance
+change. Legacy Daily documents remain readable through the repository, but
+missing or mismatched current provenance makes them ineligible for a cache hit
+and for new feedback. Legacy feedback documents remain readable with their
+historical fields and are not rewritten or backfilled.
 
 ### Negative feedback and traceability
 
@@ -299,6 +343,18 @@ Each new submission creates one durable `_docType: 'insightFeedback'` document
 under the authenticated user's `/userId` partition. The server-owned
 traceability contract is:
 
+Feedback processing status is persisted as `Open`, `Done`, or `Rejected`:
+`Open` means unhandled and needing triage, `Done` means reviewed and handled,
+and `Rejected` means reviewed and not accepted for action. New feedback starts
+at `Open`. For backward compatibility, a missing `processingStatus` on a
+legacy feedback document is normalized to `Open` on reads and operational
+searches. The only allowed transitions are `Open -> Done` and
+`Open -> Rejected`; writing the current state again is an idempotent no-op.
+`Done` and `Rejected` are terminal and cannot transition to each other or
+back to `Open`. Unresolved operational searches include only feedback with a
+missing status or `Open`; handled searches include only `Done` or `Rejected`.
+Every such search is scoped to `_docType = 'insightFeedback'`.
+
 | Persisted field | Source / meaning |
 |---|---|
 | `insightId` | Exact matched Daily document ID |
@@ -306,7 +362,9 @@ traceability contract is:
 | `userComment` | Exact server-trimmed negative comment |
 | `response` | Complete generated/displayed Daily response |
 | `promptSnapshot.system` / `.user` | Exact provider system prompt and serialized user message |
-| `promptVersion` / `intent` | Stored v11 version and deterministic server intent |
+| `promptVersion` / `intent` | Stored v14 version and deterministic server intent |
+| `promptFingerprint` | Global content identity copied from the exact Daily instance |
+| `systemPromptHash` | SHA-256 identity of the exact context-specific system prompt |
 | `inputContext` / `inputHash` | Complete server input and its cache hash |
 | `model` / `intelligenceVersion` / `tokensUsed` | Server deployment, intelligence schema, provider token usage |
 | `submittedAt` | Server-generated submission timestamp |
@@ -323,11 +381,12 @@ conditional on the same Daily identity and does not extend the Daily
 document's existing TTL or expiry.
 
 The backend Daily GET emits the server-owned boolean `feedbackAvailable`.
-It is `true` only for a stored Daily with complete feedback provenance and
-`false` for legacy or incomplete instances. The Mobile type keeps the field
-optional for compatibility; the feedback POST remains authoritative and
-returns `feedback_snapshot_unavailable` when the stored Daily lacks the
-required snapshot.
+It is `true` only for a stored Daily with complete feedback provenance,
+including both prompt identities and the exact snapshot, and `false` for
+legacy or incomplete instances. The Mobile type keeps the field optional for
+compatibility; the feedback POST remains authoritative and returns
+`feedback_snapshot_unavailable` when the stored Daily lacks the required
+snapshot or identity.
 
 ## 8. Weekly Insight
 
@@ -380,4 +439,4 @@ Required: API version ≥ `2024-07-01`, model ≥ `gpt-4o-mini 2024-07-18`.
 
 ## Prompt Versioning
 
-Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v11'`). This version is stored with each generated insight document in Cosmos. When prompts change in ways affecting output interpretation, the version must be incremented.
+Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v14'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily document in Cosmos. The concrete `systemPromptHash` is stored for the exact composed system prompt used by that instance. When a provider-visible prompt, guard, assembly, or schema change affects output interpretation, the version must be incremented and the append-only release manifest updated.

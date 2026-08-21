@@ -13,6 +13,7 @@ import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } 
 import { requireUser } from '../lib/auth';
 import { withHandler } from '../lib/http';
 import { trackUsage } from '../lib/quota';
+import { logEvent } from '../lib/log';
 import { generateDailyInsight, DAILY_INSIGHT_PROMPT_VERSION } from '../lib/openai';
 import {
   getInsightRepository,
@@ -26,7 +27,11 @@ import {
 import { getAiUsageRepository } from '../lib/repositories/aiUsageRepository';
 import { buildDailyInsightContext } from '../lib/dailyInsightContext';
 import { selectInsightIntent } from '../lib/dailyInsightIntent';
-import { buildDailyInsightPrompt } from '../lib/prompts/dailyInsightV10';
+import {
+  buildDailyInsightPrompt,
+  computeDailyInsightSystemPromptHash,
+  DAILY_INSIGHT_PROMPT_FINGERPRINT,
+} from '../lib/prompts/dailyInsightPrompt';
 import { hasFeedbackSnapshot } from '../lib/insightFeedback';
 import type {
   InsightDocument,
@@ -67,7 +72,7 @@ export { buildDailyInsightContext as buildInputContext } from '../lib/dailyInsig
 
 export const dailyInsightHandler = withHandler(
   'ai.daily-insight',
-  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const userContext = await requireUser(request);
     const { userId, tier, isAdmin } = userContext;
 
@@ -120,10 +125,27 @@ export const dailyInsightHandler = withHandler(
     context = { ...context, timezoneOffsetMinutes };
     const intent = selectInsightIntent(context);
     const promptSnapshot = buildDailyInsightPrompt(intent, context);
-    const newHash = computeInputHash(context, DAILY_INSIGHT_PROMPT_VERSION, intent);
+    const systemPromptHash = computeDailyInsightSystemPromptHash(promptSnapshot.system);
+    const newHash = computeInputHash(
+      context,
+      DAILY_INSIGHT_PROMPT_VERSION,
+      intent,
+      DAILY_INSIGHT_PROMPT_FINGERPRINT,
+      systemPromptHash,
+    );
 
     // Check whether we can/should regenerate
-    const regen = shouldRegenerate(cached, newHash, now, isAdmin, DAILY_INSIGHT_PROMPT_VERSION);
+    const regen = shouldRegenerate(
+      cached,
+      newHash,
+      now,
+      isAdmin,
+      DAILY_INSIGHT_PROMPT_VERSION,
+      DAILY_INSIGHT_PROMPT_FINGERPRINT,
+      systemPromptHash,
+      intent,
+      promptSnapshot,
+    );
 
     if (!regen && cached) {
       // Return from cache
@@ -184,6 +206,8 @@ export const dailyInsightHandler = withHandler(
       expiresAt,
       ttl: computeTtlUntilMidnight(now, timezoneOffsetMinutes),
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
+      promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
+      systemPromptHash,
       intent,
       promptSnapshot,
       model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
@@ -199,11 +223,16 @@ export const dailyInsightHandler = withHandler(
       intelligenceVersion: PROGRESS_INTELLIGENCE_VERSION,
     };
 
+    let persisted = false;
     try {
       await insightRepo.upsert(doc);
+      persisted = true;
     } catch (err) {
-      // Storage failure is non-fatal — still return the response
-      console.error('[daily-insight] Failed to persist insight document:', err);
+      logEvent(ctx, 'warn', 'ai.daily-insight.cache_write_failed', {
+        userId,
+        date,
+        errorClass: err instanceof Error ? err.name : 'unknown',
+      });
     }
 
     // Track quota usage AFTER successful AI call
@@ -211,7 +240,7 @@ export const dailyInsightHandler = withHandler(
 
     return {
       status: 200,
-      jsonBody: fullResponse,
+      jsonBody: persisted ? fullResponse : { ...fullResponse, feedbackAvailable: false },
     };
   },
 );

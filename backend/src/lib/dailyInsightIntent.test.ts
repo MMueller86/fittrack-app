@@ -11,7 +11,7 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
       latestKg: null,
       previousKg: null,
       targetKg: null,
-      trend7d: null,
+      weeklyTrend30d: null,
       last7Values: [],
       isOutlierPrevious: false,
       isOutlierLatest: false,

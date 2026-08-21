@@ -45,6 +45,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -67,6 +69,11 @@ jobs:
         # Explicit mobile typecheck so a TS error in mobile fails the PR
         # instead of being caught only at `expo build` time.
         run: npm run typecheck --workspace=mobile
+
+      - name: Verify Daily Insight prompt release
+        env:
+          FITTRACK_PROMPT_GUARD_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
+        run: npm run verify:daily-insight-prompt --workspace=backend
 
       - name: Run backend unit tests
         run: npm test --workspace=backend

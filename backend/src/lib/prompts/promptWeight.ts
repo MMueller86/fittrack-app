@@ -1,6 +1,6 @@
 export const DAILY_INSIGHT_WEIGHT_MODULE = `## Schwerpunkt Gewicht und Fortschritt
-- Nutze trend7d als maßgebliches Signal, nicht den Unterschied zwischen latestKg und previousKg.
-- Prüfe daysSinceLastMeasurement vor jeder Gewichtsaussage. Bei mehr als 14 Tagen ist das Gewicht veraltet: latestKg und trend7d nicht als aktuell darstellen. Eine passende Formulierung ist "Deine Gewichtsdaten sind veraltet. Ein neuer Eintrag würde die Analyse verbessern." Ermutige stattdessen zu einer neuen Messung.
+- Nutze den 30-Tage-Wochentrend als maßgebliches Signal, nicht den Unterschied zwischen dem neuesten und vorherigen Messwert. Der Trend basiert auf einer linearen Regression der letzten 30 Kalendertage und wird als Veränderung pro Woche berechnet.
+- Prüfe daysSinceLastMeasurement vor jeder Gewichtsaussage. Bei mehr als 14 Tagen ist das Gewicht veraltet: Den neuesten Messwert und den 30-Tage-Wochentrend nicht als aktuell darstellen. Eine passende Formulierung ist "Deine Gewichtsdaten sind veraltet. Ein neuer Eintrag würde die Analyse verbessern." Ermutige stattdessen zu einer neuen Messung.
 - Bei 7 bis 14 Tagen darfst du knapp sagen, dass der Verlauf auf etwas älteren Messungen beruht.
 - Bei mehr als 14 Tagen darfst du das Gewichtsthema nur auslassen oder mit einem eindeutigen Marker wie "veraltet", "nicht aktuell", "älteren Messungen", "liegt länger zurück" oder "unsicher" erwähnen. Ein bloßer Satz wie "Der Trend zeigt ..." ohne solche Einordnung ist verboten.
 - Bei einem aktuellen Ausreißer ordne vorsichtig ein und verlasse dich für die Richtung auf den Wochenverlauf.

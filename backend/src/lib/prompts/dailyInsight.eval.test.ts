@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { generateDailyInsight } from '../openai';
-import { DAILY_INSIGHT_PROMPT_VERSION } from './dailyInsightV10';
+import { DAILY_INSIGHT_PROMPT_VERSION } from './dailyInsightPrompt';
 import { DAILY_INSIGHT_EVAL_FIXTURES } from './dailyInsight.eval.fixtures';
 
-const TESTED_PROMPT_VERSION = 'v11';
+const TESTED_PROMPT_VERSION = 'v14';
 
 it('daily insight prompt version matches fixture expectations', () => {
   expect(DAILY_INSIGHT_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);

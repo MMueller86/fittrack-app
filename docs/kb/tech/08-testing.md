@@ -83,6 +83,37 @@ npx tsc --noEmit  # from mobile/ or shared/
 	settings without printing secrets; exit code `2` means `UNVERIFIED` because
 	required credentials are unavailable.
 
+### Daily Insight Prompt and Cache Checks
+
+The active Daily prompt is tested through
+`backend/src/lib/prompts/dailyInsightPrompt.ts`, which is the sole runtime
+composition root. Unit tests cover all six intent snapshots, deterministic
+canonical-bundle fingerprinting, the append-only v14 manifest, and the
+context-dependent system-prompt hashes. The offline release check
+`npm run verify:daily-insight-prompt --workspace=backend` verifies the active
+release fingerprint, historical manifest entries, and provider-visible prompt
+or schema changes without calling Azure OpenAI.
+Local consistency checks for the same change include
+`npm run build:verify --workspace=backend`, `node scripts/check-encoding.mjs`,
+and `git diff --check`.
+
+Repository and handler tests cover the complete cache identity:
+`promptVersion`, `promptFingerprint`, `systemPromptHash`, selected intent,
+prompt snapshot, and input hash. They also cover the semantic boundaries
+`remainingCalories = -0.01`, `0`, `0.01` and `remainingProteinG = 19.99`,
+`20`, `20.01`, with `null` and non-finite values treated as `unknown`.
+Missing or changed provenance must regenerate before rate limits are applied;
+an unchanged complete identity remains a cache hit. Daily and Feedback
+roundtrips verify the server-owned provenance, exact feedback binding, and
+legacy documents without optional identity fields. Legacy documents remain
+readable without a backfill; the Class 0 change is verified by compatibility
+tests rather than a migration.
+
+Prompt evals remain explicit live checks for the tested release. They are not
+part of the normal CI job because they require Azure credentials and incur
+provider cost; unavailable credentials are reported as `UNVERIFIED`, not as a
+silent pass.
+
 ## Coverage Target
 
 High function-level coverage on business logic is explicitly desired. No specific percentage target is documented, but any logic that can be tested should be.
@@ -91,13 +122,17 @@ High function-level coverage on business logic is explicitly desired. No specifi
 
 GitHub Actions — runs on every push and pull request to `main`.
 
-### Tier 1 — Unit Tests (10 min timeout)
+A separate encoding-check job also runs `node scripts/check-encoding.mjs`.
+
+### Tier 1 — Unit Tests and Offline Prompt Guard (10 min timeout)
 
 Runs on `ubuntu-latest`. Steps in order:
 1. Typecheck `shared` — `npm run typecheck --workspace=shared`
 2. Typecheck `backend` — `npm run typecheck --workspace=backend`
 3. Typecheck `mobile` — catches TypeScript errors before `expo build` does
-4. Backend unit tests — `npm test --workspace=backend`
+4. Verify the active Daily prompt release —
+	`npm run verify:daily-insight-prompt --workspace=backend`
+5. Backend unit tests — `npm test --workspace=backend`
 
 All three typechecks run before tests to fail fast on cheap checks.
 
@@ -125,5 +160,7 @@ container at `http://127.0.0.1:8081`.
 - No deploy steps — CI is test-only
 - No mobile unit tests in CI (mobile unit tests run locally; CI runs mobile typecheck only)
 - No shared unit tests in CI (covered by typecheck; shared logic is tested via backend package)
+- No live Azure OpenAI prompt evals in CI; those remain an explicit credentialed
+	check outside the normal pipeline
 
 [Open] A dedicated CI step for `shared` unit tests and `mobile` unit tests may be added in a future iteration.

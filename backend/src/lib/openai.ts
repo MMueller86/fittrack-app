@@ -10,11 +10,13 @@ import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
 import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
 import { RECIPE_SCALE_SYSTEM_PROMPT } from './prompts/recipeScale';
 import {
-  DAILY_INSIGHT_SYSTEM_PROMPT,
   DAILY_INSIGHT_PROMPT_VERSION,
+  DAILY_INSIGHT_PROMPT_FINGERPRINT,
+  DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION,
   buildDailyInsightPrompt,
   type DailyInsightPromptSnapshot,
-} from './prompts/dailyInsightV10';
+} from './prompts/dailyInsightPrompt';
+import { DAILY_INSIGHT_SCHEMA } from './dailyInsightSchema';
 import {
   WEEKLY_INSIGHT_SYSTEM_PROMPT,
   WEEKLY_INSIGHT_PROMPT_VERSION,
@@ -23,14 +25,7 @@ import {
 } from './prompts/weeklyInsightV2';
 import type { InsightInputContext, InsightIntent, InsightResponse } from '@fittrack/shared';
 import { selectInsightIntent } from './dailyInsightIntent';
-import {
-  DAILY_INSIGHT_CTA_MAX_LENGTH,
-  DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH,
-  DAILY_INSIGHT_SUMMARY_MAX_LENGTH,
-  DAILY_INSIGHT_TITLE_MAX_LENGTH,
-  toInsightResponse,
-  validateDailyInsightResponse,
-} from './dailyInsightValidation';
+import { toInsightResponse, validateDailyInsightResponse } from './dailyInsightValidation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -716,38 +711,6 @@ export interface GenerateInsightResult {
   promptSnapshot: DailyInsightPromptSnapshot;
 }
 
-export const DAILY_INSIGHT_SCHEMA = {
-  type: 'object' as const,
-  properties: {
-    title: {
-      type: 'string' as const,
-      minLength: 1,
-      maxLength: DAILY_INSIGHT_TITLE_MAX_LENGTH,
-    },
-    summary: {
-      type: 'string' as const,
-      minLength: 1,
-      maxLength: DAILY_INSIGHT_SUMMARY_MAX_LENGTH,
-    },
-    recommendation: {
-      type: ['string', 'null'] as const,
-      minLength: 1,
-      maxLength: DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH,
-    },
-    cta: {
-      type: ['string', 'null'] as const,
-      minLength: 1,
-      maxLength: DAILY_INSIGHT_CTA_MAX_LENGTH,
-    },
-    ctaTarget: {
-      type: ['string', 'null'] as const,
-      enum: ['Nutrition', 'Weight', 'Training', 'Recipe', null] as const,
-    },
-  },
-  required: ['title', 'summary', 'recommendation', 'cta', 'ctaTarget'],
-  additionalProperties: false,
-};
-
 /**
  * Generate a daily AI insight from a structured input context.
  * Returns structured JSON parsed and validated by Zod.
@@ -809,7 +772,10 @@ export async function generateDailyInsight(
 /** Exposed for mocking in tests. */
 export {
   DAILY_INSIGHT_PROMPT_VERSION,
-  DAILY_INSIGHT_SYSTEM_PROMPT,
+  DAILY_INSIGHT_PROMPT_FINGERPRINT,
+  DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION,
   WEEKLY_INSIGHT_PROMPT_VERSION,
   WEEKLY_INSIGHT_TEXT_MAX_LENGTH,
 };
+
+export { DAILY_INSIGHT_SCHEMA } from './dailyInsightSchema';

@@ -37,6 +37,12 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-016 | Daily weight-outlier forbidden tone, AC-1/AC-11 | Blocking | Backend | Closed |
 | FT-QA-2026-017 | Daily activity-budget eval instability, AC-3/AC-9 | Blocking | Backend | Closed |
 | FT-QA-2026-018 | Daily protein-gap budget consistency, AC-9 | Blocking | Backend | Closed |
+| FT-QA-2026-019 | Weight-trend rename staging artifact, AC-1 | Blocking | Infrastructure | Closed |
+| FT-QA-2026-020 | Weight-trend rename plan/source conflict, AC-2 | Blocking | Planner / Orchestrator | Closed |
+| FT-QA-2026-021 | Daily feedback processing status documentation | Non-blocking | Backend | Closed |
+| FT-QA-2026-022 | Daily prompt fingerprint mutation coverage, AC-3 | Blocking | Backend | Closed |
+| FT-QA-2026-023 | Daily prompt provider-input guard coverage, AC-4 | Blocking | Backend | Closed |
+| FT-QA-2026-024 | Daily cache provenance comparison, AC-7/AC-14 | Blocking | Backend | Closed |
 
 ## Actionable Findings
 
@@ -59,7 +65,7 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Acceptance criterion:** Documentation handoff
 - **Description:** `docs/kb/tech/02-backend.md` still lists the old diary GET route, while the implementation and API reference use `GET /api/diary?date=YYYY-MM-DD`.
 - **Criticality:** Non-blocking
-- **Owner:** Documentation
+- **Owner:** Backend
 - **Evidence:** `docs/kb/tech/02-backend.md`; `docs/kb/tech/09-api-reference.md`; `backend/src/functions/diary.ts`.
 - **Recommendation:** Align `02-backend.md` with the implemented route and keep `09-api-reference.md` as the contract reference.
 - **Status:** Awaiting decision
@@ -274,6 +280,85 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** Correction requested from Backend after the final QA FAIL; final QA verification confirmed `protein-gap-with-budget` and the complete eval pass.
 - **History:** 2026-08-20 - Imported from the final QA report; correction routed to Backend. 2026-08-20 - Nutrition/budget prompt correction applied with regression tests; focused tests 30/30, Backend 836 tests, typecheck/build green, and complete eval 26/26. 2026-08-20 - Final QA verification confirmed F-10 PASS; closed.
 
+### FT-QA-2026-019
+
+- **Plan reference:** `docs/User Stories/Insight/PLAN_US_Home-Screen-Insights_Weight-Trend-Rename.md`
+- **Acceptance criterion:** AC-1
+- **Description:** The ignored deployment artifact is stale. `_deploy_staging/dist` still contains the old `trend7d` contract and older prompt modules, while the current `backend/dist` contains `weeklyTrend30d` and `v14`.
+- **Criticality:** Blocking
+- **Owner:** Infrastructure
+- **Evidence:** `docs/qa/reports/PLAN_US_Home-Screen-Insights_Weight-Trend-Rename.md`; generated staging audit reported 44 old-name matches and 0 `weeklyTrend30d`/v14 matches in `_deploy_staging/dist`.
+- **Recommendation:** Rebuild and mirror the current backend output into `_deploy_staging/dist` through the documented release flow, then rerun the active old-name gate and verify the staged context, hash, prompt version, and migration package. Do not hand-edit generated output.
+- **Status:** Closed
+- **Decision:** Correction requested by the Orchestrator after QA FAIL; Infrastructure rebuilt and mirrored the generated output, and final QA verified the active artifact gate.
+- **History:** 2026-08-21 - Imported from the QA report; correction reserved for Infrastructure after a revised plan is approved. 2026-08-21 - I1 clean-built and mirrored the backend output; final QA verified source/staging parity and zero active legacy-token matches; closed.
+
+### FT-QA-2026-020
+
+- **Plan reference:** `docs/User Stories/Insight/PLAN_US_Home-Screen-Insights_Weight-Trend-Rename.md`
+- **Acceptance criterion:** AC-2
+- **Description:** The approved plan states that the calculation and `shared/lib/weightTrend.ts` remain unchanged, but the current implementation contains the intended 30-day regression and the new shared module as untracked files relative to the tracked baseline. The implementation matches the requested product behavior, but the approved plan does not accurately describe that change.
+- **Criticality:** Blocking
+- **Owner:** Planner / Orchestrator
+- **QA owner:** Backend
+- **Evidence:** `docs/qa/reports/PLAN_US_Home-Screen-Insights_Weight-Trend-Rename.md`; the tracked baseline used a local seven-value calculation with different thresholds, while the current source uses the shared 30-day regression and `weeklyTrend30d` contract.
+- **Recommendation:** Reconcile the approved plan with the intended 30-day behavior and explicitly include the shared helper and its tests in the deliverable. Do not silently revert the requested 30-day semantics or accept the implementation against a contradictory plan.
+- **Status:** Closed
+- **Decision:** Plan revision required by the Orchestrator after QA FAIL; the revised plan received fresh approval and final QA verified the corrected scope and implementation.
+- **History:** 2026-08-21 - Imported from the QA report; routed to Planner as a plan/source conflict. Execution paused pending revised plan and fresh approval. 2026-08-21 - Planner rebuilt the plan from verified repository state; fresh approval was received; final QA verified AC-1 through AC-13; closed.
+
+### FT-QA-2026-021
+
+- **Plan reference:** `docs/User Stories/Insight/PLAN_US_Home-Screen-Insights_Feedback_Status_Operations.md`
+- **Acceptance criterion:** `N/A`
+- **Description:** The planned documentation update for domain behavior is incomplete. The API reference documents the new PATCH status endpoint and lifecycle semantics, but `docs/kb/domain/07-ai-features.md` does not yet describe the `processingStatus` lifecycle (`Open`/`Done`/`Rejected`) for operational feedback handling.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** `docs/kb/tech/09-api-reference.md` contains the PATCH status endpoint section; `docs/kb/domain/07-ai-features.md` documents feedback snapshot persistence but has no `processingStatus` lifecycle or admin status-update semantics.
+- **Recommendation:** Extend the feedback subsection in `docs/kb/domain/07-ai-features.md` with the canonical `processingStatus` model, terminal-state rules, and unresolved-versus-handled operational search semantics so it matches the implemented backend behavior and approved plan.
+- **Status:** Closed
+- **Decision:** User requested correction of the missing domain documentation.
+- **History:** 2026-08-21 - Imported from the QA report; awaiting the user's decision on the non-blocking documentation correction. 2026-08-21 - User requested the documentation fix and clarified that the implementation owner must correct implementation-related documentation omissions; routed to Backend. 2026-08-21 - Backend updated the domain Knowledge Base; targeted QA re-check passed and found no actionable issues; closed.
+
+### FT-QA-2026-022
+
+- **Plan reference:** `docs/User Stories/Insight/PLAN_US_Home-Screen-Insights_Prompt-Provenance-Correction.md`
+- **Acceptance criterion:** AC-3
+- **Description:** The fingerprint mutation tests do not establish that every imported prompt module changes the fingerprint. The test mutates only the `general` entry, leaving the activity, morning, nutrition, and weight module wiring without the acceptance-criteria proof required for the global bundle identity.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `backend/src/lib/prompts/dailyInsightPrompt.test.ts` contains one intent-module mutation for `general`; `backend/src/lib/prompts/dailyInsightPrompt.ts` imports the other provider-visible modules into the bundle.
+- **Recommendation:** Parameterize the offline fingerprint test over each imported module, including the shared weight module used by both weight intents, and assert that each targeted mutation changes the fingerprint.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-08-21 - Imported from the QA report and routed to Backend for correction. 2026-08-21 - Backend added mutation coverage for activity, general, morning, nutrition, and the shared weight module; focused tests passed. 2026-08-21 - Full QA re-review verified AC-3; closed.
+
+### FT-QA-2026-023
+
+- **Plan reference:** `docs/User Stories/Insight/PLAN_US_Home-Screen-Insights_Prompt-Provenance-Correction.md`
+- **Acceptance criterion:** AC-4
+- **Description:** The offline release guard does not track `dailyInsightValidation.ts`, even though the central provider schema imports provider-visible length constants from it. A change to those constants can change the provider-visible schema without requiring a manifest update or a new append-only release entry.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `backend/scripts/verify-daily-insight-prompt.mjs` omits `backend/src/lib/dailyInsightValidation.ts` from `providerInputPaths`; `backend/src/lib/dailyInsightSchema.ts` imports four constants from that file. QA's focused guard probe marked only that path as changed and returned `providerInputChanged: false`, while the standard guard exited 0.
+- **Recommendation:** Include the validation dependency in provider-input tracking or make the provider schema constants part of a directly tracked canonical schema source, then add a regression test that requires a new manifest release for a validation-constant change.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-08-21 - Imported from the QA report and routed to Backend for correction. 2026-08-21 - Backend tracked `dailyInsightValidation.ts` as provider-visible and added validation-only release-guard regression coverage; focused tests passed. 2026-08-21 - Full QA re-review verified AC-4; closed.
+
+### FT-QA-2026-024
+
+- **Plan reference:** `docs/User Stories/Insight/PLAN_US_Home-Screen-Insights_Prompt-Provenance-Correction.md`
+- **Acceptance criterion:** AC-7 and AC-14
+- **Description:** `shouldRegenerate()` hard-invalidates missing intent and snapshot fields but does not compare existing cached intent or the exact cached prompt snapshot with the current expected values. The handler does not pass those expected values to `shouldRegenerate()`. Consequently, a mismatched provenance record can be treated as an ordinary input-hash change and suppressed by the 30-minute or daily-generation limits. The Knowledge Base documents the stronger comparison behavior, so it is out of alignment with the implementation until corrected.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `backend/src/lib/repositories/insightRepository.ts` accepts active version/fingerprint/system-hash values and checks intent/snapshot for presence; `backend/src/functions/dailyInsight.ts` does not pass expected intent or snapshot. QA's focused probe with a recent, maxed-out non-admin cache returned `false` for both intent and system/user snapshot mismatches.
+- **Recommendation:** Pass a current provenance object, or expected intent and exact snapshot, into `shouldRegenerate()` and compare all fields before input-hash and rate-limit decisions. Add regression tests for mismatched intent, system snapshot, and user snapshot under both recent and max-generation conditions; keep the Knowledge Base aligned after implementation.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-08-21 - Imported from the QA report and routed to Backend for correction. 2026-08-21 - Backend added exact intent and system/user snapshot comparisons before hash and rate-limit checks, with recent/max-generation regression coverage; focused tests passed. 2026-08-21 - Full QA re-review verified AC-7 and AC-14; closed.
+
 ## Verification Notes (Not Findings)
 
 These items were reported as unverified environment checks. They must not lower a QA verdict and must not enter the actionable finding list unless a defect is demonstrated.
@@ -295,3 +380,9 @@ These items were reported as unverified environment checks. They must not lower 
 - **State:** `MANUAL VALIDATION REQUIRED`
 - **Reason:** No `adb`-connected device or equivalent viewport/screen-reader setup was available to the QA agent.
 - **Manual action:** Execute the device and accessibility checklist from the approved plan and record the actual result separately from this findings register.
+
+### VER-2026-004 - Dev Cosmos provenance verification
+
+- **State:** `UNVERIFIED`
+- **Reason:** The Dev Function App health check passed with HTTP 401 and the deployed routes are registered, but the read-only Dev Cosmos provenance check was rejected with HTTP 401 because the configured `COSMOS_KEY` does not authorize the configured Dev Cosmos endpoint.
+- **Manual action:** Correct the Dev Cosmos endpoint/key configuration, then rerun the read-only check for server-owned Daily provenance, identical-identity cache hits, and regeneration after identity changes. Do not treat this as an application-code finding without evidence after valid authentication.

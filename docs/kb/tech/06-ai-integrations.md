@@ -131,10 +131,18 @@ Daily quota.
 	source are `null`. `likely_completed` is probabilistic, never a confirmed
 	completion fact; the persisted `SpecialActivity` type is unchanged.
 
-**v11 prompt and validation contract:**
-- `DAILY_INSIGHT_PROMPT_VERSION` is `'v11'`. The selected intent module is
+**v14 prompt and validation contract:**
+- `DAILY_INSIGHT_PROMPT_VERSION` is `'v14'`. The selected intent module is
 	combined with the shared German tone/output contract and the exact system
 	prompt plus serialized user message are persisted as `promptSnapshot`.
+- The active composition root is
+	`backend/src/lib/prompts/dailyInsightPrompt.ts`; its append-only release
+	history is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`.
+	The v14 bundle fingerprint is
+	`sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`.
+	`promptVersion` plus `promptFingerprint` form the release identity.
+	`systemPromptHash` additionally hashes the exact context-dependent
+	`promptSnapshot.system` sent for the selected intent.
 - Azure OpenAI uses Strict Structured Outputs with `json_schema`,
 	`strict: true`, all properties required, nullable optional values, and
 	`additionalProperties: false`. The server additionally validates the
@@ -146,7 +154,7 @@ Daily quota.
 	`cta` (maximum 80), optional `ctaTarget`, `generatedAt`, `promptVersion`, and
 	`status`. The provider schema uses nullable optional fields; the public
 	response omits optional fields whose value is `null`.
-- The v11 stale-weight contract is global: the shared tone guard is included
+- The v14 stale-weight contract is global: the shared tone guard is included
 	in every selected intent, including `activity_focus`, `nutrition_guidance`,
 	`morning_orientation`, and `general`, not only the weight-focused modules.
 	For `daysSinceLastMeasurement > 14`, weight or trend data is stale; day 14
@@ -155,7 +163,7 @@ Daily quota.
 	claim such as `Dein Gewicht ist heute klar gesunken.` is rejected, while an
 	explicit stale notice such as `Der Trend deines Gewichts ist nicht aktuell.`
 	is accepted.
-- The runtime root cause was corrected in v11: stale-weight rules had been
+- The runtime root cause was corrected in v11 and remains active in v14: stale-weight rules had been
 	present only in `promptWeight`, while deterministic `nutrition_guidance`
 	routing selected `promptNutrition`. The shared guard now covers that path
 	and all other intents; server-side validation remains strict and was not
@@ -172,11 +180,38 @@ Daily quota.
 	users bypass these regeneration and quota gates in the current handler.
 - The hash includes the active prompt version, selected intent, local-hour
 	bucket, activity/status data, current and historical nutrition/target data,
-	weight/progress signals, and other prompt inputs. A v11 prompt/version or
-	provenance change invalidates an older Daily cache.
+	weight/progress signals, and other prompt inputs, as well as the global
+	`promptFingerprint`, the concrete `systemPromptHash`, and semantic
+	`remainingCalories`/`remainingProteinG` buckets. The calorie buckets are
+	`unknown`, `negative`, `zero`, and `positive`; the protein buckets are
+	`unknown`, `nearly_complete_below`, `nearly_complete_at`, and `gap`, with
+	the protein boundary at 20 g. Non-finite values are `unknown`. This keeps
+	`-0.01`/`0`/`0.01` and `19.99`/`20`/`20.01` distinct despite numeric
+	rounding elsewhere in the cache key.
+- The active handler passes all current identities to `shouldRegenerate()`.
+	Missing or mismatched `promptVersion`, `promptFingerprint`,
+	`systemPromptHash`, `intent`, or `promptSnapshot` is a hard invalidation
+	before the regeneration interval and daily limit are considered. A cache
+	hit therefore requires matching provenance and an unchanged full input
+	hash; a changed prompt cannot remain a cache hit because a manual version
+	was left unchanged.
 - Daily documents retain their existing per-document TTL/expires-at
 	behaviour. Feedback documents are separate and have no TTL; see the API and
 	domain contracts below.
+- These provenance fields are additive Class 0/read-compatible changes in the
+	existing `aiInsights` container. `promptFingerprint` and
+	`systemPromptHash` remain optional legacy-compatible fields on both Daily
+	and Feedback documents; `intent` and `promptSnapshot` remain optional on
+	the Daily type for old documents. New Daily and Feedback documents
+	contain the current identities; no global backfill, migration, new
+	container, or partition-key change is performed for this
+	prompt-provenance change. A legacy Daily is therefore readable but is
+	not a valid current cache hit or source for new feedback; legacy
+	Feedback remains historical and its missing identity fields are not
+	rewritten.
+- Feedback copies `promptFingerprint` and `systemPromptHash` from the exact
+	bound Daily document. Neither value is accepted from the client or added
+	to the public Mobile DTOs.
 - Daily quota is checked before Azure OpenAI and tracked only after a valid
 	response. Quota exhaustion is returned as HTTP `200` with
 	`status: 'quota_exceeded'`; feedback is not an AI call and is not quota
@@ -244,7 +279,7 @@ Located in `backend/src/lib/prompts/`:
 - `foodEstimate.ts` — system prompt for food estimation
 - `mealEstimate.ts` — system prompt for meal image estimation
 - `recipeAnalyze.ts` — system prompt for recipe text analysis
-- `dailyInsightV10.ts` (current module, exporting prompt version `v11`) plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight system prompt (versioned)
+- `dailyInsightPrompt.ts` (active v14 composition root), `dailyInsightPromptManifest.ts` (append-only release locks), and `../dailyInsightSchema.ts` (shared Strict Structured Output schema), plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight prompt (versioned). The root is the only active composition path; it builds the exact snapshot used by the provider.
 - `dailyInsight.eval.test.ts` and `dailyInsight.eval.fixtures.ts` — live Daily Insight prompt evaluations
 - `weeklyInsightV2.ts` — weekly insight system prompt and sanitized context contract (versioned)
 

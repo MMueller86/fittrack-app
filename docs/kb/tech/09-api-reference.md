@@ -190,12 +190,12 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 | POST | `/api/ai/daily-insight/feedback` | Yes | None | Negative feedback for one exact Daily instance; no snapshot is returned |
 | GET | `/api/ai/weekly-insight?date=YYYY-MM-DD` | Yes | `daily-insight` | Seven completed days plus optional AI evaluation; deterministic data remains usable on AI failure |
 
-AI endpoints return `429` with `QuotaExceededResponse` when quota is exceeded.
+AI endpoints generally return `429` with `QuotaExceededResponse` when quota is exceeded.
 
-The weekly insight endpoint is the exception: it uses the existing `daily-insight`
-quota key but converts quota exhaustion into a `200` response with
-`evaluation.status: "quota_exceeded"` and `evaluation.text: null`, so the weekly
-data stays available.
+The Daily and Weekly insight endpoints are exceptions and keep their deterministic
+contracts available with HTTP `200`:
+- Daily Insight returns `status: "quota_exceeded"`.
+- Weekly Insight returns `evaluation.status: "quota_exceeded"` and `evaluation.text: null`.
 
 ### GET /api/ai/daily-insight
 
@@ -233,7 +233,7 @@ regeneration rules.
 	"cta": "Ernährung öffnen",
 	"ctaTarget": "Nutrition",
 	"generatedAt": "2026-08-20T08:30:00.000Z",
-	"promptVersion": "v11",
+	"promptVersion": "v14",
 	"status": "fresh",
 	"feedbackAvailable": true
 }
@@ -250,17 +250,29 @@ The POST guard remains authoritative and rejects incomplete provenance with
 `feedback_snapshot_unavailable`.
 
 Daily documents are stored as `_docType: "dailyInsight"` under the existing
-`aiInsights` container with `id = ${userId}:${date}`. The selected v11 intent,
+`aiInsights` container with `id = ${userId}:${date}`. The selected v14 intent,
 input context, input hash, exact system/user prompt snapshot, model, token
 usage, and intelligence version are server-owned persistence fields. Daily
 quota is checked before Azure OpenAI and tracked only after a valid response;
 quota exhaustion remains a friendly HTTP `200` response and is not tracked.
-The active v11 prompt and server validator apply the stale-weight guard to all
+The active v14 prompt and server validator apply the stale-weight guard to all
 intents: day 14 remains current, day 15 is stale, stale-as-current wording is
 rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
 accepted. Context, provider, truncation/content-filter, or validation failures
 return HTTP `200` with `status: "unavailable"`; the failed result is not
 persisted and does not consume or track Daily quota.
+
+The server-owned `inputContext.weight.weeklyTrend30d` is not exposed in the
+public response. It is the `gaining | losing | stable | null` direction
+classification from a linear regression over the last 30 calendar days,
+projected to a weekly change, and remains the authoritative weight direction
+signal. Existing Daily and durable feedback snapshots are handled by the
+explicit, idempotent `backend/scripts/migrate-insight-weight-trend.mjs`
+migration, which updates the nested context key in place, preserves document
+identity, Daily TTL/expiry, and feedback traceability, excludes Weekly
+documents, and reports conflicts without overwriting them. Request handling
+uses `weeklyTrend30d` only; there is no legacy alias, fallback, dual-read, or
+dual-write compatibility path.
 
 ### POST /api/ai/daily-insight/feedback
 
@@ -317,9 +329,9 @@ TTL/expiry.
 | `insightGeneratedAt` | Exact stored Daily `generatedAt`; no rebinding to a later generation |
 | `userComment` | Server-trimmed request comment, 1-500 characters |
 | `response` | Complete server-generated/displayed Daily response |
-| `promptSnapshot.system` | Exact selected v11 system prompt sent to Azure OpenAI |
+| `promptSnapshot.system` | Exact selected v14 system prompt sent to Azure OpenAI |
 | `promptSnapshot.user` | Exact serialized user message sent to Azure OpenAI |
-| `promptVersion` | Stored Daily prompt version, currently `v11` |
+| `promptVersion` | Stored Daily prompt version, currently `v14` |
 | `intent` | Deterministic server-selected `InsightIntent` |
 | `inputContext` | Complete server-built `InsightInputContext` used for generation |
 | `inputHash` | Server-computed hash for the Daily input and active prompt |
@@ -335,6 +347,46 @@ or cleanup endpoint. Normal users and arbitrary JWT admins receive no implicit
 database access from this persistence contract. Feedback is not automatically
 deleted; a later manual database cleanup is an operational follow-up outside
 this feature.
+
+### PATCH /api/ai/daily-insight/feedback/status
+
+The endpoint is a dedicated authenticated operational write path for updating
+Daily Insight feedback `processingStatus`. It requires a valid Bearer token and
+explicit backend admin authorization (`isAdmin === true` from the validated
+Entra role claim).
+
+Input must contain the exact `userId` partition key and exact `feedbackId`
+document id for an existing feedback document. The repository enforces exact
+partition/id access plus `_docType = "insightFeedback"` before writing.
+
+**Request body:**
+
+```json
+{
+	"userId": "test-user-abc-123",
+	"feedbackId": "test-user-abc-123:feedback:11111111-1111-4111-8111-111111111111",
+	"processingStatus": "Done"
+}
+```
+
+`processingStatus` accepts only `Open`, `Done`, or `Rejected`.
+
+**Responses:**
+
+- `200` — successful change: `{ "userId": "...", "feedbackId": "...", "processingStatus": "Done", "changed": true }`
+- `200` — idempotent same-state no-op: `{ "userId": "...", "feedbackId": "...", "processingStatus": "Done", "changed": false }`
+- `400` — invalid JSON, unknown fields, empty ids, or invalid status value
+- `401` — missing or invalid Bearer token
+- `403` — authenticated but not admin
+- `404` — `{ "code": "feedback_not_found" }` when the exact `userId` + `feedbackId` feedback document is missing
+- `409` — `{ "code": "feedback_status_transition_forbidden", "processingStatus": "<current>" }` for forbidden terminal transitions
+- `500` — unexpected backend or persistence failure
+
+Terminal-state semantics:
+
+- Allowed transitions: `Open -> Done`, `Open -> Rejected`
+- Idempotent no-op transitions: `Open -> Open`, `Done -> Done`, `Rejected -> Rejected`
+- Forbidden transitions: `Done -> Rejected`, `Rejected -> Done`, `Done -> Open`, `Rejected -> Open`
 
 ### GET /api/ai/weekly-insight?date=YYYY-MM-DD
 

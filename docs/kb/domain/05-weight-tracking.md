@@ -83,7 +83,13 @@ The daily insight weight context includes:
 - `isOutlierPrevious` — previous weight is a statistical spike (> 1.5× std dev of 7-day window)
 - `isOutlierLatest` — latest weight is a spike
 
-[Rule] When `isOutlierPrevious` is true, the AI must not use it for short-term progress comparisons. `trend7d` is the authoritative signal in this case.
+[Rule] The mobile chart and Daily Insight share the slope-based trend helper in `shared/lib/weightTrend.ts`: a linear regression over the last 30 calendar days, projected to a weekly change and exposed in the Daily context as `weeklyTrend30d`. When `isOutlierPrevious` is true, the AI must not use it for short-term progress comparisons; this 30-day regression is the authoritative direction signal.
+
+Existing Daily and durable feedback snapshots are updated by the explicit,
+idempotent migration described in [tech/07-infrastructure.md](../tech/07-infrastructure.md).
+This is a one-off persistence migration, not a runtime compatibility contract:
+normal reads and writes use `weeklyTrend30d` only, while calculation,
+stale-weight, and outlier behavior remain unchanged.
 
 ## Goal Context
 

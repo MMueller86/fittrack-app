@@ -68,6 +68,8 @@ export interface InsightFeedbackResponse {
   created: boolean;
 }
 
+export type InsightFeedbackProcessingStatus = 'Open' | 'Done' | 'Rejected';
+
 // ---------------------------------------------------------------------------
 // Input context passed to the AI (and persisted in Cosmos for reproducibility)
 // ---------------------------------------------------------------------------
@@ -76,15 +78,15 @@ export interface InsightWeightContext {
   latestKg: number | null;
   previousKg: number | null;
   targetKg: number | null;
-  /** Simple 7-day direction based on linear trend */
-  trend7d: 'gaining' | 'losing' | 'stable' | null;
+  /** 30-day linear-regression direction projected to a weekly change. */
+  weeklyTrend30d: 'gaining' | 'losing' | 'stable' | null;
   /** Up to 7 most recent values, newest first */
   last7Values: number[];
   /**
    * True when `previousKg` is a statistical outlier relative to the surrounding
    * values (spike > 1.5× stdDev of the 7-day window).
    * When true, the AI MUST NOT use previousKg as a reference point for
-   * short-term progress — trend7d is the authoritative signal instead.
+  * short-term progress — weeklyTrend30d is the authoritative signal instead.
    */
   isOutlierPrevious: boolean;
   /**
@@ -208,6 +210,10 @@ export interface InsightDocument {
   ttl: number;
   /** e.g. "v1" */
   promptVersion: string;
+  /** Global content identity of the active prompt bundle; absent on legacy documents. */
+  promptFingerprint?: string;
+  /** Hash of the exact system prompt sent for this intent/context; absent on legacy documents. */
+  systemPromptHash?: string;
   /** Server-selected focus of the generation; absent on legacy documents. */
   intent?: InsightIntent;
   /** Exact prompts sent to the provider; absent on legacy documents. */
@@ -244,6 +250,8 @@ export interface InsightFeedbackDocument {
   id: string;
   userId: string;
   _docType: 'insightFeedback';
+  /** Canonical processing status. Missing legacy values are treated as Open on read/query. */
+  processingStatus?: InsightFeedbackProcessingStatus;
   insightId: string;
   date: string;
   insightGeneratedAt: string;
@@ -254,6 +262,10 @@ export interface InsightFeedbackDocument {
   response: InsightResponse;
   promptSnapshot: InsightPromptSnapshot;
   promptVersion: string;
+  /** Global content identity copied from the exact Daily instance; absent on legacy feedback. */
+  promptFingerprint?: string;
+  /** Exact system-prompt identity copied from the exact Daily instance; absent on legacy feedback. */
+  systemPromptHash?: string;
   intent: InsightIntent;
   inputContext: InsightInputContext;
   inputHash: string;

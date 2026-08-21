@@ -33,7 +33,7 @@ import type { WeeklyInsightDocument } from './insightRepository';
 // ---------------------------------------------------------------------------
 
 function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInputContext {
-  return {
+  const context: InsightInputContext = {
     date: '2026-06-30',
     dayType: 'training',
     workoutType: 'gym',
@@ -45,7 +45,7 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
       latestKg: 83.0,
       previousKg: 83.2,
       targetKg: 80.0,
-      trend7d: 'losing',
+      weeklyTrend30d: 'losing',
       last7Values: [83.0, 83.2, 83.5, 83.4, 83.6, 83.7, 83.8],
       isOutlierPrevious: false,
       isOutlierLatest: false,
@@ -83,7 +83,27 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
         { date: '2026-06-27', calories: 2100, protein: 162 },
       ],
     },
+    userGoal: 'maintain',
+    userGoalIntensity: null,
+    displayName: 'Sportler',
+    progressIntelligence: {
+      version: 'v1',
+      primarySignal: { type: 'daily_context', confidence: 0.5, freshnessScore: 0 },
+      contextSignals: [],
+      progress: null,
+      phase: null,
+      plateau: null,
+      milestone: null,
+      monthlyTrend: null,
+      dayCompleteness: 1,
+      goalAtCalculation: 'maintain',
+    },
+  };
+
+  return {
+    ...context,
     ...overrides,
+    userGoal: overrides.userGoal ?? context.userGoal,
   };
 }
 
@@ -158,6 +178,7 @@ function makeFeedbackDocument(overrides: Partial<InsightFeedbackDocument> = {}):
     id: makeFeedbackId('user1', '11111111-1111-4111-8111-111111111111'),
     userId: 'user1',
     _docType: 'insightFeedback',
+    processingStatus: 'Open',
     insightId: insight.id,
     date: insight.date,
     insightGeneratedAt: insight.generatedAt,
@@ -286,6 +307,53 @@ describe('computeInputHash', () => {
   it('returns different hash when promptVersion changes', () => {
     const ctx = makeContext();
     expect(computeInputHash(ctx, 'v4')).not.toBe(computeInputHash(ctx, 'v5'));
+  });
+
+  it('includes the global prompt fingerprint and concrete system-prompt hash', () => {
+    const ctx = makeContext();
+    const base = computeInputHash(ctx, 'v14', 'general', 'sha256:fingerprint-a', 'sha256:system-a');
+    expect(base).not.toBe(computeInputHash(ctx, 'v14', 'general', 'sha256:fingerprint-b', 'sha256:system-a'));
+    expect(base).not.toBe(computeInputHash(ctx, 'v14', 'general', 'sha256:fingerprint-a', 'sha256:system-b'));
+  });
+
+  it('keeps semantic calorie and protein boundary changes visible to the hash', () => {
+    const base = makeContext();
+    const justOverBudget = makeContext({
+      nutrition: { ...base.nutrition, remainingCalories: -0.01 },
+    });
+    const justUnderBudget = makeContext({
+      nutrition: { ...base.nutrition, remainingCalories: 0.01 },
+    });
+    const exactlyAtBudget = makeContext({
+      nutrition: { ...base.nutrition, remainingCalories: 0 },
+    });
+    const unknownBudget = makeContext({
+      nutrition: { ...base.nutrition, remainingCalories: null },
+    });
+    const belowProteinBoundary = makeContext({
+      nutrition: { ...base.nutrition, remainingProteinG: 19.99 },
+    });
+    const nearlyCompleteProtein = makeContext({
+      nutrition: { ...base.nutrition, remainingProteinG: 20 },
+    });
+    const proteinGap = makeContext({
+      nutrition: { ...base.nutrition, remainingProteinG: 20.01 },
+    });
+
+    const overBudgetHash = computeInputHash(justOverBudget, 'v14');
+    const atBudgetHash = computeInputHash(exactlyAtBudget, 'v14');
+    const underBudgetHash = computeInputHash(justUnderBudget, 'v14');
+    expect(overBudgetHash).not.toBe(atBudgetHash);
+    expect(atBudgetHash).not.toBe(underBudgetHash);
+    expect(computeInputHash(unknownBudget, 'v14')).not.toBe(atBudgetHash);
+
+    const belowProteinHash = computeInputHash(belowProteinBoundary, 'v14');
+    const atProteinHash = computeInputHash(nearlyCompleteProtein, 'v14');
+    const gapProteinHash = computeInputHash(proteinGap, 'v14');
+    expect(belowProteinHash).not.toBe(atProteinHash);
+    expect(atProteinHash).not.toBe(gapProteinHash);
+    expect(computeInputHash(makeContext({ nutrition: { ...base.nutrition, remainingProteinG: null } }), 'v14'))
+      .not.toBe(atProteinHash);
   });
 
   it('includes the selected intent and activity status bucket in the hash', () => {
@@ -486,6 +554,65 @@ describe('shouldRegenerate', () => {
     });
     expect(shouldRegenerate(doc, baseHash, now, false, 'v10')).toBe(false);
   });
+
+  it('hard-invalidates missing or changed prompt identities before cache limits', () => {
+    const old = new Date(now.getTime() - MIN_REGEN_INTERVAL_MS + 60_000);
+    const base = makeDocument({
+      inputHash: baseHash,
+      promptVersion: 'v14',
+      intent: 'general',
+      promptSnapshot: { system: 'system', user: 'user' },
+      promptFingerprint: 'sha256:fingerprint-a',
+      systemPromptHash: 'sha256:system-a',
+      lastGeneratedAt: old.toISOString(),
+      dailyGenerations: MAX_DAILY_GENERATIONS,
+    });
+
+    expect(shouldRegenerate(base, baseHash, now, false, 'v14', 'sha256:fingerprint-a', 'sha256:system-a')).toBe(false);
+    expect(shouldRegenerate({ ...base, promptFingerprint: undefined }, baseHash, now, false, 'v14', 'sha256:fingerprint-a', 'sha256:system-a')).toBe(true);
+    expect(shouldRegenerate(base, baseHash, now, false, 'v14', 'sha256:fingerprint-b', 'sha256:system-a')).toBe(true);
+    expect(shouldRegenerate(base, baseHash, now, false, 'v14', 'sha256:fingerprint-a', 'sha256:system-b')).toBe(true);
+  });
+
+  it('hard-invalidates mismatched intent and exact prompt snapshot before cache limits', () => {
+    const recent = new Date(now.getTime() - MIN_REGEN_INTERVAL_MS + 60_000);
+    const expectedIntent = 'general' as const;
+    const expectedPromptSnapshot = { system: 'expected system', user: 'expected user' };
+    const base = makeDocument({
+      inputHash: baseHash,
+      promptVersion: 'v14',
+      promptFingerprint: 'sha256:fingerprint-a',
+      systemPromptHash: 'sha256:system-a',
+      intent: expectedIntent,
+      promptSnapshot: expectedPromptSnapshot,
+      lastGeneratedAt: recent.toISOString(),
+      dailyGenerations: MAX_DAILY_GENERATIONS,
+    });
+    const shouldRegenerateWithCurrentIdentity = (document: InsightDocument) => shouldRegenerate(
+      document,
+      baseHash,
+      now,
+      false,
+      'v14',
+      'sha256:fingerprint-a',
+      'sha256:system-a',
+      expectedIntent,
+      expectedPromptSnapshot,
+    );
+
+    expect(shouldRegenerateWithCurrentIdentity(base)).toBe(false);
+    expect(shouldRegenerateWithCurrentIdentity({ ...base, intent: 'phase_progress' })).toBe(true);
+    expect(shouldRegenerateWithCurrentIdentity({
+      ...base,
+      promptSnapshot: { ...expectedPromptSnapshot, system: 'changed system' },
+    })).toBe(true);
+    expect(shouldRegenerateWithCurrentIdentity({
+      ...base,
+      promptSnapshot: { ...expectedPromptSnapshot, user: 'changed user' },
+    })).toBe(true);
+    expect(shouldRegenerateWithCurrentIdentity({ ...base, intent: undefined })).toBe(true);
+    expect(shouldRegenerateWithCurrentIdentity({ ...base, promptSnapshot: undefined })).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -652,6 +779,16 @@ describe('InMemoryInsightRepository feedback documents', () => {
     await expect(repo.getFeedbackBySubmissionId('user1', first.submissionId)).resolves.toEqual(first);
   });
 
+  it('treats missing legacy processingStatus as Open when reading feedback', async () => {
+    const legacy = makeFeedbackDocument({ processingStatus: undefined });
+    await repo.createFeedbackIfAbsent(legacy);
+
+    await expect(repo.getFeedbackBySubmissionId('user1', legacy.submissionId)).resolves.toMatchObject({
+      id: legacy.id,
+      processingStatus: 'Open',
+    });
+  });
+
   it('isolates feedback lookups by user and discriminator', async () => {
     const feedback = makeFeedbackDocument();
     await repo.createFeedbackIfAbsent(feedback);
@@ -669,6 +806,43 @@ describe('InMemoryInsightRepository feedback documents', () => {
 
     await expect(repo.markNegativeFeedback(daily.userId, daily.date, daily.generatedAt)).resolves.toBe(true);
     expect((await repo.get(daily.userId, daily.date))?.feedbackScore).toBe('negative');
+  });
+
+  it('updates feedback processing status with terminal-state semantics', async () => {
+    const open = makeFeedbackDocument();
+    const done = makeFeedbackDocument({
+      id: makeFeedbackId('user1', '22222222-2222-4222-8222-222222222222'),
+      submissionId: '22222222-2222-4222-8222-222222222222',
+      processingStatus: 'Done',
+    });
+    const rejected = makeFeedbackDocument({
+      id: makeFeedbackId('user1', '33333333-3333-4333-8333-333333333333'),
+      submissionId: '33333333-3333-4333-8333-333333333333',
+      processingStatus: 'Rejected',
+    });
+    await repo.createFeedbackIfAbsent(open);
+    await repo.createFeedbackIfAbsent(done);
+    await repo.createFeedbackIfAbsent(rejected);
+
+    await expect(repo.updateFeedbackProcessingStatus('user1', open.id, 'Done')).resolves.toEqual({
+      outcome: 'updated',
+      status: 'Done',
+    });
+    await expect(repo.updateFeedbackProcessingStatus('user1', done.id, 'Done')).resolves.toEqual({
+      outcome: 'noop',
+      status: 'Done',
+    });
+    await expect(repo.updateFeedbackProcessingStatus('user1', done.id, 'Open')).resolves.toEqual({
+      outcome: 'invalid_transition',
+      status: 'Done',
+    });
+    await expect(repo.updateFeedbackProcessingStatus('user1', rejected.id, 'Done')).resolves.toEqual({
+      outcome: 'invalid_transition',
+      status: 'Rejected',
+    });
+    await expect(repo.updateFeedbackProcessingStatus('user2', open.id, 'Done')).resolves.toEqual({
+      outcome: 'not_found',
+    });
   });
 });
 

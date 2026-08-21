@@ -100,7 +100,7 @@ and therefore remains `unknown`; Daily expiry also falls back to UTC midnight.
 See [tech/09-api-reference.md](../tech/09-api-reference.md) for the complete
 cache, local-midnight, and TTL contract.
 
-The v11 Daily Insight also applies one global stale-weight safety rule across
+The v14 Daily Insight also applies one global stale-weight safety rule across
 all intents: day 14 is current, day 15 is stale, stale-as-current wording is
 rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
 accepted. The full prompt and failure contract is documented in
