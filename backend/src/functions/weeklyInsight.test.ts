@@ -396,6 +396,112 @@ describe('GET /api/ai/weekly-insight', () => {
     expect((day as typeof day & { activity?: { label: string } }).activity).toEqual({ type: 'cycling', label: 'Radtour' });
   });
 
+  it.each([
+    {
+      caseId: 'under-effective-target',
+      consumedCalories: 3000,
+      expectedTargetPercent: 83.33333333333333,
+    },
+    {
+      caseId: 'at-effective-target',
+      consumedCalories: 3600,
+      expectedTargetPercent: 100,
+    },
+  ])(
+    'RED-GATE: special activity uses effective weekly target in provider context ($caseId)',
+    async ({ consumedCalories, expectedTargetPercent }) => {
+      const create = mockOpenAi('Deterministischer Diagnose-Text.');
+      await addDiaryItem('2026-08-13', consumedCalories);
+      await getDayMetaRepository().setSpecialActivity(TEST_USER_ID, '2026-08-13', {
+        type: 'cycling',
+        movementTimeMinutes: 120,
+        distanceKm: 40,
+        elevationGainM: 200,
+        elevationLossM: 0,
+        asphaltShare: 1,
+        gravelShare: 0,
+        trailShare: 0,
+        ebikeSupport: 'NONE',
+        bodyWeightKg: 70,
+        dailyCalorieTarget: 2300,
+        calculatedAt: '2026-08-13T10:00:00.000Z',
+        estimatedMet: 6,
+        activityCalories: 840,
+        alreadyAccountedCalories: 190,
+        activityBonus: 1300,
+      });
+
+      const response = await weeklyInsightHandler(
+        await makeAuthRequest({ query: { date: '2026-08-14' } }),
+        makeContext(),
+      );
+
+      expect(response.status).toBe(200);
+      const body = bodyOf(response);
+      const reviewDay = body.days.find((day) => day.date === '2026-08-13');
+      expect(reviewDay).toMatchObject({
+        consumedCalories,
+        baseTargetCalories: 2300,
+        activityBonusCalories: 1300,
+        effectiveTargetCalories: 3600,
+        dataStatus: 'available',
+      });
+      expect(reviewDay?.targetPercent).toBeCloseTo(expectedTargetPercent, 12);
+      expect(consumedCalories).toBeGreaterThan(2300);
+      expect(consumedCalories).toBeLessThanOrEqual(3600);
+      expect(body.totals).toMatchObject({
+        includedDayCount: 1,
+        totalConsumedCalories: consumedCalories,
+        totalTargetCalories: 3600,
+      });
+      expect(body.totals.overallTargetPercent).toBeCloseTo(expectedTargetPercent, 12);
+
+      expect(create).toHaveBeenCalledTimes(1);
+      const promptRequest = create.mock.calls[0]?.[0] as {
+        messages: Array<{ content: string }>;
+      };
+      const providerUserContent = promptRequest.messages[1]?.content;
+      expect(typeof providerUserContent).toBe('string');
+      const providerContext = JSON.parse(providerUserContent) as {
+        days: Array<{
+          date: string;
+          consumedCalories: number | null;
+          baseTargetCalories: number | null;
+          activityBonusCalories: number | null;
+          effectiveTargetCalories: number | null;
+          targetPercent: number | null;
+        }>;
+        totals: {
+          includedDayCount: number;
+          totalConsumedCalories: number | null;
+          totalTargetCalories: number | null;
+          overallTargetPercent: number | null;
+        };
+      };
+      const providerDay = providerContext.days.find((day) => day.date === '2026-08-13');
+      expect(providerDay).toMatchObject({
+        consumedCalories,
+        baseTargetCalories: 2300,
+        activityBonusCalories: 1300,
+        effectiveTargetCalories: 3600,
+      });
+      expect(providerDay?.targetPercent).toBeCloseTo(expectedTargetPercent, 12);
+      expect(providerContext.totals).toMatchObject({
+        includedDayCount: 1,
+        totalConsumedCalories: consumedCalories,
+        totalTargetCalories: 3600,
+      });
+      expect(providerContext.totals.overallTargetPercent).toBeCloseTo(expectedTargetPercent, 12);
+      expect(providerUserContent).not.toContain('Test meal');
+      expect(providerUserContent).not.toContain('Test item');
+      expect(providerUserContent).not.toContain(TEST_USER_ID);
+      expect(providerUserContent).not.toContain('consumedMacros');
+      expect(providerUserContent).not.toContain('inputHash');
+      expect(providerUserContent).not.toContain('promptVersion');
+      expect(providerUserContent).not.toContain('_docType');
+    },
+  );
+
   it('serves an identical week from cache without another AI call', async () => {
     const sentinel = '__END_OF_WEEKLY_REVIEW__';
     const text = `${'x'.repeat(WEEKLY_INSIGHT_TEXT_MAX_LENGTH - sentinel.length)}${sentinel}`;
@@ -440,7 +546,7 @@ describe('GET /api/ai/weekly-insight', () => {
   });
 
   it('invalidates a v1 cache entry after the prompt version bump', async () => {
-    const create = mockOpenAi('Neue v2 Bewertung.');
+    const create = mockOpenAi('Neue v3 Bewertung.');
     const periodDates = [
       '2026-08-07', '2026-08-08', '2026-08-09', '2026-08-10',
       '2026-08-11', '2026-08-12', '2026-08-13',
@@ -480,13 +586,13 @@ describe('GET /api/ai/weekly-insight', () => {
 
     expect(bodyOf(response).evaluation).toEqual({
       status: 'fresh',
-      text: 'Neue v2 Bewertung.',
+      text: 'Neue v3 Bewertung.',
       generatedAt: expect.any(String),
     });
     expect(create).toHaveBeenCalledTimes(1);
     await expect(getInsightRepository().getWeekly(TEST_USER_ID, '2026-08-13')).resolves.toMatchObject({
-      promptVersion: 'v2',
-      response: { text: 'Neue v2 Bewertung.' },
+      promptVersion: 'v3',
+      response: { text: 'Neue v3 Bewertung.' },
     });
   });
 

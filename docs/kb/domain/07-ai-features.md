@@ -407,18 +407,24 @@ Only days with both nutrition and a positive effective target contribute to tota
 
 The AI receives only sanitized aggregate values for these seven days and the
 calculated totals. Meal names, product text, user IDs, tokens, and cache details
-are excluded. The prompt is versioned (`WEEKLY_INSIGHT_PROMPT_VERSION = 'v2'`)
-and uses Strict Structured Outputs with one validated `text` field. The generated
-text is trimmed and limited to exactly 750 characters at most; it is advisory and
-interpretive and must not invent missing data or make medical, deficit, or diagnosis
-claims. A length-truncated provider response is unavailable and is not counted
-toward the shared insight quota.
+are excluded. The prompt is versioned (`WEEKLY_INSIGHT_PROMPT_VERSION = 'v3'`)
+and uses Strict Structured Outputs with one validated `text` field. Its field
+contract treats `baseTargetCalories` as informational context, uses
+`effectiveTargetCalories` as the sole target denominator, and uses `targetPercent`
+as the sole measure of daily target attainment. `activityBonusCalories` is already
+included in the effective target and must not be counted as additional consumption.
+Exceedance language is allowed only when `targetPercent > 100`; a base target may
+not be used as the exceedance reference when an effective target is present. The
+generated text is trimmed and limited to exactly 750 characters at most; it is
+advisory and interpretive and must not invent missing data or make medical, deficit,
+or diagnosis claims. A length-truncated provider response is unavailable and is not
+counted toward the shared insight quota.
 
 Weekly results are cached separately from daily insights in the existing
 `aiInsights` container under `_docType: 'weeklyInsight'`. The cache is invalidated
 when meal/item macros or identities, DayMeta/activity/target snapshots, or the
 prompt version changes. The old text is never returned after a hash change,
-including the v1-to-v2 prompt bump.
+including the v2-to-v3 prompt bump.
 Quota is checked with the shared `daily-insight` key before AI and usage is tracked
 only after a fully valid AI response. Quota, provider, parse, and schema failures
 keep the deterministic chart data available and return `evaluation.text: null`.

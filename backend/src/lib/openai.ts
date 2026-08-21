@@ -26,6 +26,7 @@ import {
 import type { InsightInputContext, InsightIntent, InsightResponse } from '@fittrack/shared';
 import { selectInsightIntent } from './dailyInsightIntent';
 import { toInsightResponse, validateDailyInsightResponse } from './dailyInsightValidation';
+import { validateWeeklyInsightExceedanceClaims } from './weeklyInsightValidation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -694,8 +695,14 @@ export async function generateWeeklyInsight(
     throw new Error('Weekly insight response has an invalid schema');
   }
 
+  const text = parsedResponse.data.text;
+  const validation = validateWeeklyInsightExceedanceClaims(text, context.days);
+  if (!validation.valid) {
+    throw new Error(validation.reason ?? 'Weekly insight response failed semantic validation');
+  }
+
   return {
-    text: parsedResponse.data.text,
+    text,
     tokensUsed: completion.usage?.total_tokens ?? 0,
   };
 }

@@ -43,6 +43,7 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-022 | Daily prompt fingerprint mutation coverage, AC-3 | Blocking | Backend | Closed |
 | FT-QA-2026-023 | Daily prompt provider-input guard coverage, AC-4 | Blocking | Backend | Closed |
 | FT-QA-2026-024 | Daily cache provenance comparison, AC-7/AC-14 | Blocking | Backend | Closed |
+| FT-QA-2026-025 | Pre-existing Daily Insight syntax error blocking backend build | Blocking | Backend | Awaiting decision |
 
 ## Actionable Findings
 
@@ -358,6 +359,19 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Status:** Closed
 - **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
 - **History:** 2026-08-21 - Imported from the QA report and routed to Backend for correction. 2026-08-21 - Backend added exact intent and system/user snapshot comparisons before hash and rate-limit checks, with recent/max-generation regression coverage; focused tests passed. 2026-08-21 - Full QA re-review verified AC-7 and AC-14; closed.
+
+### FT-QA-2026-025
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Wochenrückblick_AI-Sonderaktivitaet-Kalorien.md`
+- **Acceptance criterion:** `N/A` (QA build verification baseline)
+- **Description:** `npm run build:verify` exits with code 2 because the unchanged `backend/src/lib/prompts/dailyInsightV10.ts` contains raw prompt prose instead of a valid TypeScript declaration. This is outside the approved Weekly Insight diagnostic scope and is unrelated to the tested Sonderaktivität path, but it prevents a clean backend build and caused the QA report to return `FAIL`.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `docs/qa/reports/PLAN_US-01_Wochenrückblick_AI-Sonderaktivitaet-Kalorien.md`; `cd backend; npm run build:verify` exit code 2; `backend/src/lib/prompts/dailyInsightV10.ts`.
+- **Recommendation:** Decide separately whether to repair or restore the pre-existing Daily Insight prompt syntax, then rerun `cd backend; npm run build:verify`. Do not mix this unrelated repair with a Weekly Insight correction; the Weekly Red Gate produced no `RED_CONFIRMED_A` or `RED_CONFIRMED_B`.
+- **Status:** Awaiting decision
+- **Decision:** Pending user choice: `Fix requested`, `Accepted`, or `Deferred` as a separate baseline-build task.
+- **History:** 2026-08-21 - Imported from the Weekly Insight diagnostic QA report. The Weekly payload and credentialed prompt eval did not authorize a correction; the finding remains separate from that workflow.
 
 ## Verification Notes (Not Findings)
 

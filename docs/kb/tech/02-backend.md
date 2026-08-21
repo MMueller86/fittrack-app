@@ -122,7 +122,9 @@ await trackUsage(user, 'food-estimate');
 
 `GET /api/ai/weekly-insight` reuses the existing `daily-insight` feature key as
 the shared personal-insight budget. It checks quota before Azure OpenAI and tracks
-usage only after a response passes server-side Structured Output validation. Quota
+usage only after a response passes server-side Structured Output validation and the
+weekly exceedance-language validation. When no day has `targetPercent > 100`,
+generated exceedance language is rejected and the invalid output is not cached. Quota
 exhaustion is converted to a `200` weekly response with usable deterministic week
 data and `evaluation.text: null`; it is not exposed as a standalone `429`.
 

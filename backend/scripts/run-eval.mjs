@@ -63,14 +63,16 @@ export function getMissingRequiredEvalKeys(environment) {
   return REQUIRED_EVAL_ENV_KEYS.filter((key) => !isNonEmptyString(environment[key]));
 }
 
-function runVitest(environment) {
+export function buildVitestArgs(extraArgs = []) {
+  return ['run', '--config', 'vitest.eval.config.mts', ...extraArgs];
+}
+
+function runVitest(environment, extraArgs = []) {
   const child = spawn(
     process.execPath,
     [
       require.resolve('vitest/vitest.mjs', { paths: [backendDirectory] }),
-      'run',
-      '--config',
-      'vitest.eval.config.mts',
+      ...buildVitestArgs(extraArgs),
     ],
     {
       cwd: backendDirectory,
@@ -90,18 +92,19 @@ function runVitest(environment) {
 async function main() {
   const environment = await loadEvalEnvironment();
   const missingKeys = getMissingRequiredEvalKeys(environment);
+  const extraArgs = process.argv.slice(2);
 
   if (missingKeys.length > 0) {
     console.error(
       `Live prompt evals are UNVERIFIED: missing ${missingKeys.join(', ')}. ` +
         'Set them in backend/local.settings.json or the process environment.',
     );
-    const vitestExitCode = await runVitest(environment);
+    const vitestExitCode = await runVitest(environment, extraArgs);
     process.exitCode = vitestExitCode === 0 ? EVAL_UNVERIFIED_EXIT_CODE : vitestExitCode;
     return;
   }
 
-  process.exitCode = await runVitest(environment);
+  process.exitCode = await runVitest(environment, extraArgs);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {

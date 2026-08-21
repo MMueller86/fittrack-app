@@ -1,0 +1,140 @@
+{
+  "format": "fittrack-weekly-insight-diagnostic-v1",
+  "date": "2026-08-21",
+  "diagnosis": "C",
+  "status": "UNVERIFIED",
+  "gate": "UNVERIFIED",
+  "execution": [
+    {
+      "command": "cd backend; npx vitest run src/functions/weeklyInsight.test.ts -t \"RED-GATE: special activity uses effective weekly target in provider context\"",
+      "exitCode": 0,
+      "result": "PASS",
+      "output": [
+        "Tests 2 passed | 14 skipped (16)",
+        "RED-GATE: special activity uses effective weekly target in provider context ('under-effective-target') PASS",
+        "RED-GATE: special activity uses effective weekly target in provider context ('at-effective-target') PASS"
+      ],
+      "shellNote": "The terminal was already in backend; the cd backend part emitted a backend\\backend path warning before Vitest ran in backend."
+    },
+    {
+      "command": "cd backend; npm run test:eval -- src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts",
+      "exitCode": 1,
+      "result": "UNVERIFIED",
+      "output": [
+        "WEEKLY_INSIGHT_DIAGNOSTIC_MANIFEST={\"diagnosis\":\"C\",\"status\":\"UNVERIFIED\",\"gate\":\"UNVERIFIED\",\"payload\":{\"underEffectiveTarget\":\"PASS\",\"atEffectiveTarget\":\"PASS\"},\"ai\":{\"underEffectiveTarget\":\"CORRECT\",\"atEffectiveTarget\":\"UNVERIFIED\"}}",
+        "AssertionError: expected 'UNVERIFIED' to be 'CORRECT' // Object.is equality",
+        "Expected: \"CORRECT\"",
+        "Received: \"UNVERIFIED\"",
+        "Tests 1 failed | 2 passed (3)"
+      ],
+      "shellNote": "The terminal was already in backend; the cd backend part emitted a backend\\backend path warning before npm ran in backend."
+    }
+  ],
+  "payload": {
+    "underEffectiveTarget": {
+      "caseId": "under-effective-target",
+      "result": "PASS",
+      "expected": {
+        "consumedCalories": 3000,
+        "baseTargetCalories": 2300,
+        "activityBonusCalories": 1300,
+        "effectiveTargetCalories": 3600,
+        "targetPercent": 83.33333333333333,
+        "totals": {
+          "includedDayCount": 1,
+          "totalConsumedCalories": 3000,
+          "totalTargetCalories": 3600,
+          "overallTargetPercent": 83.33333333333333
+        }
+      },
+      "actualProviderContext": {
+        "activityDay": {
+          "date": "2026-08-13",
+          "consumedCalories": 3000,
+          "baseTargetCalories": 2300,
+          "activityBonusCalories": 1300,
+          "effectiveTargetCalories": 3600,
+          "targetPercent": 83.33333333333333
+        },
+        "totals": {
+          "includedDayCount": 1,
+          "totalConsumedCalories": 3000,
+          "totalTargetCalories": 3600,
+          "overallTargetPercent": 83.33333333333333
+        }
+      }
+    },
+    "atEffectiveTarget": {
+      "caseId": "at-effective-target",
+      "result": "PASS",
+      "expected": {
+        "consumedCalories": 3600,
+        "baseTargetCalories": 2300,
+        "activityBonusCalories": 1300,
+        "effectiveTargetCalories": 3600,
+        "targetPercent": 100,
+        "totals": {
+          "includedDayCount": 1,
+          "totalConsumedCalories": 3600,
+          "totalTargetCalories": 3600,
+          "overallTargetPercent": 100
+        }
+      },
+      "actualProviderContext": {
+        "activityDay": {
+          "date": "2026-08-13",
+          "consumedCalories": 3600,
+          "baseTargetCalories": 2300,
+          "activityBonusCalories": 1300,
+          "effectiveTargetCalories": 3600,
+          "targetPercent": 100
+        },
+        "totals": {
+          "includedDayCount": 1,
+          "totalConsumedCalories": 3600,
+          "totalTargetCalories": 3600,
+          "overallTargetPercent": 100
+        }
+      }
+    }
+  },
+  "liveEvaluation": {
+    "promptVersion": "v2",
+    "deployment": "gpt-4o-mini",
+    "cases": [
+      {
+        "fixtureId": "special-activity-under-effective-target",
+        "expectedRelation": "within_effective_target",
+        "generatorStatus": "GENERATED",
+        "structuredJudge": {
+          "status": "JUDGED",
+          "basis": "effective_target",
+          "relation": "within_effective_target",
+          "evidence": "Dies entspricht 83 % deines effektiven Tagesziels von 3600 Kalorien"
+        },
+        "localSemanticStatus": "CORRECT",
+        "boundedEvidenceExcerpt": "Dies entspricht 83 % deines effektiven Tagesziels von 3600 Kalorien",
+        "reason": null
+      },
+      {
+        "fixtureId": "special-activity-at-effective-target",
+        "expectedRelation": "at_effective_target",
+        "generatorStatus": "GENERATED",
+        "structuredJudge": {
+          "status": "JUDGED",
+          "basis": "effective_target",
+          "relation": "at_effective_target",
+          "evidence": "du hast genau dieses Ziel erreicht"
+        },
+        "localSemanticStatus": "UNVERIFIED",
+        "boundedGeneratedTextExcerpt": "Du hast genau dieses Ziel erreicht",
+        "exactJudgeEvidencePresent": false,
+        "reason": "missing_or_unproven_evidence"
+      }
+    ]
+  },
+  "firstDivergentPath": null,
+  "rootCause": "Theorie mit dem aktuellen Repository nicht bestätigt",
+  "correctionRouting": "TERMINATED_NO_CORRECTION",
+  "productionCorrectionMade": false
+}

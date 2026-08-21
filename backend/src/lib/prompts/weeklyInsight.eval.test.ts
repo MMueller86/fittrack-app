@@ -5,7 +5,7 @@ import { WEEKLY_INSIGHT_PROMPT_VERSION, WEEKLY_INSIGHT_TEXT_MAX_LENGTH } from '.
 import { WEEKLY_INSIGHT_EVAL_FIXTURES } from './weeklyInsight.eval.fixtures';
 
 /** Update this constant whenever WEEKLY_INSIGHT_PROMPT_VERSION changes and re-review the fixtures. */
-const TESTED_PROMPT_VERSION = 'v2';
+const TESTED_PROMPT_VERSION = 'v3';
 
 it('weekly insight prompt version matches fixture expectations', () => {
   expect(WEEKLY_INSIGHT_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);

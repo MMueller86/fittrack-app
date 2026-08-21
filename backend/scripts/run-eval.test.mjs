@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { test } from 'node:test';
 
 import {
+  buildVitestArgs,
   getMissingRequiredEvalKeys,
   loadEvalEnvironment,
   REQUIRED_EVAL_ENV_KEYS,
@@ -60,4 +61,16 @@ test('reports missing required settings without exposing values', async () => {
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }
+});
+
+test('forwards a targeted eval file to Vitest', () => {
+  assert.deepEqual(
+    buildVitestArgs(['src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts']),
+    [
+      'run',
+      '--config',
+      'vitest.eval.config.mts',
+      'src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts',
+    ],
+  );
 });
