@@ -104,13 +104,14 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 ### `weightTrend.ts`
 - `calculateWeightTrendPerWeek` — linear regression over the last 30 calendar days, projected to a weekly change
 - `classifyWeightTrend` — shared `gaining | losing | stable` classification using the chart thresholds
+- Date-only window boundaries and regression spacing use UTC-neutral calendar-day ordinals; local `Date` components only select the current local calendar date, so DST and 24-hour instant length do not change the result.
 - Used by both the mobile weight chart and the backend Daily Insight context
 
 ### `hint.ts`
 - `HintId` — `H1`–`H28` situational hints + `M0`–`M9` motivational hints
 - `HintCategory` — `'orientation' | 'daycontext' | 'positive' | 'motivation'`
 - `HintResult` — `{ id, text, emoji, category }`
-- `HintContext` — input to the rule engine (meals, summary, targets, dayType, currentHour, bmr)
+- `HintContext` — input to the rule engine (meals, summary, targets, dayType, currentLocalDate, nullable currentHour, bmr)
 
 ### `insight.ts`
 - `InsightStatus` — `'fresh' | 'cached' | 'quota_exceeded' | 'unavailable'`

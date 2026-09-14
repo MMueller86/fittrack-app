@@ -111,11 +111,23 @@ export const getDiaryHandler = withHandler(
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const date = request.query.get('date');
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const localDate = request.query.get('localDate');
+    if (!date || !isoDate.safeParse(date).success) {
       return { status: 400, jsonBody: { error: 'Query param "date" must be YYYY-MM-DD' } };
     }
-    const localHour = parseInt(request.query.get('localHour') ?? '12', 10);
-    const currentHour = Number.isFinite(localHour) && localHour >= 0 && localHour <= 23 ? localHour : 12;
+    if (!localDate || !isoDate.safeParse(localDate).success) {
+      return { status: 400, jsonBody: { error: 'Query param "localDate" must be YYYY-MM-DD' } };
+    }
+    const rawLocalHour = request.query.get('localHour');
+    const parsedLocalHour = rawLocalHour != null && /^-?\d+$/.test(rawLocalHour)
+      ? Number(rawLocalHour)
+      : null;
+    const currentHour = parsedLocalHour != null
+      && Number.isSafeInteger(parsedLocalHour)
+      && parsedLocalHour >= 0
+      && parsedLocalHour <= 23
+      ? parsedLocalHour
+      : null;
 
     const diaryRepo = getDiaryRepository();
 
@@ -164,6 +176,7 @@ export const getDiaryHandler = withHandler(
         summary: result.summary,
         targets: effectiveTargets,
         dayType: resolvedDayType,
+        currentLocalDate: localDate,
         currentHour,
         bmr: profile?.calculationMeta?.bmr,
         weightKg: profile?.weightKg,
@@ -176,7 +189,7 @@ export const getDiaryHandler = withHandler(
     const hintChanged =
       hintState === null ||
       hintState.lastHintId !== hint.id ||
-      hintState.lastHintDate !== date;
+      hintState.lastHintDate !== localDate;
     if (hintChanged) {
       updatedState.userId = userId;
       getHintStateRepository().upsert(userId, updatedState).catch(() => {
@@ -425,6 +438,7 @@ export const addItemHandler = withHandler(
               ...(d.inputMode ? { lastInputMode: d.inputMode } : {}),
               ...(d.inputAmount != null ? { lastInputAmount: d.inputAmount } : {}),
               mealType: meal.type,
+              usageDate: meal.date,
             });
           }
         } catch {

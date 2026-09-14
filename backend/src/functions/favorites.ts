@@ -36,6 +36,16 @@ const AddFavoriteBodySchema = z.object({
   }).optional().nullable(),
 });
 
+function isRealIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() + 1 === month
+    && date.getUTCDate() === day;
+}
+
 // GET /api/favorites
 const VALID_MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout']);
 
@@ -51,8 +61,12 @@ export const listFavoritesHandler = withHandler(
       if (!VALID_MEAL_TYPES.has(contextParam)) {
         return { status: 400, jsonBody: { error: `Invalid context. Must be one of: ${[...VALID_MEAL_TYPES].join(', ')}` } };
       }
+      const localDate = request.query.get('localDate');
+      if (!localDate || !isRealIsoDate(localDate)) {
+        return { status: 400, jsonBody: { error: 'Query param "localDate" must be a real YYYY-MM-DD date' } };
+      }
       const context = contextParam as MealType;
-      const sorted = sortByRelevance(favorites, context);
+      const sorted = sortByRelevance(favorites, context, localDate);
       logEvent(ctx, 'info', 'favorites.list', { count: favorites.length, context });
       return { status: 200, jsonBody: { items: sorted, context } };
     }

@@ -13,10 +13,10 @@ export const favoritesApi = {
     return apiClient.get<UserFoodRelation[]>('/favorites').then((r) => r.data);
   },
 
-  /** GET /api/favorites?context=MealType — backend-ranked list */
-  listFavoritesRanked(context: MealType): Promise<FavoritesRankedResponse> {
+  /** GET /api/favorites?context=MealType&localDate=YYYY-MM-DD — backend-ranked list */
+  listFavoritesRanked(context: MealType, localDate: string): Promise<FavoritesRankedResponse> {
     return apiClient
-      .get<FavoritesRankedResponse>('/favorites', { params: { context } })
+      .get<FavoritesRankedResponse>('/favorites', { params: { context, localDate } })
       .then((r) => r.data);
   },
 

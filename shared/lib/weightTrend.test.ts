@@ -28,6 +28,21 @@ describe('weightTrend', () => {
     ]);
   });
 
+  it('keeps the 30-day boundary calendar-based across the DST fall-back', () => {
+    const previousTimezone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+
+    try {
+      const entries = [makeEntry('2026-10-31', 80)];
+      const now = new Date('2026-11-30T04:30:00.000Z');
+
+      expect(getWeightEntriesInLastDays(entries, 30, now)).toHaveLength(1);
+    } finally {
+      if (previousTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimezone;
+    }
+  });
+
   it('matches the chart regression and projects the slope to one week', () => {
     const entries = [
       makeEntry('2026-08-01', 80),
@@ -36,6 +51,25 @@ describe('weightTrend', () => {
     ];
 
     expect(calculateWeightTrendPerWeek(entries, 'kg', NOW)).toBeCloseTo(-1, 10);
+  });
+
+  it('uses equal calendar-day spacing across the DST spring-forward', () => {
+    const previousTimezone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+
+    try {
+      const entries = [
+        makeEntry('2026-03-07', 80),
+        makeEntry('2026-03-14', 79),
+        makeEntry('2026-03-21', 78),
+      ];
+
+      expect(calculateWeightTrendPerWeek(entries, 'kg', new Date('2026-03-22T16:00:00.000Z')))
+        .toBeCloseTo(-1, 10);
+    } finally {
+      if (previousTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimezone;
+    }
   });
 
   it('converts mixed-unit entries before calculating the trend', () => {

@@ -64,6 +64,16 @@ const UNAVAILABLE_RESPONSE: InsightResponse = {
   feedbackAvailable: false,
 };
 
+function isValidIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() + 1 === month
+    && date.getUTCDate() === day;
+}
+
 export { buildDailyInsightContext as buildInputContext } from '../lib/dailyInsightContext';
 
 // ---------------------------------------------------------------------------
@@ -76,13 +86,13 @@ export const dailyInsightHandler = withHandler(
     const userContext = await requireUser(request);
     const { userId, tier, isAdmin } = userContext;
 
-    // Determine target date (default: today UTC)
+    // The client supplies the local calendar date explicitly.
     const url = new URL(request.url);
     const rawDate = url.searchParams.get('date');
-    const date =
-      rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
-        ? rawDate
-        : new Date().toISOString().split('T')[0]!;
+    if (!rawDate || !isValidIsoDate(rawDate)) {
+      return { status: 400, jsonBody: { error: 'Query param "date" must be a real YYYY-MM-DD date' } };
+    }
+    const date = rawDate;
 
     // Local hour of the user's device (0–23), sent by the client to avoid
     // timezone issues. Used by the AI to determine whether the day is still
@@ -95,6 +105,12 @@ export const dailyInsightHandler = withHandler(
     const timezoneOffsetMinutes = normalizeTimezoneOffsetMinutes(
       url.searchParams.get('timezoneOffsetMinutes'),
     );
+    if (timezoneOffsetMinutes == null) {
+      return {
+        status: 400,
+        jsonBody: { error: 'Query param "timezoneOffsetMinutes" must be an integer from -840 to 840' },
+      };
+    }
 
     const insightRepo = getInsightRepository();
     const now = new Date();

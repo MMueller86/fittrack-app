@@ -3,6 +3,7 @@
 
 import { apiClient } from './client';
 import type { DiaryDayResponse, MealType, Meal, NutritionValues, SpecialActivity } from '@fittrack/shared';
+import { getLocalDateContext } from '../date/localDate';
 
 export type QuantityMode = 'grams' | 'portions';
 
@@ -57,8 +58,16 @@ export type AddItemInput = AddItemFlatInput | AddItemCalculatedInput | AddItemPr
 export const diaryApi = {
   /** GET /api/diary?date=YYYY-MM-DD */
   getDay(date: string): Promise<DiaryDayResponse> {
-    const localHour = new Date().getHours();
-    return apiClient.get<DiaryDayResponse>('/diary', { params: { date, localHour } }).then((r) => r.data);
+    const { currentLocalDate, currentHour } = getLocalDateContext();
+    return apiClient
+      .get<DiaryDayResponse>('/diary', {
+        params: {
+          date,
+          localDate: currentLocalDate,
+          ...(currentHour === null ? {} : { localHour: currentHour }),
+        },
+      })
+      .then((r) => r.data);
   },
 
   /** POST /api/diary/meals */

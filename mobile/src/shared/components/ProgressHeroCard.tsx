@@ -10,6 +10,7 @@ import type { WeightEntry, WeightUnit, GoalType } from '@fittrack/shared';
 import { progressGrowsOnDecrease, goalLabel } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { TrendPill } from './TrendPill';
+import { differenceInLocalDays, getLocalIsoDate, isValidDateOnly } from '../date/localDate';
 
 export interface ProgressHeroCardProps {
   latest: WeightEntry | undefined;
@@ -33,10 +34,9 @@ function formatLongDate(iso: string): string {
   });
 }
 
-function daysSince(iso: string): number {
-  const [y, m, d] = iso.split('-').map(Number);
-  if (!y || !m || !d) return 0;
-  return Math.floor((Date.now() - new Date(y, m - 1, d).getTime()) / 86_400_000);
+export function daysSince(iso: string, now: Date = new Date()): number {
+  if (!isValidDateOnly(iso)) return 0;
+  return differenceInLocalDays(getLocalIsoDate(now), iso);
 }
 
 function toKg(entry: WeightEntry): number {

@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import type { AiFoodEstimatePreview, FoodSearchResult, MealType } from '@fittrack/shared';
+import { getLocalIsoDate } from '../../../shared/date/localDate';
 import { getSuggestedMealType } from './mealTimeRules';
 
 export interface FoodEntryHubContext {
@@ -65,7 +66,7 @@ interface FoodEntryHubStore {
   close: () => void;
 }
 
-const TODAY = () => new Date().toISOString().split('T')[0]!;
+const TODAY = () => getLocalIsoDate();
 
 export const useFoodEntryHubStore = create<FoodEntryHubStore>((set) => ({
   isOpen: false,

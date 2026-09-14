@@ -4,8 +4,7 @@
 import { create } from 'zustand';
 import type { DayType, ProfileTargets, WorkoutType } from '@fittrack/shared';
 import { profileApi } from '../../shared/api/profileApi';
-
-const TODAY = () => new Date().toISOString().split('T')[0];
+import { getLocalIsoDate } from '../../shared/date/localDate';
 
 interface DayTypeState {
   dayType: DayType;
@@ -35,13 +34,15 @@ export const useDayTypeStore = create<DayTypeState>((set, get) => ({
   setDayType: async (type: DayType, workoutType?: WorkoutType | null) => {
     const prev = get().dayType;
     const prevWorkout = get().workoutType;
+    const prevDate = get().dayTypeDate;
     const resolved = type === 'rest' ? null : (workoutType ?? get().workoutType);
-    set({ dayType: type, workoutType: resolved });
+    const today = getLocalIsoDate();
+    set({ dayType: type, dayTypeDate: today, workoutType: resolved });
     try {
-      await profileApi.setDayType(TODAY(), type, resolved);
+      await profileApi.setDayType(today, type, resolved);
     } catch {
       // Revert on error
-      set({ dayType: prev, workoutType: prevWorkout });
+      set({ dayType: prev, dayTypeDate: prevDate, workoutType: prevWorkout });
     }
   },
 }));

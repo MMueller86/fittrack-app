@@ -59,12 +59,12 @@ describe('GET /api/weights', () => {
 });
 
 describe('POST /api/weights', () => {
-  it('creates an entry with default unit "kg" and today\'s date', async () => {
+  it('creates an entry with default unit "kg" and the explicit date', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-04-30T10:15:00.000Z'));
 
     const res = await addWeightHandler(
-      await makeAuthRequest({ body: { value: 82.5 } }),
+      await makeAuthRequest({ body: { value: 82.5, date: '2026-05-01' } }),
       makeContext(),
     );
 
@@ -80,7 +80,7 @@ describe('POST /api/weights', () => {
     expect(entry.userId).toBe(TEST_USER_ID);
     expect(entry.value).toBe(82.5);
     expect(entry.unit).toBe('kg');
-    expect(entry.date).toBe('2026-04-30');
+    expect(entry.date).toBe('2026-05-01');
     expect(entry.id).toMatch(/^[0-9a-f-]{36}$/i);
     expect(entry.createdAt).toBe('2026-04-30T10:15:00.000Z');
   });
@@ -122,6 +122,15 @@ describe('POST /api/weights', () => {
   ])('returns 400 on invalid date (%s)', async (_label, date) => {
     const res = await addWeightHandler(
       await makeAuthRequest({ body: { value: 80, unit: 'kg', date } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('date') });
+  });
+
+  it('returns 400 when date is missing instead of using a UTC fallback', async () => {
+    const res = await addWeightHandler(
+      await makeAuthRequest({ body: { value: 80, unit: 'kg' } }),
       makeContext(),
     );
     expect(res.status).toBe(400);

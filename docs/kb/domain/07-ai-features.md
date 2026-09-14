@@ -219,15 +219,22 @@ language, without adding unapproved numeric nutrition thresholds.
 
 The current Mobile Daily request also sends `timezoneOffsetMinutes`, interpreted
 as local time minus UTC (for example, UTC+2 is `120`). Only integer values in
-`[-840,840]` are valid. Missing or invalid values normalize to `null` and use a
-tolerant legacy fallback: the date default remains the backend UTC date,
-current-day activity evidence remains unknown, and expiry falls back to UTC
-midnight. A valid offset compares the requested date with the offset-adjusted
-local date, enables the validated `localHour` activity heuristic only for that
-current day, and sets new Daily documents to expire at the next local midnight
-represented as UTC. The Cosmos `ttl` is the ceiling of the remaining seconds.
-The normalized offset is part of the input hash, so a changed normalized offset
-follows the normal cache regeneration rules.
+`[-840,840]` are valid. The request also requires a real `date`; missing,
+malformed, calendar-invalid, fractional, or out-of-range date/offset values
+return HTTP `400` at the handler boundary, before context construction, cache
+reads, quota checks, or AI calls. The handler never substitutes a backend UTC
+date or UTC expiry. A valid offset compares the requested date with the
+offset-adjusted local date, enables the validated `localHour` activity heuristic
+only for that current day, and sets new Daily documents to expire at the next
+local midnight represented as UTC. The Cosmos `ttl` is the ceiling of the
+remaining seconds. The normalized offset is part of the input hash, so a
+changed normalized offset follows the normal cache regeneration rules.
+
+This boundary change leaves the Daily prompt, Structured Output, public AI
+response, quota ordering, quota response, persistence, and usage tracking
+unchanged for valid requests. Context/provider and server-validation failures
+remain friendly HTTP `200` `unavailable` responses, and quota exhaustion remains
+friendly HTTP `200` `quota_exceeded` without usage tracking.
 
 ### v14 prompt, output, and failure contract
 

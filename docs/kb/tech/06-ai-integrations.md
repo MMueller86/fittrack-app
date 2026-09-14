@@ -87,17 +87,17 @@ failure does not call the provider, persist an incomplete insight, or consume
 Daily quota.
 
 **Request and local-time boundary:**
-- `date` is the cache and context date. If it is absent or does not have the
-	`YYYY-MM-DD` shape, the handler falls back to the current backend UTC date;
-	the handler does not perform an additional calendar-date validation.
+- `date` is the required explicit real local calendar date used for cache and
+	context. Missing, malformed, or calendar-invalid values return HTTP `400`
+	before context, cache, quota, or AI work.
 - `localHour` is optional and is accepted only as an integer from `0` through
 	`23`. Missing, non-integer, or out-of-range values become `null` and produce
 	an unknown activity status when an activity exists.
-- `timezoneOffsetMinutes` means local time minus UTC (for example, UTC+2 is
-	`120`). Only integer values in `[-840,840]` are valid. Missing or invalid
-	values normalize to `null` and retain a tolerant legacy fallback: the date
-	default remains the backend UTC date, local-hour activity evidence is not
-	treated as current-day evidence, and expiry uses UTC midnight.
+- `timezoneOffsetMinutes` is required and means local time minus UTC (for
+	example, UTC+2 is `120`). Only integer values in `[-840,840]` are valid.
+	Missing, fractional, or out-of-range values return HTTP `400` before
+	context, cache, quota, or AI work; the handler never substitutes a backend
+	UTC date, UTC hour, or UTC expiry.
 - With a valid offset, current-day detection compares the requested date with
 	the offset-adjusted local date. This controls whether the validated
 	`localHour` may produce `planned` or `likely_completed`; otherwise an
@@ -106,6 +106,9 @@ Daily quota.
 	of the remaining seconds. The normalized offset is included in the input
 	hash, so a changed normalized offset follows the normal cache regeneration
 	rules.
+- This local date and local-midnight handling affects Daily Insight semantics
+	only. Technical timestamps and instants remain UTC; the prompt, Structured
+	Output schema, and quota/usage semantics remain unchanged.
 
 **Input context and deterministic routing:**
 - `InsightInputContext` contains the current date/day context, weight and goal

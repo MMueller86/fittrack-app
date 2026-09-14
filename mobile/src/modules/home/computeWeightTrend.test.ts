@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { computeWeightTrend } from './computeWeightTrend';
 import type { WeightEntry } from '@fittrack/shared';
+import { addLocalDays } from '../../shared/date/localDate';
 
 function makeEntries(values: number[], startDate = '2026-06-01'): WeightEntry[] {
   return values.map((value, i) => {
-    const d = new Date(startDate);
-    d.setDate(d.getDate() + i * 2); // alle 2 Tage ein Eintrag
+    const date = addLocalDays(startDate, i * 2);
+    const createdAt = new Date(`${date}T12:00:00`).toISOString();
     return {
       id: `e${i}`,
       userId: 'u1',
-      date: d.toISOString().split('T')[0],
+      date,
       value,
       unit: 'kg' as const,
-      createdAt: d.toISOString(),
+      createdAt,
     };
   });
 }

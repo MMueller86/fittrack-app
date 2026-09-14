@@ -91,6 +91,7 @@ afterEach(() => {
 function makeInputContext(): InsightInputContext {
   return {
     date: DATE,
+    timezoneOffsetMinutes: 0,
     dayType: 'training',
     workoutType: 'gym',
     currentHourLocal: 10,
@@ -243,7 +244,7 @@ async function expectFreshForIdentityMismatch(
   expect(generateDailyInsight).toHaveBeenCalledTimes(1);
 }
 
-async function makeDailyRequest(query: Record<string, string> = { date: DATE }) {
+async function makeDailyRequest(query: Record<string, string> = { date: DATE, timezoneOffsetMinutes: '0' }) {
   const search = new URLSearchParams(query).toString();
   const request = await makeAuthRequest();
   Object.assign(request, { url: `http://localhost/api/ai/daily-insight${search ? `?${search}` : ''}` });
@@ -263,10 +264,40 @@ describe('GET /api/ai/daily-insight handler contract', () => {
   });
 
   it.each([
-    ['malformed date and out-of-range hour', { date: 'not-a-date', localHour: '24' }, DATE, null],
-    ['calendar-invalid date shape and fractional hour', { date: '2026-02-30', localHour: '1.5' }, '2026-02-30', null],
-    ['valid late hour', { date: DATE, localHour: '23' }, DATE, 23],
-  ])('normalizes date and localHour for %s', async (_label, query, expectedDate, expectedHour) => {
+    ['missing date', {}],
+    ['malformed date', { date: 'not-a-date' }],
+    ['calendar-invalid date', { date: '2026-02-30' }],
+  ])('rejects %s instead of using a UTC date fallback', async (_label, query) => {
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(query),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining('date') });
+    expect(buildDailyInsightContext).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing offset', { date: DATE }],
+    ['fractional offset', { date: DATE, timezoneOffsetMinutes: '120.5' }],
+    ['out-of-range offset', { date: DATE, timezoneOffsetMinutes: '900' }],
+  ])('rejects %s instead of using UTC offset semantics', async (_label, query) => {
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(query),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining('timezoneOffsetMinutes') });
+    expect(buildDailyInsightContext).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['out-of-range hour', { date: DATE, timezoneOffsetMinutes: '0', localHour: '24' }, DATE, null],
+    ['fractional hour', { date: DATE, timezoneOffsetMinutes: '0', localHour: '1.5' }, DATE, null],
+    ['valid late hour', { date: DATE, timezoneOffsetMinutes: '0', localHour: '23' }, DATE, 23],
+  ])('normalizes localHour for %s', async (_label, query, expectedDate, expectedHour) => {
     const response = await dailyInsightHandler(
       await makeDailyRequest(query),
       makeContext(),
@@ -284,9 +315,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
 
   it.each([
     ['valid offset', { date: DATE, timezoneOffsetMinutes: '120' }, 120, true],
-    ['missing offset', { date: DATE }, null, false],
-    ['fractional offset', { date: DATE, timezoneOffsetMinutes: '120.5' }, null, false],
-    ['out-of-range offset', { date: DATE, timezoneOffsetMinutes: '900' }, null, false],
+    ['zero offset', { date: DATE, timezoneOffsetMinutes: '0' }, 0, true],
   ] as const)('normalizes timezoneOffsetMinutes for %s', async (_label, query, expectedOffset, expectedCurrentDay) => {
     const response = await dailyInsightHandler(
       await makeDailyRequest(query),
@@ -319,26 +348,6 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       expiresAt: '2026-08-21T10:00:00.000Z',
       ttl: 37_800,
       inputContext: { timezoneOffsetMinutes: 840 },
-    });
-  });
-
-  it('keeps the UTC expiry fallback for an invalid offset', async () => {
-    vi.setSystemTime(new Date('2026-08-20T23:30:00.000Z'));
-
-    const response = await dailyInsightHandler(
-      await makeDailyRequest({ date: DATE, timezoneOffsetMinutes: '900', localHour: '23' }),
-      makeContext(),
-    );
-
-    expect(response.status).toBe(200);
-    expect(buildDailyInsightContext).toHaveBeenCalledWith(expect.objectContaining({
-      timezoneOffsetMinutes: null,
-      isCurrentDay: false,
-    }));
-    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toMatchObject({
-      expiresAt: '2026-08-21T00:00:00.000Z',
-      ttl: 1_800,
-      inputContext: { timezoneOffsetMinutes: null },
     });
   });
 

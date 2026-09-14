@@ -15,6 +15,7 @@ import type { DiaryDayResponse, MealType, Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
 import { diaryApi } from '../../shared/api/diaryApi';
+import { getLocalIsoDate } from '../../shared/date/localDate';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { MealChip } from '../../shared/components/MealChip';
 import { NutritionTile } from '../../shared/components/NutritionTile';
@@ -52,7 +53,7 @@ const MEAL_OPTIONS = LOGGABLE_MEAL_TYPES.map((type) => ({
 }));
 
 function isoToday(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalIsoDate();
 }
 
 export default function LogRecipeModal({ visible, recipe, onClose, onLogged }: Props) {

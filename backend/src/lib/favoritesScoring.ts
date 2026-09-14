@@ -4,6 +4,16 @@ function daysSince(isoDate: string, now: Date): number {
   return (now.getTime() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24);
 }
 
+function dateOnlyFromInstant(instant: Date): string {
+  return instant.toISOString().substring(0, 10);
+}
+
+function dateOnlyWindowStart(referenceDate: string): string {
+  const windowStart = new Date(`${referenceDate}T00:00:00.000Z`);
+  windowStart.setUTCDate(windowStart.getUTCDate() - 90);
+  return windowStart.toISOString().substring(0, 10);
+}
+
 /**
  * Computes the relevance score for a single favorite item given a meal context.
  *
@@ -18,14 +28,22 @@ function daysSince(isoDate: string, now: Date): number {
 export function scoreItem(
   item: UserFoodRelation,
   context: MealType,
+  referenceDateOrNow: string | Date = new Date(),
   now: Date = new Date(),
 ): number {
-  const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-    .toISOString().substring(0, 10);
+  const referenceDate = typeof referenceDateOrNow === 'string'
+    ? referenceDateOrNow
+    : dateOnlyFromInstant(referenceDateOrNow);
+  const elapsedTimeNow = referenceDateOrNow instanceof Date ? referenceDateOrNow : now;
+  const ninetyDaysAgo = dateOnlyWindowStart(referenceDate);
 
   const recentEntries = (item.usageDates ?? []).filter(
     (e): e is { date: string; mealType: MealType } =>
-      typeof e === 'object' && e !== null && 'date' in e && e.date >= ninetyDaysAgo,
+      typeof e === 'object'
+      && e !== null
+      && 'date' in e
+      && e.date >= ninetyDaysAgo
+      && e.date <= referenceDate,
   );
 
   const contextUses = recentEntries.filter(e => e.mealType === context).length;
@@ -33,11 +51,11 @@ export function scoreItem(
   const mealFraction = totalUses > 0 ? contextUses / totalUses : 1;
 
   const noveltyBonus =
-    item.favoritedAt && daysSince(item.favoritedAt, now) <= 7 ? 20 * mealFraction : 0;
+    item.favoritedAt && daysSince(item.favoritedAt, elapsedTimeNow) <= 7 ? 20 * mealFraction : 0;
   const contextBonus = Math.min(contextUses * 4, 20);
   const globalUsage = Math.min(item.usageCount ?? 0, 20);
   const recencyScore = item.lastUsedAt
-    ? Math.max(0, (14 - daysSince(item.lastUsedAt, now)) * 1.5) * mealFraction
+    ? Math.max(0, (14 - daysSince(item.lastUsedAt, elapsedTimeNow)) * 1.5) * mealFraction
     : 0;
 
   return noveltyBonus + contextBonus + globalUsage + recencyScore;
@@ -51,9 +69,13 @@ export function scoreItem(
 export function sortByRelevance(
   items: UserFoodRelation[],
   context: MealType,
+  referenceDateOrNow: string | Date = new Date(),
   now: Date = new Date(),
 ): UserFoodRelation[] {
-  const scored = items.map(item => ({ item, score: scoreItem(item, context, now) }));
+  const scored = items.map(item => ({
+    item,
+    score: scoreItem(item, context, referenceDateOrNow, now),
+  }));
   const withScore = scored.filter(s => s.score > 0);
   const withoutScore = scored.filter(s => s.score === 0);
 

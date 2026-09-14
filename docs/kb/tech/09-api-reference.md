@@ -24,14 +24,14 @@ Request body for POST/PUT: `ProfileInput` — validated with Zod.
 | Method | Route | Auth | Notes |
 |---|---|---|---|
 | GET | `/api/weights` | Yes | `{ entries: WeightEntry[] }` |
-| POST | `/api/weights` | Yes | `{ value, unit?, date? }` |
+| POST | `/api/weights` | Yes | `{ value, unit?, date }`; `date` is a required real `YYYY-MM-DD` calendar date |
 | DELETE | `/api/weights/{id}` | Yes | |
 
 ## Diary
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/diary?date=YYYY-MM-DD` | Yes | Full day: meals + summary + hint + dayMeta |
+| GET | `/api/diary?date=YYYY-MM-DD&localDate=YYYY-MM-DD&localHour=0..23` | Yes | Full day: meals + summary + hint + dayMeta; `date` and `localDate` are required, `localHour` is optional |
 | POST | `/api/diary/meals` | Yes | Create meal for a date |
 | PUT | `/api/diary/meals/{mealId}` | Yes | Update meal metadata |
 | DELETE | `/api/diary/meals/{mealId}` | Yes | |
@@ -41,6 +41,12 @@ Request body for POST/PUT: `ProfileInput` — validated with Zod.
 | PUT | `/api/diary/day/{date}/meta` | Yes | Set dayType / workoutType |
 | PUT | `/api/diary/day/{date}/special-activity` | Yes | Record a hiking or cycling activity and calculate activity bonus |
 | DELETE | `/api/diary/day/{date}/special-activity` | Yes | Remove the special activity for a day |
+
+For `GET /api/diary`, `date` is the requested diary date and `localDate` is the
+current local device date used for local state decisions. Both must be real
+`YYYY-MM-DD` calendar dates. `localHour` accepts an integer from `0` through
+`23`; a missing, non-integer, or out-of-range value is represented as unknown
+and never replaced with a server or UTC hour.
 
 ### PUT /api/diary/day/{date}/special-activity
 
@@ -170,10 +176,15 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/favorites` | Yes | All favorites for user |
+| GET | `/api/favorites[?context=MealType&localDate=YYYY-MM-DD]` | Yes | All favorites for user; context-ranked requests require a valid local reference date |
 | POST | `/api/favorites` | Yes | Add or update favorite |
 | DELETE | `/api/favorites/{foodRef}` | Yes | Remove favorite |
 | GET | `/api/food-relations/recent` | Yes | Top 10 recently used items (sorted by `lastUsedAt` DESC) |
+
+When `context` is supplied, `localDate` is required and must be a real local
+`YYYY-MM-DD` calendar date. The backend uses it as the reference date for the
+date-only `usageDates` ranking window; `lastUsedAt`, `favoritedAt`, and
+`createdAt` remain UTC timestamps/instants.
 
 ## AI Endpoints (Quota Enforced)
 
@@ -186,7 +197,7 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 | POST | `/api/ai/label-scan` | Yes | `label-scan` | Multipart image → nutrition label data |
 | POST | `/api/ai/recipe-analyze` | Yes | `recipe-analyze` | Recipe text → structured metadata and ingredient preview |
 | POST | `/api/ai/recipe-scale/preview` | Yes | `recipe-scale` | Stored recipe → transient scaled description and steps |
-| GET | `/api/ai/daily-insight` | Yes | (tracked separately) | Once-daily AI briefing; never returns error to user |
+| GET | `/api/ai/daily-insight?date=YYYY-MM-DD&timezoneOffsetMinutes=-840..840[&localHour=0..23]` | Yes | (tracked separately) | Once-daily AI briefing; never returns AI/quota error to user |
 | POST | `/api/ai/daily-insight/feedback` | Yes | None | Negative feedback for one exact Daily instance; no snapshot is returned |
 | GET | `/api/ai/weekly-insight?date=YYYY-MM-DD` | Yes | `daily-insight` | Seven completed days plus optional AI evaluation; deterministic data remains usable on AI failure |
 
@@ -205,23 +216,28 @@ current handler uses the following query parameters:
 
 | Parameter | Type | Required | Implemented behaviour |
 |---|---|---|---|
-| `date` | `YYYY-MM-DD` string | No | Cache/context date; absent or non-matching shape falls back to the current backend UTC date. The handler does not additionally validate that the date is a real calendar date. |
+| `date` | `YYYY-MM-DD` string | Yes | Explicit real local calendar date used for cache and context. Missing, malformed, or calendar-invalid values return HTTP `400` before context, cache, quota, or AI work. |
 | `localHour` | integer `0..23` | No | Used for the current-day activity-language heuristic. Missing, non-integer, or out-of-range values become unknown. |
-| `timezoneOffsetMinutes` | integer | No | Normalized as `local - UTC`; valid range `[-840,840]`. Missing or invalid values become `null` and use the tolerant legacy UTC fallback. A valid offset drives local current-day/activity safety, local-midnight expiry/TTL, and cache hashing. |
+| `timezoneOffsetMinutes` | integer | Yes | Explicit local-minus-UTC offset in `[-840,840]`. Missing, fractional, or out-of-range values return HTTP `400` before context, cache, quota, or AI work. A valid offset drives local current-day/activity safety, local-midnight expiry/TTL, and cache hashing. |
 
 The current Mobile service sends its local date, `localHour`, and
 `timezoneOffsetMinutes`. The offset means local time minus UTC (for example,
 UTC+2 is `120`) and only integer values from `-840` through `840` are valid.
-Missing or invalid values normalize to `null`: the request remains usable with
-the legacy UTC fallback, the date default remains the backend UTC date, the
-current-day activity heuristic is treated as unknown, and expiry falls back to
-UTC midnight. With a valid offset, current-day detection compares the requested
-date with the offset-adjusted local date; a present activity may then use the
-validated `localHour` heuristic. A newly generated Daily document expires at
-the next local midnight represented as UTC, and its Cosmos `ttl` is the
-ceiling of the remaining seconds. The normalized offset is included in the
-input hash, so a changed normalized offset follows the normal cache
-regeneration rules.
+The handler requires both the real `date` and this valid offset and returns
+HTTP `400` for missing or invalid values; it never substitutes a backend UTC
+date, UTC hour, or UTC expiry. With a valid offset, current-day detection
+compares the requested date with the offset-adjusted local date; a present
+activity may then use the validated `localHour` heuristic. A newly generated
+Daily document expires at the next local midnight represented as UTC, and its
+Cosmos `ttl` is the ceiling of the remaining seconds. The normalized offset is
+included in the input hash, so a changed normalized offset follows the normal
+cache regeneration rules.
+
+This request-boundary validation does not change the Daily v14 prompt, the
+Structured Output or public AI response contract, or the existing quota and
+failure semantics. For valid requests, quota is still checked before Azure
+OpenAI, successful usage is tracked only after persistence, and context/provider
+failures plus quota exhaustion remain friendly HTTP `200` responses.
 
 **Response body (200):**
 

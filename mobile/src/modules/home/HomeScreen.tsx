@@ -40,7 +40,7 @@ import { WeeklyReviewCard } from './WeeklyReviewCard';
 import { InsightCard } from './InsightCard';
 import { getInsight, type DailyInsightResponse } from '../../services/insightService';
 import { aiApi } from '../../shared/api/aiApi';
-import { getLocalIsoDate } from '../../shared/date/localDate';
+import { getLocalDateContext } from '../../shared/date/localDate';
 import type {
   WeightEntry,
   DiaryDayResponse,
@@ -53,6 +53,7 @@ import { ActivityPickerSheet } from '../nutrition/components/ActivityPickerSheet
 import { ActivityBonusSheet } from '../nutrition/components/ActivityBonusSheet';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
+import { getHomeActionDate } from './homeDate';
 
 // Shown when the insight could not be loaded (network error, backend unavailable, etc.)
 const INSIGHT_UNAVAILABLE: DailyInsightResponse = {
@@ -110,8 +111,6 @@ export default function HomeScreen({ navigation }: Props) {
     }
   };
 
-  const todayDate = new Date().toISOString().split('T')[0]!;
-
   const handleDeleteActivity = () => {
     setConfirmSheet({
       visible: true,
@@ -123,7 +122,7 @@ export default function HomeScreen({ navigation }: Props) {
           destructive: true,
           onPress: async () => {
             try {
-              await diaryApi.removeSpecialActivity(todayDate);
+              await diaryApi.removeSpecialActivity(getHomeActionDate());
               await load();
             } catch {
               // silent — reload zeigt aktuellen Stand
@@ -136,16 +135,17 @@ export default function HomeScreen({ navigation }: Props) {
 
   const handleEditActivity = () => {
     if (!todayDiary?.specialActivity) return;
+    const currentDate = getHomeActionDate();
     if (todayDiary.specialActivity.type === 'cycling') {
-      navigation.navigate('CyclingInput', { date: todayDate, existing: todayDiary.specialActivity });
+      navigation.navigate('CyclingInput', { date: currentDate, existing: todayDiary.specialActivity });
     } else {
-      navigation.navigate('HikingInput', { date: todayDate, existing: todayDiary.specialActivity });
+      navigation.navigate('HikingInput', { date: currentDate, existing: todayDiary.specialActivity });
     }
   };
 
   const loadWeeklyReview = useCallback(async () => {
     const requestId = ++weeklyRequestId.current;
-    const referenceDate = getLocalIsoDate();
+    const { currentLocalDate: referenceDate } = getLocalDateContext();
     setWeeklyError(false);
 
     try {
@@ -159,14 +159,12 @@ export default function HomeScreen({ navigation }: Props) {
   }, []);
 
   const load = useCallback(async () => {
-    // Compute today's date inside the callback so it's always current,
-    // even if the app was backgrounded overnight (module-level constants freeze at load time).
-    const today = new Date().toISOString().split('T')[0]!;
+    const { currentLocalDate: currentDate } = getLocalDateContext();
     try {
       const [weightData, profileData, diaryData] = await Promise.all([
         listWeights(),
         profileApi.getMe(),
-        diaryApi.getDay(today),
+        diaryApi.getDay(currentDate),
       ]);
       setEntries(weightData);
       if (profileData.targets) setTargets(profileData.targets);
@@ -174,7 +172,7 @@ export default function HomeScreen({ navigation }: Props) {
       if (profileData.profile?.displayName) setDisplayName(profileData.profile.displayName);
       setTodayDiary(diaryData);
       if (diaryData.dayType != null) {
-        hydrateDayType(diaryData.dayType, today, diaryData.workoutType ?? null);
+        hydrateDayType(diaryData.dayType, currentDate, diaryData.workoutType ?? null);
       }
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
@@ -183,10 +181,9 @@ export default function HomeScreen({ navigation }: Props) {
       setEntries([]);
     }
     // Insight runs independently — does NOT block the screen from rendering
-    const dailyInsightDate = getLocalIsoDate();
-    setInsightDate(dailyInsightDate);
+    setInsightDate(currentDate);
     setInsight(null);
-    getInsight(dailyInsightDate)
+    getInsight(currentDate)
       .then((result) => setInsight(result ?? INSIGHT_UNAVAILABLE))
       .catch(() => setInsight(INSIGHT_UNAVAILABLE));
   }, [setTargets, hydrateDayType]);
@@ -262,7 +259,7 @@ export default function HomeScreen({ navigation }: Props) {
         <View style={styles.searchRow}>
           <TouchableOpacity
             style={styles.searchPill}
-            onPress={() => openHub({ onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
+            onPress={() => openHub({ date: getHomeActionDate(), onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Lebensmittel suchen"
@@ -272,7 +269,7 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.searchAction}
-            onPress={() => openHub({ initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
+            onPress={() => openHub({ date: getHomeActionDate(), initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="KI-Analyse"
@@ -281,7 +278,7 @@ export default function HomeScreen({ navigation }: Props) {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.searchAction}
-            onPress={() => openHub({ initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
+            onPress={() => openHub({ date: getHomeActionDate(), initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Barcode scannen"
@@ -368,11 +365,11 @@ export default function HomeScreen({ navigation }: Props) {
         onClose={() => setActivityPickerVisible(false)}
         onSelectHiking={() => {
           setActivityPickerVisible(false);
-          navigation.navigate('HikingInput', { date: todayDate });
+          navigation.navigate('HikingInput', { date: getHomeActionDate() });
         }}
         onSelectCycling={() => {
           setActivityPickerVisible(false);
-          navigation.navigate('CyclingInput', { date: todayDate });
+          navigation.navigate('CyclingInput', { date: getHomeActionDate() });
         }}
       />
 

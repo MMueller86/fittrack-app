@@ -109,6 +109,11 @@ Available repositories:
 - `weightsRepository`, `dayMetaRepository`, `hintStateRepository`
 - `insightRepository`, `userFoodRelationRepository`
 
+`UserFoodRelationRepository.recordUsage()` requires the explicit date-only date of
+the diary meal for `usageDates`; it never derives a user date from the server
+clock. `lastUsedAt` and `createdAt` remain UTC instants. Missing internal usage
+dates fail closed in both repository implementations.
+
 ### Quota Enforcement
 
 For AI features, call `enforceQuota()` before the operation and `trackUsage()` after success.

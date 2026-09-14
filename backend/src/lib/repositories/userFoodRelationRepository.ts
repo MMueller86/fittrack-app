@@ -5,10 +5,37 @@
 
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosUserFoodRelationRepository } from './cosmosUserFoodRelationRepository';
-import type { UserFoodRelation, UpsertUserFoodRelationInput, FoodRefType, NutritionValues, PortionInfo } from '@fittrack/shared';
+import type {
+  UserFoodRelation,
+  UpsertUserFoodRelationInput,
+  RecordUserFoodRelationUsageInput,
+  FoodRefType,
+  NutritionValues,
+  PortionInfo,
+  MealType,
+} from '@fittrack/shared';
 
 /** Running score alpha for EMA of preferredInputAmount */
 export const EMA_ALPHA = 0.3;
+
+type UsageDateEntry = { date: string; mealType: MealType };
+
+/** Appends a usage entry and keeps the date-only window relative to its reference date. */
+export function trimUsageDates(
+  usageDates: UserFoodRelation['usageDates'] | undefined,
+  referenceDate: string,
+  mealType: MealType,
+): UsageDateEntry[] {
+  const windowStart = new Date(`${referenceDate}T00:00:00.000Z`);
+  windowStart.setUTCDate(windowStart.getUTCDate() - 90);
+  const firstDate = windowStart.toISOString().substring(0, 10);
+  const existingEntries = (usageDates ?? []).filter(
+    (e): e is UsageDateEntry =>
+      typeof e === 'object' && e !== null && 'date' in e && typeof e.date === 'string',
+  );
+  return [...existingEntries, { date: referenceDate, mealType }]
+    .filter((e) => e.date >= firstDate && e.date <= referenceDate);
+}
 
 export interface UserFoodRelationRepository {
   /**
@@ -51,7 +78,7 @@ export interface UserFoodRelationRepository {
    * Legt die Relation an wenn sie noch nicht existiert.
    * Fire-and-forget sicher — Fehler werden intern geloggt.
    */
-  recordUsage(userId: string, input: UpsertUserFoodRelationInput): Promise<void>;
+  recordUsage(userId: string, input: RecordUserFoodRelationUsageInput): Promise<void>;
 
   /** Gibt einen Eintrag anhand von userId + foodRef zurück. */
   getByFoodRef(userId: string, foodRef: string): Promise<UserFoodRelation | null>;
@@ -165,7 +192,11 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
       .slice(0, limit);
   }
 
-  async recordUsage(userId: string, input: UpsertUserFoodRelationInput): Promise<void> {
+  async recordUsage(userId: string, input: RecordUserFoodRelationUsageInput): Promise<void> {
+    if (typeof input.usageDate !== 'string' || input.usageDate.length === 0) {
+      throw new Error('usageDate is required for recordUsage');
+    }
+
     const existing = this.store.get(this.key(userId, input.foodRef));
     const now = new Date().toISOString();
 
@@ -201,17 +232,13 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
       };
     }
 
-    // Fix B: usageDates — append {date, mealType} entry, drop old string entries, trim to 90 days
-    const today = new Date().toISOString().substring(0, 10);
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
-    const existingEntries = (relation.usageDates ?? []).filter(
-      (e): e is { date: string; mealType: import('@fittrack/shared').MealType } =>
-        typeof e === 'object' && e !== null && 'date' in e,
-    );
-    const newEntry = { date: today, mealType: input.mealType ?? ('snack' as import('@fittrack/shared').MealType) };
     relation = {
       ...relation,
-      usageDates: [...existingEntries, newEntry].filter(e => e.date >= ninetyDaysAgo),
+      usageDates: trimUsageDates(
+        relation.usageDates,
+        input.usageDate,
+        input.mealType ?? 'snack',
+      ),
     };
 
     // preferredInputMode via running score

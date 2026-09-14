@@ -93,10 +93,13 @@ activity snapshots remain available for their own target and activity data;
 the current request hour does not manufacture a historical completion fact.
 The current Mobile client sends `timezoneOffsetMinutes` as local time minus UTC.
 Integer values from `-840` through `840` are normalized and used to determine
-the requested local current day and the safety boundary for this heuristic.
-Missing or invalid values normalize to `null`: the request remains usable with
-the legacy UTC fallback, but an activity is not treated as current-day evidence
-and therefore remains `unknown`; Daily expiry also falls back to UTC midnight.
+the requested local current day and the safety boundary for this heuristic. The
+Daily request requires a real `date` and an integer offset in that range;
+missing, malformed, or out-of-range values are rejected with HTTP `400` at the
+handler boundary. There is no UTC date, hour, or expiry fallback. With a valid
+offset, an activity is treated as current-day evidence only when the requested
+date matches the offset-adjusted local date; otherwise its status remains
+`unknown`.
 See [tech/09-api-reference.md](../tech/09-api-reference.md) for the complete
 cache, local-midnight, and TTL contract.
 
@@ -187,7 +190,15 @@ Rules run in priority order:
 3. Positive feedback — 2-day cooldown (e.g., fiber goal reached, protein goal reached)
 4. Motivational fallback — 30-day cooldown per message, cyclic across M0–M9
 
-The `currentHour` query parameter (local device time 0–23) enables time-gated rules like breakfast hints and late-evening hints.
+The `localDate` query parameter carries the current local device date separately
+from the requested diary date. The optional `localHour` query parameter
+(local device time 0–23) enables time-gated rules like breakfast hints and
+late-evening hints; missing, non-integer, or out-of-range values remain
+unknown rather than being replaced with a default hour.
+
+`HintState.lastHintDate` is compared with `localDate`, not with the requested
+diary date. Reading a historical diary day therefore does not rewrite hint
+state solely because the requested date differs from the current local date.
 
 `HintState` — persisted in Cosmos to track last-shown timestamps for each `HintId` per user.
 
@@ -208,6 +219,7 @@ The `currentHour` query parameter (local device time 0–23) enables time-gated 
 
 - [Rule] Nutrition values in `MealItem` are a **snapshot**. They do not update if the original food item changes later.
 - [Rule] Day summaries are recalculated on every GET — never stored.
+- [Rule] Food-relation usage tracking receives the explicit `Meal.date` as its date-only value; technical usage timestamps remain UTC instants, and no historical usage-date migration is performed.
 - [Rule] AI-estimated items must be reviewed by the user before saving. The review screens (`MealParserReviewScreen`, `FoodEstimateReviewScreen`, `LabelScanReviewScreen`, `MealEstimateReviewScreen`) enforce this.
 - [Rule] `isAiEstimate: true` must be preserved on all diary items that originated from AI.
 - [Rule] The hint engine must never be an AI call — it is a pure rule evaluation.

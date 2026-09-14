@@ -48,12 +48,14 @@ export interface HintContext {
   targets: DayTargets;
   /** Whether today is a rest or training day. */
   dayType: 'rest' | 'training';
+  /** Current local device calendar date (YYYY-MM-DD), independent of the requested diary date. */
+  currentLocalDate: string;
   /**
    * Local hour of the device at the time the hint was requested (0–23).
    * Used for time-gated rules (breakfast hint, dinner hint).
-   * Provided by the mobile client via query param.
+   * Provided by the mobile client via query param; null means unknown.
    */
-  currentHour: number;
+  currentHour: number | null;
   /**
    * Basal metabolic rate (kcal/day) from profile.calculationMeta.bmr.
    * Used for H27 (under-BMR warning). Undefined when no profile exists.

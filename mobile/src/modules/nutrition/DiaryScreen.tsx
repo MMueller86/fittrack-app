@@ -39,7 +39,7 @@ import { useFoodEntryHubStore } from './hub/useFoodEntryHubStore';
 import { applyAddMeal } from './diaryItemUtils';
 import { ActivityBonusSheet } from './components/ActivityBonusSheet';
 import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
-import { isValidDateOnly } from '../../shared/date/localDate';
+import { addLocalDays, getLocalIsoDate, isValidDateOnly } from '../../shared/date/localDate';
 
 type Props = NativeStackScreenProps<NutritionStackParamList, 'DiaryMain'>;
 
@@ -63,18 +63,12 @@ const MEAL_ICONS: Record<MealType, string> = {
   postworkout: '💪',
 };
 
-function isoToday(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 function offsetDate(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return addLocalDays(iso, days);
 }
 
 function formatDateLabel(iso: string): string {
-  const today = isoToday();
+  const today = getLocalIsoDate();
   const yesterday = offsetDate(today, -1);
   if (iso === today) return 'Heute';
   if (iso === yesterday) return 'Gestern';
@@ -216,7 +210,7 @@ function MealCard({
 
 export default function DiaryScreen({ navigation, route }: Props) {
   const initialRouteDate = isValidDateOnly(route.params?.date) ? route.params.date : null;
-  const [date, setDate] = useState(initialRouteDate ?? isoToday());
+  const [date, setDate] = useState(initialRouteDate ?? getLocalIsoDate());
   const consumedRouteDate = useRef<string | null>(null);
   const [data, setData] = useState<DiaryDayResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -348,9 +342,9 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const prevDay = () => setDate((d) => offsetDate(d, -1));
   const nextDay = () => {
     const next = offsetDate(date, 1);
-    if (next <= isoToday()) setDate(next);
+    if (next <= getLocalIsoDate()) setDate(next);
   };
-  const isToday = date === isoToday();
+  const isToday = date === getLocalIsoDate();
 
   // Add meal — direkt ohne Bestätigungs-Alert, optimistisches Update
   const handleAddMeal = async (type: MealType) => {

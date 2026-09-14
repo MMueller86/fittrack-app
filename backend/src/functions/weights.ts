@@ -22,10 +22,6 @@ import type { WeightEntry } from '@fittrack/shared';
 //   - `parseBody`   runs the body through a Zod schema with consistent 400s
 //   - `logEvent`    is used for handler-specific events
 
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 // ISO `YYYY-MM-DD` that survives a UTC round-trip. Catches inputs that
 // JavaScript's Date silently rolls over, e.g. `2026-02-30` becoming Mar 2.
 const isoDate = z
@@ -59,7 +55,7 @@ const positiveWeight = z.coerce
 const AddWeightBodySchema = z.object({
   value: positiveWeight,
   unit: z.enum(['kg', 'lbs']).default('kg'),
-  date: isoDate.optional(),
+  date: isoDate,
 });
 
 export const listWeightsHandler = withHandler(
@@ -83,7 +79,7 @@ export const addWeightHandler = withHandler(
     const entry: WeightEntry = {
       id: randomUUID(),
       userId,
-      date: parsed.data.date ?? todayIso(),
+      date: parsed.data.date,
       value: parsed.data.value,
       // `.default('kg')` populates the runtime value but Zod 3.25's
       // inferred output type is `'kg' | 'lbs' | undefined`. The fallback

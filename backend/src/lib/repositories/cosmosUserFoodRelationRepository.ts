@@ -1,9 +1,16 @@
 // Cosmos-backed implementation of UserFoodRelationRepository.
 // Container: userFoodRelations, partition key: /userId
 
-import type { UserFoodRelation, UpsertUserFoodRelationInput, FoodRefType, NutritionValues, PortionInfo } from '@fittrack/shared';
+import type {
+  UserFoodRelation,
+  UpsertUserFoodRelationInput,
+  RecordUserFoodRelationUsageInput,
+  FoodRefType,
+  NutritionValues,
+  PortionInfo,
+} from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
-import { EMA_ALPHA, type UserFoodRelationRepository } from './userFoodRelationRepository';
+import { EMA_ALPHA, trimUsageDates, type UserFoodRelationRepository } from './userFoodRelationRepository';
 
 export class CosmosUserFoodRelationRepository implements UserFoodRelationRepository {
 
@@ -113,8 +120,12 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     return resources;
   }
 
-  async recordUsage(userId: string, input: UpsertUserFoodRelationInput): Promise<void> {
+  async recordUsage(userId: string, input: RecordUserFoodRelationUsageInput): Promise<void> {
     try {
+      if (typeof input.usageDate !== 'string' || input.usageDate.length === 0) {
+        throw new Error('usageDate is required for recordUsage');
+      }
+
       const { containers } = await getCosmos();
       const now = new Date().toISOString();
       const existing = await this.getByFoodRef(userId, input.foodRef);
@@ -154,17 +165,13 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
         };
       }
 
-      // Fix B: usageDates — append {date, mealType} entry, drop old string entries, trim to 90 days
-      const today = new Date().toISOString().substring(0, 10);
-      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
-      const existingEntries = (relation.usageDates ?? []).filter(
-        (e): e is { date: string; mealType: import('@fittrack/shared').MealType } =>
-          typeof e === 'object' && e !== null && 'date' in e,
-      );
-      const newEntry = { date: today, mealType: input.mealType ?? ('snack' as import('@fittrack/shared').MealType) };
       relation = {
         ...relation,
-        usageDates: [...existingEntries, newEntry].filter(e => e.date >= ninetyDaysAgo),
+        usageDates: trimUsageDates(
+          relation.usageDates,
+          input.usageDate,
+          input.mealType ?? 'snack',
+        ),
       };
 
       // preferredInputMode via running score

@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
+import { addLocalDays, getLocalIsoDate } from '../../shared/date/localDate';
 import { buildCopyPayload } from './diaryItemUtils';
 import { useSourceProduct } from './useSourceProduct';
 
@@ -41,13 +42,11 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', '
 // ---------------------------------------------------------------------------
 
 function isoToday(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getLocalIsoDate();
 }
 
 function offsetIso(iso: string, days: number): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
+  return addLocalDays(iso, days);
 }
 
 function formatShort(iso: string): string {

@@ -9,12 +9,14 @@ import { getUserFoodRelationRepository, EMA_ALPHA, __resetUserFoodRelationReposi
 
 const USER_A = 'unit-ufr-a';
 const FOOD_REF = 'openFoodFacts:12345';
+const DEFAULT_USAGE_DATE = '2026-05-08';
 
 function baseInput(overrides: Record<string, unknown> = {}) {
   return {
     foodRef: FOOD_REF,
     foodRefType: 'catalog' as const,
     displayName: 'Test Food',
+    usageDate: DEFAULT_USAGE_DATE,
     ...overrides,
   };
 }
@@ -185,9 +187,17 @@ describe('recordUsage — new-document Fix A: lastInputAmount / lastInputMode', 
 });
 
 describe('recordUsage — usageDates as {date, mealType}[]', () => {
+  it('fails closed when usageDate is missing instead of deriving the server UTC date', async () => {
+    const repo = getUserFoodRelationRepository();
+    const input = { ...baseInput({ mealType: 'lunch' }), usageDate: undefined } as unknown as Parameters<typeof repo.recordUsage>[1];
+
+    await expect(repo.recordUsage(USER_A, input)).rejects.toThrow('usageDate');
+    expect(await repo.getByFoodRef(USER_A, FOOD_REF)).toBeNull();
+  });
+
   it('contains today\'s date as an object entry after a single recordUsage call', async () => {
     const repo = getUserFoodRelationRepository();
-    const today = new Date().toISOString().substring(0, 10);
+    const today = DEFAULT_USAGE_DATE;
     await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch' }));
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
     expect(rel?.usageDates).toHaveLength(1);
@@ -203,7 +213,7 @@ describe('recordUsage — usageDates as {date, mealType}[]', () => {
 
   it('contains two object entries for today after two recordUsage calls on the same day', async () => {
     const repo = getUserFoodRelationRepository();
-    const today = new Date().toISOString().substring(0, 10);
+    const today = DEFAULT_USAGE_DATE;
     await repo.recordUsage(USER_A, baseInput({ mealType: 'breakfast' }));
     await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch' }));
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
@@ -261,7 +271,7 @@ describe('recordUsage — usageDates as {date, mealType}[]', () => {
 
   it('trims entries older than 90 days on each recordUsage call', async () => {
     const repo = getUserFoodRelationRepository();
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+    const ninetyDaysAgo = '2026-02-07';
     await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch' }));
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
     expect(rel?.usageDates?.every(e => e.date >= ninetyDaysAgo)).toBe(true);
@@ -271,20 +281,39 @@ describe('recordUsage — usageDates as {date, mealType}[]', () => {
     const repo = getUserFoodRelationRepository();
     await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch' }));
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
-    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
-    const eightyNineDaysAgo = new Date(Date.now() - 89 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10);
+    const ninetyDaysAgo = '2026-02-07';
+    const eightyNineDaysAgo = '2026-02-08';
     expect(eightyNineDaysAgo >= ninetyDaysAgo).toBe(true);
     expect(rel?.usageDates?.every(e => e.date >= ninetyDaysAgo)).toBe(true);
   });
 
   it('initializes usageDates correctly on a brand-new relation', async () => {
     const repo = getUserFoodRelationRepository();
-    const today = new Date().toISOString().substring(0, 10);
+    const today = DEFAULT_USAGE_DATE;
     await repo.recordUsage(USER_A, baseInput({ mealType: 'dinner' }));
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
     expect(Array.isArray(rel?.usageDates)).toBe(true);
     expect(rel?.usageDates).toHaveLength(1);
     expect(rel?.usageDates![0]).toEqual({ date: today, mealType: 'dinner' });
+  });
+
+  it('uses the explicit usage date instead of the server UTC date', async () => {
+    const repo = getUserFoodRelationRepository();
+    await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch', usageDate: '2026-05-08' }));
+    const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
+
+    expect(rel?.usageDates).toEqual([{ date: '2026-05-08', mealType: 'lunch' }]);
+    expect(rel?.lastUsedAt).toMatch(/Z$/);
+    expect(rel?.createdAt).toMatch(/Z$/);
+  });
+
+  it('trims usage dates relative to the explicit usage date', async () => {
+    const repo = getUserFoodRelationRepository();
+    await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch', usageDate: '2026-02-06' }));
+    await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch', usageDate: '2026-05-08' }));
+    const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
+
+    expect(rel?.usageDates).toEqual([{ date: '2026-05-08', mealType: 'lunch' }]);
   });
 });
 

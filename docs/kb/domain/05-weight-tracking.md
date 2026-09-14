@@ -102,5 +102,5 @@ Needed because "weight going down = progress" is only true for weight loss goals
 ## API
 
 - `GET /api/weights` — `{ entries: WeightEntry[] }`
-- `POST /api/weights` — `{ value, unit?, date? }`
+- `POST /api/weights` — `{ value, unit?, date }`; `date` is a required real `YYYY-MM-DD` calendar date
 - `DELETE /api/weights/{id}` — optimistic delete on mobile

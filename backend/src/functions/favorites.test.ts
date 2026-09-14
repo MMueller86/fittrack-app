@@ -156,6 +156,7 @@ describe('GET /api/favorites', () => {
       lastInputMode: 'portion',
       lastInputAmount: 1,
       mealType: 'breakfast',
+      usageDate: '2026-05-08',
     });
 
     const res = await listFavoritesHandler(
@@ -227,6 +228,7 @@ describe('GET /api/favorites/grouped', () => {
       foodRefType: 'catalog',
       displayName: 'Apple',
       mealType: 'breakfast',
+      usageDate: '2026-05-08',
     });
 
     const res = await getFavoritesGroupedHandler(await makeAuthRequest(), ctx);
@@ -251,12 +253,14 @@ describe('GET /api/favorites/grouped', () => {
       foodRefType: 'catalog',
       displayName: 'Apple',
       mealType: 'breakfast',
+      usageDate: '2026-05-08',
     });
     await repo.recordUsage(TEST_USER_ID, {
       foodRef: 'openFoodFacts:a',
       foodRefType: 'catalog',
       displayName: 'Apple',
       mealType: 'snack',
+      usageDate: '2026-05-08',
     });
 
     const res = await getFavoritesGroupedHandler(await makeAuthRequest(), ctx);
@@ -284,6 +288,7 @@ describe('GET /api/favorites/grouped', () => {
       foodRefType: 'catalog',
       displayName: 'Apple',
       mealType: 'breakfast',
+      usageDate: '2026-05-08',
     });
 
     const res = await getFavoritesGroupedHandler(await makeAuthRequest(), ctx);
@@ -355,7 +360,7 @@ describe('GET /api/favorites — context param', () => {
       ctx,
     );
     const res = await listFavoritesHandler(
-      await makeAuthRequest({ query: { context: 'lunch' } }),
+      await makeAuthRequest({ query: { context: 'lunch', localDate: '2026-05-08' } }),
       ctx,
     );
     expect(res.status).toBe(200);
@@ -382,7 +387,7 @@ describe('GET /api/favorites — context param', () => {
       ctx,
     );
     const res = await listFavoritesHandler(
-      await makeAuthRequest({ query: { context: 'breakfast' } }),
+      await makeAuthRequest({ query: { context: 'breakfast', localDate: '2026-05-08' } }),
       ctx,
     );
     expect(res.status).toBe(200);
@@ -390,5 +395,21 @@ describe('GET /api/favorites — context param', () => {
     expect(body.context).toBe('breakfast');
     expect(body.items).toHaveLength(1);
     expect(body.items[0]!.foodRef).toBe('openFoodFacts:b');
+  });
+
+  it('requires a valid localDate for ranked favorites', async () => {
+    const missingDate = await listFavoritesHandler(
+      await makeAuthRequest({ query: { context: 'lunch' } }),
+      ctx,
+    );
+    expect(missingDate.status).toBe(400);
+    expect(missingDate.jsonBody).toMatchObject({ error: expect.stringContaining('localDate') });
+
+    const invalidDate = await listFavoritesHandler(
+      await makeAuthRequest({ query: { context: 'lunch', localDate: '2026-02-30' } }),
+      ctx,
+    );
+    expect(invalidDate.status).toBe(400);
+    expect(invalidDate.jsonBody).toMatchObject({ error: expect.stringContaining('localDate') });
   });
 });

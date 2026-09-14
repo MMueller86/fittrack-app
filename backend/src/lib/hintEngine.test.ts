@@ -34,6 +34,7 @@ function makeCtx(overrides: Partial<HintContext> = {}): HintContext {
     summary: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
     targets: TARGETS,
     dayType: 'rest',
+    currentLocalDate: '2026-07-02',
     currentHour: 12,
     ...overrides,
   };
@@ -106,6 +107,16 @@ describe('H2 — no breakfast', () => {
       meals: [makeMeal('breakfast'), makeMeal('lunch')],
       summary: { calories: 800, protein: 60, carbs: 80, fat: 20, fiber: 10 },
       currentHour: 10,
+    });
+    const { hint } = evaluateHint(ctx, noState());
+    expect(hint.id).not.toBe('H2');
+  });
+
+  it('does NOT fire when the local hour is unknown', () => {
+    const ctx = makeCtx({
+      meals: [makeMeal('lunch')],
+      summary: { calories: 400, protein: 30, carbs: 40, fat: 10, fiber: 5 },
+      currentHour: null,
     });
     const { hint } = evaluateHint(ctx, noState());
     expect(hint.id).not.toBe('H2');
@@ -445,6 +456,32 @@ describe('H13 — rest day', () => {
     const { hint } = evaluateHint(ctx, state);
     expect(hint.id).not.toBe('H13');
   });
+
+  it('uses the local device date for cooldowns and state dates', () => {
+    const localDate = '2026-07-02';
+    const state: HintState = {
+      id: 'hintState',
+      userId: 'user1',
+      _docType: 'hintState',
+      lastHintId: 'H13',
+      lastHintDate: localDate,
+      lastHintGeneratedAt: '2026-07-02T12:00:00.000Z',
+      cooldownHistory: { H13: localDate },
+      motivationIndex: 0,
+    };
+    const ctx = makeCtx({
+      currentLocalDate: localDate,
+      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+      summary: { calories: 1900, protein: 145, carbs: 230, fat: 65, fiber: 15 },
+      dayType: 'rest',
+      currentHour: 18,
+    });
+
+    const { hint, updatedState } = evaluateHint(ctx, state);
+
+    expect(hint.id).toBe('H15');
+    expect(updatedState.lastHintDate).toBe(localDate);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -649,7 +686,7 @@ describe('updatedState', () => {
     });
     const { updatedState } = evaluateHint(ctx, noState());
     expect(updatedState.lastHintId).toBe('H16');
-    expect(updatedState.cooldownHistory.H16).toBe(new Date().toISOString().slice(0, 10));
+    expect(updatedState.cooldownHistory.H16).toBe(ctx.currentLocalDate);
   });
 
   it('does NOT record cooldown for orientation hints (no cooldown)', () => {
@@ -776,7 +813,7 @@ describe('H17 — training + protein reached (cooldown regression)', () => {
   });
 
   it('H17 records cooldown date in updatedState (regression: was missing from COOLDOWN_DAYS)', () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = makeCtx().currentLocalDate;
     const state: HintState = {
       id: 'hintState',
       userId: 'user1',

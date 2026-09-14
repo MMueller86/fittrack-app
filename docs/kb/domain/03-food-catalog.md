@@ -100,19 +100,24 @@ Usage tracking:
 - `preferredInputMode?: 'grams' | 'portion'` — EMA-derived preferred mode
 - `preferredInputAmount?: number` — EMA-derived preferred amount (α = 0.3)
 - `mealTypeCounts?: Partial<Record<MealType, number>>` — per-meal usage counts
-- `usageDates?: string[]` — ISO date strings of recent uses, trimmed to 90 days (used for 30-day count)
+- `usageDates?: Array<{ date: string; mealType: MealType }>` — date-only diary dates with meal context, trimmed to the 90-day window relative to the recorded diary date
 - `favoritedAt?: string` — ISO timestamp when `isFavorite` was first set to `true`
+
+The internal `recordUsage` contract requires the explicit diary meal date for
+`usageDates`; a missing date fails closed instead of falling back to the server
+UTC date. Existing usage dates are not rewritten or migrated.
 
 `@deprecated` fields (kept for backward compat with existing documents):
 - `shortName?: string` — no longer generated or used; `displayName` is used everywhere
 
 ### Quick Entry Relevance
 
-Favorites (Quick Entries) are sorted for display using `computeRelevanceOrder()` in `mobile/src/modules/nutrition/hub/quickEntryRelevance.ts`. Scoring factors: novelty bonus (favoritedAt within 7 days), contextual usage (mealTypeCounts), global usage (usageCount), recency (lastUsedAt).
+Favorites (Quick Entries) are sorted for display using `computeRelevanceOrder()` in `mobile/src/modules/nutrition/hub/quickEntryRelevance.ts` or the backend-ranked favorites endpoint. Backend ranking uses the local request reference date for the date-only `usageDates` window; `favoritedAt` and `lastUsedAt` remain elapsed-time UTC instants. Scoring factors: novelty bonus (favoritedAt within 7 days), contextual usage, global usage (usageCount), and recency (lastUsedAt).
 
 ### API
 
 - `GET /api/favorites` — all favorites, sorted by displayName
+- `GET /api/favorites?context=MealType&localDate=YYYY-MM-DD` — favorites ranked for a meal context; `localDate` is a required real local reference date
 - `GET /api/favorites/grouped` — favorites pre-grouped into `{ ungrouped, groups, all }` (used by legacy IdleState; flat `all` used by current hub)
 - `POST /api/favorites` — upsert a favorite; stores `nutritionPer100g`, `portion`, `favoritedAt`
 - `DELETE /api/favorites/{foodRef}` — removes favorite (sets `isFavorite: false`)

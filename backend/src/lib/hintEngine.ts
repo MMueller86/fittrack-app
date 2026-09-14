@@ -59,6 +59,14 @@ function pct(actual: number, target: number): number {
   return (actual / target) * 100;
 }
 
+function isHourBetween(hour: number | null, startInclusive: number, endExclusive: number): boolean {
+  return hour !== null && hour >= startInclusive && hour < endExclusive;
+}
+
+function isHourAtLeast(hour: number | null, threshold: number): boolean {
+  return hour !== null && hour >= threshold;
+}
+
 function hasMealType(meals: Meal[], type: string): boolean {
   return meals.some((m) => m.type === type && m.items.length > 0);
 }
@@ -123,7 +131,7 @@ interface RuleCtx {
   breakfastCalories: number;
   breakfastProtein: number;
   dayType: 'rest' | 'training';
-  currentHour: number;
+  currentHour: number | null;
   bmr: number | undefined;
   weightKg: number | undefined;
   recentDaysCaloriesPct: number[];
@@ -162,7 +170,7 @@ const RULES: RuleDef[] = [
     category: 'orientation',
     emoji: '🍳',
     text: 'Wie sieht dein Start in den Tag aus?',
-    condition: ({ hasBreakfast, currentHour }) => !hasBreakfast && currentHour >= 8 && currentHour < 13,
+    condition: ({ hasBreakfast, currentHour }) => !hasBreakfast && isHourBetween(currentHour, 8, 13),
   },
 
   // H26: 3 consecutive days over 115% -- highest warning level [1-day cooldown]
@@ -221,7 +229,7 @@ const RULES: RuleDef[] = [
     condition: ({ hasBreakfast, hasLunch, breakfastCalories, breakfastProtein, currentHour }) =>
       hasBreakfast &&
       !hasLunch &&
-      currentHour < 12 &&
+      isHourBetween(currentHour, 0, 12) &&
       breakfastCalories > 0 &&
       (breakfastProtein * 4) / breakfastCalories >= 0.3,
   },
@@ -233,7 +241,7 @@ const RULES: RuleDef[] = [
     emoji: '☀️',
     text: 'Gut getaktet für den Vormittag – du liegst auf Kurs, um dein Tagesziel zu erreichen.',
     condition: ({ mealCount, calPct, currentHour }) =>
-      mealCount >= 1 && calPct >= 15 && calPct <= 40 && currentHour < 13,
+      mealCount >= 1 && calPct >= 15 && calPct <= 40 && isHourBetween(currentHour, 0, 13),
   },
 
   // H20: Good calorie pace -- midday (time-gated)
@@ -243,7 +251,7 @@ const RULES: RuleDef[] = [
     emoji: '🌤️',
     text: 'Zur Mittagszeit liegst du gut auf Kurs – halte diese Pace und du triffst dein Tagesziel.',
     condition: ({ mealCount, calPct, currentHour }) =>
-      mealCount >= 2 && calPct >= 35 && calPct <= 65 && currentHour >= 12 && currentHour < 16,
+      mealCount >= 2 && calPct >= 35 && calPct <= 65 && isHourBetween(currentHour, 12, 16),
   },
 
   // H3: Protein < 25% of daily target (only after 2+ meals)
@@ -284,7 +292,7 @@ const RULES: RuleDef[] = [
     emoji: '📊',
     text: 'Heute liegst du über deinem Kalorienziel – das passiert. Einzelne Tage machen keinen Unterschied, was zählt ist die Konstanz über die Woche.',
     condition: ({ calPct, mealCount, currentHour }) =>
-      calPct > 115 && (mealCount >= 3 || currentHour >= 15),
+      calPct > 115 && (mealCount >= 3 || isHourAtLeast(currentHour, 15)),
   },
 
   // H23: Significantly under calorie target in the evening
@@ -294,7 +302,7 @@ const RULES: RuleDef[] = [
     emoji: '⚠️',
     text: 'Heute bist du deutlich unter deinem Kalorienziel. Falls du noch Hunger hast, wäre jetzt ein guter Moment für eine weitere Mahlzeit.',
     condition: ({ calPct, currentHour, mealCount }) =>
-      currentHour >= 18 && calPct < 70 && mealCount >= 2,
+      isHourAtLeast(currentHour, 18) && calPct < 70 && mealCount >= 2,
   },
 
   // H6: All main meals present, no snack, remaining calories > 20%
@@ -314,7 +322,7 @@ const RULES: RuleDef[] = [
     emoji: '🌙',
     text: 'Dein Abendessen fehlt noch.',
     condition: ({ hasDinner, hasBreakfast, hasLunch, currentHour }) =>
-      !hasDinner && (hasBreakfast || hasLunch) && currentHour >= 17,
+      !hasDinner && (hasBreakfast || hasLunch) && isHourAtLeast(currentHour, 17),
   },
 
   // H8: Training day, protein not yet reached (2+ meals or after 15:00)
@@ -325,7 +333,7 @@ const RULES: RuleDef[] = [
     emoji: '💪',
     text: 'Nach deinem Training lohnt sich heute noch eine proteinreiche Mahlzeit.',
     condition: ({ dayType, proteinPct, mealCount, currentHour, isHighProteinCalShare }) =>
-      dayType === 'training' && proteinPct < 95 && (mealCount >= 2 || currentHour >= 15) && !isHighProteinCalShare,
+      dayType === 'training' && proteinPct < 95 && (mealCount >= 2 || isHourAtLeast(currentHour, 15)) && !isHighProteinCalShare,
   },
 
   // H12: High variety ≥5 food categories
@@ -377,7 +385,7 @@ const RULES: RuleDef[] = [
     emoji: '🌙',
     text: 'Ein stimmiger Abschluss – du liegst heute sehr nah an deinem Kalorienziel.',
     condition: ({ hasDinner, calPct, currentHour }) =>
-      currentHour >= 19 && calPct >= 85 && calPct <= 110 && hasDinner,
+      isHourAtLeast(currentHour, 19) && calPct >= 85 && calPct <= 110 && hasDinner,
   },
 
   // H13: Rest day
@@ -471,7 +479,7 @@ export function evaluateHint(context: HintContext, state: HintState | null): Eva
   const { summary, targets, dayType, currentHour } = context;
   // Guard: Cosmos documents written before items array existed may omit the field.
   const meals: Meal[] = context.meals.map((m) => ({ ...m, items: m.items ?? [] }));
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const today = context.currentLocalDate;
 
   const cooldownHistory: Partial<Record<HintId, string>> = state?.cooldownHistory ?? {};
   const motivationIndex: number = state?.motivationIndex ?? 0;

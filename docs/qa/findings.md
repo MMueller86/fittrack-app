@@ -44,6 +44,8 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-023 | Daily prompt provider-input guard coverage, AC-4 | Blocking | Backend | Closed |
 | FT-QA-2026-024 | Daily cache provenance comparison, AC-7/AC-14 | Blocking | Backend | Closed |
 | FT-QA-2026-025 | Pre-existing Daily Insight syntax error blocking backend build | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-026 | Local-date correction documentation, AC-12 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-027 | Diary local-hour parameter documentation, AC-12 | Non-blocking | Documentation | Closed |
 
 ## Actionable Findings
 
@@ -372,6 +374,32 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Status:** Awaiting decision
 - **Decision:** Pending user choice: `Fix requested`, `Accepted`, or `Deferred` as a separate baseline-build task.
 - **History:** 2026-08-21 - Imported from the Weekly Insight diagnostic QA report. The Weekly payload and credentialed prompt eval did not authorize a correction; the finding remains separate from that workflow.
+
+### FT-QA-2026-026
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_User-Local-Date-Timezone-Korrektur.md`
+- **Acceptance criterion:** AC-12
+- **Description:** `docs/kb/tech/06-ai-integrations.md` still documents obsolete Daily Insight behavior in which missing or malformed date/context values use backend UTC fallback semantics and expiry uses UTC midnight. The implementation and current API documentation require explicit validated local context.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** `backend/src/functions/dailyInsight.ts`; `docs/kb/tech/06-ai-integrations.md`; `docs/kb/tech/09-api-reference.md`.
+- **Recommendation:** Align the Daily Insight local-time section with the implemented required date/offset contract while preserving the unchanged prompt, schema, quota, and technical UTC timestamp statements.
+- **Status:** Closed
+- **Decision:** User requested all necessary corrections on 2026-09-14.
+- **History:** 2026-09-14 - Imported from the final QA report and routed for correction. 2026-09-14 - Backend aligned the Daily Insight Knowledge Base documentation with the required local date/offset contract. 2026-09-14 - Targeted QA re-review verified the correction; closed.
+
+### FT-QA-2026-027
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_User-Local-Date-Timezone-Korrektur.md`
+- **Acceptance criterion:** AC-12
+- **Description:** `docs/kb/domain/02-diary.md` refers once to a `currentHour` query parameter although the implemented and documented API contract uses `localHour`.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** `backend/src/functions/diary.ts`; `docs/kb/domain/02-diary.md`; `docs/kb/tech/09-api-reference.md`.
+- **Recommendation:** Rename the remaining query-parameter reference to `localHour` and retain `currentLocalDate` only for the internal hint context.
+- **Status:** Closed
+- **Decision:** User requested all necessary corrections on 2026-09-14.
+- **History:** 2026-09-14 - Imported from the final QA report and routed for correction. 2026-09-14 - Backend corrected the diary parameter documentation to `localHour`. 2026-09-14 - Targeted QA re-review verified the correction; closed.
 
 ## Verification Notes (Not Findings)
 

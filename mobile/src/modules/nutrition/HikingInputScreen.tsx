@@ -21,6 +21,7 @@ import type { PackCategory, SpecialActivity, TerrainType } from '@fittrack/share
 import { calculateActivityBonus } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { diaryApi } from '../../shared/api/diaryApi';
+import { addLocalDays, getLocalIsoDate } from '../../shared/date/localDate';
 import { profileApi } from '../../shared/api/profileApi';
 import { Icon } from '../../shared/components/Icon';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
@@ -32,11 +33,8 @@ type Props = NativeStackScreenProps<NutritionStackParamList, 'HikingInput'>;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDateLabel(dateStr: string): string {
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const todayStr = getLocalIsoDate();
+  const yesterdayStr = addLocalDays(todayStr, -1);
   if (dateStr === todayStr) return 'Heute';
   if (dateStr === yesterdayStr) return 'Gestern';
   const d = new Date(dateStr + 'T12:00:00');

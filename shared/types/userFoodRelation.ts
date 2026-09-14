@@ -98,9 +98,16 @@ export interface UpsertUserFoodRelationInput {
   nutritionPer100g?: NutritionValues;
   /** Denormalized portion info */
   portion?: PortionInfo | null;
+  /** Date-only diary date of the entry being recorded — stored in usageDates entries */
+  usageDate?: string;
   /** Meal type of the diary entry being recorded — stored in usageDates entries */
   mealType?: MealType;
 }
+
+/** Internal recordUsage input; a diary date is required for date-only usage tracking. */
+export type RecordUserFoodRelationUsageInput = Omit<UpsertUserFoodRelationInput, 'usageDate'> & {
+  usageDate: string;
+};
 
 /** @deprecated Use GET /api/favorites?context=MealType with backend scoring instead. */
 export interface QuickEntryGroupedResponse {

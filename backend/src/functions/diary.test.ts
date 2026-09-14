@@ -1,8 +1,9 @@
-﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach } from 'vitest';
+﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest';
 
 import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler, getDiaryHandler, listMealsHandler } from './diary';
 import { __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
+import { getHintStateRepository, __resetHintStateRepositoryForTests } from '../lib/repositories/hintStateRepository';
 import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
 import { getUserFoodRelationRepository, __resetUserFoodRelationRepositoryForTests } from '../lib/repositories/userFoodRelationRepository';
 import type { SpecialActivity } from '@fittrack/shared';
@@ -547,6 +548,7 @@ describe('addItemHandler — recordUsage foodRefType mapping', () => {
     const repo = getUserFoodRelationRepository();
     const rel = await repo.getByFoodRef('test-user-abc-123', 'recipe:abc-123');
     expect(rel?.foodRefType).toBe('recipe');
+    expect(rel?.usageDates).toEqual([{ date: '2026-05-08', mealType: 'breakfast' }]);
   });
 });
 
@@ -558,7 +560,11 @@ describe('GET /api/diary — specialActivity response fields', () => {
   const GET_DATE = '2026-07-21';
 
   // Helper to build a fake GET request with query params
-  async function makeGetRequest(date: string) {
+  async function makeGetRequest(
+    date: string,
+    localDate: string | null = date,
+    localHour = '12',
+  ) {
     const token = await (async () => {
       // Re-use makeAuthRequest pattern with query support
       const { signTestToken } = await import('../test-utils/http');
@@ -566,14 +572,17 @@ describe('GET /api/diary — specialActivity response fields', () => {
     })();
     // Build a fake request manually with query support
     const { makeRequest } = await import('../test-utils/http');
+    const query: Record<string, string> = { date, localHour };
+    if (localDate !== null) query.localDate = localDate;
     return makeRequest({
-      query: { date },
+      query,
       headers: { authorization: `Bearer ${token}` },
     });
   }
 
   beforeEach(() => {
     __resetDayMetaRepositoryForTests();
+    __resetHintStateRepositoryForTests();
   });
 
   it('returns specialActivity: null and activityBonus: 0 when no activity is set', async () => {
@@ -637,6 +646,51 @@ describe('GET /api/diary — specialActivity response fields', () => {
     expect(res.status).toBe(200);
     const body = res.jsonBody as { previousDayHasActivity: boolean };
     expect(body.previousDayHasActivity).toBe(true);
+  });
+
+  it('does not rewrite hint state when reading a historical day for the current local date', async () => {
+    const hintStateRepository = getHintStateRepository();
+    await hintStateRepository.upsert('test-user-abc-123', {
+      id: 'hintState',
+      userId: 'test-user-abc-123',
+      _docType: 'hintState',
+      lastHintId: 'H1',
+      lastHintDate: '2026-08-20',
+      lastHintGeneratedAt: '2026-08-20T08:00:00.000Z',
+      cooldownHistory: {},
+      motivationIndex: 0,
+    });
+    const upsertSpy = vi.spyOn(hintStateRepository, 'upsert');
+
+    const req = await makeGetRequest(GET_DATE, '2026-08-20');
+    const res = await getDiaryHandler(req, makeContext());
+
+    expect(res.status).toBe(200);
+    expect(upsertSpy).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['missing', null],
+    ['wrong format', '2026-7-21'],
+    ['impossible day', '2026-02-30'],
+  ] as const)('returns 400 for %s localDate', async (_label, localDate) => {
+    const req = await makeGetRequest(GET_DATE, localDate);
+    const res = await getDiaryHandler(req, makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('localDate') });
+  });
+
+  it.each([
+    ['missing', ''],
+    ['wrong format', '2026-7-21'],
+    ['impossible day', '2026-02-30'],
+  ])('returns 400 for %s diary date', async (_label, date) => {
+    const req = await makeGetRequest(date);
+    const res = await getDiaryHandler(req, makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('date') });
   });
 });
 

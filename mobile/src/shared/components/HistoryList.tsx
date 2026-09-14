@@ -12,6 +12,7 @@ import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { WeightEntry, WeightUnit } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { addLocalDays, getLocalIsoDate } from '../date/localDate';
 
 export interface HistoryListProps {
   entries: WeightEntry[];
@@ -29,14 +30,7 @@ interface HistoryItem {
 
 function parseDate(iso: string): Date {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function last7CutoffDate(): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - 6);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return new Date(y, m - 1, d, 12);
 }
 
 function formatEntryDate(iso: string): string {
@@ -57,16 +51,16 @@ function buildAllItems(entries: WeightEntry[]): HistoryItem[] {
 
 /** Rolling last-7-days window (today inclusive, going 6 days back). */
 function buildLast7DaysItems(allItems: HistoryItem[]): HistoryItem[] {
-  const cutoff = last7CutoffDate();
-  return allItems.filter((item) => parseDate(item.entry.date) >= cutoff);
+  const today = getLocalIsoDate();
+  const cutoff = addLocalDays(today, -6);
+  return allItems.filter((item) => item.entry.date >= cutoff && item.entry.date <= today);
 }
 
 function getMondayOf(iso: string): string {
   const d = parseDate(iso);
   const day = d.getDay();
   const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return addLocalDays(iso, diff);
 }
 
 function formatWeekRange(mondayIso: string): string {
@@ -93,15 +87,12 @@ interface WeekGroup {
  * Items from the last-7-days window may also appear here — intentional overlap.
  */
 function buildCompletedWeekGroups(allItems: HistoryItem[]): WeekGroup[] {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = getLocalIsoDate();
 
   const map = new Map<string, HistoryItem[]>();
   for (const item of allItems) {
     const monday = getMondayOf(item.entry.date);
-    const mondayDate = parseDate(monday);
-    const sundayDate = new Date(mondayDate);
-    sundayDate.setDate(mondayDate.getDate() + 6);
+    const sundayDate = addLocalDays(monday, 6);
     // Only include closed weeks (Sunday < today)
     if (sundayDate < today) {
       const bucket = map.get(monday) ?? [];

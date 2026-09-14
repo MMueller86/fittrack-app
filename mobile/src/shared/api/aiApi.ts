@@ -6,12 +6,19 @@ import type {
   AiFoodEstimatePreview,
   NutritionLabelScanResult,
   AiMealEstimatePreview,
+  InsightResponse,
   RecipeScalePreviewRequest,
   RecipeScalePreviewResponse,
   InsightFeedbackRequest,
   InsightFeedbackResponse,
   WeeklyNutritionReviewResponse,
 } from '@fittrack/shared';
+import { getLocalDateContext, getLocalTimezoneOffsetMinutes } from '../date/localDate';
+
+export interface DailyInsightResponse extends InsightResponse {
+  /** Explicitly false for legacy Daily documents without feedback provenance. */
+  feedbackAvailable?: boolean;
+}
 
 const INSIGHT_FEEDBACK_ERROR_CODES = [
   'insight_not_found',
@@ -193,6 +200,23 @@ export const aiApi = {
         request,
         { timeout: 90_000, signal },
       )
+      .then((r) => r.data);
+  },
+
+  /** GET /api/ai/daily-insight — explicit local date plus local time context */
+  getDailyInsight(referenceDate?: string): Promise<DailyInsightResponse> {
+    const now = new Date();
+    const { currentLocalDate, currentHour } = getLocalDateContext(now);
+    const timezoneOffsetMinutes = getLocalTimezoneOffsetMinutes(now);
+
+    return apiClient
+      .get<DailyInsightResponse>('/ai/daily-insight', {
+        params: {
+          date: referenceDate ?? currentLocalDate,
+          ...(currentHour === null ? {} : { localHour: currentHour }),
+          ...(timezoneOffsetMinutes === null ? {} : { timezoneOffsetMinutes }),
+        },
+      })
       .then((r) => r.data);
   },
 

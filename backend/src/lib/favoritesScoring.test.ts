@@ -283,6 +283,16 @@ describe('scoreItem — 90-day window', () => {
     // Only 1 recent entry: contextBonus = min(1*4,20) = 4
     expect(scoreItem(item, 'lunch', NOW)).toBe(4);
   });
+
+  it('uses the explicit date-only reference while keeping instant scores on now', () => {
+    const lastUsedAt = new Date(NOW.getTime() - 1 * 24 * 60 * 60 * 1000).toISOString();
+    const item = makeItem({
+      lastUsedAt,
+      usageDates: [makeEntry('2025-03-01', 'lunch')],
+    });
+
+    expect(scoreItem(item, 'lunch', '2025-03-01', NOW)).toBeCloseTo(23.5);
+  });
 });
 
 // ---------------------------------------------------------------------------

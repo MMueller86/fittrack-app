@@ -7,9 +7,19 @@ export const WEIGHT_TREND_DIRECTION_THRESHOLD_PER_WEEK = 0.01;
 
 export type WeightTrendDirection = 'gaining' | 'losing' | 'stable';
 
-function parseDateMs(iso: string): number {
+function parseDateDay(iso: string): number {
   const [year, month, day] = iso.split('-').map(Number);
-  return new Date(year, month - 1, day).getTime();
+  const date = new Date(0);
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCFullYear(year, month - 1, day);
+  return Math.floor(date.getTime() / MILLISECONDS_PER_DAY);
+}
+
+function getCurrentDateDay(now: Date): number {
+  const date = new Date(0);
+  date.setUTCHours(12, 0, 0, 0);
+  date.setUTCFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.floor(date.getTime() / MILLISECONDS_PER_DAY);
 }
 
 function toKg(entry: WeightEntry): number {
@@ -25,8 +35,8 @@ export function getWeightEntriesInLastDays(
   days: number,
   now: Date = new Date(),
 ): WeightEntry[] {
-  const cutoff = days * MILLISECONDS_PER_DAY;
-  return entries.filter((entry) => now.getTime() - parseDateMs(entry.date) <= cutoff);
+  const currentDay = getCurrentDateDay(now);
+  return entries.filter((entry) => currentDay - parseDateDay(entry.date) <= days);
 }
 
 /** Returns the chart's linear-regression slope projected to a weekly change. */
@@ -38,8 +48,8 @@ export function calculateWeightTrendPerWeek(
   const last30 = getWeightEntriesInLastDays(entries, WEIGHT_TREND_WINDOW_DAYS, now);
   if (last30.length < 2) return null;
 
-  const sorted = [...last30].sort((a, b) => parseDateMs(a.date) - parseDateMs(b.date));
-  const xs = sorted.map((entry) => parseDateMs(entry.date) / MILLISECONDS_PER_DAY);
+  const sorted = [...last30].sort((a, b) => parseDateDay(a.date) - parseDateDay(b.date));
+  const xs = sorted.map((entry) => parseDateDay(entry.date));
   const ys = sorted.map(toKg);
   const count = xs.length;
   const meanX = xs.reduce((sum, value) => sum + value, 0) / count;

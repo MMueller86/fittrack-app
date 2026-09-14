@@ -24,6 +24,7 @@ import { foodApi } from '../../../shared/api/foodApi';
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import { reusableItemsApi } from '../../../shared/api/reusableItemsApi';
 import { recipeApi } from '../../../shared/api/recipeApi';
+import { getLocalIsoDate } from '../../../shared/date/localDate';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { computeLastUsageText, computeMacroText, computeDirectAddLabel, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
 export { computeLastUsageText, computeMacroText };
@@ -143,7 +144,7 @@ export function FoodEntryHub() {
     setAllFavoritesError(null);
     try {
       const contextMealType = context.mealType ?? getSuggestedMealType();
-      const response = await favoritesApi.listFavoritesRanked(contextMealType);
+      const response = await favoritesApi.listFavoritesRanked(contextMealType, getLocalIsoDate());
       setAllFavorites(response.items);
       sessionOrderRef.current = response.items;
     } catch (e: unknown) {
