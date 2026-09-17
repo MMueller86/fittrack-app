@@ -12,6 +12,14 @@ import { randomUUID } from 'node:crypto';
 const CONTAINER_NAME = 'recipe-images';
 const PRODUCT_IMAGES_CONTAINER = 'product-images';
 const SAS_TTL_MS = 60 * 60 * 1000; // 1 hour
+export const RECIPE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+
+export class RecipeImageTooLargeError extends Error {
+  constructor() {
+    super('Recipe image exceeds the 8 MB limit.');
+    this.name = 'RecipeImageTooLargeError';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Client (lazy singleton)
@@ -81,6 +89,29 @@ export async function deleteRecipeImage(blobName: string): Promise<void> {
   const containerClient = client.getContainerClient(CONTAINER_NAME);
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
   await blockBlobClient.deleteIfExists();
+}
+
+/**
+ * Download an authorized recipe image without going through a SAS URL.
+ * The bounded download protects the Function from oversized blobs even when
+ * the stored content length is missing or stale.
+ */
+export async function downloadRecipeImage(blobName: string): Promise<Buffer> {
+  const client = getClient();
+  const containerClient = client.getContainerClient(CONTAINER_NAME);
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+  const properties = await blockBlobClient.getProperties();
+
+  if (properties.contentLength !== undefined && properties.contentLength > RECIPE_IMAGE_MAX_BYTES) {
+    throw new RecipeImageTooLargeError();
+  }
+
+  const buffer = await blockBlobClient.downloadToBuffer(0, RECIPE_IMAGE_MAX_BYTES + 1);
+  if (buffer.byteLength > RECIPE_IMAGE_MAX_BYTES) {
+    throw new RecipeImageTooLargeError();
+  }
+
+  return buffer;
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,8 @@
 // All amountGrams ranges are derived from the documented unit conversions:
 //   "1 EL → ~15g", "1 TL → ~5g", "1 Prise → ~1g"
 // Explicit gram/ml values in the input should pass through unchanged.
+// A food item with a genuinely indeterminate amount may remain food with amountGrams = null
+// so the application can route it to manual review; explicit quantities must still convert.
 //
 // Update this file whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-run evals.
 
@@ -120,6 +122,19 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
         // Herbs without quantity: amountGrams is unconstrained (null is acceptable)
         { displayNameContains: 'rosmarin', category: 'seasoning', kitchenAmountText: 'non-empty' },
         { displayNameContains: 'thymian', category: 'seasoning', kitchenAmountText: 'non-empty' },
+      ],
+    },
+  },
+  {
+    id: 'indeterminate-spray-oil-stays-food',
+    description: 'Spray oil remains a food item when its amount cannot be converted reliably; explicit oil quantity remains measurable',
+    input: 'Sprühöl zum Anbraten, 1 EL Olivenöl, 300g Hähnchenbrust',
+    constraints: {
+      exactIngredientCount: 3,
+      ingredients: [
+        { displayNameContains: 'sprühöl', category: 'food', amountGrams: null },
+        { displayNameContains: 'olivenöl', category: 'food', amountGrams: { min: 10, max: 20 } },
+        { displayNameContains: 'hähnchen', category: 'food', amountGrams: { min: 295, max: 305 } },
       ],
     },
   },

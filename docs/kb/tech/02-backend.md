@@ -20,6 +20,7 @@ Located in `backend/src/functions/`. Each file owns one domain.
 | `reusableItemsEnrich.ts` | POST /reusable-items/{id}/enrich | Yes | AI enrichment |
 | `reusableItemsEnrichScheduler.ts` | Timer trigger | — | Background enrichment |
 | `recipes.ts` | CRUD /recipes, image upload/delete/reorder, recipe logging | Yes | Image upload appends; delete and reorder normalize image order. |
+| `instagramRecipe.ts` | POST /recipes/{id}/instagram-render | Yes | Server-owned recipe data to PNG renderer; no persistence |
 | `ai.ts` | POST /ai/parse-meal, /ai/estimate-meal | Yes | Quota enforced |
 | `foodEstimate.ts` | POST /ai/food-estimate | Yes | Quota enforced |
 | `foodEstimateBatch.ts` | POST /ai/food-estimate/batch | Yes | Quota enforced |
@@ -55,6 +56,7 @@ Health check: `GET /api/health` — anonymous, always returns `{ status: 'ok' }`
 | `searchRanking.ts` | Ranking logic for food search results |
 | `tokenize.ts` | Text tokenization for food product search keywords |
 | `log.ts` | `logEvent()` structured logging |
+| `instagramRenderer/recipeAdapter.ts` | Maps authenticated `Recipe` data and request presentation options to `RenderInput` |
 | `weeklyInsight.ts` | Server-side weekly aggregation, sanitized AI context, and cache decisions |
 | `openFoodFactsClient.ts` | (Unused at runtime — kept for reference) |
 | `repositories/` | Repository pattern implementations |
@@ -113,6 +115,29 @@ Available repositories:
 the diary meal for `usageDates`; it never derives a user date from the server
 clock. `lastUsedAt` and `createdAt` remain UTC instants. Missing internal usage
 dates fail closed in both repository implementations.
+
+### Instagram recipe rendering
+
+`functions/instagramRecipe.ts` is a thin orchestration layer for
+`POST /api/recipes/{id}/instagram-render`. It authenticates with
+`requireUser()`, validates the strict request body, loads the recipe through
+`getRecipesRepository().get(userId, recipeId)`, selects the stored image, and
+maps controlled renderer errors to the documented HTTP statuses.
+
+`instagramRenderer/recipeAdapter.ts` is the boundary between the persistent
+recipe model and `RenderInput`. It takes the title, tags, portions, and
+`nutritionPerPortion` only from the server-loaded recipe. It applies the
+request defaults `focusX=0.5`, `focusY=0.46`, `zoom=1.0`, and
+`nutritionHighlight=null`; optional time and difficulty remain request-level
+metadata and are omitted when absent. Layout constants, Satori nodes, icon
+resolution, and nutrition rounding remain owned by the renderer.
+
+The render path calls `downloadRecipeImage()` with only the server-read
+`RecipeImage.blobName`. Storage downloads the Blob directly with
+`downloadToBuffer()` and enforces the 8 MB limit before the buffer reaches the
+renderer. It does not perform a SAS-URL round trip and never accepts a client
+blob name or image URL. Successful output is an in-memory PNG response with
+`Cache-Control: no-store`; no image or render metadata is persisted.
 
 ### Quota Enforcement
 
@@ -192,9 +217,33 @@ Local values are in `backend/local.settings.json` (gitignored) — this is the *
 ## Build and Deploy
 
 - Local dev: `npm run dev` from `backend/`; the launcher checks port 7071, builds, starts Azurite, waits until its Blob, Queue, and Table services answer over HTTP, provisions the `reusable-items-enrich` queue, and only then starts Azure Functions. It fails early with an actionable message if another Functions host already owns port 7071. Azurite data is stored in the OS temp directory by default to avoid sync-folder file locks; `FITTRACK_AZURITE_LOCATION` can override it. `npm run start` assumes Azurite is already running.
-- Build: `npm run build` (TypeScript → `dist/`)
-- Verify: `npm run build:verify` — compiles then runs `scripts/verify-build.mjs` which checks that `require('@fittrack/shared')` does not appear in the output
+- Build: `npm run build` (TypeScript -> `dist/`, then deterministic Instagram renderer asset copy)
+- Verify: `npm run build:verify` — builds, copies the renderer assets, then runs `scripts/verify-build.mjs`, which checks that `require('@fittrack/shared')` does not appear in the output
 - Deploy: always from `_deploy_staging/` with `--no-build` flag (used for all environments, not just staging)
 - Before deploy: delete `dist/` and `tsconfig.tsbuildinfo` for a clean build
+
+### Instagram renderer package contract
+
+The backend runtime dependencies contain the renderer packages at the verified
+POC ranges: `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static
+~1.46.0`, `@tabler/icons ~3.46.0`, and `sharp ^0.34.5`. `pixelmatch
+~7.2.0`, TypeScript, Vitest, and type packages remain backend development or
+test dependencies and are not part of `_deploy_staging`.
+
+`npm run copy:instagram-assets` validates and copies the complete nine-file
+manifest from `backend/src/lib/instagramRenderer/assets/` to
+`backend/dist/backend/src/lib/instagramRenderer/assets/`. The manifest is:
+
+- `branding/fittrack-wordmark.png` (legacy fallback)
+- `branding/micha-logo-writing.svg`
+- `fonts/Inter-Medium.ttf`, `fonts/Inter-SemiBold.ttf`,
+  `fonts/InterDisplay-Bold.ttf`, and `fonts/LICENSE.txt`
+- `nutrition/barbell-header-frame.svg`
+- `nutrition-highlights/high-protein.png` and `nutrition-highlights/low-fat.png`
+
+The script removes the target asset directory before copying, rejects missing
+or unexpected source files, and is included in `build` and `build:verify`.
+The compiled renderer therefore resolves `__dirname/assets` without reading
+from `backend/src`.
 
 See [tech/07-infrastructure.md](07-infrastructure.md) for full deploy workflow.

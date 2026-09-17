@@ -470,17 +470,33 @@ function bundleAiItems(items: AiParsedItem[]): AiParsedItem[] {
 
 function mapRecipeFoodIngredientsToParsedItems(items: AiRecipeIngredientLine[]): AiParsedItem[] {
   const parsedItems = items.map((item): AiParsedItem => {
-    if (typeof item.amountGrams !== 'number' || !Number.isFinite(item.amountGrams) || item.amountGrams <= 0) {
-      throw new Error(`Recipe analyzer returned invalid amountGrams for food ingredient "${item.displayName}"`);
-    }
+    const hasValidAmount =
+      typeof item.amountGrams === 'number' && Number.isFinite(item.amountGrams) && item.amountGrams > 0;
     return {
       rawText: item.line,
       displayName: item.displayName,
-      inputMode: 'grams',
-      inputAmount: item.amountGrams,
+      inputMode: hasValidAmount ? 'grams' : 'unknown',
+      inputAmount: hasValidAmount ? item.amountGrams : null,
     };
   });
   return bundleAiItems(parsedItems);
+}
+
+const UNKNOWN_FOOD_AMOUNT_WARNING = 'Menge konnte nicht automatisch bestimmt werden. Bitte Produkt und Menge auswählen.';
+
+function markUnknownFoodAmountsForReview(items: MealParserPreviewItem[]): MealParserPreviewItem[] {
+  return items.map((item) => {
+    if (item.inputMode !== 'unknown') return item;
+
+    return {
+      ...item,
+      status: item.candidates.length === 0 ? 'unmatched' : 'needsSelection',
+      selectedProductId: null,
+      selectedProductName: null,
+      needsReview: true,
+      warnings: [...item.warnings, UNKNOWN_FOOD_AMOUNT_WARNING],
+    };
+  });
 }
 
 export interface AiRecipeAnalysisResponse {
@@ -525,15 +541,9 @@ export const recipeAnalyzeHandler = withHandler(
     // 2. Route ingredients: food → catalog; seasoning → direct construction
     const foodIngredients = recipeRaw.ingredients.filter((i) => i.category !== 'seasoning');
     const seasoningIngredients = recipeRaw.ingredients.filter((i) => i.category === 'seasoning');
-    let parsedFoodIngredients: AiParsedItem[] = [];
-    try {
-      parsedFoodIngredients = mapRecipeFoodIngredientsToParsedItems(foodIngredients);
-    } catch (err) {
-      console.error('[AI] Recipe analyzer returned invalid food amount:', err);
-      return { status: 502, jsonBody: { error: 'AI recipe analysis returned an invalid food amount.' } };
-    }
+    const parsedFoodIngredients = mapRecipeFoodIngredientsToParsedItems(foodIngredients);
 
-    // Track usage after a successful AI call and valid food amount contract.
+    // Track usage after a successful AI call.
     await trackUsage(userContext, 'recipe-analyze');
 
     let ingredients: MealParserPreviewItem[] = [];
@@ -541,7 +551,9 @@ export const recipeAnalyzeHandler = withHandler(
       let resolvedFood: MealParserPreviewItem[] = [];
       if (parsedFoodIngredients.length > 0) {
         const resolved = await resolveIngredients(userId, parsedFoodIngredients);
-        resolvedFood = resolved.map((item) => ({ ...item, category: 'food' as const }));
+        resolvedFood = markUnknownFoodAmountsForReview(
+          resolved.map((item) => ({ ...item, category: 'food' as const })),
+        );
       }
 
       const resolvedSeasonings: MealParserPreviewItem[] = seasoningIngredients.map((s) => ({

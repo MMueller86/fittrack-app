@@ -28,7 +28,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Update this constant whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-review all fixtures. */
-const TESTED_PROMPT_VERSION = 'v8';
+const TESTED_PROMPT_VERSION = 'v9';
 
 it('prompt version matches fixture expectations', () => {
   expect(RECIPE_ANALYZE_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);

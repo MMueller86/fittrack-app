@@ -2,7 +2,17 @@
 
 Azure Functions v4 backend for FitTrack. TypeScript, Node 20 LTS, Consumption Plan.
 
-## Implementation status
+## Current implementation status
+
+The M1-M5 table and the former fixed-user authentication text are historical
+milestone notes, not a current route inventory. The current backend validates
+Bearer JWTs in `requireUser()` for protected handlers, while Azure Functions
+triggers remain `authLevel: 'anonymous'` and enforce application auth in code.
+`GET /api/health` is the anonymous exception. Recipe ownership and all render
+inputs are resolved server-side; the Instagram renderer is registered at
+`POST /api/recipes/{id}/instagram-render`.
+
+### Historical milestone snapshot
 
 | Milestone | Scope | Status |
 |---|---|---|
@@ -10,32 +20,20 @@ Azure Functions v4 backend for FitTrack. TypeScript, Node 20 LTS, Consumption Pl
 | M2 | Real auth: Google ID token → JWT, `jwtMiddleware`, `/api/auth/google\|refresh\|logout`, profile + onboarding | ⏳ Stubs only (501) |
 | M3 | Nutrition targets, diary, reusable items | ⏳ Stubs only (501) |
 | M4 | Recipes (CRUD + image upload) | ⏳ Stubs only (501) |
-| M5 | AI workflows (Azure OpenAI), dashboard aggregation | ⏳ Stubs only (501) |
+| M5 | AI workflows (Azure OpenAI), dashboard aggregation | Historical baseline |
 
-All routes documented below that are not in M1 currently return
-`501 Not Implemented`. Their paths and shapes are provisional.
+The table preserves the original delivery snapshot. Consult the Knowledge Base
+and the implementation for current route behavior.
 
-## Auth (M1)
+### Historical M1 auth stub (superseded)
 
-**There is no real authentication yet.** [`src/lib/auth.ts`](./src/lib/auth.ts)
-exposes a `requireUser()` helper that returns a fixed dev user id
-(`'dev-user'`) for every request, regardless of any `Authorization`
-header.
+The former M1 `requireUser()` dev-user implementation returned `'dev-user'` for
+every request and did not validate `Authorization`. That behavior was
+superseded by server-side JWT validation and must not be used as deployment
+guidance. The historical warning about exposing the M1 app publicly remains
+useful only for that old snapshot.
 
-Consequences:
-
-- The backend is **not safe to expose publicly** in this state — anyone
-  who reaches the endpoint reads/writes the same `dev-user` data.
-- The deployed Azure Function App is gated by Functions auth keys at the
-  HTTP trigger level (per-route `authLevel`), but for M1 all weights
-  routes use `authLevel: 'anonymous'` and rely on "only I know the URL".
-- Multi-tenant isolation arrives with **M2** when JWT validation
-  replaces the stub. Until then, do not invite other users.
-
-When M2 lands, JWT middleware will be applied to every route except
-`/api/auth/google`, `/api/auth/refresh`, and `/api/health`.
-
-## Structure
+## Structure (historical overview)
 
 ```
 src/
@@ -130,10 +128,10 @@ func --version   # should be 4.x
 
 ## Key Rules
 
-- **M1:** weights routes are `authLevel: 'anonymous'` and use the
-  `requireUser()` dev stub. Do not deploy publicly without M2 auth.
-- **From M2:** JWT middleware must be applied to every route except
-  `/api/auth/google`, `/api/auth/refresh`, `/api/health`.
+- Protected routes must call `requireUser()`; the helper validates the Bearer
+  JWT and supplies the user scope used for repository access.
+- Azure Functions `authLevel: 'anonymous'` is not application anonymity. The
+  health route is public; protected handlers enforce auth in application code.
 - No Azure OpenAI keys or calls in `mobile/` — all AI goes through this backend
 - All AI endpoints return a preview payload only — caller must POST to a save endpoint after user confirmation
 - `local.settings.json` is gitignored — use the `.template` file as reference
@@ -146,9 +144,9 @@ func --version   # should be 4.x
 | `@azure/cosmos` | Cosmos DB client |
 | `@azure/storage-blob` | Blob Storage client (recipe images, M4) |
 
-When M2/M5 lands, `google-auth-library`, `jsonwebtoken`, and `openai`
-will be added back. They were removed in M1 because no source file
-imports them yet.
+The current dependency manifest already contains the runtime authentication and
+AI packages used by the implementation. Dependency ownership and versions are
+defined by `backend/package.json` and the workspace lockfiles.
 
 ## Testing
 

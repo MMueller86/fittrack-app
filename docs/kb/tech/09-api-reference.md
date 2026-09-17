@@ -121,6 +121,7 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | PUT | `/api/recipes/{id}/images/order` | Yes | Reorders existing images; returns `{ images: RecipeImage[] }` |
 | DELETE | `/api/recipes/{id}/images/{imageId}` | Yes | Deletes the blob and compacts remaining image order; `204` with no body |
 | POST | `/api/recipes/{id}/log` | Yes | Logs a portion snapshot into a diary meal |
+| POST | `/api/recipes/{id}/instagram-render` | Yes | Renders the server-owned recipe as a direct `1080 x 1350` PNG; no render result is persisted |
 
 ### Recipe create/update body
 
@@ -163,6 +164,86 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 `POST /api/recipes/{id}/images` accepts multipart field `image`, only `image/jpeg` and `image/png`, up to 8 MB. The new image is appended at `max existing order + 1`. `DELETE /api/recipes/{id}/images/{imageId}` deletes the blob and renumbers remaining images from 1.
 
 `PUT /api/recipes/{id}/images/order` accepts `{ "imageIds": string[] }`. The array must contain every existing image ID exactly once, with no duplicates or unknown IDs. The backend normalizes `order` to `1..n` in the supplied sequence and returns `{ images: RecipeImage[] }`. The endpoint only changes image metadata in the recipe document; it does not move or rewrite blob data.
+
+### POST /api/recipes/{id}/instagram-render
+
+This authenticated endpoint renders one private recipe with the backend's
+Instagram renderer. Azure Functions exposes the trigger with
+`authLevel: "anonymous"`, but application authentication is mandatory:
+`requireUser()` validates the Bearer token and the recipe repository lookup is
+scoped to that JWT user. The endpoint has no AI quota, does not create a
+Cosmos document, does not update the recipe, and does not upload the PNG.
+
+**Request body:**
+
+```json
+{
+	"imageId": "optional-recipe-image-uuid",
+	"presentation": {
+		"focusX": 0.5,
+		"focusY": 0.46,
+		"zoom": 1.0
+	},
+	"nutritionHighlight": "high-protein",
+	"recipeMeta": {
+		"totalTimeMinutes": 25,
+		"difficulty": "Einfach"
+	}
+}
+```
+
+All request fields are optional, so `{}` is valid. The strict schema accepts
+only `imageId`, `presentation`, `nutritionHighlight`, and `recipeMeta`:
+
+| Field | Validation and default |
+|---|---|
+| `imageId` | Optional UUID. When absent, the image with the lowest finite `order` is selected; ties use the lowest image ID. |
+| `presentation.focusX` | Optional finite number in `0..1`; defaults to `0.5`. |
+| `presentation.focusY` | Optional finite number in `0..1`; defaults to `0.46`. |
+| `presentation.zoom` | Optional finite number `>= 1`; defaults to `1.0`. |
+| `nutritionHighlight` | `"high-protein"`, `"low-fat"`, or `null`; defaults to `null`. There is no automatic nutrition-threshold calculation. |
+| `recipeMeta.totalTimeMinutes` | Positive integer. Required together with `difficulty` when `recipeMeta` is present. |
+| `recipeMeta.difficulty` | Non-empty, trimmed, single-line string. Required together with `totalTimeMinutes`. |
+
+`title`, `tags`, `portions`, `nutrition`, `blobName`, and `ownerUserId` are
+never accepted from the client. The adapter obtains `title`, tags, portions,
+and `nutritionPerPortion` from the authenticated user's stored `Recipe`.
+`recipeMeta.portions` is not a request field; when meta is requested, portions
+come from the stored recipe. The selected image's stored `blobName` is passed
+directly to the backend storage layer. The render path does not fetch a
+client-provided SAS URL.
+
+**Success response (200):**
+
+The response body is the PNG buffer, not JSON or Base64. The renderer owns the
+layout and returns exactly `1080 x 1350` pixels in PNG format.
+
+```text
+Content-Type: image/png
+Content-Length: <buffer.byteLength>
+Content-Disposition: inline; filename="fittrack-recipe.png"
+Cache-Control: no-store
+```
+
+The direct Blob download is bounded by the existing 8 MB recipe-image limit.
+
+**Errors:**
+
+- `400` — missing route id, invalid JSON, unknown request fields, invalid
+	`imageId`/presentation values, or incomplete `recipeMeta`; the response uses
+	the existing `{ error: string }` shape.
+- `401` — missing or invalid Bearer token.
+- `404` — recipe not found for the authenticated user, or an explicitly
+	requested `imageId` is not part of that recipe.
+- `422` — no renderable recipe image, invalid stored image metadata, image over
+	8 MB, unreadable image, invalid stored portions for requested meta, or an
+	expected renderer input/layout error. Controlled renderer failures include a
+	stable `code`, such as `NO_RECIPE_IMAGE`, `IMAGE_BLOB_INVALID`,
+	`IMAGE_TOO_LARGE`, `INVALID_RECIPE_META`, `TITLE_OVERFLOW`,
+	`TOO_MANY_TAGS`, or `TAG_ROW_OVERFLOW`.
+- `500` — unexpected storage, native renderer, missing-asset, or other backend
+	failure. The external response is generic; internal causes and asset details
+	are logged but never returned.
 
 ## Food Search
 

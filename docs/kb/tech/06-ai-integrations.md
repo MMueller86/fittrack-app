@@ -63,7 +63,7 @@ Mobile shows `MealEstimateReviewScreen`.
 
 ### 6. Recipe Analyzer (`POST /api/ai/recipe-analyze`)
 
-User provides a free-text recipe. The AI extracts ingredients and returns positive total gram weights for every `food` ingredient, including conversions such as `2 EL` → approximately `30 g`.
+User provides a free-text recipe. The AI extracts ingredients and returns positive total gram weights for every `food` ingredient with a determinable quantity, including conversions such as `2 EL` → approximately `30 g`. A genuinely indeterminate food amount, such as spray oil used for coating without a reliable measurable quantity, remains a food ingredient with `amountGrams: null` and is sent to manual review instead of failing the analysis.
 
 **Used by:** `RecipeWizardScreen` on mobile.
 

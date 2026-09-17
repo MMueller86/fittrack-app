@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 904 64">
+  <defs>
+    <linearGradient id="barbell-metal-a" x1="0" x2="1">
+      <stop offset="0" stop-color="#343A37"/>
+      <stop offset=".18" stop-color="#69716C"/>
+      <stop offset=".42" stop-color="#C8CECB"/>
+      <stop offset=".56" stop-color="#F4F6F5"/>
+      <stop offset=".76" stop-color="#8B938E"/>
+      <stop offset="1" stop-color="#3B423E"/>
+    </linearGradient>
+
+    <linearGradient id="barbell-metal-b" x1="0" x2="1">
+      <stop offset="0" stop-color="#2B312E"/>
+      <stop offset=".22" stop-color="#5E6661"/>
+      <stop offset=".48" stop-color="#BFC6C2"/>
+      <stop offset=".63" stop-color="#EEF1EF"/>
+      <stop offset=".82" stop-color="#717A74"/>
+      <stop offset="1" stop-color="#303633"/>
+    </linearGradient>
+
+    <linearGradient id="barbell-sleeve" y1="0" y2="1">
+      <stop offset="0" stop-color="#F1F3F2"/>
+      <stop offset=".35" stop-color="#B8BFBB"/>
+      <stop offset=".70" stop-color="#7B837E"/>
+      <stop offset="1" stop-color="#545B57"/>
+    </linearGradient>
+
+    <linearGradient id="barbell-shaft" y1="0" y2="1">
+      <stop offset="0" stop-color="#EEF1EF"/>
+      <stop offset=".35" stop-color="#AAB1AD"/>
+      <stop offset=".66" stop-color="#707873"/>
+      <stop offset="1" stop-color="#D7DCDA"/>
+    </linearGradient>
+  </defs>
+
+  <!-- LEFT END:
+       largest plate nearest the shaft, then progressively smaller toward the outside -->
+  <g>
+    <rect x="2"  y="28" width="5"  height="8"  rx="2"   fill="url(#barbell-metal-b)"/>
+    <rect x="7"  y="24" width="7"  height="16" rx="2.3" fill="url(#barbell-metal-a)"/>
+    <rect x="14" y="19" width="8"  height="26" rx="2.5" fill="url(#barbell-metal-b)"/>
+    <rect x="22" y="13" width="9"  height="38" rx="2.8" fill="url(#barbell-metal-a)"/>
+    <rect x="31" y="7"  width="10" height="50" rx="3"   fill="url(#barbell-metal-b)"/>
+    <rect x="41" y="22" width="6"  height="20" rx="2.5" fill="url(#barbell-metal-a)"/>
+    <rect x="47" y="28" width="10" height="8"  rx="4"   fill="url(#barbell-sleeve)"/>
+
+    <path d="M9.2 26V38 M16.4 21V43 M24.5 16V48 M33.8 10V54 M43 25V39"
+          stroke="#FFFFFF"
+          stroke-opacity=".16"
+          stroke-width="1.05"
+          stroke-linecap="round"/>
+
+    <!-- fixed shaft section for the frozen German V1 template -->
+    <rect x="55" y="29" width="311" height="6" rx="3" fill="url(#barbell-shaft)"/>
+    <rect x="58" y="30.5" width="308" height="2" rx="1" fill="#E6EAE8" opacity=".75"/>
+  </g>
+
+  <!-- RIGHT END: exact mirror of the left side -->
+  <g transform="translate(904 0) scale(-1 1)">
+    <rect x="2"  y="28" width="5"  height="8"  rx="2"   fill="url(#barbell-metal-b)"/>
+    <rect x="7"  y="24" width="7"  height="16" rx="2.3" fill="url(#barbell-metal-a)"/>
+    <rect x="14" y="19" width="8"  height="26" rx="2.5" fill="url(#barbell-metal-b)"/>
+    <rect x="22" y="13" width="9"  height="38" rx="2.8" fill="url(#barbell-metal-a)"/>
+    <rect x="31" y="7"  width="10" height="50" rx="3"   fill="url(#barbell-metal-b)"/>
+    <rect x="41" y="22" width="6"  height="20" rx="2.5" fill="url(#barbell-metal-a)"/>
+    <rect x="47" y="28" width="10" height="8"  rx="4"   fill="url(#barbell-sleeve)"/>
+
+    <path d="M9.2 26V38 M16.4 21V43 M24.5 16V48 M33.8 10V54 M43 25V39"
+          stroke="#FFFFFF"
+          stroke-opacity=".16"
+          stroke-width="1.05"
+          stroke-linecap="round"/>
+
+    <rect x="55" y="29" width="311" height="6" rx="3" fill="url(#barbell-shaft)"/>
+    <rect x="58" y="30.5" width="308" height="2" rx="1" fill="#E6EAE8" opacity=".75"/>
+  </g>
+</svg>

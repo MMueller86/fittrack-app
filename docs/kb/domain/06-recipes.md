@@ -45,7 +45,7 @@ Nutrition for each ingredient is calculated from `amountGrams / 100 × nutrition
 
 `kitchenAmountText` belongs exclusively to the AI analysis contract; the persistent `RecipeIngredient` field is `amountLabel`.
 
-[Rule] For recipe analysis, every `food` ingredient must have a positive finite `amountGrams` value. Kitchen units such as tablespoons, teaspoons, millilitres, and pieces are converted before catalog resolution; an indeterminate `seasoning` may retain `amountGrams: null`.
+[Rule] During recipe analysis, every `food` ingredient with a determinable quantity must have a positive finite `amountGrams` value. Kitchen units such as tablespoons, teaspoons, millilitres, and pieces are converted before catalog resolution. A genuinely indeterminate food amount, such as spray oil without a reliable measurable quantity, may retain `amountGrams: null` in the preview and is routed to manual review; it must be resolved or removed before persistence.
 
 ### Create / Update Compatibility
 

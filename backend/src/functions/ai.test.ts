@@ -774,7 +774,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
     expect(body.ingredients[0]!.inputAmount).toBe(30);
   });
 
-  it('rejects a food ingredient without a positive gram amount', async () => {
+  it('routes a food ingredient without a positive gram amount to manual review', async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fakeClient: any = {
       chat: {
@@ -801,8 +801,87 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
       makeContext(),
     );
 
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { ingredients: {
+      displayName: string;
+      status: string;
+      inputMode: string;
+      inputAmount: number | null;
+      amountGrams: number | null;
+      selectedProductId: string | null;
+      needsReview: boolean;
+      warnings: string[];
+    }[] };
+    expect(body.ingredients[0]).toMatchObject({
+      displayName: 'Frischkäse',
+      status: 'unmatched',
+      inputMode: 'unknown',
+      inputAmount: null,
+      amountGrams: null,
+      selectedProductId: null,
+      needsReview: true,
+    });
+    expect(body.ingredients[0]!.warnings).toContain('Menge konnte nicht automatisch bestimmt werden. Bitte Produkt und Menge auswählen.');
+  });
+
+  it('keeps catalog candidates searchable but does not auto-match an unknown amount', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fakeClient: any = {
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValueOnce({
+            choices: [{ message: { content: JSON.stringify({
+              ...VALID_RECIPE_RAW,
+              ingredients: [{
+                line: 'Sprühöl zum Anbraten',
+                displayName: 'Sprühöl',
+                category: 'food',
+                amountGrams: null,
+                kitchenAmountText: null,
+              }],
+            }) } }],
+          }),
+        },
+      },
+    };
+    __setOpenAiClientForTests(fakeClient);
+    mockFoodRepo([makeCandidate('prod:spruehoel', 'Sprühöl')]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Sprühöl zum Anbraten verwenden' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { ingredients: {
+      status: string;
+      inputMode: string;
+      selectedProductId: string | null;
+      needsReview: boolean;
+      candidates: { id: string }[];
+    }[] };
+    expect(body.ingredients[0]).toMatchObject({
+      status: 'needsSelection',
+      inputMode: 'unknown',
+      selectedProductId: null,
+      needsReview: true,
+    });
+    expect(body.ingredients[0]!.candidates.map((candidate) => candidate.id)).toContain('prod:spruehoel');
+  });
+
+  it('still returns 502 when the recipe analyzer itself fails', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    __setOpenAiClientForTests({
+      chat: { completions: { create: vi.fn().mockRejectedValue(new Error('provider unavailable')) } },
+    } as any);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Rezeptanalyse ohne erreichbaren Dienst' } }),
+      makeContext(),
+    );
+
     expect(res.status).toBe(502);
-    expect((res.jsonBody as { error: string }).error).toContain('invalid food amount');
+    expect((res.jsonBody as { error: string }).error).toContain('AI recipe analysis failed');
   });
 
   it('routes food items through catalog and constructs seasoning items directly', async () => {

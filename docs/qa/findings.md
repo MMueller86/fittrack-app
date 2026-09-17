@@ -46,6 +46,11 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-025 | Pre-existing Daily Insight syntax error blocking backend build | Blocking | Backend | Awaiting decision |
 | FT-QA-2026-026 | Local-date correction documentation, AC-12 | Non-blocking | Documentation | Closed |
 | FT-QA-2026-027 | Diary local-hour parameter documentation, AC-12 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-028 | Instagram renderer Golden comparison, AC-12 | Blocking | Backend | Closed |
+| FT-QA-2026-029 | Instagram renderer wordmark compositing, AC-5 | Blocking | Backend | Closed |
+| FT-QA-2026-030 | Instagram renderer shared ambient field, AC-6 | Blocking | Backend | Closed |
+| FT-QA-2026-031 | Instagram renderer footer documentation, AC-14 | Non-blocking | Documentation | Accepted |
+| FT-QA-2026-032 | Instagram renderer footer SVG provenance, AC-10 | Suggestion | Backend | Accepted |
 
 ## Actionable Findings
 
@@ -400,6 +405,71 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Status:** Closed
 - **Decision:** User requested all necessary corrections on 2026-09-14.
 - **History:** 2026-09-14 - Imported from the final QA report and routed for correction. 2026-09-14 - Backend corrected the diary parameter documentation to `localHour`. 2026-09-14 - Targeted QA re-review verified the correction; closed.
+
+### FT-QA-2026-028
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_Instagram-Recipe-Renderer-PoC.md`
+- **Acceptance criterion:** AC-12
+- **Description:** The approved Golden comparison fails with `0.5278950617283951` differing pixels, exceeding the allowed `0.03` ratio. The failure is reproducible and the generated diff artifacts show broad differences across the hero photo and lower composition.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `npx vitest run src/lib/instagramRenderer/__tests__/golden.test.ts` exits `1`; `backend/src/lib/instagramRenderer/__tests__/golden.test.ts`; `backend/src/lib/instagramRenderer/__tests__/output/diff.png`.
+- **Recommendation:** Reconcile the renderer composition and asset/layout treatment with the V1.7 Golden master, then rerun the unchanged Golden test.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-09-15 - Imported from `docs/qa/reports/PLAN_Instagram-Recipe-Renderer-PoC.md` and routed to Backend for correction. 2026-09-15 - Backend adjusted the photo/ambient composition and reduced the differing-pixel ratio to `0.03500274348422497`; targeted QA re-review confirmed AC-5 and AC-6, but AC-12 remained open. Routed to Backend for final correction retry. 2026-09-15 - Backend aligned the remaining Golden-sensitive layout geometry; unchanged Golden test passed at ratio `0.029250342935528122`. 2026-09-16 - Final QA re-review independently verified AC-12 and closed the finding.
+
+### FT-QA-2026-029
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_Instagram-Recipe-Renderer-PoC.md`
+- **Acceptance criterion:** AC-5
+- **Description:** The generated renderer PNG visibly contains the wordmark asset's dark rectangular background, so the footer wordmark is not blended into the ambient field and presents a hard rectangle.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `backend/output/quarkbroetchen.png` versus the V1.7 master; the wordmark is composed as a direct image layer in `backend/src/lib/instagramRenderer/compose.ts`.
+- **Recommendation:** Adjust the renderer's wordmark compositing or asset treatment so the wordmark background matches the surrounding ambient field without a visible rectangle.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-09-15 - Imported from `docs/qa/reports/PLAN_Instagram-Recipe-Renderer-PoC.md` and routed to Backend for correction. 2026-09-15 - Backend removed the visible wordmark rectangle through alpha normalization; targeted QA re-review confirmed AC-5.
+
+### FT-QA-2026-030
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_Instagram-Recipe-Renderer-PoC.md`
+- **Acceptance criterion:** AC-6
+- **Description:** The generated lower area does not visually preserve the required shared green ambient field; the opaque dark transition dominates the footer and masks the intended green radial treatment.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `backend/output/quarkbroetchen.png` versus the V1.7 master; `backend/src/lib/instagramRenderer/ambient.ts` defines the ambient field while `backend/src/lib/instagramRenderer/transition.ts` adds a full-canvas transition that reaches opaque ambient-base alpha.
+- **Recommendation:** Rework the layer interaction so the photo transition and the single green ambient field compose together across the lower area without masking the field.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-09-15 - Imported from `docs/qa/reports/PLAN_Instagram-Recipe-Renderer-PoC.md` and routed to Backend for correction. 2026-09-15 - Backend revised the transition/ambient layering so the shared field remains visible; targeted QA re-review confirmed AC-6.
+
+### FT-QA-2026-031
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_Instagram-Recipe-Renderer-Polish-and-UX-Review.md`
+- **Acceptance criterion:** AC-14
+- **Description:** `backend/src/lib/instagramRenderer/docs/tag-icon-mapping.md` contains contradictory unmarked Footer documentation: its opening section documents the active transparent `micha-logo-writing.svg`, while the later Footer section still describes `fittrack-wordmark.png` and the old PNG workaround as current.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** `backend/src/lib/instagramRenderer/docs/tag-icon-mapping.md`; `backend/src/lib/instagramRenderer/render.ts`; QA report finding `Q-IPR-1-DOC-001`.
+- **Recommendation:** Mark the old Footer/PoC section explicitly as historical or replace its current-state claims with the active SVG path, retaining the legacy PNG only as a documented fallback.
+- **Status:** Accepted
+- **Decision:** User approved the current renderer and accepted the remaining documentation risk on 2026-09-16; no correction requested.
+- **History:** 2026-09-16 - Imported from `docs/qa/reports/PLAN_Instagram-Recipe-Renderer-Polish-and-UX-Review.md` and routed to Documentation. 2026-09-16 - User accepted the remaining risk; no correction requested.
+
+### FT-QA-2026-032
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_Instagram-Recipe-Renderer-Polish-and-UX-Review.md`
+- **Acceptance criterion:** AC-10
+- **Description:** The active backend SVG is semantically and visually equivalent to Mobile variant 02 but is not an exact text copy: its unused root-group identifier is `Layer 2` instead of `Layer_2`. The normalized files have equal length but differ at the identifier, so provenance is not byte-exact.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** `backend/src/lib/instagramRenderer/assets/branding/micha-logo-writing.svg`; `mobile/assets/brand/micha_logo_writing_02.svg`; QA report finding `Q-IPR-1-ASSET-001`.
+- **Recommendation:** Preserve an exact source copy of variant 02, or document the intentional non-visual identifier normalization so future provenance checks are unambiguous.
+- **Status:** Accepted
+- **Decision:** User approved the current renderer and accepted the remaining SVG provenance risk on 2026-09-16; no correction requested.
+- **History:** 2026-09-16 - Imported from `docs/qa/reports/PLAN_Instagram-Recipe-Renderer-Polish-and-UX-Review.md` and routed to Backend. 2026-09-16 - User accepted the remaining risk; no correction requested.
 
 ## Verification Notes (Not Findings)
 

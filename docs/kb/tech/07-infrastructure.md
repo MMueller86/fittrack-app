@@ -158,6 +158,39 @@ fittrack-app/
 
 **Root cause of missing endpoints on Alpha:** If step 2 (sync) is skipped, `_deploy_staging/dist/` contains stale compiled output. The deploy succeeds (exit 0) but the new functions are absent. Always verify step 3 before deploying.
 
+`_deploy_staging/package.json` is a production-only Node 20 manifest. It
+contains the backend runtime packages and the renderer packages
+`satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static ~1.46.0`,
+`@tabler/icons ~3.46.0`, and `sharp ^0.34.5`. `pixelmatch`, TypeScript,
+Vitest, and type packages remain in the backend workspace for tests and builds;
+they are not installed in production staging. The staging lockfile is generated
+from this manifest. Install it only in a Linux Node 20 x64 environment so
+`sharp` and Resvg use Linux-compatible native modules; do not run `npm ci` for
+staging on Windows.
+
+### Instagram renderer package and asset gate
+
+The renderer endpoint uses the backend-owned Blob client for a bounded direct
+download of the selected recipe image. It does not expose a SAS URL as part of
+the render path, so the deployed Function must retain the existing storage
+application setting and must not be replaced by a public image fetch.
+
+The production staging package contains exactly the five renderer runtime
+packages listed above. `pixelmatch`, TypeScript, Vitest, and type packages stay
+outside the production staging dependency set. The deterministic build step
+copies exactly nine renderer assets from
+`backend/src/lib/instagramRenderer/assets/` to
+`backend/dist/backend/src/lib/instagramRenderer/assets/`; the compiled
+renderer resolves them through `__dirname/assets`.
+
+Before any release handoff, `npm run build:verify` must pass, the copy step
+must reject missing or unexpected files, and the staged tree must contain both
+`_deploy_staging/dist/backend/src/functions/instagramRecipe.js` and the full
+asset manifest, including
+`_deploy_staging/dist/backend/src/lib/instagramRenderer/assets/fonts/LICENSE.txt`.
+The native smoke gate is run with Linux Node 20 x64 dependencies from the
+staging lockfile; Windows-native `sharp` or Resvg modules are not deployable.
+
 ### Step-by-Step (run from repo root)
 
 ```powershell
@@ -166,8 +199,12 @@ fittrack-app/
 Remove-Item -Recurse -Force "backend\dist" -ErrorAction SilentlyContinue
 Remove-Item -Force "backend\tsconfig.tsbuildinfo" -ErrorAction SilentlyContinue
 cd backend
-npx tsc --project tsconfig.json
+npm run build
 cd ..
+
+# `npm run build` also runs the deterministic renderer asset copy from
+# backend/src/lib/instagramRenderer/assets/ to
+# backend/dist/backend/src/lib/instagramRenderer/assets/.
 
 # 2. Sync build output to _deploy_staging/dist/ using robocopy (mirror).
 #    robocopy exit codes 0–7 are all SUCCESS (0=nothing to copy, 1=files copied).
@@ -178,6 +215,9 @@ robocopy "backend\dist" "_deploy_staging\dist" /MIR /NFL /NDL /NJH /NJS
 #    Replace the filename with the most recently added function in functions/.
 Test-Path "_deploy_staging\dist\backend\src\functions\specialActivity.js"
 # Must return True — if False, step 2 did not sync correctly.
+Test-Path "_deploy_staging\dist\backend\src\functions\instagramRecipe.js"
+Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\LICENSE.txt"
+# Both must return True for the renderer endpoint and complete asset manifest.
 
 # 4. Deploy — always from _deploy_staging/, never from backend/
 cd _deploy_staging
