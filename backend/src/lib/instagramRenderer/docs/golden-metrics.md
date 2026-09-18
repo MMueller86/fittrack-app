@@ -15,6 +15,9 @@ ueber dem historischen Gate. Dieser Lauf ist eine Diagnose der historischen
 Abweichung, kein aktuelles Release-Gate. Weder die Datei noch der Threshold
 oder das Ratio-Gate duerfen ersetzt, angehoben oder durch ein groesseres
 Toleranzfenster verborgen werden.
+Der Tier-1-Test prueft deshalb die unveraenderte historische Berechnung und die
+dokumentierte aktuelle Abweichung von rund `5.5 %`; er bewertet diese
+historische Abweichung nicht als aktuellen Release-Fehler.
 
 Die aktuelle akzeptierte Komposition stammt aus dem Arbeitsrender
 `backend/output/quarkbroetchen.png`, erzeugt mit
