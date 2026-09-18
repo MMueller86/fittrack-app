@@ -9,6 +9,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Recipe, RecipeIngredient, RecipeStep, RecipeImage, RecipeNutrition } from '@fittrack/shared';
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosRecipesRepository } from './cosmosRecipesRepository';
 
@@ -41,6 +42,16 @@ export interface UpdateRecipeInput {
 
 export interface ListRecipesOptions {
   limit?: number;
+}
+
+function withEffectiveImageHeroCrop(recipe: Recipe): Recipe {
+  return {
+    ...recipe,
+    images: recipe.images.map((image) => ({
+      ...image,
+      heroCrop: image.heroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP,
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -79,12 +90,12 @@ class InMemoryRecipesRepository implements RecipesRepository {
       const bKey = b.lastUsedAt ?? b.updatedAt;
       return bKey.localeCompare(aKey);
     });
-    return opts?.limit ? all.slice(0, opts.limit) : all;
+    return (opts?.limit ? all.slice(0, opts.limit) : all).map(withEffectiveImageHeroCrop);
   }
 
   async get(userId: string, id: string): Promise<Recipe | null> {
     const recipe = this.store.get(this.key(userId, id));
-    return recipe ?? null;
+    return recipe ? withEffectiveImageHeroCrop(recipe) : null;
   }
 
   async create(userId: string, input: CreateRecipeInput): Promise<Recipe> {
@@ -108,7 +119,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
       updatedAt: now,
     };
     this.store.set(this.key(userId, recipe.id), recipe);
-    return recipe;
+    return withEffectiveImageHeroCrop(recipe);
   }
 
   async update(userId: string, id: string, input: UpdateRecipeInput): Promise<Recipe | null> {
@@ -120,7 +131,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
       updatedAt: new Date().toISOString(),
     };
     this.store.set(this.key(userId, id), updated);
-    return updated;
+    return withEffectiveImageHeroCrop(updated);
   }
 
   async delete(userId: string, id: string): Promise<boolean> {

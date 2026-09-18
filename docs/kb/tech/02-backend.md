@@ -19,7 +19,7 @@ Located in `backend/src/functions/`. Each file owns one domain.
 | `reusableItems.ts` | CRUD /reusable-items | Yes | |
 | `reusableItemsEnrich.ts` | POST /reusable-items/{id}/enrich | Yes | AI enrichment |
 | `reusableItemsEnrichScheduler.ts` | Timer trigger | — | Background enrichment |
-| `recipes.ts` | CRUD /recipes, image upload/delete/reorder, recipe logging | Yes | Image upload appends; delete and reorder normalize image order. |
+| `recipes.ts` | CRUD /recipes, image upload/crop-update/delete/reorder, recipe logging | Yes | Image upload appends; crop updates metadata only; delete and reorder normalize image order. |
 | `instagramRecipe.ts` | POST /recipes/{id}/instagram-render | Yes | Server-owned recipe data to PNG renderer; no persistence |
 | `ai.ts` | POST /ai/parse-meal, /ai/estimate-meal | Yes | Quota enforced |
 | `foodEstimate.ts` | POST /ai/food-estimate | Yes | Quota enforced |
@@ -116,21 +116,57 @@ the diary meal for `usageDates`; it never derives a user date from the server
 clock. `lastUsedAt` and `createdAt` remain UTC instants. Missing internal usage
 dates fail closed in both repository implementations.
 
+### Recipe image persistence and validation
+
+`cosmosRecipesRepository.ts` stores recipe image metadata as `id`, `blobName`,
+`order`, and optional `heroCrop`; transient `url` values are never serialized.
+When a legacy document has no `heroCrop`, the repository materializes the
+deterministic effective default `{ version: 1, frame: 'instagram-recipe-v1',
+focusX: 0.5, focusY: 0.46, zoom: 1 }` on read. This is read compatibility, not
+a migration. An upload that omits `heroCrop` keeps the field absent in Cosmos.
+
+`recipes.ts` strictly validates `heroCrop` on multipart upload and on
+`PUT /api/recipes/{id}/images/{imageId}/hero-crop`: version and frame are
+closed values, `focusX` and `focusY` are finite values in `0..1`, and `zoom` is
+finite and at least `1`. Unknown fields and invalid JSON are rejected with
+`400`; upload validation happens before the blob is written. The crop update
+route is user-scoped and changes only recipe metadata. Upload accepts only
+JPEG/PNG images up to 8 MB; delete removes the blob, and reorder preserves
+each image's crop metadata while normalizing order.
+
 ### Instagram recipe rendering
 
 `functions/instagramRecipe.ts` is a thin orchestration layer for
 `POST /api/recipes/{id}/instagram-render`. It authenticates with
 `requireUser()`, validates the strict request body, loads the recipe through
-`getRecipesRepository().get(userId, recipeId)`, selects the stored image, and
-maps controlled renderer errors to the documented HTTP statuses.
+`getRecipesRepository().get(userId, recipeId)`, selects the requested image or
+the image with the lowest finite order (lowest image ID breaks ties), and maps
+controlled renderer errors to the documented HTTP statuses.
 
 `instagramRenderer/recipeAdapter.ts` is the boundary between the persistent
 recipe model and `RenderInput`. It takes the title, tags, portions, and
-`nutritionPerPortion` only from the server-loaded recipe. It applies the
-request defaults `focusX=0.5`, `focusY=0.46`, `zoom=1.0`, and
+nutritionPerPortion only from the server-loaded recipe. It starts presentation
+from the selected image's stored/effective `heroCrop`, falls back to the
+deterministic legacy default `{ focusX: 0.5, focusY: 0.46, zoom: 1.0 }`, and
+applies request presentation fields as independent partial overrides. The
+effective priority for each field is request override, stored/effective crop,
+then legacy default. The repository normally supplies the default for legacy
+images, and the adapter retains the fallback when called without stored
+metadata. An omitted request field does not reset the other crop fields. It applies
 `nutritionHighlight=null`; optional time and difficulty remain request-level
 metadata and are omitted when absent. Layout constants, Satori nodes, icon
 resolution, and nutrition rounding remain owned by the renderer.
+
+The versioned `instagram-recipe-v1` frame is the renderer's `1080 x 1015`
+photo/hero area, not the complete output. The older `1080 x 880` reference is
+not a runtime contract because it ends before the tag zone. The renderer still
+returns exactly `1080 x 1350` PNG. Before cover placement, `loadPhoto()` uses
+Sharp to normalize non-default EXIF orientation in memory and then uses the
+oriented dimensions; the stored Blob is not replaced. The resulting
+`PhotoAsset.renderRotation` is explicit: it is `0` after EXIF normalization,
+so `createPhotoLayer()` never derives a second rotation from the normalized
+dimensions. Unnormalized legacy landscape sources retain their explicit
+renderer rotation, while portrait sources remain upright.
 
 The render path calls `downloadRecipeImage()` with only the server-read
 `RecipeImage.blobName`. Storage downloads the Blob directly with

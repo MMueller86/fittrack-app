@@ -14,7 +14,7 @@ import {
   TAG_ROW_MAX_WIDTH,
   TITLE_MAX_WIDTH,
 } from "./layout";
-import type { PhotoAsset } from "./photo";
+import type { PhotoAsset, PhotoRenderRotation } from "./photo";
 import { loadRecipeMetaIcons, RecipeMetaIconAssetError } from "./recipeMeta";
 import { TagIconAssetError } from "./tagIcons";
 import type { RenderInput, RenderResult } from "./types";
@@ -357,7 +357,7 @@ function mimeTypeForImage(format: string | undefined): string {
   return mimeType;
 }
 
-async function loadPhoto(sharp: SharpFactory, image: RenderInput["image"]): Promise<PhotoAsset> {
+export async function loadPhoto(sharp: SharpFactory, image: RenderInput["image"]): Promise<PhotoAsset> {
   try {
     let buffer: Buffer;
     if (image && "buffer" in image && Buffer.isBuffer(image.buffer)) {
@@ -368,17 +368,35 @@ async function loadPhoto(sharp: SharpFactory, image: RenderInput["image"]): Prom
       throw new Error("Image must contain a readable path or Buffer.");
     }
 
-    const metadata = await sharp(buffer).metadata();
+    const sourceMetadata = await sharp(buffer).metadata();
+    const sourceIsLandscape =
+      Number.isFinite(sourceMetadata.width) &&
+      Number.isFinite(sourceMetadata.height) &&
+      sourceMetadata.width > sourceMetadata.height;
+    const exifWasNormalized =
+      sourceMetadata.orientation !== undefined && sourceMetadata.orientation !== 1;
+    let normalizedBuffer = buffer;
+    if (exifWasNormalized) {
+      normalizedBuffer = await sharp(buffer).rotate().toBuffer();
+    }
+
+    const metadata = normalizedBuffer === buffer
+      ? sourceMetadata
+      : await sharp(normalizedBuffer).metadata();
     const width = metadata.width;
     const height = metadata.height;
     if (!Number.isFinite(width) || !Number.isFinite(height) || !width || !height) {
       throw new Error("Image dimensions are unavailable.");
     }
 
+    const renderRotation: PhotoRenderRotation =
+      exifWasNormalized ? 0 : sourceIsLandscape ? 90 : 0;
+
     return {
-      src: toDataUri(buffer, mimeTypeForImage(metadata.format)),
+      src: toDataUri(normalizedBuffer, mimeTypeForImage(metadata.format)),
       width,
       height,
+      renderRotation,
     };
   } catch (error) {
     throw new UnreadableImageError(error);

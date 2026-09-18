@@ -18,12 +18,11 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import { randomUUID } from 'expo-crypto';
 import { useSharedValue } from 'react-native-reanimated';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { AiFoodEstimatePreview, FoodSearchResult } from '@fittrack/shared';
+import type { AiFoodEstimatePreview, FoodSearchResult, RecipeImageHeroCrop } from '@fittrack/shared';
 import { calculateRecipeNutrition } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { aiApi, type AiRecipeStep, type MealParserPreviewItem } from '../../shared/api/aiApi';
@@ -39,8 +38,14 @@ import { RecipeWizardInputPhase } from './RecipeWizardInputPhase';
 import { RecipeWizardIngredientsPhase } from './RecipeWizardIngredientsPhase';
 import { RecipeWizardPreviewPhase } from './RecipeWizardPreviewPhase';
 import { RecipeWizardStepsPhase } from './RecipeWizardStepsPhase';
+import { RecipeImageSourcePicker } from './RecipeImageSourcePicker';
+import type { RecipeImageSelection } from './recipeImageSource';
+import { RecipeImageHeroCropEditor } from './RecipeImageHeroCropEditor';
 import { buildRecipeWizardEditBootstrapState } from './recipeWizardEditBootstrap';
-import { persistRecipeWizardImages } from './recipeWizardImageMutations';
+import {
+  persistRecipeWizardImageHeroCrop,
+  persistRecipeWizardImages,
+} from './recipeWizardImageMutations';
 import {
   buildRecipeDetailAfterSaveParams,
   canRunRecipeWizardAnalysis,
@@ -186,6 +191,10 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   // Image
   const [imageDrafts, setImageDrafts] = useState<WizardImageDraft[]>([]);
   const [initialImageIds, setInitialImageIds] = useState<string[]>([]);
+  const [imagePickerVisible, setImagePickerVisible] = useState(false);
+  const [editingImageDraftId, setEditingImageDraftId] = useState<string | null>(null);
+  const [imageCropError, setImageCropError] = useState(false);
+  const imageCropUpdateInFlightRef = useRef(false);
 
   // Save
   const [saving, setSaving] = useState(false);
@@ -684,24 +693,65 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   // Image picker
   // ---------------------------------------------------------------------------
 
-  const handlePickImage = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Berechtigung', 'Zugriff auf Fotos erforderlich.');
+  const handlePickImage = () => {
+    setImagePickerVisible(true);
+  };
+
+  const handleImageSelected = useCallback((selection: RecipeImageSelection, heroCrop: RecipeImageHeroCrop) => {
+    setImageDrafts((prev) => [
+      ...prev,
+      {
+        draftId: randomUUID(),
+        source: 'local',
+        uri: selection.uri,
+        mime: selection.mime,
+        heroCrop,
+      },
+    ]);
+  }, []);
+
+  const handleEditImage = useCallback((draftId: string) => {
+    if (imageCropUpdateInFlightRef.current) return;
+    setImageCropError(false);
+    setEditingImageDraftId(draftId);
+  }, []);
+
+  const handleImageCropConfirmed = useCallback(async (heroCrop: RecipeImageHeroCrop) => {
+    if (imageCropUpdateInFlightRef.current) return;
+    const draft = imageDrafts.find((image) => image.draftId === editingImageDraftId);
+    if (!draft) return;
+
+    if (draft.source === 'local') {
+      setImageDrafts((prev) => prev.map((image) => (
+        image.draftId === draft.draftId ? { ...image, heroCrop } : image
+      )));
+      setEditingImageDraftId(null);
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.85,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const mime = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-      setImageDrafts((prev) => [...prev, { draftId: randomUUID(), source: 'local', uri: asset.uri, mime }]);
+
+    if (!editId) {
+      setEditingImageDraftId(null);
+      setImageCropError(true);
+      return;
     }
-  };
+
+    imageCropUpdateInFlightRef.current = true;
+    try {
+      const confirmedImage = await persistRecipeWizardImageHeroCrop(editId, draft, heroCrop, recipeApi);
+      setImageDrafts((prev) => prev.map((image) => (
+        image.draftId === draft.draftId && image.source === 'existing'
+          ? confirmedImage
+          : image
+      )));
+      setEditingImageDraftId(null);
+    } catch (err: unknown) {
+      console.error('[RecipeWizard] Image hero crop update failed:', err);
+      setEditingImageDraftId(null);
+      setImageCropError(true);
+    } finally {
+      imageCropUpdateInFlightRef.current = false;
+    }
+  }, [editId, editingImageDraftId, imageDrafts]);
 
   const handleRemoveImage = (draftId: string) => {
     setImageDrafts((prev) => prev.filter((image) => image.draftId !== draftId));
@@ -850,6 +900,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       ? calculateRecipeNutrition(confirmedIngredients, portions)
       : null;
   const previewViewModel = buildRecipePreviewViewModel(confirmedIngredients);
+  const editingImage = imageDrafts.find((image) => image.draftId === editingImageDraftId) ?? null;
 
   const handleConfirmIngredient = (ingId: string) => {
     setIngredients((prev) => prev.map((ingredient) => {
@@ -1015,6 +1066,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
               onRecipeDescriptionChange={setRecipeDescription}
               onPortionsChange={handlePortionsChange}
               onPickImage={handlePickImage}
+              onEditImage={handleEditImage}
               onRemoveImage={handleRemoveImage}
               onMoveImage={handleMoveImage}
             />
@@ -1097,6 +1149,26 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
         title="Zutaten bestätigen"
         body="Mit dem grünen Haken kannst du eine Zuordnung direkt bestätigen. Tippe auf eine Zutatenkarte, um im Such-Hub nach dem passenden Lebensmittel zu suchen."
         onClose={() => setReviewHelpVisible(false)}
+      />
+      <RecipeImageSourcePicker
+        visible={imagePickerVisible}
+        onClose={() => setImagePickerVisible(false)}
+        onImageSelected={handleImageSelected}
+      />
+      <RecipeImageHeroCropEditor
+        visible={editingImage != null}
+        imageUri={editingImage?.uri ?? null}
+        initialCrop={editingImage?.heroCrop}
+        onCancel={() => {
+          if (!imageCropUpdateInFlightRef.current) setEditingImageDraftId(null);
+        }}
+        onConfirm={(heroCrop) => void handleImageCropConfirmed(heroCrop)}
+      />
+      <InfoOverlay
+        visible={imageCropError}
+        title="Hero-Ausschnitt konnte nicht gespeichert werden"
+        body="Der zuletzt bestätigte Ausschnitt bleibt erhalten. Bitte versuche es erneut."
+        onClose={() => setImageCropError(false)}
       />
       <Snackbar ref={snackbarRef} />
     </SafeAreaView>

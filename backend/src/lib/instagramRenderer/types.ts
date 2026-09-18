@@ -1,6 +1,10 @@
+import type { RecipeImageHeroCrop } from "@fittrack/shared";
+
+export type RenderPresentation = Pick<RecipeImageHeroCrop, "focusX" | "focusY" | "zoom">;
+
 export type RenderInput = {
   image: { path: string } | { buffer: Buffer };
-  presentation: { focusX: number; focusY: number; zoom: number };
+  presentation: RenderPresentation;
   title: string;
   tags: Array<{ id: string; label: string }>;
   nutritionHighlight: "high-protein" | "low-fat" | null;

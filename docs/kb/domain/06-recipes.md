@@ -13,7 +13,7 @@
 | `portions` | `number` | Number of portions |
 | `ingredients` | `RecipeIngredient[]` | |
 | `steps` | `RecipeStep[]` | Ordered instructions |
-| `images` | `RecipeImage[]` | Blob references |
+| `images` | `RecipeImage[]` | Blob references and hero presentation metadata |
 | `nutritionTotal` | `RecipeNutrition` | Aggregate nutrition for the full recipe |
 | `nutritionPerPortion` | `RecipeNutrition` | Nutrition for one portion |
 | `visibility` | `'private'` | Current recipes are private |
@@ -91,11 +91,18 @@ There is no top-level recipe notes field and no step-level notes field in the pe
 - `id` — image identity within the recipe
 - `blobName` — path in Azure Blob Storage container
 - `order` — 1-based display order
+- `heroCrop?` — versioned hero presentation metadata (`version`, `frame`, `focusX`, `focusY`, `zoom`)
 - `url?` — transient read-only SAS URL, returned by the API but never stored in Cosmos
 
-[Rule] Only `blobName` and `order` are stored in Cosmos metadata. Binary image data goes to Blob Storage; SAS URLs are generated per request.
+[Rule] `id`, `blobName`, `order`, and the optional `heroCrop` are stored in Cosmos metadata. Binary image data goes to Blob Storage; SAS URLs are generated per request. Legacy images without `heroCrop` are materialized on repository reads with the deterministic effective default `{ version: 1, frame: 'instagram-recipe-v1', focusX: 0.5, focusY: 0.46, zoom: 1 }`. Uploading without metadata leaves the optional field absent in Cosmos, while read and upload response objects expose the effective default.
 
-The current API supports upload, delete, and reorder. Upload appends the image at the next order value. Delete removes the blob and renumbers remaining images. Reorder accepts a complete image-ID permutation and normalizes `order` to `1..n`; it does not move blob data.
+`heroCrop` is a closed, versioned contract: `version: 1`, `frame: 'instagram-recipe-v1'`, finite normalized `focusX` and `focusY` values in `0..1`, and finite `zoom >= 1`. The focus coordinates refer to the visually oriented source image. Arbitrary frame dimensions, versions, or frame names are not accepted.
+
+The `instagram-recipe-v1` frame uses a `1080 x 1015` photo/hero area. This intentionally differs from the older `1080 x 880` reference: `1080 x 880` ends before the renderer's tag zone and is not the runtime crop contract. The complete Instagram output remains exactly `1080 x 1350`; `1080 x 1015` is only the photo/hero frame.
+
+The current API supports upload, crop-metadata update, delete, and reorder. Upload appends the image at the next order value. Delete removes the blob and renumbers remaining images. Reorder accepts a complete image-ID permutation and normalizes `order` to `1..n`; it does not move blob data.
+
+Upload accepts optional validated `heroCrop` JSON metadata, and `PUT /api/recipes/{id}/images/{imageId}/hero-crop` updates the metadata for an image owned by the authenticated user. Neither operation modifies the stored image blob.
 
 SAS tokens are generated **per request** by the backend (`backend/src/lib/storage.ts`), read-only, with a **1-hour TTL**. The mobile app never holds permanent storage credentials. If a SAS URL expires between receiving it and displaying it, the client should re-fetch the recipe to get a fresh URL.
 

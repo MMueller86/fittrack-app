@@ -1,8 +1,11 @@
 import type { Recipe } from '@fittrack/shared';
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
+import type { RecipeImageHeroCrop } from '../../../../shared/types/recipeImageHeroCrop';
 
 import type { RenderInput } from './types';
 
 export type RecipeRenderOptions = {
+  storedHeroCrop?: RecipeImageHeroCrop;
   presentation?: Partial<RenderInput['presentation']>;
   nutritionHighlight?: RenderInput['nutritionHighlight'];
   recipeMeta?: {
@@ -21,13 +24,14 @@ export function adaptRecipeToRenderInput(
   options: RecipeRenderOptions,
 ): RenderInput {
   const presentation = options.presentation;
+  const storedHeroCrop = options.storedHeroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP;
 
   return {
     image: { buffer: image },
     presentation: {
-      focusX: presentation?.focusX ?? 0.5,
-      focusY: presentation?.focusY ?? 0.46,
-      zoom: presentation?.zoom ?? 1.0,
+      focusX: presentation?.focusX ?? storedHeroCrop.focusX,
+      focusY: presentation?.focusY ?? storedHeroCrop.focusY,
+      zoom: presentation?.zoom ?? storedHeroCrop.zoom,
     },
     title: recipe.name,
     tags: recipe.tags.map((tag) => ({ id: tag, label: tag })),

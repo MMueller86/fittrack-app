@@ -1,9 +1,33 @@
-import type { RecipeImage } from '@fittrack/shared';
-import type { WizardImageDraft } from './recipeWizardTypes';
+import type { RecipeImage, RecipeImageHeroCrop } from '@fittrack/shared';
+import { normalizeRecipeImageHeroCrop } from './recipeImageHeroCropMath';
+import type { ExistingWizardImageDraft, WizardImageDraft } from './recipeWizardTypes';
+
+export interface RecipeWizardHeroCropApi {
+  updateImageHeroCrop(recipeId: string, imageId: string, heroCrop: RecipeImageHeroCrop): Promise<RecipeImage>;
+}
+
+export async function persistRecipeWizardImageHeroCrop(
+  recipeId: string,
+  image: ExistingWizardImageDraft,
+  heroCrop: RecipeImageHeroCrop,
+  api: RecipeWizardHeroCropApi,
+): Promise<ExistingWizardImageDraft> {
+  const updatedImage = await api.updateImageHeroCrop(recipeId, image.imageId, heroCrop);
+  return {
+    ...image,
+    heroCrop: normalizeRecipeImageHeroCrop(updatedImage.heroCrop ?? heroCrop),
+    uri: updatedImage.url ?? image.uri,
+  };
+}
 
 export interface RecipeImageMutationApi {
   deleteImage(recipeId: string, imageId: string): Promise<void>;
-  uploadImage(recipeId: string, imageUri: string, mimeType: 'image/jpeg' | 'image/png'): Promise<RecipeImage>;
+  uploadImage(
+    recipeId: string,
+    imageUri: string,
+    mimeType: 'image/jpeg' | 'image/png',
+    heroCrop: RecipeImageHeroCrop,
+  ): Promise<RecipeImage>;
   reorderImages(recipeId: string, imageIds: string[]): Promise<{ images: RecipeImage[] }>;
 }
 
@@ -60,7 +84,7 @@ export async function persistRecipeWizardImages(
   for (let index = 0; index < localDrafts.length; index += 1) {
     const image = localDrafts[index]!;
     try {
-      const uploadedImage = await api.uploadImage(recipeId, image.uri, image.mime);
+      const uploadedImage = await api.uploadImage(recipeId, image.uri, image.mime, image.heroCrop);
       if (!knownServerImageIds.has(uploadedImage.id)) {
         serverImageIds = [...serverImageIds, uploadedImage.id];
         knownServerImageIds.add(uploadedImage.id);

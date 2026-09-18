@@ -68,7 +68,7 @@ module.exports = ({ config }) => ({
     [
       'expo-camera',
       {
-        cameraPermission: 'FitTrack benötigt Kamerazugriff für den Barcode-Scanner und KI-Analyse.',
+        cameraPermission: 'FitTrack benötigt Kamerazugriff für Barcode-Scanner, KI-Analyse und Rezeptfotos.',
         microphonePermission: false,
         recordAudioAndroid: false,
       },

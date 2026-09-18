@@ -146,12 +146,128 @@ In recipe-ingredient context the same hub is opened as an ingredient picker. `us
 ### Recipes Module (`modules/recipes/`)
 
 - `RecipeListScreen.tsx` — recipe overview
-- `RecipeDetailScreen.tsx` — recipe detail, temporary portion scaling, diary logging, image display
+- `RecipeDetailScreen.tsx` — recipe detail, temporary portion scaling, diary logging, crop-consistent image display
 - `RecipeWizardScreen.tsx` — single create/edit wizard; replaces the removed `RecipeCreateScreen`
 - `RecipeWizardInputPhase.tsx`, `RecipeWizardIngredientsPhase.tsx`, `RecipeWizardStepsPhase.tsx`, `RecipeWizardPreviewPhase.tsx` — phase views controlled by `RecipeWizardScreen`
 - `recipeWizardImageMutations.ts` — client-side sequencing for image delete/upload/reorder after recipe save
 
 `RecipeCreateScreen` and the `RecipeCreate` navigation route are removed. New recipe creation and existing recipe editing both use `RecipeWizardScreen`; edit mode is selected by passing `editId`.
+
+#### Recipe images: camera, gallery and Hero-Crop
+
+The recipe wizard offers a FitTrack-owned source picker through
+`RecipeImageSourcePicker`:
+
+- **Camera:** Uses the existing `expo-camera` `CameraView` integration. The
+    preview shows a responsive `1080:1015` frame, dims the area outside the
+    frame, accounts for top and bottom safe-area insets, and displays the hint
+    `Motiv im Rahmen platzieren`.
+- **Gallery:** Uses `expo-image-picker` with `allowsEditing: false`. The
+    selected image is handed over without a system `4:3` crop. The picker uses a
+    normal JPEG quality setting, but does not create a spatially cropped Hero
+    file.
+
+Both sources enter the same `RecipeImageHeroCropEditor`. The editor keeps the
+    source URI and lets the user move the image with one-finger pan and change
+    the zoom with pinch. The minimum scale fully covers the frame and panning is
+    clamped so that no empty space appears. Only normalized presentation
+    metadata is produced; the editor neither rewrites image bytes nor creates a
+    second Blob. The lower part of the frame contains a non-destructive
+    `Titel- und Tag-Zone` Safe-Area hint for the renderer's text area. It is a
+    visual aid only and is not persisted as a separate value.
+
+The shared image contract is closed and versioned:
+
+```ts
+interface RecipeImageHeroCrop {
+    version: 1;
+    frame: 'instagram-recipe-v1';
+    focusX: number;
+    focusY: number;
+    zoom: number;
+}
+```
+
+`focusX` and `focusY` are finite normalized coordinates in `[0, 1]` on the
+visually oriented source image. `zoom` is finite and at least `1`. The
+`instagram-recipe-v1` frame describes the `1080 x 1015` photo/hero area of the
+existing renderer. It is not the complete share image: the Instagram output
+remains exactly `1080 x 1350` PNG. The older `1080 x 880` reference is not a
+runtime contract because it ends before the renderer's tag zone.
+
+Legacy images without `heroCrop` use the same central effective default on
+Mobile and Backend:
+
+```ts
+{
+    version: 1,
+    frame: 'instagram-recipe-v1',
+    focusX: 0.5,
+    focusY: 0.46,
+    zoom: 1,
+}
+```
+
+The default is applied when an existing recipe is mapped into wizard state and
+when images are rendered. A saved crop is loaded again when an existing image
+is reopened in the editor. The wizard draft stores `uri`, MIME type and
+`heroCrop`; the edit bootstrap, preview thumbnails, `RecipeDetailScreen` and
+`RecipeListScreen` use the same crop-aware image presentation. Delete and
+reorder continue through the existing image mutation sequence, so remaining
+images retain their metadata and a deleted image loses it with the image.
+
+The Mobile API client mirrors the Backend contract:
+
+- `POST /api/recipes/{id}/images` sends the image plus optional `heroCrop` as
+    a JSON multipart field. The Backend validates the closed version/frame,
+    finite focus values, normalized range and `zoom >= 1` before storing one
+    user-scoped image Blob.
+- `PUT /api/recipes/{id}/images/{imageId}/hero-crop` updates only metadata for
+    an existing image of the authenticated user's recipe. It returns the
+    confirmed `RecipeImage` and a fresh read-only URL; it never rewrites the
+    Blob.
+- The saved/effective crop is the Instagram renderer default. Individual
+    request presentation fields may override only their own values; omitted
+    fields continue to come from the saved crop or the central legacy default.
+    Backend EXIF orientation is normalized in memory, while Mobile coordinates
+    continue to refer to the visually oriented source image.
+
+#### Recipe image permissions and failure states
+
+- Canceling the camera, gallery or editor flow does not create an empty draft.
+- While camera permission is being checked, the camera view shows a loading
+    state. If permission is denied, the screen explains whether the user can
+    retry or must allow access in device settings; `Abbrechen` leaves the wizard
+    usable, and the gallery remains available when the source picker is opened
+    again.
+- A denied gallery permission distinguishes a retryable denial from a setting
+    that must be changed in the device settings. Failure to open the gallery or
+    an unusable asset shows a German error with `Erneut versuchen` where
+    applicable. A canceled gallery result is ignored.
+- A failed camera capture can be retried. While the editor image is loading,
+    the confirm action is disabled; an unreadable image shows
+    `Das Bild konnte nicht geladen werden.` without creating a draft.
+- For an existing image, a failed Hero-Crop metadata update keeps the last
+    confirmed crop and shows an app-owned error overlay. Upload, delete and
+    reorder failures after recipe save are reported by the wizard as photos that
+    were not fully saved. The server-side `8 MB` image limit remains in force;
+    an oversized upload is rejected rather than silently cropped or partially
+    stored.
+
+#### Native configuration and dependencies
+
+`mobile/app.config.js` configures the existing `expo-camera` plugin. Its
+permission description explicitly includes recipe photos alongside the
+Barcode-Scanner and AI use cases; microphone recording remains disabled. A
+change to this native permission configuration has **potential native build
+impact**: a new Dev Build may be necessary even though the exact decision is
+environment- and release-dependent. The Infrastructure release gate decides
+whether a new build is required.
+
+This feature introduced **no new npm dependency**. It reuses the already
+installed `expo-camera`, `expo-image-picker`,
+`react-native-gesture-handler`, `react-native-reanimated` and
+`react-native-safe-area-context` packages.
 
 ### Progress Module (`modules/progress/`)
 

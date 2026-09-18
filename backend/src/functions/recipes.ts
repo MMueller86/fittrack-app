@@ -1,12 +1,17 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import type { RecipeImage } from '@fittrack/shared';
+import type { RecipeImage, RecipeImageHeroCrop } from '@fittrack/shared';
+import {
+  DEFAULT_RECIPE_IMAGE_HERO_CROP,
+  RECIPE_IMAGE_HERO_CROP_FRAME,
+  RECIPE_IMAGE_HERO_CROP_VERSION,
+} from '../../../shared/types/recipeImageHeroCrop';
 // Use a relative path so the compiled JS resolves to dist/shared/lib/recipeCalculator.js
 // instead of @fittrack/shared (which points to TypeScript source at runtime).
 import { calculateRecipeNutrition } from '../../../shared/lib/recipeCalculator';
 
 import { requireUser } from '../lib/auth';
-import { withHandler } from '../lib/http';
+import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getRecipesRepository } from '../lib/repositories/recipesRepository';
@@ -35,6 +40,16 @@ import {
 
 const nonNegativeFiniteNumber = z.coerce.number().finite().nonnegative();
 const positiveFiniteNumber = z.coerce.number().finite().positive();
+
+export const RecipeImageHeroCropSchema = z
+  .object({
+    version: z.literal(RECIPE_IMAGE_HERO_CROP_VERSION),
+    frame: z.literal(RECIPE_IMAGE_HERO_CROP_FRAME),
+    focusX: z.number().finite().min(0).max(1),
+    focusY: z.number().finite().min(0).max(1),
+    zoom: z.number().finite().min(1),
+  })
+  .strict();
 
 const NutritionPer100gSchema = z.object({
   calories: nonNegativeFiniteNumber,
@@ -96,9 +111,31 @@ const ReorderImagesSchema = z.object({
   imageIds: z.array(z.string().min(1)),
 });
 
+const UpdateRecipeImageHeroCropSchema = z.object({
+  heroCrop: RecipeImageHeroCropSchema,
+}).strict();
+
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
 type AllowedMimeType = (typeof ALLOWED_MIME_TYPES)[number];
+
+function parseMultipartHeroCrop(value: FormDataEntryValue | null):
+  | { heroCrop?: RecipeImageHeroCrop; error?: never }
+  | { heroCrop?: never; error: string } {
+  if (value === null) return {};
+  if (typeof value !== 'string') return { error: 'heroCrop must be a JSON object' };
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(value);
+  } catch {
+    return { error: 'heroCrop must be valid JSON' };
+  }
+
+  const parsed = RecipeImageHeroCropSchema.safeParse(raw);
+  if (!parsed.success) return { error: 'Invalid heroCrop' };
+  return { heroCrop: parsed.data };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: attach SAS URLs to recipe images
@@ -279,6 +316,11 @@ export const uploadImageHandler = withHandler(
       return { status: 400, jsonBody: { error: 'Missing image file' } };
     }
 
+    const parsedHeroCrop = parseMultipartHeroCrop(formData.get('heroCrop'));
+    if (parsedHeroCrop.error) {
+      return { status: 400, jsonBody: { error: parsedHeroCrop.error } };
+    }
+
     const mimeType = imageFile.type as AllowedMimeType;
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
       return { status: 400, jsonBody: { error: 'Image must be image/jpeg or image/png' } };
@@ -291,18 +333,24 @@ export const uploadImageHandler = withHandler(
 
     const { blobName, imageId } = await uploadRecipeImage(userId, id, buffer, mimeType);
 
-    const newImage: RecipeImage = {
+    const storedImage: RecipeImage = {
       id: imageId,
       blobName,
       order: recipe.images.reduce((maxOrder, image) => Math.max(maxOrder, image.order), 0) + 1,
+      ...(parsedHeroCrop.heroCrop !== undefined ? { heroCrop: parsedHeroCrop.heroCrop } : {}),
     };
 
-    const updatedImages = [...recipe.images, newImage];
+    const updatedImages = [...recipe.images, storedImage];
     await repo.update(userId, id, { images: updatedImages });
 
     const sasUrl = await generateRecipeImageSasUrl(blobName);
+    const responseImage: RecipeImage = {
+      ...storedImage,
+      heroCrop: storedImage.heroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP,
+      url: sasUrl,
+    };
     logEvent(ctx, 'info', 'recipe.imageUploaded', { userId, recipeId: id, imageId });
-    return { status: 201, jsonBody: { ...newImage, url: sasUrl } };
+    return { status: 201, jsonBody: responseImage };
   },
 );
 
@@ -377,6 +425,43 @@ export const reorderImagesHandler = withHandler(
     await repo.update(userId, recipeId, { images: updatedImages });
     logEvent(ctx, 'info', 'recipe.imagesReordered', { userId, recipeId, imageCount: updatedImages.length });
     return { status: 200, jsonBody: { images: updatedImages } };
+  },
+);
+
+// ---------------------------------------------------------------------------
+// PUT /recipes/:id/images/:imageId/hero-crop
+// ---------------------------------------------------------------------------
+
+export const updateImageHeroCropHandler = withHandler(
+  'recipes.updateImageHeroCrop',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const recipeId = request.params['id'];
+    const imageId = request.params['imageId'];
+    if (!recipeId || !imageId) return { status: 400, jsonBody: { error: 'Missing id' } };
+
+    const parsed = await parseBody(request, UpdateRecipeImageHeroCropSchema);
+    if (!parsed.ok) return parsed.response;
+
+    const repo = getRecipesRepository();
+    const recipe = await repo.get(userId, recipeId);
+    if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+
+    const image = recipe.images.find((candidate) => candidate.id === imageId);
+    if (!image) return { status: 404, jsonBody: { error: 'Image not found' } };
+
+    const updatedImages = recipe.images.map((candidate) =>
+      candidate.id === imageId ? { ...candidate, heroCrop: parsed.data.heroCrop } : candidate,
+    );
+    const updated = await repo.update(userId, recipeId, { images: updatedImages });
+    if (!updated) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+
+    const updatedImage = updated.images.find((candidate) => candidate.id === imageId);
+    if (!updatedImage) return { status: 404, jsonBody: { error: 'Image not found' } };
+
+    const url = await generateRecipeImageSasUrl(updatedImage.blobName);
+    logEvent(ctx, 'info', 'recipe.imageHeroCropUpdated', { userId, recipeId, imageId });
+    return { status: 200, jsonBody: { ...updatedImage, url } };
   },
 );
 
@@ -493,6 +578,13 @@ app.http('recipes-reorder-images', {
   authLevel: 'anonymous',
   route: 'recipes/{id}/images/order',
   handler: reorderImagesHandler,
+});
+
+app.http('recipes-update-image-hero-crop', {
+  methods: ['PUT'],
+  authLevel: 'anonymous',
+  route: 'recipes/{id}/images/{imageId}/hero-crop',
+  handler: updateImageHeroCropHandler,
 });
 
 app.http('recipes-log', {

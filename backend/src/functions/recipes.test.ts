@@ -16,11 +16,21 @@ import {
   uploadImageHandler,
   deleteImageHandler,
   reorderImagesHandler,
+  updateImageHeroCropHandler,
   logRecipeHandler,
 } from './recipes';
 import { __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
-import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth, TEST_USER_ID } from '../test-utils/http';
+import {
+  makeContext,
+  makeAuthRequest,
+  makeRequest,
+  setupTestAuth,
+  signTestToken,
+  teardownTestAuth,
+  TEST_USER_ID,
+} from '../test-utils/http';
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../shared/types/recipeImageHeroCrop';
 
 beforeAll(async () => {
   await setupTestAuth();
@@ -447,11 +457,18 @@ describe('POST /recipes/:id/log — logRecipe', () => {
 // POST /recipes/:id/images — uploadImage
 // ---------------------------------------------------------------------------
 
-function makeImageFormData(mimeType = 'image/jpeg', sizeBytes = 1024): FormData {
+function makeImageFormData(
+  mimeType = 'image/jpeg',
+  sizeBytes = 1024,
+  heroCrop?: string | Record<string, unknown>,
+): FormData {
   const fd = new FormData();
   const buf = Buffer.alloc(sizeBytes, 0);
   const file = new File([buf], 'photo.jpg', { type: mimeType });
   fd.append('image', file);
+  if (heroCrop !== undefined) {
+    fd.append('heroCrop', typeof heroCrop === 'string' ? heroCrop : JSON.stringify(heroCrop));
+  }
   return fd;
 }
 
@@ -465,12 +482,62 @@ describe('POST /recipes/:id/images — uploadImage', () => {
     const body = res.jsonBody as Record<string, unknown>;
     expect(body['id']).toBe('img1');
     expect(body['order']).toBe(1);
+    expect(body['heroCrop']).toEqual(DEFAULT_RECIPE_IMAGE_HERO_CROP);
     expect(typeof body['url']).toBe('string');
 
     // Recipe should now have 1 image
     const getReq = await makeAuthRequest({ params: { id } });
     const getRes = await getRecipeHandler(getReq, ctx);
     expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toHaveLength(1);
+  });
+
+  it('stores a validated heroCrop supplied in multipart form data', async () => {
+    const created = await createTestRecipe();
+    const id = String(created['id']);
+    const heroCrop = {
+      version: 1,
+      frame: 'instagram-recipe-v1',
+      focusX: 0.21,
+      focusY: 0.74,
+      zoom: 1.35,
+    };
+
+    const res = await uploadImageHandler(
+      await makeAuthRequest({ params: { id }, formData: makeImageFormData('image/jpeg', 1024, heroCrop) }),
+      ctx,
+    );
+
+    expect(res.status).toBe(201);
+    expect(res.jsonBody).toMatchObject({ heroCrop });
+
+    const getRes = await getRecipeHandler(await makeAuthRequest({ params: { id } }), ctx);
+    expect((getRes.jsonBody as { images: Array<Record<string, unknown>> }).images[0]?.['heroCrop']).toEqual(heroCrop);
+  });
+
+  it('rejects invalid heroCrop metadata before uploading the image', async () => {
+    const created = await createTestRecipe();
+    const id = String(created['id']);
+    const res = await uploadImageHandler(
+      await makeAuthRequest({
+        params: { id },
+        formData: makeImageFormData('image/jpeg', 1024, { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, zoom: 0.5 }),
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('keeps the legacy heroCrop default when an image is read without metadata', async () => {
+    const created = await createTestRecipe();
+    const id = String(created['id']);
+    const repo = (await import('../lib/repositories/recipesRepository')).getRecipesRepository();
+    await repo.update(TEST_USER_ID, id, {
+      images: [{ id: 'legacy-image', blobName: 'u1/r1/legacy.jpg', order: 1 }],
+    });
+
+    const fetched = await repo.get(TEST_USER_ID, id);
+    expect(fetched?.images[0]?.heroCrop).toEqual(DEFAULT_RECIPE_IMAGE_HERO_CROP);
   });
 
   it('returns 201 for multiple sequential uploads (multi-image)', async () => {
@@ -563,9 +630,24 @@ describe('DELETE /recipes/:id/images/:imageId — deleteImage', () => {
     const repo = (await import('../lib/repositories/recipesRepository')).getRecipesRepository();
     await repo.update(TEST_USER_ID, recipeId, {
       images: [
-        { id: 'img1', blobName: 'u1/r1/img1.jpg', order: 1 },
-        { id: 'img2', blobName: 'u1/r1/img2.jpg', order: 2 },
-        { id: 'img3', blobName: 'u1/r1/img3.jpg', order: 3 },
+        {
+          id: 'img1',
+          blobName: 'u1/r1/img1.jpg',
+          order: 1,
+          heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2 },
+        },
+        {
+          id: 'img2',
+          blobName: 'u1/r1/img2.jpg',
+          order: 2,
+          heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusY: 0.7 },
+        },
+        {
+          id: 'img3',
+          blobName: 'u1/r1/img3.jpg',
+          order: 3,
+          heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, zoom: 1.4 },
+        },
       ],
     });
 
@@ -575,7 +657,7 @@ describe('DELETE /recipes/:id/images/:imageId — deleteImage', () => {
 
     const getRes = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
     expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toMatchObject([
-      { id: 'img1', order: 1 },
+      { id: 'img1', order: 1, heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2 } },
       { id: 'img3', order: 2 },
     ]);
   });
@@ -612,9 +694,24 @@ describe('PUT /recipes/:id/images/order — reorderImages', () => {
     const repo = (await import('../lib/repositories/recipesRepository')).getRecipesRepository();
     await repo.update(TEST_USER_ID, recipeId, {
       images: [
-        { id: 'img1', blobName: 'u1/r1/img1.jpg', order: 1 },
-        { id: 'img2', blobName: 'u1/r1/img2.jpg', order: 2 },
-        { id: 'img3', blobName: 'u1/r1/img3.jpg', order: 3 },
+        {
+          id: 'img1',
+          blobName: 'u1/r1/img1.jpg',
+          order: 1,
+          heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2 },
+        },
+        {
+          id: 'img2',
+          blobName: 'u1/r1/img2.jpg',
+          order: 2,
+          heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusY: 0.7 },
+        },
+        {
+          id: 'img3',
+          blobName: 'u1/r1/img3.jpg',
+          order: 3,
+          heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, zoom: 1.4 },
+        },
       ],
     });
     return recipeId;
@@ -631,16 +728,16 @@ describe('PUT /recipes/:id/images/order — reorderImages', () => {
 
     expect(res.status).toBe(200);
     expect((res.jsonBody as { images: Array<Record<string, unknown>> }).images).toMatchObject([
-      { id: 'img3', order: 1 },
-      { id: 'img1', order: 2 },
-      { id: 'img2', order: 3 },
+      { id: 'img3', order: 1, heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, zoom: 1.4 } },
+      { id: 'img1', order: 2, heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2 } },
+      { id: 'img2', order: 3, heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusY: 0.7 } },
     ]);
 
     const getRes = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
     expect((getRes.jsonBody as Record<string, unknown[]>)['images']).toMatchObject([
-      { id: 'img3', order: 1 },
-      { id: 'img1', order: 2 },
-      { id: 'img2', order: 3 },
+      { id: 'img3', order: 1, heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, zoom: 1.4 } },
+      { id: 'img1', order: 2, heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2 } },
+      { id: 'img2', order: 3, heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusY: 0.7 } },
     ]);
   });
 
@@ -673,6 +770,71 @@ describe('PUT /recipes/:id/images/order — reorderImages', () => {
   it('returns 404 for an unknown recipe id', async () => {
     const res = await reorderImagesHandler(
       await makeAuthRequest({ params: { id: 'nonexistent' }, body: { imageIds: [] } }),
+      ctx,
+    );
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PUT /recipes/:id/images/:imageId/hero-crop — updateImageHeroCrop
+// ---------------------------------------------------------------------------
+
+describe('PUT /recipes/:id/images/:imageId/hero-crop — updateImageHeroCrop', () => {
+  async function createRecipeWithImage() {
+    const created = await createTestRecipe();
+    const recipeId = String(created['id']);
+    await uploadImageHandler(
+      await makeAuthRequest({ params: { id: recipeId }, formData: makeImageFormData() }),
+      ctx,
+    );
+    return recipeId;
+  }
+
+  it('updates the crop for an image owned by the authenticated user', async () => {
+    const recipeId = await createRecipeWithImage();
+    const heroCrop = {
+      version: 1,
+      frame: 'instagram-recipe-v1',
+      focusX: 0.12,
+      focusY: 0.88,
+      zoom: 1.8,
+    };
+
+    const res = await updateImageHeroCropHandler(
+      await makeAuthRequest({ params: { id: recipeId, imageId: 'img1' }, body: { heroCrop } }),
+      ctx,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toMatchObject({ id: 'img1', heroCrop });
+    const fetched = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
+    expect((fetched.jsonBody as { images: Array<Record<string, unknown>> }).images[0]?.['heroCrop']).toEqual(heroCrop);
+  });
+
+  it('rejects invalid crop payloads', async () => {
+    const recipeId = await createRecipeWithImage();
+    const res = await updateImageHeroCropHandler(
+      await makeAuthRequest({
+        params: { id: recipeId, imageId: 'img1' },
+        body: { heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 2 } },
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('does not allow another user to update the image metadata', async () => {
+    const recipeId = await createRecipeWithImage();
+    const token = await signTestToken('different-user');
+    const res = await updateImageHeroCropHandler(
+      makeRequest({
+        params: { id: recipeId, imageId: 'img1' },
+        headers: { authorization: `Bearer ${token}` },
+        body: { heroCrop: DEFAULT_RECIPE_IMAGE_HERO_CROP },
+      }),
       ctx,
     );
 

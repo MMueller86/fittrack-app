@@ -22,6 +22,7 @@ import {
 import { __resetCosmosForTests } from '../cosmos';
 import { CosmosRecipesRepository } from './cosmosRecipesRepository';
 import type { CreateRecipeInput } from './recipesRepository';
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 
 let ctx: EmulatorContext | undefined;
 let repo: CosmosRecipesRepository;
@@ -160,6 +161,37 @@ describe('CosmosRecipesRepository (contract)', () => {
     expect(fetched!.ingredients[0]).not.toHaveProperty('amountLabel');
   });
 
+  it('applies the deterministic heroCrop default when a legacy image has no metadata', async () => {
+    const historicalRecipe = {
+      id: '00000000-0000-0000-0000-000000000104',
+      userId: USER_A,
+      ownerUserId: USER_A,
+      name: 'Historisches Bildrezept',
+      portions: 2,
+      ingredients: [],
+      steps: [],
+      images: [{
+        id: 'legacy-image',
+        blobName: `${USER_A}/legacy-image.jpg`,
+        order: 1,
+      }],
+      nutritionTotal: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      nutritionPerPortion: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      visibility: 'private' as const,
+      sharedWithUserIds: [],
+      tags: [],
+      usageCount: 0,
+      createdAt: '2026-01-10T10:00:00.000Z',
+      updatedAt: '2026-01-10T10:00:00.000Z',
+    };
+
+    await ctx!.database.container('recipes').items.create(historicalRecipe);
+
+    const fetched = await repo.get(USER_A, historicalRecipe.id);
+
+    expect(fetched?.images[0]?.heroCrop).toEqual(DEFAULT_RECIPE_IMAGE_HERO_CROP);
+  });
+
   it('stores image order without transient SAS URLs', async () => {
     const created = await repo.create(USER_A, makeInput());
     const images = [
@@ -190,6 +222,36 @@ describe('CosmosRecipesRepository (contract)', () => {
       { id: 'image-a', blobName: `${USER_A}/${created.id}/image-a.jpg`, order: 1 },
       { id: 'image-b', blobName: `${USER_A}/${created.id}/image-b.jpg`, order: 2 },
     ]);
+  });
+
+  it('stores and preserves heroCrop metadata without transient SAS URLs', async () => {
+    const created = await repo.create(USER_A, makeInput());
+    const heroCrop = { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.18, zoom: 1.4 };
+    const images = [{
+      id: 'image-crop',
+      blobName: `${USER_A}/${created.id}/image-crop.jpg`,
+      order: 1,
+      heroCrop,
+      url: 'https://blob.example/image-crop?sas=temporary',
+    }];
+
+    await repo.update(USER_A, created.id, { images });
+
+    const raw = await ctx!.database.container('recipes').item(created.id, USER_A).read<Record<string, unknown>>();
+    expect(raw.resource?.['images']).toEqual([{
+      id: 'image-crop',
+      blobName: `${USER_A}/${created.id}/image-crop.jpg`,
+      order: 1,
+      heroCrop,
+    }]);
+
+    const fetched = await repo.get(USER_A, created.id);
+    expect(fetched?.images).toEqual([{
+      id: 'image-crop',
+      blobName: `${USER_A}/${created.id}/image-crop.jpg`,
+      order: 1,
+      heroCrop,
+    }]);
   });
 
   it('does not expose or persist root-level notes or step notes', async () => {

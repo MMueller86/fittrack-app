@@ -3,7 +3,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Image,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -19,6 +18,8 @@ import { recipeApi } from '../../shared/api/recipeApi';
 import { favoritesApi } from '../../shared/api/favoritesApi';
 import { Icon } from '../../shared/components/Icon';
 import { computeRecipeQuickEntryData } from './recipeUtils';
+import { RecipeImageHeroImage } from './RecipeImageHeroImage';
+import { RECIPE_HERO_ASPECT_RATIO } from './recipeImageSource';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeList'>;
@@ -38,13 +39,19 @@ function RecipeCard({
   onPress: () => void;
   onFavoriteToggle: (recipe: Recipe) => void;
 }) {
-  const thumbnailUrl = recipe.images.length > 0 ? (recipe.images[0]!.url ?? null) : null;
+  const thumbnailImage = recipe.images[0];
+  const thumbnailUrl = thumbnailImage?.url ?? null;
 
   return (
     <TouchableOpacity style={cardStyles.card} onPress={onPress} activeOpacity={0.75}>
       <View style={cardStyles.row}>
         {thumbnailUrl ? (
-          <Image source={{ uri: thumbnailUrl }} style={cardStyles.thumbnail} resizeMode="cover" />
+          <RecipeImageHeroImage
+            uri={thumbnailUrl}
+            heroCrop={thumbnailImage?.heroCrop}
+            style={cardStyles.thumbnail}
+            accessibilityLabel="Rezeptfoto"
+          />
         ) : (
           <View style={cardStyles.thumbnailPlaceholder}>
             <Text style={cardStyles.thumbnailPlaceholderIcon}>🍽</Text>
@@ -103,14 +110,14 @@ const cardStyles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
   thumbnail: {
     width: THUMB,
-    height: THUMB,
+    aspectRatio: RECIPE_HERO_ASPECT_RATIO,
     borderRadius: radius.sm,
     marginRight: spacing.md,
     flexShrink: 0,
   },
   thumbnailPlaceholder: {
     width: THUMB,
-    height: THUMB,
+    aspectRatio: RECIPE_HERO_ASPECT_RATIO,
     borderRadius: radius.sm,
     marginRight: spacing.md,
     backgroundColor: colors.border,

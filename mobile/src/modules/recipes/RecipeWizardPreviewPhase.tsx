@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,8 +9,11 @@ import {
 } from 'react-native';
 import type { RecipeNutrition } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { Icon } from '../../shared/components/Icon';
 import type { RecipePreviewViewModel } from './recipePreviewViewModel';
 import type { WizardImageDraft, WizardStepItem } from './recipeWizardTypes';
+import { RecipeImageHeroImage } from './RecipeImageHeroImage';
+import { RECIPE_HERO_ASPECT_RATIO } from './recipeImageSource';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
 import { stepRecipeWizardPortions } from './recipeWizardPortions';
 
@@ -28,6 +30,7 @@ interface Props {
   onRecipeDescriptionChange: (value: string) => void;
   onPortionsChange: (value: number) => void;
   onPickImage: () => void;
+  onEditImage: (draftId: string) => void;
   onRemoveImage: (draftId: string) => void;
   onMoveImage: (draftId: string, direction: -1 | 1) => void;
 }
@@ -45,6 +48,7 @@ export function RecipeWizardPreviewPhase({
   onRecipeDescriptionChange,
   onPortionsChange,
   onPickImage,
+  onEditImage,
   onRemoveImage,
   onMoveImage,
 }: Props) {
@@ -155,7 +159,20 @@ export function RecipeWizardPreviewPhase({
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imageStrip}>
         {imageDrafts.map((image, index) => (
           <View key={image.draftId} style={styles.imageThumbnailContainer}>
-            <Image source={{ uri: image.uri }} style={styles.imageThumbnail} resizeMode="cover" />
+            <RecipeImageHeroImage
+              uri={image.uri}
+              heroCrop={image.heroCrop}
+              style={styles.imageThumbnail}
+              accessibilityLabel={`Rezeptfoto ${index + 1}`}
+            />
+            <TouchableOpacity
+              style={styles.imageCropButton}
+              onPress={() => onEditImage(image.draftId)}
+              accessibilityRole="button"
+              accessibilityLabel={`Hero-Ausschnitt von Foto ${index + 1} bearbeiten`}
+            >
+              <Icon lib="mci" name="crop" size="sm" color={colors.text} />
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.imageThumbnailRemove}
               onPress={() => onRemoveImage(image.draftId)}
@@ -364,8 +381,19 @@ const styles = StyleSheet.create({
   },
   imageThumbnail: {
     width: 100,
-    height: 100,
+    aspectRatio: RECIPE_HERO_ASPECT_RATIO,
     borderRadius: radius.md,
+  },
+  imageCropButton: {
+    position: 'absolute',
+    top: spacing.xs,
+    left: spacing.xs,
+    width: spacing.md,
+    height: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceElevated,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   imageThumbnailRemove: {
     position: 'absolute',
@@ -415,7 +443,7 @@ const styles = StyleSheet.create({
   },
   imagePickerThumb: {
     width: 100,
-    height: 100,
+    aspectRatio: RECIPE_HERO_ASPECT_RATIO,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,

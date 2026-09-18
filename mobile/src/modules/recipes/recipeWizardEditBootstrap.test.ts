@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '@fittrack/shared';
 import type { Recipe, RecipeIngredient } from '@fittrack/shared';
 import { buildRecipeWizardEditBootstrapState } from './recipeWizardEditBootstrap';
 
@@ -123,7 +124,13 @@ describe('buildRecipeWizardEditBootstrapState', () => {
   it('maps persisted recipe images to sorted editable image drafts', () => {
     const state = buildRecipeWizardEditBootstrapState(makeRecipe({
       images: [
-        { id: 'image-2', blobName: 'u/r/image-2.jpg', order: 2, url: 'https://example.test/image-2.jpg' },
+        {
+          id: 'image-2',
+          blobName: 'u/r/image-2.jpg',
+          order: 2,
+          url: 'https://example.test/image-2.jpg',
+          heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2, zoom: 1.4 },
+        },
         { id: 'image-hidden', blobName: 'u/r/image-hidden.jpg', order: 3 },
         { id: 'image-1', blobName: 'u/r/image-1.jpg', order: 1, url: 'https://example.test/image-1.jpg' },
       ],
@@ -136,6 +143,7 @@ describe('buildRecipeWizardEditBootstrapState', () => {
         imageId: 'image-1',
         uri: 'https://example.test/image-1.jpg',
         order: 1,
+        heroCrop: DEFAULT_RECIPE_IMAGE_HERO_CROP,
       },
       {
         draftId: 'existing:image-2',
@@ -143,6 +151,7 @@ describe('buildRecipeWizardEditBootstrapState', () => {
         imageId: 'image-2',
         uri: 'https://example.test/image-2.jpg',
         order: 2,
+        heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2, zoom: 1.4 },
       },
     ]);
   });

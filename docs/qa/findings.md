@@ -51,6 +51,7 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-030 | Instagram renderer shared ambient field, AC-6 | Blocking | Backend | Closed |
 | FT-QA-2026-031 | Instagram renderer footer documentation, AC-14 | Non-blocking | Documentation | Accepted |
 | FT-QA-2026-032 | Instagram renderer footer SVG provenance, AC-10 | Suggestion | Backend | Accepted |
+| FT-QA-2026-033 | Rezeptfoto Hero-Crop EXIF-Orientierung, AC-13 | Blocking | Backend | Closed |
 
 ## Actionable Findings
 
@@ -470,6 +471,19 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Status:** Accepted
 - **Decision:** User approved the current renderer and accepted the remaining SVG provenance risk on 2026-09-16; no correction requested.
 - **History:** 2026-09-16 - Imported from `docs/qa/reports/PLAN_Instagram-Recipe-Renderer-Polish-and-UX-Review.md` and routed to Backend. 2026-09-16 - User accepted the remaining risk; no correction requested.
+
+### FT-QA-2026-033
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US_Rezeptfoto_Hero_Bild.md`
+- **Acceptance criterion:** AC-13
+- **Description:** The renderer normalizes non-default EXIF orientation in memory and then applies the legacy landscape rotation based only on normalized `width > height`. An EXIF-6 input can therefore be rotated twice, so final visual orientation is not reliably correct.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `backend/src/lib/instagramRenderer/render.ts` calls Sharp `rotate()` and rereads dimensions; `backend/src/lib/instagramRenderer/photo.ts` derives `rotate(90deg)` solely from `photo.width > photo.height`; `backend/src/lib/instagramRenderer/__tests__/photo.test.ts` expects that post-normalization rotation instead of proving final pixel orientation.
+- **Recommendation:** Replace the post-normalization width heuristic with one explicit orientation contract and add deterministic visual/pixel regression fixtures for EXIF 0/1/90/180/270 plus normal portrait/landscape inputs. Re-run the focused renderer suite and the full backend suite.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-09-17 - Imported from `docs/qa/reports/PLAN_US_Rezeptfoto_Hero_Bild.md` and routed to Backend for the first B-HR-3 correction attempt. 2026-09-17 - Backend replaced the post-normalization width heuristic with explicit `renderRotation` semantics and added pixel-based EXIF regression coverage. 2026-09-17 - Targeted QA re-review verified AC-13 and closed the finding.
 
 ## Verification Notes (Not Findings)
 

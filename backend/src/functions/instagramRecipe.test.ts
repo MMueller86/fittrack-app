@@ -16,6 +16,8 @@ vi.mock('../lib/instagramRenderer', () => ({
 
 import { getRecipesRepository, __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
 import { RecipeImageTooLargeError } from '../lib/storage';
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../shared/types/recipeImageHeroCrop';
+import type { RecipeImageHeroCrop } from '../../../shared/types/recipeImageHeroCrop';
 import {
   makeAuthRequest,
   makeContext,
@@ -53,7 +55,14 @@ beforeEach(() => {
   });
 });
 
-async function createRecipe(images: Array<{ id: string; blobName: string; order: number }> = []) {
+async function createRecipe(
+  images: Array<{
+    id: string;
+    blobName: string;
+    order: number;
+    heroCrop?: RecipeImageHeroCrop;
+  }> = [],
+) {
   const repo = getRecipesRepository();
   const recipe = await repo.create(TEST_USER_ID, {
     name: 'Stored recipe',
@@ -131,6 +140,26 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     expect(input.presentation).toEqual({ focusX: 0.5, focusY: 0.25, zoom: 1 });
     expect(input.nutritionHighlight).toBe('low-fat');
     expect(input.recipeMeta).toEqual({ totalTimeMinutes: 25, difficulty: 'Einfach', portions: 4 });
+  });
+
+  it('uses the selected image crop and merges partial presentation overrides', async () => {
+    const recipe = await createRecipe([
+      {
+        id: 'image-1',
+        blobName: 'server/blob.png',
+        order: 1,
+        heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2, focusY: 0.7, zoom: 1.4 },
+      },
+    ]);
+
+    const response = await instagramRecipeHandler(
+      await renderRequest(recipe.id, { presentation: { focusY: 0.25 } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    const input = renderInstagramRecipeMock.mock.calls[0][0] as Record<string, any>;
+    expect(input.presentation).toEqual({ focusX: 0.2, focusY: 0.25, zoom: 1.4 });
   });
 
   it('rejects client-owned recipe fields and invalid request options', async () => {

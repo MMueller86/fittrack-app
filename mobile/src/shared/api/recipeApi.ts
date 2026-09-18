@@ -4,6 +4,7 @@ import type {
   Meal,
   Recipe,
   RecipeImage,
+  RecipeImageHeroCrop,
   RecipeIngredient,
   RecipeStep,
 } from '@fittrack/shared';
@@ -70,19 +71,38 @@ export const recipeApi = {
    * POST /api/recipes/:id/images — upload a recipe image.
    * Sends as multipart/form-data with an `image` field.
    */
-  uploadImage(recipeId: string, imageUri: string, mimeType: 'image/jpeg' | 'image/png'): Promise<RecipeImage> {
+  uploadImage(
+    recipeId: string,
+    imageUri: string,
+    mimeType: 'image/jpeg' | 'image/png',
+    heroCrop?: RecipeImageHeroCrop,
+  ): Promise<RecipeImage> {
     const formData = new FormData();
     formData.append('image', {
       uri: imageUri,
       name: mimeType === 'image/png' ? 'recipe.png' : 'recipe.jpg',
       type: mimeType,
     } as unknown as Blob);
+    if (heroCrop !== undefined) {
+      formData.append('heroCrop', JSON.stringify(heroCrop));
+    }
 
     return apiClient
       .post<RecipeImage>(`/recipes/${recipeId}/images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 60_000,
       })
+      .then((r) => r.data);
+  },
+
+  /** PUT /api/recipes/:id/images/:imageId/hero-crop — update crop metadata only */
+  updateImageHeroCrop(
+    recipeId: string,
+    imageId: string,
+    heroCrop: RecipeImageHeroCrop,
+  ): Promise<RecipeImage> {
+    return apiClient
+      .put<RecipeImage>(`/recipes/${recipeId}/images/${imageId}/hero-crop`, { heroCrop })
       .then((r) => r.data);
   },
 

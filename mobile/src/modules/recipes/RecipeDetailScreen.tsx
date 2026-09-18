@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -30,6 +29,8 @@ import { NutritionTile } from '../../shared/components/NutritionTile';
 import { computeRecipeQuickEntryData } from './recipeUtils';
 import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
+import { RecipeImageHeroImage } from './RecipeImageHeroImage';
+import { RECIPE_HERO_ASPECT_RATIO } from './recipeImageSource';
 import {
   createRecipeScalePreviewController,
   type RecipeScalePreviewController,
@@ -285,10 +286,10 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const visibleSteps = isTextPreviewLoading
     ? []
     : textPreview.steps.filter((step) => step.description.trim().length > 0);
-  const imageUrls = recipe.images
-    .map((image) => image.url)
-    .filter((url): url is string => typeof url === 'string' && url.length > 0);
-  const currentImageUrl = imageUrls[imgIndex] ?? imageUrls[0];
+  const imageEntries = recipe.images.filter(
+    (image): image is typeof image & { url: string } => typeof image.url === 'string' && image.url.length > 0,
+  );
+  const currentImage = imageEntries[imgIndex] ?? imageEntries[0];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -396,19 +397,24 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           <NutritionTile label="Fett" value={recipe.nutritionPerPortion.fat} unit="g" />
         </View>
 
-        {imageUrls.length > 0 && (
+        {currentImage && (
           <>
-            <Text style={styles.sectionLabel}>Fotos ({imageUrls.length})</Text>
+            <Text style={styles.sectionLabel}>Fotos ({imageEntries.length})</Text>
             <View style={styles.imageContainer}>
-              <Image source={{ uri: currentImageUrl }} style={styles.image} resizeMode="cover" />
-              {imageUrls.length > 1 && (
+              <RecipeImageHeroImage
+                uri={currentImage.url}
+                heroCrop={currentImage.heroCrop}
+                style={styles.image}
+                accessibilityLabel={`Rezeptfoto ${imgIndex + 1}`}
+              />
+              {imageEntries.length > 1 && (
                 <View style={styles.imageDots}>
-                  {imageUrls.map((_, index) => (
+                  {imageEntries.map((_, index) => (
                     <TouchableOpacity
                       key={index}
                       onPress={() => setImgIndex(index)}
                       accessibilityRole="button"
-                      accessibilityLabel={`Foto ${index + 1} von ${imageUrls.length} anzeigen`}
+                      accessibilityLabel={`Foto ${index + 1} von ${imageEntries.length} anzeigen`}
                     >
                       <View style={[styles.dot, index === imgIndex && styles.dotActive]} />
                     </TouchableOpacity>
@@ -727,7 +733,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: 'hidden',
   },
-  image: { width: '100%', height: 240 },
+  image: { width: '100%', aspectRatio: RECIPE_HERO_ASPECT_RATIO },
   imageDots: {
     position: 'absolute',
     bottom: spacing.sm,

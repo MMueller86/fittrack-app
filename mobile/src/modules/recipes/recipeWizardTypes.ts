@@ -1,5 +1,6 @@
-import type { RecipeImage, RecipeIngredient } from '@fittrack/shared';
+import type { RecipeImage, RecipeImageHeroCrop, RecipeIngredient } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
+import { normalizeRecipeImageHeroCrop } from './recipeImageHeroCropMath';
 
 export type WizardPhase = 'input' | 'analyzing' | 'ingredients' | 'steps' | 'preview';
 export type IngStatus = 'auto-matched' | 'needs-selection' | 'needs-ai' | 'confirmed' | 'seasoning';
@@ -30,6 +31,7 @@ export interface NewWizardImageDraft {
   source: 'local';
   uri: string;
   mime: 'image/jpeg' | 'image/png';
+  heroCrop: RecipeImageHeroCrop;
 }
 
 export interface ExistingWizardImageDraft {
@@ -38,6 +40,7 @@ export interface ExistingWizardImageDraft {
   imageId: string;
   uri: string;
   order: number;
+  heroCrop: RecipeImageHeroCrop;
 }
 
 export type WizardImageDraft = NewWizardImageDraft | ExistingWizardImageDraft;
@@ -50,5 +53,6 @@ export function buildWizardImageDraftFromRecipeImage(image: RecipeImage): Existi
     imageId: image.id,
     uri: image.url,
     order: image.order,
+    heroCrop: normalizeRecipeImageHeroCrop(image.heroCrop),
   };
 }

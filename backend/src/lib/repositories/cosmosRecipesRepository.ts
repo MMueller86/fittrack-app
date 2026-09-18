@@ -6,6 +6,7 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Recipe, RecipeImage, RecipeStep } from '@fittrack/shared';
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { getCosmos } from '../cosmos';
 import type {
   CreateRecipeInput,
@@ -18,7 +19,7 @@ import type {
 // The document shape mirrors Recipe exactly, plus a `userId` field
 // that Cosmos uses as the physical partition key (/userId). SAS URLs are
 // response-only and are deliberately excluded from stored image metadata.
-type StoredRecipeImage = Pick<RecipeImage, 'id' | 'blobName' | 'order'>;
+type StoredRecipeImage = Pick<RecipeImage, 'id' | 'blobName' | 'order' | 'heroCrop'>;
 type CosmosRecipeDoc = Omit<Recipe, 'images'> & { images: StoredRecipeImage[]; userId: string };
 
 function isCosmosRecipeDoc(resource: CosmosRecipeDoc | undefined): resource is CosmosRecipeDoc {
@@ -26,7 +27,12 @@ function isCosmosRecipeDoc(resource: CosmosRecipeDoc | undefined): resource is C
 }
 
 function toStoredImages(images: RecipeImage[] | undefined): StoredRecipeImage[] {
-  return (images ?? []).map(({ id, blobName, order }) => ({ id, blobName, order }));
+  return (images ?? []).map(({ id, blobName, order, heroCrop }) => ({
+    id,
+    blobName,
+    order,
+    ...(heroCrop !== undefined ? { heroCrop } : {}),
+  }));
 }
 
 function toRecipeSteps(steps: RecipeStep[] | undefined): RecipeStep[] {
@@ -46,7 +52,10 @@ function toRecipe(doc: CosmosRecipeDoc): Recipe {
     portions: doc.portions,
     ingredients: doc.ingredients,
     steps: toRecipeSteps(doc.steps),
-    images: toStoredImages(doc.images),
+    images: toStoredImages(doc.images).map((image) => ({
+      ...image,
+      heroCrop: image.heroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP,
+    })),
     nutritionTotal: doc.nutritionTotal,
     nutritionPerPortion: doc.nutritionPerPortion,
     visibility: doc.visibility,

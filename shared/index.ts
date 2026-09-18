@@ -7,6 +7,7 @@ export * from './types/profile';
 export * from './types/nutrition';
 export * from './types/diary';
 export * from './types/aiMealEstimate';
+export * from './types/recipeImageHeroCrop';
 export * from './types/recipes';
 export * from './types/recipeScale';
 export * from './types/weights';

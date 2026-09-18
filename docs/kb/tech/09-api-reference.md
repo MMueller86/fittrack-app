@@ -118,6 +118,7 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | PUT | `/api/recipes/{id}` | Yes | |
 | DELETE | `/api/recipes/{id}` | Yes | |
 | POST | `/api/recipes/{id}/images` | Yes | Multipart upload; returns one `RecipeImage` |
+| PUT | `/api/recipes/{id}/images/{imageId}/hero-crop` | Yes | Updates validated hero-crop metadata; returns one `RecipeImage` |
 | PUT | `/api/recipes/{id}/images/order` | Yes | Reorders existing images; returns `{ images: RecipeImage[] }` |
 | DELETE | `/api/recipes/{id}/images/{imageId}` | Yes | Deletes the blob and compacts remaining image order; `204` with no body |
 | POST | `/api/recipes/{id}/log` | Yes | Logs a portion snapshot into a diary meal |
@@ -159,9 +160,45 @@ Each step contains `order` (positive integer), `description` (1-2000 characters)
 
 ### Recipe images
 
-`RecipeImage` persistence contains `id`, `blobName`, and a 1-based `order`. `url` is response-only: the backend creates a read-only SAS URL with a one-hour TTL for `GET /api/recipes/{id}` (all images) and for the first image in `GET /api/recipes` (thumbnail). The upload response is one image object with a fresh `url`; it is not a complete `Recipe` response.
+`RecipeImage` persistence contains `id`, `blobName`, a 1-based `order`, and optional `heroCrop` metadata. `url` is response-only: the backend creates a read-only SAS URL with a one-hour TTL for `GET /api/recipes/{id}` (all images) and for the first image in `GET /api/recipes` (thumbnail). The upload response is one image object with a fresh `url`; it is not a complete `Recipe` response.
 
-`POST /api/recipes/{id}/images` accepts multipart field `image`, only `image/jpeg` and `image/png`, up to 8 MB. The new image is appended at `max existing order + 1`. `DELETE /api/recipes/{id}/images/{imageId}` deletes the blob and renumbers remaining images from 1.
+`heroCrop` has the closed shape `{ version: 1, frame: "instagram-recipe-v1", focusX, focusY, zoom }`. `focusX` and `focusY` are finite normalized coordinates in `0..1` on the visually oriented source image; `zoom` is finite and at least `1`. Width, height, aspect-ratio, unknown frame, unknown version, and unknown extra fields are not part of the contract.
+
+The `instagram-recipe-v1` frame is `1080 x 1015`, matching the current
+renderer's photo/hero area. This is the confirmed implementation deviation
+from the older `1080 x 880` reference: `1080 x 880` ends before the tag zone
+and is not accepted as a runtime frame. The renderer output remains exactly
+`1080 x 1350` PNG.
+
+`POST /api/recipes/{id}/images` accepts multipart field `image`, only `image/jpeg` and `image/png`, up to 8 MB, plus the optional `heroCrop` JSON string. The new image is appended at `max existing order + 1`. When omitted, the field remains absent in Cosmos; repository reads and response objects expose the deterministic effective legacy default. When supplied, it must match the strict `RecipeImageHeroCrop` contract; invalid JSON or metadata returns `400` before the blob is uploaded. The crop is metadata only: upload never creates a second or cropped blob. `DELETE /api/recipes/{id}/images/{imageId}` deletes the blob and renumbers remaining images from 1.
+
+### PUT /api/recipes/{id}/images/{imageId}/hero-crop
+
+This authenticated route is scoped to the JWT user's recipe and accepts only an existing image in that recipe.
+
+**Request body:**
+
+```json
+{
+	"heroCrop": {
+		"version": 1,
+		"frame": "instagram-recipe-v1",
+		"focusX": 0.5,
+		"focusY": 0.46,
+		"zoom": 1
+	}
+}
+```
+
+`heroCrop` is strict: `focusX` and `focusY` are finite values in `0..1`, `zoom` is finite and at least `1`, and unknown fields, frames, and versions are rejected. The route changes only metadata and returns a fresh URL; it never rewrites the image Blob.
+
+**Responses:**
+
+- `200` — updated `RecipeImage` with a fresh read-only SAS `url`
+- `400` — invalid JSON, unknown fields, or invalid `heroCrop`
+- `401` — missing or invalid Bearer token
+- `404` — recipe not found for the authenticated user, or `imageId` is not part of that recipe
+- `500` — unexpected persistence or storage failure
 
 `PUT /api/recipes/{id}/images/order` accepts `{ "imageIds": string[] }`. The array must contain every existing image ID exactly once, with no duplicates or unknown IDs. The backend normalizes `order` to `1..n` in the supplied sequence and returns `{ images: RecipeImage[] }`. The endpoint only changes image metadata in the recipe document; it does not move or rewrite blob data.
 
@@ -198,9 +235,9 @@ only `imageId`, `presentation`, `nutritionHighlight`, and `recipeMeta`:
 | Field | Validation and default |
 |---|---|
 | `imageId` | Optional UUID. When absent, the image with the lowest finite `order` is selected; ties use the lowest image ID. |
-| `presentation.focusX` | Optional finite number in `0..1`; defaults to `0.5`. |
-| `presentation.focusY` | Optional finite number in `0..1`; defaults to `0.46`. |
-| `presentation.zoom` | Optional finite number `>= 1`; defaults to `1.0`. |
+| `presentation.focusX` | Optional finite number in `0..1`; defaults to the selected image's effective crop, or `0.5` for legacy images. |
+| `presentation.focusY` | Optional finite number in `0..1`; defaults to the selected image's effective crop, or `0.46` for legacy images. |
+| `presentation.zoom` | Optional finite number `>= 1`; defaults to the selected image's effective crop, or `1.0` for legacy images. |
 | `nutritionHighlight` | `"high-protein"`, `"low-fat"`, or `null`; defaults to `null`. There is no automatic nutrition-threshold calculation. |
 | `recipeMeta.totalTimeMinutes` | Positive integer. Required together with `difficulty` when `recipeMeta` is present. |
 | `recipeMeta.difficulty` | Non-empty, trimmed, single-line string. Required together with `totalTimeMinutes`. |
@@ -212,6 +249,13 @@ and `nutritionPerPortion` from the authenticated user's stored `Recipe`.
 come from the stored recipe. The selected image's stored `blobName` is passed
 directly to the backend storage layer. The render path does not fetch a
 client-provided SAS URL.
+
+Presentation precedence is evaluated independently for each field:
+`presentation.focusX`, `focusY`, or `zoom` from the request wins when
+supplied; otherwise the selected image's stored/effective `heroCrop` is used;
+only a missing legacy value reaches the deterministic default. A partial
+request therefore preserves the other stored crop fields, and rendering never
+persists request overrides.
 
 **Success response (200):**
 

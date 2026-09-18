@@ -7,7 +7,10 @@ export type PhotoAsset = {
   src: string;
   width: number;
   height: number;
+  renderRotation: PhotoRenderRotation;
 };
+
+export type PhotoRenderRotation = 0 | 90;
 
 export type PhotoPlacement = {
   width: number;
@@ -81,7 +84,7 @@ export function createPhotoLayer(
   photo: PhotoAsset,
   presentation: PhotoPlacementOptions,
 ): SatoriElement {
-  const rotateLandscape = photo.width > photo.height;
+  const rotateLandscape = photo.renderRotation === 90;
   const placement = calculateCoverPlacement({
     ...presentation,
     sourceWidth: rotateLandscape ? photo.height : photo.width,
@@ -110,20 +113,20 @@ export function createPhotoLayer(
     },
     children: element("img", {
       src: photo.src,
-        width: imagePlacement.width,
-        height: imagePlacement.height,
+      width: imagePlacement.width,
+      height: imagePlacement.height,
       style: {
         position: "absolute",
-          left: imagePlacement.left,
-          top: imagePlacement.top,
-          width: imagePlacement.width,
-          height: imagePlacement.height,
-          ...(rotateLandscape
-            ? {
-                transform: "rotate(90deg)",
-                transformOrigin: "center center",
-              }
-            : {}),
+        left: imagePlacement.left,
+        top: imagePlacement.top,
+        width: imagePlacement.width,
+        height: imagePlacement.height,
+        ...(rotateLandscape
+          ? {
+              transform: "rotate(90deg)",
+              transformOrigin: "center center",
+            }
+          : {}),
       },
     }),
   });

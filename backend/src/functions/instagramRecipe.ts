@@ -1,5 +1,6 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { z } from 'zod';
+import type { RecipeImage } from '@fittrack/shared';
 
 import { requireUser } from '../lib/auth';
 import { withHandler, parseBody } from '../lib/http';
@@ -55,7 +56,7 @@ const UNRENDERABLE_ERROR_CODES = new Set<RenderError['code']>([
   'IMAGE_UNREADABLE',
 ]);
 
-function selectRecipeImage(recipe: { images: Array<{ id: string; blobName: string; order: number }> }, imageId?: string) {
+function selectRecipeImage(recipe: { images: RecipeImage[] }, imageId?: string) {
   if (imageId !== undefined) {
     return recipe.images.find((image) => image.id === imageId);
   }
@@ -148,7 +149,10 @@ export const instagramRecipeHandler = withHandler(
     }
 
     const renderResult = await renderInstagramRecipe(
-      adaptRecipeToRenderInput(recipe, imageBuffer, parsed.data),
+      adaptRecipeToRenderInput(recipe, imageBuffer, {
+        ...parsed.data,
+        storedHeroCrop: image.heroCrop,
+      }),
     );
     if (!renderResult.ok) {
       return renderFailureResponse(renderResult.error, userId, recipeId, ctx);

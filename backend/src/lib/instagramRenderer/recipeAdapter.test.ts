@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Recipe } from '@fittrack/shared';
 
+import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { adaptRecipeToRenderInput } from './recipeAdapter';
 
 const recipe = {
@@ -22,7 +23,7 @@ const recipe = {
 } satisfies Recipe;
 
 describe('adaptRecipeToRenderInput', () => {
-  it('uses renderer defaults and server-owned recipe values', () => {
+  it('uses the deterministic legacy crop default and server-owned recipe values', () => {
     const input = adaptRecipeToRenderInput(recipe, Buffer.from('image'), {});
 
     expect(input).toMatchObject({
@@ -39,7 +40,23 @@ describe('adaptRecipeToRenderInput', () => {
     expect(input).not.toHaveProperty('recipeMeta');
   });
 
-  it('defaults presentation fields independently and takes portions from the recipe', () => {
+  it('uses the stored crop and merges partial request overrides field by field', () => {
+    const storedHeroCrop = {
+      ...DEFAULT_RECIPE_IMAGE_HERO_CROP,
+      focusX: 0.18,
+      focusY: 0.73,
+      zoom: 1.4,
+    };
+
+    const input = adaptRecipeToRenderInput(recipe, Buffer.from('image'), {
+      storedHeroCrop,
+      presentation: { focusY: 0.2 },
+    });
+
+    expect(input.presentation).toEqual({ focusX: 0.18, focusY: 0.2, zoom: 1.4 });
+  });
+
+  it('takes portions from the recipe and preserves request-level metadata', () => {
     const input = adaptRecipeToRenderInput(recipe, Buffer.from('image'), {
       presentation: { focusY: 0.2 },
       nutritionHighlight: 'high-protein',
