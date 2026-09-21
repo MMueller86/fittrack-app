@@ -45,6 +45,45 @@ az deployment group create `
 If you ever need to override the inherited location, edit
 `infra/parameters/dev.bicepparam` and uncomment the `param location = '...'` line.
 
+## Azure Functions Release
+
+The Azure Functions runtime is Linux, while releases are normally prepared on
+Windows. Use the same artifact gates for Dev and Alpha releases:
+
+```powershell
+# 1. Clean the compiler output and build the complete verified artifact.
+Remove-Item -Recurse -Force "backend\dist" -ErrorAction SilentlyContinue
+Remove-Item -Force "backend\tsconfig.tsbuildinfo" -ErrorAction SilentlyContinue
+Push-Location backend
+npm run build:verify
+Pop-Location
+
+# 2. Mirror the build output. robocopy exit codes 0-7 are successful.
+robocopy "backend\dist" "_deploy_staging\dist" /MIR /NFL /NDL /NJH /NJS
+
+# 3. Do not publish if either gate is False.
+Test-Path "_deploy_staging\dist\backend\src\functions\instagramRecipe.js"
+Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\LICENSE.txt"
+
+# 4. Publish from staging with a Linux remote build.
+Push-Location _deploy_staging
+func azure functionapp publish <function-app-name> --build remote --javascript
+Pop-Location
+```
+
+`npm run build:verify` is required instead of calling `tsc` directly: the
+build copies and validates the complete nine-file Instagram renderer asset
+manifest. `--build remote` is required for the normal Windows-to-Linux flow;
+Azure Oryx installs the production lockfile on Linux, including native
+packages such as `sharp` and `@resvg/resvg-js`. Do not run `npm ci` in the
+staging directory on Windows and do not use `--no-build` unless a separately
+verified Linux-compatible `node_modules` tree is intentionally packaged.
+
+After publishing, verify the changed function in `az functionapp function list`,
+check `GET /api/health` for HTTP 200, and check one protected endpoint for HTTP
+401 without a token. For authenticated features, perform the relevant smoke
+flow and inspect Application Insights for post-deploy errors.
+
 ## Naming Convention
 
 | Resource | Dev Name |

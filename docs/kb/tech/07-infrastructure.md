@@ -151,12 +151,12 @@ fittrack-app/
 │       └── shared/          ← compiled shared library
 └── _deploy_staging/
     ├── dist/               ← SEPARATE copy — must be synced manually before deploy
-    ├── node_modules/        ← Linux-compatible node_modules (do NOT rebuild on Windows)
     ├── host.json
-    └── package.json
+  ├── package.json
+  └── package-lock.json
 ```
 
-**Root cause of missing endpoints on Alpha:** If step 2 (sync) is skipped, `_deploy_staging/dist/` contains stale compiled output. The deploy succeeds (exit 0) but the new functions are absent. Always verify step 3 before deploying.
+**Root cause of missing runtime behaviour on Alpha:** A successful upload does not prove that the package contains the current compiled code, renderer assets, or runtime dependencies. Skipping the clean build, asset copy, or `/MIR` sync can produce a successful deployment with stale or incomplete output. Every release must pass the artifact gates below before publishing.
 
 `_deploy_staging/package.json` is a production-only Node 20 manifest. It
 contains the backend runtime packages and the renderer packages
@@ -164,9 +164,10 @@ contains the backend runtime packages and the renderer packages
 `@tabler/icons ~3.46.0`, and `sharp ^0.34.5`. `pixelmatch`, TypeScript,
 Vitest, and type packages remain in the backend workspace for tests and builds;
 they are not installed in production staging. The staging lockfile is generated
-from this manifest. Install it only in a Linux Node 20 x64 environment so
-`sharp` and Resvg use Linux-compatible native modules; do not run `npm ci` for
-staging on Windows.
+from this manifest. The standard Windows-to-Linux release uses the Azure Oryx
+remote build, which installs the lockfile dependencies on Linux; do not run
+`npm ci` for staging on Windows and do not package Windows-native `sharp` or
+Resvg modules.
 
 ### Instagram renderer package and asset gate
 
@@ -189,20 +190,23 @@ must reject missing or unexpected files, and the staged tree must contain both
 asset manifest, including
 `_deploy_staging/dist/backend/src/lib/instagramRenderer/assets/fonts/LICENSE.txt`.
 The native smoke gate is run with Linux Node 20 x64 dependencies from the
-staging lockfile; Windows-native `sharp` or Resvg modules are not deployable.
+staging lockfile. The standard `--build remote` publish performs this install
+on Linux, so Windows-native `sharp` or Resvg modules are never used for the
+Azure package.
 
 ### Step-by-Step (run from repo root)
 
 ```powershell
-# 1. Clean build — REQUIRED. Incremental build cache silently omits changes.
+# 1. Clean build and verification — REQUIRED. Incremental build cache silently
+#    omits changes. build:verify also copies and validates the renderer assets.
 #    Run from repo root.
 Remove-Item -Recurse -Force "backend\dist" -ErrorAction SilentlyContinue
 Remove-Item -Force "backend\tsconfig.tsbuildinfo" -ErrorAction SilentlyContinue
 cd backend
-npm run build
+npm run build:verify
 cd ..
 
-# `npm run build` also runs the deterministic renderer asset copy from
+# `npm run build:verify` runs the deterministic renderer asset copy from
 # backend/src/lib/instagramRenderer/assets/ to
 # backend/dist/backend/src/lib/instagramRenderer/assets/.
 
@@ -211,23 +215,28 @@ cd ..
 #    Do NOT use Copy-Item — it creates nested folders when target exists.
 robocopy "backend\dist" "_deploy_staging\dist" /MIR /NFL /NDL /NJH /NJS
 
-# 3. Verify: spot-check that a recently added/changed function file is present.
-#    Replace the filename with the most recently added function in functions/.
+# 3. Verify the compiled handler and the complete renderer asset manifest.
+#    Every check must return True. Stop if any check fails.
 Test-Path "_deploy_staging\dist\backend\src\functions\specialActivity.js"
-# Must return True — if False, step 2 did not sync correctly.
 Test-Path "_deploy_staging\dist\backend\src\functions\instagramRecipe.js"
 Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\LICENSE.txt"
-# Both must return True for the renderer endpoint and complete asset manifest.
+# For renderer releases, also verify all nine files from the asset manifest.
 
-# 4. Deploy — always from _deploy_staging/, never from backend/
+# 4. Deploy — always from _deploy_staging/, never from backend/.
+#    Oryx installs production dependencies on Linux; this is required for
+#    native packages such as sharp and @resvg/resvg-js.
 cd _deploy_staging
-func azure functionapp publish func-fittrack-alpha-ppf5sc --no-build --javascript
+func azure functionapp publish func-fittrack-alpha-ppf5sc --build remote --javascript
 cd ..
 ```
 
 ### Rules
 
-[Rule] Always deploy from `_deploy_staging/` with `--no-build`. Never deploy from `backend/` directly.
+[Rule] Always deploy from `_deploy_staging/` with `--build remote --javascript`. Never deploy from `backend/` directly.
+
+[Rule] Never use `--no-build` in the normal Windows-to-Linux workflow. It is
+only valid when the package explicitly contains Linux-compatible production
+`node_modules` and a separate gate has verified those native modules.
 
 [Rule] Always include `--javascript`. The `_deploy_staging/` directory has no `local.settings.json`, so the `func` CLI cannot auto-detect the Node.js worker runtime without this flag.
 
@@ -236,6 +245,20 @@ cd ..
 [Rule] Always sync with `robocopy /MIR` (step 2) before deploying. `_deploy_staging/dist/` is NOT automatically updated by `tsc`. Skipping this step deploys stale code silently.
 
 [Rule] Verify step 3 before deploying. A successful `func publish` (exit 0) does NOT guarantee the new functions are present — it only confirms the upload succeeded. Only the function list in the output or a `Test-Path` check confirms the sync was complete.
+
+### Post-deploy verification
+
+After every Functions deployment:
+
+1. Confirm the function list contains the changed handler and `health`.
+2. Confirm `GET /api/health` returns HTTP 200.
+3. Confirm a protected route returns HTTP 401 without a token.
+4. For an authenticated feature release, execute the relevant user flow once
+  and check Application Insights for new `*.failed` events after the deploy.
+
+The Instagram renderer additionally requires the authenticated
+`POST /api/recipes/{id}/instagram-render` smoke flow. A `GET` request to this
+route is not a valid renderer check because the route only accepts `POST`.
 
 ## Application Settings — Local Dev Credentials
 

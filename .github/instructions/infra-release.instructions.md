@@ -93,9 +93,9 @@ Verify the deployment succeeded (exit code 0, no ARM error in output). If it fai
 Remove-Item -Recurse -Force "backend\dist" -ErrorAction SilentlyContinue
 Remove-Item -Force "backend\tsconfig.tsbuildinfo" -ErrorAction SilentlyContinue
 
-# 2. Compile
+# 2. Compile and copy the renderer assets
 cd backend
-npx tsc --project tsconfig.json
+npm run build:verify
 cd ..
 
 # 3. Sync to _deploy_staging — use robocopy /MIR, never Copy-Item
@@ -104,10 +104,14 @@ robocopy "backend\dist" "_deploy_staging\dist" /MIR /NFL /NDL /NJH /NJS
 # 4. Verify sync — replace with most recently changed function file
 Test-Path "_deploy_staging\dist\backend\src\functions\[recently-changed-file].js"
 # Must return True — if False, stop; do not deploy stale code
+Test-Path "_deploy_staging\dist\backend\src\functions\instagramRecipe.js"
+Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\LICENSE.txt"
+# The renderer handler and asset check must both return True.
 
-# 5. Deploy
+# 5. Deploy — remote build installs Linux-compatible production dependencies.
+#    Do not use --no-build for the normal Windows-to-Linux workflow.
 cd _deploy_staging
-func azure functionapp publish func-fittrack-alpha-ppf5sc --no-build --javascript
+func azure functionapp publish func-fittrack-alpha-ppf5sc --build remote --javascript
 cd ..
 ```
 

@@ -334,7 +334,8 @@ Fehlersemantik bleiben in `backend/src/lib/instagramRenderer/`.
   und Deployment-Locks sind fuer diesen POC-Teil unvollstaendig.
 - Das Azure-Function-Bicep verwendet Linux und Node 20 und die bestehende
   Deployment-Organisation verlangt Clean Build, `robocopy /MIR`, Staging-
-  Verifikation und `func ... publish --no-build --javascript`.
+  Verifikation und `func ... publish --build remote --javascript`, damit
+  Runtime- und Native-Abhaengigkeiten auf Linux installiert werden.
 - `backend/README.md` enthaelt noch den historischen M1-Text, dass Auth und
   viele Handler Stubs seien. Das widerspricht dem aktuellen `auth.ts`, den
   produktiven Handlern und der KB. Dieser Plan folgt der aktuellen
@@ -733,8 +734,8 @@ vor einer Function-Publikation pruefen.
 **Goal**
 
 Den neuen Backend-Pfad in der Development-Funktion mit dem bestehenden
-Clean-Build-, Mirror- und `--no-build`-Ablauf bereitstellen und die Laufzeit-
-Voraussetzungen nachweisen.
+Clean-Build-, Mirror- und Linux-Remote-Build-Ablauf bereitstellen und die
+Laufzeit-Voraussetzungen nachweisen.
 
 **Required Knowledge Base:**
 
@@ -1018,7 +1019,7 @@ als additive shared/API-Typaenderung geplant.
 5. `Test-Path` auf die kompilierte neue Function und einen Font-/SVG-/PNG-
    Pfad muss erfolgreich sein.
 6. Die Publikation erfolgt aus `_deploy_staging` mit
-   `func azure functionapp publish ... --no-build --javascript`.
+  `func azure functionapp publish ... --build remote --javascript`.
 7. Nach dem Deploy werden Function-Liste, Health-Check und ein authentifizierter
    Render-Smoke geprueft.
 
@@ -1122,7 +1123,7 @@ gepflegt; der Orchestrator uebernimmt nur tatsaechlich bestaetigte Findings.
 | AC-12 | Root-Lock und Backend-/Staging-Manifeste enthalten alle benoetigten Runtime-Pakete mit reproduzierbaren aufgeloesten Versionen und Integrities; `pixelmatch` bleibt test-only. |
 | AC-13 | Ein Linux-Node-20-x64-Paket enthaelt Linux-kompatible `sharp`-/Resvg-native Module; ein isolierter Paket-Smoke importiert den kompilierten Renderer ohne Windows-Binaries oder System-Font-Abhaengigkeit. |
 | AC-14 | Fonts, Lizenzdatei, SVGs, PNGs und Legacy-Fallback liegen im dist-relativen Assetpfad und nach `robocopy /MIR` identisch unter `_deploy_staging/dist`; die neue Function-Datei ist im Staging vorhanden. |
-| AC-15 | Dev- und gegebenenfalls Alpha-Deploy folgen Clean Build -> Asset-Copy -> `robocopy /MIR` -> `Test-Path` -> Publish aus `_deploy_staging` mit `--no-build --javascript`; Alpha bleibt explizit angefordert und Infrastruktur kommt vor Backend, falls Bicep betroffen ist. |
+| AC-15 | Dev- und gegebenenfalls Alpha-Deploy folgen Clean Build -> Asset-Copy -> `robocopy /MIR` -> `Test-Path` -> Publish aus `_deploy_staging` mit `--build remote --javascript`; Alpha bleibt explizit angefordert und Infrastruktur kommt vor Backend, falls Bicep betroffen ist. |
 | AC-16 | Der aktuelle Referenztest fuer `fittrack_instagram_current_approved.png` besteht gegen den akzeptierten POC-Stand; Fixture, Runtime, Dimensionen und Hash sind dokumentiert und die Datei wird nur nach QA-Gate promoviert. |
 | AC-17 | Der historische V1.7-Test behalt die Originaldatei, Fixture, `0.10`-Threshold und `0.03`-Gate; der bekannte ungefaehre `5.50 %`-Mismatch wird separat diagnostiziert und nicht durch Toleranzanhebung, Fixture-Ersetzung oder Testloeschung verborgen. |
 | AC-18 | Unit- und Handlertests decken Auth, Ownership, Defaults, Meta, Bildauswahl, Storagefehler, Rendererfehler, Response-Header und Registrierung ab; `build:verify` besteht. |

@@ -254,7 +254,7 @@ Local values are in `backend/local.settings.json` (gitignored) — this is the *
 - Local dev: `npm run dev` from `backend/`; the launcher checks port 7071, builds, starts Azurite, waits until its Blob, Queue, and Table services answer over HTTP, provisions the `reusable-items-enrich` queue, and only then starts Azure Functions. It fails early with an actionable message if another Functions host already owns port 7071. Azurite data is stored in the OS temp directory by default to avoid sync-folder file locks; `FITTRACK_AZURITE_LOCATION` can override it. `npm run start` assumes Azurite is already running.
 - Build: `npm run build` (TypeScript -> `dist/`, then deterministic Instagram renderer asset copy)
 - Verify: `npm run build:verify` — builds, copies the renderer assets, then runs `scripts/verify-build.mjs`, which checks that `require('@fittrack/shared')` does not appear in the output
-- Deploy: always from `_deploy_staging/` with `--no-build` flag (used for all environments, not just staging)
+- Deploy: always from `_deploy_staging/` with `--build remote --javascript`; the remote Linux build installs production dependencies and native packages for the Azure Functions runtime
 - Before deploy: delete `dist/` and `tsconfig.tsbuildinfo` for a clean build
 
 ### Instagram renderer package contract
