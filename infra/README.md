@@ -45,6 +45,29 @@ az deployment group create `
 If you ever need to override the inherited location, edit
 `infra/parameters/dev.bicepparam` and uncomment the `param location = '...'` line.
 
+## Azure Functions Runtime
+
+The Function App is pinned to Linux `Node|22` and
+`WEBSITE_NODE_DEFAULT_VERSION=~22` with Functions runtime v4. Microsoft
+documents Node 22 as the last Node version supported on Linux Consumption;
+newer versions such as Node 24 require Flex Consumption. The general Azure
+runtime listing can still show Node 24, but it must not be applied to this Y1
+app. See Microsoft's [supported versions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-versions).
+
+Microsoft lists Node 22 support through **30 April 2027** and Linux
+Consumption retirement for **30 September 2028**. Plan the Flex migration
+before the Node 22 support date; the later platform retirement is not the first
+deadline.
+
+```powershell
+az functionapp list-runtimes --os-type linux -o table
+```
+
+After an infrastructure deployment, the deployed app must report
+`linuxFxVersion: Node|22` and `WEBSITE_NODE_DEFAULT_VERSION: ~22`.
+Moving to Node 24 requires the separate Flex migration workflow; it creates a
+new Function App and is not a safe in-place runtime-setting change.
+
 ## Azure Functions Release
 
 The Azure Functions runtime is Linux, while releases are normally prepared on

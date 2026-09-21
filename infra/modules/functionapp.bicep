@@ -1,4 +1,6 @@
-// Linux Consumption (Y1) Function App, Node 20 LTS, Functions runtime v4.
+// Linux Consumption (Y1) Function App, Node 22 LTS, Functions runtime v4.
+// Node 22 is the last Node version supported on Linux Consumption; Node 24
+// requires a migration to Flex Consumption.
 // Wires app settings for Cosmos, Storage, Azure OpenAI, JWT, Google, AppInsights.
 // Secrets that must remain secret (Cosmos key, JWT secrets, Google client id,
 // OpenAI key) are passed in as @secure() params and not echoed via outputs.
@@ -102,7 +104,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     serverFarmId: plan.id
     httpsOnly: true
     siteConfig: {
-      linuxFxVersion: 'Node|20'
+      linuxFxVersion: 'Node|22'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       use32BitWorkerProcess: false
@@ -133,7 +135,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~20'
+          value: '~22'
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
@@ -196,9 +198,8 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'ENRICH_QUEUE_NAME'
           value: enrichQueueName
         }
-        // WEBSITE_RUN_FROM_PACKAGE=1: deploy ZIP is mounted directly (no Oryx extraction).
-        // Required so that func CLI --no-build deploys work correctly with pre-built artifacts
-        // including Linux-native binaries (e.g. sharp) that are bundled in _deploy_staging.
+        // Keep the app on package-based execution after the release build.
+        // The release workflow uses --build remote so native modules are built on Linux.
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
           value: '1'

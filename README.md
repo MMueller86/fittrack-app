@@ -7,7 +7,7 @@ Android-first cross-platform nutrition and training app.
 | Folder | Purpose |
 |---|---|
 | `mobile/` | Expo bare React Native app (Android-first, iOS compatible) |
-| `backend/` | Azure Functions v4, TypeScript, Node 20 LTS |
+| `backend/` | Azure Functions v4, TypeScript, Node 22 LTS |
 | `infra/` | Bicep Infrastructure-as-Code |
 | `shared/` | Shared TypeScript types and DTOs |
 | `docs/` | Product specifications and planning documents |
@@ -17,7 +17,7 @@ Android-first cross-platform nutrition and training app.
 Install these once before starting local development:
 
 ```powershell
-# Node.js 20 LTS
+# Node.js 22 LTS
 winget install OpenJS.NodeJS.LTS
 
 # Azure Functions Core Tools v4
@@ -44,7 +44,7 @@ cd backend && npm start
 ## Architecture
 
 - **Frontend:** React Native (Expo bare)
-- **Backend:** Azure Functions v4 (TypeScript, Node 20)
+- **Backend:** Azure Functions v4 (TypeScript, Node 22)
 - **Database:** Azure Cosmos DB serverless
 - **Storage:** Azure Blob Storage (recipe images)
 - **AI:** Azure OpenAI gpt4o-mini (backend-only, 3 guided workflows)

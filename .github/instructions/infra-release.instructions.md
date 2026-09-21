@@ -86,6 +86,21 @@ az deployment group create `
 
 Verify the deployment succeeded (exit code 0, no ARM error in output). If it fails: **stop**. Do not proceed to Phase 2.
 
+After an infrastructure change, verify the Function App runtime before
+continuing:
+
+```powershell
+$runtime = az functionapp config show `
+  --resource-group rg-Michael-Mueller `
+  --name func-fittrack-alpha-ppf5sc `
+  --query linuxFxVersion -o tsv
+if ($runtime -ne 'Node|22') { Write-Error "Unexpected Function runtime: $runtime"; exit 1 }
+```
+
+The expected runtime is `Node|22`; do not continue with Node 20 or Node 24 on
+the current Linux Consumption Y1 plan. Node 24 requires the separate Flex
+Consumption migration workflow.
+
 ### Phase 2 — Backend Deploy (only if backend code changes exist)
 
 ```powershell

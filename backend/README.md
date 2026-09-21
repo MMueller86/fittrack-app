@@ -1,6 +1,6 @@
 # backend/
 
-Azure Functions v4 backend for FitTrack. TypeScript, Node 20 LTS, Consumption Plan.
+Azure Functions v4 backend for FitTrack. TypeScript, Node 22 LTS, Consumption Plan.
 
 ## Current implementation status
 

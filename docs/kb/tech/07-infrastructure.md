@@ -158,7 +158,31 @@ fittrack-app/
 
 **Root cause of missing runtime behaviour on Alpha:** A successful upload does not prove that the package contains the current compiled code, renderer assets, or runtime dependencies. Skipping the clean build, asset copy, or `/MIR` sync can produce a successful deployment with stale or incomplete output. Every release must pass the artifact gates below before publishing.
 
-`_deploy_staging/package.json` is a production-only Node 20 manifest. It
+### Azure Functions runtime
+
+The Function App uses Linux Functions runtime v4 with Node 22 LTS. The Bicep
+module pins `linuxFxVersion` to `Node|22` and
+`WEBSITE_NODE_DEFAULT_VERSION` to `~22`. Microsoft documents Node 22 as the
+last Node version supported on Linux Consumption; newer versions such as Node
+24 require Flex Consumption. The general Azure runtime listing can still show
+Node 24, but it must not be applied to this Y1 app. See Microsoft's
+[supported versions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-versions).
+
+Microsoft lists Node 22 support through **30 April 2027** and Linux
+Consumption retirement for **30 September 2028**. The Flex migration must be
+planned before the Node 22 support date; the later platform retirement is not
+the first deadline.
+
+```powershell
+az functionapp list-runtimes --os-type linux -o table
+```
+
+After every infrastructure deployment, verify that the deployed Function App
+still reports `Node|22`; a successful ARM deployment alone is not a runtime
+version check. Moving to Node 24 requires the separate Flex migration workflow,
+which creates a new Function App rather than changing this Y1 app in place.
+
+`_deploy_staging/package.json` is a production-only Node 22 manifest. It
 contains the backend runtime packages and the renderer packages
 `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static ~1.46.0`,
 `@tabler/icons ~3.46.0`, and `sharp ^0.34.5`. `pixelmatch`, TypeScript,
@@ -189,7 +213,7 @@ must reject missing or unexpected files, and the staged tree must contain both
 `_deploy_staging/dist/backend/src/functions/instagramRecipe.js` and the full
 asset manifest, including
 `_deploy_staging/dist/backend/src/lib/instagramRenderer/assets/fonts/LICENSE.txt`.
-The native smoke gate is run with Linux Node 20 x64 dependencies from the
+The native smoke gate is run with Linux Node 22 x64 dependencies from the
 staging lockfile. The standard `--build remote` publish performs this install
 on Linux, so Windows-native `sharp` or Resvg modules are never used for the
 Azure package.
