@@ -66,6 +66,14 @@ module.exports = ({ config }) => ({
     withHealthConnectPermissions,
     withMinSdkVersion26,
     [
+      'expo-media-library',
+      {
+        photosPermission: 'FitTrack benötigt Zugriff auf deine Fotos, um Rezeptbilder zu speichern.',
+        savePhotosPermission: 'FitTrack benötigt Zugriff, um Rezeptbilder im Album FitTrack zu speichern.',
+        granularPermissions: ['photo'],
+      },
+    ],
+    [
       'expo-camera',
       {
         cameraPermission: 'FitTrack benötigt Kamerazugriff für Barcode-Scanner, KI-Analyse und Rezeptfotos.',

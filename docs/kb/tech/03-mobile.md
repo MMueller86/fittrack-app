@@ -232,6 +232,52 @@ The Mobile API client mirrors the Backend contract:
     Backend EXIF orientation is normalized in memory, while Mobile coordinates
     continue to refer to the visually oriented source image.
 
+#### Instagram share draft and local media handoff [F-1/F-3]
+
+The Mobile API client exposes the transient
+`POST /api/recipes/{id}/instagram-render` PNG request through the existing
+Axios client. The request contract sends `selectedTags`, the explicit
+`'high-protein' | null` highlight and temporary `recipeMeta` values
+(`30` minutes, `Einfach`). The initial preview omits `imageId` and
+`presentation`; the final render adds one complete normalized presentation.
+The response is typed as an `ArrayBuffer` and uses a 60-second timeout.
+
+`recipeShareDraftState.ts` keeps the share draft screen-local and
+non-persistent. It selects the crop-editor source from the server-equivalent
+primary-image rule (`order`, then image-ID tie-breaker), keeps the effective
+stored crop, aborts superseded renders, ignores stale responses and cleans up
+on disposal. Pan and pinch do not issue render requests; only crop
+confirmation starts the one final render.
+
+`services/recipeShareMediaService.ts` provides the F-3 handoff for the
+temporary PNG URI, the local media library and the native share sheet. The
+adapter uses Expo SDK 54-compatible packages `expo-file-system@19.0.24`,
+`expo-media-library@18.2.1` and `expo-sharing@14.0.8`, resolved with
+`npx expo install` while retaining `expo@54.0.36`. The `expo-media-library`
+config plugin requests photo access and add-only save access; a new native
+build may therefore be required.
+
+The adapter requests photo read/write access before saving because it looks up
+the exact album name `FitTrack` and then creates or adds the asset. On Android
+13+, the native build declares `READ_MEDIA_IMAGES` and
+`READ_MEDIA_VISUAL_USER_SELECTED` for this lookup; write-only access is
+insufficient. `canAskAgain: true` is a retryable denial;
+`canAskAgain: false` is a settings-only denial. It creates that album only
+after a missing lookup, and never uses names such as `FitTrack (1)` or changes
+another album. A newly created asset is
+removed best effort on an album/asset failure; if the adapter created the
+album too, it removes the new asset before attempting to remove that empty
+album. In all failure cases no share sheet is opened and the preview remains
+available to the caller for retry.
+
+`createSession(previewUri)` memoizes the successful save result. The session
+passes the exact same temporary PNG URI to `shareAsync`, so a share retry does
+not create a second media asset. The URI remains available while the
+`shareAsync` promise is pending. A resolved share call is followed by cleanup;
+an unavailable share target or rejected share call leaves the URI for an
+explicit retry or close cleanup. The adapter does not upload to Google Photos,
+Instagram or FitTrack persistence.
+
 #### Recipe image permissions and failure states
 
 - Canceling the camera, gallery or editor flow does not create an empty draft.
@@ -264,10 +310,11 @@ impact**: a new Dev Build may be necessary even though the exact decision is
 environment- and release-dependent. The Infrastructure release gate decides
 whether a new build is required.
 
-This feature introduced **no new npm dependency**. It reuses the already
-installed `expo-camera`, `expo-image-picker`,
+The F-3 media handoff adds the SDK-54-compatible direct dependencies
+`expo-file-system@19.0.24`, `expo-media-library@18.2.1` and
+`expo-sharing@14.0.8`. The existing `expo-camera`, `expo-image-picker`,
 `react-native-gesture-handler`, `react-native-reanimated` and
-`react-native-safe-area-context` packages.
+`react-native-safe-area-context` packages remain unchanged.
 
 ### Progress Module (`modules/progress/`)
 

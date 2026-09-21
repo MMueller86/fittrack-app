@@ -14,7 +14,7 @@ import {
   TAG_ROW_MAX_WIDTH,
   TITLE_MAX_WIDTH,
 } from "./layout";
-import type { PhotoAsset, PhotoRenderRotation } from "./photo";
+import type { PhotoAsset } from "./photo";
 import { loadRecipeMetaIcons, RecipeMetaIconAssetError } from "./recipeMeta";
 import { TagIconAssetError } from "./tagIcons";
 import type { RenderInput, RenderResult } from "./types";
@@ -369,10 +369,6 @@ export async function loadPhoto(sharp: SharpFactory, image: RenderInput["image"]
     }
 
     const sourceMetadata = await sharp(buffer).metadata();
-    const sourceIsLandscape =
-      Number.isFinite(sourceMetadata.width) &&
-      Number.isFinite(sourceMetadata.height) &&
-      sourceMetadata.width > sourceMetadata.height;
     const exifWasNormalized =
       sourceMetadata.orientation !== undefined && sourceMetadata.orientation !== 1;
     let normalizedBuffer = buffer;
@@ -389,14 +385,10 @@ export async function loadPhoto(sharp: SharpFactory, image: RenderInput["image"]
       throw new Error("Image dimensions are unavailable.");
     }
 
-    const renderRotation: PhotoRenderRotation =
-      exifWasNormalized ? 0 : sourceIsLandscape ? 90 : 0;
-
     return {
       src: toDataUri(normalizedBuffer, mimeTypeForImage(metadata.format)),
       width,
       height,
-      renderRotation,
     };
   } catch (error) {
     throw new UnreadableImageError(error);

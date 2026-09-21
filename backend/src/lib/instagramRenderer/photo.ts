@@ -1,16 +1,11 @@
 import { CANVAS_WIDTH, HERO_HEIGHT, PHOTO_TRANSITION_END_Y } from "./layout";
 import type { SatoriElement } from "./compose";
 
-const LANDSCAPE_COVER_HEIGHT = 1105;
-
 export type PhotoAsset = {
   src: string;
   width: number;
   height: number;
-  renderRotation: PhotoRenderRotation;
 };
-
-export type PhotoRenderRotation = 0 | 90;
 
 export type PhotoPlacement = {
   width: number;
@@ -84,22 +79,12 @@ export function createPhotoLayer(
   photo: PhotoAsset,
   presentation: PhotoPlacementOptions,
 ): SatoriElement {
-  const rotateLandscape = photo.renderRotation === 90;
   const placement = calculateCoverPlacement({
     ...presentation,
-    sourceWidth: rotateLandscape ? photo.height : photo.width,
-    sourceHeight: rotateLandscape ? photo.width : photo.height,
-    containerHeight: rotateLandscape ? LANDSCAPE_COVER_HEIGHT : HERO_HEIGHT,
+    sourceWidth: photo.width,
+    sourceHeight: photo.height,
+    containerHeight: HERO_HEIGHT,
   });
-  const rotationOffset = rotateLandscape ? (placement.height - placement.width) / 2 : 0;
-  const imagePlacement = rotateLandscape
-    ? {
-        width: placement.height,
-        height: placement.width,
-        left: placement.left - rotationOffset,
-        top: placement.top + rotationOffset,
-      }
-    : placement;
 
   return element("div", {
     style: {
@@ -113,20 +98,14 @@ export function createPhotoLayer(
     },
     children: element("img", {
       src: photo.src,
-      width: imagePlacement.width,
-      height: imagePlacement.height,
+      width: placement.width,
+      height: placement.height,
       style: {
         position: "absolute",
-        left: imagePlacement.left,
-        top: imagePlacement.top,
-        width: imagePlacement.width,
-        height: imagePlacement.height,
-        ...(rotateLandscape
-          ? {
-              transform: "rotate(90deg)",
-              transformOrigin: "center center",
-            }
-          : {}),
+        left: placement.left,
+        top: placement.top,
+        width: placement.width,
+        height: placement.height,
       },
     }),
   });

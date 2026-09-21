@@ -221,6 +221,7 @@ Cosmos document, does not update the recipe, and does not upload the PNG.
 		"focusY": 0.46,
 		"zoom": 1.0
 	},
+	"selectedTags": ["Schnell", "Salat"],
 	"nutritionHighlight": "high-protein",
 	"recipeMeta": {
 		"totalTimeMinutes": 25,
@@ -230,7 +231,8 @@ Cosmos document, does not update the recipe, and does not upload the PNG.
 ```
 
 All request fields are optional, so `{}` is valid. The strict schema accepts
-only `imageId`, `presentation`, `nutritionHighlight`, and `recipeMeta`:
+only `imageId`, `presentation`, `selectedTags`, `nutritionHighlight`, and
+`recipeMeta`:
 
 | Field | Validation and default |
 |---|---|
@@ -238,13 +240,16 @@ only `imageId`, `presentation`, `nutritionHighlight`, and `recipeMeta`:
 | `presentation.focusX` | Optional finite number in `0..1`; defaults to the selected image's effective crop, or `0.5` for legacy images. |
 | `presentation.focusY` | Optional finite number in `0..1`; defaults to the selected image's effective crop, or `0.46` for legacy images. |
 | `presentation.zoom` | Optional finite number `>= 1`; defaults to the selected image's effective crop, or `1.0` for legacy images. |
-| `nutritionHighlight` | `"high-protein"`, `"low-fat"`, or `null`; defaults to `null`. There is no automatic nutrition-threshold calculation. |
+| `selectedTags` | Optional array of at most four exact values from the stored recipe tags. Unknown or duplicate values are invalid. When supplied, the stored recipe-tag order determines the render order; the client array order is ignored. |
+| `nutritionHighlight` | `"high-protein"` or `null`; defaults to `null`. There is no automatic nutrition-threshold calculation. |
 | `recipeMeta.totalTimeMinutes` | Positive integer. Required together with `difficulty` when `recipeMeta` is present. |
 | `recipeMeta.difficulty` | Non-empty, trimmed, single-line string. Required together with `totalTimeMinutes`. |
 
 `title`, `tags`, `portions`, `nutrition`, `blobName`, and `ownerUserId` are
 never accepted from the client. The adapter obtains `title`, tags, portions,
 and `nutritionPerPortion` from the authenticated user's stored `Recipe`.
+`selectedTags` can only select up to four exact stored tags; the adapter
+filters the stored tag list so its order and labels remain authoritative.
 `recipeMeta.portions` is not a request field; when meta is requested, portions
 come from the stored recipe. The selected image's stored `blobName` is passed
 directly to the backend storage layer. The render path does not fetch a
@@ -274,8 +279,8 @@ The direct Blob download is bounded by the existing 8 MB recipe-image limit.
 **Errors:**
 
 - `400` — missing route id, invalid JSON, unknown request fields, invalid
-	`imageId`/presentation values, or incomplete `recipeMeta`; the response uses
-	the existing `{ error: string }` shape.
+	`imageId`/presentation/selectedTags/nutritionHighlight values, or incomplete
+	`recipeMeta`; the response uses the existing `{ error: string }` shape.
 - `401` — missing or invalid Bearer token.
 - `404` — recipe not found for the authenticated user, or an explicitly
 	requested `imageId` is not part of that recipe.

@@ -163,10 +163,9 @@ not a runtime contract because it ends before the tag zone. The renderer still
 returns exactly `1080 x 1350` PNG. Before cover placement, `loadPhoto()` uses
 Sharp to normalize non-default EXIF orientation in memory and then uses the
 oriented dimensions; the stored Blob is not replaced. The resulting
-`PhotoAsset.renderRotation` is explicit: it is `0` after EXIF normalization,
-so `createPhotoLayer()` never derives a second rotation from the normalized
-dimensions. Unnormalized legacy landscape sources retain their explicit
-renderer rotation, while portrait sources remain upright.
+`createPhotoLayer()` uses those oriented dimensions directly and never applies
+an additional landscape rotation, so normal portrait and landscape sources
+remain upright and EXIF orientation is handled exactly once.
 
 The render path calls `downloadRecipeImage()` with only the server-read
 `RecipeImage.blobName`. Storage downloads the Blob directly with

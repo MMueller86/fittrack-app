@@ -50,7 +50,7 @@ async function decodePhotoPixels(photo: Awaited<ReturnType<typeof loadPhoto>>): 
 describe("Instagram renderer photo placement", () => {
   it("keeps portrait photos upright and covers the hero with the existing geometry", () => {
     const layer = createPhotoLayer(
-      { src: "data:image/png;base64,", width: 800, height: 1200, renderRotation: 0 },
+      { src: "data:image/png;base64,", width: 800, height: 1200 },
       { sourceWidth: 800, sourceHeight: 1200, focusX: 0.5, focusY: 0.5, zoom: 1 },
     );
     const image = imageElement(layer);
@@ -63,25 +63,9 @@ describe("Instagram renderer photo placement", () => {
     expect(style?.top).toBe(-302.5);
   });
 
-  it("keeps the existing rotated landscape treatment and cover geometry", () => {
+  it("does not rotate a normal landscape photo", () => {
     const layer = createPhotoLayer(
-      { src: "data:image/png;base64,", width: 1200, height: 800, renderRotation: 90 },
-      { sourceWidth: 1200, sourceHeight: 800, focusX: 0.5, focusY: 0.5, zoom: 1 },
-    );
-    const image = imageElement(layer);
-    const style = image.props.style;
-
-    expect(style?.transform).toBe("rotate(90deg)");
-    expect(style?.transformOrigin).toBe("center center");
-    expect(style?.width).toBe(1620);
-    expect(style?.height).toBe(1080);
-    expect(style?.left).toBe(-270);
-    expect(style?.top).toBe(12.5);
-  });
-
-  it("does not infer a rotation from landscape dimensions when the asset is upright", () => {
-    const layer = createPhotoLayer(
-      { src: "data:image/png;base64,", width: 1200, height: 800, renderRotation: 0 },
+      { src: "data:image/png;base64,", width: 1200, height: 800 },
       { sourceWidth: 1200, sourceHeight: 800, focusX: 0.5, focusY: 0.5, zoom: 1 },
     );
     const image = imageElement(layer);
@@ -122,7 +106,7 @@ describe("Instagram renderer photo placement", () => {
     },
   );
 
-  it("keeps normal portrait and landscape source orientation explicit", async () => {
+  it("keeps normal portrait and landscape source pixels upright", async () => {
     const portraitPixels = Buffer.from([
       255, 0, 0, 0, 255, 0,
       0, 0, 255, 255, 255, 0,
@@ -138,8 +122,13 @@ describe("Instagram renderer photo placement", () => {
     const portrait = await loadPhoto(sharp, { buffer: portraitSource });
     const landscape = await loadPhoto(sharp, { buffer: landscapeSource });
 
-    expect(portrait.renderRotation).toBe(0);
-    expect(landscape.renderRotation).toBe(90);
+    expect(imageElement(createPhotoLayer(landscape, {
+      sourceWidth: landscape.width,
+      sourceHeight: landscape.height,
+      focusX: 0.5,
+      focusY: 0.5,
+      zoom: 1,
+    })).props.style?.transform).toBeUndefined();
     expect(await decodePhotoPixels(portrait)).toEqual(portraitPixels);
     expect(await decodePhotoPixels(landscape)).toEqual(CANONICAL_PIXELS);
   });

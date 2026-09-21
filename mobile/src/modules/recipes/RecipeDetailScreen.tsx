@@ -2,6 +2,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -26,11 +27,29 @@ import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
 import { Icon } from '../../shared/components/Icon';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { NutritionTile } from '../../shared/components/NutritionTile';
+import {
+  RecipeShareMediaError,
+  recipeShareMediaService,
+  type RecipeShareMediaSession,
+} from '../../services/recipeShareMediaService';
 import { computeRecipeQuickEntryData } from './recipeUtils';
 import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
 import { RecipeImageHeroImage } from './RecipeImageHeroImage';
+import { RecipeImageHeroCropEditor } from './RecipeImageHeroCropEditor';
+import {
+  RecipeInstagramOptionsSheet,
+  type RecipeInstagramOptions,
+  getInitialRecipeInstagramTags,
+} from './RecipeInstagramOptionsSheet';
+import { RecipeInstagramPreview } from './RecipeInstagramPreview';
 import { RECIPE_HERO_ASPECT_RATIO } from './recipeImageSource';
+import {
+  createRecipeShareDraftController,
+  createRecipeShareDraftState,
+  type RecipeShareDraftController,
+  type RecipeShareDraftState,
+} from './recipeShareDraftState';
 import {
   createRecipeScalePreviewController,
   type RecipeScalePreviewController,
@@ -48,6 +67,103 @@ const RECIPE_SCALE_LOADING_MESSAGE =
 
 function clampTargetPortions(value: number): number {
   return Math.min(RECIPE_PORTION_MAX, Math.max(RECIPE_PORTION_MIN, value));
+}
+
+type RecipeShareStage = 'closed' | 'options' | 'preview';
+type RecipeShareNoticeKind = 'render' | 'media' | 'success';
+
+interface RecipeShareNotice {
+  kind: RecipeShareNoticeKind;
+  title: string;
+  body: string;
+  actionLabel?: string;
+  openSettings?: boolean;
+}
+
+function getRecipeShareMediaNotice(error: unknown): RecipeShareNotice {
+  if (!(error instanceof RecipeShareMediaError)) {
+    return {
+      kind: 'media',
+      title: 'Bild konnte nicht gespeichert werden',
+      body: 'Das Bild konnte nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+      actionLabel: 'Erneut versuchen',
+    };
+  }
+
+  switch (error.code) {
+    case 'permission-denied':
+      return {
+        kind: 'media',
+        title: 'Fotozugriff erforderlich',
+        body: error.openSettings
+          ? 'Der Zugriff auf die Fotomediathek ist deaktiviert. Erlaube FitTrack den Fotozugriff in den Geräteeinstellungen und versuche es danach erneut.'
+          : 'Der Zugriff auf die Fotomediathek wurde nicht erteilt. Bitte erlaube den Zugriff und versuche es erneut.',
+        actionLabel: error.retryable ? 'Erneut versuchen' : undefined,
+        openSettings: error.openSettings,
+      };
+    case 'media-library-unavailable':
+      return {
+        kind: 'media',
+        title: 'Fotomediathek nicht verfügbar',
+        body: 'Die Fotomediathek ist auf diesem Gerät nicht verfügbar. Deine Vorschau bleibt erhalten.',
+        actionLabel: 'Erneut versuchen',
+      };
+    case 'album-lookup-failed':
+    case 'album-create-failed':
+    case 'album-asset-failed':
+    case 'asset-create-failed':
+      return {
+        kind: 'media',
+        title: 'Bild konnte nicht gespeichert werden',
+        body: 'Das Bild konnte nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+        actionLabel: 'Erneut versuchen',
+      };
+    case 'sharing-unavailable':
+      return {
+        kind: 'media',
+        title: 'Teilen nicht verfügbar',
+        body: 'Das Bild wurde im Album FitTrack gespeichert. Auf diesem Gerät ist derzeit kein Teilen verfügbar.',
+        actionLabel: 'Erneut versuchen',
+      };
+    case 'share-failed':
+      return {
+        kind: 'media',
+        title: 'Teilen nicht abgeschlossen',
+        body: 'Das Bild wurde im Album FitTrack gespeichert, aber das Teilen wurde abgebrochen oder ist fehlgeschlagen. Es wurde nichts an Instagram übermittelt.',
+        actionLabel: 'Erneut teilen',
+      };
+    case 'cleanup-failed':
+      return {
+        kind: 'media',
+        title: 'Aufräumen nicht abgeschlossen',
+        body: 'Das Bild wurde gespeichert, aber die temporäre Vorschau konnte nicht bereinigt werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+        actionLabel: 'Erneut teilen',
+      };
+    case 'preview-file-write-failed':
+      return {
+        kind: 'render',
+        title: 'Vorschau konnte nicht gespeichert werden',
+        body: 'Die gerenderte Vorschau konnte nicht vorbereitet werden. Bitte versuche es erneut.',
+        actionLabel: 'Erneut versuchen',
+      };
+    default:
+      return {
+        kind: 'media',
+        title: 'Bild konnte nicht gespeichert werden',
+        body: 'Das Bild konnte nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+        actionLabel: 'Erneut versuchen',
+      };
+  }
+}
+
+function describeShareError(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  if (typeof error === 'string') return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
 }
 
 export default function RecipeDetailScreen({ route, navigation }: Props) {
@@ -69,10 +185,27 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     description: null,
     steps: [],
   });
+  const [shareStage, setShareStage] = useState<RecipeShareStage>('closed');
+  const [shareDraft, setShareDraft] = useState<RecipeShareDraftState | null>(null);
+  const [shareCropVisible, setShareCropVisible] = useState(false);
+  const [shareNotice, setShareNotice] = useState<RecipeShareNotice | null>(null);
+  const [shareBusy, setShareBusy] = useState(false);
   const recipeRef = useRef<Recipe | null>(null);
   const logIntentConsumedRef = useRef(false);
   const targetPortionsRef = useRef(RECIPE_PORTION_MIN);
   const recipeIdRef = useRef(id);
+  const shareControllerRef = useRef<RecipeShareDraftController | null>(null);
+  const shareDraftRef = useRef<RecipeShareDraftState | null>(null);
+  const shareSessionRef = useRef<RecipeShareMediaSession | null>(null);
+  const shareAssetSavedRef = useRef(false);
+  const sharePreviewUrisRef = useRef(new Set<string>());
+  const shareFlowActiveRef = useRef(false);
+  const shareBusyRef = useRef(false);
+  const shareInFlightRef = useRef(false);
+  const shareCleanupRequestedRef = useRef(false);
+  const optionsConfirmedRef = useRef(false);
+  const optionsOriginRef = useRef<'new' | 'preview'>('new');
+  const mountedRef = useRef(true);
   recipeIdRef.current = id;
   const setTargetPortionsValue = useCallback((value: number) => {
     targetPortionsRef.current = value;
@@ -92,6 +225,267 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     });
   }
   const scalePreviewController = scalePreviewControllerRef.current;
+
+  const cleanupShareResources = useCallback(async () => {
+    shareCleanupRequestedRef.current = true;
+    const session = shareSessionRef.current;
+    shareSessionRef.current = null;
+
+    if (session) {
+      try {
+        await session.cleanup();
+      } catch (error: unknown) {
+        console.error('[RecipeDetail] Share preview cleanup failed', error);
+      }
+    }
+
+    const previewUris = [...sharePreviewUrisRef.current];
+    sharePreviewUrisRef.current.clear();
+    for (const previewUri of previewUris) {
+      try {
+        await recipeShareMediaService.cleanupPreviewUri(previewUri);
+      } catch (error: unknown) {
+        console.error('[RecipeDetail] Share preview cleanup failed', error);
+      }
+    }
+  }, []);
+
+  const closeShareFlow = useCallback(() => {
+    if (shareBusyRef.current || shareInFlightRef.current) return;
+
+    shareFlowActiveRef.current = false;
+    shareAssetSavedRef.current = false;
+    optionsConfirmedRef.current = false;
+    setShareStage('closed');
+    setShareCropVisible(false);
+    setShareNotice(null);
+    shareControllerRef.current?.dispose();
+    shareControllerRef.current = null;
+    shareDraftRef.current = null;
+    setShareDraft(null);
+    void cleanupShareResources();
+  }, [cleanupShareResources]);
+
+  const handleRetryRender = useCallback(() => {
+    if (shareBusyRef.current) return;
+    setShareNotice(null);
+    setShareStage('preview');
+    shareControllerRef.current?.retryRender();
+  }, []);
+
+  const createShareController = useCallback((currentRecipe: Recipe) => {
+    shareCleanupRequestedRef.current = false;
+    const initialState = createRecipeShareDraftState(currentRecipe, {
+      recipeId: currentRecipe.id,
+      selectedTags: getInitialRecipeInstagramTags(currentRecipe.tags),
+      nutritionHighlight: null,
+    });
+    shareDraftRef.current = initialState;
+    setShareDraft(initialState);
+
+    const controller = createRecipeShareDraftController({
+      initialState,
+      renderApi: { renderInstagramRecipe: recipeApi.renderInstagramRecipe },
+      createPreviewUri: async (png) => {
+        const previewUri = await recipeShareMediaService.createPreviewUri(png);
+        if (shareCleanupRequestedRef.current || !shareFlowActiveRef.current) {
+          try {
+            await recipeShareMediaService.cleanupPreviewUri(previewUri);
+          } catch (error: unknown) {
+            console.error('[RecipeDetail] Stale share preview cleanup failed', error);
+          }
+        } else {
+          sharePreviewUrisRef.current.add(previewUri);
+        }
+        return previewUri;
+      },
+      onStateChange: (nextState) => {
+        if (!mountedRef.current) return;
+        shareDraftRef.current = nextState;
+        setShareDraft(nextState);
+        if (nextState.renderStatus === 'error') {
+          setShareNotice({
+            kind: 'render',
+            title: 'Vorschau konnte nicht erstellt werden',
+            body: nextState.renderStage === 'final'
+              ? 'Der neue Ausschnitt konnte nicht gerendert werden. Deine letzte Vorschau bleibt erhalten.'
+              : 'Die gerenderte Vorschau konnte nicht vorbereitet werden. Bitte versuche es erneut.',
+            actionLabel: 'Erneut versuchen',
+          });
+        }
+      },
+    });
+
+    shareControllerRef.current = controller;
+    return controller;
+  }, []);
+
+  const handleOpenShare = useCallback(() => {
+    const currentRecipe = recipeRef.current;
+    if (!currentRecipe || shareFlowActiveRef.current || shareBusyRef.current) return;
+
+    shareFlowActiveRef.current = true;
+    shareAssetSavedRef.current = false;
+    optionsOriginRef.current = 'new';
+    optionsConfirmedRef.current = false;
+    setShareNotice(null);
+    setShareCropVisible(false);
+    createShareController(currentRecipe);
+    setShareStage('options');
+  }, [createShareController]);
+
+  const handleOptionsConfirm = useCallback((options: RecipeInstagramOptions) => {
+    const controller = shareControllerRef.current;
+    if (
+      !controller
+      || optionsConfirmedRef.current
+      || shareBusyRef.current
+      || shareAssetSavedRef.current
+    ) return;
+
+    optionsConfirmedRef.current = true;
+    shareAssetSavedRef.current = false;
+    shareSessionRef.current = null;
+    setShareNotice(null);
+    controller.setOptions(options);
+    setShareStage('preview');
+    controller.startInitialPreview();
+  }, []);
+
+  const handleOptionsClose = useCallback(() => {
+    if (optionsConfirmedRef.current) {
+      optionsConfirmedRef.current = false;
+      return;
+    }
+    if (optionsOriginRef.current === 'preview') {
+      setShareStage('preview');
+      return;
+    }
+    closeShareFlow();
+  }, [closeShareFlow]);
+
+  const handleChangeShareOptions = useCallback(() => {
+    if (shareBusyRef.current || shareAssetSavedRef.current) return;
+    optionsOriginRef.current = 'preview';
+    optionsConfirmedRef.current = false;
+    setShareNotice(null);
+    setShareStage('options');
+  }, []);
+
+  const handleOpenCrop = useCallback(() => {
+    const currentDraft = shareDraftRef.current;
+    if (
+      shareBusyRef.current
+      || shareAssetSavedRef.current
+      || !currentDraft?.cropImageUri
+      || !currentDraft.previewUri
+    ) return;
+    setShareNotice(null);
+    setShareCropVisible(true);
+  }, []);
+
+  const handleCropConfirmed = useCallback((crop: Parameters<NonNullable<RecipeShareDraftController['confirmCrop']>>[0]) => {
+    if (shareBusyRef.current) return;
+    setShareCropVisible(false);
+    setShareNotice(null);
+    setShareStage('preview');
+    shareControllerRef.current?.confirmCrop(crop);
+  }, []);
+
+  const handleSaveAndShare = useCallback(async () => {
+    const currentDraft = shareDraftRef.current;
+    const controller = shareControllerRef.current;
+    if (
+      !currentDraft?.previewUri ||
+      currentDraft.renderStatus !== 'ready' ||
+      !controller ||
+      shareBusyRef.current ||
+      shareInFlightRef.current
+    ) return;
+
+    const previewUri = currentDraft.previewUri;
+    const existingSession = shareSessionRef.current?.previewUri === previewUri
+      ? shareSessionRef.current
+      : null;
+    const session = existingSession ?? recipeShareMediaService.createSession(previewUri);
+    if (!existingSession) shareAssetSavedRef.current = false;
+    shareSessionRef.current = session;
+    shareBusyRef.current = true;
+    shareInFlightRef.current = true;
+    setShareBusy(true);
+    setShareNotice(null);
+    controller.setAssetStatus('loading');
+    controller.setShareStatus('loading');
+
+    try {
+      await session.save();
+      shareAssetSavedRef.current = true;
+      controller.setAssetStatus('ready');
+      await session.share();
+      if (!mountedRef.current) return;
+      controller.setAssetStatus('ready');
+      controller.setShareStatus('ready');
+      setShareStage('closed');
+      setShareNotice({
+        kind: 'success',
+        title: 'Bild gespeichert',
+        body: 'Bild wurde im Album FitTrack gespeichert.',
+      });
+    } catch (error: unknown) {
+      if (!mountedRef.current) return;
+      console.error('[RecipeDetail] Recipe share failed', {
+        code: error instanceof RecipeShareMediaError ? error.code : 'unknown',
+        message: describeShareError(error),
+        cause: error instanceof RecipeShareMediaError ? describeShareError(error.cause) : undefined,
+        rollback: error instanceof RecipeShareMediaError ? error.rollback : undefined,
+      });
+      const notice = getRecipeShareMediaNotice(error);
+      const assetWasSaved = error instanceof RecipeShareMediaError
+        && ['sharing-unavailable', 'share-failed', 'cleanup-failed'].includes(error.code);
+      shareAssetSavedRef.current = assetWasSaved;
+      controller.setAssetStatus(assetWasSaved ? 'ready' : 'error');
+      controller.setShareStatus('error');
+      setShareNotice(notice);
+    } finally {
+      shareInFlightRef.current = false;
+      shareBusyRef.current = false;
+      if (!mountedRef.current) {
+        await cleanupShareResources();
+        return;
+      }
+      setShareBusy(false);
+    }
+  }, [cleanupShareResources]);
+
+  const handleOpenSettings = useCallback(() => {
+    void Linking.openSettings().catch(() => undefined);
+  }, []);
+
+  const handleShareNoticeAction = useCallback(() => {
+    const notice = shareNotice;
+    setShareNotice(null);
+    if (!notice) return;
+    if (notice.kind === 'render') {
+      handleRetryRender();
+      return;
+    }
+    void handleSaveAndShare();
+  }, [handleRetryRender, handleSaveAndShare, shareNotice]);
+
+  const handleShareNoticeClose = useCallback(() => {
+    if (shareNotice?.kind === 'success') {
+      closeShareFlow();
+      return;
+    }
+    setShareNotice(null);
+  }, [closeShareFlow, shareNotice?.kind]);
+
+  useEffect(() => () => {
+    mountedRef.current = false;
+    shareFlowActiveRef.current = false;
+    shareControllerRef.current?.dispose();
+    if (!shareInFlightRef.current) void cleanupShareResources();
+  }, [cleanupShareResources]);
 
   const load = useCallback(async () => {
     const currentRecipe = recipeRef.current;
@@ -290,6 +684,12 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     (image): image is typeof image & { url: string } => typeof image.url === 'string' && image.url.length > 0,
   );
   const currentImage = imageEntries[imgIndex] ?? imageEntries[0];
+  const shareCrop = shareDraft
+    ? shareDraft.presentation
+      ? { ...shareDraft.primaryImageCrop, ...shareDraft.presentation }
+      : shareDraft.primaryImageCrop
+    : null;
+  const shareInteractionDisabled = shareFlowActiveRef.current || shareStage !== 'closed' || shareNotice != null;
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -493,6 +893,18 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           <Text style={styles.stickyActionText}>Bearbeiten</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.stickyAction, shareInteractionDisabled && styles.stickyActionDisabled]}
+          onPress={handleOpenShare}
+          disabled={shareInteractionDisabled}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Rezept teilen"
+          accessibilityState={{ disabled: shareInteractionDisabled }}
+        >
+          <Icon lib="ion" name="share-outline" size="md" color={colors.primaryBright} />
+          <Text style={styles.stickyShareText}>Teilen</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.stickyAction}
           onPress={() => setDeleteConfirmVisible(true)}
           disabled={deleting}
@@ -522,6 +934,40 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         onClose={() => setDeleteConfirmVisible(false)}
       />
 
+      <RecipeInstagramOptionsSheet
+        visible={shareStage === 'options'}
+        tags={recipe.tags}
+        initialSelectedTags={shareDraft?.selectedTags}
+        initialNutritionHighlight={shareDraft?.nutritionHighlight ?? null}
+        onClose={handleOptionsClose}
+        onConfirm={handleOptionsConfirm}
+      />
+
+      <RecipeInstagramPreview
+        visible={shareStage === 'preview'}
+        previewUri={shareDraft?.previewUri ?? null}
+        renderStatus={shareDraft?.renderStatus ?? 'idle'}
+        renderStage={shareDraft?.renderStage ?? null}
+        assetStatus={shareDraft?.assetStatus ?? 'idle'}
+        shareStatus={shareDraft?.shareStatus ?? 'idle'}
+        canAdjustCrop={Boolean(shareDraft?.cropImageUri) && !shareAssetSavedRef.current}
+        canChangeOptions={!shareAssetSavedRef.current}
+        busy={shareBusy}
+        onClose={closeShareFlow}
+        onAdjustCrop={handleOpenCrop}
+        onChangeOptions={handleChangeShareOptions}
+        onRetryRender={handleRetryRender}
+        onSaveAndShare={() => void handleSaveAndShare()}
+      />
+
+      <RecipeImageHeroCropEditor
+        visible={shareCropVisible}
+        imageUri={shareDraft?.cropImageUri ?? null}
+        initialCrop={shareCrop}
+        onCancel={() => setShareCropVisible(false)}
+        onConfirm={handleCropConfirmed}
+      />
+
       <InfoOverlay
         visible={scaleInfoVisible}
         title="Für wie viele kochst du?"
@@ -534,6 +980,28 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         title={errorNotice?.title ?? 'Fehler'}
         body={errorNotice?.body ?? ''}
         onClose={() => setErrorNotice(null)}
+      />
+
+      <InfoOverlay
+        visible={shareNotice != null}
+        title={shareNotice?.title ?? 'Fehler'}
+        body={shareNotice?.body ?? ''}
+        onClose={handleShareNoticeClose}
+        secondaryAction={
+          shareNotice?.openSettings
+            ? {
+                label: 'Geräteeinstellungen öffnen',
+                onPress: handleOpenSettings,
+                accessibilityLabel: 'Geräteeinstellungen öffnen',
+              }
+            : shareNotice?.actionLabel
+              ? {
+                  label: shareNotice.actionLabel,
+                  onPress: handleShareNoticeAction,
+                  accessibilityLabel: shareNotice.actionLabel,
+                }
+              : undefined
+        }
       />
     </SafeAreaView>
   );
@@ -803,7 +1271,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.xs,
   },
+  stickyActionDisabled: {
+    opacity: 0.5,
+  },
   stickyActionText: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
+  stickyShareText: { ...typography.caption, color: colors.primaryBright, fontWeight: '600' },
   stickyDeleteText: { ...typography.caption, color: colors.negative, fontWeight: '600' },
   primaryButton: {
     backgroundColor: colors.primary,

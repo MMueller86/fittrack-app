@@ -21,17 +21,23 @@ afterEach(() => {
 });
 
 describe('downloadRecipeImage', () => {
-  it('downloads only the server-selected blob and bounds the SDK read', async () => {
+  it('downloads a small blob without requesting a range beyond its size', async () => {
+    const downloadToBuffer = vi.fn().mockImplementation(async (offset: number, count: number) => {
+      if (offset + count > 4) {
+        throw new Error('The range specified is invalid for the current size of the resource.');
+      }
+      return Buffer.from('image');
+    });
     const blockBlobClient = {
       getProperties: vi.fn().mockResolvedValue({ contentLength: 4 }),
-      downloadToBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
+      downloadToBuffer,
     } as unknown as BlockBlobClient;
     __setStorageClientForTests(makeClient(blockBlobClient));
 
     const result = await downloadRecipeImage('user/recipe/image.png');
 
     expect(result).toEqual(Buffer.from('image'));
-    expect(blockBlobClient.downloadToBuffer).toHaveBeenCalledWith(0, RECIPE_IMAGE_MAX_BYTES + 1);
+    expect(downloadToBuffer).toHaveBeenCalledWith(0, 4);
   });
 
   it('rejects a blob whose advertised size exceeds the render limit before downloading', async () => {

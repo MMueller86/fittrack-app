@@ -10,8 +10,9 @@
 Die historische V1.7-Datei bleibt unveraendert. Der vorhandene Vergleich nutzt
 weiterhin `pixelmatch` mit `threshold=0.10` und einem maximalen
 Differenzverhaeltnis von `0.03`. Der aktuelle Renderer liegt gegen diese alte
-Komposition bei ungefaehr `0.0549972565` (rund `5.50 %`) und damit erwartbar
-ueber dem historischen Gate. Dieser Lauf ist eine Diagnose der historischen
+Komposition bei `0.5602764060356653` (rund `56.03 %`) und damit erwartbar
+ueber dem historischen Gate, weil die historische Datei noch die fruehere
+Landschaftsrotation enthaelt. Dieser Lauf ist eine Diagnose der historischen
 Abweichung, kein aktuelles Release-Gate. Weder die Datei noch der Threshold
 oder das Ratio-Gate duerfen ersetzt, angehoben oder durch ein groesseres
 Toleranzfenster verborgen werden.

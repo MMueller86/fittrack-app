@@ -163,6 +163,111 @@ Pattern:
 
 [Rule] Review screens must never be skipped, even if confidence is high.
 
+## Rezept teilen: lokaler Share-Flow und Fotomediathek
+
+Der lokale Rezept-Share-Flow ist implementiert und bleibt als flüchtiger
+Share-Draft in der Rezeptdetailansicht. Ein Tap auf `Teilen` öffnet zuerst das
+Options-Sheet. Vor `Speichern & teilen` wird weder ein Foto gespeichert noch
+das native Share-Sheet geöffnet; weitere Teilen-Taps sind während des Flows
+gesperrt. Rezept, Bilder, gespeicherte Crop-Metadaten und Nutrition bleiben
+unverändert.
+
+### Optionen aus der Rezeptdetailansicht
+
+Das Options-Sheet ist ein lokales Bottom-Sheet mit `Vorschau anzeigen` und
+`Abbrechen`:
+
+- Die Tag-Auswahl verwendet ausschließlich bereits gespeicherte Rezept-Tags
+    in ihrer gespeicherten Reihenfolge. Es gibt keine freie Tag-Eingabe und
+    höchstens vier Tags können aktiv sein. Bei mehr als vier gespeicherten Tags
+    sind zunächst die ersten vier ausgewählt; weitere Tags bleiben sichtbar und
+    sind solange deaktiviert, bis ein aktiver Tag abgewählt wird. Der Zähler
+    zeigt die aktive Auswahl im Verhältnis `n von 4`.
+- Hat das Rezept keine Tags, zeigt das Sheet
+    `Für dieses Rezept sind keine Tags hinterlegt.` und übergibt die gültige
+    leere Auswahl `selectedTags: []`.
+- `High-Protein-Symbol anzeigen` ist ein expliziter Toggle, standardmäßig
+    ausgeschaltet und mit `Kein Highlight` beschriftet. Aktiviert wird nur die
+    sichtbare Presentation-Option `nutritionHighlight: 'high-protein'`,
+    deaktiviert `nutritionHighlight: null`. Daraus wird keine automatische
+    High-Protein-Klassifikation und keine Nutrition-Regel abgeleitet.
+
+Die Auswahl bleibt bis zur Vorschau beziehungsweise zum abschließenden Render
+im Share-Draft. Wird das Sheet beim Start mit `Abbrechen`, über den Backdrop
+oder über den System-Back geschlossen, wird der Entwurf verworfen und das
+Rezept bleibt unverändert. Wird es über `Optionen ändern` aus einer bestehenden
+Vorschau geöffnet, führt `Abbrechen` zurück zu dieser Vorschau.
+
+### Server-Preview und Hero-Crop
+
+`Vorschau anzeigen` startet den initialen serverseitigen Render. Die Antwort
+ist eine PNG mit exakt `1080 x 1350` Pixeln, wird temporär abgelegt und vor
+jeglichem Speichern oder Teilen in einer dunklen, app-eigenen Preview mit
+stabilem Seitenverhältnis angezeigt. Der Server bestimmt dabei das primäre
+Rezeptbild sowie den gespeicherten beziehungsweise effektiven Hero-Crop. Der
+initiale Request enthält keinen `presentation`-Override; erst der finale
+Render sendet die vollständig bestätigte `presentation`. Die Preview ist erst
+bei fertigem Render für `Speichern & teilen` freigegeben.
+
+`Ausschnitt anpassen` öffnet den bestehenden
+`RecipeImageHeroCropEditor` mit dem `1080 x 1015`-Hero-Frame. Pan und Pinch
+bleiben lokal im Editor; während der Gesten gibt es keinen Live-Render. Ein
+Tap auf `Übernehmen` erzeugt genau einen abschließenden Server-Render mit der
+vollständig normalisierten `presentation` sowie derselben Tag- und Highlight-
+Auswahl. Das Ergebnis ersetzt die bisherige Preview und bleibt als Gesamtbild
+`1080 x 1350`; der Hero-Frame ist nur der Foto-/Hero-Bereich. Auch ein
+unverändert bestätigter Crop löst diesen einmaligen finalen Render aus.
+
+Der bestätigte Crop ist nur ein transienter Share-Draft-Override. Er wird
+nicht über `updateImageHeroCrop` gespeichert. `Abbrechen` oder das Schließen
+des Crop-Editors verwirft nur die lokale Änderung und führt zur letzten
+Preview zurück. Das Schließen der Preview verwirft die temporäre Preview und
+den Share-Draft, kehrt zur Rezeptdetailansicht zurück und verändert das Rezept
+nicht.
+
+### Speichern, Teilen und Fehlerzustände
+
+Render-, Berechtigungs- und Medienfehler bleiben im aktiven Share-Draft
+wiederherstellbar. Die UI verwendet dafür den deutschen, app-eigenen
+`InfoOverlay` mit `Schließen` als primärer Dismiss-Aktion und einer getrennten
+sekundären Aktion wie `Erneut versuchen`, `Erneut teilen` oder
+`Geräteeinstellungen öffnen`. Die implementierten Hinweise verwenden dabei
+zum Beispiel die Titel `Vorschau konnte nicht erstellt werden`,
+`Fotozugriff erforderlich`, `Bild konnte nicht gespeichert werden` und
+`Teilen nicht abgeschlossen`; technische Fehler werden nicht als
+Standard-Alert angezeigt.
+
+- Ein fehlgeschlagener initialer Render bietet `Erneut versuchen` mit derselben
+    Tag-/Highlight-Auswahl. Schlägt der abschließende Render fehl, bleibt die
+    letzte gültige Preview sichtbar und kann ebenfalls erneut gerendert werden.
+- Beim Speichern wird die erforderliche Lese-/Schreibberechtigung der
+    Fotomediathek geprüft, weil das vorhandene Album `FitTrack` zuerst gelesen
+    und das Bild anschließend gespeichert wird. `canAskAgain: true` bleibt über
+    `Erneut versuchen` retrybar; `canAskAgain: false` verweist über
+    `Geräteeinstellungen öffnen` auf die Geräteeinstellungen. Die Preview und
+    die Auswahl bleiben erhalten.
+- Erst nach `Speichern & teilen` wird das lokale Asset angelegt. Das Ziel ist
+    bei jeder Speicherung das exakte Album `FitTrack`; ein fehlendes Album wird
+    beim ersten erfolgreichen Vorgang angelegt und danach wiederverwendet.
+    Fehler bei Asset-Erstellung, Albumzugriff oder Album-Zuordnung öffnen kein
+    Share-Sheet. Neu angelegte Assets und ein dabei angelegtes leeres Album
+    werden best effort zurückgerollt; vorhandene Albuminhalte bleiben unberührt.
+    Die Preview bleibt für einen neuen Versuch erhalten.
+- Nach erfolgreichem Albumzugriff öffnet sich das native Share-Sheet mit exakt
+    derselben temporären PNG-URI. Bei nicht verfügbarem Sharing oder einem
+    Abbruch beziehungsweise Fehler des Share-Aufrufs bleibt das Foto in
+    `FitTrack` gespeichert und es wird kein Instagram-Erfolg behauptet. Die
+    URI bleibt für `Erneut teilen` erhalten; der Retry verwendet das bereits
+    gespeicherte Asset und legt kein zweites an. Bereinigt wird die temporäre
+    URI erst nach der Auflösung des Share-Promises oder wenn der Share-Flow
+    ausdrücklich geschlossen wird.
+
+`FitTrack` bezeichnet dabei ein lokales Gerätealbum der nativen
+Fotomediathek, nicht einen direkten Google-Photos-Upload. Ein aktiviertes
+Google-Photos-Backup kann das lokale Foto anschließend selbst synchronisieren,
+wird von FitTrack aber weder abgefragt noch als Erfolg garantiert. Preview,
+Crop-Editor und Fehler-Overlays folgen der bestehenden Dark-only-Oberfläche.
+
 ---
 
 ## Optimistic Updates

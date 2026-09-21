@@ -106,7 +106,8 @@ export async function downloadRecipeImage(blobName: string): Promise<Buffer> {
     throw new RecipeImageTooLargeError();
   }
 
-  const buffer = await blockBlobClient.downloadToBuffer(0, RECIPE_IMAGE_MAX_BYTES + 1);
+  const downloadCount = properties.contentLength ?? RECIPE_IMAGE_MAX_BYTES + 1;
+  const buffer = await blockBlobClient.downloadToBuffer(0, downloadCount);
   if (buffer.byteLength > RECIPE_IMAGE_MAX_BYTES) {
     throw new RecipeImageTooLargeError();
   }

@@ -59,11 +59,16 @@ describe('adaptRecipeToRenderInput', () => {
   it('takes portions from the recipe and preserves request-level metadata', () => {
     const input = adaptRecipeToRenderInput(recipe, Buffer.from('image'), {
       presentation: { focusY: 0.2 },
+      selectedTags: ['Salat', 'Schnell'],
       nutritionHighlight: 'high-protein',
       recipeMeta: { totalTimeMinutes: 25, difficulty: 'Einfach' },
     });
 
     expect(input.presentation).toEqual({ focusX: 0.5, focusY: 0.2, zoom: 1 });
+    expect(input.tags).toEqual([
+      { id: 'Schnell', label: 'Schnell' },
+      { id: 'Salat', label: 'Salat' },
+    ]);
     expect(input.nutritionHighlight).toBe('high-protein');
     expect(input.recipeMeta).toEqual({
       totalTimeMinutes: 25,

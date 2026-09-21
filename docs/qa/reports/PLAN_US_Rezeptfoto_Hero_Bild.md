@@ -44,7 +44,7 @@ device/deployment checks.
 | AC-10 | UNVERIFIED | [cosmosRecipesRepository.ts](../../backend/src/lib/repositories/cosmosRecipesRepository.ts) and the repository unit path materialize the deterministic legacy default, and [recipes.test.ts](../../backend/src/functions/recipes.test.ts) covers a legacy image in the in-memory repository. The Cosmos contract suite could not initialize because the local emulator was not reachable; no live Cosmos legacy read is claimed. |
 | AC-11 | PASS | Delete and reorder preserve the remaining image objects, including `heroCrop`, while filtering the deleted object; [recipes.test.ts](../../backend/src/functions/recipes.test.ts) covers both metadata-preservation paths. |
 | AC-12 | PASS | [recipeAdapter.ts](../../backend/src/lib/instagramRenderer/recipeAdapter.ts) starts with the stored/default crop and merges `focusX`, `focusY`, and `zoom` independently. Its focused tests pass and the render request does not write persistence. |
-| AC-13 | PASS | [render.ts](../../backend/src/lib/instagramRenderer/render.ts) normalizes non-default EXIF orientation in memory, re-reads oriented dimensions, and sets `renderRotation: 0` after normalization. [photo.ts](../../backend/src/lib/instagramRenderer/photo.ts) consumes the explicit `renderRotation` value in `createPhotoLayer()` and does not infer a second turn from normalized dimensions. [photo.test.ts](../../backend/src/lib/instagramRenderer/__tests__/photo.test.ts) uses deterministic pixel fixtures for EXIF 0/1/90/180/270, asserts exact canonical pixel buffers and normalized metadata, and separately verifies normal portrait and landscape source pixels plus explicit layer geometry. The focused renderer check passes 13/13 tests. The historical blocking finding is verified closed below. |
+| AC-13 | PASS | [render.ts](../../backend/src/lib/instagramRenderer/render.ts) normalizes non-default EXIF orientation in memory and re-reads oriented dimensions. [photo.ts](../../backend/src/lib/instagramRenderer/photo.ts) uses the oriented dimensions directly for cover placement and applies no additional landscape rotation. [photo.test.ts](../../backend/src/lib/instagramRenderer/__tests__/photo.test.ts) uses deterministic pixel fixtures for EXIF 0/1/90/180/270, asserts exact canonical pixel buffers and normalized metadata, and separately verifies normal portrait and landscape source pixels plus upright layer geometry. The focused renderer check passes 12/12 tests. The historical blocking finding is verified closed below. |
 | AC-14 | PASS | [layout.ts](../../backend/src/lib/instagramRenderer/layout.ts) defines `HERO_HEIGHT = 1015`, `CANVAS_WIDTH = 1080`, and `CANVAS_HEIGHT = 1350`; the renderer smoke/output tests assert PNG output at `1080 x 1350`. The old `1080 x 880` value is not used as the runtime frame. |
 | AC-15 | PASS | [RecipeImageHeroImage.tsx](../../mobile/src/modules/recipes/RecipeImageHeroImage.tsx) is used by [RecipeDetailScreen.tsx](../../mobile/src/modules/recipes/RecipeDetailScreen.tsx), [RecipeListScreen.tsx](../../mobile/src/modules/recipes/RecipeListScreen.tsx), and the wizard preview, each passing the effective `heroCrop`. |
 | AC-16 | PASS | [storage.ts](../../backend/src/lib/storage.ts) bounds downloads to 8 MB and [recipes.ts](../../backend/src/functions/recipes.ts) rejects an oversized upload before `uploadRecipeImage`; [instagramRecipe.ts](../../backend/src/functions/instagramRecipe.ts) returns controlled `422 IMAGE_TOO_LARGE`. Focused Backend tests cover the limit/error path. |
@@ -61,7 +61,7 @@ device/deployment checks.
 | `cd backend && npx vitest run src/functions/recipeImageHeroCrop.test.ts src/functions/recipes.test.ts src/functions/instagramRecipe.test.ts src/lib/instagramRenderer/recipeAdapter.test.ts src/lib/instagramRenderer/__tests__/photo.test.ts` | 0 | 5 files, 80 tests passed. |
 | `cd mobile && npx vitest run src/modules/recipes/recipeImageHeroCropMath.test.ts src/modules/recipes/recipeImageSource.test.ts src/modules/recipes/recipeWizardEditBootstrap.test.ts src/modules/recipes/recipeWizardImageMutations.test.ts src/shared/api/recipeApi.test.ts` | 0 | 5 files, 25 tests passed. |
 | `cd shared && npx vitest run` | 0 | 9 files, 444 tests passed. |
-| `cd backend && npx vitest run` | 1 | 58 files ran; 1058 of 1059 tests passed. The only failure is the known V1.7 golden-master ratio `0.05462757201646091` versus the approved maximum `0.03`. |
+| `cd backend && npx vitest run` | 1 | 58 files ran; 1058 of 1059 tests passed. The only failure is the known V1.7 golden-master ratio `0.5602764060356653` versus the approved maximum `0.03`; the historical fixture still contains the former landscape rotation. |
 | `cd mobile && npx vitest run` | 1 | 40 files passed and 403 tests passed; the unrelated `MockHealthPlatformService.test.ts` suite failed during file read with `UNKNOWN: unknown error, read` and ran no tests. |
 | `cd backend && npx tsc --noEmit` | 0 | Backend typecheck passed. |
 | `cd shared && npx tsc --noEmit` | 0 | Shared typecheck passed. |
@@ -115,8 +115,8 @@ Acceptance criterion: AC-13
 
 Description: The previous blocker concerned a second orientation turn after
 EXIF normalization and tests that only confirmed the suspect transform
-string. The corrected implementation now carries explicit `renderRotation`
-semantics, sets normalized EXIF assets to rotation `0`, and adds deterministic
+string. The corrected implementation normalizes EXIF orientation once, uses
+the oriented dimensions directly for cover placement, and adds deterministic
 pixel/fixture regression evidence for EXIF 0/1/90/180/270 plus normal portrait
 and landscape sources.
 

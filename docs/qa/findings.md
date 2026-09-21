@@ -52,6 +52,9 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-031 | Instagram renderer footer documentation, AC-14 | Non-blocking | Documentation | Accepted |
 | FT-QA-2026-032 | Instagram renderer footer SVG provenance, AC-10 | Suggestion | Backend | Accepted |
 | FT-QA-2026-033 | Rezeptfoto Hero-Crop EXIF-Orientierung, AC-13 | Blocking | Backend | Closed |
+| FT-QA-2026-034 | US-09 Rezept teilen, finaler Render-UI-Lock, AC-9 | Blocking | Frontend | Closed |
+| FT-QA-2026-035 | US-09 Rezept teilen, Options-Sheet-Copy, AC-21 | Non-blocking | Frontend | Closed |
+| FT-QA-2026-036 | US-09 Rezept teilen, UX-KB-Dokumentation, AC-23 | Non-blocking | Documentation | Closed |
 
 ## Actionable Findings
 
@@ -483,7 +486,46 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Recommendation:** Replace the post-normalization width heuristic with one explicit orientation contract and add deterministic visual/pixel regression fixtures for EXIF 0/1/90/180/270 plus normal portrait/landscape inputs. Re-run the focused renderer suite and the full backend suite.
 - **Status:** Closed
 - **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
-- **History:** 2026-09-17 - Imported from `docs/qa/reports/PLAN_US_Rezeptfoto_Hero_Bild.md` and routed to Backend for the first B-HR-3 correction attempt. 2026-09-17 - Backend replaced the post-normalization width heuristic with explicit `renderRotation` semantics and added pixel-based EXIF regression coverage. 2026-09-17 - Targeted QA re-review verified AC-13 and closed the finding.
+- **History:** 2026-09-17 - Imported from `docs/qa/reports/PLAN_US_Rezeptfoto_Hero_Bild.md` and routed to Backend for the first B-HR-3 correction attempt. 2026-09-17 - An intermediate correction replaced the post-normalization width heuristic with explicit `renderRotation` semantics and added pixel-based EXIF regression coverage. 2026-09-17 - Targeted QA re-review verified AC-13 and closed the finding. 2026-09-18 - Follow-up regression testing showed that ordinary landscape inputs were still rotated in the share preview; the final correction removed the redundant post-normalization landscape rotation and retained the EXIF pixel coverage.
+
+### FT-QA-2026-034
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-09_Rezept_teilen_und_Instagram-Bild_speichern.md`
+- **Acceptance criterion:** AC-9
+- **Description:** During a final re-render, the last preview remains visible, but `Ausschnitt anpassen` and `Optionen ändern` remain enabled. Changing options calls `setOptions()` and invalidates or aborts the running final render, so the confirmed one-time render is not protected from concurrent UI actions.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** `mobile/src/modules/recipes/RecipeInstagramPreview.tsx` computes the rendering state but does not use it in both action disabled conditions; `mobile/src/modules/recipes/RecipeDetailScreen.tsx` passes option/crop permissions independently of render status. QA reproduced this while `renderStatus` was `loading` with an existing preview URI.
+- **Recommendation:** Disable the options and crop actions while `renderStatus === 'loading'`, and add a regression test covering an existing `previewUri` with a loading render status.
+- **Status:** Closed
+- **Decision:** Correction requested automatically after QA `FAIL` on 2026-09-18.
+- **History:** 2026-09-18 - Imported from QA report `docs/qa/reports/PLAN_US-09_Rezept_teilen_und_Instagram-Bild_speichern.md`; correction routed to Frontend. 2026-09-18 - Frontend disabled crop/options actions during the final render and added regression coverage; focused Mobile tests and typecheck passed. Targeted QA verification confirmed AC-9 and closed the finding.
+
+### FT-QA-2026-035
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-09_Rezept_teilen_und_Instagram-Bild_speichern.md`
+- **Acceptance criterion:** AC-21
+- **Description:** The implemented Options Sheet copy differs from the normative approved wording for the tag question and the empty-tag state.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** `mobile/src/modules/recipes/RecipeInstagramOptionsSheet.tsx` uses `Wähle bis zu vier Tags für dein Bild.` and `Dieses Rezept hat keine Tags. Es werden keine Tags angezeigt.` instead of the approved strings `Welche Tags sollen auf dem Bild erscheinen?` and `Für dieses Rezept sind keine Tags hinterlegt.`
+- **Recommendation:** Pending user decision: adopt the normative German strings, accept the copy deviation, or defer it.
+- **Status:** Closed
+- **Decision:** User requested correction for both remaining US-09 findings on 2026-09-18.
+- **History:** 2026-09-18 - Imported from QA report `docs/qa/reports/PLAN_US-09_Rezept_teilen_und_Instagram-Bild_speichern.md`. 2026-09-18 - User requested correction; routed to Frontend. 2026-09-18 - Frontend updated both normative Options-Sheet strings and focused assertions; focused tests and typecheck passed. 2026-09-18 - Final QA verified AC-21 and closed the finding.
+
+### FT-QA-2026-036
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-09_Rezept_teilen_und_Instagram-Bild_speichern.md`
+- **Acceptance criterion:** AC-23
+- **Description:** The UX Knowledge Base does not document the implemented Options Sheet, preview, crop, Back/Cancel, and retry states of the complete local share flow. It currently documents the local photo library, album, rollback, URI, and share retry behavior only.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** `docs/kb/product/05-ux-patterns.md` contains the local photo library section but not the required complete options/preview/crop/back/cancel/retry flow; `docs/kb/tech/03-mobile.md` does not replace the explicitly required UX-pattern documentation.
+- **Recommendation:** Pending user decision: add the implemented flow and German error semantics to the UX Knowledge Base, accept the documentation gap, or defer it.
+- **Status:** Closed
+- **Decision:** User requested correction for both remaining US-09 findings on 2026-09-18.
+- **History:** 2026-09-18 - Imported from QA report `docs/qa/reports/PLAN_US-09_Rezept_teilen_und_Instagram-Bild_speichern.md`. 2026-09-18 - User requested correction; UX documentation routed to Frontend as the owning UX surface. 2026-09-18 - Frontend documented the complete implemented local recipe-share UX flow in the UX Knowledge Base; diff and encoding checks passed. 2026-09-18 - Final QA verified AC-23 and closed the finding.
 
 ## Verification Notes (Not Findings)
 

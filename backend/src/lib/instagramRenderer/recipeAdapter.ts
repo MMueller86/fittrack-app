@@ -7,6 +7,7 @@ import type { RenderInput } from './types';
 export type RecipeRenderOptions = {
   storedHeroCrop?: RecipeImageHeroCrop;
   presentation?: Partial<RenderInput['presentation']>;
+  selectedTags?: string[];
   nutritionHighlight?: RenderInput['nutritionHighlight'];
   recipeMeta?: {
     totalTimeMinutes: number;
@@ -25,6 +26,11 @@ export function adaptRecipeToRenderInput(
 ): RenderInput {
   const presentation = options.presentation;
   const storedHeroCrop = options.storedHeroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP;
+  const selectedTagSet = options.selectedTags === undefined ? undefined : new Set(options.selectedTags);
+  const tags =
+    selectedTagSet === undefined
+      ? recipe.tags
+      : recipe.tags.filter((tag) => selectedTagSet.has(tag));
 
   return {
     image: { buffer: image },
@@ -34,7 +40,7 @@ export function adaptRecipeToRenderInput(
       zoom: presentation?.zoom ?? storedHeroCrop.zoom,
     },
     title: recipe.name,
-    tags: recipe.tags.map((tag) => ({ id: tag, label: tag })),
+    tags: tags.map((tag) => ({ id: tag, label: tag })),
     nutritionHighlight: options.nutritionHighlight ?? null,
     nutrition: {
       calories: recipe.nutritionPerPortion.calories,

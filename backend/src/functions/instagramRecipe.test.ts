@@ -62,6 +62,7 @@ async function createRecipe(
     order: number;
     heroCrop?: RecipeImageHeroCrop;
   }> = [],
+  tags = ['Schnell', 'Salat'],
 ) {
   const repo = getRecipesRepository();
   const recipe = await repo.create(TEST_USER_ID, {
@@ -69,7 +70,7 @@ async function createRecipe(
     portions: 4,
     ingredients: [],
     steps: [],
-    tags: ['Schnell', 'Salat'],
+    tags,
     nutritionTotal: { calories: 800, protein: 100, carbs: 80, fat: 20, fiber: 10 },
     nutritionPerPortion: { calories: 200, protein: 25, carbs: 20, fat: 5, fiber: 2 },
   });
@@ -124,12 +125,16 @@ describe('POST /api/recipes/:id/instagram-render', () => {
   });
 
   it('defaults only omitted presentation fields and uses request meta with stored portions', async () => {
-    const recipe = await createRecipe([{ id: 'image-1', blobName: 'server/blob.png', order: 1 }]);
+    const recipe = await createRecipe(
+      [{ id: 'image-1', blobName: 'server/blob.png', order: 1 }],
+      ['Schnell', 'Salat', 'Vegan', 'Abendessen'],
+    );
 
     const response = await instagramRecipeHandler(
       await renderRequest(recipe.id, {
         presentation: { focusY: 0.25 },
-        nutritionHighlight: 'low-fat',
+        selectedTags: ['Abendessen', 'Salat', 'Vegan', 'Schnell'],
+        nutritionHighlight: 'high-protein',
         recipeMeta: { totalTimeMinutes: 25, difficulty: ' Einfach ' },
       }),
       ctx,
@@ -138,8 +143,32 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     expect(response.status).toBe(200);
     const input = renderInstagramRecipeMock.mock.calls[0][0] as Record<string, any>;
     expect(input.presentation).toEqual({ focusX: 0.5, focusY: 0.25, zoom: 1 });
-    expect(input.nutritionHighlight).toBe('low-fat');
+    expect(input.tags).toEqual([
+      { id: 'Schnell', label: 'Schnell' },
+      { id: 'Salat', label: 'Salat' },
+      { id: 'Vegan', label: 'Vegan' },
+      { id: 'Abendessen', label: 'Abendessen' },
+    ]);
+    expect(input.nutritionHighlight).toBe('high-protein');
     expect(input.recipeMeta).toEqual({ totalTimeMinutes: 25, difficulty: 'Einfach', portions: 4 });
+  });
+
+  it('allows an empty selected tag list and keeps the primary image selection', async () => {
+    const recipe = await createRecipe([
+      { id: 'later', blobName: 'server/later.png', order: 2 },
+      { id: 'first', blobName: 'server/first.png', order: 1 },
+    ]);
+
+    const response = await instagramRecipeHandler(
+      await renderRequest(recipe.id, { selectedTags: [], nutritionHighlight: null }),
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(downloadRecipeImageMock).toHaveBeenCalledWith('server/first.png');
+    const input = renderInstagramRecipeMock.mock.calls[0][0] as Record<string, any>;
+    expect(input.tags).toEqual([]);
+    expect(input.nutritionHighlight).toBeNull();
   });
 
   it('uses the selected image crop and merges partial presentation overrides', async () => {
@@ -182,6 +211,49 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       ctx,
     );
     expect(partialMeta.status).toBe(400);
+
+    const unknownTag = await instagramRecipeHandler(
+      await renderRequest(recipe.id, { selectedTags: ['Nicht gespeichert'] }),
+      ctx,
+    );
+    expect(unknownTag.status).toBe(400);
+
+    const duplicateTag = await instagramRecipeHandler(
+      await renderRequest(recipe.id, { selectedTags: ['Schnell', 'Schnell'] }),
+      ctx,
+    );
+    expect(duplicateTag.status).toBe(400);
+
+    const freeTag = await instagramRecipeHandler(
+      await renderRequest(recipe.id, { selectedTags: ['Schnell '] }),
+      ctx,
+    );
+    expect(freeTag.status).toBe(400);
+
+    const tooManyTags = await instagramRecipeHandler(
+      await renderRequest(recipe.id, {
+        selectedTags: ['Schnell', 'Salat', 'Tag 3', 'Tag 4', 'Tag 5'],
+      }),
+      ctx,
+    );
+    expect(tooManyTags.status).toBe(400);
+
+    const invalidHighlights: unknown[] = [
+      'low-fat',
+      'automatic',
+      'high-fiber',
+      true,
+      42,
+      {},
+      [],
+    ];
+    for (const nutritionHighlight of invalidHighlights) {
+      const invalidHighlight = await instagramRecipeHandler(
+        await renderRequest(recipe.id, { nutritionHighlight }),
+        ctx,
+      );
+      expect(invalidHighlight.status).toBe(400);
+    }
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
   });
 

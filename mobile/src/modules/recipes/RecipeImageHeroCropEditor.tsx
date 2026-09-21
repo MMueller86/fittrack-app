@@ -56,9 +56,15 @@ export function RecipeImageHeroCropEditor({
   const pinchStartSourceY = useSharedValue(0);
 
   useEffect(() => {
+    setImageSize(null);
+    setImageError(false);
+  }, [imageUri, visible]);
+
+  useEffect(() => {
     if (!visible || !imageUri) {
       setImageSize(null);
       setImageError(false);
+      return;
     }
     const normalizedCrop = normalizeRecipeImageHeroCrop(initialCrop);
     if (imageSize && visible && imageUri) {

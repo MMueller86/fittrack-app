@@ -8,6 +8,20 @@ import type {
   RecipeIngredient,
   RecipeStep,
 } from '@fittrack/shared';
+import type {
+  RecipeInstagramNutritionHighlight,
+  RecipeInstagramPresentation,
+  RecipeInstagramRecipeMeta,
+  RecipeInstagramRenderOptions,
+} from './recipeInstagramRenderContract';
+
+export { TEMPORARY_RECIPE_RENDER_META } from './recipeInstagramRenderContract';
+export type {
+  RecipeInstagramNutritionHighlight,
+  RecipeInstagramPresentation,
+  RecipeInstagramRecipeMeta,
+  RecipeInstagramRenderOptions,
+} from './recipeInstagramRenderContract';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -117,6 +131,21 @@ export const recipeApi = {
   reorderImages(recipeId: string, imageIds: string[]): Promise<ReorderRecipeImagesResponse> {
     return apiClient
       .put<ReorderRecipeImagesResponse>(`/recipes/${recipeId}/images/order`, { imageIds })
+      .then((r) => r.data);
+  },
+
+  /** POST /api/recipes/:id/instagram-render — render one transient PNG preview. */
+  renderInstagramRecipe(
+    recipeId: string,
+    options: RecipeInstagramRenderOptions,
+    signal?: AbortSignal,
+  ): Promise<ArrayBuffer> {
+    return apiClient
+      .post<ArrayBuffer>(`/recipes/${recipeId}/instagram-render`, options, {
+        responseType: 'arraybuffer',
+        timeout: 60_000,
+        ...(signal ? { signal } : {}),
+      })
       .then((r) => r.data);
   },
 

@@ -34,11 +34,21 @@ const RecipeMetaSchema = z
   })
   .strict();
 
+const SelectedTagsSchema = z
+  .array(
+    z
+      .string()
+      .min(1)
+      .refine((value) => value.trim().length > 0, 'must not be empty'),
+  )
+  .max(4);
+
 export const InstagramRecipeRenderRequestSchema = z
   .object({
     imageId: z.string().uuid().optional(),
     presentation: PresentationSchema.optional(),
-    nutritionHighlight: z.enum(['high-protein', 'low-fat']).nullable().optional(),
+    selectedTags: SelectedTagsSchema.optional(),
+    nutritionHighlight: z.enum(['high-protein']).nullable().optional(),
     recipeMeta: RecipeMetaSchema.optional(),
   })
   .strict();
@@ -66,6 +76,16 @@ function selectRecipeImage(recipe: { images: RecipeImage[] }, imageId?: string) 
     const rightOrder = Number.isFinite(right.order) ? right.order : Number.POSITIVE_INFINITY;
     return leftOrder - rightOrder || left.id.localeCompare(right.id);
   })[0];
+}
+
+function hasValidSelectedTags(selectedTags: string[] | undefined, recipeTags: string[]): boolean {
+  if (selectedTags === undefined) return true;
+
+  const uniqueTags = new Set(selectedTags);
+  if (uniqueTags.size !== selectedTags.length) return false;
+
+  const availableTags = new Set(recipeTags);
+  return selectedTags.every((tag) => availableTags.has(tag));
 }
 
 function renderFailureResponse(
@@ -107,6 +127,13 @@ export const instagramRecipeHandler = withHandler(
     const repo = getRecipesRepository();
     const recipe = await repo.get(userId, recipeId);
     if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+
+    if (!hasValidSelectedTags(parsed.data.selectedTags, recipe.tags)) {
+      return {
+        status: 400,
+        jsonBody: { error: 'selectedTags must be a unique subset of the stored recipe tags' },
+      };
+    }
 
     const image = selectRecipeImage(recipe, parsed.data.imageId);
     if (!image) {
