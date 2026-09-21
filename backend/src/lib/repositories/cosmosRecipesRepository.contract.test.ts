@@ -219,8 +219,18 @@ describe('CosmosRecipesRepository (contract)', () => {
 
     const fetched = await repo.get(USER_A, created.id);
     expect(fetched?.images).toEqual([
-      { id: 'image-a', blobName: `${USER_A}/${created.id}/image-a.jpg`, order: 1 },
-      { id: 'image-b', blobName: `${USER_A}/${created.id}/image-b.jpg`, order: 2 },
+      {
+        id: 'image-a',
+        blobName: `${USER_A}/${created.id}/image-a.jpg`,
+        order: 1,
+        heroCrop: DEFAULT_RECIPE_IMAGE_HERO_CROP,
+      },
+      {
+        id: 'image-b',
+        blobName: `${USER_A}/${created.id}/image-b.jpg`,
+        order: 2,
+        heroCrop: DEFAULT_RECIPE_IMAGE_HERO_CROP,
+      },
     ]);
   });
 
