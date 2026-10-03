@@ -83,6 +83,16 @@ npx tsc --noEmit  # from mobile/ or shared/
 	settings without printing secrets; exit code `2` means `UNVERIFIED` because
 	required credentials are unavailable.
 
+### Instagram Detail-Template Fixtures
+
+Detail-template unit tests reuse the versioned
+`backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png`
+for the Alpha-derived recipe data. Their file-read guard rejects local
+`output/alpha-recipe-assets` photos so missing CI assets cannot be masked by
+local downloads. Production fonts, text measurements, and PNG rendering run
+unchanged. Visual approval fixtures and rendering scripts retain their Alpha
+photos; those local files are not prerequisites for Tier 1.
+
 ### Daily Insight Prompt and Cache Checks
 
 The active Daily prompt is tested through

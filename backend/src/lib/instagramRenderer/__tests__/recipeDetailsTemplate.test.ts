@@ -5,10 +5,10 @@ import satori from "satori";
 import type { Font } from "satori";
 import { describe, expect, it, vi } from "vitest";
 
-import { gefluegelfrikadellenDetailsFixture } from "../fixtures/gefluegelfrikadellen-details";
-import { nineIngredientsDetailsFixture } from "../fixtures/nine-ingredients-details";
+import { gefluegelfrikadellenDetailsFixture as alphaGefluegelfrikadellenDetailsFixture } from "../fixtures/gefluegelfrikadellen-details";
+import { nineIngredientsDetailsFixture as alphaNineIngredientsDetailsFixture } from "../fixtures/nine-ingredients-details";
 import { quarkbroetchenDetailsFixture } from "../fixtures/quarkbroetchen-details";
-import { twentyIngredientsDetailsFixture } from "../fixtures/twenty-ingredients-details";
+import { twentyIngredientsDetailsFixture as alphaTwentyIngredientsDetailsFixture } from "../fixtures/twenty-ingredients-details";
 import { renderInstagramRecipeDetailsTemplate } from "../index";
 import {
   composeRecipeDetailsTemplate,
@@ -23,10 +23,37 @@ import {
   type DetailTextMeasureRequest,
 } from "../detailTextLayout";
 
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    readFile: async (...args: Parameters<typeof actual.readFile>) => {
+      const path = String(args[0]).replace(/\\/g, "/");
+      if (path.includes("/output/alpha-recipe-assets/")) {
+        throw new Error("Local Alpha output photos are unavailable in offline unit tests.");
+      }
+      return actual.readFile(...args);
+    },
+  };
+});
+
 vi.mock("satori", async (importOriginal) => {
   const actual = await importOriginal<typeof import("satori")>();
   return { ...actual, default: vi.fn(actual.default) };
 });
+
+const gefluegelfrikadellenDetailsFixture = {
+  ...alphaGefluegelfrikadellenDetailsFixture,
+  image: quarkbroetchenDetailsFixture.image,
+};
+const nineIngredientsDetailsFixture = {
+  ...alphaNineIngredientsDetailsFixture,
+  image: quarkbroetchenDetailsFixture.image,
+};
+const twentyIngredientsDetailsFixture = {
+  ...alphaTwentyIngredientsDetailsFixture,
+  image: quarkbroetchenDetailsFixture.image,
+};
 
 const HYPHENATION_MARKER = "\uE000";
 const germanHyphenate = (require("hyphen/de") as {
@@ -293,7 +320,7 @@ describe("Instagram recipe details template", () => {
     expect(Buffer.isBuffer(result.buffer)).toBe(true);
   });
 
-  it("renders the Alpha Gefluegelfrikadellen fixture as an Instagram PNG", async () => {
+  it("renders the Alpha Gefluegelfrikadellen recipe with an offline reference photo as an Instagram PNG", async () => {
     const result = await renderInstagramRecipeDetailsTemplate(gefluegelfrikadellenDetailsFixture);
     expect(result).toMatchObject({ ok: true, width: 1080, height: 1350, format: "png" });
   });
