@@ -355,6 +355,29 @@ describe('RecipeInstagramPreview', () => {
     });
   });
 
+  it.each([
+    { nutritionHighlight: null, label: 'Kein Highlight', enabled: true, expected: 'high-protein' },
+    { nutritionHighlight: 'high-protein' as const, label: 'High-Protein', enabled: false, expected: null },
+  ])('maps the explicit highlight toggle from $label', async ({ nutritionHighlight, label, enabled, expected }) => {
+    const { renderer, props } = await renderPreview({ nutritionHighlight });
+    await act(async () => {
+      (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+
+    const toggle = getByLabel(renderer, 'High-Protein-Symbol anzeigen');
+    expect(toggle.props.value).toBe(nutritionHighlight === 'high-protein');
+    expect(renderer.root.findAll((node) => node.type === 'Text' && node.props.children === label))
+      .toHaveLength(1);
+
+    await act(async () => {
+      (toggle.props.onValueChange as (enabled: boolean) => void)(enabled);
+    });
+    expect(props.onChangeOptions).toHaveBeenCalledWith({
+      selectedTags: props.selectedTags,
+      nutritionHighlight: expected,
+    });
+  });
+
   it('shows the empty-tag state inside the unified editor', async () => {
     const { renderer } = await renderPreview({ recipeTags: [], selectedTags: [] });
     await act(async () => {
