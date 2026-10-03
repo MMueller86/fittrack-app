@@ -31,8 +31,10 @@ export type Handler = (
 /**
  * Wrap a handler so it never throws past the host.
  *
- * - Logs a structured `handler.start` / `handler.success` / `handler.error`
- *   entry with `name`, `method`, and `duration_ms`.
+ * - Logs `handler.response.failure` with status and any top-level API code
+ *   for returned 4xx/5xx responses; response bodies are not logged.
+ * - Logs structured `handler.start`, `handler.success`, and `handler.error`
+ *   entries with handler name, method, and duration.
  * - On thrown error: returns 500 with a generic body (`{ error:
  *   'Internal server error' }`); the original error is logged but never
  *   serialised into the response.
@@ -49,12 +51,30 @@ export function withHandler(name: string, fn: Handler): Handler {
     });
     try {
       const response = await fn(request, ctx);
-      logEvent(ctx, 'info', 'handler.success', {
-        handler: name,
-        method: request.method,
-        status: response.status,
-        duration_ms: Date.now() - started,
-      });
+      const status = response.status ?? 200;
+      const duration_ms = Date.now() - started;
+      if (status >= 400) {
+        const body: unknown = response.jsonBody;
+        const apiCode =
+          typeof body === 'object' && body !== null && 'code' in body &&
+          typeof body.code === 'string'
+            ? body.code
+            : undefined;
+        logEvent(ctx, status >= 500 ? 'error' : 'warn', 'handler.response.failure', {
+          handler: name,
+          method: request.method,
+          status,
+          duration_ms,
+          ...(apiCode !== undefined ? { api_code: apiCode } : {}),
+        });
+      } else {
+        logEvent(ctx, 'info', 'handler.success', {
+          handler: name,
+          method: request.method,
+          status,
+          duration_ms,
+        });
+      }
       return response;
     } catch (err) {
       if (err instanceof UnauthorizedError) {

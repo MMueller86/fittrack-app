@@ -63,7 +63,33 @@ Mobile shows `MealEstimateReviewScreen`.
 
 ### 6. Recipe Analyzer (`POST /api/ai/recipe-analyze`)
 
-User provides a free-text recipe. The AI extracts ingredients and returns positive total gram weights for every `food` ingredient with a determinable quantity, including conversions such as `2 EL` → approximately `30 g`. A genuinely indeterminate food amount, such as spray oil used for coating without a reliable measurable quantity, remains a food ingredient with `amountGrams: null` and is sent to manual review instead of failing the analysis.
+**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v11'`.
+
+The request body is `{ text }`, with 10-5000 characters. The AI extracts recipe metadata, ordered source steps, normalized ingredients, and one export suggestion in the same call. The mobile consumer is `RecipeWizardScreen`; the analyzer does not directly save a recipe, reusable food, or diary data.
+
+The strict `AiRecipeRaw` contract includes `suggestedName`, `description`, positive `suggestedPortions`, `tags`, `steps`, `ingredients`, and `exportSuggestion`. Each ingredient has a unique `analysisKey`, the original `line`, a normalized `displayName`, `category: 'food' | 'seasoning'`, `amountGrams`, and `kitchenAmountText`. Every determinable food quantity is converted to positive grams, including `2 EL` → approximately `30 g`; a genuinely indeterminate food amount such as unmeasured spray oil must be `amountGrams: null`, never a tiny positive placeholder, and is routed to manual review. Seasoning amounts may also be null only when genuinely indeterminate. Food and seasoning routing is performed by the backend without re-running the general meal parser, preserving the analyzer's kitchen-unit conversions. Source steps use contiguous 1-based order, and export steps may group only adjacent source steps so the flattened `sourceStepOrders` remains exactly in source order.
+
+The v11 `exportSuggestion` contract retains the v10 shape:
+
+```ts
+{
+	version: 1;
+	teaser: string;                  // 1-96 characters
+	totalTimeMinutes: number | null; // positive integer, at most 10080
+	difficulty: string | null;        // non-empty, single-line value when known
+	steps: Array<{
+		order: number;
+		description: string;            // 1-90 characters
+		sourceStepOrders: number[];
+		ingredientKeys: string[];
+	}>;                               // at most 5 entries
+	includedIngredientKeys: string[]; // unique, source order, at most 20
+}
+```
+
+`totalTimeMinutes` and `difficulty` are the shared time and difficulty fields used by the recipe export contract. They remain nullable during analysis when the recipe does not support a reliable value; the AI must not substitute a default. `sourceStepOrders` must be ascending and must trace every source `steps.order` exactly once and in order. Export orders are contiguous from 1, `ingredientKeys` reference existing `analysisKey` values, and `includedIngredientKeys` cannot reference seasonings. The prompt requires semantic grouping when there are more than five source steps, not mechanical truncation, so actions, ingredient references, temperatures, times, and turning points remain represented. The provider schema carries `maxItems: 5` and `maxLength: 90`; the server repeats these limits and rejects violations with `422`.
+
+Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: true`, `additionalProperties: false`). The handler enforces the `recipe-analyze` quota before the provider call and tracks usage only after the parsed result passes structural and semantic validation. Quota exhaustion returns `429`; provider, empty-response, or JSON-parse failures return `502`; invalid structured or plausibility output returns `422`. The response is a transient review preview. No AI result is persisted by this endpoint and no usage is tracked for a rejected result; only a later explicit user-confirmed recipe write can persist accepted export data.
 
 **Used by:** `RecipeWizardScreen` on mobile.
 

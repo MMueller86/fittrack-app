@@ -13,10 +13,34 @@ export type RenderInput = {
 };
 
 export type RecipeMeta = {
-  totalTimeMinutes: number;
+  totalTimeMinutes: number | null;
   portions: number;
-  difficulty: string;
+  difficulty: string | null;
 };
+
+export type RecipeDetailsTemplateInput = {
+  image: { path: string } | { buffer: Buffer };
+  presentation: RenderPresentation;
+  description?: string;
+  highlight?: "high-protein" | "low-fat";
+  title: string;
+  totalTimeMinutes: number | null;
+  difficulty?: string | null;
+  portions: number;
+  ingredients: Array<{ amount: string; name: string }>;
+  steps: Array<string>;
+};
+
+export type RecipeDetailsTemplateField =
+  | "title"
+  | "description"
+  | "totalTimeMinutes"
+  | "difficulty"
+  | "portions"
+  | "ingredients"
+  | "steps";
+
+export type RecipeDetailsTemplateItemField = "amount" | "name" | "text";
 
 export type RenderOk = {
   ok: true;
@@ -49,3 +73,39 @@ export type RenderError =
 export type RenderFail = { ok: false; error: RenderError };
 
 export type RenderResult = RenderOk | RenderFail;
+
+export type RecipeDetailsTemplateRenderError =
+  | {
+      code: "INVALID_TEMPLATE_INPUT";
+      message: string;
+      field: RecipeDetailsTemplateField;
+      itemIndex?: number;
+      itemField?: RecipeDetailsTemplateItemField;
+      itemValue?: string;
+    }
+  | {
+      code: "TEMPLATE_FIELD_OVERFLOW";
+      message: string;
+      field: RecipeDetailsTemplateField;
+      itemIndex?: number;
+      itemField?: RecipeDetailsTemplateItemField;
+      measured: {
+        width: number;
+        height: number;
+        maxWidth?: number;
+        maxHeight?: number;
+      };
+    }
+  | {
+      code: "TEMPLATE_PROBE_FAILED";
+      message: string;
+      field: RecipeDetailsTemplateField;
+      itemIndex?: number;
+      itemField?: RecipeDetailsTemplateItemField;
+    }
+  | { code: "MISSING_ASSET"; message: string; asset: string }
+  | { code: "INTERNAL"; message: string; cause?: string };
+
+export type RecipeDetailsTemplateRenderResult =
+  | RenderOk
+  | { ok: false; error: RecipeDetailsTemplateRenderError };

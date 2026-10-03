@@ -19,8 +19,9 @@ Located in `backend/src/functions/`. Each file owns one domain.
 | `reusableItems.ts` | CRUD /reusable-items | Yes | |
 | `reusableItemsEnrich.ts` | POST /reusable-items/{id}/enrich | Yes | AI enrichment |
 | `reusableItemsEnrichScheduler.ts` | Timer trigger | — | Background enrichment |
-| `recipes.ts` | CRUD /recipes, image upload/crop-update/delete/reorder, recipe logging | Yes | Image upload appends; crop updates metadata only; delete and reorder normalize image order. |
+| `recipes.ts` | CRUD /recipes, image upload/crop-update/delete/reorder, recipe logging, export-view preparation | Yes | Image upload appends; crop updates metadata only; delete and reorder normalize image order. |
 | `instagramRecipe.ts` | POST /recipes/{id}/instagram-render | Yes | Server-owned recipe data to PNG renderer; no persistence |
+| `instagramRecipe.ts` | POST /recipes/{id}/instagram-render, POST /recipes/{id}/share-bundle | Yes | Legacy direct PNG plus atomic bundle from an optional request draft or stored confirmed view, including stale snapshots; no persistence |
 | `ai.ts` | POST /ai/parse-meal, /ai/estimate-meal | Yes | Quota enforced |
 | `foodEstimate.ts` | POST /ai/food-estimate | Yes | Quota enforced |
 | `foodEstimateBatch.ts` | POST /ai/food-estimate/batch | Yes | Quota enforced |
@@ -67,7 +68,8 @@ Health check: `GET /api/health` — anonymous, always returns `{ status: 'ok' }`
 ### `withHandler(name, fn)`
 
 All HTTP handlers are wrapped with `withHandler()`. It provides:
-- Structured logging: `handler.start`, `handler.success` (with status + duration ms), `handler.error`
+- Structured logging: `handler.start`, `handler.success` (with status + duration ms), and `handler.error`
+- Returned 4xx/5xx responses are logged as `handler.response.failure` at warn/error level with status and any top-level API `code`; response bodies are not logged
 - `UnauthorizedError` → 401
 - Any other thrown error → 500 (stack never leaked to client)
 
@@ -173,6 +175,90 @@ The render path calls `downloadRecipeImage()` with only the server-read
 renderer. It does not perform a SAS-URL round trip and never accepts a client
 blob name or image URL. Successful output is an in-memory PNG response with
 `Cache-Control: no-store`; no image or render metadata is persisted.
+
+`POST /api/recipes/{id}/share-bundle` uses a strict request schema that excludes
+client `recipeMeta` and loads the authenticated recipe once. Its optional
+top-level `exportViewDraft` uses the shared request-only
+`RecipeShareBundleExportDraft` type: version `1`, a trimmed teaser (1-96 characters), nullable
+time (positive integer, at most 10,080) and difficulty (non-empty single-line
+text), 1-5 ascending ordered steps (1-90 character descriptions), and at most
+20 unique included ingredient IDs. Unknown fields, including
+`sourceFingerprint`, are rejected. Every included ID must identify exactly one
+non-seasoning ingredient in the current user-scoped recipe.
+
+The handler uses the request draft for that render when present; otherwise it
+uses the stored `exportView`, including a stale snapshot. If neither exists,
+it returns `422 MISSING_EXPORT_VIEW`. The current recipe supplies canonical
+fields, while the selected draft or view supplies teaser, time, difficulty,
+steps, and included ingredient IDs. IDs select current ingredient values
+without AI-key or name mapping. The draft is never persisted, does not refresh a
+fingerprint, and triggers neither AI nor quota work. Both PNGs are encoded into
+the unchanged JSON response only after both renders succeed; any renderer
+failure returns an error without a partial image pair.
+
+For a request draft with `null` time, both renderers omit the time chip; the
+Instagram renderer also omits a `null` difficulty chip. Portions remain visible
+in both, and the detail template keeps its displayed-ingredient-count chip.
+Difficulty remains omitted from the detail image even when present.
+The legacy direct Instagram route retains its request-level `recipeMeta`
+compatibility.
+
+The detail-template renderer keeps the `1080 x 1350` canvas and supports 1
+through 20 displayed ingredients and 1 through 5 steps. The adapter supplies
+the confirmed time and difficulty, but the detail image renders only portions,
+time, and displayed ingredient count as metadata chips. Difficulty remains in
+the persisted `exportView` and in the existing Instagram metadata input; its
+omission is limited to the detail PNG.
+
+Before composition, `renderInstagramRecipeDetailsTemplate()` applies
+`addMeasuredGermanBreaks()` to the title, teaser, ingredient amount/name text,
+and steps. Normal wrapping stays at whitespace; an overwide word may split
+only at positions returned by the German `hyphen/de` patterns. Candidate
+segments are measured with the production fonts, including each inserted
+hyphen. Satori then measures the title, teaser, ingredient, and step text nodes
+against their assigned width and height before Resvg rasterizes the image. A
+non-fitting legal break or measured overflow returns `TEMPLATE_FIELD_OVERFLOW`
+with the field and, for list content, the item index and field; no detail PNG is
+returned. A bundle with any render failure withholds both images. The template
+uses normal word breaking throughout and has no `break-all` fallback. The teaser
+has no additional heading and uses bundled Inter Medium Italic with a lime accent
+line. A final full stop is omitted from the displayed teaser. It starts at 22 px,
+matching regular preparation text, and retries in 1 px steps down to 18 px only
+if its measured layout does not fit. A 12 px clearance separates it from the
+metadata chips. Text is never truncated; an overflow at 18 px remains an error.
+Recipe title, ingredient rows, and preparation text keep their existing sizes.
+
+### Recipe export preparation and confirmation concurrency
+
+`POST /api/recipes/{id}/export-view/prepare` accepts only the strict V2 body
+`{ "contractVersion": 2 }`; it has no empty-body or V1 fallback. It does not
+require client `If-Match`. A supplied header is checked against the
+server-loaded recipe and a mismatch returns `412` before quota or provider work.
+The response keeps `sourceEtag` for compatibility, but it is not a client-side
+acceptance prerequisite. Preparation is transient and does not change the
+recipe, confirmed export view, ingredient IDs, or ingredient values.
+
+An explicit `PUT /api/recipes/{id}` export confirmation also does not require a
+client `If-Match`; a supplied header remains an optional precondition. The
+handler reads a versioned recipe and passes that server-read ETag to repository
+`compareAndReplace`. The in-memory implementation compares the expected ETag,
+and Cosmos uses `IfMatch` on replace. A lost write race returns
+`412 recipe_revision_conflict` without a merge or retry. This internal
+compare-and-replace remains the write-race guard even when the client sends no
+ETag. No recipe document, Cosmos container, or infrastructure schema changes
+are required.
+
+Renderer result failures emit structured diagnostic fields in backend logs,
+including the error code, bounded single-line message/cause, and available
+field or layout measurements. Invalid detail-template ingredient and step
+values also log `item_index`, `item_field`, and `item_value`, capped at 200
+characters; `item_value_truncated` marks values clipped for logging. Bundle
+Instagram failures use
+`recipes.shareBundle.instagramRender.unrenderable` or `.failed`; detail-template
+failures use `recipes.shareBundle.unrenderableDetail` or `.detailFailed`.
+Standalone Instagram rendering uses the corresponding
+`recipes.instagramRender.unrenderable` or `.failed` events. Diagnostic details
+are never included in HTTP error responses.
 
 ### Quota Enforcement
 

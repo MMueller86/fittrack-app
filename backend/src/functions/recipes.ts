@@ -1,6 +1,11 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { z } from 'zod';
-import type { RecipeImage, RecipeImageHeroCrop } from '@fittrack/shared';
+import type {
+  PrepareRecipeExportViewResponseV2,
+  Recipe,
+  RecipeImage,
+  RecipeImageHeroCrop,
+} from '@fittrack/shared';
 import {
   DEFAULT_RECIPE_IMAGE_HERO_CROP,
   RECIPE_IMAGE_HERO_CROP_FRAME,
@@ -11,10 +16,18 @@ import {
 import { calculateRecipeNutrition } from '../../../shared/lib/recipeCalculator';
 
 import { requireUser } from '../lib/auth';
+import { analyzeRecipeText } from '../lib/openai';
+import { validateRecipeExportPreparationOutput } from '../lib/recipeAnalyzeValidation';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getRecipesRepository } from '../lib/repositories/recipesRepository';
+import { createRecipeExportView } from '../lib/repositories/recipeExport';
+import { enforceQuota, trackUsage } from '../lib/quota';
+import {
+  RecipeExportViewInputSchema,
+  validateRecipeExportIngredients,
+} from '../lib/recipeValidation';
 import {
   deleteRecipeImage,
   generateRecipeImageSasUrl,
@@ -32,6 +45,7 @@ import {
 // PUT    /api/recipes/:id/images/order       — reorder images
 // DELETE /api/recipes/:id/images/:imageId    — delete one image
 // POST   /api/recipes/:id/log               — log portion into diary
+// POST   /api/recipes/:id/export-view/prepare — prepare transient export suggestion
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -98,6 +112,8 @@ const CreateRecipeSchema = z.object({
   ingredients: z.array(RecipeIngredientSchema).max(100),
   steps: z.array(RecipeStepSchema).max(50),
   tags: z.array(z.string().trim().max(50)).max(20),
+  exportView: RecipeExportViewInputSchema.optional(),
+  exportViewAction: z.literal('confirm').optional(),
 });
 
 const UpdateRecipeSchema = CreateRecipeSchema.partial();
@@ -106,6 +122,8 @@ const LogRecipeSchema = z.object({
   portions: z.coerce.number().positive().max(50),
   mealId: z.string().min(1),
 });
+
+const PrepareRecipeExportViewBodySchema = z.object({ contractVersion: z.literal(2) }).strict();
 
 const ReorderImagesSchema = z.object({
   imageIds: z.array(z.string().min(1)),
@@ -192,11 +210,43 @@ export const createRecipeHandler = withHandler(
       return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
     }
 
-    const { name, description, portions, ingredients, steps, tags } = parsed.data;
+    const {
+      name,
+      description,
+      portions,
+      ingredients,
+      steps,
+      tags,
+      exportView: exportViewInput,
+      exportViewAction,
+    } = parsed.data;
+    if ((exportViewInput !== undefined) !== (exportViewAction !== undefined)) {
+      return { status: 400, jsonBody: { error: 'invalid_export_view_confirmation' } };
+    }
+
     const { nutritionTotal, nutritionPerPortion } = calculateRecipeNutrition(ingredients, portions);
 
+    if (exportViewInput) {
+      const exportIngredientError = validateRecipeExportIngredients(exportViewInput, ingredients);
+      if (exportIngredientError) {
+        return { status: 400, jsonBody: { error: 'invalid_export_view_ingredient' } };
+      }
+    }
+
+    const exportView = exportViewInput
+      ? createRecipeExportView(exportViewInput, {
+          name,
+          description,
+          portions,
+          ingredients,
+          steps,
+          tags,
+          nutritionPerPortion,
+        })
+      : undefined;
+
     const repo = getRecipesRepository();
-    const recipe = await repo.create(userId, {
+    const versioned = await repo.createVersioned(userId, {
       name,
       description,
       portions,
@@ -205,10 +255,12 @@ export const createRecipeHandler = withHandler(
       tags,
       nutritionTotal,
       nutritionPerPortion,
+      ...(exportView !== undefined ? { exportView } : {}),
     });
+    const recipe = versioned.recipe;
 
     logEvent(ctx, 'info', 'recipe.created', { userId, recipeId: recipe.id });
-    return { status: 201, jsonBody: recipe };
+    return { status: 201, headers: { ETag: versioned.etag }, jsonBody: recipe };
   },
 );
 
@@ -224,12 +276,16 @@ export const getRecipeHandler = withHandler(
     if (!id) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
 
     const repo = getRecipesRepository();
-    const recipe = await repo.get(userId, id);
-    if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    const versioned = await repo.getVersioned(userId, id);
+    if (!versioned) return { status: 404, jsonBody: { error: 'Recipe not found' } };
 
     // Generate short-lived SAS URLs for all images
-    const imagesWithUrls = await attachSasUrls(recipe.images);
-    return { status: 200, jsonBody: { ...recipe, images: imagesWithUrls } };
+    const imagesWithUrls = await attachSasUrls(versioned.recipe.images);
+    return {
+      status: 200,
+      headers: { ETag: versioned.etag },
+      jsonBody: { ...versioned.recipe, images: imagesWithUrls },
+    };
   },
 );
 
@@ -250,23 +306,58 @@ export const updateRecipeHandler = withHandler(
       return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
     }
 
-    const repo = getRecipesRepository();
-    const existing = await repo.get(userId, id);
-    if (!existing) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    const {
+      exportView: exportViewInput,
+      exportViewAction,
+      ...recipeFields
+    } = parsed.data;
+    if ((exportViewInput !== undefined) !== (exportViewAction !== undefined)) {
+      return { status: 400, jsonBody: { error: 'invalid_export_view_confirmation' } };
+    }
 
-    // Recalculate nutrition if ingredients or portions changed
-    const ingredients = parsed.data.ingredients ?? existing.ingredients;
-    const portions = parsed.data.portions ?? existing.portions;
+    const ifMatch = request.headers.get('if-match');
+
+    const repo = getRecipesRepository();
+    const existingVersioned = await repo.getVersioned(userId, id);
+    if (!existingVersioned) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    if (ifMatch !== null && ifMatch !== existingVersioned.etag) {
+      return { status: 412, jsonBody: { error: 'recipe_revision_conflict' } };
+    }
+
+    const existing = existingVersioned.recipe;
+    const ingredients = recipeFields.ingredients ?? existing.ingredients;
+    const portions = recipeFields.portions ?? existing.portions;
     const { nutritionTotal, nutritionPerPortion } = calculateRecipeNutrition(ingredients, portions);
 
-    const updated = await repo.update(userId, id, {
-      ...parsed.data,
+    if (exportViewInput) {
+      const exportIngredientError = validateRecipeExportIngredients(exportViewInput, ingredients);
+      if (exportIngredientError) {
+        return { status: 400, jsonBody: { error: 'invalid_export_view_ingredient' } };
+      }
+    }
+
+    const exportView = exportViewInput
+      ? createRecipeExportView(exportViewInput, {
+          name: recipeFields.name ?? existing.name,
+          description: recipeFields.description ?? existing.description,
+          portions,
+          ingredients,
+          steps: recipeFields.steps ?? existing.steps,
+          tags: recipeFields.tags ?? existing.tags,
+          nutritionPerPortion,
+        })
+      : undefined;
+
+    const updated = await repo.compareAndReplace(userId, id, existingVersioned.etag, {
+      ...recipeFields,
       nutritionTotal,
       nutritionPerPortion,
+      ...(exportView !== undefined ? { exportView } : {}),
     });
+    if (!updated) return { status: 412, jsonBody: { error: 'recipe_revision_conflict' } };
 
     logEvent(ctx, 'info', 'recipe.updated', { userId, recipeId: id });
-    return { status: 200, jsonBody: updated };
+    return { status: 200, headers: { ETag: updated.etag }, jsonBody: updated.recipe };
   },
 );
 
@@ -520,6 +611,92 @@ export const logRecipeHandler = withHandler(
   },
 );
 
+function buildRecipePreparationText(recipe: Recipe): string {
+  const lines: string[] = [
+    `Name: ${recipe.name}`,
+    recipe.description ? `Beschreibung: ${recipe.description}` : 'Beschreibung: -',
+    `Portionen: ${recipe.portions}`,
+    `Tags: ${recipe.tags.join(', ') || 'keine'}`,
+    'Zutaten:',
+    ...recipe.ingredients.map((ingredient) => {
+      const amount = ingredient.amountGrams ?? ingredient.inputAmount ?? 0;
+      const amountText = amount > 0 ? `${amount} ${ingredient.unit}` : ingredient.unit;
+      return `- ${ingredient.displayName}: ${amountText}`;
+    }),
+    'Schritte:',
+    ...recipe.steps.map((step) => `- ${step.order}. ${step.description}`),
+  ];
+  return lines.join('\n');
+}
+
+export const prepareRecipeExportViewHandler = withHandler(
+  'recipes.prepareExportView',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const userContext = await requireUser(request);
+    const { userId } = userContext;
+    const recipeId = request.params['id'];
+    if (!recipeId) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+
+    const parsedBody = await parseBody(request, PrepareRecipeExportViewBodySchema);
+    if (!parsedBody.ok) {
+      return { status: 400, jsonBody: { error: 'invalid_export_preparation_request' } };
+    }
+    const ifMatch = request.headers.get('if-match');
+
+    const repo = getRecipesRepository();
+    const versionedRecipe = await repo.getVersioned(userId, recipeId);
+    if (!versionedRecipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    if (ifMatch !== null && ifMatch !== versionedRecipe.etag) {
+      return { status: 412, jsonBody: { error: 'recipe_revision_conflict' } };
+    }
+    const recipe = versionedRecipe.recipe;
+
+    const quotaBlock = await enforceQuota(userContext, 'recipe-analyze');
+    if (quotaBlock) return quotaBlock;
+
+    let analysis: Awaited<ReturnType<typeof analyzeRecipeText>>;
+    try {
+      analysis = await analyzeRecipeText(buildRecipePreparationText(recipe));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${message}` } };
+    }
+
+    const validation = validateRecipeExportPreparationOutput(analysis);
+    if (!validation.ok) {
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.validationFailed', {
+        userId,
+        recipeId,
+        errorCount: validation.errors.length,
+      });
+      return {
+        status: 422,
+        jsonBody: {
+          error: 'Recipe export preparation failed server-side validation',
+          details: validation.errors,
+        },
+      };
+    }
+
+    await trackUsage(userContext, 'recipe-analyze');
+
+    const suggestion = validation.data.exportSuggestion;
+    const response: PrepareRecipeExportViewResponseV2 = {
+      contractVersion: 2,
+      recipeId,
+      sourceEtag: versionedRecipe.etag,
+      suggestion: {
+        version: suggestion.version,
+        teaser: suggestion.teaser,
+        totalTimeMinutes: suggestion.totalTimeMinutes,
+        difficulty: suggestion.difficulty,
+        steps: suggestion.steps.map(({ order, description }) => ({ order, description })),
+      },
+    };
+    return { status: 200, jsonBody: response };
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Route registration
 // ---------------------------------------------------------------------------
@@ -592,4 +769,11 @@ app.http('recipes-log', {
   authLevel: 'anonymous',
   route: 'recipes/{id}/log',
   handler: logRecipeHandler,
+});
+
+app.http('recipes-prepare-export-view', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'recipes/{id}/export-view/prepare',
+  handler: prepareRecipeExportViewHandler,
 });

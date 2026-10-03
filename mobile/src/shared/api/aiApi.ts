@@ -9,6 +9,7 @@ import type {
   InsightResponse,
   RecipeScalePreviewRequest,
   RecipeScalePreviewResponse,
+  RecipeExportSuggestion,
   InsightFeedbackRequest,
   InsightFeedbackResponse,
   WeeklyNutritionReviewResponse,
@@ -102,13 +103,18 @@ export interface AiRecipeStep {
   description: string;
 }
 
+export interface AiRecipeAnalysisIngredient extends MealParserPreviewItem {
+  analysisKey: string;
+}
+
 export interface AiRecipeAnalysis {
   suggestedName: string;
   description: string;
   suggestedPortions: number;
   tags: string[];
   steps: AiRecipeStep[];
-  ingredients: MealParserPreviewItem[];
+  ingredients: AiRecipeAnalysisIngredient[];
+  exportSuggestion?: RecipeExportSuggestion;
 }
 
 // ---------------------------------------------------------------------------

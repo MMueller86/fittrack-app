@@ -434,6 +434,20 @@ function createRecipeMetaRow(
   recipeMeta: NonNullable<RenderInput["recipeMeta"]>,
   icons: ComposeAssets["recipeMetaIcons"],
 ): SatoriElement {
+  const items: SatoriElement[] = [];
+  if (recipeMeta.totalTimeMinutes !== null) {
+    items.push(createRecipeMetaItem(icons.totalTime, `${recipeMeta.totalTimeMinutes} Min.`));
+  }
+  items.push(
+    createRecipeMetaItem(
+      icons.portions,
+      `${recipeMeta.portions} ${recipeMeta.portions === 1 ? "Portion" : "Portionen"}`,
+    ),
+  );
+  if (recipeMeta.difficulty !== null) {
+    items.push(createRecipeMetaItem(icons.difficulty, recipeMeta.difficulty.trim()));
+  }
+
   const content = element(
     "div",
     {
@@ -443,16 +457,9 @@ function createRecipeMetaRow(
       flexShrink: 0,
       whiteSpace: "nowrap",
     },
-    [
-      createRecipeMetaItem(icons.totalTime, `${recipeMeta.totalTimeMinutes} Min.`),
-      createRecipeMetaSeparator(),
-      createRecipeMetaItem(
-        icons.portions,
-        `${recipeMeta.portions} ${recipeMeta.portions === 1 ? "Portion" : "Portionen"}`,
-      ),
-      createRecipeMetaSeparator(),
-      createRecipeMetaItem(icons.difficulty, recipeMeta.difficulty.trim()),
-    ],
+    items.flatMap((item, index) =>
+      index === 0 ? [item] : [createRecipeMetaSeparator(), item],
+    ),
     { "data-render-node": "recipe-meta-content" },
   );
 

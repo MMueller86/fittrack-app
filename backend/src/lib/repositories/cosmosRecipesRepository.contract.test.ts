@@ -22,6 +22,7 @@ import {
 import { __resetCosmosForTests } from '../cosmos';
 import { CosmosRecipesRepository } from './cosmosRecipesRepository';
 import type { CreateRecipeInput } from './recipesRepository';
+import { createRecipeExportView } from './recipeExport';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 
 let ctx: EmulatorContext | undefined;
@@ -77,6 +78,15 @@ const baseIngredient = {
   isAiEstimate: false,
   nutritionPer100g: { calories: 340, protein: 10, carbs: 72, fat: 1, fiber: 3 },
   nutritionContribution: { calories: 1700, protein: 50, carbs: 360, fat: 5, fiber: 15 },
+};
+
+const baseExportViewInput = {
+  version: 1 as const,
+  teaser: 'Einfaches Sauerteigbrot',
+  totalTimeMinutes: 90,
+  difficulty: 'Einfach',
+  steps: [{ order: 1, description: 'Zutaten mischen und backen.' }],
+  includedIngredientIds: [baseIngredient.id],
 };
 
 function makeInput(overrides: Partial<CreateRecipeInput> = {}): CreateRecipeInput {
@@ -159,6 +169,73 @@ describe('CosmosRecipesRepository (contract)', () => {
     expect(fetched).not.toHaveProperty('userId');
     expect(fetched!.ingredients[0]).not.toHaveProperty('category');
     expect(fetched!.ingredients[0]).not.toHaveProperty('amountLabel');
+    expect(fetched).not.toHaveProperty('exportView');
+    expect(fetched).not.toHaveProperty('exportViewStatus');
+
+    const versioned = await repo.getVersioned(USER_A, historicalRecipe.id);
+    expect(versioned?.etag).toBeTruthy();
+    const updated = await repo.compareAndReplace(USER_A, historicalRecipe.id, versioned!.etag, {
+      name: 'Historisches Rezept aktualisiert',
+    });
+    expect(updated?.recipe.name).toBe('Historisches Rezept aktualisiert');
+
+    const rawAfterUpdate = await ctx!.database.container('recipes')
+      .item(historicalRecipe.id, USER_A)
+      .read<Record<string, unknown>>();
+    expect(rawAfterUpdate.resource).not.toHaveProperty('exportView');
+    expect(rawAfterUpdate.resource).not.toHaveProperty('exportViewStatus');
+  });
+
+  it('roundtrips exportView and derives status without persisting the status field', async () => {
+    const input = makeInput();
+    const exportView = createRecipeExportView(baseExportViewInput, input);
+    const created = await repo.create(USER_A, { ...input, exportView });
+
+    expect(created.exportView).toEqual(exportView);
+    expect(created.exportViewStatus).toBe('current');
+
+    const raw = await ctx!.database.container('recipes').item(created.id, USER_A).read<Record<string, unknown>>();
+    expect(raw.resource?.['exportView']).toEqual(exportView);
+    expect(raw.resource).not.toHaveProperty('exportViewStatus');
+
+    const fetched = await repo.get(USER_A, created.id);
+    expect(fetched?.exportView).toEqual(exportView);
+    expect(fetched?.exportViewStatus).toBe('current');
+  });
+
+  it('preserves exportView on an update without the field and derives stale after a source change', async () => {
+    const input = makeInput();
+    const exportView = createRecipeExportView(baseExportViewInput, input);
+    const created = await repo.create(USER_A, { ...input, exportView });
+
+    const updated = await repo.update(USER_A, created.id, { name: 'Dinkelbrot' });
+    expect(updated?.exportView).toEqual(exportView);
+    expect(updated?.exportViewStatus).toBe('stale');
+
+    const fetched = await repo.get(USER_A, created.id);
+    expect(fetched?.exportView).toEqual(exportView);
+    expect(fetched?.exportViewStatus).toBe('stale');
+  });
+
+  it('returns Cosmos ETags and rejects stale compare-and-replace without partial writes', async () => {
+    const created = await repo.createVersioned(USER_A, makeInput());
+    expect(created.etag).toBeTruthy();
+
+    const committed = await repo.compareAndReplace(USER_A, created.recipe.id, created.etag, {
+      name: 'Committed name',
+    });
+    expect(committed?.recipe.name).toBe('Committed name');
+    expect(committed?.etag).toBeTruthy();
+    expect(committed?.etag).not.toBe(created.etag);
+
+    const stale = await repo.compareAndReplace(USER_A, created.recipe.id, created.etag, {
+      name: 'Must not persist',
+    });
+    expect(stale).toBeNull();
+
+    const current = await repo.getVersioned(USER_A, created.recipe.id);
+    expect(current?.recipe.name).toBe('Committed name');
+    expect(current?.etag).toBe(committed?.etag);
   });
 
   it('applies the deterministic heroCrop default when a legacy image has no metadata', async () => {

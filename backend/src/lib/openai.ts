@@ -27,6 +27,10 @@ import type { InsightInputContext, InsightIntent, InsightResponse } from '@fittr
 import { selectInsightIntent } from './dailyInsightIntent';
 import { toInsightResponse, validateDailyInsightResponse } from './dailyInsightValidation';
 import { validateWeeklyInsightExceedanceClaims } from './weeklyInsightValidation';
+import {
+  RECIPE_EXPORT_MAX_STEP_LENGTH,
+  RECIPE_EXPORT_MAX_STEPS,
+} from '../../../shared/types/recipeExport';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -368,11 +372,31 @@ export async function estimateMeal(input: {
 
 /** One ingredient line extracted and classified by the recipe analyzer. */
 export interface AiRecipeIngredientLine {
+  /** Stable key used by the export suggestion to reference this ingredient. */
+  analysisKey: string;
   line: string;
   displayName: string;
   category: 'food' | 'seasoning';
   amountGrams: number | null;
   kitchenAmountText: string | null;  // populated for seasoning; null for food
+}
+
+/** One export step with source anchors retained for server-side validation. */
+export interface AiRecipeExportStep {
+  order: number;
+  description: string;
+  sourceStepOrders: number[];
+  ingredientKeys: string[];
+}
+
+/** Transient export suggestion returned with recipe analysis for user review. */
+export interface AiRecipeExportSuggestion {
+  version: 1;
+  teaser: string;
+  totalTimeMinutes: number | null;
+  difficulty: string | null;
+  steps: AiRecipeExportStep[];
+  includedIngredientKeys: string[];
 }
 
 /**
@@ -390,6 +414,7 @@ export interface AiRecipeRaw {
     title: string | null;
     description: string;
   }>;
+  exportSuggestion: AiRecipeExportSuggestion;
 }
 
 const RECIPE_ANALYZE_SCHEMA = {
@@ -404,13 +429,14 @@ const RECIPE_ANALYZE_SCHEMA = {
       items: {
         type: 'object' as const,
         properties: {
+          analysisKey: { type: 'string' as const },
           line: { type: 'string' as const },
           displayName: { type: 'string' as const },
           category: { type: 'string' as const, enum: ['food', 'seasoning'] },
-          amountGrams: { type: ['number', 'null'] as const },
+          amountGrams: { type: ['number', 'null'] as const, minimum: 0.000001 },
           kitchenAmountText: { type: ['string', 'null'] as const },
         },
-        required: ['line', 'displayName', 'category', 'amountGrams', 'kitchenAmountText'],
+        required: ['analysisKey', 'line', 'displayName', 'category', 'amountGrams', 'kitchenAmountText'],
         additionalProperties: false,
       },
     },
@@ -427,8 +453,47 @@ const RECIPE_ANALYZE_SCHEMA = {
         additionalProperties: false,
       },
     },
+    exportSuggestion: {
+    type: 'object' as const,
+    properties: {
+      version: { type: 'integer' as const, enum: [1] },
+      teaser: { type: 'string' as const },
+      totalTimeMinutes: { type: ['integer', 'null'] as const },
+      difficulty: { type: ['string', 'null'] as const },
+      steps: {
+        type: 'array' as const,
+        items: {
+          type: 'object' as const,
+          properties: {
+            order: { type: 'integer' as const },
+            description: {
+              type: 'string' as const,
+              maxLength: RECIPE_EXPORT_MAX_STEP_LENGTH,
+            },
+            sourceStepOrders: {
+              type: 'array' as const,
+              items: { type: 'integer' as const },
+            },
+            ingredientKeys: {
+              type: 'array' as const,
+              items: { type: 'string' as const },
+            },
+          },
+          required: ['order', 'description', 'sourceStepOrders', 'ingredientKeys'],
+          additionalProperties: false,
+        },
+        maxItems: RECIPE_EXPORT_MAX_STEPS,
+      },
+      includedIngredientKeys: {
+        type: 'array' as const,
+        items: { type: 'string' as const },
+      },
+    },
+    required: ['version', 'teaser', 'totalTimeMinutes', 'difficulty', 'steps', 'includedIngredientKeys'],
+    additionalProperties: false,
+    },
   },
-  required: ['suggestedName', 'description', 'suggestedPortions', 'tags', 'ingredients', 'steps'],
+  required: ['suggestedName', 'description', 'suggestedPortions', 'tags', 'ingredients', 'steps', 'exportSuggestion'],
   additionalProperties: false,
 };
 
@@ -468,11 +533,16 @@ export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
   // Structured Outputs cannot express the category-dependent null rule for this field.
   return {
     ...parsed,
-    ingredients: parsed.ingredients.map((ingredient) =>
-      ingredient.category === 'food'
-        ? { ...ingredient, kitchenAmountText: null }
-        : ingredient,
-    ),
+    ingredients: parsed.ingredients.map((ingredient) => {
+      // Keep the historical runtime guard for malformed provider payloads:
+      // only the explicit seasoning value takes the seasoning path.
+      const category = ingredient.category === 'seasoning' ? 'seasoning' : 'food';
+      return {
+        ...ingredient,
+        category,
+        kitchenAmountText: category === 'food' ? null : ingredient.kitchenAmountText ?? null,
+      };
+    }),
   };
 }
 

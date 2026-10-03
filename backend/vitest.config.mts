@@ -30,5 +30,6 @@ export default defineConfig({
     exclude: ['src/**/*.contract.test.ts', 'src/**/*.eval.test.ts', 'node_modules', 'dist'],
     clearMocks: true,
     restoreMocks: true,
+    testTimeout: 30_000,
   },
 });

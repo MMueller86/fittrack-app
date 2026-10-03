@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '@fittrack/shared';
-import type { Recipe, RecipeIngredient } from '@fittrack/shared';
-import { buildRecipeWizardEditBootstrapState } from './recipeWizardEditBootstrap';
+import type { Recipe, RecipeExportSuggestion, RecipeIngredient } from '@fittrack/shared';
+import {
+  buildRecipeWizardEditBootstrapState,
+  buildWizardExportDraftFromPreparedSuggestion,
+  buildWizardExportDraftFromSuggestion,
+  loadRecipeWizardEditState,
+} from './recipeWizardEditBootstrap';
 
 vi.mock('expo-crypto', () => ({ randomUUID: vi.fn(() => 'step-uuid') }));
 
@@ -154,5 +159,144 @@ describe('buildRecipeWizardEditBootstrapState', () => {
         heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: 0.2, zoom: 1.4 },
       },
     ]);
+  });
+
+  it('keeps legacy export draft values explicit and avoids silent truncation on fallback', () => {
+    const state = buildRecipeWizardEditBootstrapState(makeRecipe({
+      ingredients: Array.from({ length: 25 }, (_, index) => makeIngredient({
+        id: `ing-${index + 1}`,
+        displayName: `Zutat ${index + 1}`,
+        linkedProductId: null,
+      })),
+      steps: [
+        { order: 1, description: 'Schritt 1' },
+        { order: 2, description: 'Schritt 2' },
+        { order: 3, description: 'Schritt 3' },
+        { order: 4, description: 'Schritt 4' },
+        { order: 5, description: 'Schritt 5' },
+        { order: 6, description: 'Schritt 6' },
+      ],
+    }));
+
+    expect(state.exportDraft).not.toBeNull();
+    expect(state.exportDraft?.totalTimeMinutes).toBe('');
+    expect(state.exportDraft?.difficulty).toBe('');
+    expect(state.exportDraft?.steps).toHaveLength(6);
+    expect(state.exportDraft?.includedIngredientIds).toEqual([]);
+    expect(state.exportDraft?.includedIngredientKeys).toEqual([]);
+    expect(state.exportDraft?.source).toBe('legacy');
+    expect(state.exportDraft?.confirmed).toBe(false);
+  });
+
+  it('includes every legacy food ingredient by default when there are at most twenty', () => {
+    const state = buildRecipeWizardEditBootstrapState(makeRecipe({
+      ingredients: [
+        makeIngredient({ id: 'food-1' }),
+        makeIngredient({ id: 'food-2', displayName: 'Gurke' }),
+        makeIngredient({ id: 'seasoning-1', displayName: 'Salz', category: 'seasoning' }),
+      ],
+    }));
+
+    expect(state.exportDraft?.includedIngredientIds).toEqual(['food-1', 'food-2']);
+  });
+
+  it('loads a persisted export view for review without auto-confirming it', () => {
+    const state = buildRecipeWizardEditBootstrapState(makeRecipe({
+      exportView: {
+        version: 1,
+        teaser: 'Frischer Salat',
+        totalTimeMinutes: 20,
+        difficulty: 'Einfach',
+        steps: [{ order: 1, description: 'Tomaten schneiden.' }],
+        includedIngredientIds: ['ing-1'],
+        sourceFingerprint: 'sha256:stored',
+      },
+    }));
+
+    expect(state.exportDraft).toMatchObject({
+      teaser: 'Frischer Salat',
+      totalTimeMinutes: '20',
+      difficulty: 'Einfach',
+      steps: [{ order: 1, description: 'Tomaten schneiden.' }],
+      includedIngredientIds: ['ing-1'],
+      source: 'persisted',
+      confirmed: false,
+    });
+  });
+
+  it('keeps AI analysis keys separate from persistent recipe ingredient IDs', () => {
+    const suggestion: RecipeExportSuggestion = {
+      version: 1,
+      teaser: 'Frischer Salat',
+      totalTimeMinutes: 15,
+      difficulty: 'Einfach',
+      steps: [{ order: 1, description: 'Tomaten schneiden.' }],
+      includedIngredientKeys: ['analysis-tomatoes'],
+      sourceFingerprint: 'analysis-only',
+    };
+
+    const draft = buildWizardExportDraftFromSuggestion(suggestion, ['analysis-tomatoes']);
+
+    expect(draft.includedIngredientKeys).toEqual(['analysis-tomatoes']);
+    expect(draft.analysisIngredientKeys).toEqual(['analysis-tomatoes']);
+    expect(draft.includedIngredientIds).toEqual([]);
+    expect(draft.confirmed).toBe(false);
+  });
+
+  it('preserves saved IDs without carrying AI key mappings into V2 preparation', () => {
+    const currentDraft = {
+      version: 1 as const,
+      teaser: 'Bisheriger Teaser',
+      totalTimeMinutes: '12',
+      difficulty: 'Einfach',
+      steps: [{ order: 1, description: 'Vorhandener Schritt.' }],
+      includedIngredientIds: ['saved-ingredient-1'],
+      includedIngredientKeys: ['saved-analysis-key'],
+      analysisIngredientKeys: ['saved-analysis-key'],
+      source: 'persisted' as const,
+      confirmed: false,
+    };
+    const draft = buildWizardExportDraftFromPreparedSuggestion({
+      version: 1,
+      teaser: 'Frischer Salat',
+      totalTimeMinutes: null,
+      difficulty: null,
+      steps: [{ order: 1, description: 'Tomaten schneiden.' }],
+    }, currentDraft);
+
+    expect(draft).toMatchObject({
+      totalTimeMinutes: '',
+      difficulty: '',
+      includedIngredientIds: ['saved-ingredient-1'],
+      includedIngredientKeys: [],
+      analysisIngredientKeys: [],
+      source: 'prepared',
+      confirmed: false,
+    });
+  });
+
+  it('reloads the latest recipe revision into an unconfirmed review state', async () => {
+    const latestRecipe = makeRecipe({
+      exportView: {
+        version: 1,
+        teaser: 'Aktuelle Exportansicht',
+        totalTimeMinutes: 35,
+        difficulty: 'Mittel',
+        steps: [{ order: 1, description: 'Aktuelle Schritte.' }],
+        includedIngredientIds: ['ing-1'],
+        sourceFingerprint: 'sha256:latest',
+      },
+    });
+    const getRecipe = vi.fn(async () => latestRecipe);
+
+    const loaded = await loadRecipeWizardEditState('recipe-1', getRecipe);
+
+    expect(getRecipe).toHaveBeenCalledWith('recipe-1');
+    expect(loaded.recipe).toBe(latestRecipe);
+    expect(loaded.bootstrapState.exportDraft).toMatchObject({
+      teaser: 'Aktuelle Exportansicht',
+      source: 'persisted',
+      confirmed: false,
+    });
   });
 });

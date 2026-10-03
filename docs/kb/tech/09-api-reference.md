@@ -122,11 +122,13 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | PUT | `/api/recipes/{id}/images/order` | Yes | Reorders existing images; returns `{ images: RecipeImage[] }` |
 | DELETE | `/api/recipes/{id}/images/{imageId}` | Yes | Deletes the blob and compacts remaining image order; `204` with no body |
 | POST | `/api/recipes/{id}/log` | Yes | Logs a portion snapshot into a diary meal |
+| POST | `/api/recipes/{id}/export-view/prepare` | Yes | Transient export-view preparation; uses the `recipe-analyze` quota |
 | POST | `/api/recipes/{id}/instagram-render` | Yes | Renders the server-owned recipe as a direct `1080 x 1350` PNG; no render result is persisted |
+| POST | `/api/recipes/{id}/share-bundle` | Yes | Atomically renders Instagram and recipe-detail PNGs from an optional request draft or confirmed stored view, including stale snapshots; no result is persisted |
 
 ### Recipe create/update body
 
-`POST /api/recipes` accepts the complete recipe body. `PUT /api/recipes/{id}` accepts a partial recipe body with any subset of `name`, `description`, `portions`, `ingredients`, `steps`, and `tags`; omitted fields keep their stored values. When `ingredients` or `portions` are supplied, nutrition is recalculated server-side from the stored/supplied combination. Both endpoints validate `ingredients` with the same Zod contract and return `400` with an `error` field when validation fails.
+`POST /api/recipes` accepts the complete recipe body. `PUT /api/recipes/{id}` accepts a partial recipe body with any subset of `name`, `description`, `portions`, `ingredients`, `steps`, `tags`, and the confirmed `exportView` fields; omitted fields keep their stored values. When `ingredients` or `portions` are supplied, nutrition is recalculated server-side from the stored/supplied combination. Both endpoints validate `ingredients` with the same Zod contract and return `400` with an `error` field when validation fails.
 
 The update endpoint always writes recalculated `nutritionTotal` and `nutritionPerPortion` using the effective ingredient list and portion count. This also covers updates that only change metadata: stored nutrition is normalized from the current recipe ingredients/portions before the response is returned.
 
@@ -153,6 +155,100 @@ Each ingredient contains the following fields:
 For `food` ingredients, and for legacy ingredients without `category`, `amountGrams` must be greater than zero. `seasoning` ingredients may use `amountGrams: null` (or `0`); their nutrition contribution is zero. Negative, non-finite, or otherwise invalid food amounts are rejected on both create and update. Existing Cosmos recipe documents do not require a migration: missing optional ingredient fields remain missing and are read as legacy `food` ingredients.
 
 `amountLabel` is retained by the create/update and GET roundtrip. `kitchenAmountText` belongs exclusively to the AI recipe-analysis response and is not a persistent `RecipeIngredient` field.
+
+### Recipe export view
+
+`exportView` is optional on create and update. The request contains `version`,
+`teaser`, `totalTimeMinutes`, `difficulty`, ordered export `steps`, and
+`includedIngredientIds`; `sourceFingerprint` is not a client input. The backend
+validates the selected ingredient IDs, recalculates nutrition, and adds the
+server-owned `sha256:` fingerprint over the effective recipe source before
+persisting the export view.
+
+Recipe responses may include the confirmed `exportView` and the derived,
+response-only `exportViewStatus`. A missing export view is represented by
+omitting both fields and is interpreted as `missing`; a matching fingerprint is
+`current`, and a changed source with the old snapshot is `stale`. The status is
+never stored in Cosmos. Omitting `exportView` during an update preserves the
+stored snapshot, while supplying a new one replaces it with a newly computed
+fingerprint. Legacy recipes without an export view remain readable without a
+Cosmos migration or a new container.
+
+Confirmation uses a top-level request-body pair: `exportView` with
+`exportViewAction: 'confirm'`. A create without an export view omits both; a
+create that includes one requires the marker and has no `If-Match`
+precondition. Ordinary updates omit both fields, preserve the old snapshot, and
+cannot re-fingerprint it. The marker is never persisted, and neither
+`If-Match` nor a client-computed `sourceFingerprint` is a JSON field. The server
+computes the fingerprint from the effective merged recipe.
+
+`GET /api/recipes/{id}`, successful `POST /api/recipes`, and successful
+`PUT /api/recipes/{id}` return the current opaque ETag in the HTTP response
+header. An export confirmation update does not require a client ETag; it may
+send the exact ETag from the recipe GET response in the HTTP `If-Match` header
+as an optional precondition. Every PUT uses atomic compare-and-replace against
+the revision it read, independently of the client header.
+
+**Confirmation errors:**
+
+- `400` — incomplete `exportView` / `exportViewAction` pair;
+	`{ "error": "invalid_export_view_confirmation" }`
+- `400` — an included ingredient ID is unknown, refers to a seasoning, occurs
+  more than once in the recipe, or is repeated in `includedIngredientIds`;
+  `{ "error": "invalid_export_view_ingredient" }`
+- `412` — supplied stale ETag or internal write race;
+	`{ "error": "recipe_revision_conflict" }`
+
+### POST /api/recipes/{id}/export-view/prepare
+
+The route loads a versioned recipe from the JWT user's partition and invokes
+the existing Recipe Analyze operation with the shared `recipe-analyze` quota.
+It does not change the prompt, make an extra AI call, or write to Cosmos. The
+AI output is validated before exactly one usage is tracked. Provider, quota,
+and validation failures do not track usage.
+
+**Request:** exactly `{ "contractVersion": 2 }`. Missing or invalid JSON,
+`{}`, unknown fields, and unsupported versions return
+`400 { "error": "invalid_export_preparation_request" }`. No client `If-Match`
+header is required. If one is supplied, a stale or non-exact ETag returns
+`412 recipe_revision_conflict` before quota or provider work.
+
+**Success response (200):** The suggestion contains only export text fields and
+plain steps. `sourceEtag` identifies the loaded revision for compatibility;
+clients do not need to send it back or compare it before accepting the text.
+The response does not return analyzer ingredient keys, ingredient IDs, or
+ingredient-resolution results. `totalTimeMinutes` and `difficulty` may be
+`null`. Preparation is transient: it does not update the recipe or its
+confirmed `exportView`; saving still uses the separate explicit confirmation
+flow above.
+
+```json
+{
+	"contractVersion": 2,
+	"recipeId": "recipe-uuid",
+	"sourceEtag": "\"recipe-revision\"",
+	"suggestion": {
+		"version": 1,
+		"teaser": "Goldbraunes Brot",
+		"totalTimeMinutes": 90,
+		"difficulty": "Einfach",
+		"steps": [
+			{ "order": 1, "description": "Tomaten schneiden." }
+		]
+	}
+}
+```
+
+**Errors:**
+
+- `400` — missing recipe id, or invalid preparation body (`invalid_export_preparation_request`)
+- `401` — missing or invalid Bearer token
+- `404` — recipe not found for the authenticated user
+- `412` — a supplied `If-Match` does not exactly match the loaded recipe revision; rejected before quota/provider work
+- `422` — AI output fails server-side recipe/export validation; response includes `details`
+- `429` — existing `QuotaExceededResponse` for `recipe-analyze`
+- `502` — provider or empty/invalid AI response
+- `500` — unexpected backend failure
 
 ### Recipe steps
 
@@ -293,6 +389,127 @@ The direct Blob download is bounded by the existing 8 MB recipe-image limit.
 - `500` — unexpected storage, native renderer, missing-asset, or other backend
 	failure. The external response is generic; internal causes and asset details
 	are logged but never returned.
+
+### POST /api/recipes/{id}/share-bundle
+
+This authenticated endpoint creates an atomic pair of share images from one
+server-loaded recipe and one selected stored image. The optional top-level
+request-only `exportViewDraft` (shared type `RecipeShareBundleExportDraft`)
+takes precedence for this render. Otherwise the endpoint uses the
+confirmed stored `exportView`, whether its fingerprint is current or stale. If
+neither exists, it returns `422 MISSING_EXPORT_VIEW` before image download or
+either renderer call. The current recipe supplies canonical fields, while the
+selected draft or view supplies the teaser, time, difficulty, steps, and
+included ingredient IDs. Current ingredient values are looked up by ID,
+without AI-key or name mapping. The draft is never persisted and does not
+refresh a fingerprint. The endpoint has no AI call or quota and returns no
+partial pair if either render fails.
+
+**Request body:**
+
+```json
+{
+	"imageId": "optional-recipe-image-uuid",
+	"presentation": {
+		"focusX": 0.5,
+		"focusY": 0.46,
+		"zoom": 1.0
+	},
+	"selectedTags": ["Schnell", "Salat"],
+	"nutritionHighlight": "high-protein",
+	"exportViewDraft": {
+		"version": 1,
+		"teaser": "Goldbraunes Brot",
+		"totalTimeMinutes": null,
+		"difficulty": null,
+		"steps": [
+			{ "order": 1, "description": "Tomaten schneiden." }
+		],
+		"includedIngredientIds": ["ingredient-uuid"]
+	}
+}
+```
+
+All fields are optional, so `{}` is valid. The strict schema accepts only
+`imageId`, `presentation`, `selectedTags`, `nutritionHighlight`, and
+`exportViewDraft`; unlike the legacy direct Instagram route, `recipeMeta` is
+rejected. The draft is strict at every object level and accepts only
+`version: 1`, `teaser` (trimmed, 1-96 characters), `totalTimeMinutes` (`null` or
+a positive integer up to 10,080), `difficulty` (`null` or non-empty trimmed
+single-line text), `steps` (1-5 entries with ascending positive integer orders
+and trimmed 1-90 character descriptions), and `includedIngredientIds` (at most
+20 unique non-empty IDs). `sourceFingerprint` and all other unknown properties
+are rejected. Each included ID must identify exactly one non-seasoning
+ingredient in the authenticated recipe; invalid references return
+`400 { "error": "invalid_export_view_ingredient" }`.
+
+When `exportViewDraft` is omitted, existing callers retain the stored-view
+contract: a present confirmed view is used whether current or stale; when both
+the request draft and stored view are absent, the endpoint returns
+`422 { "error": "Recipe export view is required for sharing",
+"code": "MISSING_EXPORT_VIEW" }`. Image selection, presentation
+defaults/overrides, selected-tag validation, and highlight values follow
+`POST /api/recipes/{id}/instagram-render`. Recipe title, portions, nutrition,
+and current ingredient values come from the authenticated server-side recipe.
+The selected draft or stored view supplies export-only text and ingredient IDs.
+Neither rendering nor accepting a request draft changes the recipe or its
+confirmed fingerprint.
+
+If draft time is `null`, both images omit the time chip. A `null` difficulty
+omits only the Instagram difficulty chip; the detail image does not display a
+difficulty chip in either case. Portions and the detail image's displayed
+ingredient-count chip remain available.
+
+**Success response (200):**
+
+```json
+{
+	"recipeId": "recipe-uuid",
+	"instagram": {
+		"mimeType": "image/png",
+		"size": 12345,
+		"data": "<base64 PNG>"
+	},
+	"detail": {
+		"mimeType": "image/png",
+		"size": 12345,
+		"data": "<base64 PNG>"
+	}
+}
+```
+
+Each `size` is the corresponding decoded PNG byte length. Both images use the
+selected stored Blob and the response shape is unchanged. The response is
+emitted only after both renderers succeed; a renderer failure never returns a
+partial image pair. A request draft is not persisted.
+
+**Errors:**
+
+- `400` — missing route id, invalid JSON, unknown fields (including
+	`recipeMeta`), invalid draft shape or ingredient IDs, invalid
+	`imageId`/presentation/selectedTags/nutritionHighlight.
+- `401` — missing or invalid Bearer token.
+- `404` — recipe not found for the authenticated user, or an explicitly
+	requested `imageId` is not part of that recipe.
+- When the recipe has no stored image and no explicit `imageId` was requested,
+	both image-export endpoints return HTTP `422` with this user-actionable body:
+
+	```json
+	{
+		"error": "Bitte lade zuerst ein Rezeptfoto hoch, bevor du das Rezept teilst.",
+		"code": "NO_RECIPE_IMAGE"
+	}
+	```
+
+	Clients should branch on `code`, not the message text, and may display `error`
+	to the user. This is a missing prerequisite, not a transient render failure;
+	retrying without uploading a recipe photo will not resolve it. No Blob
+	download, renderer call, or recipe write occurs for this response.
+- `422` — missing stored view and omitted draft (`MISSING_EXPORT_VIEW`), no renderable image,
+	invalid stored image metadata, image over 8 MB, unreadable image, or a
+	controlled renderer/layout failure.
+- `500` — unexpected storage, native renderer, missing-asset, or other backend
+	failure. Errors never include one rendered image as a partial response.
 
 ## Food Search
 

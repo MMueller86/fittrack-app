@@ -10,6 +10,7 @@ const expectedAssets = [
   "branding/fittrack-wordmark.png",
   "branding/micha-logo-writing.svg",
   "fonts/Inter-Medium.ttf",
+  "fonts/Inter-MediumItalic.ttf",
   "fonts/Inter-SemiBold.ttf",
   "fonts/InterDisplay-Bold.ttf",
   "fonts/LICENSE.txt",

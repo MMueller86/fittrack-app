@@ -45,7 +45,9 @@ Nutrition for each ingredient is calculated from `amountGrams / 100 × nutrition
 
 `kitchenAmountText` belongs exclusively to the AI analysis contract; the persistent `RecipeIngredient` field is `amountLabel`.
 
-[Rule] During recipe analysis, every `food` ingredient with a determinable quantity must have a positive finite `amountGrams` value. Kitchen units such as tablespoons, teaspoons, millilitres, and pieces are converted before catalog resolution. A genuinely indeterminate food amount, such as spray oil without a reliable measurable quantity, may retain `amountGrams: null` in the preview and is routed to manual review; it must be resolved or removed before persistence.
+[Rule] During recipe analysis, every `food` ingredient with a determinable quantity must have a positive finite `amountGrams` value. Kitchen units such as tablespoons, teaspoons, millilitres, and pieces are converted before catalog resolution. A genuinely indeterminate food amount, such as unmeasured spray oil, must retain `amountGrams: null`; a tiny positive placeholder is not a measurement. It is routed to manual review and must be resolved or removed before persistence.
+
+[Rule] Recipe analysis preserves preparation order with contiguous 1-based source-step orders. Export grouping may combine only adjacent source steps, and the flattened source-step trace must include every source step exactly once in order.
 
 ### Create / Update Compatibility
 
@@ -76,6 +78,170 @@ interface RecipeNutrition {
 
 `PUT /api/recipes/{id}` recalculates `nutritionTotal` and `nutritionPerPortion` server-side from the supplied/stored ingredient and portion combination. Clients do not own persisted recipe nutrition after create/update.
 
+## Confirmed Export View and Source Fingerprint
+
+`Recipe.exportView` is an optional, versioned export snapshot stored on the
+existing recipe document. Create and update requests accept only the confirmed
+`RecipeExportViewInput` fields. The `sourceFingerprint` is server-owned: the
+backend rejects a client-supplied value and calculates a `sha256:` fingerprint
+from a deterministic canonical representation of the effective recipe source.
+That source includes the name, description, portions, ordered steps, stored
+ingredients and their nutrition-relevant values, tags, and the server-calculated
+`nutritionPerPortion`.
+
+`exportViewStatus` is response-only and is derived on every create, update, GET,
+and list projection; it is never persisted as a separate Cosmos field:
+
+- `missing` means that no export snapshot exists. The current API represents
+  this state by omitting both `exportView` and `exportViewStatus`.
+- `current` means that the stored export snapshot fingerprint equals the
+  fingerprint of the current effective recipe source.
+- `stale` means that the recipe source changed after the stored export snapshot
+  was confirmed. Omitting `exportView` on an update preserves the old snapshot,
+  so a relevant source change makes it stale. Only an explicit confirmation
+  request replaces the snapshot and computes a new server fingerprint atomically
+  with the update.
+
+Legacy Cosmos recipe documents without `exportView` remain readable. This is a
+read-compatible additive change: no migration, new container, or partition-key
+change is required. The field remains in the existing `recipes` container,
+partitioned by `/userId`.
+
+### Confirmation and ETag Contract
+
+Confirmation is explicit and represented in the request body by `exportView`
+together with the request-only `exportViewAction: 'confirm'`. A create that
+includes an export view requires the marker and has no prior ETag. An ordinary
+update omits both fields; sending only one is invalid, and an ordinary update
+cannot re-fingerprint the existing snapshot.
+
+`GET /api/recipes/{id}`, successful `POST /api/recipes`, and successful
+`PUT /api/recipes/{id}` return the current opaque ETag in the HTTP response
+header. Confirmation of an existing recipe does not require a client ETag; an
+exact `If-Match` from the recipe GET response is checked when supplied. The
+ETag is not a JSON field or a client fingerprint; `sourceFingerprint` is
+server-owned. Every PUT uses atomic compare-and-replace against the revision it
+read, independently of the optional client precondition.
+
+An incomplete `exportView` / `exportViewAction` pair returns `400` with
+`error: 'invalid_export_view_confirmation'`. A supplied stale ETag or an
+internal write race returns `412` with `error: 'recipe_revision_conflict'`;
+the client should reload and review rather than retrying the confirmation
+automatically. The server does not merge a stale client draft or retry a failed
+compare-and-replace.
+
+On create or confirmation update, every `includedIngredientIds` entry must
+identify exactly one non-seasoning ingredient in the effective recipe. Unknown,
+duplicate, or seasoning IDs return `400` with
+`error: 'invalid_export_view_ingredient'`.
+
+### Transient Export-View Preparation
+
+`POST /api/recipes/{id}/export-view/prepare` uses the existing Recipe Analyze
+call and the shared `recipe-analyze` quota. It does not change the prompt,
+persist recipe data, or make an additional AI call. The legacy `{}` request
+accepts only the strict `{ "contractVersion": 2 }` request; `{}`, missing or
+invalid JSON, unknown fields, and unsupported versions return
+`400 invalid_export_preparation_request`. No client ETag is required. If
+`If-Match` is supplied, a stale or non-exact ETag returns
+`412 recipe_revision_conflict` before quota enforcement or provider work;
+omission does not return `428`.
+
+On success, the response retains `sourceEtag` as compatibility metadata and
+contains only the teaser, nullable time and difficulty, and ordered plain
+`RecipeExportStep` values. `sourceEtag` is not a client acceptance prerequisite.
+Preparation reads the current recipe server-side and does not expose AI
+ingredient keys, map them to saved recipe ingredient IDs, or return
+ingredient-resolution states. Existing saved ingredients remain unchanged and
+their IDs are not part of this transient suggestion. Preparation validates the
+export text limits, nullable metadata, contiguous export-step order, and complete
+ordered source-step coverage. Unused AI ingredient fields and ingredient-key
+references do not block this text-only response; full Recipe Analyze validation
+continues to enforce them for recipe import. The validated AI result is
+tracked exactly once; quota, provider, and validation failures do not track
+usage. Preparation does not update the recipe or its confirmed `exportView`;
+saving still requires the separate explicit confirmation flow.
+
+### Sharing a Confirmed Export View or Request Draft
+
+`POST /api/recipes/{id}/share-bundle` accepts an optional top-level
+`exportViewDraft`. When supplied, this unconfirmed request-only value is used
+for that render. Otherwise the endpoint uses the stored confirmed `exportView`,
+whether its derived status is `current` or `stale`. If neither exists, it
+returns `422 MISSING_EXPORT_VIEW`. This precedence preserves legacy requests
+that omit `exportViewDraft`.
+
+The shared request-only type `RecipeShareBundleExportDraft` is supplied
+through the top-level `exportViewDraft` property. Its shape is
+`{ version, teaser, totalTimeMinutes, difficulty, steps, includedIngredientIds }`.
+`version` is `1`; `teaser` is a
+trimmed 1-96 character string; `totalTimeMinutes` is `null` or a positive
+integer up to 10,080; `difficulty` is `null` or a non-empty trimmed single-line
+string. There must be 1-5 export steps with ascending positive integer orders
+and trimmed 1-90 character descriptions. `includedIngredientIds` is a unique
+array of at most 20 non-empty IDs. Each selected ID must identify exactly one
+non-seasoning ingredient in the current authenticated user's recipe. Unknown
+fields, including `sourceFingerprint`, are rejected. The request draft has no
+confirmation action and is not a persisted `RecipeExportViewInput`.
+
+The request draft never updates a recipe or its fingerprint, even when both a
+draft and a stored view are present. Sharing makes no AI call, consumes no
+quota, and requires no recipe confirmation or persistence operation.
+
+The handler loads the current recipe and selected image server-side. Canonical
+recipe fields, including title, portions, nutrition, tags, and current
+ingredient values, come from that recipe. The teaser, time, difficulty, steps,
+and included ingredient IDs come from the request draft when present, otherwise
+from `exportView`; ingredient values are looked up by those IDs in the current
+recipe. There is no mapping by AI key or ingredient name, and export text is
+never copied into the normal recipe description or steps. Instagram and detail
+PNGs are returned together only after both renders succeed.
+
+The detail PNG keeps the `1080 x 1350` output and supports 1 through 20
+displayed ingredients and 1 through 5 preparation steps. Its metadata chips
+show portions, total time, and displayed ingredient count. When request-draft
+time is `null`, both renderers omit the time chip; Instagram also omits the
+difficulty chip when difficulty is `null`. Portions remain visible in both
+images, and the detail PNG always shows its displayed ingredient count. The
+detail PNG intentionally omits difficulty even when it is known. These are
+presentation-only distinctions and do not change confirmed export data or
+ordinary recipe fields.
+
+Title, teaser, ingredient amount/name, and preparation text wrap at word
+boundaries; an overwide word may break only at a valid German hyphenation
+point. Candidate breaks are measured with the production font, including any
+inserted hyphen, and each text block is checked against its assigned width and
+height. If no legal layout fits, detail rendering fails with an error
+identifying the affected field or item instead of returning clipped or
+overflowing text. The bundle
+still returns neither image unless both renders succeed.
+
+### Mobile Share-Review Lifecycle
+
+The Mobile recipe wizard has no export tab, export inputs, or export-confirm
+action. Ordinary create and update requests omit `exportViewAction` and
+`exportView`; an update therefore preserves any existing snapshot. A new-recipe
+analyzer `exportSuggestion` is carried to `RecipeDetailScreen` as an
+unconfirmed, serializable local draft. It contains the teaser, nullable time
+and difficulty, ordered export steps, and only ingredient IDs uniquely
+resolved to user-confirmed, non-seasoning recipe ingredients. It contains no
+AI `analysisKey`, candidates, resolution state, or client fingerprint and is
+not persisted by recipe creation.
+
+On Share, a request draft being previewed takes precedence for that render. If
+there is no such draft, Mobile reuses an existing confirmed `exportView` whether
+its status is `current` or `stale`. If neither exists, it reuses an unconfirmed
+local draft from new-recipe analysis or V2 preparation while the detail screen
+remains mounted; only when neither source is available does it call the V2
+preparation endpoint. A draft may be sent as `exportViewDraft` before confirmation
+and remains request-only. A stale view does not trigger preparation or
+automatic reconfirmation. The Share review is editable. New or changed values
+are persisted only through the existing explicit
+`exportViewAction: 'confirm'` plus `exportView` request pair. Export text is
+not copied into the ordinary recipe description or steps. A defensive
+`MISSING_EXPORT_VIEW` response is recovered inside Share rather than sending
+the user back to the wizard.
+
 ## Recipe Steps
 
 `RecipeStep`:
@@ -99,6 +265,12 @@ There is no top-level recipe notes field and no step-level notes field in the pe
 `heroCrop` is a closed, versioned contract: `version: 1`, `frame: 'instagram-recipe-v1'`, finite normalized `focusX` and `focusY` values in `0..1`, and finite `zoom >= 1`. The focus coordinates refer to the visually oriented source image. Arbitrary frame dimensions, versions, or frame names are not accepted.
 
 The `instagram-recipe-v1` frame uses a `1080 x 1015` photo/hero area. This intentionally differs from the older `1080 x 880` reference: `1080 x 880` ends before the renderer's tag zone and is not the runtime crop contract. The complete Instagram output remains exactly `1080 x 1350`; `1080 x 1015` is only the photo/hero frame.
+
+Title and detail export images share the same asymmetric ambient background:
+green at the lower left, fading into the near-black panel base on the right
+around the FitTrack wordmark. Both templates use `ambientBackgroundImage()`;
+the detail template's existing gradient is the reference. Logo placement,
+footer geometry, photo transition, and output dimensions are unchanged.
 
 The current API supports upload, crop-metadata update, delete, and reorder. Upload appends the image at the next order value. Delete removes the blob and renumbers remaining images. Reorder accepts a complete image-ID permutation and normalizes `order` to `1..n`; it does not move blob data.
 
@@ -163,6 +335,8 @@ Opening the dialog reads the current diary day but does not mutate it. On final 
 - `PUT /api/recipes/{id}/images/order` — reorder existing images by complete unique image-ID permutation
 - `DELETE /api/recipes/{id}/images/{imageId}` — delete one image and compact order
 - `POST /api/recipes/{id}/log` — log one or more recipe portions into a diary meal
+- `POST /api/recipes/{id}/log` — log one or more recipe portions into a diary meal
+- `POST /api/recipes/{id}/share-bundle` — render an atomic Instagram/detail PNG pair from a confirmed export view, including stale snapshots
 
 ## Related Documents
 

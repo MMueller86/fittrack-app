@@ -1,4 +1,9 @@
-import type { RecipeImage, RecipeImageHeroCrop, RecipeIngredient } from '@fittrack/shared';
+import type {
+  RecipeExportStep,
+  RecipeImage,
+  RecipeImageHeroCrop,
+  RecipeIngredient,
+} from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
 import { normalizeRecipeImageHeroCrop } from './recipeImageHeroCropMath';
 
@@ -7,6 +12,7 @@ export type IngStatus = 'auto-matched' | 'needs-selection' | 'needs-ai' | 'confi
 
 export interface WizardIngredient {
   id: string;
+  analysisKey?: string;
   parserItem: MealParserPreviewItem;
   status: IngStatus;
   userConfirmed: boolean;
@@ -44,6 +50,19 @@ export interface ExistingWizardImageDraft {
 }
 
 export type WizardImageDraft = NewWizardImageDraft | ExistingWizardImageDraft;
+
+export interface WizardExportDraft {
+  version: 1;
+  teaser: string;
+  totalTimeMinutes: string;
+  difficulty: string;
+  steps: RecipeExportStep[];
+  includedIngredientIds: string[];
+  includedIngredientKeys: string[];
+  analysisIngredientKeys: string[];
+  source: 'analysis' | 'prepared' | 'persisted' | 'legacy' | 'manual';
+  confirmed: boolean;
+}
 
 export function buildWizardImageDraftFromRecipeImage(image: RecipeImage): ExistingWizardImageDraft | null {
   if (!image.url) return null;

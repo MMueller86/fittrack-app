@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { PendingRecipeExportDraft } from './recipeWizardExportView';
 import {
   buildRecipeDetailAfterSaveParams,
   canRunRecipeWizardAnalysis,
@@ -32,6 +33,25 @@ describe('recipe wizard navigation', () => {
       id: 'recipe-1',
       intent: RECIPE_DETAIL_INTENT_OPEN_LOG_MODAL,
     });
+  });
+
+  it('carries a serializable pending export draft in detail route params', () => {
+    const pendingExportDraft: PendingRecipeExportDraft = {
+      version: 1,
+      teaser: 'Frischer Salat',
+      totalTimeMinutes: null,
+      difficulty: null,
+      steps: [{ order: 1, description: 'Tomaten schneiden.' }],
+      includedIngredientIds: ['recipe-ingredient-1'],
+    };
+
+    expect(buildRecipeDetailAfterSaveParams('recipe-1', pendingExportDraft)).toEqual({
+      id: 'recipe-1',
+      intent: RECIPE_DETAIL_INTENT_OPEN_LOG_MODAL,
+      pendingExportDraft,
+    });
+    expect(JSON.stringify(pendingExportDraft)).not.toContain('sourceFingerprint');
+    expect(JSON.stringify(pendingExportDraft)).not.toContain('analysisKey');
   });
 
   it('consumes the post-save log-modal intent only once', () => {

@@ -1,0 +1,9 @@
+export const RECIPE_EXPORT_VIEW_VERSION = 1 as const;
+export const RECIPE_EXPORT_MAX_TEASER_LENGTH = 96;
+export const RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES = 10_080;
+export const RECIPE_EXPORT_MIN_STEPS = 1;
+export const RECIPE_EXPORT_MAX_STEPS = 5;
+export const RECIPE_EXPORT_MAX_STEP_LENGTH = 90;
+export const RECIPE_EXPORT_MAX_INGREDIENTS = 20;
+
+export type RecipeExportViewVersion = typeof RECIPE_EXPORT_VIEW_VERSION;

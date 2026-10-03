@@ -28,7 +28,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Update this constant whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-review all fixtures. */
-const TESTED_PROMPT_VERSION = 'v9';
+const TESTED_PROMPT_VERSION = 'v11';
 
 it('prompt version matches fixture expectations', () => {
   expect(RECIPE_ANALYZE_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);
@@ -125,10 +125,32 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () => 
     expect(result.description, 'description must be non-empty').toBeTruthy();
     expect(Array.isArray(result.ingredients), 'ingredients must be an array').toBe(true);
     expect(Array.isArray(result.steps), 'steps must be an array').toBe(true);
+    expect(result.exportSuggestion, 'exportSuggestion must be present').toBeDefined();
     expect(typeof result.suggestedPortions).toBe('number');
     expect(result.suggestedPortions, 'suggestedPortions must be > 0').toBeGreaterThan(0);
 
+    expect(result.exportSuggestion.version).toBe(1);
+    expect(result.exportSuggestion.teaser.trim()).not.toBe('');
+    expect(result.exportSuggestion.teaser.length).toBeLessThanOrEqual(96);
+    expect(
+      result.exportSuggestion.totalTimeMinutes === null ||
+        (Number.isInteger(result.exportSuggestion.totalTimeMinutes) && result.exportSuggestion.totalTimeMinutes > 0),
+    ).toBe(true);
+    expect(
+      result.exportSuggestion.difficulty === null ||
+        (result.exportSuggestion.difficulty.trim().length > 0 && !/[\r\n]/u.test(result.exportSuggestion.difficulty)),
+    ).toBe(true);
+    expect(result.exportSuggestion.steps.length).toBeLessThanOrEqual(5);
+    expect(new Set(result.exportSuggestion.includedIngredientKeys).size).toBe(
+      result.exportSuggestion.includedIngredientKeys.length,
+    );
+
+    const analysisKeys = new Set<string>();
     for (const ing of result.ingredients) {
+      expect(ing.analysisKey.trim()).toBe(ing.analysisKey);
+      expect(ing.analysisKey).not.toBe('');
+      expect(analysisKeys.has(ing.analysisKey), `analysisKey must be unique: ${ing.analysisKey}`).toBe(false);
+      analysisKeys.add(ing.analysisKey);
       expect(
         ['food', 'seasoning'],
         `ingredient.category must be 'food' or 'seasoning', got "${ing.category}"`,
@@ -138,7 +160,7 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () => 
         `amountGrams must be number | null, got ${typeof ing.amountGrams}`,
       ).toBe(true);
       if (typeof ing.amountGrams === 'number') {
-        expect(ing.amountGrams, `amountGrams must be >= 0`).toBeGreaterThanOrEqual(0);
+        expect(ing.amountGrams, `amountGrams must be positive`).toBeGreaterThan(0);
       }
       // food items must never carry a kitchen amount text
       if (ing.category === 'food') {
@@ -146,6 +168,25 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () => 
           ing.kitchenAmountText,
           `food ingredient "${ing.displayName}": kitchenAmountText must be null`,
         ).toBeNull();
+      }
+    }
+
+    for (const key of result.exportSuggestion.includedIngredientKeys) {
+      expect(analysisKeys.has(key), `includedIngredientKeys must reference ${key}`).toBe(true);
+      const ingredient = result.ingredients.find((item) => item.analysisKey === key);
+      expect(ingredient?.category, `includedIngredientKeys must exclude seasoning: ${key}`).not.toBe('seasoning');
+    }
+
+    const sourceOrders = result.steps.map((step) => step.order);
+    expect(sourceOrders).toEqual(sourceOrders.map((_, index) => index + 1));
+    const tracedOrders = result.exportSuggestion.steps.flatMap((step) => step.sourceStepOrders);
+    expect(tracedOrders).toEqual(sourceOrders);
+    for (const step of result.exportSuggestion.steps) {
+      expect(step.description.trim()).not.toBe('');
+      expect(step.description.length).toBeLessThanOrEqual(90);
+      expect(new Set(step.sourceStepOrders).size).toBe(step.sourceStepOrders.length);
+      for (const key of step.ingredientKeys) {
+        expect(analysisKeys.has(key), `ingredientKeys must reference ${key}`).toBe(true);
       }
     }
 

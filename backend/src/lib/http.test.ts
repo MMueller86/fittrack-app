@@ -24,6 +24,47 @@ describe('withHandler', () => {
     expect(res.jsonBody).toEqual({ hello: 'world' });
   });
 
+  it('logs returned 4xx responses with status and API code', async () => {
+    const ctx = makeContext();
+    const warnSpy = vi.spyOn(ctx, 'warn');
+    const wrapped = withHandler('recipes.shareBundle', async () => ({
+      status: 422,
+      jsonBody: {
+        error: 'Recipe detail image cannot be rendered',
+        code: 'INVALID_TEMPLATE_INPUT',
+        details: 'do not log response details',
+      },
+    }));
+
+    const response = await wrapped(makeRequest(), ctx);
+
+    expect(response.status).toBe(422);
+    expect(warnSpy).toHaveBeenCalledOnce();
+    const line = String(warnSpy.mock.calls[0]?.[0]);
+    expect(line).toContain('"event":"handler.response.failure"');
+    expect(line).toContain('"status":422');
+    expect(line).toContain('"api_code":"INVALID_TEMPLATE_INPUT"');
+    expect(line).not.toContain('do not log response details');
+  });
+
+  it('logs returned 5xx responses at error level', async () => {
+    const ctx = makeContext();
+    const errorSpy = vi.spyOn(ctx, 'error');
+    const wrapped = withHandler('test.unavailable', async () => ({
+      status: 503,
+      jsonBody: { error: 'Service unavailable', code: 'UPSTREAM_UNAVAILABLE' },
+    }));
+
+    const response = await wrapped(makeRequest(), ctx);
+
+    expect(response.status).toBe(503);
+    expect(errorSpy).toHaveBeenCalledOnce();
+    const line = String(errorSpy.mock.calls[0]?.[0]);
+    expect(line).toContain('"event":"handler.response.failure"');
+    expect(line).toContain('"status":503');
+    expect(line).toContain('"api_code":"UPSTREAM_UNAVAILABLE"');
+  });
+
   it('returns a generic 500 when the inner handler throws', async () => {
     const wrapped = withHandler('test.boom', async () => {
       throw new Error('database is on fire');

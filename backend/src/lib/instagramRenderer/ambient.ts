@@ -1,16 +1,7 @@
 import {
-  AMBIENT_CENTER_X,
-  AMBIENT_CENTER_Y,
-  AMBIENT_RADIUS,
-  AMBIENT_STOP_BASE,
-  AMBIENT_STOP_EDGE,
-  AMBIENT_STOP_LOCAL,
-  AMBIENT_STOP_NEAR,
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
-  COLOR_AMBIENT_BASE,
-  WORDMARK_AMBIENT_CENTER_Y,
-  WORDMARK_AMBIENT_RADIUS,
+  COLOR_PANEL,
 } from "./layout";
 import type { SatoriElement } from "./compose";
 
@@ -19,10 +10,7 @@ function element(type: string, props: Record<string, unknown>): SatoriElement {
 }
 
 export function ambientBackgroundImage(): string {
-  const wordmarkZone = `radial-gradient(circle ${WORDMARK_AMBIENT_RADIUS}px at ${AMBIENT_CENTER_X}px ${WORDMARK_AMBIENT_CENTER_Y}px, ${AMBIENT_STOP_LOCAL} 0%, rgba(3, 6, 4, 0.92) 42%, rgba(3, 6, 4, 0) 100%)`;
-  const ambientField = `radial-gradient(circle ${AMBIENT_RADIUS}px at ${AMBIENT_CENTER_X}px ${AMBIENT_CENTER_Y}px, ${AMBIENT_STOP_LOCAL} 0%, ${AMBIENT_STOP_NEAR} 15%, ${AMBIENT_STOP_BASE} 40%, ${AMBIENT_STOP_EDGE} 100%)`;
-
-  return `${wordmarkZone}, ${ambientField}`;
+  return "radial-gradient(circle 700px at 1030px 90px, #203b1d 0%, rgba(32, 59, 29, 0) 62%), radial-gradient(circle 760px at 70px 1320px, #172b18 0%, rgba(23, 43, 24, 0) 68%)";
 }
 
 export function createAmbientLayer(): SatoriElement {
@@ -33,7 +21,7 @@ export function createAmbientLayer(): SatoriElement {
       top: 0,
       width: CANVAS_WIDTH,
       height: CANVAS_HEIGHT,
-      backgroundColor: COLOR_AMBIENT_BASE,
+      backgroundColor: COLOR_PANEL,
       backgroundImage: ambientBackgroundImage(),
     },
   });

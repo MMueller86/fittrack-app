@@ -13,14 +13,16 @@ import type {
   ListRecipesOptions,
   RecipesRepository,
   UpdateRecipeInput,
+  VersionedRecipe,
 } from './recipesRepository';
+import { withRecipeExportViewStatus } from './recipeExport';
 
 // Cosmos stores ownerUserId as the partition key field.
 // The document shape mirrors Recipe exactly, plus a `userId` field
 // that Cosmos uses as the physical partition key (/userId). SAS URLs are
 // response-only and are deliberately excluded from stored image metadata.
 type StoredRecipeImage = Pick<RecipeImage, 'id' | 'blobName' | 'order' | 'heroCrop'>;
-type CosmosRecipeDoc = Omit<Recipe, 'images'> & { images: StoredRecipeImage[]; userId: string };
+type CosmosRecipeDoc = Omit<Recipe, 'images' | 'exportViewStatus'> & { images: StoredRecipeImage[]; userId: string };
 
 function isCosmosRecipeDoc(resource: CosmosRecipeDoc | undefined): resource is CosmosRecipeDoc {
   return Boolean(resource?.id && resource.ownerUserId && resource.userId && resource.name);
@@ -44,7 +46,7 @@ function toRecipeSteps(steps: RecipeStep[] | undefined): RecipeStep[] {
 }
 
 function toRecipe(doc: CosmosRecipeDoc): Recipe {
-  return {
+  const recipe: Recipe = {
     id: doc.id,
     ownerUserId: doc.ownerUserId,
     name: doc.name,
@@ -58,6 +60,7 @@ function toRecipe(doc: CosmosRecipeDoc): Recipe {
     })),
     nutritionTotal: doc.nutritionTotal,
     nutritionPerPortion: doc.nutritionPerPortion,
+    ...(doc.exportView !== undefined ? { exportView: doc.exportView } : {}),
     visibility: doc.visibility,
     sharedWithUserIds: doc.sharedWithUserIds,
     tags: doc.tags,
@@ -66,10 +69,11 @@ function toRecipe(doc: CosmosRecipeDoc): Recipe {
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   };
+  return withRecipeExportViewStatus(recipe);
 }
 
 function toStoredRecipe(recipe: Recipe, userId: string): CosmosRecipeDoc {
-  return {
+  const doc: CosmosRecipeDoc = {
     id: recipe.id,
     ownerUserId: recipe.ownerUserId,
     name: recipe.name,
@@ -89,6 +93,19 @@ function toStoredRecipe(recipe: Recipe, userId: string): CosmosRecipeDoc {
     updatedAt: recipe.updatedAt,
     userId,
   };
+  if (recipe.exportView !== undefined) doc.exportView = recipe.exportView;
+  return doc;
+}
+
+function requireCosmosEtag(etag: string): string {
+  if (!etag) throw new Error('Cosmos did not return a recipe ETag');
+  return etag;
+}
+
+function isPreconditionFailed(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const details = error as { code?: unknown; statusCode?: unknown };
+  return details.code === 412 || details.statusCode === 412 || details.code === 'PreconditionFailed';
 }
 
 export class CosmosRecipesRepository implements RecipesRepository {
@@ -113,12 +130,23 @@ export class CosmosRecipesRepository implements RecipesRepository {
   }
 
   async get(userId: string, id: string): Promise<Recipe | null> {
+    const versioned = await this.getVersioned(userId, id);
+    return versioned?.recipe ?? null;
+  }
+
+  async getVersioned(userId: string, id: string): Promise<VersionedRecipe | null> {
     const { containers } = await getCosmos();
-    const { resource } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    return isCosmosRecipeDoc(resource) ? toRecipe(resource) : null;
+    const { resource, etag } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
+    if (!isCosmosRecipeDoc(resource)) return null;
+    return { recipe: toRecipe(resource), etag: requireCosmosEtag(etag) };
   }
 
   async create(userId: string, input: CreateRecipeInput): Promise<Recipe> {
+    const versioned = await this.createVersioned(userId, input);
+    return versioned.recipe;
+  }
+
+  async createVersioned(userId: string, input: CreateRecipeInput): Promise<VersionedRecipe> {
     const { containers } = await getCosmos();
     const now = new Date().toISOString();
     const recipe: Recipe = {
@@ -132,6 +160,7 @@ export class CosmosRecipesRepository implements RecipesRepository {
       images: [],
       nutritionTotal: input.nutritionTotal,
       nutritionPerPortion: input.nutritionPerPortion,
+      ...(input.exportView !== undefined ? { exportView: input.exportView } : {}),
       visibility: 'private',
       sharedWithUserIds: [],
       tags: input.tags,
@@ -140,11 +169,27 @@ export class CosmosRecipesRepository implements RecipesRepository {
       updatedAt: now,
     };
     const doc = toStoredRecipe(recipe, userId);
-    const { resource } = await containers.recipes.items.create<CosmosRecipeDoc>(doc);
-    return isCosmosRecipeDoc(resource) ? toRecipe(resource) : recipe;
+    const { resource, etag } = await containers.recipes.items.create<CosmosRecipeDoc>(doc);
+    if (!isCosmosRecipeDoc(resource)) throw new Error('Cosmos did not return the created recipe');
+    return { recipe: toRecipe(resource), etag: requireCosmosEtag(etag) };
   }
 
   async update(userId: string, id: string, input: UpdateRecipeInput): Promise<Recipe | null> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const existing = await this.getVersioned(userId, id);
+      if (!existing) return null;
+      const updated = await this.compareAndReplace(userId, id, existing.etag, input);
+      if (updated) return updated.recipe;
+    }
+    throw new Error('Recipe changed repeatedly while updating');
+  }
+
+  async compareAndReplace(
+    userId: string,
+    id: string,
+    expectedEtag: string,
+    input: UpdateRecipeInput,
+  ): Promise<VersionedRecipe | null> {
     const { containers } = await getCosmos();
     const { resource: existing } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
     if (!isCosmosRecipeDoc(existing)) return null;
@@ -156,9 +201,27 @@ export class CosmosRecipesRepository implements RecipesRepository {
       images: input.images ?? existingRecipe.images,
       updatedAt: new Date().toISOString(),
     };
-    const updated = toStoredRecipe(updatedRecipe, userId);
-    const { resource } = await containers.recipes.item(id, userId).replace<CosmosRecipeDoc>(updated);
-    return isCosmosRecipeDoc(resource) ? toRecipe(resource) : updatedRecipe;
+    return this.replaceIfMatch(userId, id, updatedRecipe, expectedEtag);
+  }
+
+  private async replaceIfMatch(
+    userId: string,
+    id: string,
+    recipe: Recipe,
+    expectedEtag: string,
+  ): Promise<VersionedRecipe | null> {
+    const { containers } = await getCosmos();
+    try {
+      const { resource, etag } = await containers.recipes.item(id, userId).replace<CosmosRecipeDoc>(
+        toStoredRecipe(recipe, userId),
+        { accessCondition: { type: 'IfMatch', condition: expectedEtag } },
+      );
+      if (!isCosmosRecipeDoc(resource)) throw new Error('Cosmos did not return the replaced recipe');
+      return { recipe: toRecipe(resource), etag: requireCosmosEtag(etag) };
+    } catch (error) {
+      if (isPreconditionFailed(error)) return null;
+      throw error;
+    }
   }
 
   async delete(userId: string, id: string): Promise<boolean> {
@@ -170,15 +233,19 @@ export class CosmosRecipesRepository implements RecipesRepository {
   }
 
   async incrementUsage(userId: string, id: string): Promise<void> {
-    const { containers } = await getCosmos();
-    const { resource: existing } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!isCosmosRecipeDoc(existing)) return;
-    const updatedRecipe: Recipe = {
-      ...toRecipe(existing),
-      usageCount: existing.usageCount + 1,
-      lastUsedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await containers.recipes.item(id, userId).replace<CosmosRecipeDoc>(toStoredRecipe(updatedRecipe, userId));
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const existing = await this.getVersioned(userId, id);
+      if (!existing) return;
+      const now = new Date().toISOString();
+      const updatedRecipe: Recipe = {
+        ...existing.recipe,
+        usageCount: existing.recipe.usageCount + 1,
+        lastUsedAt: now,
+        updatedAt: now,
+      };
+      const updated = await this.replaceIfMatch(userId, id, updatedRecipe, existing.etag);
+      if (updated) return;
+    }
+    throw new Error('Recipe changed repeatedly while incrementing usage');
   }
 }

@@ -11,8 +11,9 @@
 // All amountGrams ranges are derived from the documented unit conversions:
 //   "1 EL → ~15g", "1 TL → ~5g", "1 Prise → ~1g"
 // Explicit gram/ml values in the input should pass through unchanged.
-// A food item with a genuinely indeterminate amount may remain food with amountGrams = null
-// so the application can route it to manual review; explicit quantities must still convert.
+// A food item with a genuinely indeterminate amount must remain food with amountGrams = null
+// (docs/kb/domain/06-recipes.md); a tiny positive placeholder is not a measurement.
+// Explicit quantities must still convert.
 //
 // Update this file whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-run evals.
 
@@ -127,7 +128,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
   },
   {
     id: 'indeterminate-spray-oil-stays-food',
-    description: 'Spray oil remains a food item when its amount cannot be converted reliably; explicit oil quantity remains measurable',
+    description: 'Unmeasurable spray oil stays food with null grams, not a tiny positive placeholder; explicit oil quantity remains measurable',
     input: 'Sprühöl zum Anbraten, 1 EL Olivenöl, 300g Hähnchenbrust',
     constraints: {
       exactIngredientCount: 3,

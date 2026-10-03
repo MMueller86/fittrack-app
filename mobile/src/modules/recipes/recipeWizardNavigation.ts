@@ -1,4 +1,5 @@
 import type { WizardPhase } from './recipeWizardTypes';
+import type { PendingRecipeExportDraft } from './recipeWizardExportView';
 
 export const RECIPE_DETAIL_INTENT_OPEN_LOG_MODAL = 'openLogRecipeModal' as const;
 export type RecipeDetailNavigationIntent = typeof RECIPE_DETAIL_INTENT_OPEN_LOG_MODAL;
@@ -6,12 +7,17 @@ export type RecipeDetailNavigationIntent = typeof RECIPE_DETAIL_INTENT_OPEN_LOG_
 export type RecipeDetailNavigationParams = {
   id: string;
   intent?: RecipeDetailNavigationIntent;
+  pendingExportDraft?: PendingRecipeExportDraft;
 };
 
-export function buildRecipeDetailAfterSaveParams(id: string): RecipeDetailNavigationParams {
+export function buildRecipeDetailAfterSaveParams(
+  id: string,
+  pendingExportDraft?: PendingRecipeExportDraft,
+): RecipeDetailNavigationParams {
   return {
     id,
     intent: RECIPE_DETAIL_INTENT_OPEN_LOG_MODAL,
+    ...(pendingExportDraft ? { pendingExportDraft } : {}),
   };
 }
 

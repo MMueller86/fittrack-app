@@ -15,9 +15,42 @@ import {
   TITLE_MAX_WIDTH,
 } from "./layout";
 import type { PhotoAsset } from "./photo";
+import {
+  composeRecipeDetailsTemplate,
+  getRecipeDetailsTitleLayout,
+  RECIPE_DETAILS_TEMPLATE_CHIP_TOP,
+  RECIPE_DETAILS_TEMPLATE_DESCRIPTION_GAP,
+  RECIPE_DETAILS_TEMPLATE_DESCRIPTION_TEXT_WIDTH,
+  RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_ROW_HEIGHT,
+  RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_TEXT_WIDTH,
+  RECIPE_DETAILS_TEMPLATE_INGREDIENT_LARGE_ROW_HEIGHT,
+  RECIPE_DETAILS_TEMPLATE_INGREDIENT_LARGE_TEXT_WIDTH,
+  RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX,
+  RECIPE_DETAILS_TEMPLATE_MAX_INGREDIENTS,
+  RECIPE_DETAILS_TEMPLATE_MAX_STEPS,
+  RECIPE_DETAILS_TEMPLATE_STEP_COMPACT_ROW_HEIGHT,
+  RECIPE_DETAILS_TEMPLATE_STEP_COMPACT_TEXT_WIDTH,
+  RECIPE_DETAILS_TEMPLATE_STEP_LARGE_ROW_HEIGHT,
+  RECIPE_DETAILS_TEMPLATE_STEP_LARGE_TEXT_WIDTH,
+  RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX,
+  RECIPE_DETAILS_TEMPLATE_TITLE_NODE,
+  RECIPE_DETAILS_TEMPLATE_TITLE_TOP,
+  RECIPE_DETAILS_TEMPLATE_TITLE_WIDTH,
+  RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE,
+  getRecipeDetailsTextLayoutFields,
+  type RecipeDetailsTemplateTextOverrides,
+} from "./recipeDetailsTemplateV3";
+import { addMeasuredGermanBreaks, measureDetailTextWidths } from "./detailTextLayout";
 import { loadRecipeMetaIcons, RecipeMetaIconAssetError } from "./recipeMeta";
 import { TagIconAssetError } from "./tagIcons";
-import type { RenderInput, RenderResult } from "./types";
+import type {
+  RecipeDetailsTemplateInput,
+  RecipeDetailsTemplateField,
+  RecipeDetailsTemplateItemField,
+  RecipeDetailsTemplateRenderResult,
+  RenderInput,
+  RenderResult,
+} from "./types";
 
 type SatoriRenderer = typeof import("satori").default;
 type ResvgConstructor = typeof import("@resvg/resvg-js").Resvg;
@@ -58,6 +91,7 @@ class UnreadableImageError extends Error {
 const ASSET_ROOT_RELATIVE = "src/lib/instagramRenderer/assets";
 const FONT_FILES = {
   medium: "fonts/Inter-Medium.ttf",
+  mediumItalic: "fonts/Inter-MediumItalic.ttf",
   semiBold: "fonts/Inter-SemiBold.ttf",
   displayBold: "fonts/InterDisplay-Bold.ttf",
 } as const;
@@ -200,8 +234,9 @@ function toDataUri(buffer: Buffer, mimeType: string): string {
 async function loadRendererAssets(): Promise<RendererAssets> {
   const assetRoot = findAssetRoot();
   const recipeMetaIcons = loadRecipeMetaIcons();
-  const [medium, semiBold, displayBold, barbell, highProtein, lowFat] = await Promise.all([
+  const [medium, mediumItalic, semiBold, displayBold, barbell, highProtein, lowFat] = await Promise.all([
     readAsset(assetRoot, FONT_FILES.medium),
+    readAsset(assetRoot, FONT_FILES.mediumItalic),
     readAsset(assetRoot, FONT_FILES.semiBold),
     readAsset(assetRoot, FONT_FILES.displayBold),
     readAsset(assetRoot, DESIGN_ASSET_FILES.barbell),
@@ -226,7 +261,8 @@ async function loadRendererAssets(): Promise<RendererAssets> {
 
   return {
     fonts: [
-      { name: "Inter", weight: 500, data: medium },
+      { name: "Inter", weight: 500, style: "normal", data: medium },
+      { name: "Inter", weight: 500, style: "italic", data: mediumItalic },
       { name: "Inter", weight: 600, data: semiBold },
       { name: "InterDisplay", weight: 700, data: displayBold },
     ],
@@ -291,10 +327,11 @@ function validateRecipeMeta(input: RenderInput): RenderResult | undefined {
   const values = recipeMeta as Record<string, unknown>;
   const totalTimeMinutes = values.totalTimeMinutes;
   if (
-    typeof totalTimeMinutes !== "number" ||
-    !Number.isFinite(totalTimeMinutes) ||
-    !Number.isInteger(totalTimeMinutes) ||
-    totalTimeMinutes <= 0
+    totalTimeMinutes !== null &&
+    (typeof totalTimeMinutes !== "number" ||
+      !Number.isFinite(totalTimeMinutes) ||
+      !Number.isInteger(totalTimeMinutes) ||
+      totalTimeMinutes <= 0)
   ) {
     return invalidRecipeMeta(
       "totalTimeMinutes",
@@ -314,9 +351,10 @@ function validateRecipeMeta(input: RenderInput): RenderResult | undefined {
 
   const difficulty = values.difficulty;
   if (
-    typeof difficulty !== "string" ||
-    difficulty.trim().length === 0 ||
-    /[\r\n\u2028\u2029]/u.test(difficulty)
+    difficulty !== null &&
+    (typeof difficulty !== "string" ||
+      difficulty.trim().length === 0 ||
+      /[\r\n\u2028\u2029]/u.test(difficulty))
   ) {
     return invalidRecipeMeta(
       "difficulty",
@@ -482,7 +520,10 @@ async function render(input: RenderInput): Promise<RenderResult> {
   const normalizedInput = input.recipeMeta
     ? {
         ...input,
-        recipeMeta: { ...input.recipeMeta, difficulty: input.recipeMeta.difficulty.trim() },
+        recipeMeta: {
+          ...input.recipeMeta,
+          difficulty: input.recipeMeta.difficulty?.trim() ?? null,
+        },
       }
     : input;
 
@@ -565,5 +606,455 @@ export async function renderInstagramRecipe(input: RenderInput): Promise<RenderR
       return toImageError(error);
     }
     return toInternalError(error);
+  }
+}
+
+type DetailsProbeMeasurement = { width: number; height: number };
+
+type DetailsProbeMeasurements = {
+  title?: DetailsProbeMeasurement;
+  description?: DetailsProbeMeasurement;
+  ingredients: Map<number, DetailsProbeMeasurement>;
+  steps: Map<number, DetailsProbeMeasurement>;
+};
+
+function getDetailsNodeIndex(marker: string, prefix: string): number | undefined {
+  if (!marker.startsWith(prefix)) return undefined;
+  const index = Number(marker.slice(prefix.length));
+  return Number.isInteger(index) && index >= 0 ? index : undefined;
+}
+
+function detailsProbeFailure(
+  field: RecipeDetailsTemplateField,
+  message: string,
+  itemIndex?: number,
+  itemField?: RecipeDetailsTemplateItemField,
+): RecipeDetailsTemplateRenderResult {
+  return {
+    ok: false,
+    error: { code: "TEMPLATE_PROBE_FAILED", field, message, itemIndex, itemField },
+  };
+}
+
+function detailsFieldOverflow(
+  field: RecipeDetailsTemplateField,
+  message: string,
+  measurement: DetailsProbeMeasurement,
+  maxWidth: number,
+  maxHeight: number,
+  itemIndex?: number,
+  itemField?: RecipeDetailsTemplateItemField,
+): RecipeDetailsTemplateRenderResult {
+  return {
+    ok: false,
+    error: {
+      code: "TEMPLATE_FIELD_OVERFLOW",
+      field,
+      message,
+      itemIndex,
+      itemField,
+      measured: {
+        width: measurement.width,
+        height: measurement.height,
+        maxWidth,
+        maxHeight,
+      },
+    },
+  };
+}
+
+function exceedsDetailsBounds(
+  measurement: DetailsProbeMeasurement,
+  maxWidth: number,
+  maxHeight: number,
+): boolean {
+  return measurement.width > maxWidth + 0.5 || measurement.height > maxHeight + 0.5;
+}
+
+function validateMeasuredDetailsTemplate(
+  input: RecipeDetailsTemplateInput,
+  measurements: DetailsProbeMeasurements,
+): RecipeDetailsTemplateRenderResult | undefined {
+  const titleMeasurement = measurements.title;
+  if (!titleMeasurement) {
+    return detailsProbeFailure("title", "The production font probe did not measure the title.");
+  }
+
+  const titleLayout = getRecipeDetailsTitleLayout(input.title);
+  const titleMaxHeight =
+    (input.description ? titleLayout.teaserTop : RECIPE_DETAILS_TEMPLATE_CHIP_TOP) -
+    RECIPE_DETAILS_TEMPLATE_TITLE_TOP;
+  if (exceedsDetailsBounds(titleMeasurement, RECIPE_DETAILS_TEMPLATE_TITLE_WIDTH, titleMaxHeight)) {
+    return detailsFieldOverflow(
+      "title",
+      "Recipe title exceeds the measured detail-template bounds.",
+      titleMeasurement,
+      RECIPE_DETAILS_TEMPLATE_TITLE_WIDTH,
+      titleMaxHeight,
+    );
+  }
+
+  if (input.description !== undefined) {
+    const descriptionMeasurement = measurements.description;
+    if (!descriptionMeasurement) {
+      return detailsProbeFailure(
+        "description",
+        "The production font probe did not measure the teaser.",
+      );
+    }
+
+    const descriptionMaxHeight =
+      RECIPE_DETAILS_TEMPLATE_CHIP_TOP -
+      titleLayout.teaserTop -
+      RECIPE_DETAILS_TEMPLATE_DESCRIPTION_GAP;
+    if (
+      exceedsDetailsBounds(
+        descriptionMeasurement,
+        RECIPE_DETAILS_TEMPLATE_DESCRIPTION_TEXT_WIDTH,
+        descriptionMaxHeight,
+      )
+    ) {
+      return detailsFieldOverflow(
+        "description",
+        "Recipe teaser exceeds the measured detail-template bounds.",
+        descriptionMeasurement,
+        RECIPE_DETAILS_TEMPLATE_DESCRIPTION_TEXT_WIDTH,
+        descriptionMaxHeight,
+      );
+    }
+  }
+
+  const compactIngredients = input.ingredients.length > 8;
+  const ingredientMaxWidth = compactIngredients
+    ? RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_TEXT_WIDTH
+    : RECIPE_DETAILS_TEMPLATE_INGREDIENT_LARGE_TEXT_WIDTH;
+  const ingredientMaxHeight = compactIngredients
+    ? RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_ROW_HEIGHT
+    : RECIPE_DETAILS_TEMPLATE_INGREDIENT_LARGE_ROW_HEIGHT;
+  for (let index = 0; index < input.ingredients.length; index += 1) {
+    const measurement = measurements.ingredients.get(index);
+    if (!measurement) {
+      return detailsProbeFailure(
+        "ingredients",
+        `The production font probe did not measure ingredient ${index + 1}.`,
+        index,
+        "text",
+      );
+    }
+    if (exceedsDetailsBounds(measurement, ingredientMaxWidth, ingredientMaxHeight)) {
+      return detailsFieldOverflow(
+        "ingredients",
+        `Ingredient ${index + 1} exceeds its measured detail-template row.`,
+        measurement,
+        ingredientMaxWidth,
+        ingredientMaxHeight,
+        index,
+        "text",
+      );
+    }
+  }
+
+  const compactSteps = input.steps.length === RECIPE_DETAILS_TEMPLATE_MAX_STEPS;
+  const stepMaxWidth = compactSteps
+    ? RECIPE_DETAILS_TEMPLATE_STEP_COMPACT_TEXT_WIDTH
+    : RECIPE_DETAILS_TEMPLATE_STEP_LARGE_TEXT_WIDTH;
+  const stepMaxHeight = compactSteps
+    ? RECIPE_DETAILS_TEMPLATE_STEP_COMPACT_ROW_HEIGHT
+    : RECIPE_DETAILS_TEMPLATE_STEP_LARGE_ROW_HEIGHT;
+  for (let index = 0; index < input.steps.length; index += 1) {
+    const measurement = measurements.steps.get(index);
+    if (!measurement) {
+      return detailsProbeFailure(
+        "steps",
+        `The production font probe did not measure step ${index + 1}.`,
+        index,
+        "text",
+      );
+    }
+    if (exceedsDetailsBounds(measurement, stepMaxWidth, stepMaxHeight)) {
+      return detailsFieldOverflow(
+        "steps",
+        `Step ${index + 1} exceeds its measured detail-template row.`,
+        measurement,
+        stepMaxWidth,
+        stepMaxHeight,
+        index,
+        "text",
+      );
+    }
+  }
+
+  return undefined;
+}
+
+function invalidTemplateInput(
+  field: RecipeDetailsTemplateField,
+  message: string,
+  itemIndex?: number,
+  itemField?: RecipeDetailsTemplateItemField,
+  itemValue?: string,
+): RecipeDetailsTemplateRenderResult {
+  return {
+    ok: false,
+    error: { code: "INVALID_TEMPLATE_INPUT", field, message, itemIndex, itemField, itemValue },
+  };
+}
+
+function validateRecipeDetailsTemplate(
+  input: RecipeDetailsTemplateInput,
+): RecipeDetailsTemplateRenderResult | undefined {
+  if (
+    input.title.trim().length === 0 ||
+    input.title.trim().length > 60 ||
+    /[\r\n\u2028\u2029]/u.test(input.title)
+  ) {
+    return invalidTemplateInput(
+      "title",
+      "title must be a visible single-line string with at most 60 characters.",
+    );
+  }
+  if (
+    input.description !== undefined &&
+    (input.description.trim().length === 0 ||
+      input.description.trim().length > 96 ||
+      /[\r\n\u2028\u2029]/u.test(input.description))
+  ) {
+    return invalidTemplateInput(
+      "description",
+      "description must be a visible single-line string with at most 96 characters.",
+    );
+  }
+  if (
+    input.difficulty !== undefined &&
+    input.difficulty !== null &&
+    (input.difficulty.trim().length === 0 || /[\r\n\u2028\u2029]/u.test(input.difficulty))
+  ) {
+    return invalidTemplateInput(
+      "difficulty",
+      "difficulty must be a visible single-line string.",
+    );
+  }
+  if (
+    input.totalTimeMinutes !== null &&
+    (!Number.isInteger(input.totalTimeMinutes) || input.totalTimeMinutes <= 0)
+  ) {
+    return invalidTemplateInput("totalTimeMinutes", "totalTimeMinutes must be a positive integer.");
+  }
+  if (!Number.isInteger(input.portions) || input.portions <= 0) {
+    return invalidTemplateInput("portions", "portions must be a positive integer.");
+  }
+  if (
+    input.ingredients.length === 0 ||
+    input.ingredients.length > RECIPE_DETAILS_TEMPLATE_MAX_INGREDIENTS
+  ) {
+    return invalidTemplateInput(
+      "ingredients",
+      `ingredients must contain 1 to ${RECIPE_DETAILS_TEMPLATE_MAX_INGREDIENTS} visible entries with amounts up to 16 and names up to 36 characters.`,
+    );
+  }
+  const invalidIngredientIndex = input.ingredients.findIndex((ingredient) =>
+    ingredient.amount.trim().length === 0 ||
+    ingredient.amount.trim().length > 16 ||
+    ingredient.name.trim().length === 0 ||
+    ingredient.name.trim().length > 36 ||
+    /[\r\n\u2028\u2029]/u.test(ingredient.amount) ||
+    /[\r\n\u2028\u2029]/u.test(ingredient.name),
+  );
+  if (invalidIngredientIndex >= 0) {
+    const ingredient = input.ingredients[invalidIngredientIndex]!;
+    const itemField =
+      ingredient.amount.trim().length === 0 ||
+      ingredient.amount.trim().length > 16 ||
+      /[\r\n\u2028\u2029]/u.test(ingredient.amount)
+        ? "amount"
+        : "name";
+    return invalidTemplateInput(
+      "ingredients",
+      `ingredient ${invalidIngredientIndex + 1} has an invalid ${itemField}.`,
+      invalidIngredientIndex,
+      itemField,
+      ingredient[itemField],
+    );
+  }
+  if (
+    input.steps.length === 0 ||
+    input.steps.length > RECIPE_DETAILS_TEMPLATE_MAX_STEPS
+  ) {
+    return invalidTemplateInput(
+      "steps",
+      `steps must contain 1 to ${RECIPE_DETAILS_TEMPLATE_MAX_STEPS} visible entries with up to 90 characters each.`,
+    );
+  }
+  const invalidStepIndex = input.steps.findIndex((step) =>
+    step.trim().length === 0 ||
+    step.trim().length > 90 ||
+    /[\r\n\u2028\u2029]/u.test(step),
+  );
+  if (invalidStepIndex >= 0) {
+    return invalidTemplateInput(
+      "steps",
+      `step ${invalidStepIndex + 1} has invalid text.`,
+      invalidStepIndex,
+      "text",
+      input.steps[invalidStepIndex],
+    );
+  }
+  return undefined;
+}
+
+export async function renderInstagramRecipeDetailsTemplate(
+  input: RecipeDetailsTemplateInput,
+): Promise<RecipeDetailsTemplateRenderResult> {
+  const validationError = validateRecipeDetailsTemplate(input);
+  if (validationError) {
+    return validationError;
+  }
+
+  try {
+    const [runtime, assets] = await Promise.all([getRuntimeDependencies(), getRendererAssets()]);
+    const photo = await loadPhoto(runtime.sharp, input.image);
+    for (const descriptionFontSize of [22, 21, 20, 19, 18]) {
+      const textFields = getRecipeDetailsTextLayoutFields(input, descriptionFontSize);
+      const textLayout = await addMeasuredGermanBreaks(textFields, (requests) =>
+        measureDetailTextWidths(runtime.satori, assets.fonts, requests),
+      );
+      if (!textLayout.ok) {
+        if (textLayout.error.field === "description" && descriptionFontSize > 18) {
+          continue;
+        }
+        const failedField = textFields.find((field) => field.id === textLayout.error.id);
+        if (!failedField) {
+          return detailsProbeFailure(
+            textLayout.error.field,
+            "The detail text layout did not return its source field.",
+            textLayout.error.itemIndex,
+            textLayout.error.itemField,
+          );
+        }
+        return detailsFieldOverflow(
+          textLayout.error.field,
+          "No valid German hyphenation break fits the assigned detail-text width.",
+          {
+            width: textLayout.error.measuredWidth,
+            height: failedField.style.fontSize * failedField.style.lineHeight,
+          },
+          failedField.maxWidth,
+          failedField.maxHeight,
+          textLayout.error.itemIndex,
+          textLayout.error.itemField,
+        );
+      }
+
+      const textById = textLayout.textById;
+      const textOverrides: RecipeDetailsTemplateTextOverrides = {
+        title: textById.get(RECIPE_DETAILS_TEMPLATE_TITLE_NODE) ?? input.title,
+        descriptionFontSize,
+        ...(input.description === undefined
+          ? {}
+          : {
+              description:
+                textById.get(RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) ?? input.description,
+            }),
+        ingredients: input.ingredients.map((ingredient, index) =>
+          textById.get(`${RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX}${index}`) ??
+          `${ingredient.amount} ${ingredient.name}`,
+        ),
+        steps: input.steps.map(
+          (step, index) =>
+            textById.get(`${RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX}${index}`) ?? step,
+        ),
+      };
+      const measurements: DetailsProbeMeasurements = {
+        ingredients: new Map(),
+        steps: new Map(),
+      };
+      const svg = await runtime.satori(
+        composeRecipeDetailsTemplate(input, {
+          photo,
+          wordmark: assets.wordmark,
+          wordmarkMimeType: assets.wordmarkMimeType,
+          nutritionHighlights: assets.nutritionHighlights,
+        }, textOverrides) as unknown as Parameters<SatoriRenderer>[0],
+        {
+          width: CANVAS_WIDTH,
+          height: CANVAS_HEIGHT,
+          fonts: assets.fonts,
+          embedFont: true,
+          onNodeDetected: (node) => {
+            const marker = getNodeMarker(node);
+            if (marker === RECIPE_DETAILS_TEMPLATE_TITLE_NODE) {
+              measurements.title = { width: node.width, height: node.height };
+            } else if (marker === RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) {
+              measurements.description = { width: node.width, height: node.height };
+            } else {
+              const ingredientIndex = getDetailsNodeIndex(
+                marker ?? "",
+                RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX,
+              );
+              if (ingredientIndex !== undefined) {
+                measurements.ingredients.set(ingredientIndex, {
+                  width: node.width,
+                  height: node.height,
+                });
+                return;
+              }
+
+              const stepIndex = getDetailsNodeIndex(marker ?? "", RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX);
+              if (stepIndex !== undefined) {
+                measurements.steps.set(stepIndex, {
+                  width: node.width,
+                  height: node.height,
+                });
+              }
+            }
+          },
+        },
+      );
+      const layoutError = validateMeasuredDetailsTemplate(input, measurements);
+      if (layoutError) {
+        if (
+          !layoutError.ok && layoutError.error.code === "TEMPLATE_FIELD_OVERFLOW" &&
+          layoutError.error.field === "description" && descriptionFontSize > 18
+        ) {
+          continue;
+        }
+        return layoutError;
+      }
+      const rendered = new runtime.Resvg(svg, {
+        fitTo: { mode: "original" },
+        font: { loadSystemFonts: false },
+      }).render();
+      if (rendered.width !== CANVAS_WIDTH || rendered.height !== CANVAS_HEIGHT) {
+        throw new Error(`Unexpected render dimensions: ${rendered.width}x${rendered.height}.`);
+      }
+
+      return {
+        ok: true,
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        format: "png",
+        buffer: rendered.asPng(),
+      };
+    }
+    throw new Error("No detail teaser font size was evaluated.");
+  } catch (error) {
+    if (error instanceof MissingRendererAssetError) {
+      return {
+        ok: false,
+        error: {
+          code: "MISSING_ASSET",
+          message: error.message,
+          asset: error.asset,
+        },
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        code: "INTERNAL",
+        message: "Instagram recipe details template rendering failed.",
+        cause: errorMessage(error),
+      },
+    };
   }
 }

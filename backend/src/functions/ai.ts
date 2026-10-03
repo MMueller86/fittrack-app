@@ -29,6 +29,9 @@ import type {
 } from '@fittrack/shared';
 import { scaleRecipeIngredients } from '../../../shared/lib/recipeCalculator';
 import { RECIPE_PORTION_MAX, RECIPE_PORTION_MIN } from '../../../shared/types/recipeScale';
+import { validateRecipeAnalyzeOutput } from '../lib/recipeAnalyzeValidation';
+export { validateRecipeAnalyzeOutput };
+export type { RecipeAnalyzeValidationResult } from '../lib/recipeAnalyzeValidation';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -505,6 +508,7 @@ export interface AiRecipeAnalysisResponse {
   suggestedPortions: number;
   tags: string[];
   steps: AiRecipeRaw['steps'];
+  exportSuggestion: AiRecipeRaw['exportSuggestion'];
   ingredients: MealParserPreviewItem[];
 }
 
@@ -537,6 +541,18 @@ export const recipeAnalyzeHandler = withHandler(
       const msg = e instanceof Error ? e.message : String(e);
       return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${msg}` } };
     }
+
+    const validation = validateRecipeAnalyzeOutput(recipeRaw);
+    if (!validation.ok) {
+      return {
+        status: 422,
+        jsonBody: {
+          error: 'AI recipe analysis failed server-side validation',
+          details: validation.errors,
+        },
+      };
+    }
+    recipeRaw = validation.data;
 
     // 2. Route ingredients: food → catalog; seasoning → direct construction
     const foodIngredients = recipeRaw.ingredients.filter((i) => i.category !== 'seasoning');
@@ -581,6 +597,7 @@ export const recipeAnalyzeHandler = withHandler(
       suggestedPortions: recipeRaw.suggestedPortions,
       tags: recipeRaw.tags,
       steps: recipeRaw.steps,
+      exportSuggestion: recipeRaw.exportSuggestion,
       ingredients,
     };
 

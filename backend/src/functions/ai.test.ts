@@ -30,6 +30,10 @@ import {
   TEST_USER_ID,
 } from '../test-utils/http';
 import { getRecipesRepository, __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
+import {
+  RECIPE_EXPORT_MAX_STEP_LENGTH,
+  RECIPE_EXPORT_MAX_STEPS,
+} from '../../../shared/types/recipeExport';
 
 beforeAll(async () => {
   await setupTestAuth();
@@ -597,16 +601,19 @@ function mockRecipeAnalyzeClient(recipe: AiRecipeRaw) {
   // recipeAnalyzeHandler makes one OpenAI call: analyzeRecipeText returns the
   // recipe structure and the already converted food ingredient amounts.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const create = vi.fn().mockResolvedValueOnce({
+    choices: [{ message: { content: JSON.stringify(recipe) } }],
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fakeClient: any = {
     chat: {
       completions: {
-        create: vi.fn().mockResolvedValueOnce({
-          choices: [{ message: { content: JSON.stringify(recipe) } }],
-        }),
+        create,
       },
     },
   };
   __setOpenAiClientForTests(fakeClient);
+  return create;
 }
 
 const VALID_RECIPE_RAW: AiRecipeRaw = {
@@ -615,13 +622,46 @@ const VALID_RECIPE_RAW: AiRecipeRaw = {
   suggestedPortions: 4,
   tags: ['Schnell', 'Familienrezept'],
   ingredients: [
-    { line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300, kitchenAmountText: null },
-    { line: '1 Zwiebel', displayName: 'Zwiebel', category: 'food', amountGrams: 100, kitchenAmountText: null },
+    { analysisKey: 'ingredient-chicken', line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300, kitchenAmountText: null },
+    { analysisKey: 'ingredient-onion', line: '1 Zwiebel', displayName: 'Zwiebel', category: 'food', amountGrams: 100, kitchenAmountText: null },
   ],
   steps: [
     { order: 1, title: 'Vorbereitung', description: 'Hähnchenbrust in Würfel schneiden.' },
     { order: 2, title: null, description: 'Zwiebel anbraten.' },
   ],
+  exportSuggestion: {
+    version: 1,
+    teaser: 'Proteinreiche Hähnchenpfanne mit Gemüse.',
+    totalTimeMinutes: 45,
+    difficulty: 'Mittel',
+    steps: [
+      { order: 1, description: 'Hähnchenbrust in Würfel schneiden.', sourceStepOrders: [1], ingredientKeys: [] },
+      { order: 2, description: 'Zwiebel anbraten.', sourceStepOrders: [2], ingredientKeys: [] },
+    ],
+    includedIngredientKeys: [],
+  },
+};
+
+const VALID_RECIPE_RAW_WITH_EXPORT_KEYS: AiRecipeRaw = {
+  ...VALID_RECIPE_RAW,
+  exportSuggestion: {
+    ...VALID_RECIPE_RAW.exportSuggestion,
+    steps: [
+      {
+        order: 1,
+        description: 'Hähnchenbrust in Würfel schneiden.',
+        sourceStepOrders: [1],
+        ingredientKeys: ['ingredient-chicken'],
+      },
+      {
+        order: 2,
+        description: 'Zwiebel anbraten.',
+        sourceStepOrders: [2],
+        ingredientKeys: ['ingredient-onion'],
+      },
+    ],
+    includedIngredientKeys: ['ingredient-chicken', 'ingredient-onion'],
+  },
 };
 
 describe('analyzeRecipeText normalization', () => {
@@ -663,7 +703,7 @@ describe('POST /api/ai/recipe-analyze', () => {
   });
 
   it('returns 200 with correct structure for a valid request', async () => {
-    mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW_WITH_EXPORT_KEYS);
     mockFoodRepo([makeCandidate('prod:1', 'Hähnchenbrust')]);
 
     const res = await recipeAnalyzeHandler(
@@ -678,6 +718,177 @@ describe('POST /api/ai/recipe-analyze', () => {
     expect(body.tags).toEqual(['Schnell', 'Familienrezept']);
     expect(body.steps).toHaveLength(2);
     expect(body.ingredients).toHaveLength(2);
+    expect(body.exportSuggestion).toMatchObject({
+      version: 1,
+      totalTimeMinutes: 45,
+      difficulty: 'Mittel',
+      includedIngredientKeys: ['ingredient-chicken', 'ingredient-onion'],
+    });
+
+    const request = create.mock.calls[0]?.[0] as {
+      response_format: {
+        type: string;
+        json_schema: {
+          name: string;
+          strict: boolean;
+          schema: {
+            additionalProperties: boolean;
+            properties: Record<string, { additionalProperties?: boolean }>;
+          };
+        };
+      };
+    };
+    expect(request.response_format).toMatchObject({
+      type: 'json_schema',
+      json_schema: { name: 'recipe_analyze', strict: true },
+    });
+    expect(request.response_format.json_schema.schema.additionalProperties).toBe(false);
+    expect(request.response_format.json_schema.schema.properties.exportSuggestion.additionalProperties).toBe(false);
+  });
+
+  it('keeps missing time and difficulty nullable instead of applying defaults', async () => {
+    mockRecipeAnalyzeClient({
+      ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS,
+      exportSuggestion: {
+        ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS.exportSuggestion,
+        totalTimeMinutes: null,
+        difficulty: null,
+      },
+    });
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Rezept ohne belastbare Zeitangabe' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toMatchObject({
+      exportSuggestion: { totalTimeMinutes: null, difficulty: null },
+    });
+  });
+
+  it('rejects duplicate analysis keys before tracking usage', async () => {
+    mockRecipeAnalyzeClient({
+      ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS,
+      ingredients: [
+        VALID_RECIPE_RAW_WITH_EXPORT_KEYS.ingredients[0]!,
+        { ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS.ingredients[1]!, analysisKey: 'ingredient-chicken' },
+      ],
+    });
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Doppelte Analyse-Schlüssel testen' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect((res.jsonBody as { details: string[] }).details.join(' ')).toContain('analysisKey');
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('rejects export steps that do not trace every source step', async () => {
+    mockRecipeAnalyzeClient({
+      ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS,
+      exportSuggestion: {
+        ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS.exportSuggestion,
+        steps: [{
+          ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS.exportSuggestion.steps[0]!,
+          sourceStepOrders: [1],
+        }],
+      },
+    });
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Unvollständige Schrittspur testen' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect((res.jsonBody as { details: string[] }).details.join(' ')).toContain('trace');
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('rejects more than the maximum number of export steps before tracking usage', async () => {
+    mockRecipeAnalyzeClient({
+      ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS,
+      exportSuggestion: {
+        ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS.exportSuggestion,
+        steps: Array.from({ length: RECIPE_EXPORT_MAX_STEPS + 1 }, (_, index) => ({
+          order: index + 1,
+          description: 'Schritt aus dem Rezept ausführen.',
+          sourceStepOrders: [1],
+          ingredientKeys: [],
+        })),
+      },
+    });
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Zu viele Export-Schritte testen' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('rejects an export step description above the maximum length before tracking usage', async () => {
+    mockRecipeAnalyzeClient({
+      ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS,
+      exportSuggestion: {
+        ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS.exportSuggestion,
+        steps: [{
+          ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS.exportSuggestion.steps[0]!,
+          description: 'x'.repeat(RECIPE_EXPORT_MAX_STEP_LENGTH + 1),
+        }],
+      },
+    });
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Zu lange Export-Beschreibung testen' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('enforces recipe-analyze quota before AI and tracks only after validation', async () => {
+    const events: string[] = [];
+    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW_WITH_EXPORT_KEYS);
+    create.mockReset();
+    create.mockImplementation(async () => {
+      events.push('ai');
+      return { choices: [{ message: { content: JSON.stringify(VALID_RECIPE_RAW_WITH_EXPORT_KEYS) } }] };
+    });
+    vi.mocked(enforceQuota).mockImplementation(async () => {
+      events.push('quota');
+      return null;
+    });
+    vi.mocked(trackUsage).mockImplementation(async () => {
+      events.push('track');
+    });
+    mockFoodRepo([]);
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Quota-Reihenfolge der Rezeptanalyse' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(events).toEqual(['quota', 'ai', 'track']);
+    expect(enforceQuota).toHaveBeenCalledWith(
+      { userId: TEST_USER_ID, tier: 'free', isAdmin: false },
+      'recipe-analyze',
+    );
+    expect(trackUsage).toHaveBeenCalledWith(
+      { userId: TEST_USER_ID, tier: 'free', isAdmin: false },
+      'recipe-analyze',
+    );
   });
 
   it('returns matched ingredient when catalog has a strong match', async () => {
@@ -747,6 +958,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
               choices: [{ message: { content: JSON.stringify({
                 ...VALID_RECIPE_RAW,
                 ingredients: [{
+                  analysisKey: 'ingredient-cream-cheese',
                   line: '2 EL Frischkäse',
                   displayName: 'Frischkäse',
                   category: 'food',
@@ -783,6 +995,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
             choices: [{ message: { content: JSON.stringify({
               ...VALID_RECIPE_RAW,
               ingredients: [{
+                analysisKey: 'ingredient-cream-cheese',
                 line: 'Frischkäse',
                 displayName: 'Frischkäse',
                 category: 'food',
@@ -833,6 +1046,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
             choices: [{ message: { content: JSON.stringify({
               ...VALID_RECIPE_RAW,
               ingredients: [{
+                analysisKey: 'ingredient-spray-oil',
                 line: 'Sprühöl zum Anbraten',
                 displayName: 'Sprühöl',
                 category: 'food',
@@ -894,8 +1108,8 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
               choices: [{ message: { content: JSON.stringify({
                 ...VALID_RECIPE_RAW,
                 ingredients: [
-                  { line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300 },
-                  { line: '1 Prise Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 2 },
+                  { analysisKey: 'ingredient-chicken', line: '300g Hähnchenbrust', displayName: 'Hähnchenbrust', category: 'food', amountGrams: 300 },
+                  { analysisKey: 'ingredient-salt', line: '1 Prise Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 2 },
                 ],
               }) } }],
             })
@@ -935,8 +1149,8 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
       choices: [{ message: { content: JSON.stringify({
         ...VALID_RECIPE_RAW,
         ingredients: [
-          { line: '1 Prise Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 1 },
-          { line: '1 TL Pfeffer', displayName: 'Pfeffer', category: 'seasoning', amountGrams: 3 },
+          { analysisKey: 'ingredient-salt', line: '1 Prise Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 1 },
+          { analysisKey: 'ingredient-pepper', line: '1 TL Pfeffer', displayName: 'Pfeffer', category: 'seasoning', amountGrams: 3 },
         ],
       }) } }],
     });
@@ -962,7 +1176,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
     const recipeWithBadCategory = {
       ...VALID_RECIPE_RAW,
       ingredients: [
-        { line: '100g Mystery', displayName: 'Mystery', category: 'unknown', amountGrams: 100 },
+        { analysisKey: 'ingredient-mystery', line: '100g Mystery', displayName: 'Mystery', category: 'unknown', amountGrams: 100 },
       ],
     };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1000,7 +1214,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
           create: vi.fn().mockResolvedValueOnce({
             choices: [{ message: { content: JSON.stringify({
               ...VALID_RECIPE_RAW,
-              ingredients: [{ line: '5g Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' }],
+              ingredients: [{ analysisKey: 'ingredient-salt', line: '5g Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' }],
             }) } }],
           }),
         },
@@ -1027,7 +1241,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
           create: vi.fn().mockResolvedValueOnce({
             choices: [{ message: { content: JSON.stringify({
               ...VALID_RECIPE_RAW,
-              ingredients: [{ line: '1 TL Oregano', displayName: 'Oregano', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' }],
+              ingredients: [{ analysisKey: 'ingredient-oregano', line: '1 TL Oregano', displayName: 'Oregano', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' }],
             }) } }],
           }),
         },
@@ -1053,7 +1267,7 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
           create: vi.fn().mockResolvedValueOnce({
             choices: [{ message: { content: JSON.stringify({
               ...VALID_RECIPE_RAW,
-              ingredients: [{ line: 'Salz', displayName: 'Salz', category: 'seasoning', amountGrams: null, kitchenAmountText: null }],
+              ingredients: [{ analysisKey: 'ingredient-salt', line: 'Salz', displayName: 'Salz', category: 'seasoning', amountGrams: null, kitchenAmountText: null }],
             }) } }],
           }),
         },

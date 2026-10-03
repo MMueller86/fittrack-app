@@ -18,10 +18,11 @@ import {
   RECIPE_PORTION_MIN,
   scaleRecipeIngredients,
 } from '@fittrack/shared';
-import type { Recipe } from '@fittrack/shared';
+import type { Recipe, RecipeImageHeroCrop } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { aiApi } from '../../shared/api/aiApi';
 import { recipeApi } from '../../shared/api/recipeApi';
+import { isQuotaExceededError } from '../../shared/api/client';
 import { favoritesApi } from '../../shared/api/favoritesApi';
 import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
 import { Icon } from '../../shared/components/Icon';
@@ -37,16 +38,16 @@ import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
 import { RecipeImageHeroImage } from './RecipeImageHeroImage';
 import { RecipeImageHeroCropEditor } from './RecipeImageHeroCropEditor';
-import {
-  RecipeInstagramOptionsSheet,
-  type RecipeInstagramOptions,
-  getInitialRecipeInstagramTags,
-} from './RecipeInstagramOptionsSheet';
 import { RecipeInstagramPreview } from './RecipeInstagramPreview';
+import {
+  getRecipeShareRenderNotice,
+  logRecipeShareRenderFailure,
+} from './recipeShareRenderNotice';
 import { RECIPE_HERO_ASPECT_RATIO } from './recipeImageSource';
 import {
   createRecipeShareDraftController,
   createRecipeShareDraftState,
+  hasDistinctRecipeShareUris,
   type RecipeShareDraftController,
   type RecipeShareDraftState,
 } from './recipeShareDraftState';
@@ -57,6 +58,20 @@ import {
   type RecipeTextPreviewState,
 } from './recipeScalePreviewState';
 import { consumeRecipeDetailNavigationIntent } from './recipeWizardNavigation';
+import { isRecipeRevisionConflict } from './recipeWizardExportView';
+import {
+  buildRecipeShareExportDraftFromPending,
+  buildRecipeShareExportDraftFromPreparation,
+  buildRecipeShareExportDraftFromStored,
+  buildRecipeShareExportDraftFromView,
+  isSameRecipeExportView,
+  validateRecipeShareExportDraft,
+} from './recipeShareExportView';
+import {
+  getInitialRecipeInstagramTags,
+  type RecipeInstagramOptions,
+} from './recipeInstagramOptions';
+import type { WizardExportDraft } from './recipeWizardTypes';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
 import LogRecipeModal from './LogRecipeModal';
 
@@ -64,13 +79,24 @@ type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeDetail'>;
 
 const RECIPE_SCALE_LOADING_MESSAGE =
   'Die KI passt die Texte an die neuen Rezeptmengen an. Die KI kann Fehler machen.';
+const RECIPE_SHARE_PREPARING_MESSAGE = 'Exportvorschau wird vorbereitet.';
+const RECIPE_SHARE_AI_PREPARING_MESSAGE =
+  'Die KI macht deine Texte gerade fit fürs Bild ... Gleich kannst du beide Bilder checken und die Texte noch anpassen.';
 
 function clampTargetPortions(value: number): number {
   return Math.min(RECIPE_PORTION_MAX, Math.max(RECIPE_PORTION_MIN, value));
 }
 
-type RecipeShareStage = 'closed' | 'options' | 'preview';
-type RecipeShareNoticeKind = 'render' | 'media' | 'success';
+type RecipeShareStage = 'closed' | 'preparing' | 'preview';
+type RecipeShareNoticeKind =
+  | 'render'
+  | 'photo'
+  | 'missing'
+  | 'media'
+  | 'success'
+  | 'preparation'
+  | 'save'
+  | 'conflict';
 
 interface RecipeShareNotice {
   kind: RecipeShareNoticeKind;
@@ -80,12 +106,53 @@ interface RecipeShareNotice {
   openSettings?: boolean;
 }
 
+interface RecipeSharePreflightRequest {
+  requestId: number;
+  flowRevision: number;
+  recipe: Recipe;
+  forceFresh: boolean;
+  keepFlowOnFailure: boolean;
+}
+
+function getRecipeSharePreparationNotice(error: unknown): RecipeShareNotice {
+  if (isQuotaExceededError(error)) {
+    const resetsAt = error.quotaExceeded?.resetsAt;
+    const resetDate = resetsAt ? new Date(resetsAt) : null;
+    const resetCopy = resetDate && !Number.isNaN(resetDate.getTime())
+      ? ` Dein Kontingent wird am ${resetDate.toLocaleDateString('de-DE')} zurückgesetzt.`
+      : '';
+    return {
+      kind: 'preparation',
+      title: 'Kontingent ausgeschöpft',
+      body: `Das monatliche Kontingent für Rezeptanalysen ist ausgeschöpft.${resetCopy} Du kannst die Exportvorschau danach erneut vorbereiten.`,
+      actionLabel: 'Erneut versuchen',
+    };
+  }
+
+  const status = typeof error === 'object' && error !== null && 'response' in error
+    && typeof error.response === 'object' && error.response !== null && 'status' in error.response
+    ? error.response.status
+    : null;
+  const body = status === 422
+    ? 'Die vorgeschlagenen Exporttexte konnten nicht zuverlässig geprüft werden. Deine Rezeptdaten bleiben unverändert.'
+    : status === 502
+      ? 'Der Textdienst ist gerade nicht erreichbar. Deine Rezeptdaten bleiben unverändert.'
+      : 'Die Exportvorschau konnte nicht vorbereitet werden. Bitte prüfe deine Verbindung. Deine Rezeptdaten bleiben unverändert.';
+
+  return {
+    kind: 'preparation',
+    title: 'Exportvorschau konnte nicht vorbereitet werden',
+    body,
+    actionLabel: 'Erneut versuchen',
+  };
+}
+
 function getRecipeShareMediaNotice(error: unknown): RecipeShareNotice {
   if (!(error instanceof RecipeShareMediaError)) {
     return {
       kind: 'media',
-      title: 'Bild konnte nicht gespeichert werden',
-      body: 'Das Bild konnte nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+      title: 'Bilder konnten nicht gespeichert werden',
+      body: 'Die Bilder konnten nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
       actionLabel: 'Erneut versuchen',
     };
   }
@@ -114,43 +181,43 @@ function getRecipeShareMediaNotice(error: unknown): RecipeShareNotice {
     case 'asset-create-failed':
       return {
         kind: 'media',
-        title: 'Bild konnte nicht gespeichert werden',
-        body: 'Das Bild konnte nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+        title: 'Bilder konnten nicht gespeichert werden',
+        body: 'Die Bilder konnten nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
         actionLabel: 'Erneut versuchen',
       };
     case 'sharing-unavailable':
       return {
         kind: 'media',
         title: 'Teilen nicht verfügbar',
-        body: 'Das Bild wurde im Album FitTrack gespeichert. Auf diesem Gerät ist derzeit kein Teilen verfügbar.',
+        body: 'Beide Bilder wurden im Album FitTrack gespeichert. Auf diesem Gerät ist derzeit kein Teilen verfügbar.',
         actionLabel: 'Erneut versuchen',
       };
     case 'share-failed':
       return {
         kind: 'media',
         title: 'Teilen nicht abgeschlossen',
-        body: 'Das Bild wurde im Album FitTrack gespeichert, aber das Teilen wurde abgebrochen oder ist fehlgeschlagen. Es wurde nichts an Instagram übermittelt.',
+        body: 'Beide Bilder wurden im Album FitTrack gespeichert, aber das Teilen wurde abgebrochen oder ist fehlgeschlagen. Es wurde nichts an Instagram übermittelt.',
         actionLabel: 'Erneut teilen',
       };
     case 'cleanup-failed':
       return {
         kind: 'media',
         title: 'Aufräumen nicht abgeschlossen',
-        body: 'Das Bild wurde gespeichert, aber die temporäre Vorschau konnte nicht bereinigt werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+        body: 'Beide Bilder wurden gespeichert, aber die temporären Vorschauen konnten nicht bereinigt werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
         actionLabel: 'Erneut teilen',
       };
     case 'preview-file-write-failed':
       return {
         kind: 'render',
         title: 'Vorschau konnte nicht gespeichert werden',
-        body: 'Die gerenderte Vorschau konnte nicht vorbereitet werden. Bitte versuche es erneut.',
+        body: 'Eine der beiden Vorschauen konnte nicht vorbereitet werden. Bitte versuche es erneut.',
         actionLabel: 'Erneut versuchen',
       };
     default:
       return {
         kind: 'media',
-        title: 'Bild konnte nicht gespeichert werden',
-        body: 'Das Bild konnte nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
+        title: 'Bilder konnten nicht gespeichert werden',
+        body: 'Die Bilder konnten nicht im Album FitTrack gespeichert werden. Deine Vorschau bleibt für einen neuen Versuch erhalten.',
         actionLabel: 'Erneut versuchen',
       };
   }
@@ -190,6 +257,9 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [shareCropVisible, setShareCropVisible] = useState(false);
   const [shareNotice, setShareNotice] = useState<RecipeShareNotice | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
+  const [shareExportDraft, setShareExportDraft] = useState<WizardExportDraft | null>(null);
+  const [sharePreparationMessage, setSharePreparationMessage] = useState<string | null>(null);
+  const [sharePreflightRequest, setSharePreflightRequest] = useState<RecipeSharePreflightRequest | null>(null);
   const recipeRef = useRef<Recipe | null>(null);
   const logIntentConsumedRef = useRef(false);
   const targetPortionsRef = useRef(RECIPE_PORTION_MIN);
@@ -203,14 +273,241 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const shareBusyRef = useRef(false);
   const shareInFlightRef = useRef(false);
   const shareCleanupRequestedRef = useRef(false);
-  const optionsConfirmedRef = useRef(false);
-  const optionsOriginRef = useRef<'new' | 'preview'>('new');
   const mountedRef = useRef(true);
+  const shareExportDraftRef = useRef<WizardExportDraft | null>(null);
+  const shareExportDraftRecipeIdRef = useRef<string | null>(null);
+  const shareFlowRevisionRef = useRef(0);
+  const sharePreflightRequestSequenceRef = useRef(0);
+  const handledSharePreflightRequestRef = useRef(0);
+  const sharePreparationInFlightRef = useRef(false);
+  const missingRecoveryUsedRef = useRef(false);
   recipeIdRef.current = id;
   const setTargetPortionsValue = useCallback((value: number) => {
     targetPortionsRef.current = value;
     setTargetPortions(value);
   }, []);
+
+  const storeShareExportDraft = useCallback((draft: WizardExportDraft | null, recipeId = id) => {
+    shareExportDraftRef.current = draft;
+    shareExportDraftRecipeIdRef.current = draft ? recipeId : null;
+    setShareExportDraft(draft);
+  }, [id]);
+
+  const startSharePreflight = useCallback((
+    currentRecipe: Recipe,
+    flowRevision: number,
+    forceFresh = false,
+    keepFlowOnFailure = false,
+  ) => {
+    const requestId = ++sharePreflightRequestSequenceRef.current;
+    setSharePreparationMessage(RECIPE_SHARE_PREPARING_MESSAGE);
+    setShareStage('preparing');
+    setSharePreflightRequest({
+      requestId,
+      flowRevision,
+      recipe: currentRecipe,
+      forceFresh,
+      keepFlowOnFailure,
+    });
+  }, []);
+
+  const resolveSharePreflight = useCallback(async (request: RecipeSharePreflightRequest) => {
+    const isCurrentFlow = () => mountedRef.current
+      && shareFlowActiveRef.current
+      && shareFlowRevisionRef.current === request.flowRevision;
+
+    try {
+      let draft: WizardExportDraft | null = null;
+      const cachedDraft = shareExportDraftRecipeIdRef.current === request.recipe.id
+        ? shareExportDraftRef.current
+        : null;
+
+      if (request.recipe.exportView) {
+        draft = buildRecipeShareExportDraftFromStored(request.recipe);
+      } else if (!request.forceFresh && cachedDraft) {
+        draft = cachedDraft;
+      } else if (!request.forceFresh && route.params.pendingExportDraft) {
+        draft = buildRecipeShareExportDraftFromPending(route.params.pendingExportDraft);
+      } else {
+        setSharePreparationMessage(RECIPE_SHARE_AI_PREPARING_MESSAGE);
+        sharePreparationInFlightRef.current = true;
+        const response = await recipeApi.prepareExportView(request.recipe.id);
+        sharePreparationInFlightRef.current = false;
+        if (response.recipeId !== request.recipe.id) {
+          throw new Error('Recipe export preparation response does not match the active recipe.');
+        }
+        draft = buildRecipeShareExportDraftFromPreparation(request.recipe, response.suggestion);
+      }
+
+      if (!isCurrentFlow() || !draft) return false;
+      const validation = validateRecipeShareExportDraft(draft, request.recipe);
+      const controller = shareControllerRef.current;
+      if (!controller) return false;
+      const shareState = controller.getState();
+      controller.setOptions({
+        selectedTags: shareState.selectedTags,
+        nutritionHighlight: shareState.nutritionHighlight,
+        exportViewDraft: validation.bundleDraft,
+      });
+      storeShareExportDraft(draft, request.recipe.id);
+      setSharePreparationMessage(null);
+      setShareStage('preview');
+      if (validation.bundleDraft) {
+        controller.startInitialPreview(
+          hasDistinctRecipeShareUris(shareState.instagramUri, shareState.detailUri),
+        );
+      }
+      return true;
+    } catch (error: unknown) {
+      sharePreparationInFlightRef.current = false;
+      if (!isCurrentFlow()) return false;
+      setSharePreparationMessage(null);
+      if (request.keepFlowOnFailure) {
+        setShareStage('preview');
+      } else {
+        shareFlowActiveRef.current = false;
+        setShareStage('closed');
+      }
+      setShareNotice(getRecipeSharePreparationNotice(error));
+      return false;
+    }
+  }, [route.params.pendingExportDraft, storeShareExportDraft]);
+
+  const recoverMissingShareView = useCallback(async () => {
+    if (!shareFlowActiveRef.current || shareBusyRef.current) return;
+    const flowRevision = shareFlowRevisionRef.current;
+    storeShareExportDraft(null, id);
+    setShareNotice(null);
+    setSharePreparationMessage(RECIPE_SHARE_PREPARING_MESSAGE);
+    setShareStage('preparing');
+
+    try {
+      const currentRecipe = await recipeApi.get(id);
+      if (!mountedRef.current
+        || !shareFlowActiveRef.current
+        || shareFlowRevisionRef.current !== flowRevision) return;
+      recipeRef.current = currentRecipe;
+      setRecipe(currentRecipe);
+      startSharePreflight(currentRecipe, flowRevision, true, true);
+    } catch (error: unknown) {
+      if (!mountedRef.current
+        || !shareFlowActiveRef.current
+        || shareFlowRevisionRef.current !== flowRevision) return;
+      setSharePreparationMessage(null);
+      setShareStage('preview');
+      setShareNotice(getRecipeSharePreparationNotice(error));
+    }
+  }, [id, startSharePreflight, storeShareExportDraft]);
+
+  const reloadShareAfterRevisionConflict = useCallback(async (
+    draftToReview?: WizardExportDraft,
+  ) => {
+    if (!shareFlowActiveRef.current) return;
+    const flowRevision = shareFlowRevisionRef.current;
+    setShareNotice(null);
+    setSharePreparationMessage(RECIPE_SHARE_PREPARING_MESSAGE);
+    setShareStage('preparing');
+
+    try {
+      const currentRecipe = await recipeApi.get(id);
+      if (!mountedRef.current
+        || !shareFlowActiveRef.current
+        || shareFlowRevisionRef.current !== flowRevision) return;
+      recipeRef.current = currentRecipe;
+      setRecipe(currentRecipe);
+      const storedDraft = buildRecipeShareExportDraftFromStored(currentRecipe);
+      if (storedDraft) {
+        const validation = validateRecipeShareExportDraft(storedDraft, currentRecipe);
+        const controller = shareControllerRef.current;
+        const shareState = controller?.getState();
+        storeShareExportDraft(storedDraft, id);
+        setSharePreparationMessage(null);
+        setShareStage('preview');
+        if (controller && shareState) {
+          controller.setOptions({
+            selectedTags: shareState.selectedTags,
+            nutritionHighlight: shareState.nutritionHighlight,
+            exportViewDraft: validation.bundleDraft,
+          });
+          if (validation.bundleDraft) {
+            controller.startInitialPreview(
+              hasDistinctRecipeShareUris(shareState.instagramUri, shareState.detailUri),
+            );
+          }
+        }
+        setShareNotice({
+          kind: 'save',
+          title: 'Rezept wurde geändert',
+          body: 'Der nicht gespeicherte Exportentwurf wurde verworfen. Bitte prüfe die Exporttexte der aktuellen Rezeptfassung erneut.',
+        });
+        return;
+      }
+
+      const localDraft = draftToReview ?? shareExportDraftRef.current;
+      if (!localDraft) {
+        setSharePreparationMessage(null);
+        setShareStage('preview');
+        setShareNotice({
+          kind: 'conflict',
+          title: 'Rezept wurde geändert',
+          body: 'Die aktuelle Rezeptfassung enthält keine gespeicherte Exportansicht und es ist kein lokaler Entwurf verfügbar. Schließe die Vorschau und starte Teilen erneut, um Exporttexte vorzubereiten.',
+        });
+        return;
+      }
+
+      const localValidation = validateRecipeShareExportDraft(localDraft, currentRecipe);
+      const unresolvedIngredientIds = localValidation.ingredientResolution.unresolvedIngredientIds;
+      const reviewDraft = unresolvedIngredientIds.length > 0
+        ? {
+            ...localDraft,
+            includedIngredientIds: localValidation.ingredientResolution.includedIngredientIds,
+          }
+        : localDraft;
+      const reviewValidation = reviewDraft === localDraft
+        ? localValidation
+        : validateRecipeShareExportDraft(reviewDraft, currentRecipe);
+      const controller = shareControllerRef.current;
+      const shareState = controller?.getState();
+      storeShareExportDraft(reviewDraft, id);
+      setSharePreparationMessage(null);
+      setShareStage('preview');
+      if (controller && shareState) {
+        controller.setOptions({
+          selectedTags: shareState.selectedTags,
+          nutritionHighlight: shareState.nutritionHighlight,
+          exportViewDraft: reviewValidation.bundleDraft,
+        });
+        controller.reset();
+      }
+      setShareNotice({
+        kind: 'conflict',
+        title: 'Rezept wurde geändert',
+        body: unresolvedIngredientIds.length > 0
+          ? 'Dein nicht gespeicherter Exportentwurf wurde beibehalten. Ausgewählte Zutaten, die sich der aktuellen Rezeptfassung nicht eindeutig zuordnen ließen, wurden aus der Auswahl entfernt. Prüfe den Entwurf und aktualisiere die Vorschau manuell.'
+          : 'Dein nicht gespeicherter Exportentwurf wurde beibehalten. Prüfe die Exporttexte für die aktuelle Rezeptfassung und aktualisiere die Vorschau manuell.',
+      });
+    } catch {
+      if (!mountedRef.current
+        || !shareFlowActiveRef.current
+        || shareFlowRevisionRef.current !== flowRevision) return;
+      setSharePreparationMessage(null);
+      setShareStage('preview');
+      setShareNotice({
+        kind: 'conflict',
+        title: 'Rezept konnte nicht neu geladen werden',
+        body: 'Dein nicht bestätigter Exportentwurf bleibt erhalten. Lade die aktuelle Rezeptfassung, bevor du fortfährst.',
+        actionLabel: 'Erneut laden',
+      });
+    }
+  }, [id, storeShareExportDraft]);
+
+  useEffect(() => {
+    if (!sharePreflightRequest
+      || sharePreflightRequest.requestId <= handledSharePreflightRequestRef.current) return;
+    handledSharePreflightRequestRef.current = sharePreflightRequest.requestId;
+    setSharePreflightRequest(null);
+    void resolveSharePreflight(sharePreflightRequest);
+  }, [resolveSharePreflight, sharePreflightRequest]);
 
   const scalePreviewControllerRef = useRef<RecipeScalePreviewController | null>(null);
   if (scalePreviewControllerRef.current === null) {
@@ -253,10 +550,13 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const closeShareFlow = useCallback(() => {
     if (shareBusyRef.current || shareInFlightRef.current) return;
 
+    shareFlowRevisionRef.current += 1;
     shareFlowActiveRef.current = false;
+    sharePreparationInFlightRef.current = false;
     shareAssetSavedRef.current = false;
-    optionsConfirmedRef.current = false;
     setShareStage('closed');
+    setSharePreflightRequest(null);
+    setSharePreparationMessage(null);
     setShareCropVisible(false);
     setShareNotice(null);
     shareControllerRef.current?.dispose();
@@ -285,7 +585,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
     const controller = createRecipeShareDraftController({
       initialState,
-      renderApi: { renderInstagramRecipe: recipeApi.renderInstagramRecipe },
+      renderApi: { renderShareBundle: recipeApi.renderShareBundle },
       createPreviewUri: async (png) => {
         const previewUri = await recipeShareMediaService.createPreviewUri(png);
         if (shareCleanupRequestedRef.current || !shareFlowActiveRef.current) {
@@ -299,77 +599,87 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         }
         return previewUri;
       },
+      cleanupPreviewUri: recipeShareMediaService.cleanupPreviewUri,
       onStateChange: (nextState) => {
         if (!mountedRef.current) return;
         shareDraftRef.current = nextState;
         setShareDraft(nextState);
         if (nextState.renderStatus === 'error') {
-          setShareNotice({
-            kind: 'render',
-            title: 'Vorschau konnte nicht erstellt werden',
-            body: nextState.renderStage === 'final'
-              ? 'Der neue Ausschnitt konnte nicht gerendert werden. Deine letzte Vorschau bleibt erhalten.'
-              : 'Die gerenderte Vorschau konnte nicht vorbereitet werden. Bitte versuche es erneut.',
-            actionLabel: 'Erneut versuchen',
-          });
+          logRecipeShareRenderFailure(nextState.error, nextState.recipeId, nextState.renderStage);
+          const notice = getRecipeShareRenderNotice(nextState.error, nextState.renderStage);
+          if (notice.kind === 'photo') {
+            closeShareFlow();
+            const currentRecipe = recipeRef.current;
+            if (currentRecipe) {
+              const recipeWithoutPhoto = { ...currentRecipe, images: [] };
+              recipeRef.current = recipeWithoutPhoto;
+              setRecipe(recipeWithoutPhoto);
+              setImgIndex(0);
+            }
+            setShareNotice(notice);
+          } else if (notice.kind === 'missing') {
+            if (!missingRecoveryUsedRef.current) {
+              missingRecoveryUsedRef.current = true;
+              void recoverMissingShareView();
+            } else {
+              setShareNotice({ ...notice, actionLabel: 'Erneut vorbereiten' });
+            }
+          } else {
+            setShareNotice(notice);
+          }
         }
       },
     });
 
     shareControllerRef.current = controller;
     return controller;
-  }, []);
+  }, [closeShareFlow, recoverMissingShareView]);
 
   const handleOpenShare = useCallback(() => {
     const currentRecipe = recipeRef.current;
     if (!currentRecipe || shareFlowActiveRef.current || shareBusyRef.current) return;
+    if (currentRecipe.images.length === 0) return;
 
     shareFlowActiveRef.current = true;
     shareAssetSavedRef.current = false;
-    optionsOriginRef.current = 'new';
-    optionsConfirmedRef.current = false;
+    shareFlowRevisionRef.current += 1;
+    missingRecoveryUsedRef.current = false;
     setShareNotice(null);
     setShareCropVisible(false);
     createShareController(currentRecipe);
-    setShareStage('options');
-  }, [createShareController]);
+    startSharePreflight(currentRecipe, shareFlowRevisionRef.current);
+  }, [createShareController, startSharePreflight]);
 
-  const handleOptionsConfirm = useCallback((options: RecipeInstagramOptions) => {
+  const handleShareOptionsChange = useCallback((options: RecipeInstagramOptions) => {
     const controller = shareControllerRef.current;
-    if (
-      !controller
-      || optionsConfirmedRef.current
-      || shareBusyRef.current
-      || shareAssetSavedRef.current
-    ) return;
-
-    optionsConfirmedRef.current = true;
-    shareAssetSavedRef.current = false;
-    shareSessionRef.current = null;
+    const currentRecipe = recipeRef.current;
+    const currentDraft = shareExportDraftRef.current;
+    if (!controller || !currentRecipe || !currentDraft
+      || shareBusyRef.current || shareAssetSavedRef.current) return;
+    const validation = validateRecipeShareExportDraft(currentDraft, currentRecipe);
+    controller.setOptions({ ...options, exportViewDraft: validation.bundleDraft });
     setShareNotice(null);
-    controller.setOptions(options);
-    setShareStage('preview');
-    controller.startInitialPreview();
   }, []);
 
-  const handleOptionsClose = useCallback(() => {
-    if (optionsConfirmedRef.current) {
-      optionsConfirmedRef.current = false;
-      return;
-    }
-    if (optionsOriginRef.current === 'preview') {
-      setShareStage('preview');
-      return;
-    }
-    closeShareFlow();
-  }, [closeShareFlow]);
-
-  const handleChangeShareOptions = useCallback(() => {
-    if (shareBusyRef.current || shareAssetSavedRef.current) return;
-    optionsOriginRef.current = 'preview';
-    optionsConfirmedRef.current = false;
+  const handleUpdateSharePreview = useCallback(() => {
+    const currentRecipe = recipeRef.current;
+    const currentDraft = shareExportDraftRef.current;
+    const controller = shareControllerRef.current;
+    if (!currentRecipe || !currentDraft || !controller
+      || shareBusyRef.current || shareAssetSavedRef.current) return;
+    const validation = validateRecipeShareExportDraft(currentDraft, currentRecipe);
+    if (!validation.bundleDraft) return;
+    const shareState = controller.getState();
+    controller.setOptions({
+      selectedTags: shareState.selectedTags,
+      nutritionHighlight: shareState.nutritionHighlight,
+      exportViewDraft: validation.bundleDraft,
+    });
     setShareNotice(null);
-    setShareStage('options');
+    setShareStage('preview');
+    controller.startInitialPreview(
+      hasDistinctRecipeShareUris(shareState.instagramUri, shareState.detailUri),
+    );
   }, []);
 
   const handleOpenCrop = useCallback(() => {
@@ -378,36 +688,175 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       shareBusyRef.current
       || shareAssetSavedRef.current
       || !currentDraft?.cropImageUri
-      || !currentDraft.previewUri
+      || !hasDistinctRecipeShareUris(currentDraft.instagramUri, currentDraft.detailUri)
     ) return;
     setShareNotice(null);
     setShareCropVisible(true);
   }, []);
 
-  const handleCropConfirmed = useCallback((crop: Parameters<NonNullable<RecipeShareDraftController['confirmCrop']>>[0]) => {
-    if (shareBusyRef.current) return;
+  const handleCropConfirmed = useCallback((crop: RecipeImageHeroCrop) => {
+    const currentRecipe = recipeRef.current;
+    const currentExportDraft = shareExportDraftRef.current;
+    const currentShareDraft = shareDraftRef.current;
+    if (
+      shareBusyRef.current
+      || !currentRecipe
+      || !currentExportDraft
+      || !currentShareDraft
+      || !hasDistinctRecipeShareUris(currentShareDraft.instagramUri, currentShareDraft.detailUri)
+    ) return;
+
+    const validation = validateRecipeShareExportDraft(currentExportDraft, currentRecipe);
+    if (!validation.bundleDraft) return;
     setShareCropVisible(false);
     setShareNotice(null);
     setShareStage('preview');
+    const shareState = shareControllerRef.current?.getState();
+    if (!shareState) return;
+    shareControllerRef.current?.setOptions({
+      selectedTags: shareState.selectedTags,
+      nutritionHighlight: shareState.nutritionHighlight,
+      exportViewDraft: validation.bundleDraft,
+    });
     shareControllerRef.current?.confirmCrop(crop);
   }, []);
 
+  const handleShareExportDraftChange = useCallback((draft: WizardExportDraft) => {
+    const currentRecipe = recipeRef.current;
+    const controller = shareControllerRef.current;
+    if (!shareFlowActiveRef.current || shareBusyRef.current || !currentRecipe || !controller) return;
+    storeShareExportDraft(draft, id);
+    const validation = validateRecipeShareExportDraft(draft, currentRecipe);
+    const shareState = controller.getState();
+    controller.setOptions({
+      selectedTags: shareState.selectedTags,
+      nutritionHighlight: shareState.nutritionHighlight,
+      exportViewDraft: validation.bundleDraft,
+    });
+  }, [id, storeShareExportDraft]);
+
+  const handleToggleShareIncludedIngredient = useCallback((ingredientId: string) => {
+    const currentRecipe = recipeRef.current;
+    const currentDraft = shareExportDraftRef.current;
+    const controller = shareControllerRef.current;
+    if (!currentRecipe || !currentDraft || !controller || shareBusyRef.current) return;
+    const matches = currentRecipe.ingredients.filter((ingredient) => ingredient.id === ingredientId);
+    if (matches.length !== 1 || (matches[0]?.category ?? 'food') === 'seasoning') return;
+
+    const includedIngredientIds = currentDraft.includedIngredientIds.includes(ingredientId)
+      ? currentDraft.includedIngredientIds.filter((selectedId) => selectedId !== ingredientId)
+      : [...currentDraft.includedIngredientIds, ingredientId];
+    const nextDraft = { ...currentDraft, includedIngredientIds };
+    storeShareExportDraft(nextDraft, id);
+    const validation = validateRecipeShareExportDraft(nextDraft, currentRecipe);
+    const shareState = controller.getState();
+    controller.setOptions({
+      selectedTags: shareState.selectedTags,
+      nutritionHighlight: shareState.nutritionHighlight,
+      exportViewDraft: validation.bundleDraft,
+    });
+  }, [id, storeShareExportDraft]);
+
+  const handleSaveShareExportDraft = useCallback(async () => {
+    const currentRecipe = recipeRef.current;
+    const currentDraft = shareExportDraftRef.current;
+    const controller = shareControllerRef.current;
+    if (
+      !currentRecipe
+      || !currentDraft
+      || !controller
+      || !shareFlowActiveRef.current
+      || shareBusyRef.current
+      || sharePreparationInFlightRef.current
+    ) return false;
+
+    const validation = validateRecipeShareExportDraft(currentDraft, currentRecipe);
+    const exportView = validation.exportView;
+    if (!exportView) return false;
+    if (isSameRecipeExportView(currentRecipe.exportView, exportView)) return false;
+
+    const flowRevision = shareFlowRevisionRef.current;
+    shareBusyRef.current = true;
+    setShareBusy(true);
+    setShareNotice(null);
+
+    try {
+      const savedRecipe = await recipeApi.update(id, {
+        exportView,
+        exportViewAction: 'confirm',
+      });
+      if (!mountedRef.current
+        || !shareFlowActiveRef.current
+        || shareFlowRevisionRef.current !== flowRevision) return false;
+      if (!savedRecipe.exportView
+        || !isSameRecipeExportView(savedRecipe.exportView, exportView)) {
+        throw new Error('Recipe save response did not contain the saved export view.');
+      }
+      recipeRef.current = savedRecipe;
+      setRecipe(savedRecipe);
+      storeShareExportDraft(buildRecipeShareExportDraftFromView(savedRecipe.exportView), id);
+      setSharePreparationMessage(null);
+      setShareStage('preview');
+      const shareState = controller.getState();
+      controller.setOptions({
+        selectedTags: shareState.selectedTags,
+        nutritionHighlight: shareState.nutritionHighlight,
+        exportViewDraft: null,
+      });
+      controller.startInitialPreview(
+        hasDistinctRecipeShareUris(shareState.instagramUri, shareState.detailUri),
+      );
+      return true;
+    } catch (error: unknown) {
+      if (!mountedRef.current
+        || !shareFlowActiveRef.current
+        || shareFlowRevisionRef.current !== flowRevision) return false;
+      if (isRecipeRevisionConflict(error)) {
+        void reloadShareAfterRevisionConflict(currentDraft);
+      } else {
+        setShareNotice({
+          kind: 'save',
+          title: 'Exporttexte konnten nicht gespeichert werden',
+          body: 'Deine Änderungen wurden nicht gespeichert. Die bisherige Vorschau bleibt erhalten. Bitte prüfe deine Verbindung und versuche es erneut.',
+          actionLabel: 'Erneut speichern',
+        });
+      }
+      return false;
+    } finally {
+      shareBusyRef.current = false;
+      if (mountedRef.current) setShareBusy(false);
+    }
+  }, [id, reloadShareAfterRevisionConflict, storeShareExportDraft]);
+
   const handleSaveAndShare = useCallback(async () => {
+    const currentRecipe = recipeRef.current;
+    const currentExportDraft = shareExportDraftRef.current;
+    const exportValidation = currentRecipe && currentExportDraft
+      ? validateRecipeShareExportDraft(currentExportDraft, currentRecipe)
+      : null;
     const currentDraft = shareDraftRef.current;
     const controller = shareControllerRef.current;
     if (
-      !currentDraft?.previewUri ||
+      !currentRecipe
+      || !exportValidation?.bundleDraft
+      || !currentDraft?.instagramUri ||
+      !currentDraft.detailUri ||
+      !hasDistinctRecipeShareUris(currentDraft.instagramUri, currentDraft.detailUri) ||
+      !currentDraft.instagramBytes ||
+      !currentDraft.detailBytes ||
       currentDraft.renderStatus !== 'ready' ||
       !controller ||
       shareBusyRef.current ||
       shareInFlightRef.current
     ) return;
 
-    const previewUri = currentDraft.previewUri;
-    const existingSession = shareSessionRef.current?.previewUri === previewUri
+    const instagramUri = currentDraft.instagramUri;
+    const detailUri = currentDraft.detailUri;
+    const existingSession = shareSessionRef.current?.previewUri === instagramUri
+      && shareSessionRef.current.detailUri === detailUri
       ? shareSessionRef.current
       : null;
-    const session = existingSession ?? recipeShareMediaService.createSession(previewUri);
+    const session = existingSession ?? recipeShareMediaService.createSession(instagramUri, detailUri);
     if (!existingSession) shareAssetSavedRef.current = false;
     shareSessionRef.current = session;
     shareBusyRef.current = true;
@@ -428,8 +877,8 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       setShareStage('closed');
       setShareNotice({
         kind: 'success',
-        title: 'Bild gespeichert',
-        body: 'Bild wurde im Album FitTrack gespeichert.',
+        title: 'Bilder gespeichert',
+        body: 'Beide Bilder wurden im Album FitTrack gespeichert.',
       });
     } catch (error: unknown) {
       if (!mountedRef.current) return;
@@ -465,12 +914,37 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
     const notice = shareNotice;
     setShareNotice(null);
     if (!notice) return;
+    if (notice.kind === 'missing') {
+      void recoverMissingShareView();
+      return;
+    }
+    if (notice.kind === 'preparation') {
+      if (shareFlowActiveRef.current) void recoverMissingShareView();
+      else handleOpenShare();
+      return;
+    }
+    if (notice.kind === 'conflict') {
+      void reloadShareAfterRevisionConflict();
+      return;
+    }
+    if (notice.kind === 'save') {
+      void handleSaveShareExportDraft();
+      return;
+    }
     if (notice.kind === 'render') {
       handleRetryRender();
       return;
     }
     void handleSaveAndShare();
-  }, [handleRetryRender, handleSaveAndShare, shareNotice]);
+  }, [
+    handleSaveShareExportDraft,
+    handleOpenShare,
+    handleRetryRender,
+    handleSaveAndShare,
+    recoverMissingShareView,
+    reloadShareAfterRevisionConflict,
+    shareNotice,
+  ]);
 
   const handleShareNoticeClose = useCallback(() => {
     if (shareNotice?.kind === 'success') {
@@ -482,7 +956,9 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
   useEffect(() => () => {
     mountedRef.current = false;
+    shareFlowRevisionRef.current += 1;
     shareFlowActiveRef.current = false;
+    sharePreparationInFlightRef.current = false;
     shareControllerRef.current?.dispose();
     if (!shareInFlightRef.current) void cleanupShareResources();
   }, [cleanupShareResources]);
@@ -689,6 +1165,13 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       ? { ...shareDraft.primaryImageCrop, ...shareDraft.presentation }
       : shareDraft.primaryImageCrop
     : null;
+  const shareExportValidation = shareExportDraft
+    ? validateRecipeShareExportDraft(shareExportDraft, recipe)
+    : null;
+  const shareExportDraftNeedsSaving = Boolean(
+    shareExportValidation?.exportView
+    && !isSameRecipeExportView(recipe.exportView, shareExportValidation.exportView),
+  );
   const shareInteractionDisabled = shareFlowActiveRef.current || shareStage !== 'closed' || shareNotice != null;
 
   return (
@@ -892,7 +1375,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
           <Icon lib="ion" name="create-outline" size="md" color={colors.textSecondary} />
           <Text style={styles.stickyActionText}>Bearbeiten</Text>
         </TouchableOpacity>
-        <TouchableOpacity
+        {recipe.images.length > 0 ? <TouchableOpacity
           style={[styles.stickyAction, shareInteractionDisabled && styles.stickyActionDisabled]}
           onPress={handleOpenShare}
           disabled={shareInteractionDisabled}
@@ -903,7 +1386,7 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         >
           <Icon lib="ion" name="share-outline" size="md" color={colors.primaryBright} />
           <Text style={styles.stickyShareText}>Teilen</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> : null}
         <TouchableOpacity
           style={styles.stickyAction}
           onPress={() => setDeleteConfirmVisible(true)}
@@ -934,28 +1417,40 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         onClose={() => setDeleteConfirmVisible(false)}
       />
 
-      <RecipeInstagramOptionsSheet
-        visible={shareStage === 'options'}
-        tags={recipe.tags}
-        initialSelectedTags={shareDraft?.selectedTags}
-        initialNutritionHighlight={shareDraft?.nutritionHighlight ?? null}
-        onClose={handleOptionsClose}
-        onConfirm={handleOptionsConfirm}
-      />
-
       <RecipeInstagramPreview
-        visible={shareStage === 'preview'}
-        previewUri={shareDraft?.previewUri ?? null}
+        visible={shareStage === 'preparing' || shareStage === 'preview'}
+        preparationMessage={shareStage === 'preparing'
+          ? sharePreparationMessage ?? RECIPE_SHARE_PREPARING_MESSAGE
+          : null}
+        providerRequestInFlight={sharePreparationInFlightRef.current}
+        instagramUri={shareDraft?.instagramUri ?? null}
+        detailUri={shareDraft?.detailUri ?? null}
+        exportDraft={shareExportDraft}
+        exportIngredients={recipe.ingredients}
+        recipeTags={recipe.tags}
+        selectedTags={shareDraft?.selectedTags ?? getInitialRecipeInstagramTags(recipe.tags)}
+        nutritionHighlight={shareDraft?.nutritionHighlight ?? null}
+        previewErrors={shareExportValidation?.previewErrors ?? []}
+        saveErrors={shareExportValidation?.saveErrors ?? []}
+        exportDraftValid={Boolean(shareExportValidation?.bundleDraft)}
+        exportDraftSaveValid={Boolean(shareExportValidation?.exportView)}
+        exportDraftNeedsSaving={shareExportDraftNeedsSaving}
+        canChangeOptions={!shareAssetSavedRef.current}
         renderStatus={shareDraft?.renderStatus ?? 'idle'}
         renderStage={shareDraft?.renderStage ?? null}
         assetStatus={shareDraft?.assetStatus ?? 'idle'}
         shareStatus={shareDraft?.shareStatus ?? 'idle'}
-        canAdjustCrop={Boolean(shareDraft?.cropImageUri) && !shareAssetSavedRef.current}
-        canChangeOptions={!shareAssetSavedRef.current}
+        canAdjustCrop={Boolean(shareDraft?.cropImageUri)
+          && hasDistinctRecipeShareUris(shareDraft?.instagramUri ?? null, shareDraft?.detailUri ?? null)
+          && !shareAssetSavedRef.current}
         busy={shareBusy}
         onClose={closeShareFlow}
+        onChangeExportDraft={handleShareExportDraftChange}
+        onToggleIncludedIngredient={handleToggleShareIncludedIngredient}
+        onChangeOptions={handleShareOptionsChange}
+        onUpdatePreview={handleUpdateSharePreview}
+        onSaveExportDraft={handleSaveShareExportDraft}
         onAdjustCrop={handleOpenCrop}
-        onChangeOptions={handleChangeShareOptions}
         onRetryRender={handleRetryRender}
         onSaveAndShare={() => void handleSaveAndShare()}
       />

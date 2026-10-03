@@ -102,24 +102,30 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 ## 5. Recipe Analyzer
 
-**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v9'`
+**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v11'`
 
-**Input:** Free-text recipe (ingredients + steps)
+**Endpoint:** `POST /api/ai/recipe-analyze`
+
+**Input:** `{ text }`, a free-text recipe with at least 10 and at most 5000 characters.
 
 **Used in:** `RecipeWizardScreen` to speed up recipe creation.
 
 The Recipe Analyzer is separate from the Food Estimator. It parses a complete recipe into metadata, ordered steps, food ingredients, and seasoning ingredients. It does not create reusable foods and it does not save diary data. The Food Estimator (`POST /api/ai/food-estimate`) remains the single-food nutrition-estimation workflow; in recipe-ingredient search it can be invoked explicitly for one unresolved ingredient and its result is returned to `RecipeWizardScreen` for user confirmation.
 
-**AI output (`AiRecipeRaw`):**
+**AI output (`AiRecipeRaw` / handler preview):**
 
-The AI returns a fully structured recipe including `suggestedName`, `description`, `suggestedPortions`, `tags`, `steps`, and an `ingredients` array. Each ingredient is an `AiRecipeIngredientLine`:
+The structured result contains `suggestedName`, `description`, positive `suggestedPortions`, `tags`, ordered source `steps`, normalized `ingredients`, and one `exportSuggestion`. The analyzer uses Strict Structured Outputs with `additionalProperties: false`. Every ingredient has a unique `analysisKey` within the analysis; export steps and the export ingredient selection reference ingredients only through that key.
+
+Each ingredient is an `AiRecipeIngredientLine`:
 
 ```ts
 interface AiRecipeIngredientLine {
+  analysisKey: string;    // unique within this analysis
   line: string;           // full original text, e.g. "300g Hähnchenbrust"
   displayName: string;    // clean name without quantity, e.g. "Hähnchenbrust"
   category: 'food' | 'seasoning';
   amountGrams: number | null; // positive grams when determinable; null may mark an indeterminate food amount for manual review
+  kitchenAmountText: string | null; // kitchen unit for seasoning; null for food
 }
 ```
 
@@ -157,6 +163,66 @@ category?: 'food' | 'seasoning';
 ```
 
 This allows the review screen (`RecipeWizardScreen`) to render seasoning items differently from food items.
+
+### v11 analyzer and export suggestion contract
+
+`exportSuggestion` is generated in the same AI call and is only a user-review proposal. It has the following fields:
+
+```ts
+{
+  version: 1;
+  teaser: string;                 // 1-96 characters
+  totalTimeMinutes: number | null; // positive integer, at most 10080
+  difficulty: string | null;       // non-empty, single-line value when known
+  steps: Array<{
+    order: number;                 // contiguous export order, starting at 1
+    description: string;           // 1-90 characters
+    sourceStepOrders: number[];    // ascending source-step orders
+    ingredientKeys: string[];      // existing analysisKey values only
+  }>;                              // at most 5 entries
+  includedIngredientKeys: string[]; // unique, source order, at most 20
+}
+```
+
+`totalTimeMinutes` and `difficulty` use the same time and difficulty field names as the persisted recipe export view. During AI analysis both are nullable because no default may be invented; the later persisted export view has its own required-field validation. `includedIngredientKeys` excludes `seasoning` ingredients. The backend requires unique, ascending source `steps.order` values, contiguous export orders, valid ingredient references, and a complete `sourceStepOrders` trace: every source step must occur exactly once and in the original order. If more than five source steps exist, the prompt requires semantic grouping rather than mechanical truncation, preserving actions, ingredient references, temperatures, times, and turning points. Descriptions above 90 characters or more than five export steps are rejected with HTTP `422`.
+
+The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. A structurally or semantically invalid AI result returns `422` and is rejected before usage is tracked. Usage is tracked only after the AI result passes server validation. The analysis response, including `exportSuggestion`, is transient at this endpoint: it is not persisted automatically, and no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Food items with an indeterminate amount remain visible with `needsReview: true`; seasoning items bypass catalog search and are also shown for user review in the wizard.
+
+`POST /api/recipes/{id}/export-view/prepare` reuses the same analyzer call,
+server validation, and `recipe-analyze` quota. It accepts only
+`{ "contractVersion": 2 }`. A client ETag is not required; if `If-Match` is
+supplied, a stale or non-exact value returns `412 recipe_revision_conflict`
+before quota or provider work. The transient response contains only the
+teaser, nullable time and difficulty, and plain ordered export steps.
+`sourceEtag` is compatibility metadata, not a client acceptance prerequisite.
+The endpoint does not map analyzer ingredient keys to saved recipe ingredient
+IDs or expose resolution states. It performs no second AI call, does not
+persist the suggestion, and tracks usage once only after a valid AI result.
+The analyzer's `includedIngredientKeys` remain part of the separate
+new-recipe analysis contract.
+
+### Share-Triggered Recipe Export Review
+
+For a newly created recipe, Mobile keeps the analyzer's `exportSuggestion` as
+an unconfirmed local draft rather than including a confirmed `exportView` in
+the ordinary recipe create request. The draft carries export text and only
+uniquely resolved, user-confirmed non-seasoning ingredient IDs; analyzer keys,
+candidates, resolution state, and a client fingerprint are not carried into
+the saved recipe.
+
+On an explicit Share action, Mobile reuses a stored confirmed export view,
+including a stale one, without calling AI. If no confirmed view exists, it
+reuses an unconfirmed export draft already held locally from new-recipe
+analysis or an earlier V2 preparation while the detail screen remains mounted.
+Only when neither is available does Share call the existing preparation
+endpoint above. The suggestion remains transient while the user reviews it and
+may be sent to `share-bundle` as an optional request-only `exportViewDraft`
+(shared type `RecipeShareBundleExportDraft`) to render a preview without
+confirming or saving it. Without a request draft, the
+endpoint uses the stored confirmed view, including a stale one, or returns
+`MISSING_EXPORT_VIEW` when neither source exists. A new or edited export is
+persisted only through the existing explicit recipe confirmation request. The
+share-bundle endpoint does not call AI or use quota.
 
 `RecipeStep` persistence contains only `order`, optional `title`, and `description`. Step-level `notes` are not part of the shared recipe type or API contract; historical notes are cleaned lazily on recipe update rather than by a Cosmos migration.
 

@@ -28,7 +28,7 @@ import { colors } from '../theme';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, ProgressIcon } from '../../assets/icons/TabIcons';
 import { profileApi } from '../../shared/api/profileApi';
 import { useFoodEntryHubStore } from '../../modules/nutrition/hub/useFoodEntryHubStore';
-import type { RecipeDetailNavigationIntent } from '../../modules/recipes/recipeWizardNavigation';
+import type { RecipeDetailNavigationParams } from '../../modules/recipes/recipeWizardNavigation';
 
 // React Navigation needs a theme that matches our dark palette so that
 // transient surfaces (e.g. screen background flashes between renders)
@@ -128,7 +128,7 @@ function NutritionStackNavigator() {
 // --- Recipe stack ---
 export type RecipeStackParamList = {
   RecipeList: undefined;
-  RecipeDetail: { id: string; intent?: RecipeDetailNavigationIntent };
+  RecipeDetail: RecipeDetailNavigationParams;
   RecipeWizard: { editId?: string } | undefined;
 };
 

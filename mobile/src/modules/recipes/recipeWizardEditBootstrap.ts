@@ -1,9 +1,17 @@
 import { randomUUID } from 'expo-crypto';
-import type { Recipe, RecipeIngredient } from '@fittrack/shared';
+import type {
+  PrepareRecipeExportViewSuggestionV2,
+  Recipe,
+  RecipeExportStep,
+  RecipeExportSuggestion,
+  RecipeIngredient,
+} from '@fittrack/shared';
+import { RECIPE_EXPORT_MAX_INGREDIENTS } from '../../../../shared/types/recipeExport';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
 import {
   buildWizardImageDraftFromRecipeImage,
   type AmountEdit,
+  type WizardExportDraft,
   type WizardImageDraft,
   type WizardIngredient,
   type WizardStepItem,
@@ -16,6 +24,98 @@ export interface RecipeWizardEditBootstrapState {
   amountEdits: Record<string, AmountEdit>;
   steps: WizardStepItem[];
   images: WizardImageDraft[];
+  exportDraft: WizardExportDraft | null;
+}
+
+export interface LoadedRecipeWizardEditState {
+  recipe: Recipe;
+  bootstrapState: RecipeWizardEditBootstrapState;
+}
+
+export function buildWizardExportDraftFromRecipe(recipe: Recipe): WizardExportDraft | null {
+  const exportView = recipe.exportView;
+  const fallbackIngredientIds = recipe.ingredients
+    .filter((ingredient) => (ingredient.category ?? 'food') !== 'seasoning')
+    .map((ingredient) => ingredient.id);
+  const fallbackSteps = [...recipe.steps].sort((left, right) => left.order - right.order).map((step, index) => ({
+    order: index + 1,
+    description: step.description,
+  }));
+
+  return {
+    version: 1,
+    teaser: exportView?.teaser ?? (recipe.description?.trim() || recipe.name),
+    totalTimeMinutes: exportView ? String(exportView.totalTimeMinutes) : '',
+    difficulty: exportView?.difficulty ?? '',
+    steps: exportView
+      ? exportView.steps.map((step) => ({ ...step }))
+      : fallbackSteps,
+    includedIngredientIds: exportView
+      ? [...exportView.includedIngredientIds]
+      : fallbackIngredientIds.length <= RECIPE_EXPORT_MAX_INGREDIENTS ? fallbackIngredientIds : [],
+    includedIngredientKeys: [],
+    analysisIngredientKeys: [],
+    source: exportView ? 'persisted' : 'legacy',
+    confirmed: false,
+  };
+}
+
+export function buildWizardExportDraftFromSuggestion(
+  suggestion: RecipeExportSuggestion,
+  analysisIngredientKeys: string[],
+): WizardExportDraft {
+  return {
+    version: 1,
+    teaser: suggestion.teaser,
+    totalTimeMinutes: suggestion.totalTimeMinutes == null ? '' : String(suggestion.totalTimeMinutes),
+    difficulty: suggestion.difficulty ?? '',
+    steps: suggestion.steps.map((step) => ({
+      order: step.order,
+      description: step.description,
+    })),
+    includedIngredientIds: [],
+    includedIngredientKeys: [...suggestion.includedIngredientKeys],
+    analysisIngredientKeys: [...analysisIngredientKeys],
+    source: 'analysis',
+    confirmed: false,
+  };
+}
+
+export function buildManualWizardExportDraft(
+  teaser: string,
+  steps: RecipeExportStep[],
+  analysisIngredientKeys: string[],
+): WizardExportDraft {
+  return {
+    version: 1,
+    teaser,
+    totalTimeMinutes: '',
+    difficulty: '',
+    steps: steps.map((step) => ({ ...step })),
+    includedIngredientIds: [],
+    includedIngredientKeys: [],
+    analysisIngredientKeys: [...analysisIngredientKeys],
+    source: 'manual',
+    confirmed: false,
+  };
+}
+
+export function buildWizardExportDraftFromPreparedSuggestion(
+  suggestion: PrepareRecipeExportViewSuggestionV2,
+  currentDraft: WizardExportDraft | null = null,
+): WizardExportDraft {
+  return {
+    version: 1,
+    teaser: suggestion.teaser,
+    totalTimeMinutes: suggestion.totalTimeMinutes == null ? '' : String(suggestion.totalTimeMinutes),
+    difficulty: suggestion.difficulty ?? '',
+    steps: suggestion.steps.map((step) => ({ ...step })),
+    includedIngredientIds: currentDraft?.includedIngredientIds ?? [],
+    includedIngredientKeys: [],
+    analysisIngredientKeys: [],
+    source: 'prepared',
+    confirmed: false,
+  };
 }
 
 export function buildParserItemFromRecipeIngredient(ingredient: RecipeIngredient): MealParserPreviewItem {
@@ -85,5 +185,17 @@ export function buildRecipeWizardEditBootstrapState(recipe: Recipe): RecipeWizar
         const draft = buildWizardImageDraftFromRecipeImage(image);
         return draft ? [draft] : [];
       }),
+    exportDraft: buildWizardExportDraftFromRecipe(recipe),
+  };
+}
+
+export async function loadRecipeWizardEditState(
+  recipeId: string,
+  getRecipe: (id: string) => Promise<Recipe>,
+): Promise<LoadedRecipeWizardEditState> {
+  const recipe = await getRecipe(recipeId);
+  return {
+    recipe,
+    bootstrapState: buildRecipeWizardEditBootstrapState(recipe),
   };
 }

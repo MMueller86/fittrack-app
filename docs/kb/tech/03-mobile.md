@@ -151,7 +151,94 @@ In recipe-ingredient context the same hub is opened as an ingredient picker. `us
 - `RecipeWizardInputPhase.tsx`, `RecipeWizardIngredientsPhase.tsx`, `RecipeWizardStepsPhase.tsx`, `RecipeWizardPreviewPhase.tsx` — phase views controlled by `RecipeWizardScreen`
 - `recipeWizardImageMutations.ts` — client-side sequencing for image delete/upload/reorder after recipe save
 
+When an Instagram/detail share preview fails, `RecipeDetailScreen` logs the
+render stage, error message/stack, and available Axios HTTP/API error fields to
+Metro before showing the generic retry notice. It does not log Axios request
+configuration or authorization headers.
+
 `RecipeCreateScreen` and the `RecipeCreate` navigation route are removed. New recipe creation and existing recipe editing both use `RecipeWizardScreen`; edit mode is selected by passing `editId`.
+
+#### Share-triggered recipe export review [US-10 F-1/F-2/F-3]
+
+The ordinary Create/Edit wizard preview contains recipe fields, ingredients,
+and steps only; it has no export tab, export inputs, or export-confirm action.
+Normal recipe create/update requests omit `exportViewAction` and `exportView`,
+so an ordinary edit preserves an existing confirmed export view.
+
+For a new recipe, `RecipeWizardScreen` carries the analyzer suggestion to
+`RecipeDetailScreen` as a serializable, unconfirmed local draft. It contains
+the teaser, nullable time and difficulty, ordered export steps, and only
+ingredient IDs uniquely resolved to user-confirmed, non-seasoning ingredients.
+It contains no AI `analysisKey`, candidates, resolution state, or client
+fingerprint and is not sent as a confirmed view when the recipe is created.
+
+Tapping `Teilen` starts a guarded preparation before the paired preview opens.
+Mobile chooses, in order: an existing confirmed
+`exportView` whether `current` or `stale`; an unconfirmed export draft already
+held locally from new-recipe analysis or an earlier V2 preparation while the
+detail screen remains mounted; or one call to
+`POST /api/recipes/{id}/export-view/prepare` when neither is available.
+Duplicate taps do not start duplicate preparation requests. Reopening Share
+while the detail screen remains mounted reuses its pending draft.
+
+Preparation sends exactly `{ "contractVersion": 2 }`. Mobile does not send an
+`If-Match` header or require/compare `sourceEtag`; the response is transient
+export text and does not map AI keys or names to saved ingredient IDs. Show
+`Exportvorschau wird vorbereitet.` when no provider call is needed. Show the
+AI-specific notice only while a provider call is in progress:
+
+> Die KI macht deine Texte gerade fit fürs Bild ... Gleich kannst du beide Bilder checken und die Texte noch anpassen.
+
+The Share preview shows both 1080:1350 PNGs side by side: Instagram and recipe
+details render together and remain visible while the user reviews the pair.
+Sharing is offered only when the recipe has a stored image. The entry callback
+also checks that prerequisite before preparation or rendering. A backend
+`NO_RECIPE_IMAGE` response closes the share preview and shows `Rezeptfoto fehlt`
+with `Bitte lade zuerst ein Rezeptfoto hoch, bevor du das Rezept teilst.`;
+there is no render-retry action. The local image list is cleared to reflect
+the server response, so sharing stays hidden until a refreshed recipe has a photo.
+
+Each rendered thumbnail opens a full-screen, safe-area-aware image viewer.
+The selected PNG is shown proportionally without cropping; the native horizontal
+paging ScrollView supports swiping between the two images, with a page counter
+and accessible previous/next controls. A single image has no paging controls.
+Closing or Android Back returns to the paired preview. The viewer's
+`Optionen & Texte bearbeiten` CTA opens the existing unified editor without a
+save, render, or AI call. Thumbnails remain disabled during rendering or saving.
+Image rendering has its own spinner state, separate from preparation: empty
+previews show `Vorschau wird erstellt…`; existing images show
+`Wird gerendert…` or `Wird aktualisiert…` during a render. The first paired
+render starts as soon as a draft is available; it uses request-only data and
+does not require prior text confirmation or write the recipe. When both images
+are ready, show this review hint below the pair:
+
+> Check beide Bilder kurz durch. Die Texte kannst du jederzeit noch anpassen.
+
+One `Optionen & Texte bearbeiten` action opens a unified editor in that same
+preview. `Titelbild` contains `Ausschnitt anpassen`, preparation
+time, difficulty, tags, and highlight; `Detailbild` contains the teaser,
+optional ingredient selection, and export steps. There is no separate options
+sheet or pre-render text-confirmation action. A transient analyzer/preparation
+draft is sent only as request data for each bundle render that uses it. The optional
+top-level `exportViewDraft` property uses the shared
+`RecipeShareBundleExportDraft` type; it does not persist recipe data, invoke AI
+or consume quota, and does not change the atomic paired PNG response. When the
+property is omitted, Backend uses the stored confirmed view whether its status
+is `current` or `stale`. The ingredient chooser appears only when the recipe
+has more than 20 ingredients; at 20 or fewer, current included IDs remain
+unchanged without switches. Nullable preparation metadata stays blank and is
+renderable as `null`; the existing `exportViewAction: 'confirm'` plus
+`exportView` PUT pair requires valid non-null metadata and is sent only after
+the user presses `Speichern` and export fields are new or changed. A stale
+status alone does not cause a PUT: if the export fields are unchanged,
+`Speichern` sends no PUT. A successful save triggers a fresh paired render.
+Presentation-only changes and transient preview/share never write recipe data.
+The server-owned fingerprint is never sent by Mobile, and
+export text never replaces the ordinary recipe description or steps. A
+`recipe_revision_conflict` reloads the recipe for review without automatic
+merge or retry. A defensive `MISSING_EXPORT_VIEW` is recovered inside Share,
+not by returning to the wizard. The existing tag, highlight, crop, paired
+image, media-library, and native-share flow remains in place.
 
 #### Recipe images: camera, gallery and Hero-Crop
 
@@ -232,30 +319,37 @@ The Mobile API client mirrors the Backend contract:
     Backend EXIF orientation is normalized in memory, while Mobile coordinates
     continue to refer to the visually oriented source image.
 
-#### Instagram share draft and local media handoff [F-1/F-3]
+#### Instagram share draft and local media handoff [F-1/F-2/F-3]
 
-The Mobile API client exposes the transient
-`POST /api/recipes/{id}/instagram-render` PNG request through the existing
-Axios client. The request contract sends `selectedTags`, the explicit
-`'high-protein' | null` highlight and temporary `recipeMeta` values
-(`30` minutes, `Einfach`). The initial preview omits `imageId` and
-`presentation`; the final render adds one complete normalized presentation.
-The response is typed as an `ArrayBuffer` and uses a 60-second timeout.
+The Mobile API client retains the transient
+`POST /api/recipes/{id}/instagram-render` wrapper, but the production US-10
+share flow uses `POST /api/recipes/{id}/share-bundle`. Its request sends the
+selected image ID when available, saved tags and the explicit
+`'high-protein' | null` highlight; it does not send a client recipe-metadata
+copy. The initial bundle omits `presentation`; a confirmed crop adds the
+complete normalized presentation. The JSON response contains separate
+Instagram and recipe-detail PNG assets.
 
 `recipeShareDraftState.ts` keeps the share draft screen-local and
 non-persistent. It selects the crop-editor source from the server-equivalent
 primary-image rule (`order`, then image-ID tie-breaker), keeps the effective
-stored crop, aborts superseded renders, ignores stale responses and cleans up
-on disposal. Pan and pinch do not issue render requests; only crop
-confirmation starts the one final render.
+stored crop, validates both PNG payloads and dimensions, and creates two
+distinct local preview URIs before atomically marking the pair ready. It
+aborts superseded renders, ignores responses from older revisions, cleans up
+partial or late preview files, and preserves the last complete pair while a
+replacement is pending or fails. Pan and pinch do not issue render requests;
+each confirmed crop starts one final bundle render, while duplicate submits
+during that request are ignored. The legacy single-image API wrapper is not
+used by the production share flow.
 
 `services/recipeShareMediaService.ts` provides the F-3 handoff for the
-temporary PNG URI, the local media library and the native share sheet. The
-adapter uses Expo SDK 54-compatible packages `expo-file-system@19.0.24`,
-`expo-media-library@18.2.1` and `expo-sharing@14.0.8`, resolved with
-`npx expo install` while retaining `expo@54.0.36`. The `expo-media-library`
-config plugin requests photo access and add-only save access; a new native
-build may therefore be required.
+temporary PNG pair, the local media library and the native share sheet. The
+production Android path uses `expo-file-system@19.0.24` for distinct temporary
+PNG files, `expo-media-library@18.2.1` for permissions and album assets, and
+`react-native-share@12.3.1` for the native multi-image chooser. `expo-sharing`
+is not used by this flow. The `expo-media-library` config plugin requests photo
+access; these native modules and permission settings require a new Android
+native build before device verification.
 
 The adapter requests photo read/write access before saving because it looks up
 the exact album name `FitTrack` and then creates or adds the asset. On Android
@@ -266,17 +360,21 @@ insufficient. `canAskAgain: true` is a retryable denial;
 after a missing lookup, and never uses names such as `FitTrack (1)` or changes
 another album. A newly created asset is
 removed best effort on an album/asset failure; if the adapter created the
-album too, it removes the new asset before attempting to remove that empty
-album. In all failure cases no share sheet is opened and the preview remains
+album too, it removes assigned assets, deletes both newly created assets, and
+then attempts to delete that empty album. A failure while saving the second
+image therefore rolls back the first image's album assignment as well. In all
+failure cases no share sheet is opened and both temporary previews remain
 available to the caller for retry.
 
-`createSession(previewUri)` memoizes the successful save result. The session
-passes the exact same temporary PNG URI to `shareAsync`, so a share retry does
-not create a second media asset. The URI remains available while the
-`shareAsync` promise is pending. A resolved share call is followed by cleanup;
-an unavailable share target or rejected share call leaves the URI for an
-explicit retry or close cleanup. The adapter does not upload to Google Photos,
-Instagram or FitTrack persistence.
+`createSession(instagramUri, detailUri)` requires two distinct local PNG URIs.
+The session memoizes the successful two-asset save, so a canceled or failed
+native share can be retried without creating duplicate media. On Android, the
+production service calls `openNativeMultiImageShareCandidate`, which validates
+the pair and invokes exactly one `Share.open({ urls: [instagramUri, detailUri] })`.
+There is no single-image or second-dialog fallback. Failed sharing preserves
+both temporary files and the FitTrack album assets; successful sharing or
+explicit close cleanup attempts to remove both temporary files. The adapter
+does not upload to Google Photos, Instagram or FitTrack persistence.
 
 #### Recipe image permissions and failure states
 
@@ -310,11 +408,39 @@ impact**: a new Dev Build may be necessary even though the exact decision is
 environment- and release-dependent. The Infrastructure release gate decides
 whether a new build is required.
 
-The F-3 media handoff adds the SDK-54-compatible direct dependencies
-`expo-file-system@19.0.24`, `expo-media-library@18.2.1` and
-`expo-sharing@14.0.8`. The existing `expo-camera`, `expo-image-picker`,
-`react-native-gesture-handler`, `react-native-reanimated` and
-`react-native-safe-area-context` packages remain unchanged.
+The Android native handoff uses these direct dependencies:
+
+- `react-native-share@12.3.1` — React Native autolinking includes its Android
+    FileProvider; `Share.open({ urls })` maps file URLs to `ACTION_SEND_MULTIPLE`.
+- `expo-file-system@19.0.24` — writes each bundle PNG to a separate cache file.
+- `expo-media-library@18.2.1` — permission request, exact `FitTrack` album
+    lookup, asset creation and rollback.
+
+The `expo-media-library` plugin in `mobile/app.config.js` keeps
+`granularPermissions: ['photo']` and the German photo/save permission strings.
+The generic Android chooser does not need targeted-package queries or the
+package's Base64-storage option, so no `react-native-share` config-plugin
+options are set. The preflight-only `extra.nativeShareCandidate` public-config
+metadata has been removed. `mobile/eas.json` is unchanged: the existing
+development and preview profiles already produce Android APKs. Including the
+native module and permission manifest requires a fresh Android Dev Build or
+Preview Build; no build or device verification is claimed here.
+
+#### Android native multi-image share [US-10 F-3]
+
+The production share session is connected to
+`mobile/src/services/nativeShareCandidate.ts`. It accepts exactly two distinct
+local `.png` URIs and calls `Share.open({ urls: [instagramUri, detailUri] })`
+once per attempt. `react-native-share@12.3.1` implements this Android request
+with `ACTION_SEND_MULTIPLE`; a rejected or canceled call is retryable and does
+not trigger a second share dialog. The production adapter is Android-gated;
+no iOS share path is added.
+
+Automated service tests cover the real singleton-to-candidate call, pair asset
+creation, FitTrack rollback, permission denial, retry without duplicate media,
+and cleanup of both temporary URIs. These mocked tests are not device evidence.
+Android device behavior remains **UNVERIFIED** pending U-1; no full Done or
+release claim is made before that gate.
 
 ### Progress Module (`modules/progress/`)
 

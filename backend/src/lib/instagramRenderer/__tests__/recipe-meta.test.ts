@@ -392,6 +392,41 @@ describe("Instagram recipe renderer meta line", () => {
     );
   });
 
+  it("omits null time and difficulty chips while retaining portions", async () => {
+    const withoutTime: RenderInput = {
+      ...quarkbroetchenMetaFixture,
+      recipeMeta: { ...quarkbroetchenMetaFixture.recipeMeta!, totalTimeMinutes: null },
+    };
+    const withoutDifficulty: RenderInput = {
+      ...quarkbroetchenMetaFixture,
+      recipeMeta: { ...quarkbroetchenMetaFixture.recipeMeta!, difficulty: null },
+    };
+    const withoutBoth: RenderInput = {
+      ...quarkbroetchenMetaFixture,
+      recipeMeta: {
+        ...quarkbroetchenMetaFixture.recipeMeta!,
+        totalTimeMinutes: null,
+        difficulty: null,
+      },
+    };
+
+    const timeOmittedRow = findNodes(compose(withoutTime, createComposeAssets()), "recipe-meta-row")[0];
+    const difficultyOmittedRow = findNodes(
+      compose(withoutDifficulty, createComposeAssets()),
+      "recipe-meta-row",
+    )[0];
+    const bothOmittedTree = compose(withoutBoth, createComposeAssets());
+    const bothOmittedRow = findNodes(bothOmittedTree, "recipe-meta-row")[0];
+    expect(textContent(timeOmittedRow)).toBe("8 Portionen·Einfach");
+    expect(textContent(difficultyOmittedRow)).toBe("25 Min.·8 Portionen");
+    expect(textContent(bothOmittedRow)).toBe("8 Portionen");
+    expect(findNodes(bothOmittedTree, "recipe-meta-item")).toHaveLength(1);
+    expect(findNodes(bothOmittedTree, "recipe-meta-separator")).toHaveLength(0);
+
+    const rendered = await renderInstagramRecipe(withoutBoth);
+    expect(rendered.ok).toBe(true);
+  });
+
   it("keeps highlight changes confined to the existing badge zone", async () => {
     const [withHighlight, withoutHighlight] = await Promise.all([
       renderInstagramRecipe(quarkbroetchenMetaFixture),

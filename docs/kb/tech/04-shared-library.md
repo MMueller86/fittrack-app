@@ -75,7 +75,45 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `RecipeStep` — ordered instruction with `order`, optional `title`, and `description`; step-level `notes` are removed from the shared type/API contract.
 - `RecipeImage` — blob reference (`id`, `blobName`, `order`) plus transient response-only SAS `url?`
 - `RecipeNutrition` — `{ calories, protein, carbs, fat, fiber }` totals + per-portion; the recipe calculator gives seasonings and indeterminate amounts a zero contribution
-- `Recipe` — owner, ingredients, steps, images, nutrition, usage count
+- `RecipeExportStep` — ordered export instruction with `order` and a bounded `description`
+- `RecipeExportDifficulty` — free-form difficulty text; there is no shared difficulty enum
+- `RecipeExportViewAction` — request-only confirmation marker: `'confirm'`
+- `RecipeExportViewInput` — versioned export fields (`teaser`, `totalTimeMinutes`, `difficulty`, `steps`, `includedIngredientIds`); it intentionally has no `sourceFingerprint`
+- `RecipeExportViewRequest` — confirmation body fields `{ exportView, exportViewAction }`; the HTTP ETag is not part of this body type
+- `RecipeExportViewPersistence` — confirmed export fields plus the server-owned `sourceFingerprint`
+- `RecipeExportView` — compatibility alias for `RecipeExportViewPersistence`
+- `RecipeExportSuggestion` — new-recipe analyzer suggestion with nullable time/difficulty and analysis-local `includedIngredientKeys`
+- `PrepareRecipeExportViewRequestV2` — the sole strict `{ contractVersion: 2 }` existing-recipe preparation request
+- `PrepareRecipeExportViewResponseV2` — ETag-bound preparation response with `recipeId`, `sourceEtag`, and a text-only suggestion
+- `PrepareRecipeExportViewSuggestionV2` — teaser, nullable time/difficulty, and plain `RecipeExportStep` values
+- `RecipeExportViewStatus` — derived response status: `'missing' | 'current' | 'stale'`
+- `RecipeExportViewResponse` — optional response `exportView` and derived `exportViewStatus`; neither request action nor response status is persisted
+- `Recipe` — owner, ingredients, steps, images, nutrition, usage count, and the optional export response fields
+
+The export contract is version `1`. Shared structural boundaries expose a
+maximum teaser length of `96`, a positive total time up to `10080` minutes,
+`1` to `5` export steps with at most `90` characters each, and at most `20`
+selected non-seasoning ingredient IDs. The shared package defines the types
+and constants only. `RecipeExportDifficulty` remains free-form text rather
+than introducing a classification enum. The confirmation request body contains
+both `exportView` and the top-level `exportViewAction: 'confirm'`; ordinary
+updates omit both. For confirmation of an existing recipe, the client sends
+the opaque server ETag in the HTTP `If-Match` header, never in the body.
+`sourceFingerprint` is server-owned, is absent from all client input types, and
+is available only on persisted/response export data. A missing `exportView`
+remains backward-compatible for legacy recipes; an absent response status
+represents the `missing` state to consumers.
+
+Shared defines these structures and limits but does not parse or validate HTTP
+requests or perform HTTP work. Existing-recipe preparation has one shared API
+contract: V2 sends `{ contractVersion: 2 }` with the loaded ETag in `If-Match`,
+then checks that the response's `sourceEtag` matches. Its suggestion contains
+only export text and plain steps; it has no ingredient keys, IDs, or resolution
+types. This does not change `RecipeExportSuggestion`, whose analysis-local
+`includedIngredientKeys` are used by the separate new-recipe analyzer flow.
+Confirmation also sends the loaded ETag in `If-Match`, separately from the
+request body. The backend enforces strict V2 request parsing, the confirmation
+pair and ETag precondition, and computes the persisted fingerprint.
 
 ### `recipeScale.ts`
 - `RECIPE_PORTION_MIN` / `RECIPE_PORTION_MAX` — shared target portion bounds (`1`–`50`)

@@ -165,17 +165,81 @@ Pattern:
 
 ## Rezept teilen: lokaler Share-Flow und Fotomediathek
 
-Der lokale Rezept-Share-Flow ist implementiert und bleibt als flüchtiger
-Share-Draft in der Rezeptdetailansicht. Ein Tap auf `Teilen` öffnet zuerst das
-Options-Sheet. Vor `Speichern & teilen` wird weder ein Foto gespeichert noch
-das native Share-Sheet geöffnet; weitere Teilen-Taps sind während des Flows
-gesperrt. Rezept, Bilder, gespeicherte Crop-Metadaten und Nutrition bleiben
-unverändert.
+`Teilen` wird nur für Rezepte mit einem gespeicherten Foto angeboten. Ohne Foto
+starten weder die Exportvorbereitung noch ein Render. Meldet der Server dennoch
+`NO_RECIPE_IMAGE`, etwa nach einer zwischenzeitlichen Löschung, schließt die App
+die Share-Vorschau und zeigt `Rezeptfoto fehlt` mit
+`Bitte lade zuerst ein Rezeptfoto hoch, bevor du das Rezept teilst.`. Ein
+wirkungsloser Render-Retry wird nicht angeboten; auch der Teilen-Einstieg wird
+ausgeblendet, bis wieder ein gespeichertes Foto geladen wird.
+
+Der lokale Rezept-Share-Flow bleibt als flüchtiger Share-Draft in der
+Rezeptdetailansicht. Ein Tap auf `Teilen` startet eine gegen Doppeltaps
+abgesicherte Exportvorbereitung und öffnet danach die gemeinsame Vorschau mit
+einem Inline-Editor; ein separates Options-Sheet entfällt. Weitere Teilen-Taps
+starten keine parallelen Vorbereitungen. `Speichern & teilen` bleibt gesperrt,
+bis ein vollständiges, validiertes Paar aus Instagram- und Rezeptdetails-PNG
+vorliegt. Vor dem fertigen Bildpaar wird weder ein Foto angelegt noch das
+native Share-Sheet geöffnet. Rezeptbilder, gespeicherte Crop-Metadaten und
+Nutrition bleiben unverändert.
+
+### Vorbereitung und Exportprüfung
+
+Die Vorbereitung verwendet der Reihe nach ein vorhandenes bestätigtes
+`exportView` (auch mit Status `stale`), einen lokal gehaltenen unbestätigten
+Exportentwurf aus der Neuanalyse oder einer früheren V2-Vorbereitung, solange
+`RecipeDetailScreen` gemountet bleibt, oder genau einen Aufruf von
+`POST /api/recipes/{id}/export-view/prepare`, wenn beides fehlt. Ein stale View
+triggert keine KI. Ohne Provider-Aufruf zeigt die App
+`Exportvorschau wird vorbereitet.`; die KI-spezifische Meldung erscheint nur
+während eines tatsächlichen Provider-Aufrufs:
+
+> Die KI macht deine Texte gerade fit fürs Bild ... Gleich kannst du beide Bilder checken und die Texte noch anpassen.
+
+Sobald ein Exportentwurf vorliegt, startet der erste gepaarte Bundle-Render
+ohne vorherige Textbestätigung und ohne das Rezept zu speichern; der Entwurf
+wird nur als request-only `exportViewDraft` übergeben. Beide gerenderten
+1080:1350-Bilder stehen gleichzeitig nebeneinander: Instagram und
+Rezeptdetails. Während des Bild-Renderings zeigt die Vorschau einen eigenen
+Spinner (`Vorschau wird erstellt…`, `Wird gerendert…` oder
+`Wird aktualisiert…`), getrennt von der KI-Vorbereitungsmeldung. Sobald beide
+Vorschauen bereit sind, erscheint darunter exakt der Hinweis:
+
+> Check beide Bilder kurz durch. Die Texte kannst du jederzeit noch anpassen.
+
+Der optionale top-level Request-Wert heißt exakt
+`exportViewDraft` und verwendet den gemeinsamen Typ
+`RecipeShareBundleExportDraft`. Ein im Editor angezeigter Entwurf wird nur als
+Request-Daten für den jeweiligen Bundle-Render gesendet; ein transienter
+Vorschau-Render erfordert weder eine Textbestätigung noch einen Rezept-Write.
+Bei einer bereits
+gespeicherten, bestätigten Exportansicht startet der Render direkt. Die
+Zutatenauswahl erscheint nur bei mehr als 20 Rezeptzutaten; bei bis zu 20
+Zutaten werden keine Schalter angezeigt. Fehlende KI-Zeit oder -Schwierigkeit
+bleibt beim Render leer und wird als `null` übertragen. Neue oder geänderte
+Exporttexte werden nur nach `Speichern` über das bestehende
+`PUT /api/recipes/{id}`-Paar `exportViewAction: 'confirm'` plus `exportView`
+persistiert; danach wird das Bildpaar frisch gerendert. Ein unveränderter
+bestätigter View wird nicht erneut geschrieben. Exporttexte ersetzen nie die
+normale Rezeptbeschreibung oder Zubereitungsschritte. Eine fehlgeschlagene
+Vorbereitung bleibt unbestätigt und startet keinen Bundle-Render.
 
 ### Optionen aus der Rezeptdetailansicht
 
-Das Options-Sheet ist ein lokales Bottom-Sheet mit `Vorschau anzeigen` und
-`Abbrechen`:
+Ein Tap auf eines der gerenderten Vorschaubilder öffnet es bildschirmfüllend,
+proportional und ohne Zuschnitt. Bei zwei Bildern kann der Nutzer horizontal
+swipen oder die zugänglichen Vor-/Zurück-Pfeile nutzen; ein Zähler zeigt die
+aktuelle Seite. Bei nur einem Bild entfallen Pfeile und Zähler. Schließen und
+Android-Zurück führen zur gemeinsamen Vorschau zurück, ohne den Share-Flow zu
+beenden. Die CTA `Optionen & Texte bearbeiten` in der Großansicht öffnet direkt
+den bestehenden Editor; das Öffnen oder Blättern löst weder KI noch Render oder
+Speichern aus.
+
+Die einzige Aktion `Optionen & Texte bearbeiten` öffnet Tags, Highlight und
+Exporttexte in einem einheitlichen Editor direkt in derselben Vorschau. Im
+Abschnitt `Titelbild` liegen `Ausschnitt anpassen`, Zeit,
+Schwierigkeit, Tags und Highlight; `Detailbild` enthält den Teaser, die
+optionale Zutatenwahl und die Exportschritte:
 
 - Die Tag-Auswahl verwendet ausschließlich bereits gespeicherte Rezept-Tags
     in ihrer gespeicherten Reihenfolge. Es gibt keine freie Tag-Eingabe und
@@ -183,7 +247,7 @@ Das Options-Sheet ist ein lokales Bottom-Sheet mit `Vorschau anzeigen` und
     sind zunächst die ersten vier ausgewählt; weitere Tags bleiben sichtbar und
     sind solange deaktiviert, bis ein aktiver Tag abgewählt wird. Der Zähler
     zeigt die aktive Auswahl im Verhältnis `n von 4`.
-- Hat das Rezept keine Tags, zeigt das Sheet
+    - Hat das Rezept keine Tags, zeigt der Editor
     `Für dieses Rezept sind keine Tags hinterlegt.` und übergibt die gültige
     leere Auswahl `selectedTags: []`.
 - `High-Protein-Symbol anzeigen` ist ein expliziter Toggle, standardmäßig
@@ -192,81 +256,117 @@ Das Options-Sheet ist ein lokales Bottom-Sheet mit `Vorschau anzeigen` und
     deaktiviert `nutritionHighlight: null`. Daraus wird keine automatische
     High-Protein-Klassifikation und keine Nutrition-Regel abgeleitet.
 
-Die Auswahl bleibt bis zur Vorschau beziehungsweise zum abschließenden Render
-im Share-Draft. Wird das Sheet beim Start mit `Abbrechen`, über den Backdrop
-oder über den System-Back geschlossen, wird der Entwurf verworfen und das
-Rezept bleibt unverändert. Wird es über `Optionen ändern` aus einer bestehenden
-Vorschau geöffnet, führt `Abbrechen` zurück zu dieser Vorschau.
+    Teaser, Zeit, Schwierigkeit und Exportschritte bleiben lokal editierbar. Die
+    Vorschau kann mit `Vorschau aktualisieren` erneut gerendert werden, ohne das
+    Rezept zu schreiben. `Speichern` bestätigt neue oder geänderte Exportfelder
+    über das bestehende `PUT /api/recipes/{id}`-Paar
+    `exportViewAction: 'confirm'` plus `exportView`; ein unveränderter View mit
+    Status `stale` sendet beim `Speichern` keinen PUT, und der Status allein
+    erzwingt kein Speichern. Nach erfolgreicher Bestätigung wird das Bildpaar
+    frisch gerendert. Nullable Zeit und Schwierigkeit müssen für dieses
+    Speichern gültig ergänzt werden. Tag-, Highlight- und Crop-Änderungen
+    bleiben präsentationsbezogen und lösen keinen Rezept-Write aus. Ein
+    erfolgreich vorbereiteter, unbestätigter Exportentwurf bleibt im
+    Detail-Screen gespeichert, solange dieser gemountet ist; beim Verlassen des
+    Screens geht er verloren.
 
-### Server-Preview und Hero-Crop
+### Server-Bundle und Hero-Crop
 
-`Vorschau anzeigen` startet den initialen serverseitigen Render. Die Antwort
-ist eine PNG mit exakt `1080 x 1350` Pixeln, wird temporär abgelegt und vor
-jeglichem Speichern oder Teilen in einer dunklen, app-eigenen Preview mit
-stabilem Seitenverhältnis angezeigt. Der Server bestimmt dabei das primäre
-Rezeptbild sowie den gespeicherten beziehungsweise effektiven Hero-Crop. Der
-initiale Request enthält keinen `presentation`-Override; erst der finale
-Render sendet die vollständig bestätigte `presentation`. Die Preview ist erst
-bei fertigem Render für `Speichern & teilen` freigegeben.
+Mobile ruft `POST /api/recipes/{id}/share-bundle` für den ersten und jeden
+bewusst erneuerten Render auf; einen unveränderten bestätigten View schreibt
+es vorher nicht erneut. Das optionale top-level Request-Feld heißt exakt
+`exportViewDraft` und verwendet den gemeinsamen Typ `RecipeShareBundleExportDraft`.
+Der Wert gilt nur für den jeweiligen Render: Er wird nicht persistiert, löst
+keine KI aus, verbraucht kein Kontingent und ändert nicht die atomare Antwort
+mit beiden PNGs. Ohne dieses Feld verwendet der Server die gespeicherte
+Exportansicht mit Status `current` oder `stale`. Fehlen beide Quellen, liefert der Server
+`MISSING_EXPORT_VIEW`; Share bereitet die Texte innerhalb des Flows erneut vor,
+ohne zum Rezeptwizard zurückzunavigieren oder eine Retry-Schleife zu starten.
+Der Request enthält die ausgewählte Bild-ID, gespeicherte Tags und den
+expliziten Highlight-Wert, aber keine clientseitige Rezept-Metadatenkopie. Zeit
+und Schwierigkeit für beide Renderer stammen aus dem request-only Entwurf oder
+der bestätigten Exportansicht; kanonische Angaben und Zutatenwerte stammen
+aus dem aktuellen Rezept.
+
+Eine Antwort gilt nur als vollständiges Bundle, wenn sie für
+dasselbe Rezept zwei PNGs mit `image/png`, passender Byte-Länge und exakt
+`1080 x 1350` Pixeln enthält. Fehlende, ungültige oder inhaltlich identische
+Bilder werden verworfen.
+
+Mobile legt für Instagram und Rezeptdetails getrennte temporäre PNG-Dateien
+und URIs an. Beide werden gemeinsam in den Share-Draft übernommen; ein
+fehlgeschriebener zweiter URI, eine fehlende Datei oder zwei gleiche URIs
+markieren den Entwurf nicht als bereit. Die Preview zeigt beide Bilder
+gleichzeitig, nebeneinander, mit den Labels `Instagram` und `Rezeptdetails` und
+je einem festen `1080:1350`-Format. Speichern und Teilen sind nur mit einem
+aktuellen, vollständig validierten Paar und zwei verschiedenen lokalen URIs
+freigegeben; es gibt keinen Einzelbild-Fallback.
+
+Der Share-Draft ist screen-lokal und revisionsgeschützt. Eine neuere Anfrage
+bricht die vorherige ab; verspätete Antworten werden ignoriert. Beim finalen
+Crop-Render bleibt das letzte vollständige Paar sichtbar, bis beide neuen
+Dateien erfolgreich erzeugt und gemeinsam übernommen wurden. Nach Fehlern
+bleibt dieses Paar sichtbar, die CTA ist aber bis zu einem erfolgreichen
+aktuellen Render gesperrt.
 
 `Ausschnitt anpassen` öffnet den bestehenden
 `RecipeImageHeroCropEditor` mit dem `1080 x 1015`-Hero-Frame. Pan und Pinch
 bleiben lokal im Editor; während der Gesten gibt es keinen Live-Render. Ein
-Tap auf `Übernehmen` erzeugt genau einen abschließenden Server-Render mit der
-vollständig normalisierten `presentation` sowie derselben Tag- und Highlight-
-Auswahl. Das Ergebnis ersetzt die bisherige Preview und bleibt als Gesamtbild
-`1080 x 1350`; der Hero-Frame ist nur der Foto-/Hero-Bereich. Auch ein
-unverändert bestätigter Crop löst diesen einmaligen finalen Render aus.
-
-Der bestätigte Crop ist nur ein transienter Share-Draft-Override. Er wird
-nicht über `updateImageHeroCrop` gespeichert. `Abbrechen` oder das Schließen
-des Crop-Editors verwirft nur die lokale Änderung und führt zur letzten
-Preview zurück. Das Schließen der Preview verwirft die temporäre Preview und
-den Share-Draft, kehrt zur Rezeptdetailansicht zurück und verändert das Rezept
-nicht.
+Tap auf `Übernehmen` löst genau einen finalen Bundle-Request mit der
+vollständig normalisierten `presentation` sowie derselben Tag- und
+Highlight-Auswahl aus. Der Crop bleibt ein transienter Share-Draft-Override
+und wird nicht über `updateImageHeroCrop` gespeichert. `Abbrechen` verwirft
+nur die lokale Crop-Änderung; das Schließen der Preview verwirft die
+temporären Bildvorschauen, aber nicht den unbestätigten Exportvorschlag,
+solange der Detail-Screen gemountet bleibt. Beim Verlassen des Screens geht
+dieser Vorschlag verloren.
 
 ### Speichern, Teilen und Fehlerzustände
 
 Render-, Berechtigungs- und Medienfehler bleiben im aktiven Share-Draft
-wiederherstellbar. Die UI verwendet dafür den deutschen, app-eigenen
-`InfoOverlay` mit `Schließen` als primärer Dismiss-Aktion und einer getrennten
-sekundären Aktion wie `Erneut versuchen`, `Erneut teilen` oder
-`Geräteeinstellungen öffnen`. Die implementierten Hinweise verwenden dabei
-zum Beispiel die Titel `Vorschau konnte nicht erstellt werden`,
-`Fotozugriff erforderlich`, `Bild konnte nicht gespeichert werden` und
-`Teilen nicht abgeschlossen`; technische Fehler werden nicht als
+wiederherstellbar. Die UI verwendet den deutschen,
+app-eigenen `InfoOverlay` mit `Schließen` als primärer Dismiss-Aktion und einer
+getrennten sekundären Aktion. Technische Fehler werden nicht als
 Standard-Alert angezeigt.
 
-- Ein fehlgeschlagener initialer Render bietet `Erneut versuchen` mit derselben
-    Tag-/Highlight-Auswahl. Schlägt der abschließende Render fehl, bleibt die
-    letzte gültige Preview sichtbar und kann ebenfalls erneut gerendert werden.
+- Eine fehlgeschlagene Exportvorbereitung bleibt unbestätigt und startet
+    keinen Bundle-Render. Sie kann aus dem app-eigenen Share-Fehlerzustand
+    explizit wiederholt werden; es gibt keinen automatischen Vorbereitungs-Retry.
+- Ein fehlgeschlagener initialer oder finaler Bundle-Render bietet
+    `Erneut versuchen` mit derselben Auswahl beziehungsweise demselben
+    bestätigten Crop. Bei einem finalen Fehler bleibt das letzte vollständige
+    Paar sichtbar, kann aber erst nach erfolgreichem Retry gespeichert werden.
+- Ein defensives `MISSING_EXPORT_VIEW` startet die Vorprüfung innerhalb von
+    Share erneut, höchstens einmal. Es gibt keine Rückkehr zum Rezeptwizard und
+    keine automatische Retry-Schleife. Ein stale Fingerprint hat keinen
+    eigenen Share-Fehlerpfad.
 - Beim Speichern wird die erforderliche Lese-/Schreibberechtigung der
     Fotomediathek geprüft, weil das vorhandene Album `FitTrack` zuerst gelesen
-    und das Bild anschließend gespeichert wird. `canAskAgain: true` bleibt über
-    `Erneut versuchen` retrybar; `canAskAgain: false` verweist über
-    `Geräteeinstellungen öffnen` auf die Geräteeinstellungen. Die Preview und
-    die Auswahl bleiben erhalten.
-- Erst nach `Speichern & teilen` wird das lokale Asset angelegt. Das Ziel ist
-    bei jeder Speicherung das exakte Album `FitTrack`; ein fehlendes Album wird
-    beim ersten erfolgreichen Vorgang angelegt und danach wiederverwendet.
-    Fehler bei Asset-Erstellung, Albumzugriff oder Album-Zuordnung öffnen kein
-    Share-Sheet. Neu angelegte Assets und ein dabei angelegtes leeres Album
-    werden best effort zurückgerollt; vorhandene Albuminhalte bleiben unberührt.
-    Die Preview bleibt für einen neuen Versuch erhalten.
-- Nach erfolgreichem Albumzugriff öffnet sich das native Share-Sheet mit exakt
-    derselben temporären PNG-URI. Bei nicht verfügbarem Sharing oder einem
-    Abbruch beziehungsweise Fehler des Share-Aufrufs bleibt das Foto in
-    `FitTrack` gespeichert und es wird kein Instagram-Erfolg behauptet. Die
-    URI bleibt für `Erneut teilen` erhalten; der Retry verwendet das bereits
-    gespeicherte Asset und legt kein zweites an. Bereinigt wird die temporäre
-    URI erst nach der Auflösung des Share-Promises oder wenn der Share-Flow
-    ausdrücklich geschlossen wird.
+    und beide Bilder anschließend gespeichert werden. `canAskAgain: true`
+    bleibt über `Erneut versuchen` retrybar; `canAskAgain: false` verweist über
+    `Geräteeinstellungen öffnen` auf die Geräteeinstellungen. Beide Vorschauen
+    und die Auswahl bleiben erhalten.
+- Erst nach `Speichern & teilen` werden die beiden lokalen Assets angelegt.
+    Das Ziel ist bei jeder Speicherung das exakte Album `FitTrack`; ein
+    fehlendes Album wird beim ersten erfolgreichen Vorgang angelegt und danach
+    wiederverwendet. Fehler bei Asset-Erstellung, Albumzugriff oder
+    Album-Zuordnung öffnen kein Share-Sheet. Neu angelegte Assets und ein dabei
+    angelegtes leeres Album werden best effort zurückgerollt; vorhandene
+    Albuminhalte bleiben unberührt. Das vollständige Paar bleibt für einen
+    neuen Versuch erhalten.
+- Die native Multi-Image-Kandidatinvokation erhält beide unterschiedlichen
+    lokalen PNG-URIs in einem Aufruf. Ist Sharing nicht verfügbar oder wird der
+    Aufruf abgebrochen, bleiben beide Bilder in `FitTrack` gespeichert und es
+    wird kein Instagram-Erfolg behauptet. `Erneut teilen` verwendet dasselbe
+    gespeicherte Paar, ohne weitere Assets anzulegen. Die tatsächliche
+    Android-Gerätewirkung bleibt bis U-1 **UNVERIFIED**.
 
 `FitTrack` bezeichnet dabei ein lokales Gerätealbum der nativen
 Fotomediathek, nicht einen direkten Google-Photos-Upload. Ein aktiviertes
-Google-Photos-Backup kann das lokale Foto anschließend selbst synchronisieren,
-wird von FitTrack aber weder abgefragt noch als Erfolg garantiert. Preview,
-Crop-Editor und Fehler-Overlays folgen der bestehenden Dark-only-Oberfläche.
+Google-Photos-Backup kann die lokalen Bilder anschließend selbst
+synchronisieren, wird von FitTrack aber weder abgefragt noch als Erfolg
+garantiert. Preview, Crop-Editor und Fehler-Overlays folgen der bestehenden
+Dark-only-Oberfläche.
 
 ---
 

@@ -7,6 +7,19 @@ vi.mock('../lib/storage', () => ({
   generateRecipeImageSasUrl: () => Promise.resolve('https://blob.example.com/img?sas=token'),
 }));
 
+vi.mock('../lib/openai', () => ({
+  analyzeRecipeText: vi.fn(),
+}));
+
+vi.mock('../lib/quota', () => ({
+  enforceQuota: vi.fn(),
+  trackUsage: vi.fn(),
+}));
+
+vi.mock('../lib/recipeAnalyzeValidation', () => ({
+  validateRecipeExportPreparationOutput: vi.fn(),
+}));
+
 import {
   listRecipesHandler,
   createRecipeHandler,
@@ -18,8 +31,12 @@ import {
   reorderImagesHandler,
   updateImageHeroCropHandler,
   logRecipeHandler,
+  prepareRecipeExportViewHandler,
 } from './recipes';
-import { __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
+import { analyzeRecipeText } from '../lib/openai';
+import { enforceQuota, trackUsage } from '../lib/quota';
+import { validateRecipeExportPreparationOutput } from '../lib/recipeAnalyzeValidation';
+import { __resetRecipesRepositoryForTests, getRecipesRepository } from '../lib/repositories/recipesRepository';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
 import {
   makeContext,
@@ -43,6 +60,10 @@ afterAll(() => {
 beforeEach(() => {
   __resetRecipesRepositoryForTests();
   __resetDiaryRepositoryForTests();
+  vi.mocked(analyzeRecipeText).mockReset();
+  vi.mocked(enforceQuota).mockReset().mockResolvedValue(null);
+  vi.mocked(trackUsage).mockReset().mockResolvedValue(undefined);
+  vi.mocked(validateRecipeExportPreparationOutput).mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -86,24 +107,671 @@ const baseStep = {
   description: 'Zutaten mischen.',
 };
 
-async function createTestRecipe() {
+const baseExportView = {
+  version: 1,
+  teaser: 'Einfaches Sauerteigbrot',
+  totalTimeMinutes: 90,
+  difficulty: 'Einfach',
+  steps: [{ order: 1, description: 'Zutaten mischen.' }],
+  includedIngredientIds: [baseIngredient.id],
+};
+
+function responseEtag(response: { headers?: unknown }): string {
+  const headers = response.headers as Record<string, string> | undefined;
+  return headers?.['ETag'] ?? headers?.['etag'] ?? '';
+}
+
+async function createTestRecipe(ingredients = [baseIngredient], description?: string) {
   const req = await makeAuthRequest({
     body: {
       name: 'Sauerteigbrot',
+      ...(description !== undefined ? { description } : {}),
       portions: 4,
-      ingredients: [baseIngredient],
+      ingredients,
       steps: [baseStep],
       tags: ['Brot'],
     },
   });
   const res = await createRecipeHandler(req, ctx);
   expect(res.status).toBe(201);
+  expect(responseEtag(res)).toMatch(/^".+"$/);
   return res.jsonBody as Record<string, unknown>;
+}
+
+async function createTestRecipeWithExportView(description?: string) {
+  const req = await makeAuthRequest({
+    body: {
+      name: 'Sauerteigbrot',
+      ...(description !== undefined ? { description } : {}),
+      portions: 4,
+      ingredients: [baseIngredient],
+      steps: [baseStep],
+      tags: ['Brot'],
+      exportView: baseExportView,
+      exportViewAction: 'confirm',
+    },
+  });
+  const res = await createRecipeHandler(req, ctx);
+  expect(res.status).toBe(201);
+  expect(responseEtag(res)).toMatch(/^".+"$/);
+  return res.jsonBody as Record<string, unknown>;
+}
+
+function setValidPreparationAnalysis(
+  ingredients: Array<{ analysisKey: string; displayName: string; category?: 'food' | 'seasoning' }>,
+  includedKeys: string[],
+) {
+  const analysis = {
+    suggestedName: 'Sauerteigbrot',
+    description: 'Einfaches Brot',
+    suggestedPortions: 4,
+    tags: ['Brot'],
+    ingredients: ingredients.map((ingredient) => ({
+      ...ingredient,
+      line: ingredient.displayName,
+      category: ingredient.category ?? 'food',
+      amountGrams: ingredient.category === 'seasoning' ? null : 500,
+      kitchenAmountText: ingredient.category === 'seasoning' ? 'nach Geschmack' : null,
+    })),
+    steps: [{ order: 1, title: null, description: 'Mischen.' }],
+    exportSuggestion: {
+      version: 1,
+      teaser: 'Goldbraunes Brot',
+      totalTimeMinutes: 90,
+      difficulty: 'Einfach',
+      steps: [{
+        order: 1,
+        description: 'Mischen.',
+        sourceStepOrders: [1],
+        ingredientKeys: includedKeys,
+      }],
+      includedIngredientKeys: includedKeys,
+    },
+  };
+  vi.mocked(analyzeRecipeText).mockResolvedValue(analysis as any);
+  vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: true, data: analysis as any });
+  return analysis;
+}
+
+async function getRecipeEtag(recipeId: string): Promise<string> {
+  const response = await getRecipeHandler(
+    await makeAuthRequest({ params: { id: recipeId } }),
+    ctx,
+  );
+  expect(response.status).toBe(200);
+  return responseEtag(response);
+}
+
+async function requestV2Preparation(recipeId: string, ifMatch?: string) {
+  return prepareRecipeExportViewHandler(
+    await makeAuthRequest({
+      params: { id: recipeId },
+      ...(ifMatch !== undefined ? { headers: { 'if-match': ifMatch } } : {}),
+      body: { contractVersion: 2 },
+    }),
+    ctx,
+  );
+}
+
+function expectTextOnlyPreparation(
+  response: { status?: number; jsonBody?: unknown },
+  recipeId: string,
+  sourceEtag: string,
+) {
+  expect(response.status).toBe(200);
+  expect(response.jsonBody).toMatchObject({
+    contractVersion: 2,
+    recipeId,
+    sourceEtag,
+    suggestion: {
+      version: 1,
+      teaser: 'Goldbraunes Brot',
+      totalTimeMinutes: 90,
+      difficulty: 'Einfach',
+      steps: [{ order: 1, description: 'Mischen.' }],
+    },
+  });
+  const suggestion = (response.jsonBody as { suggestion: Record<string, unknown> }).suggestion;
+  expect(suggestion).not.toHaveProperty('ingredientResolutions');
+  expect(suggestion).not.toHaveProperty('includedIngredientIds');
+  expect(suggestion).not.toHaveProperty('includedIngredientKeys');
 }
 
 // ---------------------------------------------------------------------------
 // POST /recipes — createRecipe
 // ---------------------------------------------------------------------------
+
+describe('POST /recipes/{id}/export-view/prepare', () => {
+  it('returns a transient, server-generated export suggestion without persisting it', async () => {
+    const recipe = await createTestRecipe([baseIngredient], 'Canonical recipe description');
+    const createText = vi.mocked(analyzeRecipeText);
+    const createAnalysis = vi.mocked(validateRecipeExportPreparationOutput);
+    const calls: string[] = [];
+    const recipeAnalysis = {
+      suggestedName: 'Sauerteigbrot',
+      description: 'Einfaches Brot',
+      suggestedPortions: 4,
+      tags: ['Brot'],
+      ingredients: [
+        {
+          analysisKey: 'ingredient-1',
+          line: '500g Mehl',
+          displayName: 'Mehl',
+          category: 'food',
+          amountGrams: 500,
+          kitchenAmountText: null,
+        },
+      ],
+      steps: [{ order: 1, title: null, description: 'Mischen.' }],
+      exportSuggestion: {
+        version: 1,
+        teaser: 'Goldbraunes Brot',
+        totalTimeMinutes: 90,
+        difficulty: 'Einfach',
+        steps: [{ order: 1, description: 'Mischen.', sourceStepOrders: [1], ingredientKeys: ['ingredient-1'] }],
+        includedIngredientKeys: ['ingredient-1'],
+      },
+    } as const;
+
+    vi.mocked(enforceQuota).mockImplementation(async () => {
+      calls.push('quota');
+      return null;
+    });
+    createText.mockImplementation(async () => {
+      calls.push('provider');
+      return recipeAnalysis as any;
+    });
+    createAnalysis.mockImplementation((raw) => {
+      calls.push('validation');
+      return { ok: true, data: raw as any };
+    });
+    vi.mocked(trackUsage).mockImplementation(async () => {
+      calls.push('tracking');
+    });
+
+    const etag = await getRecipeEtag(String(recipe['id']));
+    const recipeId = String(recipe['id']);
+    const response = await requestV2Preparation(recipeId);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+    expect(calls).toEqual(['quota', 'provider', 'validation', 'tracking']);
+    expect(enforceQuota).toHaveBeenCalledTimes(1);
+    expect(enforceQuota).toHaveBeenCalledWith(expect.objectContaining({ userId: TEST_USER_ID }), 'recipe-analyze');
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+    expect(trackUsage).toHaveBeenCalledWith(expect.objectContaining({ userId: TEST_USER_ID }), 'recipe-analyze');
+
+    const storedRecipe = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: recipeId } }),
+      ctx,
+    );
+    expect(responseEtag(storedRecipe)).toBe(etag);
+    expect(storedRecipe.jsonBody).toMatchObject({
+      description: 'Canonical recipe description',
+      steps: recipe['steps'],
+      ingredients: recipe['ingredients'],
+    });
+    expect(storedRecipe.jsonBody).not.toHaveProperty('exportView');
+    expect(storedRecipe.jsonBody).not.toHaveProperty('exportViewStatus');
+  });
+
+  it('rejects the legacy V1 request body before quota or AI work', async () => {
+    const recipe = await createTestRecipe();
+    const response = await prepareRecipeExportViewHandler(
+      await makeAuthRequest({ params: { id: String(recipe['id']) }, body: {} }),
+      ctx,
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not return a resolution for duplicate exact ingredient names', async () => {
+    const duplicateIngredient = {
+      ...baseIngredient,
+      id: '00000000-0000-0000-0000-000000000003',
+    };
+    const recipe = await createTestRecipe([baseIngredient, duplicateIngredient]);
+    const validAnalysis = {
+      suggestedName: 'Sauerteigbrot',
+      description: 'Einfaches Brot',
+      suggestedPortions: 4,
+      tags: ['Brot'],
+      ingredients: [{
+        analysisKey: 'ingredient-1',
+        line: '500g Mehl',
+        displayName: 'Mehl',
+        category: 'food',
+        amountGrams: 500,
+        kitchenAmountText: null,
+      }],
+      steps: [{ order: 1, title: null, description: 'Mischen.' }],
+      exportSuggestion: {
+        version: 1,
+        teaser: 'Goldbraunes Brot',
+        totalTimeMinutes: 90,
+        difficulty: 'Einfach',
+        steps: [{
+          order: 1,
+          description: 'Mischen.',
+          sourceStepOrders: [1],
+          ingredientKeys: ['ingredient-1'],
+        }],
+        includedIngredientKeys: ['ingredient-1'],
+      },
+    };
+    vi.mocked(analyzeRecipeText).mockResolvedValue(validAnalysis as any);
+    vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: true, data: validAnalysis as any });
+
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not return a resolution for unmatched AI ingredient names', async () => {
+    const recipe = await createTestRecipe();
+    setValidPreparationAnalysis([{ analysisKey: 'ingredient-unknown', displayName: 'Kichererbsen' }], [
+      'ingredient-unknown',
+    ]);
+
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resolve separate AI ingredient keys to the same saved ingredient', async () => {
+    const recipe = await createTestRecipe();
+    setValidPreparationAnalysis([
+      { analysisKey: 'flour-a', displayName: 'Mehl' },
+      { analysisKey: 'flour-b', displayName: 'Mehl' },
+    ], ['flour-a', 'flour-b']);
+
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects missing or non-empty request bodies', async () => {
+    const recipe = await createTestRecipe();
+    const params = { id: String(recipe['id']) };
+
+    const missingBody = await prepareRecipeExportViewHandler(
+      await makeAuthRequest({ params }),
+      ctx,
+    );
+    const legacyBody = await prepareRecipeExportViewHandler(
+      await makeAuthRequest({ params, body: {} }),
+      ctx,
+    );
+    const extraField = await prepareRecipeExportViewHandler(
+      await makeAuthRequest({ params, body: { totalTimeMinutes: 45 } }),
+      ctx,
+    );
+    const invalidVersion = await prepareRecipeExportViewHandler(
+      await makeAuthRequest({ params, body: { contractVersion: 1 } }),
+      ctx,
+    );
+    const extraV2Field = await prepareRecipeExportViewHandler(
+      await makeAuthRequest({ params, body: { contractVersion: 2, extra: true } }),
+      ctx,
+    );
+
+    expect(missingBody.status).toBe(400);
+    expect(legacyBody.status).toBe(400);
+    expect(extraField.status).toBe(400);
+    expect(invalidVersion.status).toBe(400);
+    expect(extraV2Field.status).toBe(400);
+    expect(missingBody.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    expect(legacyBody.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    expect(extraField.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    expect(invalidVersion.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    expect(extraV2Field.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stale V2 If-Match before quota and provider work', async () => {
+    const recipe = await createTestRecipe();
+    const response = await prepareRecipeExportViewHandler(
+      await makeAuthRequest({
+        params: { id: String(recipe['id']) },
+        headers: { 'if-match': '"stale-revision"' },
+        body: { contractVersion: 2 },
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(412);
+    expect(response.jsonBody).toEqual({ error: 'recipe_revision_conflict' });
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns only text when an AI ingredient exactly matches a saved ingredient', async () => {
+    const fuzzyIngredient = {
+      ...baseIngredient,
+      id: '00000000-0000-0000-0000-000000000004',
+      displayName: 'Dinkelmehl',
+    };
+    const recipe = await createTestRecipe([baseIngredient, fuzzyIngredient]);
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+    expect(analyzeRecipeText).toHaveBeenCalledTimes(1);
+
+    const storedRecipe = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
+    expect(responseEtag(storedRecipe)).toBe(etag);
+    expect(storedRecipe.jsonBody).not.toHaveProperty('exportView');
+  });
+
+  it('does not return ingredient resolutions for a fuzzy saved ingredient name', async () => {
+    const fuzzyIngredient = {
+      ...baseIngredient,
+      id: '00000000-0000-0000-0000-000000000006',
+      displayName: 'Dinkelmehl',
+    };
+    const recipe = await createTestRecipe([fuzzyIngredient]);
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+  });
+
+  it('does not return ambiguity candidates for duplicate exact ingredient names', async () => {
+    const duplicateIngredient = {
+      ...baseIngredient,
+      id: '00000000-0000-0000-0000-000000000004',
+    };
+    const recipe = await createTestRecipe([baseIngredient, duplicateIngredient]);
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+  });
+
+  it('does not return candidates for overlapping fuzzy ingredient names', async () => {
+    const dinkelmehl = {
+      ...baseIngredient,
+      id: '00000000-0000-0000-0000-000000000004',
+      displayName: 'Dinkelmehl',
+    };
+    const weizenmehl = {
+      ...baseIngredient,
+      id: '00000000-0000-0000-0000-000000000005',
+      displayName: 'Weizenmehl',
+    };
+    const recipe = await createTestRecipe([dinkelmehl, weizenmehl]);
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+  });
+
+  it('does not expose unmatched AI ingredient names', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    setValidPreparationAnalysis([
+      { analysisKey: 'flour', displayName: 'Mehl' },
+      { analysisKey: 'chickpeas', displayName: 'Kichererbsen' },
+    ], ['flour', 'chickpeas']);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+  });
+
+  it('does not return AI ingredient mappings for seasonings', async () => {
+    const recipe = await createTestRecipe([seasoningIngredient]);
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    setValidPreparationAnalysis([{ analysisKey: 'salt', displayName: 'Salz' }], ['salt']);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+  });
+
+  it('does not search for matching ingredients in another recipe', async () => {
+    await createTestRecipe([baseIngredient]);
+    const currentRecipe = await createTestRecipe([{
+      ...baseIngredient,
+      id: '00000000-0000-0000-0000-000000000004',
+      displayName: 'Tomaten',
+    }]);
+    const recipeId = String(currentRecipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expectTextOnlyPreparation(response, recipeId, etag);
+  });
+
+  it('enforces recipe-analyze quota for V2 before provider work', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    const quotaResponse = {
+      status: 429,
+      jsonBody: { error: 'quota_exceeded', feature: 'recipe-analyze' },
+    };
+    vi.mocked(enforceQuota).mockResolvedValue(quotaResponse);
+
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expect(response).toEqual(quotaResponse);
+    expect(enforceQuota).toHaveBeenCalledWith(expect.objectContaining({ userId: TEST_USER_ID }), 'recipe-analyze');
+    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not track usage for a V2 provider failure', async () => {
+    const recipe = await createTestRecipe();
+    const etag = await getRecipeEtag(String(recipe['id']));
+    vi.mocked(analyzeRecipeText).mockRejectedValue(new Error('provider failed'));
+
+    const response = await requestV2Preparation(String(recipe['id']), etag);
+
+    expect(response.status).toBe(502);
+    expect(trackUsage).not.toHaveBeenCalled();
+    expect(validateRecipeExportPreparationOutput).not.toHaveBeenCalled();
+  });
+
+  it('does not track usage for an invalid V2 AI result', async () => {
+    const recipe = await createTestRecipe();
+    const etag = await getRecipeEtag(String(recipe['id']));
+    vi.mocked(analyzeRecipeText).mockResolvedValue({} as any);
+    vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: false, errors: ['invalid output'] });
+
+    const response = await requestV2Preparation(String(recipe['id']), etag);
+
+    expect(response.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns the recipe-analyze quota response without calling the provider or tracking usage', async () => {
+    const recipe = await createTestRecipe();
+    const quotaResponse = {
+      status: 429,
+      jsonBody: {
+        error: 'quota_exceeded',
+        feature: 'recipe-analyze',
+        used: 10,
+        limit: 10,
+        resetsAt: '2026-10-01T00:00:00.000Z',
+      },
+    };
+    vi.mocked(enforceQuota).mockResolvedValue(quotaResponse);
+
+    const etag = await getRecipeEtag(String(recipe['id']));
+    const response = await requestV2Preparation(String(recipe['id']), etag);
+
+    expect(response).toEqual(quotaResponse);
+    expect(enforceQuota).toHaveBeenCalledTimes(1);
+    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not track usage when the provider fails', async () => {
+    const recipe = await createTestRecipe();
+    vi.mocked(analyzeRecipeText).mockRejectedValue(new Error('provider failed'));
+
+    const etag = await getRecipeEtag(String(recipe['id']));
+    const response = await requestV2Preparation(String(recipe['id']), etag);
+
+    expect(response.status).toBe(502);
+    expect(trackUsage).not.toHaveBeenCalled();
+    expect(validateRecipeExportPreparationOutput).not.toHaveBeenCalled();
+  });
+
+  it('does not track usage when server validation rejects the provider result', async () => {
+    const recipe = await createTestRecipe();
+    vi.mocked(analyzeRecipeText).mockResolvedValue({} as any);
+    vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: false, errors: ['invalid output'] });
+
+    const etag = await getRecipeEtag(String(recipe['id']));
+    const response = await requestV2Preparation(String(recipe['id']), etag);
+
+    expect(response.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('prepares valid export texts even when unused AI ingredient references are invalid', async () => {
+    const recipe = await createTestRecipe();
+    const analysis = setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['unknown']);
+    const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>(
+      '../lib/recipeAnalyzeValidation',
+    );
+    expect(actualValidation.validateRecipeAnalyzeOutput(analysis).ok).toBe(false);
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actualValidation.validateRecipeExportPreparationOutput);
+
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    const response = await requestV2Preparation(recipeId, etag);
+
+    expect(response.status).toBe(200);
+    expectTextOnlyPreparation(response, recipeId, etag);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+    const storedRecipe = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
+    expect(responseEtag(storedRecipe)).toBe(etag);
+    expect(storedRecipe.jsonBody).not.toHaveProperty('exportView');
+  });
+
+  it.each([
+    ['teaser length', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.teaser = 'x'.repeat(97);
+    }],
+    ['step length', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.steps[0]!.description = 'x'.repeat(91);
+    }],
+    ['time', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.totalTimeMinutes = 0;
+    }],
+    ['difficulty', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.difficulty = 'Einfach\nSchwer';
+    }],
+    ['unknown source step', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.steps[0]!.sourceStepOrders = [2];
+    }],
+    ['duplicate source step', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.steps[0]!.sourceStepOrders = [1, 1];
+    }],
+    ['missing source step', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.steps = [];
+    }],
+    ['export order', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
+      analysis.exportSuggestion.steps[0]!.order = 2;
+    }],
+  ] as const)('still rejects invalid %s without consuming quota', async (_case, invalidate) => {
+    const recipe = await createTestRecipe();
+    const analysis = setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+    invalidate(analysis);
+    const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>(
+      '../lib/recipeAnalyzeValidation',
+    );
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actualValidation.validateRecipeExportPreparationOutput);
+
+    const response = await requestV2Preparation(String(recipe['id']));
+
+    expect(response.status).toBe(422);
+    expect(response.jsonBody).toMatchObject({ details: expect.any(Array) });
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('requires authentication before quota enforcement or AI work', async () => {
+    const recipe = await createTestRecipe();
+    const response = await prepareRecipeExportViewHandler(
+      makeRequest({
+        params: { id: String(recipe['id']) },
+        headers: { 'if-match': '"revision"' },
+        body: { contractVersion: 2 },
+      }),
+      ctx,
+    );
+    const v2Response = await prepareRecipeExportViewHandler(
+      makeRequest({
+        params: { id: String(recipe['id']) },
+        headers: { 'if-match': '"revision"' },
+        body: { contractVersion: 2 },
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(v2Response.status).toBe(401);
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not expose another user\'s recipe to a V2 preparation request', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const etag = await getRecipeEtag(recipeId);
+    const token = await signTestToken('other-user');
+    const response = await prepareRecipeExportViewHandler(
+      makeRequest({
+        params: { id: recipeId },
+        headers: { authorization: `Bearer ${token}`, 'if-match': etag },
+        body: { contractVersion: 2 },
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(404);
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+});
 
 describe('POST /recipes — createRecipe', () => {
   it('returns 201 with calculated nutrition', async () => {
@@ -145,6 +813,115 @@ describe('POST /recipes — createRecipe', () => {
     expect(ingredients[0]?.['category']).toBeUndefined();
     expect(ingredients[0]?.['amountLabel']).toBeUndefined();
     expect(ingredients[0]?.['kitchenAmountText']).toBeUndefined();
+  });
+
+  it('persists a server-fingerprinted exportView and returns current status', async () => {
+    const recipe = await createTestRecipeWithExportView();
+    const exportView = recipe['exportView'] as Record<string, unknown>;
+
+    expect(exportView).toMatchObject(baseExportView);
+    expect(exportView['sourceFingerprint']).toMatch(/^sha256:[0-9a-f]{64}$/);
+    expect(recipe['exportViewStatus']).toBe('current');
+    expect(recipe).not.toHaveProperty('exportViewAction');
+
+    const getRes = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: String(recipe['id']) } }),
+      ctx,
+    );
+    expect(getRes.status).toBe(200);
+    expect(responseEtag(getRes)).toMatch(/^".+"$/);
+    expect((getRes.jsonBody as Record<string, unknown>)['exportViewStatus']).toBe('current');
+
+    const listRes = await listRecipesHandler(await makeAuthRequest(), ctx);
+    expect((listRes.jsonBody as { recipes: Array<Record<string, unknown>> }).recipes[0]?.['exportViewStatus'])
+      .toBe('current');
+  });
+
+  it('rejects a client-owned sourceFingerprint and invalid ingredient references', async () => {
+    const withFingerprint = await createRecipeHandler(await makeAuthRequest({
+      body: {
+        name: 'Ungültiger Export',
+        portions: 1,
+        ingredients: [baseIngredient],
+        steps: [baseStep],
+        tags: [],
+        exportViewAction: 'confirm',
+        exportView: { ...baseExportView, sourceFingerprint: 'sha256:client' },
+      },
+    }), ctx);
+    expect(withFingerprint.status).toBe(400);
+
+    const withUnknownIngredient = await createRecipeHandler(await makeAuthRequest({
+      body: {
+        name: 'Ungültige Zutat',
+        portions: 1,
+        ingredients: [baseIngredient],
+        steps: [baseStep],
+        tags: [],
+        exportViewAction: 'confirm',
+        exportView: { ...baseExportView, includedIngredientIds: ['missing-ingredient'] },
+      },
+    }), ctx);
+    expect(withUnknownIngredient.status).toBe(400);
+    expect(withUnknownIngredient.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+
+    const withDuplicateSourceId = await createRecipeHandler(await makeAuthRequest({
+      body: {
+        name: 'Doppelte Zutat',
+        portions: 1,
+        ingredients: [baseIngredient, { ...baseIngredient, displayName: 'Mehl doppelt' }],
+        steps: [baseStep],
+        tags: [],
+        exportViewAction: 'confirm',
+        exportView: baseExportView,
+      },
+    }), ctx);
+    expect(withDuplicateSourceId.status).toBe(400);
+    expect(withDuplicateSourceId.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+
+    const withDuplicateSelection = await createRecipeHandler(await makeAuthRequest({
+      body: {
+        name: 'Doppelte Auswahl',
+        portions: 1,
+        ingredients: [baseIngredient],
+        steps: [baseStep],
+        tags: [],
+        exportViewAction: 'confirm',
+        exportView: {
+          ...baseExportView,
+          includedIngredientIds: [baseIngredient.id, baseIngredient.id],
+        },
+      },
+    }), ctx);
+    expect(withDuplicateSelection.status).toBe(400);
+    expect(withDuplicateSelection.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+  });
+
+  it('requires the export view and confirmation action as a pair', async () => {
+    const recipeFields = {
+      name: 'Sauerteigbrot',
+      portions: 4,
+      ingredients: [baseIngredient],
+      steps: [baseStep],
+      tags: ['Brot'],
+    };
+    const missingAction = await createRecipeHandler(await makeAuthRequest({
+      body: { ...recipeFields, exportView: baseExportView },
+    }), ctx);
+    const missingView = await createRecipeHandler(await makeAuthRequest({
+      body: { ...recipeFields, exportViewAction: 'confirm' },
+    }), ctx);
+
+    expect(missingAction.status).toBe(400);
+    expect(missingAction.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
+    expect(missingView.status).toBe(400);
+    expect(missingView.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
+  });
+
+  it('does not expose a missing export status as a persisted field', async () => {
+    const recipe = await createTestRecipe();
+    expect(recipe['exportView']).toBeUndefined();
+    expect(recipe['exportViewStatus']).toBeUndefined();
   });
 
   it('strips step notes and ignores a root-level notes field', async () => {
@@ -285,6 +1062,7 @@ describe('GET /recipes/:id — getRecipe', () => {
     const req = await makeAuthRequest({ params: { id: String(created['id']) } });
     const res = await getRecipeHandler(req, ctx);
     expect(res.status).toBe(200);
+    expect(responseEtag(res)).toMatch(/^".+"$/);
     expect((res.jsonBody as Record<string, unknown>)['id']).toBe(created['id']);
   });
 
@@ -310,6 +1088,189 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     expect(res.status).toBe(200);
     expect((res.jsonBody as Record<string, unknown>)['name']).toBe('Roggenbrot');
     expect((res.jsonBody as Record<string, unknown>)['portions']).toBe(2);
+    expect(responseEtag(res)).toMatch(/^".+"$/);
+  });
+
+  it('marks an unchanged exportView stale after a source update and preserves it when omitted', async () => {
+    const created = await createTestRecipeWithExportView('Canonical recipe description');
+    const originalExportView = created['exportView'] as Record<string, unknown>;
+    const req = await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: { name: 'Roggenbrot' },
+    });
+
+    const res = await updateRecipeHandler(req, ctx);
+    expect(res.status).toBe(200);
+    const updated = res.jsonBody as Record<string, unknown>;
+    expect(updated['exportView']).toEqual(originalExportView);
+    expect(updated['exportViewStatus']).toBe('stale');
+  });
+
+  it('re-fingerprints an explicitly replaced exportView against the effective update', async () => {
+    const created = await createTestRecipeWithExportView('Canonical recipe description');
+    const originalFingerprint = (created['exportView'] as Record<string, unknown>)['sourceFingerprint'];
+    const getRes = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: String(created['id']) } }),
+      ctx,
+    );
+    const etag = responseEtag(getRes);
+    const res = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: {
+        name: 'Roggenbrot',
+        exportViewAction: 'confirm',
+        exportView: {
+          ...baseExportView,
+          teaser: 'Roggenbrot aus dem Ofen',
+          steps: [{ order: 1, description: 'Export-only step.' }],
+        },
+      },
+    }), ctx);
+
+    expect(res.status).toBe(200);
+    const updated = res.jsonBody as Record<string, unknown>;
+    expect(updated['exportViewStatus']).toBe('current');
+    expect(updated['description']).toBe('Canonical recipe description');
+    expect(updated['steps']).toEqual(created['steps']);
+    expect(updated['ingredients']).toEqual(created['ingredients']);
+    expect((updated['exportView'] as Record<string, unknown>)['steps'])
+      .toEqual([{ order: 1, description: 'Export-only step.' }]);
+    expect((updated['exportView'] as Record<string, unknown>)['sourceFingerprint'])
+      .not.toBe(originalFingerprint);
+    expect(responseEtag(res)).not.toBe(etag);
+  });
+
+  it('rejects missing and duplicate ingredient IDs with a stable confirmation error', async () => {
+    const created = await createTestRecipe();
+    const recipeId = String(created['id']);
+    const currentRecipe = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: recipeId } }),
+      ctx,
+    );
+    const etag = responseEtag(currentRecipe);
+
+    const missingId = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: recipeId },
+      headers: { 'if-match': etag },
+      body: {
+        exportViewAction: 'confirm',
+        exportView: { ...baseExportView, includedIngredientIds: ['missing-ingredient'] },
+      },
+    }), ctx);
+    const duplicateId = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: recipeId },
+      headers: { 'if-match': etag },
+      body: {
+        ingredients: [baseIngredient, { ...baseIngredient, displayName: 'Doppelte Zutat' }],
+        exportViewAction: 'confirm',
+        exportView: baseExportView,
+      },
+    }), ctx);
+
+    expect(missingId.status).toBe(400);
+    expect(missingId.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+    expect(duplicateId.status).toBe(400);
+    expect(duplicateId.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+
+    const unchangedRecipe = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: recipeId } }),
+      ctx,
+    );
+    expect(responseEtag(unchangedRecipe)).toBe(etag);
+    expect(unchangedRecipe.jsonBody).not.toHaveProperty('exportView');
+  });
+
+  it('returns an internal revision conflict without persisting when compare-and-replace loses a race', async () => {
+    const created = await createTestRecipe([baseIngredient], 'Canonical recipe description');
+    const recipeId = String(created['id']);
+    const initialEtag = await getRecipeEtag(recipeId);
+    const repository = getRecipesRepository();
+    const compareAndReplace = vi.spyOn(repository, 'compareAndReplace').mockResolvedValue(null);
+    const res = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: recipeId },
+      body: {
+        exportViewAction: 'confirm',
+        exportView: { ...baseExportView, teaser: 'Candidate export' },
+      },
+    }), ctx);
+
+    expect(res.status).toBe(412);
+    expect(res.jsonBody).toEqual({ error: 'recipe_revision_conflict' });
+    expect(compareAndReplace).toHaveBeenCalledWith(
+      TEST_USER_ID,
+      recipeId,
+      initialEtag,
+      expect.objectContaining({ exportView: expect.objectContaining({ teaser: 'Candidate export' }) }),
+    );
+    const fetched = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: recipeId } }),
+      ctx,
+    );
+    expect(responseEtag(fetched)).toBe(initialEtag);
+    expect(fetched.jsonBody).toMatchObject({
+      name: 'Sauerteigbrot',
+      description: 'Canonical recipe description',
+      steps: created['steps'],
+      ingredients: created['ingredients'],
+    });
+    expect(fetched.jsonBody).not.toHaveProperty('exportView');
+  });
+
+  it('returns 412 without partial persistence for a stale confirmation revision', async () => {
+    const created = await createTestRecipeWithExportView();
+    const originalExportView = created['exportView'];
+    const initialGet = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: String(created['id']) } }),
+      ctx,
+    );
+    const staleEtag = responseEtag(initialGet);
+    const ordinaryUpdate = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: { name: 'Ordinary update' },
+    }), ctx);
+    const currentEtag = responseEtag(ordinaryUpdate);
+
+    const staleConfirmation = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: String(created['id']) },
+      headers: { 'if-match': staleEtag },
+      body: {
+        name: 'Must not persist',
+        exportViewAction: 'confirm',
+        exportView: { ...baseExportView, teaser: 'Stale confirmation' },
+      },
+    }), ctx);
+
+    expect(ordinaryUpdate.status).toBe(200);
+    expect(currentEtag).not.toBe(staleEtag);
+    expect(staleConfirmation.status).toBe(412);
+    expect(staleConfirmation.jsonBody).toMatchObject({ error: 'recipe_revision_conflict' });
+
+    const fetched = await getRecipeHandler(
+      await makeAuthRequest({ params: { id: String(created['id']) } }),
+      ctx,
+    );
+    const current = fetched.jsonBody as Record<string, unknown>;
+    expect(current['name']).toBe('Ordinary update');
+    expect(current['exportView']).toEqual(originalExportView);
+    expect(current['exportViewStatus']).toBe('stale');
+    expect(responseEtag(fetched)).toBe(currentEtag);
+  });
+
+  it('rejects an incomplete export confirmation pair on update', async () => {
+    const created = await createTestRecipe();
+    const missingAction = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: { exportView: baseExportView },
+    }), ctx);
+    const missingView = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: { exportViewAction: 'confirm' },
+    }), ctx);
+
+    expect(missingAction.status).toBe(400);
+    expect(missingAction.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
+    expect(missingView.status).toBe(400);
+    expect(missingView.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
   });
 
   it('returns 404 for unknown id', async () => {

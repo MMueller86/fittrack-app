@@ -25,7 +25,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AiFoodEstimatePreview, FoodSearchResult, RecipeImageHeroCrop } from '@fittrack/shared';
 import { calculateRecipeNutrition } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { aiApi, type AiRecipeStep, type MealParserPreviewItem } from '../../shared/api/aiApi';
+import { aiApi, type AiRecipeAnalysisIngredient, type AiRecipeStep, type MealParserPreviewItem } from '../../shared/api/aiApi';
 import { recipeApi } from '../../shared/api/recipeApi';
 import { buildFromProduct, buildIngFromCandidate, buildWizardIngredientFromAiEstimate, buildIngFromSeasoning } from './ingredientBuilders';
 import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
@@ -41,7 +41,10 @@ import { RecipeWizardStepsPhase } from './RecipeWizardStepsPhase';
 import { RecipeImageSourcePicker } from './RecipeImageSourcePicker';
 import type { RecipeImageSelection } from './recipeImageSource';
 import { RecipeImageHeroCropEditor } from './RecipeImageHeroCropEditor';
-import { buildRecipeWizardEditBootstrapState } from './recipeWizardEditBootstrap';
+import {
+  loadRecipeWizardEditState,
+  buildWizardExportDraftFromSuggestion,
+} from './recipeWizardEditBootstrap';
 import {
   persistRecipeWizardImageHeroCrop,
   persistRecipeWizardImages,
@@ -58,11 +61,16 @@ import {
 } from './recipeWizardPortions';
 import type {
   AmountEdit,
+  WizardExportDraft,
   WizardImageDraft,
   WizardIngredient,
   WizardPhase,
   WizardStepItem,
 } from './recipeWizardTypes';
+import {
+  buildPendingRecipeExportDraft,
+  isRecipeRevisionConflict,
+} from './recipeWizardExportView';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeWizard'>;
 
@@ -108,13 +116,14 @@ function calculateStepDropIndex(
   return crossedIndex;
 }
 
-function initWizardIngredient(item: MealParserPreviewItem): WizardIngredient {
+function initWizardIngredient(item: AiRecipeAnalysisIngredient): WizardIngredient {
   const id = randomUUID();
   if (item.status === 'matched' && item.selectedProductId) {
     const candidate = item.candidates.find((c) => c.id === item.selectedProductId);
     if (candidate) {
       return {
         id,
+        analysisKey: item.analysisKey,
         parserItem: item,
         status: 'auto-matched',
         userConfirmed: false,
@@ -125,6 +134,7 @@ function initWizardIngredient(item: MealParserPreviewItem): WizardIngredient {
   if (item.status === 'seasoning') {
     return {
       id,
+      analysisKey: item.analysisKey,
       parserItem: item,
       status: 'seasoning',
       userConfirmed: true,
@@ -132,9 +142,9 @@ function initWizardIngredient(item: MealParserPreviewItem): WizardIngredient {
     };
   }
   if (item.status === 'needsSelection') {
-    return { id, parserItem: item, status: 'needs-selection', userConfirmed: false };
+    return { id, analysisKey: item.analysisKey, parserItem: item, status: 'needs-selection', userConfirmed: false };
   }
-  return { id, parserItem: item, status: 'needs-ai', userConfirmed: false };
+  return { id, analysisKey: item.analysisKey, parserItem: item, status: 'needs-ai', userConfirmed: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +176,9 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   const [recipeDescription, setRecipeDescription] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [portions, setPortions] = useState(DEFAULT_RECIPE_WIZARD_PORTIONS);
+  const [exportDraft, setExportDraft] = useState<WizardExportDraft | null>(null);
+  const [revisionConflict, setRevisionConflict] = useState(false);
+  const [revisionConflictOverlayVisible, setRevisionConflictOverlayVisible] = useState(false);
 
   // Ingredients
   const [ingredients, setIngredients] = useState<WizardIngredient[]>([]);
@@ -209,13 +222,21 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   // Amount editor state per resolved ingredient: { mode, value }
   const [amountEdits, setAmountEdits] = useState<Record<string, AmountEdit>>({});
 
+  const invalidateExportConfirmation = useCallback(() => {
+    setExportDraft((current) => (
+      current?.confirmed ? { ...current, confirmed: false } : current
+    ));
+  }, []);
+
   const bootstrapEditRecipe = useCallback(async () => {
     if (!editId) return;
     setLoadingRecipe(true);
     setLoadRecipeError(false);
     try {
-      const recipe = await recipeApi.get(editId);
-      const bootstrapState = buildRecipeWizardEditBootstrapState(recipe);
+      const { recipe, bootstrapState } = await loadRecipeWizardEditState(
+        editId,
+        recipeApi.get,
+      );
       setRecipeName(recipe.name);
       setRecipeDescription(recipe.description ?? '');
       setTags(normalizeTags(recipe.tags));
@@ -229,6 +250,8 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
         .map((image) => image.imageId));
       setInputText(recipe.description ?? recipe.name);
       setPhase('ingredients');
+      setRevisionConflict(false);
+      setRevisionConflictOverlayVisible(false);
     } catch (err: unknown) {
       console.error('[RecipeWizard] Edit bootstrap failed for id', editId, err);
       setLoadRecipeError(true);
@@ -275,6 +298,10 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       setPortions(normalizeRecipeWizardPortions(result.suggestedPortions));
       setTags(normalizeTags(result.tags));
       const wizardIngredients = result.ingredients.map(initWizardIngredient);
+      const analysisIngredientKeys = result.ingredients.map((ingredient) => ingredient.analysisKey);
+      setExportDraft(result.exportSuggestion
+        ? buildWizardExportDraftFromSuggestion(result.exportSuggestion, analysisIngredientKeys)
+        : null);
       setIngredients(wizardIngredients);
       // Initialize amount editors for all auto-matched ingredients
       const initialEdits: Record<string, { mode: 'grams' | 'portion'; value: string }> = {};
@@ -324,6 +351,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   // ---------------------------------------------------------------------------
 
   const handleSelectViaHub = (ingId: string, product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => {
+    invalidateExportConfirmation();
     const ingredient = buildFromProduct(product, mode, amount);
     setIngredients(prev => prev.map(i => i.id !== ingId ? i : {
       ...i,
@@ -337,6 +365,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   const handleAiEstimateResult = (ingId: string, estimate: AiFoodEstimatePreview) => {
     const ing = ingredients.find((i) => i.id === ingId);
     if (!ing) return;
+    invalidateExportConfirmation();
     const estimatedState = buildWizardIngredientFromAiEstimate(ingId, ing.parserItem, estimate);
     setAmountEdits((e) => ({ ...e, [ingId]: { mode: estimatedState.resolvedIngredient.inputMode, value: String(estimatedState.resolvedIngredient.inputAmount) } }));
     setIngredients((prev) =>
@@ -353,6 +382,20 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   const handleRemoveIngredient = (ingId: string) => {
     const ing = ingredients.find(i => i.id === ingId);
     if (!ing) return;
+    invalidateExportConfirmation();
+    setExportDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        includedIngredientIds: current.includedIngredientIds.filter(
+          (ingredientId) => ingredientId !== ing.resolvedIngredient?.id,
+        ),
+        includedIngredientKeys: ing.analysisKey == null
+          ? current.includedIngredientKeys
+          : current.includedIngredientKeys.filter((analysisKey) => analysisKey !== ing.analysisKey),
+        confirmed: false,
+      };
+    });
     const originalIndex = ingredients.findIndex(i => i.id === ingId);
     const capturedAmountEdit = amountEdits[ingId];
 
@@ -381,6 +424,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   };
 
   const handleUpdateIngredientAmount = (ingId: string, mode: 'grams' | 'portion', rawValue: string) => {
+    invalidateExportConfirmation();
     setAmountEdits((prev) => ({ ...prev, [ingId]: { mode, value: rawValue } }));
     const num = parseFloat(rawValue.replace(',', '.'));
     if (!Number.isFinite(num) || num <= 0) return;
@@ -416,6 +460,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   };
 
   const handleAddManualViaHub = (product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => {
+    invalidateExportConfirmation();
     const ingredient = buildFromProduct(product, mode, amount);
     const wi: WizardIngredient = {
       id: ingredient.id,
@@ -441,6 +486,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   };
 
   const handleAddAiEstimateViaHub = (estimate: AiFoodEstimatePreview, query: string) => {
+    invalidateExportConfirmation();
     const id = randomUUID();
     const parserItem: MealParserPreviewItem = {
       rawText: query,
@@ -468,6 +514,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   };
 
   const handleReplaceViaHub = (ingId: string, product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => {
+    invalidateExportConfirmation();
     const ingredient = buildFromProduct(product, mode, amount);
     setIngredients(prev => prev.map(i => i.id !== ingId ? i : {
       ...i,
@@ -502,18 +549,23 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   // Step actions
   // ---------------------------------------------------------------------------
 
-  const handleAddStep = () =>
+  const handleAddStep = () => {
+    invalidateExportConfirmation();
     setSteps((prev) => [
       ...prev,
       { id: randomUUID(), title: '', description: '' },
     ]);
+  };
 
-  const handleUpdateStep = (id: string, field: keyof WizardStepItem, value: string) =>
-    setSteps((prev) => prev.map((s) => (s.id === id ? { ...s, [field]: value } : s)));
+  const handleUpdateStep = (id: string, field: keyof WizardStepItem, value: string) => {
+    invalidateExportConfirmation();
+    setSteps((prev) => prev.map((step) => (step.id === id ? { ...step, [field]: value } : step)));
+  };
 
   const handleRemoveStep = (id: string) => {
     const removedStep = steps.find((step) => step.id === id);
     if (!removedStep) return;
+    invalidateExportConfirmation();
     const originalIndex = steps.findIndex((step) => step.id === id);
 
     setSteps((prev) => prev.filter((step) => step.id !== id));
@@ -660,6 +712,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
     lastDropTargetRef.current = null;
     setDraggingStepId(null);
     setDropTargetIndex(null);
+    invalidateExportConfirmation();
 
     setSteps((prev) => {
       const sourceIndex = prev.findIndex((step) => step.id === id);
@@ -674,7 +727,12 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       reorderedSteps.splice(insertionIndex, 0, sourceStep);
       return reorderedSteps;
     });
-  }, [dragScrollAdjustment, steps, stopStepAutoScroll]);
+  }, [dragScrollAdjustment, invalidateExportConfirmation, steps, stopStepAutoScroll]);
+
+  const handleReloadAfterConflict = useCallback(() => {
+    setRevisionConflictOverlayVisible(false);
+    void bootstrapEditRecipe();
+  }, [bootstrapEditRecipe]);
 
   useEffect(() => () => {
     stopStepAutoScroll();
@@ -775,6 +833,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   // ---------------------------------------------------------------------------
 
   const handleSave = async () => {
+    if (revisionConflict) return;
     if (!recipeName.trim()) {
       Alert.alert('Name fehlt', 'Bitte gib dem Rezept einen Namen.');
       return;
@@ -783,6 +842,15 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       Alert.alert('Ungültige Portionszahl', 'Bitte verwende eine ganze Zahl zwischen 1 und 50.');
       return;
     }
+    if (!allIngredientsResolved) {
+      setPhase('ingredients');
+      return;
+    }
+
+    const pendingExportDraft = isEdit
+      ? undefined
+      : buildPendingRecipeExportDraft(exportDraft, ingredients);
+
     const confirmedIngredients = ingredients
       .filter((i) => i.status === 'confirmed' || i.status === 'auto-matched' || i.status === 'seasoning')
       .map((i) => i.resolvedIngredient!)
@@ -800,26 +868,30 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
     setSaving(true);
     let savedRecipeId: string | null = null;
     try {
-      const recipe = isEdit && editId
-        ? await recipeApi.update(editId, {
-          name: recipeName.trim(),
-          description: recipeDescription.trim() || undefined,
-          portions,
-          ingredients: confirmedIngredients,
-          steps: finalSteps,
-          tags: finalTags,
-        })
-        : await recipeApi.create({
+      const payload = {
         name: recipeName.trim(),
         description: recipeDescription.trim() || undefined,
         portions,
         ingredients: confirmedIngredients,
         steps: finalSteps,
         tags: finalTags,
-      });
-      savedRecipeId = recipe.id;
+      };
+
+      if (isEdit && editId) {
+        const recipe = await recipeApi.update(editId, payload);
+        savedRecipeId = recipe.id;
+      } else {
+        const recipe = await recipeApi.create(payload);
+        savedRecipeId = recipe.id;
+      }
     } catch (err: unknown) {
       console.error('[RecipeWizard] Save failed:', err);
+      if (isRecipeRevisionConflict(err)) {
+        setRevisionConflict(true);
+        setRevisionConflictOverlayVisible(true);
+        setSaving(false);
+        return;
+      }
       let detail = '';
       if (err != null && typeof err === 'object' && 'response' in err) {
         const resp = (err as { response?: { status?: number; data?: { error?: string } } }).response;
@@ -841,7 +913,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
     );
 
     setSaving(false);
-    navigation.replace('RecipeDetail', buildRecipeDetailAfterSaveParams(savedRecipeId));
+    navigation.replace('RecipeDetail', buildRecipeDetailAfterSaveParams(savedRecipeId, pendingExportDraft));
 
     if (
       imageMutationResult.failedDeleteImageIds.length > 0
@@ -862,11 +934,22 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
     }
   };
 
+  const handleRecipeNameChange = (value: string) => {
+    invalidateExportConfirmation();
+    setRecipeName(value);
+  };
+
+  const handleRecipeDescriptionChange = (value: string) => {
+    invalidateExportConfirmation();
+    setRecipeDescription(value);
+  };
+
   const handlePortionsChange = useCallback((value: number) => {
     if (isValidRecipeWizardPortions(value)) {
+      invalidateExportConfirmation();
       setPortions(value);
     }
-  }, []);
+  }, [invalidateExportConfirmation]);
 
   // ---------------------------------------------------------------------------
   // Derived
@@ -901,8 +984,8 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
       : null;
   const previewViewModel = buildRecipePreviewViewModel(confirmedIngredients);
   const editingImage = imageDrafts.find((image) => image.draftId === editingImageDraftId) ?? null;
-
   const handleConfirmIngredient = (ingId: string) => {
+    invalidateExportConfirmation();
     setIngredients((prev) => prev.map((ingredient) => {
       if (ingredient.id === ingId && ingredient.status !== 'seasoning' && ingredient.resolvedIngredient) {
         return { ...ingredient, status: 'confirmed', userConfirmed: true };
@@ -1062,8 +1145,8 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
               steps={steps}
               liveNutrition={liveNutrition}
               previewViewModel={previewViewModel}
-              onRecipeNameChange={setRecipeName}
-              onRecipeDescriptionChange={setRecipeDescription}
+              onRecipeNameChange={handleRecipeNameChange}
+              onRecipeDescriptionChange={handleRecipeDescriptionChange}
               onPortionsChange={handlePortionsChange}
               onPickImage={handlePickImage}
               onEditImage={handleEditImage}
@@ -1103,10 +1186,24 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
         )}
         {phase === 'preview' && (
           <View style={styles.stickyFooter}>
+            {revisionConflict && (
+              <View style={styles.conflictFooter}>
+                <Text style={styles.conflictFooterText}>
+                  Rezept geändert. Bitte neu laden und erneut prüfen.
+                </Text>
+                <TouchableOpacity
+                  onPress={handleReloadAfterConflict}
+                  accessibilityRole="button"
+                  accessibilityLabel="Aktuelle Rezeptversion neu laden"
+                >
+                  <Text style={styles.conflictReloadText}>Rezept neu laden</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <TouchableOpacity
-              style={[styles.primaryBtn, styles.stickyPrimaryBtn, (saving || !recipeName.trim()) && styles.primaryBtnDisabled]}
+              style={[styles.primaryBtn, styles.stickyPrimaryBtn, (saving || revisionConflict || !recipeName.trim() || !allIngredientsResolved) && styles.primaryBtnDisabled]}
               onPress={() => void handleSave()}
-              disabled={saving || !recipeName.trim()}
+              disabled={saving || revisionConflict || !recipeName.trim() || !allIngredientsResolved}
               activeOpacity={0.8}
               accessibilityRole="button"
               accessibilityLabel="Rezept speichern"
@@ -1169,6 +1266,16 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
         title="Hero-Ausschnitt konnte nicht gespeichert werden"
         body="Der zuletzt bestätigte Ausschnitt bleibt erhalten. Bitte versuche es erneut."
         onClose={() => setImageCropError(false)}
+      />
+      <InfoOverlay
+        visible={revisionConflictOverlayVisible}
+        title="Rezeptänderungen konnten nicht gespeichert werden"
+        body="Das Rezept wurde zwischenzeitlich geändert. Lade die aktuelle Version, prüfe deine Änderungen und speichere erneut."
+        secondaryAction={{
+          label: 'Rezept neu laden',
+          onPress: handleReloadAfterConflict,
+        }}
+        onClose={() => setRevisionConflictOverlayVisible(false)}
       />
       <Snackbar ref={snackbarRef} />
     </SafeAreaView>
@@ -1280,6 +1387,20 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     paddingVertical: spacing.xs,
     marginBottom: spacing.xs,
+  },
+  conflictFooter: {
+    alignItems: 'center',
+    paddingBottom: spacing.sm,
+    gap: spacing.xs,
+  },
+  conflictFooterText: {
+    ...typography.caption,
+    color: colors.negative,
+    textAlign: 'center',
+  },
+  conflictReloadText: {
+    ...typography.button,
+    color: colors.primary,
   },
   stepsDragStatus: {
     flexDirection: 'row' as const,

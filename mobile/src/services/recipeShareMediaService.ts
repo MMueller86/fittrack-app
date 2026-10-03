@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
-import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
+import { openNativeMultiImageShareCandidate, validateLocalPngUris } from './nativeShareCandidate';
 
 export const FITTRACK_ALBUM_NAME = 'FitTrack';
 
@@ -84,7 +85,7 @@ export interface RecipeShareMediaLibrary {
 
 export interface RecipeShareSharing {
   isAvailableAsync(): Promise<boolean>;
-  shareAsync(uri: string, options: Pick<Sharing.SharingOptions, 'mimeType' | 'UTI' | 'dialogTitle'>): Promise<void>;
+  sharePairAsync(urls: readonly [string, string]): Promise<void>;
 }
 
 export interface RecipeShareMediaDependencies {
@@ -95,17 +96,21 @@ export interface RecipeShareMediaDependencies {
 
 export interface RecipeShareMediaSaveResult {
   previewUri: string;
+  detailUri: string;
   asset: RecipeShareAsset;
+  detailAsset: RecipeShareAsset;
   album: RecipeShareAlbum;
 }
 
 export interface RecipeShareMediaShareResult {
   previewUri: string;
+  detailUri: string;
   saveResult: RecipeShareMediaSaveResult;
 }
 
 export interface RecipeShareMediaSession {
   readonly previewUri: string;
+  readonly detailUri: string;
   save(): Promise<RecipeShareMediaSaveResult>;
   share(): Promise<RecipeShareMediaShareResult>;
   cleanup(): Promise<void>;
@@ -113,8 +118,8 @@ export interface RecipeShareMediaSession {
 
 export interface RecipeShareMediaService {
   createPreviewUri(png: ArrayBuffer): Promise<string>;
-  savePreview(previewUri: string): Promise<RecipeShareMediaSaveResult>;
-  createSession(previewUri: string): RecipeShareMediaSession;
+  savePreview(previewUri: string, detailUri: string): Promise<RecipeShareMediaSaveResult>;
+  createSession(previewUri: string, detailUri: string): RecipeShareMediaSession;
   cleanupPreviewUri(previewUri: string): Promise<void>;
 }
 
@@ -148,8 +153,18 @@ const defaultMediaLibrary: RecipeShareMediaLibrary = {
 };
 
 const defaultSharing: RecipeShareSharing = {
-  isAvailableAsync: () => Sharing.isAvailableAsync(),
-  shareAsync: (uri, options) => Sharing.shareAsync(uri, options),
+  isAvailableAsync: async () => Platform.OS === 'android',
+  sharePairAsync: async (urls) => {
+    if (Platform.OS !== 'android') {
+      throw new Error('The native multi-image recipe share is available on Android only.');
+    }
+
+    const [previewUri, detailUri] = validateLocalPngUris(urls);
+    const result = await openNativeMultiImageShareCandidate(previewUri, detailUri);
+    if (!result.success) {
+      throw new Error(result.message ?? 'Native multi-image share failed.');
+    }
+  },
 };
 
 const defaultDependencies: RecipeShareMediaDependencies = {
@@ -165,6 +180,18 @@ function createError(
   options: ConstructorParameters<typeof RecipeShareMediaError>[2] = {},
 ): RecipeShareMediaError {
   return new RecipeShareMediaError(code, message, { ...options, ...(cause !== undefined ? { cause } : {}) });
+}
+
+function validatePreviewPair(previewUri: string, detailUri: string): [string, string] {
+  try {
+    return validateLocalPngUris([previewUri, detailUri]);
+  } catch (error) {
+    throw createError(
+      'share-failed',
+      'Zum Teilen werden zwei unterschiedliche, lokal gespeicherte PNG-Bilder benötigt.',
+      error,
+    );
+  }
 }
 
 async function rollbackAsset(
@@ -217,6 +244,61 @@ async function rollbackAsset(
   };
 }
 
+async function rollbackCreatedAssets(
+  dependencies: RecipeShareMediaDependencies,
+  assets: RecipeShareAsset[],
+  assetsInAlbum: RecipeShareAsset[],
+  album: RecipeShareAlbum | null,
+  createdAlbum: boolean,
+): Promise<RecipeShareRollbackResult> {
+  if (assets.length === 0) {
+    return {
+      attempted: false,
+      assetRemovedFromAlbum: true,
+      assetDeleted: true,
+      albumDeleted: true,
+      complete: true,
+    };
+  }
+
+  let assetRemovedFromAlbum = assetsInAlbum.length === 0 || album == null;
+  if (album && assetsInAlbum.length > 0) {
+    try {
+      assetRemovedFromAlbum = await Promise.all(
+        assetsInAlbum.map((asset) => dependencies.mediaLibrary.removeAssetsFromAlbumAsync(asset, album)),
+      ).then((results) => results.every(Boolean));
+    } catch {
+      assetRemovedFromAlbum = false;
+    }
+  }
+
+  let assetDeleted = false;
+  try {
+    assetDeleted = await Promise.all(
+      assets.map((asset) => dependencies.mediaLibrary.deleteAssetsAsync(asset)),
+    ).then((results) => results.every(Boolean));
+  } catch {
+    assetDeleted = false;
+  }
+
+  let albumDeleted = !createdAlbum;
+  if (createdAlbum && assetRemovedFromAlbum) {
+    try {
+      albumDeleted = await dependencies.mediaLibrary.deleteAlbumsAsync(album!);
+    } catch {
+      albumDeleted = false;
+    }
+  }
+
+  return {
+    attempted: true,
+    assetRemovedFromAlbum,
+    assetDeleted,
+    albumDeleted,
+    complete: assetRemovedFromAlbum && assetDeleted && albumDeleted,
+  };
+}
+
 function withRollback(
   error: unknown,
   fallbackCode: RecipeShareMediaErrorCode,
@@ -231,7 +313,7 @@ function withRollback(
       cause: error,
     });
   }
-  return createError(fallbackCode, 'Das Bild konnte nicht im Album FitTrack gespeichert werden.', error, {
+  return createError(fallbackCode, 'Die Bilder konnten nicht im Album FitTrack gespeichert werden.', error, {
     rollback,
   });
 }
@@ -259,7 +341,9 @@ export function createRecipeShareMediaService(
     }
   };
 
-  const savePreview = async (previewUri: string): Promise<RecipeShareMediaSaveResult> => {
+  const savePreview = async (previewUri: string, detailUri: string): Promise<RecipeShareMediaSaveResult> => {
+    const targetUris = validatePreviewPair(previewUri, detailUri);
+
     let permission: Pick<MediaLibrary.PermissionResponse, 'granted' | 'canAskAgain'>;
     try {
       permission = await dependencies.mediaLibrary.requestPermissionsAsync(false, ['photo']);
@@ -300,32 +384,51 @@ export function createRecipeShareMediaService(
       throw createError('album-lookup-failed', 'Das Album FitTrack konnte nicht gefunden werden.', error);
     }
 
-    let asset: RecipeShareAsset | null = null;
+    const createdAssets: RecipeShareAsset[] = [];
+    const assetsInAlbum: RecipeShareAsset[] = [];
     let createdAlbum = false;
     try {
-      asset = await dependencies.mediaLibrary.createAssetAsync(previewUri);
+      for (let index = 0; index < targetUris.length; index += 1) {
+        const uri = targetUris[index];
+        const asset = await dependencies.mediaLibrary.createAssetAsync(uri);
+        createdAssets.push(asset);
 
-      if (album) {
-        const added = await dependencies.mediaLibrary.addAssetsToAlbumAsync(asset, album, true);
-        if (!added) {
-          throw createError('album-asset-failed', 'Das Bild konnte dem Album FitTrack nicht hinzugefügt werden.');
-        }
-      } else {
-        album = await dependencies.mediaLibrary.createAlbumAsync(FITTRACK_ALBUM_NAME, asset, true);
-        createdAlbum = true;
-        if (album.title !== FITTRACK_ALBUM_NAME) {
-          throw createError('album-create-failed', 'Das Album FitTrack konnte nicht exakt angelegt werden.');
+        if (album) {
+          const added = await dependencies.mediaLibrary.addAssetsToAlbumAsync(asset, album, true);
+          if (!added) {
+            throw createError('album-asset-failed', 'Das Bild konnte dem Album FitTrack nicht hinzugefügt werden.');
+          }
+          assetsInAlbum.push(asset);
+        } else if (index === 0) {
+          album = await dependencies.mediaLibrary.createAlbumAsync(FITTRACK_ALBUM_NAME, asset, true);
+          createdAlbum = true;
+          assetsInAlbum.push(asset);
+          if (album.title !== FITTRACK_ALBUM_NAME) {
+            throw createError('album-create-failed', 'Das Album FitTrack konnte nicht exakt angelegt werden.');
+          }
         }
       }
 
-      return { previewUri, asset, album: album! };
+      const [primaryAsset, detailAsset] = createdAssets;
+      if (!primaryAsset || !detailAsset) {
+        throw createError('asset-create-failed', 'Beide Bilder konnten nicht in der Fotomediathek gespeichert werden.');
+      }
+
+      return {
+        previewUri,
+        detailUri,
+        asset: primaryAsset,
+        detailAsset,
+        album: album!,
+      };
     } catch (error) {
-      const rollback = await rollbackAsset(dependencies, asset, album, createdAlbum);
+      const rollback = await rollbackCreatedAssets(dependencies, createdAssets, assetsInAlbum, album, createdAlbum);
       throw withRollback(error, 'asset-create-failed', rollback);
     }
   };
 
-  const createSession = (previewUri: string): RecipeShareMediaSession => {
+  const createSession = (previewUri: string, detailUri: string): RecipeShareMediaSession => {
+    const shareUris = [previewUri, detailUri];
     let savePromise: Promise<RecipeShareMediaSaveResult> | null = null;
     let cleaned = false;
 
@@ -334,7 +437,7 @@ export function createRecipeShareMediaService(
         return Promise.reject(createError('cleanup-failed', 'Die temporäre Vorschau wurde bereits bereinigt.'));
       }
       if (!savePromise) {
-        savePromise = savePreview(previewUri).catch((error: unknown) => {
+        savePromise = savePreview(previewUri, detailUri).catch((error: unknown) => {
           savePromise = null;
           throw error;
         });
@@ -361,27 +464,30 @@ export function createRecipeShareMediaService(
       }
 
       try {
-        await dependencies.sharing.shareAsync(previewUri, {
-          mimeType: 'image/png',
-          UTI: 'public.png',
-          dialogTitle: 'Rezept teilen',
-        });
+        await dependencies.sharing.sharePairAsync(
+          validatePreviewPair(saveResult.previewUri, saveResult.detailUri),
+        );
       } catch (error) {
-        // Keep the file and the resolved save promise so a share retry cannot create another asset.
         throw createError('share-failed', 'Das Teilen konnte nicht abgeschlossen werden.', error);
       }
 
       await cleanup();
-      return { previewUri, saveResult };
+      return {
+        previewUri: saveResult.previewUri,
+        detailUri: saveResult.detailUri,
+        saveResult,
+      };
     };
 
     const cleanup = async (): Promise<void> => {
       if (cleaned) return;
-      await cleanupPreviewUri(previewUri);
+      const results = await Promise.allSettled(shareUris.map((uri) => cleanupPreviewUri(uri)));
+      const failure = results.find((result) => result.status === 'rejected');
+      if (failure?.status === 'rejected') throw failure.reason;
       cleaned = true;
     };
 
-    return { previewUri, save, share, cleanup };
+    return { previewUri, detailUri, save, share, cleanup };
   };
 
   return { createPreviewUri, savePreview, createSession, cleanupPreviewUri };

@@ -3,16 +3,21 @@ import { apiClient } from './client';
 import type {
   Meal,
   Recipe,
+  RecipeExportStep,
+  RecipeExportViewRequest,
   RecipeImage,
   RecipeImageHeroCrop,
   RecipeIngredient,
   RecipeStep,
+  PrepareRecipeExportViewResponseV2,
 } from '@fittrack/shared';
 import type {
   RecipeInstagramNutritionHighlight,
   RecipeInstagramPresentation,
   RecipeInstagramRecipeMeta,
   RecipeInstagramRenderOptions,
+  RecipeShareBundleOptions,
+  RecipeShareBundleResponse,
 } from './recipeInstagramRenderContract';
 
 export { TEMPORARY_RECIPE_RENDER_META } from './recipeInstagramRenderContract';
@@ -21,13 +26,15 @@ export type {
   RecipeInstagramPresentation,
   RecipeInstagramRecipeMeta,
   RecipeInstagramRenderOptions,
+  RecipeShareBundleOptions,
+  RecipeShareBundleResponse,
 } from './recipeInstagramRenderContract';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export interface CreateRecipeInput {
+interface RecipeInputFields {
   name: string;
   description?: string;
   portions: number;
@@ -36,7 +43,16 @@ export interface CreateRecipeInput {
   tags: string[];
 }
 
-export type UpdateRecipeInput = Partial<CreateRecipeInput>;
+type NoExportViewConfirmation = {
+  exportView?: never;
+  exportViewAction?: never;
+};
+
+export type CreateRecipeInput = RecipeInputFields & (RecipeExportViewRequest | NoExportViewConfirmation);
+
+export type UpdateRecipeInput = Partial<RecipeInputFields> & (RecipeExportViewRequest | NoExportViewConfirmation);
+
+export type PrepareRecipeExportResponse = PrepareRecipeExportViewResponseV2;
 
 export interface RecipeListResponse {
   recipes: Recipe[];
@@ -69,6 +85,22 @@ export const recipeApi = {
   /** POST /api/recipes — create a new recipe */
   create(input: CreateRecipeInput): Promise<Recipe> {
     return apiClient.post<Recipe>('/recipes', input).then((r) => r.data);
+  },
+
+  /** POST /api/recipes/:id/export-view/prepare — generate a strict V2 text suggestion without persisting */
+  prepareExportView(recipeId: string): Promise<PrepareRecipeExportResponse> {
+    return apiClient
+      .post<PrepareRecipeExportResponse>(
+        `/recipes/${recipeId}/export-view/prepare`,
+        { contractVersion: 2 },
+        { timeout: 90_000 },
+      )
+      .then((r) => {
+        if (r.data.contractVersion !== 2) {
+          throw new Error('Recipe export preparation response must use contract V2.');
+        }
+        return r.data;
+      });
   },
 
   /** PUT /api/recipes/:id — update a recipe */
@@ -143,6 +175,20 @@ export const recipeApi = {
     return apiClient
       .post<ArrayBuffer>(`/recipes/${recipeId}/instagram-render`, options, {
         responseType: 'arraybuffer',
+        timeout: 60_000,
+        ...(signal ? { signal } : {}),
+      })
+      .then((r) => r.data);
+  },
+
+  /** POST /api/recipes/:id/share-bundle — render one atomic Instagram/detail PNG pair. */
+  renderShareBundle(
+    recipeId: string,
+    options: RecipeShareBundleOptions,
+    signal?: AbortSignal,
+  ): Promise<RecipeShareBundleResponse> {
+    return apiClient
+      .post<RecipeShareBundleResponse>(`/recipes/${recipeId}/share-bundle`, options, {
         timeout: 60_000,
         ...(signal ? { signal } : {}),
       })

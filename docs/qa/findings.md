@@ -55,6 +55,20 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-034 | US-09 Rezept teilen, finaler Render-UI-Lock, AC-9 | Blocking | Frontend | Closed |
 | FT-QA-2026-035 | US-09 Rezept teilen, Options-Sheet-Copy, AC-21 | Non-blocking | Frontend | Closed |
 | FT-QA-2026-036 | US-09 Rezept teilen, UX-KB-Dokumentation, AC-23 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-037 | US-10 mehrdeutige Zutatenzuordnung, AC-11 | Blocking | Backend | Closed |
+| FT-QA-2026-038 | US-10 stale Export-Persistenz, AC-8 | Blocking | Backend | Closed |
+| FT-QA-2026-039 | US-10 stale Share-Bundle, AC-8 | Blocking | Backend | Closed |
+| FT-QA-2026-040 | US-10 Preparation-Quota, AC-7/25 | Blocking | Backend | Closed |
+| FT-QA-2026-041 | US-10 integrierter Zwei-Bilder-Share, AC-20/21/22/23/27 | Blocking | Frontend | Closed |
+| FT-QA-2026-042 | US-10 kanonische bestätigte Metadaten, AC-20 | Blocking | Backend | Closed |
+| FT-QA-2026-043 | US-10 API- und Mobile-KB-Genauigkeit, AC-28 | Blocking | Documentation | Closed |
+| FT-QA-2026-044 | US-10 erforderlicher aggregierter Prompt-Eval-Gate | Blocking | Backend | Closed |
+| FT-QA-2026-045 | US-10 Shared-Library-Dokumentation, AC-28 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-046 | US-10 Share UX R2, AC-2 | Blocking | Frontend | Closed |
+| FT-QA-2026-047 | US-10 Share UX R2, AC-6/AC-14 | Blocking | Frontend | Closed |
+| FT-QA-2026-048 | US-10 Share UX R2, AC-8 | Blocking | Frontend | Closed |
+| FT-QA-2026-049 | US-10 Share UX R2, AC-12 | Blocking | Frontend | Closed |
+| FT-QA-2026-050 | US-10 Share UX R2, AC-14 | Non-blocking | Documentation | Closed |
 
 ## Actionable Findings
 
@@ -527,6 +541,188 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** User requested correction for both remaining US-09 findings on 2026-09-18.
 - **History:** 2026-09-18 - Imported from QA report `docs/qa/reports/PLAN_US-09_Rezept_teilen_und_Instagram-Bild_speichern.md`. 2026-09-18 - User requested correction; UX documentation routed to Frontend as the owning UX surface. 2026-09-18 - Frontend documented the complete implemented local recipe-share UX flow in the UX Knowledge Base; diff and encoding checks passed. 2026-09-18 - Final QA verified AC-23 and closed the finding.
 
+### FT-QA-2026-037
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-11
+- **Description:** The original wizard review, confirmation, ingredient-selection, and preparation-action gaps were corrected. A remaining AC-11 defect exists in existing-recipe preparation: when multiple recipe ingredients match an AI ingredient name exactly or fuzzily, the handler silently chooses the first match and returns its ID. The review draft can then confirm and persist that arbitrary selection without asking the user to resolve the ambiguity.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `backend/src/functions/recipes.ts`; `backend/src/functions/recipes.test.ts`; `mobile/src/modules/recipes/recipeWizardEditBootstrap.ts`.
+- **Recommendation:** Return an ingredient ID only for a unique source match. For duplicate exact or overlapping fuzzy matches, return an unresolved candidate state and require explicit user selection or clarification before confirmation; add regression tests for both ambiguity cases.
+- **Status:** Closed
+- **Decision:** The F-1 UI corrections were routed after the initial QA `FAIL`; the residual Backend ambiguity correction was routed after the re-review on 2026-09-30. The user approved the AC-11 re-plan on 2026-10-01; final Q-1 verified the V2 candidate-resolution contract and explicit Mobile clarification flow and closed the finding.
+- **History:** 2026-09-30 - Imported from the initial US-10 `fittrack-qa-v1` report and routed to Frontend. 2026-09-30 - Re-review verified the editable review, confirmation and preparation UI; the unresolved Backend exact/fuzzy matching ambiguity remains Blocking under AC-11 and is routed to Backend. 2026-10-01 - After the user's explicit approval, Backend added V2 resolution states and fail-closed V1 ambiguity handling; final Q-1 verified explicit candidate resolution/exclusion and closed FT-QA-2026-037.
+
+### FT-QA-2026-038
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-8
+- **Description:** An ordinary recipe edit can resubmit a stale export as confirmed, and the update handler can assign a new source fingerprint without requiring explicit review and confirmation against the effective recipe source.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `mobile/src/modules/recipes/recipeWizardEditBootstrap.ts`; `mobile/src/modules/recipes/RecipeWizardScreen.tsx`; `backend/src/functions/recipes.ts`; `backend/src/functions/recipes.test.ts`.
+- **Recommendation:** Enforce the atomic stale GET/PUT precondition and only compute a new fingerprint after explicit user review and confirmation.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` on 2026-09-30 under the approved Orchestrator workflow.
+- **History:** 2026-09-30 - Imported from the US-10 `fittrack-qa-v1` report and routed to Backend. 2026-09-30 - Re-review verified ETag confirmation and compare-and-replace behavior for ordinary and confirming updates; finding closed.
+
+### FT-QA-2026-039
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-8
+- **Description:** `shareBundleHandler` checks only for an existing export view and does not reject a stale fingerprint before rendering either image.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `backend/src/functions/instagramRecipe.ts`; `backend/src/functions/instagramRecipe.test.ts`.
+- **Recommendation:** Derive export freshness server-side, return a controlled stale-export response before rendering, and test stale and current bundle requests.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` on 2026-09-30 under the approved Orchestrator workflow.
+- **History:** 2026-09-30 - Imported from the US-10 `fittrack-qa-v1` report and routed to Backend. 2026-09-30 - Re-review verified stale bundle rejection before rendering; finding closed.
+
+### FT-QA-2026-040
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-7, AC-25
+- **Description:** The authenticated export-preparation handler calls recipe analysis without enforcing or tracking the `recipe-analyze` quota, unlike the existing recipe-analysis handler.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `backend/src/functions/recipes.ts`; `backend/src/functions/ai.ts`; `backend/src/functions/recipes.test.ts`.
+- **Recommendation:** Apply quota enforcement and successful-use tracking to preparation, with exhausted-quota and usage-tracking handler tests.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` on 2026-09-30 under the approved Orchestrator workflow.
+- **History:** 2026-09-30 - Imported from the US-10 `fittrack-qa-v1` report and routed to Backend. 2026-09-30 - Re-review verified strict preparation body, quota enforcement and success-only usage tracking; finding closed.
+
+### FT-QA-2026-041
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-20, AC-21, AC-22, AC-23, AC-27
+- **Description:** The production Mobile share flow remains single-image: it calls the legacy renderer, aliases a missing detail URI to the preview URI, and deduplicates the resulting media. The bundle route and native candidate are not wired into the screen, and preview readiness does not require two images.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `mobile/src/modules/recipes/recipeShareDraftState.ts`; `mobile/src/modules/recipes/RecipeDetailScreen.tsx`; `mobile/src/modules/recipes/RecipeInstagramPreview.tsx`; `mobile/src/services/recipeShareMediaService.ts`; `mobile/src/services/nativeShareCandidate.ts`.
+- **Recommendation:** Integrate the bundle API, maintain and preview two distinct images, gate save/share on both, and call the Android native adapter exactly once with both local URIs; add integrated pair, rollback, and retry tests.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` on 2026-09-30 under the approved Orchestrator workflow.
+- **History:** 2026-09-30 - Imported from the US-10 `fittrack-qa-v1` report and routed to Frontend. 2026-09-30 - Re-review verified bundle-backed pair readiness, distinct image URIs, retry/rollback tests, and exactly one mocked native call; actual device behavior remains a verification note, not a finding.
+
+### FT-QA-2026-042
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-20
+- **Description:** The share-bundle Instagram adapter does not derive time and difficulty from the authenticated recipe's confirmed export view, allowing missing or client-supplied metadata instead of the canonical server-owned values.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `backend/src/functions/instagramRecipe.ts`; `backend/src/lib/instagramRenderer/recipeAdapter.ts`.
+- **Recommendation:** Build the bundle's Instagram metadata from the server-loaded confirmed export view and ignore client metadata as authority for this flow.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` on 2026-09-30 under the approved Orchestrator workflow.
+- **History:** 2026-09-30 - Imported from the US-10 `fittrack-qa-v1` report and routed to Backend. 2026-09-30 - Re-review verified both renderers use the current server-confirmed export metadata and reject client recipeMeta; finding closed.
+
+### FT-QA-2026-043
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-28
+- **Description:** The API reference omits the new preparation and share-bundle routes, and the Mobile Knowledge Base documents a two-image integration that is not present in the production screen flow.
+- **Criticality:** Blocking
+- **Owner:** Documentation
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `docs/kb/tech/09-api-reference.md`; `docs/kb/tech/03-mobile.md`.
+- **Recommendation:** Document both API contracts and align Mobile documentation with the implemented integration state; update it after the two-image flow is wired.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` on 2026-09-30 to the Backend and Frontend documentation owners declared in the approved plan.
+- **History:** 2026-09-30 - Imported from the US-10 `fittrack-qa-v1` report; API reference correction routed with B-5/B-6 and Mobile documentation correction with F-3. 2026-09-30 - Re-review confirmed API, domain, mobile and UX documentation match the implemented contracts; finding closed.
+
+### FT-QA-2026-044
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** N/A (required full prompt-eval gate)
+- **Description:** The required aggregate `npm run test:eval` exits non-zero even though all Recipe Analyze eval tests pass; unrelated Daily Insight and Weekly Insight assertions failed during QA. Backend's subsequent rerun reproduced a Daily Insight historical-effective-target failure while the Weekly special-activity assertion passed, indicating that the aggregate live eval remains red and its failing case varies between runs.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** QA report `docs/qa/reports/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`; `backend: npm run test:eval` exit code 1; `backend/src/lib/prompts/dailyInsight.eval.test.ts`; `backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts`; Backend correction handoff reports a later aggregate run with 30 passed and 1 failed.
+- **Recommendation:** Keep the Recipe Analyze eval result distinct, reproduce and report the aggregate gate accurately, and route unrelated prompt failures only through their owning approved workstream; do not hide a red aggregate result or make unrelated prompt edits under B-3.
+- **Status:** Closed
+- **Decision:** The approved re-plan scopes the US-10 blocking prompt gate to Recipe Analyze v11; unrelated Daily/Weekly aggregate failures are outside this story and are not authorized for correction here.
+- **History:** 2026-09-30 - Imported from the initial US-10 `fittrack-qa-v1` report. Backend reran the aggregate eval: Recipe Analyze passed, Daily Insight failed, and the Weekly failure was not reproduced. 2026-09-30 - The approved re-plan narrowed the US-10 gate to the scoped Recipe Analyze eval; re-review passed 8/8 Recipe Analyze tests and the aggregate diagnostic passed 31/31. No US-10 finding remains; closed under the revised scope.
+
+### FT-QA-2026-045
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Rezeptteilen_um_Exportansicht_und_Detailbild_erweitern.md`
+- **Acceptance criterion:** AC-28
+- **Description:** The shared-library Knowledge Base still prefixes the implemented Frontend consumption of the US-10 request/response types and `If-Match` ETag with `[Planned: US-10 Frontend subtasks]`. The Mobile implementation and API documentation show that this behavior is already present, so the status marker misstates the current repository state.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** `docs/kb/tech/04-shared-library.md`; the implemented client and workflow are documented in `docs/kb/tech/03-mobile.md` and tested in `mobile/src/shared/api/recipeApi.test.ts` and `mobile/src/modules/recipes/recipeWizardExportView.test.ts`.
+- **Recommendation:** Remove the stale `[Planned: US-10 Frontend subtasks]` marker or revise it to identify only any remaining unimplemented work.
+- **Status:** Closed
+- **Decision:** The user instructed that documentation errors should always be corrected; the targeted correction was implemented and verified by QA.
+- **History:** 2026-10-01 - Imported from the US-10 Q-1 re-review (`US10-Q1-F02`); the user instructed that documentation errors should always be corrected, so the finding was routed for correction. 2026-10-01 - The stale Planned marker was removed and the Shared/Mobile/Backend responsibilities were clarified; targeted QA verified AC-28 and returned `PASS`; finding closed.
+
+### FT-QA-2026-046
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Exportansicht_beim_Teilen_2026-10-02.md`
+- **Acceptance criterion:** AC-2
+- **Description:** The combined editor does not map controls to the approved image sections. Teaser is rendered in `Titelbild (Instagram)` although it feeds the detail image, while `Detailbild` omits it. The crop action is only rendered outside editor mode, so it is unavailable within the title section.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** `docs/qa/reports/PLAN_US-10_Share-UX-Follow-up_2026-10-02.md` (R2-QA-01); `mobile/src/modules/recipes/RecipeInstagramPreview.tsx`; `mobile/src/modules/recipes/RecipeInstagramPreview.test.tsx`.
+- **Recommendation:** Move Teaser into `Detailbild`, expose crop in `Titelbild (Instagram)`, and assert field ownership and crop access within the combined editor.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` under the auto-approved R2 plan.
+- **History:** 2026-10-02 - Imported from the R2 QA report and routed to Frontend in the correction loop. 2026-10-02 - Frontend moved Teaser into Detailbild, exposed crop in the title section, and added section-placement/crop assertions. 2026-10-02 - QA re-review verified AC-2; closed.
+
+### FT-QA-2026-047
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Exportansicht_beim_Teilen_2026-10-02.md`
+- **Acceptance criterion:** AC-6 / AC-14
+- **Description:** Provider preparation uses the obsolete message `Ich prüfe das Rezept und optimiere die Texte` instead of the approved R2 copy, and the paired-image ready-state review hint is absent. The Mobile and UX Knowledge Base pages also retain the obsolete provider message.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** `docs/qa/reports/PLAN_US-10_Share-UX-Follow-up_2026-10-02.md` (R2-QA-02); `mobile/src/modules/recipes/RecipeDetailScreen.tsx`; `mobile/src/modules/recipes/RecipeDetailScreen.test.tsx`; `mobile/src/modules/recipes/RecipeInstagramPreview.test.tsx`; `docs/kb/tech/03-mobile.md`; `docs/kb/product/05-ux-patterns.md`.
+- **Recommendation:** Use the approved provider copy only during preparation, show the approved review hint after both previews are ready, and align tests and both Knowledge Base pages.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` under the auto-approved R2 plan.
+- **History:** 2026-10-02 - Imported from the R2 QA report and routed to Frontend in the correction loop. 2026-10-02 - Frontend applied the approved provider and ready-state copy and updated Mobile/product UX documentation. 2026-10-02 - QA re-review verified AC-6 and AC-14; closed.
+
+### FT-QA-2026-048
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Exportansicht_beim_Teilen_2026-10-02.md`
+- **Acceptance criterion:** AC-8
+- **Description:** A stale stored view is treated as needing a save even when its export fields are unchanged; the save handler therefore sends a confirmation PUT for unchanged values.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** `docs/qa/reports/PLAN_US-10_Share-UX-Follow-up_2026-10-02.md` (R2-QA-03); `mobile/src/modules/recipes/RecipeDetailScreen.tsx`; `mobile/src/modules/recipes/RecipeDetailScreen.test.tsx` lacks an unchanged-stale-save regression case.
+- **Recommendation:** Require new or changed export fields before issuing the confirmation PUT; stale status alone must not force a write. Add an unchanged-stale-view regression test.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` under the auto-approved R2 plan.
+- **History:** 2026-10-02 - Imported from the R2 QA report and routed to Frontend in the correction loop. 2026-10-02 - Frontend added no-PUT behavior and regression coverage for unchanged stale export fields. 2026-10-02 - QA re-review verified AC-8; closed.
+
+### FT-QA-2026-049
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Exportansicht_beim_Teilen_2026-10-02.md`
+- **Acceptance criterion:** AC-12
+- **Description:** After an explicit export save receives `412 recipe_revision_conflict`, if the reloaded recipe has no stored `exportView`, the conflict path starts forced preparation and can invoke AI automatically instead of returning the failed draft for user review.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** `docs/qa/reports/PLAN_US-10_Share-UX-Follow-up_2026-10-02.md` (R2-QA-04); `mobile/src/modules/recipes/RecipeDetailScreen.tsx`; `mobile/src/modules/recipes/RecipeDetailScreen.test.tsx`.
+- **Recommendation:** Preserve and return the local draft for explicit review after conflict. Do not start preparation, auto-merge, or retry the save. Add a regression test where the reloaded recipe has no export view.
+- **Status:** Closed
+- **Decision:** Correction routed automatically after QA `FAIL` under the auto-approved R2 plan.
+- **History:** 2026-10-02 - Imported from the R2 QA re-review and routed to Frontend in the correction loop. 2026-10-02 - Frontend preserves the edited draft after a 412 when no stored view exists, blocks automatic preparation/render/save retry, and revalidates ingredient IDs; regression tests added. 2026-10-02 - Final QA verified the no-stored-view conflict path and AC-12; closed.
+
+### FT-QA-2026-050
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Exportansicht_beim_Teilen_2026-10-02.md`
+- **Acceptance criterion:** AC-14
+- **Description:** The Share-bundle introduction in the API reference contains a dangling duplicate fragment, `An optional request-only server-loaded recipe and one selected stored image.`, before the accurate `exportViewDraft` description. The contract remains accurate but the duplicated sentence is confusing and grammatically incomplete.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** `docs/qa/reports/PLAN_US-10_Share-UX-Follow-up_2026-10-02.md` (R2-QA-05); `docs/kb/tech/09-api-reference.md`.
+- **Recommendation:** Remove the dangling fragment and keep one sentence describing the optional request-only `exportViewDraft`.
+- **Status:** Closed
+- **Decision:** Correction routed to the Backend owner of the API-reference documentation within B-1's declared scope.
+- **History:** 2026-10-02 - Imported from the R2 QA re-review and routed for correction. 2026-10-02 - Backend removed the duplicated fragment and verified UTF-8 and `git diff --check`. 2026-10-02 - Final QA verified AC-14 and the corrected API reference; closed.
+
 ## Verification Notes (Not Findings)
 
 These items were reported as unverified environment checks. They must not lower a QA verdict and must not enter the actionable finding list unless a defect is demonstrated.
@@ -554,3 +750,24 @@ These items were reported as unverified environment checks. They must not lower 
 - **State:** `UNVERIFIED`
 - **Reason:** The Dev Function App health check passed with HTTP 401 and the deployed routes are registered, but the read-only Dev Cosmos provenance check was rejected with HTTP 401 because the configured `COSMOS_KEY` does not authorize the configured Dev Cosmos endpoint.
 - **Manual action:** Correct the Dev Cosmos endpoint/key configuration, then rerun the read-only check for server-owned Daily provenance, identical-identity cache hits, and regeneration after identity changes. Do not treat this as an application-code finding without evidence after valid authentication.
+
+### VER-2026-005 - US-10 Cosmos persistence contract
+
+- **State:** `UNVERIFIED`
+- **Reason:** The local emulator at `127.0.0.1:18081` was unavailable; the US-10 Cosmos contract suites stopped during setup and skipped their tests. No real Cosmos endpoint was accessed.
+- **Evidence:** `cd backend && npx vitest run --config vitest.contract.config.mts` exited 1; nine suites failed reachability setup and 74 tests were skipped.
+- **Manual action:** Start the local emulator or use the emulator-backed CI service and rerun the exact US-10 contract command before treating persistence/CAS as Cosmos-verified.
+
+### VER-2026-006 - US-10 Android U-1 device and transport checks
+
+- **State:** `MANUAL VALIDATION REQUIRED`
+- **Reason:** The approved plan reserves physical Android multi-image share behavior and Base64 budget measurement for the user's post-QA U-1. Q-1 used only automated mocked bridge tests; no device test, native build, deployment, or transport measurement was performed.
+- **Manual action:** After QA has no unresolved Blocking findings and after the I-1 documentation update, the user performs U-1 on Android, verifying both distinct saved PNGs, exactly one native share call with both URIs, recipient handoff, and measured transport budgets. Request a Dev Build separately only if the chosen setup requires one.
+
+### VER-2026-007 - US-10 Share UX R2 physical-device validation
+
+- **State:** `MANUAL VALIDATION REQUIRED`
+- **Reason:** R2 was reviewed with mocked native-share tests only; no physical Android or iOS device run was performed.
+- **Manual action:** After blocking findings are closed, validate the combined editor, transient AI preview, explicit save and rerender, image save, and one native share containing both distinct PNGs on a supported device.
+- **Expected result:** Both images render and save as a pair; transient preview and image sharing do not persist export text; explicit `Speichern` does; the native share sheet receives both image URIs once.
+- **Result:** `UNVERIFIED`.

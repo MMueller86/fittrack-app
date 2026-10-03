@@ -8,10 +8,18 @@
 //   - Otherwise → InMemoryRecipesRepository (lost on restart)
 
 import { randomUUID } from 'node:crypto';
-import type { Recipe, RecipeIngredient, RecipeStep, RecipeImage, RecipeNutrition } from '@fittrack/shared';
+import type {
+  Recipe,
+  RecipeExportView,
+  RecipeIngredient,
+  RecipeStep,
+  RecipeImage,
+  RecipeNutrition,
+} from '@fittrack/shared';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosRecipesRepository } from './cosmosRecipesRepository';
+import { withRecipeExportViewStatus } from './recipeExport';
 
 // ---------------------------------------------------------------------------
 // Input types
@@ -26,6 +34,7 @@ export interface CreateRecipeInput {
   tags: string[];
   nutritionTotal: RecipeNutrition;
   nutritionPerPortion: RecipeNutrition;
+  exportView?: RecipeExportView;
 }
 
 export interface UpdateRecipeInput {
@@ -37,21 +46,27 @@ export interface UpdateRecipeInput {
   tags?: string[];
   nutritionTotal?: RecipeNutrition;
   nutritionPerPortion?: RecipeNutrition;
+  exportView?: RecipeExportView;
   images?: RecipeImage[];
+}
+
+export interface VersionedRecipe {
+  recipe: Recipe;
+  etag: string;
 }
 
 export interface ListRecipesOptions {
   limit?: number;
 }
 
-function withEffectiveImageHeroCrop(recipe: Recipe): Recipe {
-  return {
+function withEffectiveRecipeProjection(recipe: Recipe): Recipe {
+  return withRecipeExportViewStatus({
     ...recipe,
     images: recipe.images.map((image) => ({
       ...image,
       heroCrop: image.heroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP,
     })),
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -61,8 +76,16 @@ function withEffectiveImageHeroCrop(recipe: Recipe): Recipe {
 export interface RecipesRepository {
   list(userId: string, opts?: ListRecipesOptions): Promise<Recipe[]>;
   get(userId: string, id: string): Promise<Recipe | null>;
+  getVersioned(userId: string, id: string): Promise<VersionedRecipe | null>;
   create(userId: string, input: CreateRecipeInput): Promise<Recipe>;
+  createVersioned(userId: string, input: CreateRecipeInput): Promise<VersionedRecipe>;
   update(userId: string, id: string, input: UpdateRecipeInput): Promise<Recipe | null>;
+  compareAndReplace(
+    userId: string,
+    id: string,
+    expectedEtag: string,
+    input: UpdateRecipeInput,
+  ): Promise<VersionedRecipe | null>;
   delete(userId: string, id: string): Promise<boolean>;
   /** Increment usageCount and set lastUsedAt = now. */
   incrementUsage(userId: string, id: string): Promise<void>;
@@ -73,7 +96,7 @@ export interface RecipesRepository {
 // ---------------------------------------------------------------------------
 
 class InMemoryRecipesRepository implements RecipesRepository {
-  private readonly store = new Map<string, Recipe>();
+  private readonly store = new Map<string, { recipe: Recipe; etag: string }>();
 
   private key(userId: string, id: string): string {
     return `${userId}:${id}`;
@@ -81,7 +104,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
 
   async list(userId: string, opts?: ListRecipesOptions): Promise<Recipe[]> {
     const all: Recipe[] = [];
-    for (const recipe of this.store.values()) {
+    for (const { recipe } of this.store.values()) {
       if (recipe.ownerUserId === userId) all.push(recipe);
     }
     // Sort: lastUsedAt desc, then updatedAt desc
@@ -90,15 +113,20 @@ class InMemoryRecipesRepository implements RecipesRepository {
       const bKey = b.lastUsedAt ?? b.updatedAt;
       return bKey.localeCompare(aKey);
     });
-    return (opts?.limit ? all.slice(0, opts.limit) : all).map(withEffectiveImageHeroCrop);
+    return (opts?.limit ? all.slice(0, opts.limit) : all).map(withEffectiveRecipeProjection);
   }
 
   async get(userId: string, id: string): Promise<Recipe | null> {
-    const recipe = this.store.get(this.key(userId, id));
-    return recipe ? withEffectiveImageHeroCrop(recipe) : null;
+    const versioned = await this.getVersioned(userId, id);
+    return versioned?.recipe ?? null;
   }
 
   async create(userId: string, input: CreateRecipeInput): Promise<Recipe> {
+    const versioned = await this.createVersioned(userId, input);
+    return versioned.recipe;
+  }
+
+  async createVersioned(userId: string, input: CreateRecipeInput): Promise<VersionedRecipe> {
     const now = new Date().toISOString();
     const recipe: Recipe = {
       id: randomUUID(),
@@ -111,6 +139,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
       images: [],
       nutritionTotal: input.nutritionTotal,
       nutritionPerPortion: input.nutritionPerPortion,
+      ...(input.exportView !== undefined ? { exportView: input.exportView } : {}),
       visibility: 'private',
       sharedWithUserIds: [],
       tags: input.tags,
@@ -118,20 +147,47 @@ class InMemoryRecipesRepository implements RecipesRepository {
       createdAt: now,
       updatedAt: now,
     };
-    this.store.set(this.key(userId, recipe.id), recipe);
-    return withEffectiveImageHeroCrop(recipe);
+    const record = { recipe, etag: `"${randomUUID()}"` };
+    this.store.set(this.key(userId, recipe.id), record);
+    return { recipe: withEffectiveRecipeProjection(recipe), etag: record.etag };
+  }
+
+  async getVersioned(userId: string, id: string): Promise<VersionedRecipe | null> {
+    const record = this.store.get(this.key(userId, id));
+    return record
+      ? { recipe: withEffectiveRecipeProjection(record.recipe), etag: record.etag }
+      : null;
   }
 
   async update(userId: string, id: string, input: UpdateRecipeInput): Promise<Recipe | null> {
-    const existing = this.store.get(this.key(userId, id));
-    if (!existing) return null;
-    const updated: Recipe = {
-      ...existing,
+    const key = this.key(userId, id);
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const existing = this.store.get(key);
+      if (!existing) return null;
+      const updated = await this.compareAndReplace(userId, id, existing.etag, input);
+      if (updated) return updated.recipe;
+    }
+    throw new Error('Recipe changed repeatedly while updating');
+  }
+
+  async compareAndReplace(
+    userId: string,
+    id: string,
+    expectedEtag: string,
+    input: UpdateRecipeInput,
+  ): Promise<VersionedRecipe | null> {
+    const key = this.key(userId, id);
+    const existing = this.store.get(key);
+    if (!existing || existing.etag !== expectedEtag) return null;
+
+    const recipe: Recipe = {
+      ...existing.recipe,
       ...input,
       updatedAt: new Date().toISOString(),
     };
-    this.store.set(this.key(userId, id), updated);
-    return withEffectiveImageHeroCrop(updated);
+    const record = { recipe, etag: `"${randomUUID()}"` };
+    this.store.set(key, record);
+    return { recipe: withEffectiveRecipeProjection(recipe), etag: record.etag };
   }
 
   async delete(userId: string, id: string): Promise<boolean> {
@@ -139,10 +195,17 @@ class InMemoryRecipesRepository implements RecipesRepository {
   }
 
   async incrementUsage(userId: string, id: string): Promise<void> {
-    const recipe = this.store.get(this.key(userId, id));
-    if (!recipe) return;
-    recipe.usageCount += 1;
-    recipe.lastUsedAt = new Date().toISOString();
+    const key = this.key(userId, id);
+    const existing = this.store.get(key);
+    if (!existing) return;
+    const now = new Date().toISOString();
+    const recipe: Recipe = {
+      ...existing.recipe,
+      usageCount: existing.recipe.usageCount + 1,
+      lastUsedAt: now,
+      updatedAt: now,
+    };
+    this.store.set(key, { recipe, etag: `"${randomUUID()}"` });
   }
 }
 

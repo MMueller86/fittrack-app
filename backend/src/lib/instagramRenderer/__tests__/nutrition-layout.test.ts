@@ -69,6 +69,30 @@ import {
   WORDMARK_Y,
 } from "../layout";
 import { renderInstagramRecipe } from "../index";
+import { createAmbientLayer } from "../ambient";
+
+describe("shared recipe footer background", () => {
+  it("uses the detail template's asymmetric green background on the title image", () => {
+    expect(styleOf(createAmbientLayer())).toMatchObject({
+      backgroundColor: COLOR_PANEL,
+      backgroundImage: "radial-gradient(circle 700px at 1030px 90px, #203b1d 0%, rgba(32, 59, 29, 0) 62%), radial-gradient(circle 760px at 70px 1320px, #172b18 0%, rgba(23, 43, 24, 0) 68%)",
+    });
+  });
+
+  it("renders a greener left footer and a darker right footer", async () => {
+    const result = await renderInstagramRecipe(smokeFixture);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.code);
+    const image = await decodePng(result.buffer);
+    const left = pixelAt(image, 24, CANVAS_HEIGHT - 4);
+    const right = pixelAt(image, CANVAS_WIDTH - 24, CANVAS_HEIGHT - 4);
+    expect(left[1]).toBeGreaterThan(right[1] + 8);
+    expect(left[1]).toBeGreaterThan(left[0]);
+    expect(right[1]).toBeLessThan(30);
+    expect(image.info.width).toBe(CANVAS_WIDTH);
+    expect(image.info.height).toBe(CANVAS_HEIGHT);
+  });
+});
 
 const EMPTY_PNG = "data:image/png;base64,iVBORw0KGgo=";
 const EMPTY_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1" />';
@@ -318,7 +342,7 @@ function toDataUri(buffer: Buffer, mimeType: string): string {
   return `data:${mimeType};base64,${buffer.toString("base64")}`;
 }
 
-async function renderNutritionComparison(barbell: string): Promise<Buffer> {
+async function renderNutritionComparison(barbell: string, uniformBackground = false): Promise<Buffer> {
   const assetRoot = resolve(__dirname, "../assets");
   const photoBuffer = readFileSync(quarkbroetchenFixture.image.path);
   const photoMetadata = await sharp(photoBuffer).metadata();
@@ -354,7 +378,14 @@ async function renderNutritionComparison(barbell: string): Promise<Buffer> {
     ),
   };
 
-  const svg = await satori(compose(quarkbroetchenFixture, assets) as never, {
+  const tree = compose(quarkbroetchenFixture, assets);
+  if (uniformBackground) {
+    const background = childElements(tree)[0]!;
+    const backgroundStyle = { ...styleOf(background) };
+    delete backgroundStyle["backgroundImage"];
+    background.props.style = backgroundStyle;
+  }
+  const svg = await satori(tree as never, {
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
     fonts: [
@@ -479,12 +510,15 @@ describe("Instagram recipe renderer nutrition layout", () => {
 
     expect(leftPlatePixels).toBeGreaterThan(240);
     expect(rightPlatePixels).toBeGreaterThan(240);
-    expect(Math.abs(leftPlatePixels - rightPlatePixels)).toBeLessThanOrEqual(2);
     expect(leftPlateBounds).toBeDefined();
     expect(rightPlateBounds).toBeDefined();
     if (!leftPlateBounds || !rightPlateBounds) {
       return;
     }
+
+    expect(Math.abs(
+      (leftPlateBounds.maxX - leftPlateBounds.minX) - (rightPlateBounds.maxX - rightPlateBounds.minX),
+    )).toBeLessThanOrEqual(1);
 
     expect(leftPlateBounds.minX).toBeGreaterThanOrEqual(BARBELL_X);
     expect(rightPlateBounds.maxX).toBeLessThanOrEqual(BARBELL_X + BARBELL_WIDTH - 1);
@@ -534,10 +568,14 @@ describe("Instagram recipe renderer nutrition layout", () => {
     expect(BARBELL_SHAFT_CENTER_Y).toBe(NUTRITION_FOOTER_TOP_Y);
     expect(Math.abs((shaftRows[0] + shaftRows.at(-1)!) / 2 - NUTRITION_FOOTER_TOP_Y)).toBeLessThanOrEqual(1);
 
+    const symmetricImage = await decodePng(await renderNutritionComparison(
+      readFileSync(BARBELL_ASSET_PATH, "utf8"),
+      true,
+    ));
     for (let y = barbellPixelTop; y < barbellPixelBottom; y += 1) {
       for (let offset = 2; offset < 58; offset += 1) {
-        expect(isMetalPixel(image, BARBELL_X + offset, y)).toBe(
-          isMetalPixel(image, BARBELL_X + BARBELL_WIDTH - 1 - offset, y),
+        expect(isMetalPixel(symmetricImage, BARBELL_X + offset, y)).toBe(
+          isMetalPixel(symmetricImage, BARBELL_X + BARBELL_WIDTH - 1 - offset, y),
         );
       }
     }

@@ -1,3 +1,5 @@
+import type { RecipeShareBundleExportDraft } from '@fittrack/shared';
+
 export type RecipeInstagramNutritionHighlight = 'high-protein' | null;
 
 export interface RecipeInstagramPresentation {
@@ -7,8 +9,8 @@ export interface RecipeInstagramPresentation {
 }
 
 export interface RecipeInstagramRecipeMeta {
-  totalTimeMinutes: number;
-  difficulty: string;
+  totalTimeMinutes: number | null;
+  difficulty: string | null;
 }
 
 export interface RecipeInstagramRenderOptions {
@@ -18,7 +20,27 @@ export interface RecipeInstagramRenderOptions {
   presentation?: RecipeInstagramPresentation;
 }
 
-export const TEMPORARY_RECIPE_RENDER_META = {
-  totalTimeMinutes: 30,
-  difficulty: 'Einfach',
-} as const;
+export interface RecipeShareBundleOptions {
+  imageId?: string;
+  selectedTags: string[];
+  nutritionHighlight: RecipeInstagramNutritionHighlight;
+  exportViewDraft?: RecipeShareBundleExportDraft;
+  presentation?: RecipeInstagramPresentation;
+}
+
+export interface RecipeShareBundlePng {
+  mimeType: 'image/png';
+  size: number;
+  data: string;
+}
+
+export interface RecipeShareBundleResponse {
+  recipeId: string;
+  instagram: RecipeShareBundlePng;
+  detail: RecipeShareBundlePng;
+}
+
+export const TEMPORARY_RECIPE_RENDER_META: RecipeInstagramRecipeMeta = {
+  totalTimeMinutes: null,
+  difficulty: null,
+};

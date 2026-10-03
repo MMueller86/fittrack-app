@@ -11,7 +11,10 @@ import type { RecipeNutrition } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { Icon } from '../../shared/components/Icon';
 import type { RecipePreviewViewModel } from './recipePreviewViewModel';
-import type { WizardImageDraft, WizardStepItem } from './recipeWizardTypes';
+import type {
+  WizardImageDraft,
+  WizardStepItem,
+} from './recipeWizardTypes';
 import { RecipeImageHeroImage } from './RecipeImageHeroImage';
 import { RECIPE_HERO_ASPECT_RATIO } from './recipeImageSource';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
@@ -248,6 +251,152 @@ export function RecipeWizardPreviewPhase({
 }
 
 const styles = StyleSheet.create({
+  previewTabs: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    padding: spacing.xs,
+    marginBottom: spacing.md,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+  },
+  previewTab: {
+    flex: 1,
+    minHeight: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.md,
+  },
+  previewTabSelected: {
+    backgroundColor: colors.surface,
+  },
+  previewTabText: {
+    ...typography.button,
+    color: colors.textMuted,
+  },
+  previewTabTextSelected: {
+    color: colors.text,
+  },
+  exportCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  exportLine: {
+    ...typography.body2,
+    color: colors.textSecondary,
+  },
+  exportFieldLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  exportInput: {
+    ...typography.body2,
+    color: colors.text,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    minHeight: spacing.xxl,
+  },
+  exportMetadataRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  exportMetadataField: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  exportStepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  exportStepInput: {
+    flex: 1,
+    minHeight: spacing.xxl,
+  },
+  exportStepRemove: {
+    minWidth: spacing.xxl,
+    minHeight: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportTextAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    minHeight: spacing.xxl,
+  },
+  exportActionDisabled: {
+    opacity: 0.45,
+  },
+  exportTextActionLabel: {
+    ...typography.button,
+    color: colors.primary,
+  },
+  exportIngredientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  exportIngredientDisabled: {
+    opacity: 0.6,
+  },
+  exportIngredientCopy: {
+    flex: 1,
+  },
+  exportIngredientName: {
+    ...typography.body2,
+    color: colors.text,
+  },
+  exportIngredientStatus: {
+    ...typography.caption,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+  },
+  exportError: {
+    ...typography.caption,
+    color: colors.negative,
+  },
+  exportUnresolvedRow: {
+    gap: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  exportSecondaryButton: {
+    minHeight: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  exportSecondaryButtonText: {
+    ...typography.button,
+    color: colors.primary,
+  },
+  exportConfirmButton: {
+    minHeight: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+  },
+  exportConfirmButtonDisabled: {
+    backgroundColor: colors.border,
+  },
+  exportConfirmButtonText: {
+    ...typography.button,
+    color: colors.white,
+  },
   nameInput: {
     ...typography.h2,
     color: colors.text,
