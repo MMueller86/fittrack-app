@@ -1,5 +1,20 @@
-import type { MealType } from '@fittrack/shared';
+import type { MealType, UserFoodRelation } from '@fittrack/shared';
 import { addLocalDays, getLocalIsoDate } from '../../../shared/date/localDate';
+
+export function isUnavailableRecipeRelation(
+  relation: Pick<UserFoodRelation, 'foodRefType' | 'recipeAccess'>,
+): boolean {
+  return relation.foodRefType === 'recipe'
+    && relation.recipeAccess !== 'owner'
+    && relation.recipeAccess !== 'community';
+}
+
+export function canToggleFavorite(
+  relation: Pick<UserFoodRelation, 'foodRefType' | 'recipeAccess'>,
+  isFavorite: boolean,
+): boolean {
+  return !isUnavailableRecipeRelation(relation) || isFavorite;
+}
 
 export function thumbnailBorderWidth(
   usageDates?: Array<{ date: string; mealType: MealType }>,

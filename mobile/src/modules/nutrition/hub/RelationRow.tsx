@@ -8,7 +8,7 @@ import type { UserFoodRelation } from '@fittrack/shared';
 import { Icon } from '../../../shared/components/Icon';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
-import { thumbnailBorderWidth } from './RelationRow.utils';
+import { canToggleFavorite, isUnavailableRecipeRelation, thumbnailBorderWidth } from './RelationRow.utils';
 export { thumbnailBorderWidth };
 
 export interface RelationRowProps {
@@ -71,10 +71,16 @@ export const RelationRow = React.memo(function RelationRow({
 }: RelationRowProps) {
   const [isFavorite, setIsFavorite] = useState(relation.isFavorite);
   const isRecipe = relation.foodRefType === 'recipe';
-  const secondaryText = getSecondaryText?.(relation) ?? null;
-  const brandDisplay = relation.displayBrand
-    ?? (relation.foodRefType === 'recipe' ? 'Eigenes Rezept' : undefined)
-    ?? (relation.foodRefType === 'personal' ? 'Eigenes Lebensmittel' : undefined);
+  const isUnavailable = isUnavailableRecipeRelation(relation);
+  const displayName = isUnavailable ? 'Rezept nicht verfügbar' : relation.displayName;
+  const secondaryText = isUnavailable ? null : getSecondaryText?.(relation) ?? null;
+  const brandDisplay = isUnavailable
+    ? undefined
+    : relation.displayBrand
+      ?? (relation.foodRefType === 'recipe'
+        ? relation.recipeAccess === 'community' ? 'Community-Rezept' : 'Eigenes Rezept'
+        : undefined)
+      ?? (relation.foodRefType === 'personal' ? 'Eigenes Lebensmittel' : undefined);
   const bw = thumbnailBorderWidth(relation.usageDates);
 
   const handleFavoriteToggle = useCallback(async () => {
@@ -103,16 +109,18 @@ export const RelationRow = React.memo(function RelationRow({
   return (
     <TouchableOpacity
       style={[styles.row, isFirst && styles.rowFirst]}
-      onPress={onPress}
+      onPress={isUnavailable ? undefined : onPress}
+      disabled={isUnavailable}
       activeOpacity={0.75}
-      accessibilityRole="button"
-      accessibilityLabel={relation.displayName}
+      accessibilityRole={isUnavailable ? 'text' : 'button'}
+      accessibilityLabel={displayName}
+      accessibilityState={isUnavailable ? { disabled: true } : undefined}
     >
-      <Thumbnail uri={relation.imageUrl} isRecipe={isRecipe} borderWidth={bw} />
+      <Thumbnail uri={isUnavailable ? null : relation.imageUrl} isRecipe={isRecipe} borderWidth={bw} />
 
       <View style={styles.rowBody}>
         <Text style={styles.rowName} numberOfLines={1}>
-          {relation.displayName}
+          {displayName}
         </Text>
         {brandDisplay ? (
           <Text style={styles.rowBrand} numberOfLines={1}>{brandDisplay}</Text>
@@ -124,7 +132,7 @@ export const RelationRow = React.memo(function RelationRow({
             ) : (
               <View style={{ flex: 1 }} />
             )}
-            {showDirectAdd && directAddLabel ? (
+            {showDirectAdd && directAddLabel && !isUnavailable ? (
               <TouchableOpacity
                 style={[styles.directAddPill, directAddLoading && styles.directAddPillLoading]}
                 onPress={onDirectAdd}
@@ -148,9 +156,12 @@ export const RelationRow = React.memo(function RelationRow({
 
       <TouchableOpacity
         onPress={() => void handleFavoriteToggle()}
+        disabled={!canToggleFavorite(relation, isFavorite)}
         style={isFavorite ? { opacity: 0.7 } : undefined}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
+        accessibilityLabel={isUnavailable
+          ? 'Nicht verfügbares Rezept aus Favoriten entfernen'
+          : isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}
       >
         <Icon
           lib="ion"

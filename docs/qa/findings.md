@@ -69,6 +69,10 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-048 | US-10 Share UX R2, AC-8 | Blocking | Frontend | Closed |
 | FT-QA-2026-049 | US-10 Share UX R2, AC-12 | Blocking | Frontend | Closed |
 | FT-QA-2026-050 | US-10 Share UX R2, AC-14 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-051 | Long serving labels, pre-existing test-helper diagnostic | Non-blocking | Backend | Awaiting decision |
+| FT-QA-2026-052 | US-11 recipe gram quick-add prefill | Non-blocking | Frontend | Closed |
+| FT-QA-2026-053 | US-11 D-1 plan execution status | Non-blocking | Documentation | Closed |
+| FT-QA-2026-054 | US-11 name-consent interaction | Non-blocking | Frontend | Closed |
 
 ## Actionable Findings
 
@@ -723,6 +727,58 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** Correction routed to the Backend owner of the API-reference documentation within B-1's declared scope.
 - **History:** 2026-10-02 - Imported from the R2 QA re-review and routed for correction. 2026-10-02 - Backend removed the duplicated fragment and verified UTF-8 and `git diff --check`. 2026-10-02 - Final QA verified AC-14 and the corrected API reference; closed.
 
+### FT-QA-2026-051
+
+- **Plan reference:** `docs/User Stories/plans/PLAN_Instagram-Share-Bundle-Long-Serving-Labels.md`
+- **Acceptance criterion:** N/A; separately reported under AC-7.
+- **Description:** The editor reports `'value' is possibly 'null'` in the unchanged `isTemplateElement` helper. `Boolean(value)` does not provide TypeScript's null narrowing for the later `in` operator. This is pre-existing, not introduced by the label fix.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** `docs/qa/reports/PLAN_Instagram-Share-Bundle-Long-Serving-Labels.md` (QA-LSL-01); `backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts`, helper expression `Boolean(value) && typeof value === "object" && "type" in value && "props" in value`. QA confirmed the identical expression in HEAD and no B-1 change to the helper. The full unit suite passes; the production build excludes test files and does not certify test-file typechecking.
+- **Recommendation:** Address the explicit null guard in a separate coordinated Backend change and rerun test-file typechecking plus the detail-template tests.
+- **Status:** Awaiting decision
+- **Decision:** Pending user choice: `Fix requested`, `Accepted`, or `Deferred`.
+- **History:** 2026-10-03 - Imported from the validated long-serving-label QA report. All AC-1 through AC-7 passed; no actionable B-1 implementation findings. No additional correction authorized.
+
+### FT-QA-2026-052
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md` (section 8)
+- **Acceptance criterion:** N/A (approved plan mobile behavior)
+- **Description:** `FoodEntryHub` forwards a saved recipe preference in grams to `RecipeQuantityView`, but that view initializes from the prefill only when its mode is `portion`; a gram preference silently becomes one portion. The planned compatible grams-to-portions conversion is not performed.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** `mobile/src/modules/nutrition/hub/FoodEntryHub.tsx`; `mobile/src/modules/nutrition/hub/QuantityView.tsx`; saved-amount cases in `mobile/src/modules/nutrition/hub/FoodEntryHub.test.ts`; `docs/qa/reports/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md` (US11-01).
+- **Recommendation:** Convert historical gram preferences using the existing recipe portion-weight rule and its fallback, and add regression tests for gram and portion prefills.
+- **Status:** Closed
+- **Decision:** User requested correction on 2026-10-04; Frontend converted saved gram preferences using the recipe-weight rule and fallback. QA re-review verified the correction.
+- **History:** 2026-10-03 - Imported from the validated US-11 QA report. No correction started. 2026-10-04 - User requested correction; Frontend added gram/portion prefill handling and regression tests. QA re-review verified the conversion and tests; closed.
+
+### FT-QA-2026-053
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md`
+- **Acceptance criterion:** N/A (execution-status documentation)
+- **Description:** The plan header and execution-status section still state that D-1 is next/not started, while the supplied D-1 handoff reports completion and the US-11 API/domain/auth/product documentation changes are present.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** Plan status text; `docs/kb/tech/09-api-reference.md`; `docs/kb/tech/05-authentication.md`; `docs/kb/domain/02-diary.md`; `docs/kb/domain/03-food-catalog.md`; `docs/kb/domain/06-recipes.md`; `docs/kb/product/04-food-entry-hub.md`; `docs/qa/reports/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md` (US11-02).
+- **Recommendation:** Update the plan's execution status to record the D-1 handoff before the next workflow handoff; do not alter approved scope or requirements.
+- **Status:** Closed
+- **Decision:** User requested correction on 2026-10-04; Planner updated the plan execution status without changing scope. QA re-review verified the correction.
+- **History:** 2026-10-03 - Imported from the validated US-11 QA report. No correction started. 2026-10-04 - User requested correction; Planner updated D-1/Q-1/I-1 progress and preserved plan scope. QA re-review verified the status; closed.
+
+### FT-QA-2026-054
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md` (section 8)
+- **Acceptance criterion:** N/A (approved plan UI interaction)
+- **Description:** The plan and API/domain documentation specify a name-consent checkbox initially off. The implemented confirmation sheet instead offers separate publish-with-name and publish-without-name actions. Both actions are explicit and consent remains opt-in, so the privacy outcome is preserved, but the specified interaction is not implemented and the documentation does not describe the actual controls precisely.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** `mobile/src/modules/recipes/RecipeDetailScreen.tsx`; `mobile/src/modules/recipes/RecipeDetailScreen.test.tsx`; `docs/kb/tech/09-api-reference.md`; `docs/kb/domain/06-recipes.md`; `docs/qa/reports/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md` (US11-03).
+- **Recommendation:** Align the UI with the approved unchecked-checkbox interaction, or obtain approval to retain the two-action design and update the plan and Knowledge Base wording accordingly.
+- **Status:** Closed
+- **Decision:** User requested correction on 2026-10-04; Frontend aligned the publication interaction to an initially unchecked name-consent checkbox. QA re-review verified the correction.
+- **History:** 2026-10-03 - Imported from the validated US-11 QA report. No correction started. 2026-10-04 - User requested correction; Frontend implemented the unchecked consent checkbox and interaction tests. QA re-review verified default-off consent, request behavior, and accessibility tests; closed.
+
 ## Verification Notes (Not Findings)
 
 These items were reported as unverified environment checks. They must not lower a QA verdict and must not enter the actionable finding list unless a defect is demonstrated.
@@ -771,3 +827,48 @@ These items were reported as unverified environment checks. They must not lower 
 - **Manual action:** After blocking findings are closed, validate the combined editor, transient AI preview, explicit save and rerender, image save, and one native share containing both distinct PNGs on a supported device.
 - **Expected result:** Both images render and save as a pair; transient preview and image sharing do not persist export text; explicit `Speichern` does; the native share sheet receives both image URIs once.
 - **Result:** `UNVERIFIED`.
+
+### VER-2026-008 - Long serving labels Alpha end-to-end
+
+- **State:** `UNVERIFIED`
+- **Reason:** The approved plan excludes deployment, EAS builds, installation and Azure access/mutations. Local real-renderer tests verify the fix, not its presence in the deployed Alpha binary.
+- **Evidence:** `docs/qa/reports/PLAN_Instagram-Share-Bundle-Long-Serving-Labels.md`; focused 48 tests, full 1193 backend tests and isolated `build:verify` pass.
+- **Manual action:** Only after a separately authorized backend deployment, use an existing authenticated installation to share a seven-ingredient recipe whose seventh amount is `3 1 portion (10 g)` and inspect both returned images.
+- **Expected result:** An atomic pair of 1080x1350 PNGs with the full fitting amount label and no recipe or nutrition mutation; genuine overflow returns a controlled error without a partial pair.
+- **Result:** Not performed; no installation or deployment authorized.
+
+### VER-2026-009 - US-11 Cosmos persistence contracts
+
+- **State:** `UNVERIFIED`
+- **Reason:** The emulator at `127.0.0.1:18081` was unreachable; nine contract suites failed during setup and 83 tests were skipped. No Cosmos repository contract assertions executed.
+- **Evidence:** `docs/qa/reports/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md`; `cd backend && npx vitest run --config vitest.contract.config.mts` exited 1.
+- **Manual action:** Start the local Cosmos emulator or use the emulator-backed CI service, then rerun the contract suite from `backend/`.
+- **Expected result:** Legacy private defaults, publication writes, pagination, cross-partition community reads, and compare-and-replace behavior pass against the emulator.
+- **Result:** `UNVERIFIED`.
+
+### VER-2026-010 - US-11 Dev and Alpha two-user E2E
+
+- **State:** `UNVERIFIED`
+- **Reason:** No deployed Dev/Alpha two-user scenario was run; local tests do not verify deployed CIAM, Cosmos pagination, protected blob delivery, or revocation behavior.
+- **Evidence:** `docs/qa/reports/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md`.
+- **Manual action:** With two authenticated accounts in Dev and Alpha, run the plan's create-private, publish, read, favorite, log, edit, revoke, and delete sequence, including old favorite and direct URLs.
+- **Expected result:** New reads and logs fail after revocation while previously stored diary snapshots remain unchanged.
+- **Result:** `UNVERIFIED`.
+
+### VER-2026-011 - US-11 device, accessibility, and HealthConnect validation
+
+- **State:** `MANUAL VALIDATION REQUIRED`
+- **Reason:** No physical or equivalent iOS/Android device, enlarged-text viewport, or screen-reader run was performed. HealthConnect diary-sync behavior was not exercised on device.
+- **Evidence:** `docs/qa/reports/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md`; F-1/F-2 handoffs.
+- **Manual action:** On supported devices, follow the report's owner/community navigation, publication consent, protected image, favorite, diary log, and revoked-state checklist using small/large viewports, enlarged text, and VoiceOver/TalkBack. Verify HealthConnect sync occurs only after successful logging and not after rejected access.
+- **Expected result:** Controls remain readable and accessible; consent is never implicit; foreign management actions are absent; only successful diary writes sync.
+- **Result:** `MANUAL VALIDATION REQUIRED`.
+
+### VER-2026-012 - US-11 Dev and Alpha release gate
+
+- **State:** `UNVERIFIED`
+- **Reason:** I-1 preflight found the implementation is not merged/released to Dev. No deployed route, two-user smoke, protected-blob request, or Cosmos pagination check was run; Alpha deployment was correctly held until merge and Dev gates are satisfied.
+- **Evidence:** I-1 Infrastructure & Release handoff; `docs/qa/reports/PLAN_US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md`.
+- **Manual action:** After the normal merge and Dev rollout, complete the plan's two-user checks for route registration, publication/revocation, authenticated image bytes without SAS or redirect, and paginated Cosmos reads. Proceed to Alpha only after those gates pass, then repeat the two-user smoke there.
+- **Expected result:** Dev and Alpha checks pass for publication, revocation, protected image delivery, pagination, and preservation of existing diary snapshots.
+- **Result:** `UNVERIFIED`; no deployment or environment changes were made.

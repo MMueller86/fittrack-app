@@ -23,10 +23,21 @@ import type { FoodSearchResult, MealType } from '@fittrack/shared';
 import { calculateNutrition } from '../nutritionUtils';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
+import { diaryApi as recipeDiaryApi } from '../../../shared/api/diaryApi';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
+import { recipeApi } from '../../../shared/api/recipeApi';
+import { resolveRecipeQuickEntryPortions } from '../../recipes/recipeUtils';
+import {
+  isRecipeUnavailableError,
+  resolvePortionInput,
+  scaleNutritionByPortions,
+  submitRecipeLog,
+  type RecipeLogTarget,
+} from '../../../shared/viewModels/recipeLoggingViewModel';
+import { nutritionSyncService } from '../../../services/health/nutritionSyncService';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 
 // ---------------------------------------------------------------------------
@@ -525,6 +536,195 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
           <ActivityIndicator color={colors.white} size="small" />
         ) : (
           <Text style={styles.addBtnText}>{onSelectIngredient ? 'Zum Rezept hinzufügen' : 'Hinzufügen'}</Text>
+        )}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+
+interface RecipeQuantityViewProps {
+  recipe: RecipeLogTarget;
+  context: FoodEntryHubContext;
+  prefill?: {
+    inputMode?: 'grams' | 'portion';
+    inputAmount?: number;
+  };
+  onBack: () => void;
+  onAdded: (recipeName: string, mealId: string, itemId: string) => void;
+  onUnavailable: () => void;
+}
+
+export function RecipeQuantityView({
+  recipe,
+  context,
+  prefill,
+  onBack,
+  onAdded,
+  onUnavailable,
+}: RecipeQuantityViewProps) {
+  const hasPreferredPortionPrefill = prefill?.inputMode === 'portion'
+    && prefill.inputAmount != null
+    && Number.isFinite(prefill.inputAmount)
+    && prefill.inputAmount > 0;
+  const initialPortions = resolveRecipeQuickEntryPortions(recipe, prefill);
+  const initialPortionsText = hasPreferredPortionPrefill
+    ? String(initialPortions)
+    : formatAmount(initialPortions, true);
+  const [portionsText, setPortionsText] = useState(initialPortionsText);
+  const [selectedMeal, setSelectedMeal] = useState<MealType>(context.mealType);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack]);
+
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const portions = resolvePortionInput(portionsText);
+  const previewNutrition = useMemo(
+    () => scaleNutritionByPortions(recipe.nutritionPerPortion, portions ?? 0),
+    [recipe.nutritionPerPortion, portions],
+  );
+  const canAdd = portions !== null && !loading;
+
+  const adjustPortions = useCallback((delta: number) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPortionsText((previous) => {
+      const current = parseFloat(previous.replace(',', '.'));
+      const base = Number.isFinite(current) && current > 0 ? current : 0;
+      return formatAmount(Math.max(0.5, +(base + delta).toFixed(1)), true);
+    });
+  }, []);
+
+  const handleAdd = useCallback(async () => {
+    if (portions === null || loading) return;
+    Keyboard.dismiss();
+    setLoading(true);
+    setError(null);
+    try {
+      const submission = await submitRecipeLog(
+        {
+          date: context.date,
+          recipeId: recipe.id,
+          mealType: selectedMeal,
+          portions,
+          mealId: context.mealId?.startsWith('temp-') ? null : context.mealId,
+        },
+        {
+          getDiary: recipeDiaryApi.getDay,
+          createMeal: recipeDiaryApi.createMeal,
+          logRecipe: recipeApi.log,
+        },
+      );
+      void nutritionSyncService.syncNutritionUpsert(submission.result);
+      const loggedItem = [...submission.result.items].reverse().find((item) => (
+        item.sourceType === 'recipe' && item.recipeId === recipe.id
+      ));
+      onAdded(recipe.name, submission.result.id, loggedItem?.id ?? '');
+    } catch (submitError: unknown) {
+      if (isRecipeUnavailableError(submitError)) {
+        onUnavailable();
+      } else {
+        setError(formatApiError(submitError));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [context.date, context.mealId, loading, onAdded, onUnavailable, portions, recipe.id, recipe.name, selectedMeal]);
+
+  return (
+    <ScrollView
+      ref={scrollRef}
+      style={styles.root}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <TouchableOpacity onPress={onBack} style={styles.workspaceNav} hitSlop={8}>
+        <Icon lib="feather" name="arrow-left" size={14} color={colors.textMuted} />
+        <Text style={styles.workspaceNavText}>Zurück zur Auswahl</Text>
+      </TouchableOpacity>
+
+      <View style={styles.header}>
+        <View style={styles.headerInfo}>
+          <Text style={styles.productName} numberOfLines={2}>{recipe.name}</Text>
+          <Text style={styles.productBrand}>Rezept</Text>
+        </View>
+      </View>
+
+      {!context.mealId && (
+        <View style={styles.mealRow}>
+          <MealSelector selected={selectedMeal} onChange={setSelectedMeal} />
+        </View>
+      )}
+
+      <View style={styles.quantityRow}>
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => adjustPortions(-0.5)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Portionen verringern"
+        >
+          <Text style={styles.stepBtnText}>−</Text>
+        </TouchableOpacity>
+
+        <View style={styles.quantityCenter}>
+          <TextInput
+            ref={inputRef}
+            style={styles.quantityInput}
+            value={portionsText}
+            onChangeText={setPortionsText}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+            returnKeyType="done"
+            onSubmitEditing={Keyboard.dismiss}
+            accessibilityLabel="Portionen"
+          />
+          <Text style={styles.unitLabel}>Portionen</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.stepBtn}
+          onPress={() => adjustPortions(0.5)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          accessibilityLabel="Portionen erhöhen"
+        >
+          <Text style={styles.stepBtnText}>+</Text>
+        </TouchableOpacity>
+      </View>
+
+      <MacroBar
+        kcal={previewNutrition.calories}
+        protein={previewNutrition.protein}
+        carbs={previewNutrition.carbs}
+        fat={previewNutrition.fat}
+      />
+
+      {error && <ErrorBanner error={error} />}
+
+      <TouchableOpacity
+        style={[styles.addBtn, !canAdd && styles.addBtnDisabled]}
+        onPress={() => void handleAdd()}
+        disabled={!canAdd}
+        accessibilityRole="button"
+      >
+        {loading ? (
+          <ActivityIndicator color={colors.white} size="small" />
+        ) : (
+          <Text style={styles.addBtnText}>Portion eintragen</Text>
         )}
       </TouchableOpacity>
     </ScrollView>

@@ -317,6 +317,43 @@ describe('recordUsage — usageDates as {date, mealType}[]', () => {
   });
 });
 
+describe('recipe relation cache', () => {
+  it('strips legacy image and nutrition caches on favorite and usage updates', async () => {
+    const repo = getUserFoodRelationRepository();
+    const foodRef = 'recipe-reference';
+    const nutrition = { calories: 250, protein: 15, carbs: 20, fat: 8, fiber: 4 };
+    const portion = { label: 'Portion', weightGrams: 300 };
+    await repo.setFavorite(
+      USER_A, foodRef, 'catalog', 'Old cached title', 'Old brand', true,
+      'https://blob.invalid/image.jpg?sig=stale', nutrition, portion,
+    );
+
+    const favorited = await repo.setFavorite(
+      USER_A, foodRef, 'recipe', 'Current recipe', 'Forged brand', true,
+      'https://blob.invalid/forged.jpg?sig=stale', nutrition, portion,
+    );
+    expect(favorited).toMatchObject({ foodRefType: 'recipe', displayName: 'Current recipe' });
+    expect(favorited).not.toHaveProperty('displayBrand');
+    expect(favorited).not.toHaveProperty('imageUrl');
+    expect(favorited).not.toHaveProperty('nutritionPer100g');
+    expect(favorited).not.toHaveProperty('portion');
+
+    await repo.recordUsage(USER_A, {
+      foodRef,
+      foodRefType: 'recipe',
+      displayName: 'Current recipe',
+      imageUrl: 'https://blob.invalid/forged-again.jpg?sig=stale',
+      usageDate: DEFAULT_USAGE_DATE,
+    });
+    const used = await repo.getByFoodRef(USER_A, foodRef);
+    expect(used).toMatchObject({ foodRefType: 'recipe', displayName: 'Current recipe' });
+    expect(used).not.toHaveProperty('displayBrand');
+    expect(used).not.toHaveProperty('imageUrl');
+    expect(used).not.toHaveProperty('nutritionPer100g');
+    expect(used).not.toHaveProperty('portion');
+  });
+});
+
 describe('updateNutritionDenormalized', () => {
   it('updates nutritionPer100g and portion on an existing relation', async () => {
     const repo = getUserFoodRelationRepository();

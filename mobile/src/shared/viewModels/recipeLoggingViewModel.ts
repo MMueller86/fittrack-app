@@ -1,7 +1,11 @@
-import type { Meal, MealType, RecipeNutrition } from '@fittrack/shared';
+import type { Meal, MealType, Recipe, RecipeNutrition, UserFoodRelation } from '@fittrack/shared';
 
 export type MealSelection = Pick<Meal, 'id' | 'type'> & Partial<Pick<Meal, 'createdAt'>>;
 export type PortionInput = string | number;
+export type RecipeLogTarget = Pick<Recipe, 'id' | 'name' | 'nutritionPerPortion'> & {
+  portions?: number;
+  ingredients?: ReadonlyArray<{ amountGrams: number | null }>;
+};
 
 export const LOGGABLE_MEAL_TYPES: readonly MealType[] = [
   'breakfast',
@@ -99,6 +103,32 @@ export interface SubmitRecipeLogInput {
   recipeId: string;
   mealType: MealType;
   portions: PortionInput;
+  mealId?: string | null;
+}
+
+export async function loadRecipeForRelation(
+  relation: Pick<UserFoodRelation, 'foodRef' | 'foodRefType' | 'recipeAccess'>,
+  dependencies: {
+    getOwnedRecipe: (id: string) => Promise<RecipeLogTarget>;
+    getCommunityRecipe: (id: string) => Promise<RecipeLogTarget>;
+  },
+): Promise<RecipeLogTarget | null> {
+  if (relation.foodRefType !== 'recipe') return null;
+
+  if (relation.recipeAccess === 'owner') return dependencies.getOwnedRecipe(relation.foodRef);
+  if (relation.recipeAccess === 'community') return dependencies.getCommunityRecipe(relation.foodRef);
+  return null;
+}
+
+export function isRecipeUnavailableError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('response' in error)) return false;
+  const response = error.response;
+  if (typeof response !== 'object' || response === null || !('data' in response)) return false;
+  const data = response.data;
+  return typeof data === 'object'
+    && data !== null
+    && 'error' in data
+    && data.error === 'Recipe not found';
 }
 
 export async function submitRecipeLog<
@@ -119,7 +149,10 @@ export async function submitRecipeLog<
   }
 
   const diary = await dependencies.getDiary(input.date);
-  const existingMeal = selectMealForType(diary.meals, input.mealType);
+  const selectedMeal = input.mealId == null
+    ? null
+    : diary.meals.find((meal) => meal.id === input.mealId) ?? null;
+  const existingMeal = selectedMeal ?? selectMealForType(diary.meals, input.mealType);
   const meal = existingMeal
     ?? (await dependencies.createMeal(input.date, input.mealType)).meal;
   const result = await dependencies.logRecipe(input.recipeId, {

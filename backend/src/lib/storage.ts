@@ -21,6 +21,13 @@ export class RecipeImageTooLargeError extends Error {
   }
 }
 
+export class RecipeImageUnsupportedContentTypeError extends Error {
+  constructor() {
+    super('Recipe image content type must be image/jpeg or image/png.');
+    this.name = 'RecipeImageUnsupportedContentTypeError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Client (lazy singleton)
 // ---------------------------------------------------------------------------
@@ -113,6 +120,33 @@ export async function downloadRecipeImage(blobName: string): Promise<Buffer> {
   }
 
   return buffer;
+}
+
+/** Download an authorized community image with its validated stored media type. */
+export async function downloadRecipeImageWithContentType(
+  blobName: string,
+): Promise<{ buffer: Buffer; contentType: 'image/jpeg' | 'image/png' }> {
+  const client = getClient();
+  const containerClient = client.getContainerClient(CONTAINER_NAME);
+  const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+  const properties = await blockBlobClient.getProperties();
+
+  if (properties.contentLength !== undefined && properties.contentLength > RECIPE_IMAGE_MAX_BYTES) {
+    throw new RecipeImageTooLargeError();
+  }
+
+  const contentType = properties.contentType?.split(';', 1)[0]?.trim().toLowerCase();
+  if (contentType !== 'image/jpeg' && contentType !== 'image/png') {
+    throw new RecipeImageUnsupportedContentTypeError();
+  }
+
+  const downloadCount = properties.contentLength ?? RECIPE_IMAGE_MAX_BYTES + 1;
+  const buffer = await blockBlobClient.downloadToBuffer(0, downloadCount);
+  if (buffer.byteLength > RECIPE_IMAGE_MAX_BYTES) {
+    throw new RecipeImageTooLargeError();
+  }
+
+  return { buffer, contentType };
 }
 
 // ---------------------------------------------------------------------------

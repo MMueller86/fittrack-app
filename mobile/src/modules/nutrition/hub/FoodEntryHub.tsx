@@ -24,21 +24,29 @@ import { foodApi } from '../../../shared/api/foodApi';
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import { reusableItemsApi } from '../../../shared/api/reusableItemsApi';
 import { recipeApi } from '../../../shared/api/recipeApi';
+import {
+  isRecipeUnavailableError,
+  loadRecipeForRelation,
+  submitRecipeLog,
+  type RecipeLogTarget,
+} from '../../../shared/viewModels/recipeLoggingViewModel';
+import { nutritionSyncService } from '../../../services/health/nutritionSyncService';
 import { getLocalIsoDate } from '../../../shared/date/localDate';
 import { colors, radius, spacing, typography } from '../../../app/theme';
-import { computeLastUsageText, computeMacroText, computeDirectAddLabel, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
+import { canSelectFoodRelation, computeLastUsageText, computeMacroText, computeDirectAddLabel, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
 export { computeLastUsageText, computeMacroText };
 import { useFoodEntryHubStore } from './useFoodEntryHubStore';
 import { hubReducer, INITIAL_HUB_STATE } from './hubReducer';
 import type { QuickEntryPrefill } from './hubReducer';
 import { FoodList } from './FoodList';
 import { SearchState } from './SearchState';
-import { QuantityView } from './QuantityView';
+import { QuantityView, RecipeQuantityView } from './QuantityView';
 import { ManuellerSubFlow } from './ManuellerSubFlow';
 import { AISubFlow } from './AISubFlow';
 import { BarcodeSubFlow } from './BarcodeSubFlow';
 import { LabelSubFlow } from './LabelSubFlow';
 import { getSuggestedMealType } from './mealTimeRules';
+import { isUnavailableRecipeRelation } from './RelationRow.utils';
 
 // Einziger Snap Point -- Sheet bleibt bei 85%, Tastatur überlagert nur den unteren Inhalt
 const DEFAULT_SNAP_POINTS = ['85%'];
@@ -71,6 +79,13 @@ const MEAL_LABEL: Record<string, string> = {
   postworkout: 'Post-Workout',
 };
 
+type RecipeSelectionState =
+  | { status: 'idle' }
+  | { status: 'loading'; relation: UserFoodRelation }
+  | { status: 'ready'; relation: UserFoodRelation; recipe: RecipeLogTarget }
+  | { status: 'unavailable'; relation: UserFoodRelation }
+  | { status: 'error'; relation: UserFoodRelation };
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -88,6 +103,7 @@ export function FoodEntryHub() {
   // searchActive bleibt true solange der Nutzer im Suchmodus ist -- unabhängig vom Keyboard-Status
   const [searchActive, setSearchActive] = useState(false);
   const [addedItem, setAddedItem] = useState<{ productName: string; mealId: string; itemId: string } | null>(null);
+  const [recipeSelection, setRecipeSelection] = useState<RecipeSelectionState>({ status: 'idle' });
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   // Filter-State für den IdleMode
   const [activeFilter, setActiveFilter] = useState<FilterKey>('fuerDich');
@@ -106,6 +122,7 @@ export function FoodEntryHub() {
   // Gecachte Suchergebnisse — erhalten beim Übergang in Quantity-Modus und zurück
   const [cachedResults, setCachedResults] = useState<FoodSearchResult[]>([]);
   const sheetRef = useRef<BottomSheetModal>(null);
+  const recipeRequestIdRef = useRef(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const searchInputRef = useRef<any>(null);
   // Guard: ignoriert Android-Auto-Focus während der Sheet-Öffnungsanimation.
@@ -188,6 +205,7 @@ export function FoodEntryHub() {
             userId: '',
             foodRef: r.id,
             foodRefType: 'recipe' as const,
+            recipeAccess: 'owner' as const,
             displayName: r.name,
             imageUrl: r.images?.[0]?.url ?? null,
             isFavorite: false,
@@ -322,6 +340,8 @@ export function FoodEntryHub() {
     // Sheet hat sich selbst geschlossen (Swipe/onDismiss). Ref VOR close() setzen,
     // damit useEffect([isOpen]) kein doppeltes dismiss() ausführt.
     sheetIsOpenRef.current = false;
+    recipeRequestIdRef.current += 1;
+    setRecipeSelection({ status: 'idle' });
     onSuccess?.();
     close();
   }, [close, onSuccess]);
@@ -377,6 +397,8 @@ export function FoodEntryHub() {
   // ---------------------------------------------------------------------------
 
   const handleSelectProduct = useCallback((product: FoodSearchResult) => {
+    recipeRequestIdRef.current += 1;
+    setRecipeSelection({ status: 'idle' });
     blurIsSelectionRef.current = true;
     Keyboard.dismiss();
     dispatch({ type: 'SELECT_PRODUCT', product });
@@ -388,7 +410,77 @@ export function FoodEntryHub() {
    * Fast path wenn nutritionPer100g vorhanden — kein Netzwerk-Call.
    * Fallback auf foodApi.search() für Legacy-Einträge ohne denormalisierte Nährwerte.
    */
+  const markRecipeUnavailable = useCallback((foodRef: string) => {
+    const stripRecipeDetails = (relations: UserFoodRelation[]) => relations.map((relation) => (
+      relation.foodRefType === 'recipe' && relation.foodRef === foodRef
+        ? {
+            ...relation,
+            recipeAccess: 'unavailable' as const,
+            displayName: 'Rezept nicht verfügbar',
+            displayBrand: undefined,
+            imageUrl: null,
+            nutritionPer100g: undefined,
+            portion: null,
+            lastInputMode: undefined,
+            lastInputAmount: undefined,
+            preferredInputMode: undefined,
+            preferredInputAmount: undefined,
+          }
+        : relation
+    ));
+
+    setAllFavorites(stripRecipeDetails);
+    setAllItems(stripRecipeDetails);
+    setRecents(stripRecipeDetails);
+    if (sessionOrderRef.current) {
+      sessionOrderRef.current = stripRecipeDetails(sessionOrderRef.current);
+    }
+  }, []);
+
+  const showRecipeUnavailable = useCallback((relation: UserFoodRelation) => {
+    markRecipeUnavailable(relation.foodRef);
+    setRecipeSelection({
+      status: 'unavailable',
+      relation: { ...relation, recipeAccess: 'unavailable' },
+    });
+  }, [markRecipeUnavailable]);
+
   const handleSelectRelation = useCallback(async (relation: UserFoodRelation) => {
+    if (relation.foodRefType === 'recipe') {
+      if (isRecipeContext) return;
+      if (isUnavailableRecipeRelation(relation)) {
+        setRecipeSelection({ status: 'unavailable', relation });
+        return;
+      }
+
+      const requestId = ++recipeRequestIdRef.current;
+      blurIsSelectionRef.current = true;
+      Keyboard.dismiss();
+      setRecipeSelection({ status: 'loading', relation });
+      try {
+        const recipe = await loadRecipeForRelation(relation, {
+          getOwnedRecipe: recipeApi.get,
+          getCommunityRecipe: recipeApi.getCommunity,
+        });
+        if (requestId !== recipeRequestIdRef.current) return;
+        if (!recipe) {
+          showRecipeUnavailable(relation);
+          return;
+        }
+        setRecipeSelection({ status: 'ready', relation, recipe });
+      } catch (error: unknown) {
+        if (requestId !== recipeRequestIdRef.current) return;
+        if (isRecipeUnavailableError(error)) {
+          showRecipeUnavailable(relation);
+        } else {
+          setRecipeSelection({ status: 'error', relation });
+        }
+      }
+      return;
+    }
+
+    recipeRequestIdRef.current += 1;
+    setRecipeSelection({ status: 'idle' });
     blurIsSelectionRef.current = true;
     Keyboard.dismiss();
 
@@ -438,7 +530,7 @@ export function FoodEntryHub() {
         isComplete: false,
       },
     });
-  }, [dispatch]);
+  }, [dispatch, isRecipeContext, showRecipeUnavailable]);
 
   // ---------------------------------------------------------------------------
   // QuantityView callbacks
@@ -448,12 +540,19 @@ export function FoodEntryHub() {
     dispatch({ type: 'CLOSE_PRODUCT' });
   }, []);
 
+  const handleRecipeBack = useCallback(() => {
+    recipeRequestIdRef.current += 1;
+    setRecipeSelection({ status: 'idle' });
+  }, []);
+
   const handleQuantitySelectIngredient = useCallback((product: FoodSearchResult, mode: 'grams' | 'portion', amount: number) => {
     onSelectIngredient?.(product, mode, amount);
     close();
   }, [onSelectIngredient, close]);
 
   const handleQuantityAdded = useCallback((productName: string, mealId: string, itemId: string) => {
+    recipeRequestIdRef.current += 1;
+    setRecipeSelection({ status: 'idle' });
     if (autoCloseOnSave) {
       // HomeScreen-Modus: Hub sofort schließen, kein Snackbar
       onSuccess?.();
@@ -533,6 +632,13 @@ export function FoodEntryHub() {
     }
   }, [activeFilter, ordered, recents, allItems]);
 
+  const selectableDisplayItems = isRecipeContext
+    ? displayItems.filter((item) => canSelectFoodRelation(item, true))
+    : displayItems;
+  const selectableRecents = isRecipeContext
+    ? recents.filter((item) => canSelectFoodRelation(item, true))
+    : recents;
+
   const getSecondaryText = useCallback((item: UserFoodRelation): string | null => {
     switch (activeFilter) {
       case 'fuerDich':
@@ -575,6 +681,66 @@ export function FoodEntryHub() {
   }, [allFavorites]);
 
   const handleDirectAdd = useCallback(async (item: UserFoodRelation) => {
+    if (item.foodRefType === 'recipe') {
+      if (isRecipeContext || isUnavailableRecipeRelation(item)) return;
+      if (
+        item.preferredInputMode !== 'portion'
+        || !item.preferredInputAmount
+        || !Number.isFinite(item.preferredInputAmount)
+        || item.preferredInputAmount <= 0
+        || context.mealId?.startsWith('temp-')
+      ) {
+        void handleSelectRelation(item);
+        return;
+      }
+
+      recipeRequestIdRef.current += 1;
+      setDirectAddLoadingRefs(prev => new Set(prev).add(item.foodRef));
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        const recipe = await loadRecipeForRelation(item, {
+          getOwnedRecipe: recipeApi.get,
+          getCommunityRecipe: recipeApi.getCommunity,
+        });
+        if (!recipe) {
+          showRecipeUnavailable(item);
+          return;
+        }
+        const submission = await submitRecipeLog(
+          {
+            date: context.date,
+            recipeId: recipe.id,
+            mealType: context.mealType,
+            portions: item.preferredInputAmount,
+            mealId: context.mealId,
+          },
+          {
+            getDiary: diaryApi.getDay,
+            createMeal: diaryApi.createMeal,
+            logRecipe: recipeApi.log,
+          },
+        );
+        void nutritionSyncService.syncNutritionUpsert(submission.result);
+        const loggedItem = [...submission.result.items].reverse().find((entry) => (
+          entry.sourceType === 'recipe' && entry.recipeId === recipe.id
+        ));
+        handleQuantityAdded(recipe.name, submission.result.id, loggedItem?.id ?? '');
+      } catch (error: unknown) {
+        if (isRecipeUnavailableError(error)) {
+          showRecipeUnavailable(item);
+        } else {
+          setRecipeSelection({ status: 'error', relation: item });
+        }
+      } finally {
+        setDirectAddLoadingRefs(prev => {
+          const next = new Set(prev);
+          next.delete(item.foodRef);
+          return next;
+        });
+      }
+      return;
+    }
+
     // Fehlende Nährwerte → kein Direkthinzufügen möglich
     if (!item.preferredInputAmount || !item.nutritionPer100g) {
       void handleSelectRelation(item);
@@ -656,7 +822,7 @@ export function FoodEntryHub() {
         return next;
       });
     }
-  }, [context, handleSelectRelation, handleQuantityAdded, onSelectIngredient, prefillAmount, close]);
+  }, [context, handleSelectRelation, handleQuantityAdded, isRecipeContext, onSelectIngredient, prefillAmount, close, showRecipeUnavailable]);
 
   const handleSubflowClose = useCallback(() => {
     dispatch({ type: 'RESET' });
@@ -919,7 +1085,49 @@ export function FoodEntryHub() {
 
           {/* Content-Bereich */}
           <View style={styles.contentArea}>
-            {hubState.mode === 'product' ? (
+            {recipeSelection.status === 'loading' ? (
+              <View style={styles.recipeLoadingState}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.recipeAccessText}>Rezept wird geladen…</Text>
+              </View>
+            ) : recipeSelection.status === 'ready' ? (
+              <RecipeQuantityView
+                recipe={recipeSelection.recipe}
+                context={context}
+                prefill={recipeSelection.relation.preferredInputAmount == null
+                  ? undefined
+                  : {
+                      inputMode: recipeSelection.relation.preferredInputMode,
+                      inputAmount: recipeSelection.relation.preferredInputAmount,
+                    }}
+                onBack={handleRecipeBack}
+                onAdded={handleQuantityAdded}
+                onUnavailable={() => showRecipeUnavailable(recipeSelection.relation)}
+              />
+            ) : recipeSelection.status === 'unavailable' ? (
+              <View style={styles.recipeAccessState}>
+                <Text style={styles.recipeAccessTitle}>Rezept nicht verfügbar</Text>
+                <Text style={styles.recipeAccessText}>Diese gespeicherte Referenz kann nicht mehr geöffnet werden.</Text>
+                <TouchableOpacity onPress={handleRecipeBack} style={styles.recipeAccessAction} accessibilityRole="button">
+                  <Text style={styles.recipeAccessActionText}>Zurück</Text>
+                </TouchableOpacity>
+              </View>
+            ) : recipeSelection.status === 'error' ? (
+              <View style={styles.recipeAccessState}>
+                <Text style={styles.recipeAccessTitle}>Rezept konnte nicht geladen werden</Text>
+                <Text style={styles.recipeAccessText}>Bitte prüfe deine Verbindung und versuche es erneut.</Text>
+                <TouchableOpacity
+                  onPress={() => void handleSelectRelation(recipeSelection.relation)}
+                  style={styles.recipeAccessAction}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.recipeAccessActionText}>Erneut versuchen</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleRecipeBack} style={styles.recipeAccessAction} accessibilityRole="button">
+                  <Text style={styles.recipeAccessActionText}>Zurück</Text>
+                </TouchableOpacity>
+              </View>
+            ) : hubState.mode === 'product' ? (
               <QuantityView
                 product={hubState.product}
                 prefill={hubState.prefill ?? (prefillAmount ? { inputMode: prefillAmount.mode, inputAmount: prefillAmount.amount } : undefined)}
@@ -931,7 +1139,7 @@ export function FoodEntryHub() {
             ) : showSearch ? (
               <SearchState
                 query={searchQuery}
-                recents={recents}
+                recents={selectableRecents}
                 initialResults={cachedResults}
                 onSelect={handleSelectProduct}
                 onSelectRelation={(relation) => void handleSelectRelation(relation)}
@@ -953,7 +1161,7 @@ export function FoodEntryHub() {
                   </View>
                 ) : (
                   <FoodList
-                    items={displayItems}
+                    items={selectableDisplayItems}
                     loading={allFavoritesLoading}
                     error={allFavoritesError}
                     onSelect={(item) => void handleSelectRelation(item)}
@@ -1075,6 +1283,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 48,
+  },
+  recipeLoadingState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  recipeAccessState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  recipeAccessTitle: {
+    ...typography.h3,
+    color: colors.text,
+    textAlign: 'center',
+  },
+  recipeAccessText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  recipeAccessAction: {
+    minHeight: 48,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  recipeAccessActionText: {
+    ...typography.button,
+    color: colors.primary,
   },
   handle: {
     backgroundColor: colors.textSecondary,

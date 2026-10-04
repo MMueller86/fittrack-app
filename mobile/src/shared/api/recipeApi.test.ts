@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '@fittrack/shared';
 import { TEMPORARY_RECIPE_RENDER_META } from './recipeApi';
-import type { RecipeShareBundleOptions } from './recipeApi';
+import type { RecipeShareBundleOptions, RecipeVisibilityChangeInput } from './recipeApi';
 
 const postMock = vi.hoisted(() => vi.fn());
 const putMock = vi.hoisted(() => vi.fn());
@@ -250,5 +250,105 @@ describe('recipeApi image crop contract', () => {
     );
     expect(options).not.toHaveProperty('exportDraft');
     expect(options).not.toHaveProperty('recipeMeta');
+  });
+});
+
+describe('recipeApi community contract', () => {
+  it('passes an abort signal through to the owner recipe list request', async () => {
+    const controller = new AbortController();
+    getMock.mockResolvedValueOnce({ data: { recipes: [] }, headers: {} });
+
+    await recipeApi.list(controller.signal);
+
+    expect(getMock).toHaveBeenCalledWith('/recipes', { signal: controller.signal });
+  });
+
+  it('loads published recipe pages with pagination and an abort signal', async () => {
+    const page = { recipes: [], continuationToken: 'next-page' };
+    const controller = new AbortController();
+    getMock.mockResolvedValueOnce({ data: page, headers: {} });
+
+    await expect(recipeApi.listCommunity({ limit: 20, continuationToken: 'page-1' }, controller.signal))
+      .resolves.toEqual(page);
+
+    expect(getMock).toHaveBeenCalledWith('/community-recipes', {
+      params: { limit: 20, continuationToken: 'page-1' },
+      signal: controller.signal,
+    });
+  });
+
+  it('uses the authenticated community detail route and encodes the recipe ID', async () => {
+    const communityRecipe = { id: 'recipe/1' };
+    getMock.mockResolvedValueOnce({ data: communityRecipe, headers: {} });
+
+    await expect(recipeApi.getCommunity('recipe/1')).resolves.toEqual(communityRecipe);
+
+    expect(getMock).toHaveBeenCalledWith('/community-recipes/recipe%2F1', undefined);
+  });
+
+  it('loads community image bytes through the authenticated client and accepts only JPEG/PNG', async () => {
+    const imageBytes = new Uint8Array([137, 80, 78, 71]).buffer;
+    const controller = new AbortController();
+    getMock.mockResolvedValueOnce({
+      data: imageBytes,
+      headers: { 'content-type': 'image/png; charset=binary' },
+    });
+
+    await expect(recipeApi.getCommunityImage('recipe-1', 'image-1', controller.signal))
+      .resolves.toBe(`data:image/png;base64,${globalThis.btoa(String.fromCharCode(137, 80, 78, 71))}`);
+
+    expect(getMock).toHaveBeenCalledWith(
+      '/community-recipes/recipe-1/images/image-1',
+      { responseType: 'arraybuffer', timeout: 60_000, signal: controller.signal },
+    );
+
+    getMock.mockResolvedValueOnce({ data: imageBytes, headers: { 'content-type': 'application/json' } });
+    await expect(recipeApi.getCommunityImage('recipe-1', 'image-1'))
+      .rejects.toThrow('Community recipe image response must be JPEG or PNG.');
+  });
+
+  it('requires and returns the owner recipe ETag for visibility changes', async () => {
+    const recipe = { id: 'recipe-1' };
+    getMock.mockResolvedValueOnce({ data: recipe, headers: { etag: '"recipe-rev-1"' } });
+    await expect(recipeApi.getVersioned('recipe-1')).resolves.toEqual({
+      recipe,
+      etag: '"recipe-rev-1"',
+    });
+
+    const input: RecipeVisibilityChangeInput = {
+      visibility: 'community',
+      confirmContentSharing: true,
+      displayNameConsent: false,
+    };
+    putMock.mockResolvedValueOnce({ data: { ...recipe, visibility: 'community' }, headers: { etag: '"recipe-rev-2"' } });
+    await expect(recipeApi.setVisibility('recipe-1', input, '"recipe-rev-1"')).resolves.toEqual({
+      recipe: { ...recipe, visibility: 'community' },
+      etag: '"recipe-rev-2"',
+    });
+
+    expect(putMock).toHaveBeenCalledWith(
+      '/recipes/recipe-1/visibility',
+      input,
+      { headers: { 'If-Match': '"recipe-rev-1"' } },
+    );
+  });
+
+  it('sends the strict private visibility body without publication consent fields', async () => {
+    const input: RecipeVisibilityChangeInput = { visibility: 'private' };
+    putMock.mockResolvedValueOnce({ data: { id: 'recipe-1', visibility: 'private' }, headers: { etag: '"recipe-rev-3"' } });
+
+    await recipeApi.setVisibility('recipe-1', input, '"recipe-rev-2"');
+
+    expect(putMock).toHaveBeenCalledWith(
+      '/recipes/recipe-1/visibility',
+      { visibility: 'private' },
+      { headers: { 'If-Match': '"recipe-rev-2"' } },
+    );
+  });
+
+  it('rejects owner visibility reads without the required ETag', async () => {
+    getMock.mockResolvedValueOnce({ data: { id: 'recipe-1' }, headers: {} });
+
+    await expect(recipeApi.getVersioned('recipe-1')).rejects.toThrow('Recipe response is missing its ETag.');
   });
 });

@@ -1,4 +1,5 @@
 import type { NutritionValues, PortionInfo, MealType } from './diary';
+import type { RecipeAccess } from './recipes';
 
 // UserFoodRelation — nutzerspezifische Beziehung zwischen einem Nutzer und einem Lebensmittel.
 //
@@ -30,6 +31,7 @@ export interface UserFoodRelation {
    * nie für Sortier- oder Filterabfragen.
    */
   foodRefType: FoodRefType;
+  recipeAccess?: RecipeAccess;
   /** Denormalisierter Anzeigename (für schnelles Rendering ohne Join) */
   displayName: string;
   /** Denormalisierter Markenname (optional) */

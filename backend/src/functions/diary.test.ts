@@ -1,11 +1,12 @@
 ﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest';
 
 import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler, getDiaryHandler, listMealsHandler } from './diary';
-import { __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
+import { getDiaryRepository, __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
 import { getHintStateRepository, __resetHintStateRepositoryForTests } from '../lib/repositories/hintStateRepository';
-import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth } from '../test-utils/http';
+import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, signTestToken, teardownTestAuth } from '../test-utils/http';
 import { getUserFoodRelationRepository, __resetUserFoodRelationRepositoryForTests } from '../lib/repositories/userFoodRelationRepository';
+import { getRecipesRepository, __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
 import type { SpecialActivity } from '@fittrack/shared';
 
 // Unit tests for POST /api/diary/meals/:id/items
@@ -27,11 +28,15 @@ beforeEach(() => {
   delete process.env.COSMOS_ENDPOINT;
   delete process.env.COSMOS_KEY;
   __resetDiaryRepositoryForTests();
+  __resetRecipesRepositoryForTests();
+  __resetUserFoodRelationRepositoryForTests();
 });
 
 afterEach(() => {
   Object.assign(process.env, originalEnv);
   __resetDiaryRepositoryForTests();
+  __resetRecipesRepositoryForTests();
+  __resetUserFoodRelationRepositoryForTests();
 });
 
 /** Create a meal and return its id. */
@@ -42,6 +47,30 @@ async function createMeal(): Promise<string> {
   );
   const body = res.jsonBody as { meal: { id: string } };
   return body.meal.id;
+}
+
+async function createRecipeForDiary(userId = 'test-user-abc-123') {
+  return getRecipesRepository().create(userId, {
+    name: 'Server-Rezept',
+    portions: 4,
+    ingredients: [{
+      id: '00000000-0000-4000-8000-000000000021',
+      displayName: 'Tomaten',
+      inputMode: 'grams',
+      inputAmount: 200,
+      amountGrams: 200,
+      unit: 'g',
+      linkedProductId: null,
+      linkedReusableItemId: null,
+      isAiEstimate: false,
+      nutritionPer100g: { calories: 20, protein: 1, carbs: 4, fat: 0.2, fiber: 1 },
+      nutritionContribution: { calories: 40, protein: 2, carbs: 8, fat: 0.4, fiber: 2 },
+    }],
+    steps: [],
+    tags: [],
+    nutritionTotal: { calories: 400, protein: 40, carbs: 80, fat: 8, fiber: 20 },
+    nutritionPerPortion: { calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5 },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -523,32 +552,189 @@ describe('addItemHandler — recordUsage foodRefType mapping', () => {
     __resetUserFoodRelationRepositoryForTests();
   });
 
-  it('creates UserFoodRelation with foodRefType "recipe" when sourceType is "recipe"', async () => {
+  it('uses the current recipe snapshot and records usage for its owner and the target meal date', async () => {
+    const recipe = await createRecipeForDiary();
     const mealId = await createMeal();
     const res = await addItemHandler(
       await makeAuthRequest({
         params: { id: mealId },
         body: {
-          productId: 'recipe:abc-123',
-          productName: 'Pasta al Pomodoro',
+          productId: recipe.id,
           sourceType: 'recipe',
           inputMode: 'portion',
-          inputAmount: 1,
-          amountGrams: 400,
-          calculatedNutrition: { calories: 520, protein: 18, carbs: 72, fat: 14, fiber: 4 },
+          inputAmount: 2,
+          productName: 'Forged name',
+          amountGrams: 1,
+          calculatedNutrition: { calories: 9999, protein: 9999, carbs: 9999, fat: 9999, fiber: 9999 },
         },
       }),
       makeContext(),
     );
     expect(res.status).toBe(201);
 
-    // Flush the fire-and-forget recordUsage microtask
+    // Flush fire-and-forget recipe and relation usage updates.
     await new Promise<void>(resolve => setTimeout(resolve, 0));
 
-    const repo = getUserFoodRelationRepository();
-    const rel = await repo.getByFoodRef('test-user-abc-123', 'recipe:abc-123');
+    const body = res.jsonBody as { meal: { items: Array<{ name: string; recipeId?: string; recipePortions?: number; macros: { calories: number } }> } };
+    expect(body.meal.items[0]).toMatchObject({
+      name: 'Server-Rezept',
+      recipeId: recipe.id,
+      recipePortions: 2,
+      macros: { calories: 200 },
+    });
+    const relationRepo = getUserFoodRelationRepository();
+    const rel = await relationRepo.getByFoodRef('test-user-abc-123', recipe.id);
     expect(rel?.foodRefType).toBe('recipe');
     expect(rel?.usageDates).toEqual([{ date: '2026-05-08', mealType: 'breakfast' }]);
+    expect((await getRecipesRepository().get('test-user-abc-123', recipe.id))?.usageCount).toBe(1);
+  });
+
+  it('denies new quick-entry writes after revocation without changing the prior snapshot or usage', async () => {
+    const ownerId = 'recipe-publisher';
+    const readerId = 'recipe-reader';
+    const recipe = await createRecipeForDiary(ownerId);
+    const recipes = getRecipesRepository();
+    const current = await recipes.getVersioned(ownerId, recipe.id);
+    await recipes.setVisibility(ownerId, recipe.id, current!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+    const meal = await getDiaryRepository().createMeal({
+      userId: readerId,
+      date: '2026-10-02',
+      type: 'dinner',
+      name: 'Abendessen',
+    });
+    const token = await signTestToken(readerId);
+    const request = () => makeRequest({
+      params: { id: meal.id },
+      headers: { authorization: `Bearer ${token}` },
+      body: {
+        productId: recipe.id,
+        sourceType: 'recipe',
+        inputMode: 'portion',
+        inputAmount: 2,
+        productName: 'Forged name',
+        amountGrams: 1,
+        calculatedNutrition: { calories: 9999, protein: 9999, carbs: 9999, fat: 9999, fiber: 9999 },
+      },
+    });
+
+    const logged = await addItemHandler(await request(), makeContext());
+    expect(logged.status).toBe(201);
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const priorSnapshot = structuredClone((await getDiaryRepository().getMealById(readerId, meal.id))!.items);
+
+    const publishedVersion = await recipes.getVersioned(ownerId, recipe.id);
+    await recipes.setVisibility(ownerId, recipe.id, publishedVersion!.etag, { visibility: 'private' });
+    const denied = await addItemHandler(await request(), makeContext());
+
+    expect(denied.status).toBe(404);
+    expect((await getDiaryRepository().getMealById(readerId, meal.id))?.items).toEqual(priorSnapshot);
+    expect((await recipes.get(ownerId, recipe.id))?.usageCount).toBe(1);
+    expect(await getUserFoodRelationRepository().getByFoodRef(readerId, recipe.id)).toMatchObject({
+      usageCount: 1,
+      usageDates: [{ date: '2026-10-02', mealType: 'dinner' }],
+    });
+  });
+
+  it('converts grams with the recipe quick-entry portion weight and ignores client nutrition', async () => {
+    const recipe = await createRecipeForDiary();
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId: recipe.id,
+          sourceType: 'recipe',
+          inputMode: 'grams',
+          inputAmount: 100,
+          calculatedNutrition: { calories: 1, protein: 0, carbs: 0, fat: 0 },
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    const meal = (res.jsonBody as { meal: { items: Array<{ recipePortions?: number; macros: { calories: number } }> } }).meal;
+    expect(meal.items[0]).toMatchObject({ recipePortions: 2, macros: { calories: 200 } });
+  });
+
+  it('rejects recipe refs without a recipe id and does not fall back from a stored recipe relation', async () => {
+    const recipe = await createRecipeForDiary();
+    const mealId = await createMeal();
+    const missingId = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          sourceType: 'recipe',
+          productName: 'Forged recipe',
+          inputMode: 'portion',
+          inputAmount: 1,
+          amountGrams: 300,
+          calculatedNutrition: { calories: 500, protein: 10, carbs: 50, fat: 20 },
+        },
+      }),
+      makeContext(),
+    );
+    expect(missingId.status).toBe(400);
+
+    await getUserFoodRelationRepository().setFavorite(
+      'test-user-abc-123', recipe.id, 'recipe', recipe.name, undefined, true,
+    );
+    const unmarked = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productId: recipe.id,
+          productName: 'Forged recipe',
+          sourceType: 'manual',
+          inputMode: 'portion',
+          inputAmount: 1,
+          amountGrams: 300,
+          calculatedNutrition: { calories: 500, protein: 10, carbs: 50, fat: 20 },
+        },
+      }),
+      makeContext(),
+    );
+    expect(unmarked.status).toBe(404);
+    expect((await getDiaryRepository().getMealById('test-user-abc-123', mealId))?.items).toHaveLength(0);
+  });
+
+  it('rejects a recipe log targeting a meal owned by another user', async () => {
+    const recipe = await createRecipeForDiary();
+    const foreignMeal = await getDiaryRepository().createMeal({
+      userId: 'another-user',
+      date: '2026-05-08',
+      type: 'dinner',
+      name: 'Foreign meal',
+    });
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: foreignMeal.id },
+        body: { productId: recipe.id, sourceType: 'recipe', inputMode: 'portion', inputAmount: 1 },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(404);
+    expect((await getDiaryRepository().getMealById('another-user', foreignMeal.id))?.items).toHaveLength(0);
+  });
+
+  it('rejects recipe quick-entry amounts exceeding the recipe-log portion bound', async () => {
+    const recipe = await createRecipeForDiary();
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: { productId: recipe.id, sourceType: 'recipe', inputMode: 'portion', inputAmount: 51 },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: 'invalid_recipe_portions' });
   });
 });
 

@@ -107,6 +107,7 @@ export interface RecipeExportViewResponse {
 
 export type RecipeIngredientInputMode = 'grams' | 'portion';
 export type RecipeIngredientCategory = 'food' | 'seasoning';
+export type RecipeNutritionSource = 'openFoodFacts' | 'manual' | 'ai' | 'label-scan' | 'unknown';
 
 export interface RecipeIngredient {
   id: string;
@@ -127,6 +128,7 @@ export interface RecipeIngredient {
   linkedReusableItemId: string | null;
   /** True when nutrition was estimated by AI */
   isAiEstimate: boolean;
+  nutritionSource?: RecipeNutritionSource;
   /** AI-assigned classification; omitted on legacy documents and treated as food */
   category?: RecipeIngredientCategory;
   /** Gram weight of one portion — present when the source product has portion info */
@@ -172,7 +174,49 @@ export interface RecipeImage {
 // Recipe
 // ---------------------------------------------------------------------------
 
-export type RecipeVisibility = 'private';
+export type RecipeVisibility = 'private' | 'community';
+export type RecipeAccess = 'owner' | 'community' | 'unavailable';
+
+export interface RecipeCommunityPublication {
+  contentConfirmedAt: string;
+  displayNameConsent: boolean;
+}
+
+export type RecipeVisibilityInput =
+  | { visibility: 'community'; contentConfirmed: true; displayNameConsent: boolean }
+  | { visibility: 'private' };
+
+export type CommunityRecipeIngredient = Omit<RecipeIngredient, 'linkedReusableItemId' | 'linkedProductId'>;
+
+export interface CommunityRecipeImage {
+  id: string;
+  order: number;
+  heroCrop: RecipeImageHeroCrop;
+  url: string;
+}
+
+export interface CommunityRecipe {
+  id: string;
+  name: string;
+  description?: string;
+  portions: number;
+  ingredients: CommunityRecipeIngredient[];
+  steps: RecipeStep[];
+  images: CommunityRecipeImage[];
+  nutritionTotal: RecipeNutrition;
+  nutritionPerPortion: RecipeNutrition;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+  authorDisplayName: string;
+  isOwnRecipe: boolean;
+  ingredientNotices: { containsAiEstimates: boolean; containsManualIngredients: boolean };
+}
+
+export interface CommunityRecipesPage {
+  recipes: CommunityRecipe[];
+  continuationToken?: string;
+}
 
 export interface Recipe extends RecipeExportViewResponse {
   id: string;
@@ -188,9 +232,9 @@ export interface Recipe extends RecipeExportViewResponse {
   nutritionTotal: RecipeNutrition;
   /** Nutrition per single portion (= nutritionTotal / portions) */
   nutritionPerPortion: RecipeNutrition;
-  /** Always 'private' for now — architecture ready for future sharing */
   visibility: RecipeVisibility;
-  /** Future sharing — user IDs explicitly granted access */
+  communityPublication?: RecipeCommunityPublication;
+  /** Reserved for future sharing; does not grant community access. */
   sharedWithUserIds: string[];
   tags: string[];
   /** ISO timestamp of last diary log — used for "Zuletzt verwendet" sorting */

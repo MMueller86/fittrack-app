@@ -376,6 +376,32 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     expect(missingImage.jsonBody).toEqual({ error: 'Image not found' });
   });
 
+  it('does not render a published recipe owned by another user', async () => {
+    const recipe = await createRecipe([{ id: 'image-1', blobName: 'server/blob.png', order: 1 }]);
+    const repo = getRecipesRepository();
+    const current = await repo.getVersioned(TEST_USER_ID, recipe.id);
+    await repo.setVisibility(TEST_USER_ID, recipe.id, current!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+    const token = await signTestToken('different-user');
+
+    const response = await instagramRecipeHandler(
+      makeRequest({
+        params: { id: recipe.id },
+        body: {},
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(downloadRecipeImageMock).not.toHaveBeenCalled();
+    expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
+  });
+
   it('returns controlled 422 errors for missing, invalid, or oversized images', async () => {
     const noImageRecipe = await createRecipe();
     const noImage = await instagramRecipeHandler(await renderRequest(noImageRecipe.id), ctx);
@@ -488,6 +514,33 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
+  });
+
+  it('does not share a published recipe owned by another user', async () => {
+    const { recipe } = await createDraftBundleRecipe();
+    const repo = getRecipesRepository();
+    const current = await repo.getVersioned(TEST_USER_ID, recipe.id);
+    await repo.setVisibility(TEST_USER_ID, recipe.id, current!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+    const token = await signTestToken('different-user');
+
+    const response = await shareBundleHandler(
+      makeRequest({
+        params: { id: recipe.id },
+        body: { exportViewDraft: shareBundleExportDraft },
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(downloadRecipeImageMock).not.toHaveBeenCalled();
+    expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
+    expect(renderInstagramRecipeDetailsTemplateMock).not.toHaveBeenCalled();
   });
 
   it('renders a request-only draft with nullable metadata and does not persist it', async () => {

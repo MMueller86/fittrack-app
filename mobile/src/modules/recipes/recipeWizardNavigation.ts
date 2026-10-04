@@ -6,6 +6,7 @@ export type RecipeDetailNavigationIntent = typeof RECIPE_DETAIL_INTENT_OPEN_LOG_
 
 export type RecipeDetailNavigationParams = {
   id: string;
+  source?: 'community';
   intent?: RecipeDetailNavigationIntent;
   pendingExportDraft?: PendingRecipeExportDraft;
 };

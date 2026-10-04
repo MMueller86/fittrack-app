@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { Icon } from './Icon';
 
 export interface ConfirmSheetAction {
   label: string;
@@ -18,15 +19,22 @@ export interface ConfirmSheetAction {
   destructive?: boolean;
 }
 
+export interface ConfirmSheetCheckbox {
+  label: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
 interface Props {
   visible: boolean;
   title: string;
   subtitle?: string;
   actions: ConfirmSheetAction[];
+  checkbox?: ConfirmSheetCheckbox;
   onClose: () => void;
 }
 
-export function ConfirmSheet({ visible, title, subtitle, actions, onClose }: Props) {
+export function ConfirmSheet({ visible, title, subtitle, actions, checkbox, onClose }: Props) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -44,6 +52,22 @@ export function ConfirmSheet({ visible, title, subtitle, actions, onClose }: Pro
           <Text style={styles.title}>{title}</Text>
           {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
         </View>
+
+        {checkbox ? (
+          <TouchableOpacity
+            style={styles.checkboxRow}
+            onPress={() => checkbox.onChange(!checkbox.checked)}
+            activeOpacity={0.7}
+            accessibilityRole="checkbox"
+            accessibilityLabel={checkbox.label}
+            accessibilityState={{ checked: checkbox.checked }}
+          >
+            <View style={[styles.checkbox, checkbox.checked && styles.checkboxChecked]}>
+              {checkbox.checked ? <Icon lib="feather" name="check" size={14} color={colors.background} /> : null}
+            </View>
+            <Text style={styles.checkboxLabel}>{checkbox.label}</Text>
+          </TouchableOpacity>
+        ) : null}
 
         {/* Divider */}
         <View style={styles.divider} />
@@ -112,6 +136,31 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  checkboxRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: colors.textMuted,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  checkboxLabel: {
+    ...typography.body2,
+    color: colors.text,
+    flex: 1,
   },
   divider: {
     height: 1,

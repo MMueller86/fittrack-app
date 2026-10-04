@@ -89,6 +89,26 @@ describe('buildRecipeWizardEditBootstrapState', () => {
     expect(state.amountEdits).toEqual({ 'ing-1': { mode: 'grams', value: '200' } });
   });
 
+  it('preserves reusable links and unknown legacy provenance in an unchanged edit', () => {
+    const persistedIngredient = makeIngredient({
+      linkedProductId: null,
+      linkedReusableItemId: 'reusable-1',
+      nutritionSource: 'unknown',
+    });
+    const state = buildRecipeWizardEditBootstrapState(makeRecipe({
+      ingredients: [persistedIngredient],
+    }));
+
+    expect(state.ingredients[0]).toMatchObject({
+      parserItem: {
+        selectedProductId: 'reusable-1',
+        selectedProductName: 'Tomaten',
+      },
+      resolvedIngredient: persistedIngredient,
+    });
+    expect(state.ingredients[0]?.resolvedIngredient?.nutritionSource).toBe('unknown');
+  });
+
   it('keeps seasonings confirmed with their kitchen amount label', () => {
     const state = buildRecipeWizardEditBootstrapState(makeRecipe({
       ingredients: [makeIngredient({

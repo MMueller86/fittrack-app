@@ -120,6 +120,7 @@ export function buildWizardExportDraftFromPreparedSuggestion(
 
 export function buildParserItemFromRecipeIngredient(ingredient: RecipeIngredient): MealParserPreviewItem {
   const category = ingredient.category ?? 'food';
+  const linkedFoodId = ingredient.linkedProductId ?? ingredient.linkedReusableItemId;
   return {
     rawText: ingredient.amountLabel
       ? `${ingredient.amountLabel} ${ingredient.displayName}`
@@ -127,8 +128,8 @@ export function buildParserItemFromRecipeIngredient(ingredient: RecipeIngredient
     displayName: ingredient.displayName,
     status: category === 'seasoning' ? 'seasoning' : 'matched',
     category,
-    selectedProductId: ingredient.linkedProductId,
-    selectedProductName: ingredient.linkedProductId ? ingredient.displayName : null,
+    selectedProductId: linkedFoodId,
+    selectedProductName: linkedFoodId ? ingredient.displayName : null,
     candidates: [],
     inputMode: ingredient.inputMode,
     inputAmount: ingredient.inputAmount,

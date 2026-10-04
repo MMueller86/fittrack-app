@@ -31,7 +31,11 @@ Additional fields beyond `FoodSearchResult`:
 - `userId` — owner
 - `searchTerms: string[]` — AI-generated alternative queries for meal parser matching
 - `aiKeywords: string[]` — auto-match keywords for the meal parser
-- `sourceType` — `'manual' | 'label-scan' | 'ai' | 'recipe' | 'openFoodFacts'`
+- `sourceType` — `ReusableItemSourceType`: `'manual' | 'openFoodFacts' | 'ai' | 'label-scan'`; `'recipe'` is not a `ReusableItem` source type
+
+Recipes are represented separately: `UserFoodRelation.foodRefType` may be
+`'recipe'`, and diary `MealItemSourceType` may be `'recipe'`. Neither adds
+`'recipe'` to `ReusableItemSourceType`.
 
 Users save items to their library via:
 - Manual creation
@@ -86,12 +90,24 @@ The meal parser may automatically assign a candidate only when its normalized na
 
 Core fields:
 - `userId`, `foodRef` (item ID), `foodRefType: 'catalog' | 'personal' | 'recipe'`
+- `recipeAccess?` — response-only current access for recipe references: `'owner' | 'community' | 'unavailable'`
 - `isFavorite: boolean` — marks an item as a Quick Entry
 - `displayName`, `displayBrand`, `imageUrl` — denormalized for instant display without API lookups
 
 Nutrition denormalization (stored at time of favoriting, enables instant QuantityView):
 - `nutritionPer100g?: NutritionValues` — macros per 100g
 - `portion?: PortionInfo` — portion label + weightGrams
+
+Recipe relations are references, not cached food products. Favorites,
+grouped favorites, recent, and frequent-item reads project the current
+`recipeAccess: 'owner' | 'community' | 'unavailable'` and strip stale recipe
+nutrition/image caches. Mobile loads the current owner or community recipe
+before showing a portion preview and logs it through
+`POST /api/recipes/{id}/log`; an unavailable reference cannot be opened or
+logged again, but the user's favorite relation can still be removed. Adding a
+recipe favorite validates current access and stores only that user's
+reference; client-supplied recipe metadata does not grant access or create a
+recipe/food copy.
 
 Usage tracking:
 - `lastUsedAt`, `usageCount` — recency and frequency
@@ -116,12 +132,13 @@ Favorites (Quick Entries) are sorted for display using `computeRelevanceOrder()`
 
 ### API
 
-- `GET /api/favorites` — all favorites, sorted by displayName
+- `GET /api/favorites` — all favorites, sorted by displayName; recipe references include current `recipeAccess` and no stale recipe caches
 - `GET /api/favorites?context=MealType&localDate=YYYY-MM-DD` — favorites ranked for a meal context; `localDate` is a required real local reference date
 - `GET /api/favorites/grouped` — favorites pre-grouped into `{ ungrouped, groups, all }` (used by legacy IdleState; flat `all` used by current hub)
-- `POST /api/favorites` — upsert a favorite; stores `nutritionPer100g`, `portion`, `favoritedAt`
-- `DELETE /api/favorites/{foodRef}` — removes favorite (sets `isFavorite: false`)
+- `POST /api/favorites` — upsert a favorite; food references store nutrition/portion caches, while a recipe reference must currently resolve as owner or community and stores no recipe caches
+- `DELETE /api/favorites/{foodRef}` — removes the user's favorite even when a recipe reference is unavailable
 - `GET /api/food-relations/recent` — top N items sorted by `lastUsedAt` DESC
+- `GET /api/food-relations/frequent` — top N items by usage; recipe references include current access projection
 
 ## Badge Semantics
 

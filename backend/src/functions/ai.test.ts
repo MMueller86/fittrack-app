@@ -1413,6 +1413,29 @@ describe('POST /api/ai/recipe-scale/preview', () => {
     expect(enforceQuota).not.toHaveBeenCalled();
   });
 
+  it('does not scale a community recipe owned by another user', async () => {
+    const recipe = await createRecipeForScale('publisher');
+    const repository = getRecipesRepository();
+    const current = await repository.getVersioned('publisher', recipe.id);
+    await repository.setVisibility('publisher', recipe.id, current!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+
+    const response = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions: 2 } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(create).not.toHaveBeenCalled();
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
   it('projects stored ingredients on the server and does not persist the preview', async () => {
     const recipe = await createRecipeForScale();
     const originalSnapshot = JSON.parse(JSON.stringify(recipe));

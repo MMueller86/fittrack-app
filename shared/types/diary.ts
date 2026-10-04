@@ -2,6 +2,7 @@
 
 import type { FoodCategory } from './foodCategory';
 import type { HintResult } from './hint';
+import type { RecipeAccess } from './recipes';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'preworkout' | 'postworkout';
 export type MealItemSourceType = 'manual' | 'reusableItem' | 'openFoodFacts' | 'ai' | 'ai-meal-estimate' | 'recipe';
@@ -60,6 +61,7 @@ export interface MealItem {
   recipeId?: string;
   /** Number of portions logged (may be fractional, e.g. 0.5) */
   recipePortions?: number;
+  recipeAccess?: RecipeAccess;
   /**
    * Optional food category for hint engine and future analytics.
    * Not required — hints for categories only activate when at least one item has a category.

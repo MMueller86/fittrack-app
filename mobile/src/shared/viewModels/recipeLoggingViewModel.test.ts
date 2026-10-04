@@ -7,6 +7,8 @@ import {
   selectMealForType,
   scaleNutritionByPortions,
   selectCanonicalMeal,
+  loadRecipeForRelation,
+  isRecipeUnavailableError,
   submitRecipeLog,
   type MealSelection,
 } from './recipeLoggingViewModel';
@@ -196,5 +198,77 @@ describe('submitRecipeLog', () => {
     expect(getDiary).not.toHaveBeenCalled();
     expect(createMeal).not.toHaveBeenCalled();
     expect(logRecipe).not.toHaveBeenCalled();
+  });
+
+  it('uses the exact selected meal when it is present in the current diary day', async () => {
+    const breakfastMeal = meal('breakfast-1', 'breakfast');
+    const selectedMeal = meal('selected-dinner', 'dinner');
+    const getDiary = vi.fn().mockResolvedValue({ meals: [breakfastMeal, selectedMeal] });
+    const createMeal = vi.fn();
+    const logRecipe = vi.fn().mockResolvedValue({ id: 'logged' });
+
+    const submission = await submitRecipeLog({ ...input, mealId: 'selected-dinner' }, {
+      getDiary,
+      createMeal,
+      logRecipe,
+    });
+
+    expect(submission.meal).toBe(selectedMeal);
+    expect(createMeal).not.toHaveBeenCalled();
+    expect(logRecipe).toHaveBeenCalledWith('recipe-1', { portions: 1.5, mealId: 'selected-dinner' });
+  });
+});
+
+describe('loadRecipeForRelation', () => {
+  const recipe = {
+    id: 'recipe-1',
+    name: 'Linsensuppe',
+    nutritionPerPortion: nutrition,
+  };
+
+  it('loads owner and community references through their authorized detail routes', async () => {
+    const getOwnedRecipe = vi.fn().mockResolvedValue(recipe);
+    const getCommunityRecipe = vi.fn().mockResolvedValue(recipe);
+    const dependencies = { getOwnedRecipe, getCommunityRecipe };
+
+    await expect(loadRecipeForRelation({
+      foodRef: 'recipe-1',
+      foodRefType: 'recipe',
+      recipeAccess: 'owner',
+    }, dependencies)).resolves.toEqual(recipe);
+    await expect(loadRecipeForRelation({
+      foodRef: 'recipe-1',
+      foodRefType: 'recipe',
+      recipeAccess: 'community',
+    }, dependencies)).resolves.toEqual(recipe);
+
+    expect(getOwnedRecipe).toHaveBeenCalledTimes(1);
+    expect(getOwnedRecipe).toHaveBeenCalledWith('recipe-1');
+    expect(getCommunityRecipe).toHaveBeenCalledTimes(1);
+    expect(getCommunityRecipe).toHaveBeenCalledWith('recipe-1');
+  });
+
+  it.each([
+    { foodRefType: 'recipe' as const, recipeAccess: 'unavailable' as const },
+    { foodRefType: 'recipe' as const, recipeAccess: undefined },
+    { foodRefType: 'personal' as const, recipeAccess: undefined },
+  ])('does not load an inaccessible or non-recipe reference: %o', async (relation) => {
+    const getOwnedRecipe = vi.fn();
+    const getCommunityRecipe = vi.fn();
+
+    await expect(loadRecipeForRelation({ foodRef: 'ref-1', ...relation }, {
+      getOwnedRecipe,
+      getCommunityRecipe,
+    })).resolves.toBeNull();
+    expect(getOwnedRecipe).not.toHaveBeenCalled();
+    expect(getCommunityRecipe).not.toHaveBeenCalled();
+  });
+});
+
+describe('isRecipeUnavailableError', () => {
+  it('only treats an explicit missing-recipe response as revoked or deleted access', () => {
+    expect(isRecipeUnavailableError({ response: { data: { error: 'Recipe not found' } } })).toBe(true);
+    expect(isRecipeUnavailableError({ response: { data: { error: 'Meal not found' } } })).toBe(false);
+    expect(isRecipeUnavailableError(new Error('Network error'))).toBe(false);
   });
 });

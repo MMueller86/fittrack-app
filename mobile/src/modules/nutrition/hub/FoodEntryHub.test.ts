@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { computeLastUsageText, computeMacroText, computeDirectAddLabel } from './FoodEntryHub.utils';
+import {
+  canSelectFoodRelation,
+  computeLastUsageText,
+  computeMacroText,
+  computeDirectAddLabel,
+} from './FoodEntryHub.utils';
+import { canToggleFavorite, isUnavailableRecipeRelation } from './RelationRow.utils';
 import type { UserFoodRelation } from '@fittrack/shared';
 
 function makeItem(overrides: Partial<UserFoodRelation>): UserFoodRelation {
@@ -188,5 +194,62 @@ describe('computeDirectAddLabel', () => {
       nutritionPer100g: { calories: 200, protein: 10, carbs: 20, fat: 5 },
     });
     expect(computeDirectAddLabel(item, 'fuerDich')).toBe('182 g');
+  });
+
+  it('shows recipe portion direct-add without relying on cached nutrition', () => {
+    const item = makeItem({
+      foodRefType: 'recipe',
+      recipeAccess: 'community',
+      preferredInputMode: 'portion',
+      preferredInputAmount: 1.5,
+      nutritionPer100g: undefined,
+    });
+
+    expect(computeDirectAddLabel(item, 'fuerDich')).toBe('1.5 Portionen');
+  });
+
+  it('hides direct-add for unavailable or non-portion recipe references', () => {
+    const unavailable = makeItem({
+      foodRefType: 'recipe',
+      recipeAccess: 'unavailable',
+      preferredInputMode: 'portion',
+      preferredInputAmount: 1,
+    });
+    const gramsMode = makeItem({
+      foodRefType: 'recipe',
+      recipeAccess: 'owner',
+      preferredInputMode: 'grams',
+      preferredInputAmount: 100,
+    });
+
+    expect(computeDirectAddLabel(unavailable, 'fuerDich')).toBeNull();
+    expect(computeDirectAddLabel(gramsMode, 'fuerDich')).toBeNull();
+  });
+});
+
+describe('recipe relation selection', () => {
+  it('blocks recipe references in ingredient context and keeps food references selectable', () => {
+    const recipe = makeItem({ foodRefType: 'recipe', recipeAccess: 'community' });
+    const food = makeItem({ foodRefType: 'personal' });
+
+    expect(canSelectFoodRelation(recipe, false)).toBe(true);
+    expect(canSelectFoodRelation(recipe, true)).toBe(false);
+    expect(canSelectFoodRelation(food, true)).toBe(true);
+  });
+
+  it('fails closed for unavailable and unclassified recipe references', () => {
+    const unavailable = makeItem({ foodRefType: 'recipe', recipeAccess: 'unavailable' });
+    const unclassified = makeItem({ foodRefType: 'recipe', recipeAccess: undefined });
+
+    expect(isUnavailableRecipeRelation(unavailable)).toBe(true);
+    expect(isUnavailableRecipeRelation(unclassified)).toBe(true);
+    expect(canSelectFoodRelation(unavailable, false)).toBe(false);
+  });
+
+  it('allows removing an unavailable favorite but never adding one', () => {
+    const unavailable = makeItem({ foodRefType: 'recipe', recipeAccess: 'unavailable' });
+
+    expect(canToggleFavorite(unavailable, true)).toBe(true);
+    expect(canToggleFavorite(unavailable, false)).toBe(false);
   });
 });

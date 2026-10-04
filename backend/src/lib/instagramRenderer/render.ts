@@ -849,12 +849,11 @@ function validateRecipeDetailsTemplate(
   ) {
     return invalidTemplateInput(
       "ingredients",
-      `ingredients must contain 1 to ${RECIPE_DETAILS_TEMPLATE_MAX_INGREDIENTS} visible entries with amounts up to 16 and names up to 36 characters.`,
+      `ingredients must contain 1 to ${RECIPE_DETAILS_TEMPLATE_MAX_INGREDIENTS} visible entries with single-line amounts and names up to 36 characters.`,
     );
   }
   const invalidIngredientIndex = input.ingredients.findIndex((ingredient) =>
     ingredient.amount.trim().length === 0 ||
-    ingredient.amount.trim().length > 16 ||
     ingredient.name.trim().length === 0 ||
     ingredient.name.trim().length > 36 ||
     /[\r\n\u2028\u2029]/u.test(ingredient.amount) ||
@@ -864,7 +863,6 @@ function validateRecipeDetailsTemplate(
     const ingredient = input.ingredients[invalidIngredientIndex]!;
     const itemField =
       ingredient.amount.trim().length === 0 ||
-      ingredient.amount.trim().length > 16 ||
       /[\r\n\u2028\u2029]/u.test(ingredient.amount)
         ? "amount"
         : "name";

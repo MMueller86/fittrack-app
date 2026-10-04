@@ -30,7 +30,7 @@ infra/
 | Log Analytics Workspace | `appinsights.bicep` | |
 | Application Insights | `appinsights.bicep` | |
 | App Service Plan | `functionapp.bicep` | Consumption (serverless) |
-| Function App | `functionapp.bicep` | Node.js 20, TypeScript build output |
+| Function App | `functionapp.bicep` | Node.js 22, TypeScript build output |
 | Document Intelligence | `documentintelligence.bicep` | F0 for dev, S0 for alpha/prod |
 
 **Not in IaC:**
@@ -185,7 +185,8 @@ which creates a new Function App rather than changing this Y1 app in place.
 `_deploy_staging/package.json` is a production-only Node 22 manifest. It
 contains the backend runtime packages and the renderer packages
 `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static ~1.46.0`,
-`@tabler/icons ~3.46.0`, and `sharp ^0.34.5`. `pixelmatch`, TypeScript,
+`@tabler/icons ~3.46.0`, `sharp ^0.34.5`, and `hyphen ^1.14.1` for German
+detail-text hyphenation. `pixelmatch`, TypeScript,
 Vitest, and type packages remain in the backend workspace for tests and builds;
 they are not installed in production staging. The staging lockfile is generated
 from this manifest. The standard Windows-to-Linux release uses the Azure Oryx
@@ -200,10 +201,10 @@ download of the selected recipe image. It does not expose a SAS URL as part of
 the render path, so the deployed Function must retain the existing storage
 application setting and must not be replaced by a public image fetch.
 
-The production staging package contains exactly the five renderer runtime
+The production staging package contains exactly the six renderer runtime
 packages listed above. `pixelmatch`, TypeScript, Vitest, and type packages stay
 outside the production staging dependency set. The deterministic build step
-copies exactly nine renderer assets from
+copies exactly ten renderer assets from
 `backend/src/lib/instagramRenderer/assets/` to
 `backend/dist/backend/src/lib/instagramRenderer/assets/`; the compiled
 renderer resolves them through `__dirname/assets`.
@@ -244,7 +245,7 @@ robocopy "backend\dist" "_deploy_staging\dist" /MIR /NFL /NDL /NJH /NJS
 Test-Path "_deploy_staging\dist\backend\src\functions\specialActivity.js"
 Test-Path "_deploy_staging\dist\backend\src\functions\instagramRecipe.js"
 Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\LICENSE.txt"
-# For renderer releases, also verify all nine files from the asset manifest.
+# For renderer releases, also verify all ten files from the asset manifest.
 
 # 4. Deploy — always from _deploy_staging/, never from backend/.
 #    Oryx installs production dependencies on Linux; this is required for

@@ -37,6 +37,19 @@ export function trimUsageDates(
     .filter((e) => e.date >= firstDate && e.date <= referenceDate);
 }
 
+export function stripRecipeRelationCache(relation: UserFoodRelation): UserFoodRelation {
+  const {
+    displayBrand: _displayBrand,
+    imageUrl: _imageUrl,
+    nutritionPer100g: _nutritionPer100g,
+    portion: _portion,
+    isComplete: _isComplete,
+    recipeAccess: _recipeAccess,
+    ...safeRelation
+  } = relation;
+  return safeRelation;
+}
+
 export interface UserFoodRelationRepository {
   /**
    * Erstellt einen neuen Eintrag oder aktualisiert Anzeigeinformationen.
@@ -52,7 +65,7 @@ export interface UserFoodRelationRepository {
     displayName: string,
     displayBrand: string | undefined,
     isFavorite: boolean,
-    imageUrl?: string,
+    imageUrl?: string | null,
     nutritionPer100g?: NutritionValues,
     portion?: PortionInfo | null,
   ): Promise<UserFoodRelation>;
@@ -141,16 +154,21 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
     portion?: PortionInfo | null,
   ): Promise<UserFoodRelation> {
     const existing = this.store.get(this.key(userId, foodRef));
-    const relation: UserFoodRelation = existing
+    const isRecipe = foodRefType === 'recipe';
+    const safeExisting = existing && isRecipe ? stripRecipeRelationCache(existing) : existing;
+    const relation: UserFoodRelation = safeExisting
       ? {
-          ...existing,
+          ...safeExisting,
+          foodRefType,
           isFavorite,
           displayName,
-          displayBrand,
-          ...(imageUrl !== undefined ? { imageUrl } : {}),
-          ...(nutritionPer100g !== undefined ? { nutritionPer100g } : {}),
-          ...(portion !== undefined ? { portion } : {}),
-          ...(isFavorite && !existing.favoritedAt ? { favoritedAt: new Date().toISOString() } : {}),
+          ...(!isRecipe ? {
+            displayBrand,
+            ...(imageUrl !== undefined ? { imageUrl } : {}),
+            ...(nutritionPer100g !== undefined ? { nutritionPer100g } : {}),
+            ...(portion !== undefined ? { portion } : {}),
+          } : {}),
+          ...(isFavorite && !safeExisting.favoritedAt ? { favoritedAt: new Date().toISOString() } : {}),
         }
       : {
           id: `${userId}:${foodRef}`,
@@ -158,11 +176,13 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
           foodRef,
           foodRefType,
           displayName,
-          displayBrand,
           isFavorite,
-          ...(imageUrl ? { imageUrl } : {}),
-          ...(nutritionPer100g ? { nutritionPer100g } : {}),
-          ...(portion != null ? { portion } : {}),
+          ...(!isRecipe ? {
+            displayBrand,
+            ...(imageUrl ? { imageUrl } : {}),
+            ...(nutritionPer100g ? { nutritionPer100g } : {}),
+            ...(portion != null ? { portion } : {}),
+          } : {}),
           ...(isFavorite ? { favoritedAt: new Date().toISOString() } : {}),
           lastUsedAt: null,
           usageCount: 0,
@@ -197,7 +217,10 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
       throw new Error('usageDate is required for recordUsage');
     }
 
-    const existing = this.store.get(this.key(userId, input.foodRef));
+    const storedExisting = this.store.get(this.key(userId, input.foodRef));
+    const existing = storedExisting && input.foodRefType === 'recipe'
+      ? stripRecipeRelationCache(storedExisting)
+      : storedExisting;
     const now = new Date().toISOString();
 
     // Fix C: drop mealTypeCounts from existing doc spread (self-cleaning)
@@ -206,11 +229,12 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
       const { mealTypeCounts: _dropped, ...existingWithoutLegacy } = existing as UserFoodRelation & { mealTypeCounts?: unknown };
       relation = {
         ...existingWithoutLegacy,
+        foodRefType: input.foodRefType,
         lastUsedAt: now,
         usageCount: existing.usageCount + 1,
         displayName: input.displayName,
-        displayBrand: input.displayBrand,
-        ...(input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
+        ...(input.foodRefType !== 'recipe' ? { displayBrand: input.displayBrand } : {}),
+        ...(input.foodRefType !== 'recipe' && input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
         ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
         ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
       };
@@ -222,7 +246,7 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
         foodRef: input.foodRef,
         foodRefType: input.foodRefType,
         displayName: input.displayName,
-        displayBrand: input.displayBrand,
+        ...(input.foodRefType !== 'recipe' ? { displayBrand: input.displayBrand } : {}),
         isFavorite: false,
         lastUsedAt: now,
         usageCount: 1,

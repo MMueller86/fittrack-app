@@ -15,11 +15,14 @@ import type {
   RecipeStep,
   RecipeImage,
   RecipeNutrition,
+  RecipeVisibilityInput,
 } from '@fittrack/shared';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosRecipesRepository } from './cosmosRecipesRepository';
 import { withRecipeExportViewStatus } from './recipeExport';
+import { applyRecipeVisibility, communityPageSize, effectiveRecipeVisibility } from './recipePublication';
+import { resolveRecipeIngredientProvenance } from './recipeIngredientProvenance';
 
 // ---------------------------------------------------------------------------
 // Input types
@@ -59,12 +62,24 @@ export interface ListRecipesOptions {
   limit?: number;
 }
 
+export interface ListCommunityRecipesOptions {
+  limit?: number;
+  continuationToken?: string;
+}
+
+export interface CommunityRecipeRepositoryPage {
+  recipes: Recipe[];
+  continuationToken?: string;
+}
+
 function withEffectiveRecipeProjection(recipe: Recipe): Recipe {
   return withRecipeExportViewStatus({
-    ...recipe,
-    images: recipe.images.map((image) => ({
-      ...image,
-      heroCrop: image.heroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP,
+    ...structuredClone(recipe),
+    visibility: effectiveRecipeVisibility(recipe.visibility),
+    sharedWithUserIds: structuredClone(recipe.sharedWithUserIds ?? []),
+    images: recipe.images.map(({ id, blobName, order, heroCrop }) => ({
+      id, blobName, order,
+      heroCrop: structuredClone(heroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP),
     })),
   });
 }
@@ -75,6 +90,9 @@ function withEffectiveRecipeProjection(recipe: Recipe): Recipe {
 
 export interface RecipesRepository {
   list(userId: string, opts?: ListRecipesOptions): Promise<Recipe[]>;
+  listCommunity(opts?: ListCommunityRecipesOptions): Promise<CommunityRecipeRepositoryPage>;
+  getCommunityById(id: string): Promise<Recipe | null>;
+  setVisibility(userId: string, id: string, expectedEtag: string, input: RecipeVisibilityInput): Promise<VersionedRecipe | null>;
   get(userId: string, id: string): Promise<Recipe | null>;
   getVersioned(userId: string, id: string): Promise<VersionedRecipe | null>;
   create(userId: string, input: CreateRecipeInput): Promise<Recipe>;
@@ -102,6 +120,38 @@ class InMemoryRecipesRepository implements RecipesRepository {
     return `${userId}:${id}`;
   }
 
+  async getCommunityById(id: string): Promise<Recipe | null> {
+    const matches = [...this.store.values()].filter(({ recipe }) => recipe.id === id);
+    return matches.length === 1 && matches[0].recipe.visibility === 'community'
+      ? withEffectiveRecipeProjection(matches[0].recipe) : null;
+  }
+
+  async listCommunity(opts: ListCommunityRecipesOptions = {}): Promise<CommunityRecipeRepositoryPage> {
+    const limit = communityPageSize(opts.limit);
+    const offset = opts.continuationToken === undefined ? 0 : Number(opts.continuationToken);
+    if (!Number.isSafeInteger(offset) || offset < 0 || (opts.continuationToken !== undefined && String(offset) !== opts.continuationToken)) {
+      throw new Error('Invalid community continuation token');
+    }
+    const all = [...this.store.values()].map(({ recipe }) => recipe)
+      .filter((recipe) => recipe.visibility === 'community')
+      .filter((recipe) => [...this.store.values()].filter((record) => record.recipe.id === recipe.id).length === 1)
+      .sort((first, second) => second.updatedAt.localeCompare(first.updatedAt));
+    return {
+      recipes: all.slice(offset, offset + limit).map(withEffectiveRecipeProjection),
+      ...(offset + limit < all.length ? { continuationToken: String(offset + limit) } : {}),
+    };
+  }
+
+  async setVisibility(userId: string, id: string, expectedEtag: string, input: RecipeVisibilityInput): Promise<VersionedRecipe | null> {
+    const key = this.key(userId, id);
+    const existing = this.store.get(key);
+    if (!existing || existing.etag !== expectedEtag) return null;
+    const recipe = applyRecipeVisibility(existing.recipe, input);
+    const record = { recipe, etag: `"${randomUUID()}"` };
+    this.store.set(key, record);
+    return { recipe: withEffectiveRecipeProjection(recipe), etag: record.etag };
+  }
+
   async list(userId: string, opts?: ListRecipesOptions): Promise<Recipe[]> {
     const all: Recipe[] = [];
     for (const { recipe } of this.store.values()) {
@@ -127,6 +177,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
   }
 
   async createVersioned(userId: string, input: CreateRecipeInput): Promise<VersionedRecipe> {
+    const ingredients = await resolveRecipeIngredientProvenance(userId, input.ingredients);
     const now = new Date().toISOString();
     const recipe: Recipe = {
       id: randomUUID(),
@@ -134,7 +185,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
       name: input.name,
       description: input.description,
       portions: input.portions,
-      ingredients: input.ingredients,
+      ingredients,
       steps: input.steps,
       images: [],
       nutritionTotal: input.nutritionTotal,
@@ -147,7 +198,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
       createdAt: now,
       updatedAt: now,
     };
-    const record = { recipe, etag: `"${randomUUID()}"` };
+    const record = { recipe: structuredClone(recipe), etag: `"${randomUUID()}"` };
     this.store.set(this.key(userId, recipe.id), record);
     return { recipe: withEffectiveRecipeProjection(recipe), etag: record.etag };
   }
@@ -180,12 +231,24 @@ class InMemoryRecipesRepository implements RecipesRepository {
     const existing = this.store.get(key);
     if (!existing || existing.etag !== expectedEtag) return null;
 
+    const ingredients = input.ingredients === undefined ? existing.recipe.ingredients
+      : await resolveRecipeIngredientProvenance(userId, input.ingredients, existing.recipe.ingredients);
+    if (this.store.get(key)?.etag !== expectedEtag) return null;
     const recipe: Recipe = {
       ...existing.recipe,
       ...input,
+      id: existing.recipe.id,
+      ownerUserId: existing.recipe.ownerUserId,
+      visibility: effectiveRecipeVisibility(existing.recipe.visibility),
+      communityPublication: existing.recipe.communityPublication,
+      sharedWithUserIds: existing.recipe.sharedWithUserIds,
+      ingredients,
+      images: (input.images ?? existing.recipe.images).map(({ id: imageId, blobName, order, heroCrop }) => ({
+        id: imageId, blobName, order, ...(heroCrop !== undefined ? { heroCrop } : {}),
+      })),
       updatedAt: new Date().toISOString(),
     };
-    const record = { recipe, etag: `"${randomUUID()}"` };
+    const record = { recipe: structuredClone(recipe), etag: `"${randomUUID()}"` };
     this.store.set(key, record);
     return { recipe: withEffectiveRecipeProjection(recipe), etag: record.etag };
   }
@@ -201,6 +264,7 @@ class InMemoryRecipesRepository implements RecipesRepository {
     const now = new Date().toISOString();
     const recipe: Recipe = {
       ...existing.recipe,
+      visibility: effectiveRecipeVisibility(existing.recipe.visibility),
       usageCount: existing.recipe.usageCount + 1,
       lastUsedAt: now,
       updatedAt: now,

@@ -16,12 +16,53 @@
 | `images` | `RecipeImage[]` | Blob references and hero presentation metadata |
 | `nutritionTotal` | `RecipeNutrition` | Aggregate nutrition for the full recipe |
 | `nutritionPerPortion` | `RecipeNutrition` | Nutrition for one portion |
-| `visibility` | `'private'` | Current recipes are private |
-| `sharedWithUserIds` | `string[]` | Reserved for future sharing; currently empty |
+| `visibility` | `'private' | 'community'` | New recipes default to private; missing legacy values are read as private |
+| `communityPublication?` | `RecipeCommunityPublication` | Content-confirmation timestamp and per-recipe display-name consent |
+| `sharedWithUserIds` | `string[]` | Reserved; does not grant access |
 | `tags` | `string[]` | Recipe tags |
 | `usageCount` | `number` | How many times added to diary |
 | `lastUsedAt` | `string?` | ISO timestamp of last diary log |
 | `createdAt`, `updatedAt` | `string` | ISO timestamps |
+
+## Visibility and Community Publication
+
+Only the owner can change visibility. New recipes and legacy documents without
+visibility are private. `sharedWithUserIds` is reserved and does not enable
+sharing. Publication uses the dedicated `PUT /api/recipes/{id}/visibility`
+route; ordinary create/update requests cannot set visibility or publication
+metadata.
+
+Publishing requires explicit confirmation that recipe text, ingredients,
+preparation steps, and images will be visible to signed-in FitTrack users. The
+separate display-name consent is per recipe and starts unchecked in Mobile.
+Only when it is true does the community projection read the owner's current
+profile `displayName`; otherwise, or when no display name is available, the
+author is exactly `Anonymous`. No owner ID or other profile data is included in
+the community response. Setting a recipe private removes its publication
+record and prevents other users from loading it through community routes or
+using an old favorite to open/log it. The owner retains ordinary access.
+
+The authenticated community list is paginated. Community detail uses a safe
+`CommunityRecipe` projection: ingredient product/library link IDs and owner
+identifiers are omitted; ingredient provenance and derived AI/manual notices
+are retained without claiming that FitTrack verified nutrition. Unknown
+provenance is not described as manual or verified. Community image URLs point
+to the authenticated image-bytes route, not a SAS URL; that route rechecks
+current publication access on every request. Owner-only recipe routes continue
+to use their existing access rules and image contract. Existing diary logs are
+snapshots of the server's current recipe name, logged portions, and scaled
+nutrition; later edits, privacy changes, or deletion do not rewrite them.
+
+These publication and provenance fields use the existing `recipes` document
+and container. No new container, partition-key change, global backfill,
+migration, or Bicep change is part of this feature. The Cosmos-emulator
+repository contract gate remains `UNVERIFIED`; this documentation is not a
+QA-acceptance or release claim. See [tech/09-api-reference.md](../tech/09-api-reference.md)
+for request/response shapes and the owner/community route matrix.
+
+### Nutrition Provenance Compatibility
+
+`RecipeNutritionSource` is `'openFoodFacts' | 'manual' | 'ai' | 'label-scan' | 'unknown'`. `nutritionSource` is backend-resolved response data, not a client-owned write field. The resolver uses linked catalog/reusable-item data and the AI flag where available. If an edit preserves the ingredient ID, source links, AI flag, and nutrition basis, stored provenance is retained, including `unknown`. Legacy unknown provenance is not inferred from current catalog contents or relabeled as manual. Contradictory source links or AI/provenance flags are rejected; unknown provenance does not produce a manual-origin notice.
 
 ## Ingredients
 
@@ -36,6 +77,7 @@
 - `linkedProductId` — reference to a catalog product, or `null`
 - `linkedReusableItemId` — reference to a reusable item, or `null`
 - `isAiEstimate` — true when nutrition was estimated by AI
+- `nutritionSource?` — server-resolved origin (`openFoodFacts`, `manual`, `ai`, `label-scan`, or `unknown`); this is response data, not a client-owned request field
 - `category?: 'food' | 'seasoning'` — optional classification; omitted on historical food documents and treated as `food`
 - `portionWeightGrams?`, `portionLabel?` — optional source-portion display data
 - `nutritionPer100g` — nutrient basis used for recalculation on edit
@@ -44,6 +86,8 @@
 Nutrition for each ingredient is calculated from `amountGrams / 100 × nutritionPer100g`. A seasoning or any ingredient with `amountGrams: null` contributes zero.
 
 `kitchenAmountText` belongs exclusively to the AI analysis contract; the persistent `RecipeIngredient` field is `amountLabel`.
+
+[Rule] A recipe ingredient links to at most one source: catalog items use `linkedProductId`, reusable library items use `linkedReusableItemId`, and unlinked AI estimates use `isAiEstimate: true`. The backend resolves `nutritionSource` from these references and flags. Legacy ingredients with unknown provenance remain unknown when edited without changing their nutrition origin.
 
 [Rule] During recipe analysis, every `food` ingredient with a determinable quantity must have a positive finite `amountGrams` value. Kitchen units such as tablespoons, teaspoons, millilitres, and pieces are converted before catalog resolution. A genuinely indeterminate food amount, such as unmeasured spray oil, must retain `amountGrams: null`; a tiny positive placeholder is not a measurement. It is routed to manual review and must be resolved or removed before persistence.
 
@@ -207,6 +251,16 @@ detail PNG intentionally omits difficulty even when it is known. These are
 presentation-only distinctions and do not change confirmed export data or
 ordinary recipe fields.
 
+Ingredient amounts retain the complete adapter-formatted label, including
+serving labels such as `3 1 portion (10 g)`. There is no fixed 16-character
+amount limit, shortening, translation, or parsing/conversion of label strings.
+Existing numeric formatting and the grams fallback remain unchanged. Amounts
+must still be non-empty and single-line; other field limits, production fonts,
+and canvas dimensions are unchanged. Labels longer than 16 characters succeed
+only when the existing measured width and height checks pass; genuine overflow
+returns `TEMPLATE_FIELD_OVERFLOW` with the ingredient index and affected field.
+This is rendering-only and does not change recipe data or nutrition.
+
 Title, teaser, ingredient amount/name, and preparation text wrap at word
 boundaries; an overwide word may break only at a valid German hyphenation
 point. Candidate breaks are measured with the production font, including any
@@ -252,6 +306,14 @@ the user back to the wizard.
 There is no top-level recipe notes field and no step-level notes field in the persistent recipe contract. Historical notes are stripped from API responses and cleaned lazily on the next recipe update. No global Cosmos migration is required.
 
 ## Recipe Images
+
+Owner-scoped recipe routes return short-lived read-only SAS URLs. Community
+DTOs do not expose `blobName` or a SAS token: each image `url` is the
+authenticated `GET /api/community-recipes/{recipeId}/images/{imageId}` route,
+which streams bounded JPEG/PNG bytes with `Cache-Control: no-store` and
+rechecks that the recipe is still published. Switching to private blocks
+subsequent community image requests; it cannot revoke copies already
+downloaded by another user.
 
 `RecipeImage`:
 - `id` — image identity within the recipe
@@ -326,16 +388,19 @@ Opening the dialog reads the current diary day but does not mutate it. On final 
 
 ## API
 
-- `GET /api/recipes` — list all user recipes
-- `POST /api/recipes` — create recipe
-- `GET /api/recipes/{id}` — get by ID
-- `PUT /api/recipes/{id}` — partial update; server recalculates nutrition from ingredients/portions
-- `DELETE /api/recipes/{id}` — delete
-- `POST /api/recipes/{id}/images` — upload one JPEG/PNG image and append it
-- `PUT /api/recipes/{id}/images/order` — reorder existing images by complete unique image-ID permutation
-- `DELETE /api/recipes/{id}/images/{imageId}` — delete one image and compact order
-- `POST /api/recipes/{id}/log` — log one or more recipe portions into a diary meal
-- `POST /api/recipes/{id}/log` — log one or more recipe portions into a diary meal
+- `GET /api/recipes` — list the authenticated user's recipes
+- `POST /api/recipes` — create a private recipe
+- `GET /api/recipes/{id}` — get an owner recipe by ID
+- `PUT /api/recipes/{id}` — partial owner update; server recalculates nutrition from ingredients/portions
+- `PUT /api/recipes/{id}/visibility` — owner-only explicit private/community transition
+- `DELETE /api/recipes/{id}` — delete an owner recipe
+- `GET /api/community-recipes?limit=&continuationToken=` — paginated list of currently published recipes for authenticated users
+- `GET /api/community-recipes/{id}` — safe community detail projection
+- `GET /api/community-recipes/{id}/images/{imageId}` — authenticated image bytes; not a SAS URL
+- `POST /api/recipes/{id}/images` — upload one JPEG/PNG image and append it to an owner recipe
+- `PUT /api/recipes/{id}/images/order` — reorder owner images by complete unique image-ID permutation
+- `DELETE /api/recipes/{id}/images/{imageId}` — delete one owner image and compact order
+- `POST /api/recipes/{id}/log` — server-resolved owner/community recipe log with a historical nutrition snapshot
 - `POST /api/recipes/{id}/share-bundle` — render an atomic Instagram/detail PNG pair from a confirmed export view, including stale snapshots
 
 ## Related Documents

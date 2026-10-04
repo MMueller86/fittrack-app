@@ -31,9 +31,10 @@ import { nutritionSyncService } from '../../services/health/nutritionSyncService
 
 interface Props {
   visible: boolean;
-  recipe: Recipe;
+  recipe: Pick<Recipe, 'id' | 'name' | 'nutritionPerPortion'>;
   onClose: () => void;
   onLogged: () => void;
+  onUnavailable?: () => void;
 }
 
 const QUICK_PORTIONS = [0.5, 1, 1.5, 2] as const;
@@ -56,7 +57,18 @@ function isoToday(): string {
   return getLocalIsoDate();
 }
 
-export default function LogRecipeModal({ visible, recipe, onClose, onLogged }: Props) {
+function isRecipeUnavailable(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('response' in error)) return false;
+  const response = error.response;
+  if (typeof response !== 'object' || response === null || !('data' in response)) return false;
+  const data = response.data;
+  return typeof data === 'object'
+    && data !== null
+    && 'error' in data
+    && data.error === 'Recipe not found';
+}
+
+export default function LogRecipeModal({ visible, recipe, onClose, onLogged, onUnavailable }: Props) {
   const [portions, setPortions] = useState(1);
   const [customPortions, setCustomPortions] = useState('');
   const [useCustom, setUseCustom] = useState(false);
@@ -143,7 +155,12 @@ export default function LogRecipeModal({ visible, recipe, onClose, onLogged }: P
       setDiary(submission.diary);
       void nutritionSyncService.syncNutritionUpsert(submission.result);
       onLogged();
-    } catch {
+    } catch (error: unknown) {
+      if (onUnavailable && isRecipeUnavailable(error)) {
+        onClose();
+        onUnavailable();
+        return;
+      }
       setErrorNotice({
         title: 'Rezept konnte nicht eingetragen werden',
         body: 'Bitte versuche es später erneut.',

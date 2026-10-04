@@ -1,6 +1,8 @@
 // Recipe API — full CRUD + image upload + diary logging
 import { apiClient } from './client';
 import type {
+  CommunityRecipe,
+  CommunityRecipesPage,
   Meal,
   Recipe,
   RecipeExportStep,
@@ -58,6 +60,24 @@ export interface RecipeListResponse {
   recipes: Recipe[];
 }
 
+export interface CommunityRecipeListParams {
+  limit?: number;
+  continuationToken?: string;
+}
+
+export interface VersionedRecipeResponse {
+  recipe: Recipe;
+  etag: string;
+}
+
+export type RecipeVisibilityChangeInput =
+  | { visibility: 'private' }
+  | {
+      visibility: 'community';
+      confirmContentSharing: true;
+      displayNameConsent: boolean;
+    };
+
 export interface LogRecipeInput {
   portions: number;
   mealId: string;
@@ -73,13 +93,78 @@ export interface ReorderRecipeImagesResponse {
 
 export const recipeApi = {
   /** GET /api/recipes — list all recipes for the current user */
-  list(): Promise<RecipeListResponse> {
-    return apiClient.get<RecipeListResponse>('/recipes').then((r) => r.data);
+  list(signal?: AbortSignal): Promise<RecipeListResponse> {
+    return apiClient
+      .get<RecipeListResponse>('/recipes', signal ? { signal } : undefined)
+      .then((r) => r.data);
+  },
+
+  /** GET /api/community-recipes — list published recipes for authenticated users */
+  listCommunity(
+    params: CommunityRecipeListParams = {},
+    signal?: AbortSignal,
+  ): Promise<CommunityRecipesPage> {
+    return apiClient
+      .get<CommunityRecipesPage>('/community-recipes', {
+        params,
+        ...(signal ? { signal } : {}),
+      })
+      .then((r) => r.data);
   },
 
   /** GET /api/recipes/:id — get single recipe with SAS image URLs */
   get(id: string): Promise<Recipe> {
     return apiClient.get<Recipe>(`/recipes/${id}`).then((r) => r.data);
+  },
+
+  /** GET /api/recipes/:id — get the owner recipe and its concurrency ETag */
+  getVersioned(id: string, signal?: AbortSignal): Promise<VersionedRecipeResponse> {
+    return apiClient
+      .get<Recipe>(`/recipes/${id}`, signal ? { signal } : undefined)
+      .then((response) => {
+        const etag = response.headers['etag'];
+        if (typeof etag !== 'string' || etag.length === 0) {
+          throw new Error('Recipe response is missing its ETag.');
+        }
+        return { recipe: response.data, etag };
+      });
+  },
+
+  /** GET /api/community-recipes/:id — get the access-checked community projection */
+  getCommunity(id: string, signal?: AbortSignal): Promise<CommunityRecipe> {
+    return apiClient
+      .get<CommunityRecipe>(
+        `/community-recipes/${encodeURIComponent(id)}`,
+        signal ? { signal } : undefined,
+      )
+      .then((r) => r.data);
+  },
+
+  /** GET /api/community-recipes/:id/images/:imageId — fetch authenticated image bytes */
+  async getCommunityImage(id: string, imageId: string, signal?: AbortSignal): Promise<string> {
+    const response = await apiClient.get<ArrayBuffer>(
+      `/community-recipes/${encodeURIComponent(id)}/images/${encodeURIComponent(imageId)}`,
+      {
+        responseType: 'arraybuffer',
+        timeout: 60_000,
+        ...(signal ? { signal } : {}),
+      },
+    );
+    const rawContentType = response.headers['content-type'];
+    const contentType = typeof rawContentType === 'string'
+      ? rawContentType.split(';', 1)[0]?.trim().toLowerCase()
+      : undefined;
+    if (contentType !== 'image/jpeg' && contentType !== 'image/png') {
+      throw new Error('Community recipe image response must be JPEG or PNG.');
+    }
+
+    const bytes = new Uint8Array(response.data);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+    }
+    return `data:${contentType};base64,${globalThis.btoa(binary)}`;
   },
 
   /** POST /api/recipes — create a new recipe */
@@ -106,6 +191,31 @@ export const recipeApi = {
   /** PUT /api/recipes/:id — update a recipe */
   update(id: string, input: UpdateRecipeInput): Promise<Recipe> {
     return apiClient.put<Recipe>(`/recipes/${id}`, input).then((r) => r.data);
+  },
+
+  /** PUT /api/recipes/:id/visibility — owner-only, ETag-protected visibility change */
+  setVisibility(
+    id: string,
+    input: RecipeVisibilityChangeInput,
+    etag: string,
+    signal?: AbortSignal,
+  ): Promise<VersionedRecipeResponse> {
+    return apiClient
+      .put<Recipe>(
+        `/recipes/${id}/visibility`,
+        input,
+        {
+          headers: { 'If-Match': etag },
+          ...(signal ? { signal } : {}),
+        },
+      )
+      .then((response) => {
+        const nextEtag = response.headers['etag'];
+        if (typeof nextEtag !== 'string' || nextEtag.length === 0) {
+          throw new Error('Recipe visibility response is missing its ETag.');
+        }
+        return { recipe: response.data, etag: nextEtag };
+      });
   },
 
   /** DELETE /api/recipes/:id — delete a recipe and all its images */

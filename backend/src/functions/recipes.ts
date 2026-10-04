@@ -23,6 +23,7 @@ import { logEvent } from '../lib/log';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getRecipesRepository } from '../lib/repositories/recipesRepository';
 import { createRecipeExportView } from '../lib/repositories/recipeExport';
+import { addRecipeDiarySnapshot } from '../lib/recipeDiary';
 import { enforceQuota, trackUsage } from '../lib/quota';
 import {
   RecipeExportViewInputSchema,
@@ -133,6 +134,15 @@ const UpdateRecipeImageHeroCropSchema = z.object({
   heroCrop: RecipeImageHeroCropSchema,
 }).strict();
 
+const SetRecipeVisibilityBodySchema = z.discriminatedUnion('visibility', [
+  z.object({ visibility: z.literal('private') }).strict(),
+  z.object({
+    visibility: z.literal('community'),
+    confirmContentSharing: z.literal(true),
+    displayNameConsent: z.boolean(),
+  }).strict(),
+]);
+
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024; // 8 MB
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
 type AllowedMimeType = (typeof ALLOWED_MIME_TYPES)[number];
@@ -153,6 +163,18 @@ function parseMultipartHeroCrop(value: FormDataEntryValue | null):
   const parsed = RecipeImageHeroCropSchema.safeParse(raw);
   if (!parsed.success) return { error: 'Invalid heroCrop' };
   return { heroCrop: parsed.data };
+}
+
+function containsRecipePublicationFields(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false;
+  return [
+    'visibility',
+    'communityPublication',
+    'displayNameConsent',
+    'confirmContentSharing',
+    'contentConfirmed',
+    'contentConfirmedAt',
+  ].some((field) => Object.prototype.hasOwnProperty.call(value, field));
 }
 
 // ---------------------------------------------------------------------------
@@ -205,6 +227,9 @@ export const createRecipeHandler = withHandler(
     const { userId } = await requireUser(request);
 
     const body = await request.json();
+    if (containsRecipePublicationFields(body)) {
+      return { status: 400, jsonBody: { error: 'recipe_visibility_requires_dedicated_endpoint' } };
+    }
     const parsed = CreateRecipeSchema.safeParse(body);
     if (!parsed.success) {
       return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
@@ -289,6 +314,39 @@ export const getRecipeHandler = withHandler(
   },
 );
 
+export const setRecipeVisibilityHandler = withHandler(
+  'recipes.setVisibility',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params['id'];
+    if (!id) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+
+    const parsed = await parseBody(request, SetRecipeVisibilityBodySchema);
+    if (!parsed.ok) return parsed.response;
+
+    const repo = getRecipesRepository();
+    const existing = await repo.getVersioned(userId, id);
+    if (!existing) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    const ifMatch = request.headers.get('if-match');
+    if (ifMatch !== null && ifMatch !== existing.etag) {
+      return { status: 412, jsonBody: { error: 'recipe_revision_conflict' } };
+    }
+
+    const input = parsed.data.visibility === 'private'
+      ? { visibility: 'private' as const }
+      : {
+          visibility: 'community' as const,
+          contentConfirmed: true as const,
+          displayNameConsent: parsed.data.displayNameConsent,
+        };
+    const updated = await repo.setVisibility(userId, id, existing.etag, input);
+    if (!updated) return { status: 412, jsonBody: { error: 'recipe_revision_conflict' } };
+
+    logEvent(ctx, 'info', 'recipes.visibilityChanged', { userId, recipeId: id, visibility: updated.recipe.visibility });
+    return { status: 200, headers: { ETag: updated.etag }, jsonBody: updated.recipe };
+  },
+);
+
 // ---------------------------------------------------------------------------
 // PUT /recipes/:id
 // ---------------------------------------------------------------------------
@@ -301,6 +359,9 @@ export const updateRecipeHandler = withHandler(
     if (!id) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
 
     const body = await request.json();
+    if (containsRecipePublicationFields(body)) {
+      return { status: 400, jsonBody: { error: 'recipe_visibility_requires_dedicated_endpoint' } };
+    }
     const parsed = UpdateRecipeSchema.safeParse(body);
     if (!parsed.success) {
       return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
@@ -575,39 +636,22 @@ export const logRecipeHandler = withHandler(
 
     const { portions, mealId } = parsed.data;
 
-    const repo = getRecipesRepository();
-    const recipe = await repo.get(userId, id);
-    if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
-
-    // Snapshot: calories = nutritionPerPortion × portions logged
-    const snap = {
-      calories: Math.round(recipe.nutritionPerPortion.calories * portions * 10) / 10,
-      protein: Math.round(recipe.nutritionPerPortion.protein * portions * 10) / 10,
-      carbs: Math.round(recipe.nutritionPerPortion.carbs * portions * 10) / 10,
-      fat: Math.round(recipe.nutritionPerPortion.fat * portions * 10) / 10,
-      fiber: Math.round(recipe.nutritionPerPortion.fiber * portions * 10) / 10,
-    };
-
-    const diaryRepo = getDiaryRepository();
-    const meal = await diaryRepo.addItem(userId, mealId, {
-      name: recipe.name,
-      calories: snap.calories,
-      protein: snap.protein,
-      carbs: snap.carbs,
-      fat: snap.fat,
-      fiber: snap.fiber,
-      quantity: portions,
-      unit: portions === 1 ? 'Portion' : 'Portionen',
-      sourceType: 'recipe',
-      recipeId: id,
-      recipePortions: portions,
+    const result = await addRecipeDiarySnapshot(userId, id, mealId, {
+      inputMode: 'portion',
+      inputAmount: portions,
     });
-
-    // Fire-and-forget: increment usage counter (don't block response)
-    repo.incrementUsage(userId, id).catch(() => {});
+    if (!result.ok) {
+      if (result.reason === 'invalid_portions') {
+        return { status: 400, jsonBody: { error: 'invalid_recipe_portions' } };
+      }
+      return {
+        status: 404,
+        jsonBody: { error: result.reason === 'meal_not_found' ? 'Meal not found' : 'Recipe not found' },
+      };
+    }
 
     logEvent(ctx, 'info', 'recipe.logged', { userId, recipeId: id, portions, mealId });
-    return { status: 200, jsonBody: meal };
+    return { status: 200, jsonBody: result.meal };
   },
 );
 
@@ -727,6 +771,13 @@ app.http('recipes-update', {
   authLevel: 'anonymous',
   route: 'recipes/{id}',
   handler: updateRecipeHandler,
+});
+
+app.http('recipes-set-visibility', {
+  methods: ['PUT'],
+  authLevel: 'anonymous',
+  route: 'recipes/{id}/visibility',
+  handler: setRecipeVisibilityHandler,
 });
 
 app.http('recipes-delete', {

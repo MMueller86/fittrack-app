@@ -95,9 +95,34 @@ describe('buildFromProduct — gram mode', () => {
 
   it('sets linkedProductId and isAiEstimate correctly', () => {
     const ing = buildFromProduct(makeProduct(), 'grams', 100);
-    expect(ing.linkedProductId).toBe('prod-1');
+    expect(ing.linkedProductId).toBeNull();
+    expect(ing.linkedReusableItemId).toBe('prod-1');
     expect(ing.isAiEstimate).toBe(false);
     expect(ing.category).toBe('food');
+  });
+
+  it('keeps catalog links separate and propagates AI provenance from library items', () => {
+    const catalogIngredient = buildFromProduct(
+      makeProduct({ id: 'off-123', source: 'openFoodFacts' }),
+      'grams',
+      100,
+    );
+    const aiLibraryIngredient = buildFromProduct(
+      makeProduct({ id: 'ai-item', isAiEstimate: true }),
+      'grams',
+      100,
+    );
+
+    expect(catalogIngredient).toMatchObject({
+      linkedProductId: 'off-123',
+      linkedReusableItemId: null,
+      isAiEstimate: false,
+    });
+    expect(aiLibraryIngredient).toMatchObject({
+      linkedProductId: null,
+      linkedReusableItemId: 'ai-item',
+      isAiEstimate: true,
+    });
   });
 });
 
@@ -209,6 +234,32 @@ describe('buildIngFromCandidate — gram mode', () => {
   it('preserves the provided id', () => {
     const ing = buildIngFromCandidate('custom-id', item, makeProduct());
     expect(ing.id).toBe('custom-id');
+    expect(ing.linkedProductId).toBeNull();
+    expect(ing.linkedReusableItemId).toBe('prod-1');
+  });
+
+  it('uses catalog links and AI flags from the selected candidate', () => {
+    const catalogIngredient = buildIngFromCandidate(
+      'catalog-ing',
+      item,
+      makeProduct({ id: 'off-456', source: 'openFoodFacts' }),
+    );
+    const aiLibraryIngredient = buildIngFromCandidate(
+      'ai-ing',
+      item,
+      makeProduct({ id: 'ai-item', isAiEstimate: true }),
+    );
+
+    expect(catalogIngredient).toMatchObject({
+      linkedProductId: 'off-456',
+      linkedReusableItemId: null,
+      isAiEstimate: false,
+    });
+    expect(aiLibraryIngredient).toMatchObject({
+      linkedProductId: null,
+      linkedReusableItemId: 'ai-item',
+      isAiEstimate: true,
+    });
   });
 });
 

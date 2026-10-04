@@ -111,8 +111,13 @@ Data source: `favoritesApi.listFavorites()` → sorted by `computeRelevanceOrder
 
 **Direct-Add ("Wie immer?"):**
 - Visible in "Für dich" when `preferredInputAmount > 0`
-- Bypasses QuantityView; directly calls `diaryApi.addItem()` with preferred amount
-- Requires `context.mealId` — falls back to QuantityView if absent
+- For catalog and personal food references, bypasses QuantityView and calls `diaryApi.addItem()` with the preferred amount and cached nutrition
+- Without `context.mealId`, resolves or creates a meal for the Hub date and meal type; a temporary meal ID falls back to QuantityView
+- For recipe references, direct-add is available only for a saved portion preference. It reloads the current owner/community recipe and calls `POST /api/recipes/{id}/log`; recipe nutrition caches are never used for a client diary write
+- Without a saved recipe portion preference, the Hub opens the recipe-specific portion view; a saved gram preference is converted with the existing recipe portion-weight rule and its 300 g fallback, while a saved portion preference is prefilled unchanged. Its final write also uses the recipe-log endpoint
+- An unavailable recipe reference is shown as `Rezept nicht verfügbar` without a stale image, nutrition preview, or direct-add action; it cannot be opened or logged, but its favorite can still be removed
+
+In `recipeIngredient` context, recipe references are omitted from favorites and recents and guarded from ingredient callbacks. Only selected foods or an explicit single-food AI estimate can return to the recipe wizard.
 
 **Key files:**
 - `mobile/src/modules/nutrition/hub/FoodEntryHub.tsx` — filter state, data loading, hub wiring

@@ -1,15 +1,32 @@
 # PLAN US-11 - Community-Rezepte veroeffentlichen und entdecken
 
-Status: Approved - automatisch gemaess Nutzerauftrag, da keine offenen PO-Entscheidungen vorliegen. Umsetzung noch nicht begonnen.
+Status: Approved - the existing plan approval remains valid. B-1, B-2, F-1, F-2, and D-1 handoffs are complete. Q-1 is complete with QA verdict PASS WITH ISSUES; findings FT-QA-2026-052, FT-QA-2026-053, and FT-QA-2026-054 are Fix requested as of 2026-10-04, and the correction loop is in progress. I-1 remains gated/pending. Cosmos emulator contracts and two-user Dev/Alpha E2E remain UNVERIFIED; device/accessibility validation remains MANUAL/UNVERIFIED. No release is claimed.
 Infrastructure Impact: Alpha
 Mobile Build Impact: None
 
 Erstellt: 2026-10-03
+Revidiert: 2026-10-04 - D-1-Dokumentationshandoff als abgeschlossen erfasst; Q-1 mit QA verdict PASS WITH ISSUES, den Findings FT-QA-2026-052/053/054 mit Status `Fix requested` vom 2026-10-04 und laufender Korrekturschleife dokumentiert; I-1 bleibt gated/pending. Vorherige B-1/B-2/F-1/F-2-Handoff-Korrekturen und Kontextupdates bleiben erhalten. Keine Produkt-, API-, Scope-, AC-, Arbeitspaket- oder User-Story-Aenderung; empfohlene Ausfuehrungsreihenfolge unveraendert.
 User Story: [US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md](US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md)
 
 ## Open Product Owner Decisions
 
-Keine blockierenden PO-Rueckfragen. Die neun Produktentscheidungen und alle 17 Akzeptanzkriterien der Story werden unveraendert umgesetzt. Automatische Freigabe ist eine Planfreigabe, kein Implementierungs-, QA- oder Deployment-Nachweis.
+Keine PO- oder Spezifikationsentscheidung erforderlich. Die bestehende Planfreigabe bleibt gueltig; diese eng begrenzte Statuskorrektur setzt die ausdrueckliche Nutzerwahl `Fix requested` fuer FT-QA-2026-053 vom 2026-10-04 um. Vorherige F-1/F-2-Kontextkorrekturen bleiben erhalten. Die neun Produktentscheidungen und alle 17 Akzeptanzkriterien der Story bleiben unveraendert. Die Planfreigabe ist kein Implementierungs-, QA- oder Deployment-Nachweis.
+
+## Revisions- und Ausfuehrungsstand
+
+- Verifizierte Kontextabweichung: `backend/src/functions/recipeScale.ts` existiert nicht. B-2 Required Repository Context ersetzt diese Referenz durch `backend/src/functions/ai.ts` (`recipeScalePreviewHandler`, aktuell Zeile 706) und `backend/src/functions/ai.test.ts` (zugehoeriger Testabschnitt ab Zeile 1290). Handler liest via `get(userId, recipeId)`; vorhandener Test weist fremdes Rezept mit 404 ab. Keine nachgewiesene technische Ungueltigkeit der fachlichen Spezifikation, keine AI-Vertragsaenderung.
+- B-1: Implementierung laut bestehendem handoff_store abgeschlossen; Arbeitspaket unveraendert und Handoff beibehalten. Shared-Typen in `shared/types/recipes.ts`, `shared/types/diary.ts`, `shared/types/userFoodRelation.ts`; Exporte `RecipeVisibility`, `RecipeAccess`, `RecipeNutritionSource`, `RecipeCommunityPublication`, `RecipeVisibilityInput`, `CommunityRecipe`, `CommunityRecipeIngredient`, `CommunityRecipeImage`, `CommunityRecipesPage`.
+- B-1 Repository-Handoff: `listCommunity({ limit?, continuationToken? })`, `getCommunityById(id)`, `setVisibility(userId, id, expectedEtag, input)` in RecipesRepository/CosmosRecipesRepository. Neue Helper: `backend/src/lib/communityRecipes.ts`, `backend/src/lib/repositories/recipeIngredientProvenance.ts`, `backend/src/lib/repositories/recipePublication.ts`. Eigene Reads/Writes bleiben eigentuemergebunden; Default privat, aktueller Profilname nur mit Zustimmung, unbekannte Altherkunft bleibt unknown. Keine neuen Container, Bicep-Aenderungen oder Migration.
+- B-1 Pruefnachweise laut Handoff, in dieser Revision nicht erneut ausgefuehrt: `npm test --workspace backend -- --reporter=dot` Exit 0, 1176 Tests; Shared-Tests Exit 0, 450 Tests; Backend `build:verify` Exit 0; Mobile Typecheck Exit 0. Backend-Test-tsconfig-Typecheck Exit 1 mit Fehlern ausserhalb B-1. Kein von B-1 gemeldeter Planfehler.
+- B-1 Pflicht-Cosmos-Contracts: UNVERIFIED, nicht bestanden. Ausfuehrung Exit 1 im Setup, 26 Tests uebersprungen; Emulator `127.0.0.1:18081` nicht verfuegbar, Docker/Podman fehlen laut Handoff. Pflichtgate bleibt offen; Implementierungsabschluss ist keine vollstaendige Verifikation oder QA-Freigabe.
+- B-2: Implementierung und API-Handoff sind abgeschlossen; Sichtbarkeits-/Community-/Bildrouten, Favoriten-/Relations-Reads und Rezept-Logging/Snapshot-Pfade wurden angepasst. Laut Handoff: 323 fokussierte Tests, 1223 Backend-Tests gesamt, 450 Shared-Tests sowie vollstaendige Typechecks, `build:verify`, Encoding- und Diff-Checks bestanden. Cosmos Contracts bleiben UNVERIFIED; kein Dev-/Alpha-E2E ausgefuehrt. Die Required-Repository-Context-Korrektur auf `backend/src/functions/ai.ts` und `backend/src/functions/ai.test.ts` bleibt bestehen.
+- F-1: Implementierung abgeschlossen und Handoff erfolgt. Laut Handoff: 52 Mobile-Tests, 225 agent-seitige Backend-Tests sowie Mobile- und Backend-Typechecks bestanden. Community-Liste/-Detail, Freigabe und authentifizierte Bild-Clients geaendert. Manuelle Geraete- und Screenreader-Validierung nicht ausgefuehrt. Die vorherige Kontextkorrektur mit den exakten relevanten Story-AC-Texten und dem User-Story-Pfad im Required Repository Context bleibt erhalten.
+- F-2: Implementierung abgeschlossen. Laut Handoff: 592 Tests in 53 Mobile-Testdateien bestanden; Mobile `tsc --noEmit` bestanden. Hub, QuantityView, RelationRow sowie Zutaten-Builder, Edit-Bootstrap und Logger samt Tests geaendert. Edit erhaelt unbekanntes `nutritionSource`; Katalog-/Bibliotheks-IDs und AI-Flags bleiben korrekt. Hub loest das aktuelle Rezept auf, Direct-Add nutzt Recipe-Log, nicht verfuegbare Referenzen koennen nur entfernt werden; keine Kopierfunktion. Live-Backend-Auth/Widerruf/Snapshot und HealthConnect-Geraete-Sync wurden in diesem Mobile-Handoff nicht ausgefuehrt.
+- D-1: Knowledge-Base- und API-Dokumentationshandoff abgeschlossen; Work-Package-Inhalt und Handoff bleiben erhalten.
+- Q-1: Review abgeschlossen mit QA verdict PASS WITH ISSUES. Findings FT-QA-2026-052, FT-QA-2026-053 und FT-QA-2026-054 sind Fix requested vom 2026-10-04; die Korrekturschleife ist in Bearbeitung.
+- Verifikationsgrenzen: Cosmos-Emulator-Contracts und Zwei-Nutzer-E2E in Dev/Alpha bleiben UNVERIFIED. Geraete- und Accessibility-Pruefung bleibt MANUAL/UNVERIFIED.
+- I-1: Gated/pending waehrend der laufenden Korrekturschleife; kein Release oder Deployment wird als abgeschlossen behauptet.
+- Workflow: Die bestehende Planfreigabe bleibt gueltig; die ausdrueckliche Nutzerwahl fuer FT-QA-2026-053 autorisiert diese reine Statuskorrektur. Keine PO-Entscheidung oder neue Feature-Freigabe ist erforderlich. Die Arbeitspakete bleiben strikt sequenziell; die empfohlene Ausfuehrungsreihenfolge bleibt unveraendert. B-1/B-2/F-1/F-2/D-1-Handoffs bleiben erhalten. Keine Feature-, API-, AC-, Scope- oder Arbeitspaketaenderung.
 
 ## 1. Requirement Assessment
 
@@ -33,9 +50,9 @@ In Scope: Shared-Vertraege, RecipesRepository mit beiden Implementierungen, HTTP
 
 Out of Scope: Rezept- oder Zutatenkopien, oeffentlicher Webzugriff, neue Moderation/Admin-UI, Instagram-Freigabe fuer fremde Rezepte, neue AI-Features, neue native Module, neue Azure-Ressourcen oder Resource Groups. Keine Erweiterung der Eigentuemerrechte auf fremde private Daten. Kein Umbau allgemeiner manueller Tagebucheintraege.
 
-## 3. Current Behaviour und bestaetigte Fakten
+## 3. Current Behaviour und bestaetigte Fakten bei urspruenglicher Planung (vor B-1)
 
-Repository-Pruefung am 2026-10-03: keine bestehende Plan-Datei oder Implementierung fuer US-11 gefunden; Suche nach `US-11`, Community-Rezepten und entsprechenden Dateinamen liefert nur die User Story.
+Urspruengliche Repository-Pruefung am 2026-10-03 vor Planerstellung/B-1: keine bestehende Plan-Datei oder Implementierung fuer US-11 gefunden; Suche nach `US-11`, Community-Rezepten und entsprechenden Dateinamen lieferte nur die User Story. Die folgenden Befunde dokumentieren diesen Ausgangsstand, nicht den inzwischen teilweise implementierten Stand; aktueller Ausfuehrungsstand siehe oben.
 
 - `shared/types/recipes.ts`: `RecipeVisibility` ist ausschliesslich `private`; Zutaten besitzen `isAiEstimate`, aber keinen verlaesslichen allgemeinen Herkunfts-Snapshot.
 - `backend/src/lib/repositories/recipesRepository.ts` und `cosmosRecipesRepository.ts`: Create setzt privat; Reads und Writes sind eigentuemergebunden. Cosmos nutzt unveraendert `/userId`. ETags und Compare-and-Replace existieren bereits.
@@ -124,7 +141,7 @@ Community-Liste nach `updatedAt DESC`, single-field Index und Cosmos-Continuatio
 
 Ein kleiner gemeinsamer Backend-Resolver laedt zuerst das eigene Rezept, sonst das explizit veroeffentlichte Rezept. Er liefert serverintern Original und Owner fuer Detailprojektion/Logging. Mutationen, Bilderverwaltung, Exportvorbereitung, Instagram-/Share-Bundle-Handler und bestehende AI-Scale-Pfade bleiben owner-only. Community-Aufrufer erhalten keine freigeschalteten Export- oder Verwaltungsaktionen. Bei eigenen Community-Karten kann die App ins Eigentuemerdetail wechseln.
 
-Visibility-Write nutzt ETag/Compare-and-Replace wie Recipe-Update: optionales Client-`If-Match` pruefen, internen Read immer konditional ersetzen; Konflikt 412 `recipe_revision_conflict`, keine automatische Wiederveroeffentlichung aus einem veralteten Draft. Generische Create-/Update-Bodies duerfen weder Visibility noch Consent einschleusen; neue Felder dort explizit zurueckweisen. Normale Inhaltsupdates erhalten die bestehende Freigabe unveraendert.
+Visibility-Write nutzt ETag/Compare-and-Replace wie Recipe-Update: optionales Client-`If-Match` pruefen, internen Read immer konditional ersetzen; Konflikt 412 `recipe_revision_conflict`, keine automatische Wiederv eroeffentlichung aus einem veralteten Draft. Generische Create-/Update-Bodies duerfen weder Visibility noch Consent einschleusen; neue Felder dort explizit zurueckweisen. Normale Inhaltsupdates erhalten die bestehende Freigabe unveraendert.
 
 ### Tagebuch und Schnelleintrag
 
@@ -154,12 +171,12 @@ Neue widerspruechliche Provenienz/AI-Flags nicht stillschweigend akzeptieren; be
 - Community-Bilder ueber den zentral authentifizierten API-Client laden und als fluechtigen Bild-Source darstellen; Token-Refresh bleibt zentral. Keine Tokens in URL, DTO, Logs oder Persistenz; keine dauerhaften Bilddateien. `RecipeImageHeroImage` fuer den vorhandenen Crop wiederverwenden. Bereits vorhandene binaere Response-Verarbeitung als Muster verwenden, keine neue native Abhaengigkeit.
 - Favoriten- und Hub-Rezeptauswahl laedt das aktuelle berechtigte Rezept statt gecachte Naehrwerte als Produkt zu behandeln. Portionspicker/`submitRecipeLog` nutzen; historische bevorzugte Grammenge bei Bedarf nach obiger kompatibler Gewichtsregel umrechnen. Rezeptrelation nicht in persoenliche Lebensmittel-/Zutatenkopie umwandeln.
 - Verweigerter Zugriff beim Detail, Bild, Favorisieren oder Logging entfernt veraltete aktive Inhalte/Previews; Anzeige `Rezept nicht mehr verfuegbar`, Rueckkehr/Refresh und Entfernen der eigenen Favoritenreferenz anbieten. Kein Fallback vom fehlgeschlagenen Recipe-Log auf Client-Naehrwerte.
-- Owner-Mutation, Tabwechsel, Reload und Unmount invalidieren veraltete Requests. Spaete Antworten duerfen ein inzwischen privates/unverfuegbares Rezept nicht wieder als aktiv zeigen.
+- Owner-Mutation, Tabwechsel, Reload und Unmount invalidieren veraltete Requests. Spae te Antworten duerfen ein inzwischen privates/unverfuegbares Rezept nicht wieder als aktiv zeigen.
 - Bestehende HealthConnect-Sync nach erfolgreichem Recipe-Log erhalten; kein Sync nach abgelehntem Write. KB-Navigations- und Theme-Konventionen beibehalten, TalkBack, kleine Displays und vergroesserte Schrift pruefen.
 
 ## 9. Work Packages
 
-Alle Arbeitspakete werden strikt nacheinander ausgefuehrt. PO-Freigabe liegt vor; fachliche Erweiterungen sind nicht automatisch mitfreigegeben.
+Alle Arbeitspakete werden strikt nacheinander ausgefuehrt. Die bestehende Planfreigabe und diese in-scope Korrektur sind gueltig. Produktentscheidungen bleiben unveraendert; fachliche Erweiterungen sind nicht mitfreigegeben.
 
 ### B-1 - Shared-Vertraege, Persistenz und Zugriff
 
@@ -262,6 +279,7 @@ Required Knowledge Base:
 - docs/kb/domain/06-recipes.md
 
 Required Repository Context:
+- docs/User Stories/Reciepe/US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md
 - mobile/src/modules/recipes/RecipeListScreen.tsx
 - mobile/src/modules/recipes/RecipeDetailScreen.tsx
 - mobile/src/modules/recipes/RecipeDetailScreen.test.tsx
@@ -280,6 +298,24 @@ Required Repository Context:
 Required Skills: None
 
 Relevant Acceptance Criteria: AC-1 bis AC-15, AC-17
+
+Relevant Acceptance Criteria Details (verbatim from the User Story):
+- AC-1: Die Rezeptübersicht bietet die Bereiche **Deine Rezepte** und **Community-Rezepte**. Beim Öffnen ist **Deine Rezepte** ausgewählt.
+- AC-2: **Deine Rezepte** zeigt sämtliche Rezepte des angemeldeten Nutzers, unabhängig davon, ob sie privat oder veröffentlicht sind. Der Veröffentlichungsstatus ist für den Eigentümer erkennbar.
+- AC-3: Neu erstellte Rezepte sind privat, solange der Eigentümer die Community-Freigabe nicht ausdrücklich aktiviert.
+- AC-4: Auch vorhandene Rezepte ohne Freigabe bleiben privat und erscheinen nicht in der Community-Übersicht.
+- AC-5: Der Eigentümer kann bei einem eigenen Rezept zwischen privat und Community wechseln. Andere Nutzer können diese Einstellung nicht ändern.
+- AC-6: Vor einer erstmaligen Community-Freigabe wird verständlich angezeigt, dass angemeldete FitTrack-Nutzer die Rezepttexte, Zutaten, Zubereitung und Bilder sehen können. Bei Abbruch bleibt das Rezept privat; bei Bestätigung wird es veröffentlicht.
+- AC-7: Bei der Veröffentlichung kann der Eigentümer für dieses Rezept ausdrücklich zustimmen, dass sein FitTrack-Anzeigename angezeigt wird. Ist die Zustimmung nicht erteilt oder kein Anzeigename verfügbar, erscheint in der Community-Rezeptansicht **Anonymous**.
+- AC-8: **Community-Rezepte** enthält ausschließlich veröffentlichte Rezepte und ist nur für angemeldete FitTrack-Nutzer erreichbar.
+- AC-9: Ein angemeldeter Nutzer kann ein Community-Rezept öffnen und dessen gespeicherte Rezeptinformationen ansehen: Name, Beschreibung, Portionen, Zutaten, Zubereitung, Nährwerte und verfügbare Bilder.
+- AC-10: Die Community-Rezeptansicht zeigt den freigegebenen Anzeigenamen oder **Anonymous**. Sie zeigt keine persönlichen Verwaltungsaktionen wie Bearbeiten, Löschen oder Bildverwaltung für fremde Rezepte.
+- AC-11: Enthält ein Rezept KI-geschätzte Zutaten, wird in der Rezeptansicht **Enthält KI-Schätzungen** angezeigt. Enthält es manuell erfasste Zutaten, wird **Enthält manuell erfasste Zutaten** angezeigt. Sind beide Arten vorhanden, werden beide Hinweise gezeigt. Die Hinweise behaupten nicht, dass FitTrack die Werte verifiziert hat.
+- AC-12: Der Nutzer kann ein Community-Rezept zu seinen Favoriten hinzufügen und wieder daraus entfernen. Favorisieren legt keine eigene Rezeptkopie und keine neuen Lebensmitteleinträge an.
+- AC-13: Der Nutzer kann ein Community-Rezept wie ein eigenes Rezept portionsweise in ein Tagebuch eintragen. Die Nährwerte werden zum Zeitpunkt des Eintrags als Snapshot gespeichert.
+- AC-14: Wird ein Community-Rezept nach dem Tagebucheintrag privat gestellt oder gelöscht, bleiben Name, Portion und Nährwert-Snapshot des bestehenden Tagebucheintrags erhalten.
+- AC-15: Wird ein veröffentlichtes Rezept privat gestellt, verschwindet es aus der Community-Übersicht. Andere Nutzer können es anschließend weder über einen direkten Rezeptaufruf noch über eine gespeicherte Favoriten-Referenz ansehen oder neu ins Tagebuch eintragen.
+- AC-17: Die Funktion **In eigene Rezepte übernehmen** ist nicht Bestandteil dieser Story. Ebenso werden beim Ansehen, Favorisieren oder Tagebuch-Eintrag keine Zutaten in die persönliche Lebensmittelsammlung kopiert.
 
 Dependencies: B-2 API-Handoff
 
@@ -304,6 +340,7 @@ Required Knowledge Base:
 - docs/kb/product/05-ux-patterns.md
 
 Required Repository Context:
+- docs/User Stories/Reciepe/US-11_Community-Rezepte_veroeffentlichen_und_entdecken.md
 - mobile/src/modules/recipes/ingredientBuilders.ts
 - mobile/src/modules/recipes/ingredientBuilders.test.ts
 - mobile/src/modules/recipes/recipeWizardEditBootstrap.ts
@@ -320,6 +357,15 @@ Required Repository Context:
 Required Skills: None
 
 Relevant Acceptance Criteria: AC-11 bis AC-17
+
+Relevant Acceptance Criteria Details (verbatim from the User Story):
+- AC-11: Enthält ein Rezept KI-geschätzte Zutaten, wird in der Rezeptansicht **Enthält KI-Schätzungen** angezeigt. Enthält es manuell erfasste Zutaten, wird **Enthält manuell erfasste Zutaten** angezeigt. Sind beide Arten vorhanden, werden beide Hinweise gezeigt. Die Hinweise behaupten nicht, dass FitTrack die Werte verifiziert hat.
+- AC-12: Der Nutzer kann ein Community-Rezept zu seinen Favoriten hinzufügen und wieder daraus entfernen. Favorisieren legt keine eigene Rezeptkopie und keine neuen Lebensmitteleinträge an.
+- AC-13: Der Nutzer kann ein Community-Rezept wie ein eigenes Rezept portionsweise in ein Tagebuch eintragen. Die Nährwerte werden zum Zeitpunkt des Eintrags als Snapshot gespeichert.
+- AC-14: Wird ein Community-Rezept nach dem Tagebucheintrag privat gestellt oder gelöscht, bleiben Name, Portion und Nährwert-Snapshot des bestehenden Tagebucheintrags erhalten.
+- AC-15: Wird ein veröffentlichtes Rezept privat gestellt, verschwindet es aus der Community-Übersicht. Andere Nutzer können es anschließend weder über einen direkten Rezeptaufruf noch über eine gespeicherte Favoriten-Referenz ansehen oder neu ins Tagebuch eintragen.
+- AC-16: Die Sichtbarkeitsprüfung gilt serverseitig für Community-Liste, Rezeptdetail und Tagebuch-Eintrag. Eine Nutzeroberfläche oder eine bekannte Rezept-ID allein gewährt keinen Zugriff auf private Rezepte.
+- AC-17: Die Funktion **In eigene Rezepte übernehmen** ist nicht Bestandteil dieser Story. Ebenso werden beim Ansehen, Favorisieren oder Tagebuch-Eintrag keine Zutaten in die persönliche Lebensmittelsammlung kopiert.
 
 Dependencies: F-1 Handoff und B-2 API-Handoff
 
@@ -446,11 +492,12 @@ npm run test:backend
 npm run test:shared
 npm run test:mobile
 npm run build:verify --workspace=backend
+npx vitest run --config backend/vitest.contract.config.mts
 node scripts/check-encoding.mjs
 git diff --check
 ```
 
-Zusaetzlich Contract-Kommando im `backend`-Arbeitsverzeichnis als `npx vitest run --config vitest.contract.config.mts` ausfuehren, entsprechend der vorhandenen Konfiguration. Keine Live-AI-Evals erforderlich, solange AI-Vertraege unveraendert bleiben. Falls Emulator/Geraet/zweiter Account fehlen, die betroffenen Gates `Unverified` nennen, nicht als bestanden werten. Mobile Sichtpruefung auf kleinem/grossem Display, mit vergroesserter Schrift und TalkBack dokumentieren.
+Contract-Kommando im `backend`-Arbeitsverzeichnis als `npx vitest run --config vitest.contract.config.mts` ausfuehren, entsprechend der vorhandenen Konfiguration. Keine Live-AI-Evals erforderlich, solange AI-Vertraege unveraendert bleiben. Falls Emulator/Geraet/zweiter Account fehlen, die betroffenen Gates `Unverified` nennen, nicht als bestanden werten. Mobile Sichtpruefung auf kleinem/grossem Display, mit vergroesserter Schrift und TalkBack dokumentieren.
 
 ## 11. Acceptance Criteria
 
@@ -494,4 +541,4 @@ AC-1 bis AC-17 entsprechen nummerngleich den Story-ACs; die folgenden Konkretisi
 6. Q-1 vollstaendige Verifikation inklusive Dokumentation und Dev-Zwei-Nutzer-E2E; Findings an zustaendigen Owner, danach erneut pruefen.
 7. I-1 Release-Gate und koordinierter Alpha-Rollout; Alpha-E2E-Nachweis nach Deployment.
 
-Plan ist repositoryseitig persistiert und automatisch approved. Die Ausfuehrung muss durch FitTrack-Orchestrator/Backend/Frontend/QA/Infrastructure erfolgen. Der aktive FitTrack Planner darf weder Produktionscode/Tests aendern noch Builds/Deployments ausfuehren. Es wird keine begonnene oder abgeschlossene Entwicklung behauptet.
+Dieser Plan bleibt freigegeben; fuer diese Statuskorrektur sind weder ein neues APPROVE noch eine PO-Entscheidung erforderlich. B-1/B-2/F-1/F-2/D-1 bleiben gemaess ihren bestehenden Handoffs abgeschlossen. Der Story-Pfad und die exakten Story-AC-Texte AC-11 bis AC-17 bleiben im F-2-Task-Package enthalten. Q-1 ist mit PASS WITH ISSUES abgeschlossen; FT-QA-2026-052/053/054 sind Fix requested vom 2026-10-04 und die Korrekturschleife laeuft. I-1 bleibt gated/pending. Cosmos-Emulator-Contracts und Zwei-Nutzer-E2E in Dev/Alpha bleiben UNVERIFIED; Geraete-/Accessibility-Pruefung bleibt MANUAL/UNVERIFIED. Die empfohlene Ausfuehrungsreihenfolge bleibt unveraendert. Die Ausfuehrung muss durch FitTrack-Orchestrator/Backend/Frontend/QA/Infrastructure erfolgen. Der aktive FitTrack Planner darf weder Produktionscode/Tests aendern noch Builds/Deployments ausfuehren. Kein Release oder Deployment wird behauptet.

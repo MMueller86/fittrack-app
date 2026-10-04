@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   __setStorageClientForTests,
   downloadRecipeImage,
+  downloadRecipeImageWithContentType,
   RECIPE_IMAGE_MAX_BYTES,
   RecipeImageTooLargeError,
+  RecipeImageUnsupportedContentTypeError,
 } from './storage';
 
 function makeClient(blockBlobClient: BlockBlobClient): BlobServiceClient {
@@ -61,6 +63,63 @@ describe('downloadRecipeImage', () => {
     __setStorageClientForTests(makeClient(blockBlobClient));
 
     await expect(downloadRecipeImage('user/recipe/unknown-size.png')).rejects.toBeInstanceOf(
+      RecipeImageTooLargeError,
+    );
+  });
+});
+
+describe('downloadRecipeImageWithContentType', () => {
+  it('returns bounded image bytes and the validated stored PNG type', async () => {
+    const downloadToBuffer = vi.fn().mockResolvedValue(Buffer.from('image'));
+    const blockBlobClient = {
+      getProperties: vi.fn().mockResolvedValue({ contentLength: 5, contentType: 'image/png' }),
+      downloadToBuffer,
+    } as unknown as BlockBlobClient;
+    __setStorageClientForTests(makeClient(blockBlobClient));
+
+    const result = await downloadRecipeImageWithContentType('user/recipe/image.png');
+
+    expect(result).toEqual({ buffer: Buffer.from('image'), contentType: 'image/png' });
+    expect(downloadToBuffer).toHaveBeenCalledWith(0, 5);
+  });
+
+  it('rejects an advertised oversized blob before downloading', async () => {
+    const blockBlobClient = {
+      getProperties: vi.fn().mockResolvedValue({
+        contentLength: RECIPE_IMAGE_MAX_BYTES + 1,
+        contentType: 'image/jpeg',
+      }),
+      downloadToBuffer: vi.fn(),
+    } as unknown as BlockBlobClient;
+    __setStorageClientForTests(makeClient(blockBlobClient));
+
+    await expect(downloadRecipeImageWithContentType('user/recipe/large.jpg')).rejects.toBeInstanceOf(
+      RecipeImageTooLargeError,
+    );
+    expect(blockBlobClient.downloadToBuffer).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported stored content types before downloading', async () => {
+    const blockBlobClient = {
+      getProperties: vi.fn().mockResolvedValue({ contentLength: 5, contentType: 'image/gif' }),
+      downloadToBuffer: vi.fn(),
+    } as unknown as BlockBlobClient;
+    __setStorageClientForTests(makeClient(blockBlobClient));
+
+    await expect(downloadRecipeImageWithContentType('user/recipe/image.gif')).rejects.toBeInstanceOf(
+      RecipeImageUnsupportedContentTypeError,
+    );
+    expect(blockBlobClient.downloadToBuffer).not.toHaveBeenCalled();
+  });
+
+  it('rejects oversized downloaded bytes when blob length metadata is absent', async () => {
+    const blockBlobClient = {
+      getProperties: vi.fn().mockResolvedValue({ contentLength: undefined, contentType: 'image/jpeg' }),
+      downloadToBuffer: vi.fn().mockResolvedValue(Buffer.alloc(RECIPE_IMAGE_MAX_BYTES + 1)),
+    } as unknown as BlockBlobClient;
+    __setStorageClientForTests(makeClient(blockBlobClient));
+
+    await expect(downloadRecipeImageWithContentType('user/recipe/unknown-size.jpg')).rejects.toBeInstanceOf(
       RecipeImageTooLargeError,
     );
   });

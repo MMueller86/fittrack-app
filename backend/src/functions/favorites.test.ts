@@ -5,11 +5,19 @@
 //         GET  /api/favorites (new fields present),
 //         GET  /api/favorites/grouped (shape, grouping, ungrouped logic).
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 
-import { addFavoriteHandler, listFavoritesHandler, getFavoritesGroupedHandler } from './favorites';
+import {
+  addFavoriteHandler,
+  getFavoritesGroupedHandler,
+  listFavoritesHandler,
+  listFrequentHandler,
+  listRecentHandler,
+  removeFavoriteHandler,
+} from './favorites';
 import { __resetUserFoodRelationRepositoryForTests, getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
-import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth, TEST_USER_ID } from '../test-utils/http';
+import { __resetRecipesRepositoryForTests, getRecipesRepository } from '../lib/repositories/recipesRepository';
+import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, signTestToken, teardownTestAuth, TEST_USER_ID } from '../test-utils/http';
 
 const ctx = makeContext();
 
@@ -25,6 +33,135 @@ beforeEach(() => {
   delete process.env.COSMOS_ENDPOINT;
   delete process.env.COSMOS_KEY;
   __resetUserFoodRelationRepositoryForTests();
+  __resetRecipesRepositoryForTests();
+});
+
+async function requestAs(userId: string, init: Parameters<typeof makeRequest>[0] = {}) {
+  const token = await signTestToken(userId);
+  return makeRequest({ ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } });
+}
+
+async function createRecipe(ownerUserId: string, visibility: 'private' | 'community' = 'private') {
+  const recipes = getRecipesRepository();
+  const recipe = await recipes.create(ownerUserId, {
+    name: 'Server recipe',
+    portions: 2,
+    ingredients: [],
+    steps: [],
+    tags: [],
+    nutritionTotal: { calories: 400, protein: 40, carbs: 80, fat: 8, fiber: 20 },
+    nutritionPerPortion: { calories: 200, protein: 20, carbs: 40, fat: 4, fiber: 10 },
+  });
+  if (visibility === 'private') return recipe;
+
+  const current = await recipes.getVersioned(ownerUserId, recipe.id);
+  const published = await recipes.setVisibility(ownerUserId, recipe.id, current!.etag, {
+    visibility: 'community',
+    contentConfirmed: true,
+    displayNameConsent: false,
+  });
+  return published!.recipe;
+}
+
+describe('recipe favorite access', () => {
+  it('authorizes against the current recipe and projects every relation read after revocation', async () => {
+    const published = await createRecipe('publisher', 'community');
+    const privateRecipe = await createRecipe('private-owner');
+    const readerRelations = getUserFoodRelationRepository();
+
+    const added = await addFavoriteHandler(
+      await requestAs('reader', {
+        body: {
+          foodRef: published.id,
+          foodRefType: 'recipe',
+          displayName: 'Forged title',
+          imageUrl: 'https://example.invalid/forged.jpg',
+          nutritionPer100g: { calories: 9999, protein: 9999, carbs: 9999, fat: 9999, fiber: 9999 },
+          portion: { label: 'Forged', weightGrams: 1 },
+        },
+      }),
+      ctx,
+    );
+    expect(added.status).toBe(201);
+    expect(added.jsonBody).toMatchObject({
+      foodRef: published.id,
+      displayName: 'Server recipe',
+      recipeAccess: 'community',
+    });
+    for (const field of ['nutritionPer100g', 'portion', 'imageUrl', 'displayBrand']) {
+      expect(added.jsonBody).not.toHaveProperty(field);
+    }
+
+    const privateAdd = await addFavoriteHandler(
+      await requestAs('reader', {
+        body: { foodRef: privateRecipe.id, foodRefType: 'recipe', displayName: 'Private title' },
+      }),
+      ctx,
+    );
+    expect(privateAdd.status).toBe(404);
+    expect(await readerRelations.getByFoodRef('reader', privateRecipe.id)).toBeNull();
+
+    const ownerRecipe = await createRecipe(TEST_USER_ID);
+    const ownerAdd = await addFavoriteHandler(
+      await makeAuthRequest({
+        body: { foodRef: ownerRecipe.id, foodRefType: 'recipe', displayName: 'Forged owner title' },
+      }),
+      ctx,
+    );
+    expect(ownerAdd.status).toBe(201);
+    expect(ownerAdd.jsonBody).toMatchObject({ displayName: 'Server recipe', recipeAccess: 'owner' });
+
+    const readerRelation = await readerRelations.getByFoodRef('reader', published.id);
+    if (!readerRelation) throw new Error('Expected favorite relation');
+    const staleRelation = {
+      ...readerRelation,
+      displayName: 'Stale recipe title',
+      displayBrand: 'Stale brand',
+      imageUrl: 'https://example.invalid/stale.jpg',
+      nutritionPer100g: { calories: 1234, protein: 123, carbs: 456, fat: 78, fiber: 9 },
+      portion: { label: 'Stale portion', weightGrams: 999 },
+      isComplete: true,
+    };
+    const current = await getRecipesRepository().getVersioned('publisher', published.id);
+    await getRecipesRepository().setVisibility('publisher', published.id, current!.etag, { visibility: 'private' });
+
+    const reAddAfterRevocation = await addFavoriteHandler(
+      await requestAs('reader', {
+        body: { foodRef: published.id, foodRefType: 'recipe', displayName: 'Forged after revoke' },
+      }),
+      ctx,
+    );
+    expect(reAddAfterRevocation.status).toBe(404);
+    expect(await readerRelations.getByFoodRef('reader', published.id)).toMatchObject({ isFavorite: true });
+
+    vi.spyOn(readerRelations, 'listFavorites').mockResolvedValue([staleRelation]);
+    vi.spyOn(readerRelations, 'listRecent').mockResolvedValue([staleRelation]);
+    vi.spyOn(readerRelations, 'listFrequent').mockResolvedValue([staleRelation]);
+
+    const favorites = await listFavoritesHandler(await requestAs('reader'), ctx);
+    const grouped = await getFavoritesGroupedHandler(await requestAs('reader'), ctx);
+    const recent = await listRecentHandler(await requestAs('reader'), ctx);
+    const frequent = await listFrequentHandler(await requestAs('reader'), ctx);
+    const rows = [
+      (favorites.jsonBody as Array<Record<string, unknown>>)[0]!,
+      (grouped.jsonBody as { all: Array<Record<string, unknown>> }).all[0]!,
+      (recent.jsonBody as Array<Record<string, unknown>>)[0]!,
+      (frequent.jsonBody as Array<Record<string, unknown>>)[0]!,
+    ];
+    for (const row of rows) {
+      expect(row).toMatchObject({ displayName: 'Rezept nicht verfügbar', recipeAccess: 'unavailable' });
+      for (const field of ['displayBrand', 'imageUrl', 'nutritionPer100g', 'portion', 'isComplete']) {
+        expect(row).not.toHaveProperty(field);
+      }
+    }
+
+    const removed = await removeFavoriteHandler(
+      await requestAs('reader', { params: { foodRef: published.id } }),
+      ctx,
+    );
+    expect(removed.status).toBe(204);
+    vi.restoreAllMocks();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -33,10 +170,11 @@ beforeEach(() => {
 
 describe('POST /api/favorites', () => {
   it('accepts foodRefType "recipe" and returns 201', async () => {
+    const recipe = await createRecipe(TEST_USER_ID);
     const res = await addFavoriteHandler(
       await makeAuthRequest({
         body: {
-          foodRef: 'recipe-uuid-1',
+          foodRef: recipe.id,
           foodRefType: 'recipe',
           displayName: 'Mein Rezept',
         },
@@ -44,8 +182,12 @@ describe('POST /api/favorites', () => {
       ctx,
     );
     expect(res.status).toBe(201);
-    const body = res.jsonBody as { foodRefType: string };
-    expect(body.foodRefType).toBe('recipe');
+    expect(res.jsonBody).toMatchObject({
+      foodRef: recipe.id,
+      foodRefType: 'recipe',
+      displayName: 'Server recipe',
+      recipeAccess: 'owner',
+    });
   });
 
   it('stores nutritionPer100g when provided', async () => {

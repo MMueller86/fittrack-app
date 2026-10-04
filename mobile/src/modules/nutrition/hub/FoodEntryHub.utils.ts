@@ -1,4 +1,13 @@
 import type { UserFoodRelation, MealType } from '@fittrack/shared';
+import { isUnavailableRecipeRelation } from './RelationRow.utils';
+
+export function canSelectFoodRelation(
+  relation: UserFoodRelation,
+  isRecipeContext: boolean,
+): boolean {
+  return !isUnavailableRecipeRelation(relation)
+    && !(isRecipeContext && relation.foodRefType === 'recipe');
+}
 
 export function computeLastUsageText(item: UserFoodRelation): string | null {
   const { lastInputMode, lastInputAmount, nutritionPer100g, portion } = item;
@@ -50,9 +59,20 @@ export function computeDirectAddLabel(
   activeFilter: string,
 ): string | null {
   if (activeFilter !== 'fuerDich') return null;
-  if (!item.nutritionPer100g) return null;
   const { preferredInputMode, preferredInputAmount } = item;
   if (!preferredInputAmount || preferredInputAmount <= 0) return null;
+  if (item.foodRefType === 'recipe') {
+    if (
+      isUnavailableRecipeRelation(item)
+      || preferredInputMode !== 'portion'
+      || !Number.isFinite(preferredInputAmount)
+    ) return null;
+    const count = preferredInputAmount % 1 === 0
+      ? String(preferredInputAmount)
+      : preferredInputAmount.toFixed(1);
+    return `${count} ${preferredInputAmount === 1 ? 'Portion' : 'Portionen'}`;
+  }
+  if (!item.nutritionPer100g) return null;
   if (preferredInputMode === 'portion') {
     const unitLabel = item.portion?.label ?? 'Portion';
     const count = preferredInputAmount % 1 === 0

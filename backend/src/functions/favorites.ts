@@ -2,6 +2,7 @@
 import { z } from 'zod';
 
 import { requireUser } from '../lib/auth';
+import { projectRecipeReferenceAccess, resolveRecipeForRead } from '../lib/communityRecipes';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
@@ -49,12 +50,16 @@ function isRealIsoDate(value: string): boolean {
 // GET /api/favorites
 const VALID_MEAL_TYPES = new Set(['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout']);
 
+async function projectRecipeRelations(userId: string, relations: UserFoodRelation[]) {
+  return Promise.all(relations.map((relation) => projectRecipeReferenceAccess(userId, relation)));
+}
+
 export const listFavoritesHandler = withHandler(
   'favorites.list',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const repo = getUserFoodRelationRepository();
-    const favorites = await repo.listFavorites(userId);
+    const favorites = await projectRecipeRelations(userId, await repo.listFavorites(userId));
 
     const contextParam = request.query.get('context');
     if (contextParam !== null) {
@@ -71,6 +76,7 @@ export const listFavoritesHandler = withHandler(
       return { status: 200, jsonBody: { items: sorted, context } };
     }
 
+    favorites.sort((first, second) => first.displayName.localeCompare(second.displayName, 'de'));
     logEvent(ctx, 'info', 'favorites.list', { count: favorites.length });
     return { status: 200, jsonBody: favorites };
   },
@@ -86,6 +92,23 @@ export const addFavoriteHandler = withHandler(
     const body = parsed.data;
 
     const repo = getUserFoodRelationRepository();
+    if (body.foodRefType === 'recipe') {
+      const resolved = await resolveRecipeForRead(userId, body.foodRef);
+      if (!resolved.recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+
+      const relation = await repo.setFavorite(
+        userId,
+        body.foodRef,
+        'recipe',
+        resolved.recipe.name,
+        undefined,
+        true,
+      );
+      const projected = await projectRecipeReferenceAccess(userId, relation);
+      logEvent(ctx, 'info', 'favorites.add', { foodRef: body.foodRef });
+      return { status: 201, jsonBody: projected };
+    }
+
     const relation = await repo.setFavorite(
       userId,
       body.foodRef,
@@ -131,7 +154,7 @@ export const listRecentHandler = withHandler(
     const limitParam = request.query.get('limit');
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 10, 1), 50) : 10;
     const repo = getUserFoodRelationRepository();
-    const recent = await repo.listRecent(userId, limit);
+    const recent = await projectRecipeRelations(userId, await repo.listRecent(userId, limit));
     logEvent(ctx, 'info', 'foodRelations.recent', { count: recent.length });
     return { status: 200, jsonBody: recent };
   },
@@ -145,7 +168,7 @@ export const listFrequentHandler = withHandler(
     const limitParam = request.query.get('limit');
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 10, 1), 50) : 10;
     const repo = getUserFoodRelationRepository();
-    const frequent = await repo.listFrequent(userId, limit);
+    const frequent = await projectRecipeRelations(userId, await repo.listFrequent(userId, limit));
     logEvent(ctx, 'info', 'foodRelations.frequent', { count: frequent.length });
     return { status: 200, jsonBody: frequent };
   },
@@ -168,7 +191,7 @@ export const getFavoritesGroupedHandler = withHandler(
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const repo = getUserFoodRelationRepository();
-    const favorites = await repo.listFavorites(userId);
+    const favorites = await projectRecipeRelations(userId, await repo.listFavorites(userId));
 
     const all = sortFavorites(favorites);
 

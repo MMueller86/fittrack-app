@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import sharp from "sharp";
 import satori from "satori";
 import type { Font } from "satori";
 import { describe, expect, it, vi } from "vitest";
@@ -53,6 +54,14 @@ const nineIngredientsDetailsFixture = {
 const twentyIngredientsDetailsFixture = {
   ...alphaTwentyIngredientsDetailsFixture,
   image: quarkbroetchenDetailsFixture.image,
+};
+const servingLabelDetailsFixture = {
+  ...quarkbroetchenDetailsFixture,
+  ingredients: [
+    ...quarkbroetchenDetailsFixture.ingredients,
+    { amount: "10 g", name: "Leinsamen" },
+    { amount: "3 1 portion (10 g)", name: "Sesam" },
+  ],
 };
 
 const HYPHENATION_MARKER = "\uE000";
@@ -324,6 +333,82 @@ describe("Instagram recipe details template", () => {
     const result = await renderInstagramRecipeDetailsTemplate(gefluegelfrikadellenDetailsFixture);
     expect(result).toMatchObject({ ok: true, width: 1080, height: 1350, format: "png" });
   });
+
+  it("renders seven ingredients with the full serving label at index 6 as an Instagram PNG", async () => {
+    vi.mocked(satori).mockClear();
+    const result = await renderInstagramRecipeDetailsTemplate(servingLabelDetailsFixture);
+
+    expect(result, result.ok ? undefined : JSON.stringify(result.error))
+      .toMatchObject({ ok: true, width: 1080, height: 1350, format: "png" });
+    if (!result.ok) {
+      return;
+    }
+    expect(await sharp(result.buffer).metadata()).toMatchObject({
+      width: 1080,
+      height: 1350,
+      format: "png",
+    });
+    const ingredientNodes = vi.mocked(satori).mock.calls.flatMap(([root]) =>
+      flattenTemplateElements(root).filter(
+        (node) => node.props["data-render-node"] === "recipe-details-ingredient-6",
+      ),
+    );
+    expect(ingredientNodes).toHaveLength(1);
+    expect(ingredientNodes[0]?.props.children).toBe("3 1 portion (10 g) Sesam");
+  });
+
+  it.each([
+    { dimension: "width" as const, amount: "W".repeat(80) },
+    { dimension: "height" as const, amount: "1 portion (10 g) ".repeat(30).trim() },
+  ])("reports genuine amount $dimension overflow with ingredient detail", async ({ dimension, amount }) => {
+    const result = await renderInstagramRecipeDetailsTemplate({
+      ...servingLabelDetailsFixture,
+      ingredients: servingLabelDetailsFixture.ingredients.map((ingredient, index) =>
+        index === 6 ? { ...ingredient, amount } : ingredient,
+      ),
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: "TEMPLATE_FIELD_OVERFLOW",
+        field: "ingredients",
+        itemIndex: 6,
+        itemField: "text",
+      },
+    });
+    if (result.ok || result.error.code !== "TEMPLATE_FIELD_OVERFLOW") {
+      return;
+    }
+    const measured = result.error.measured!;
+    expect(measured).toMatchObject({ maxWidth: expect.any(Number), maxHeight: expect.any(Number) });
+    expect(measured[dimension]).toBeGreaterThan(
+      (dimension === "width" ? measured.maxWidth : measured.maxHeight)! + 0.5,
+    );
+  });
+
+  it.each(["", "   ", "3\nportion", "3\rportion", "3\r\nportion", "3\u2028portion", "3\u2029portion"])(
+    "rejects an empty or multiline amount %j with ingredient detail",
+    async (amount) => {
+      const result = await renderInstagramRecipeDetailsTemplate({
+        ...servingLabelDetailsFixture,
+        ingredients: servingLabelDetailsFixture.ingredients.map((ingredient, index) =>
+          index === 6 ? { ...ingredient, amount } : ingredient,
+        ),
+      });
+
+      expect(result).toMatchObject({
+        ok: false,
+        error: {
+          code: "INVALID_TEMPLATE_INPUT",
+          field: "ingredients",
+          itemIndex: 6,
+          itemField: "amount",
+          itemValue: amount,
+        },
+      });
+    },
+  );
 
   it("renders the nine-ingredient two-column boundary as an Instagram PNG", async () => {
     const result = await renderInstagramRecipeDetailsTemplate(nineIngredientsDetailsFixture);

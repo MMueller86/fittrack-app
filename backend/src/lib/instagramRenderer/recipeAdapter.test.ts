@@ -191,6 +191,36 @@ describe('adaptRecipeToRenderInput', () => {
     });
   });
 
+  it.each([
+    { inputAmount: 3, unit: '1 portion (10 g)', amountGrams: 30, expected: '3 1 portion (10 g)' },
+    { inputAmount: 1.25, unit: '1 portion (10 g)', amountGrams: 12.5, expected: '1.3 1 portion (10 g)' },
+    { inputAmount: 250, unit: 'g', amountGrams: 250, expected: '250 g' },
+    { inputAmount: 2, unit: 'Stück', amountGrams: 100, expected: '2 Stück' },
+    { inputAmount: 1, unit: 'Dose', amountGrams: 400, expected: '1 Dose' },
+    { inputAmount: 125.5, unit: 'g', amountGrams: 125.5, expected: '125.5 g' },
+    { inputAmount: null, unit: 'g', amountGrams: 125.5, expected: '125.5 g' },
+    { inputAmount: 2, unit: '', amountGrams: 140.5, expected: '140.5 g' },
+  ])('preserves amount formatting as $expected without changing the recipe or nutrition', ({ expected, ...amount }) => {
+    const sourceRecipe = {
+      ...detailsRecipe,
+      ingredients: detailsRecipe.ingredients.map((ingredient, index) =>
+        index === 0 ? { ...ingredient, ...amount } : ingredient,
+      ),
+    };
+    const before = structuredClone(sourceRecipe);
+
+    const input = adaptRecipeToDetailsTemplateInput(sourceRecipe, Buffer.from('image'));
+
+    expect(input.ingredients).toEqual([
+      { amount: expected, name: 'Eier' },
+      { amount: '125.5 g', name: 'Magerquark' },
+    ]);
+    expect(sourceRecipe).toEqual(before);
+    expect(adaptRecipeToRenderInput(sourceRecipe, Buffer.from('image'), {}).nutrition).toEqual({
+      calories: 200.25, protein: 25.5, carbs: 20.75, fat: 5.125,
+    });
+  });
+
   it('requires a confirmed export view instead of inventing detail data', () => {
     expect(() => adaptRecipeToDetailsTemplateInput(recipe, Buffer.from('image'))).toThrowError(
       expect.objectContaining({ code: 'MISSING_EXPORT_VIEW', field: 'exportView' } satisfies Partial<RecipeDetailsAdapterError>),

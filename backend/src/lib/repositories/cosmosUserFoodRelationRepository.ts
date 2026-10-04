@@ -10,7 +10,7 @@ import type {
   PortionInfo,
 } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
-import { EMA_ALPHA, trimUsageDates, type UserFoodRelationRepository } from './userFoodRelationRepository';
+import { EMA_ALPHA, stripRecipeRelationCache, trimUsageDates, type UserFoodRelationRepository } from './userFoodRelationRepository';
 
 export class CosmosUserFoodRelationRepository implements UserFoodRelationRepository {
 
@@ -54,23 +54,28 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     displayName: string,
     displayBrand: string | undefined,
     isFavorite: boolean,
-    imageUrl?: string,
+    imageUrl?: string | null,
     nutritionPer100g?: NutritionValues,
     portion?: PortionInfo | null,
   ): Promise<UserFoodRelation> {
     const { containers } = await getCosmos();
     const existing = await this.getByFoodRef(userId, foodRef);
     const id = this.makeId(userId, foodRef);
-    const relation: UserFoodRelation = existing
+    const isRecipe = foodRefType === 'recipe';
+    const safeExisting = existing && isRecipe ? stripRecipeRelationCache(existing) : existing;
+    const relation: UserFoodRelation = safeExisting
       ? {
-          ...existing,
+          ...safeExisting,
+          foodRefType,
           isFavorite,
           displayName,
-          displayBrand,
-          ...(imageUrl !== undefined ? { imageUrl } : {}),
-          ...(nutritionPer100g !== undefined ? { nutritionPer100g } : {}),
-          ...(portion !== undefined ? { portion } : {}),
-          ...(isFavorite && !existing.favoritedAt ? { favoritedAt: new Date().toISOString() } : {}),
+          ...(!isRecipe ? {
+            displayBrand,
+            ...(imageUrl !== undefined ? { imageUrl } : {}),
+            ...(nutritionPer100g !== undefined ? { nutritionPer100g } : {}),
+            ...(portion !== undefined ? { portion } : {}),
+          } : {}),
+          ...(isFavorite && !safeExisting.favoritedAt ? { favoritedAt: new Date().toISOString() } : {}),
         }
       : {
           id,
@@ -78,10 +83,12 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
           foodRef,
           foodRefType,
           displayName,
-          displayBrand,
-          ...(imageUrl ? { imageUrl } : {}),
-          ...(nutritionPer100g ? { nutritionPer100g } : {}),
-          ...(portion != null ? { portion } : {}),
+          ...(!isRecipe ? {
+            displayBrand,
+            ...(imageUrl ? { imageUrl } : {}),
+            ...(nutritionPer100g ? { nutritionPer100g } : {}),
+            ...(portion != null ? { portion } : {}),
+          } : {}),
           ...(isFavorite ? { favoritedAt: new Date().toISOString() } : {}),
           isFavorite,
           lastUsedAt: null,
@@ -128,7 +135,10 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
 
       const { containers } = await getCosmos();
       const now = new Date().toISOString();
-      const existing = await this.getByFoodRef(userId, input.foodRef);
+      const storedExisting = await this.getByFoodRef(userId, input.foodRef);
+      const existing = storedExisting && input.foodRefType === 'recipe'
+        ? stripRecipeRelationCache(storedExisting)
+        : storedExisting;
       const id = this.makeId(userId, input.foodRef);
 
       // Fix C: drop mealTypeCounts from existing doc spread (self-cleaning)
@@ -137,12 +147,13 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
         const { mealTypeCounts: _dropped, ...existingWithoutLegacy } = existing as UserFoodRelation & { mealTypeCounts?: unknown };
         relation = {
           ...existingWithoutLegacy,
+          foodRefType: input.foodRefType,
           lastUsedAt: now,
           usageCount: existing.usageCount + 1,
           displayName: input.displayName,
-          displayBrand: input.displayBrand,
+          ...(input.foodRefType !== 'recipe' ? { displayBrand: input.displayBrand } : {}),
           // imageUrl aktualisieren wenn neu geliefert (überschreibt nie mit null wenn bereits gesetzt)
-          ...(input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
+          ...(input.foodRefType !== 'recipe' && input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
           ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
           ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
         };
@@ -154,8 +165,10 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
           foodRef: input.foodRef,
           foodRefType: input.foodRefType,
           displayName: input.displayName,
-          displayBrand: input.displayBrand,
-          imageUrl: input.imageUrl ?? null,
+          ...(input.foodRefType !== 'recipe' ? {
+            displayBrand: input.displayBrand,
+            imageUrl: input.imageUrl ?? null,
+          } : {}),
           isFavorite: false,
           lastUsedAt: now,
           usageCount: 1,

@@ -24,6 +24,10 @@ import { CosmosRecipesRepository } from './cosmosRecipesRepository';
 import type { CreateRecipeInput } from './recipesRepository';
 import { createRecipeExportView } from './recipeExport';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
+import { projectCommunityRecipe, projectRecipeReferenceAccess, resolveRecipeForRead } from '../communityRecipes';
+import { getReusableItemsRepository, __resetReusableItemsRepositoryForTests } from './reusableItemsRepository';
+import { _resetFoodProductRepository } from './foodProductRepository';
+import { getProfileRepository, __resetProfileRepositoryForTests } from './profileRepository';
 
 let ctx: EmulatorContext | undefined;
 let repo: CosmosRecipesRepository;
@@ -60,6 +64,9 @@ const USER_B = 'contract-recipes-b';
 
 beforeEach(async () => {
   await clearRecipes([USER_A, USER_B]);
+  __resetReusableItemsRepositoryForTests();
+  _resetFoodProductRepository();
+  __resetProfileRepositoryForTests();
 });
 
 // ---------------------------------------------------------------------------
@@ -108,6 +115,169 @@ function makeInput(overrides: Partial<CreateRecipeInput> = {}): CreateRecipeInpu
 // ---------------------------------------------------------------------------
 
 describe('CosmosRecipesRepository (contract)', () => {
+  it('reads legacy missing/unknown visibility as private and never grants access through sharedWithUserIds', async () => {
+    for (const visibility of [undefined, 'public', 'PRIVATE']) {
+      const created = await repo.create(USER_A, makeInput());
+      const container = ctx!.database.container('recipes');
+      const { resource } = await container.item(created.id, USER_A).read<Record<string, unknown>>();
+      delete resource!.visibility;
+      delete resource!.communityPublication;
+      delete (resource!.ingredients as Array<Record<string, unknown>>)[0].nutritionSource;
+      if (visibility !== undefined) resource!.visibility = visibility;
+      resource!.sharedWithUserIds = [USER_B];
+      await container.item(created.id, USER_A).replace(resource!);
+      const legacy = await repo.get(USER_A, created.id);
+      expect(legacy?.visibility).toBe('private');
+      expect(legacy?.ingredients[0].nutritionSource).toBeUndefined();
+      expect(await repo.getCommunityById(created.id)).toBeNull();
+      expect(await resolveRecipeForRead(USER_B, created.id, repo)).toEqual({ access: 'unavailable', recipe: null });
+    }
+    expect((await repo.listCommunity()).recipes).toEqual([]);
+  });
+
+  it('paginates explicit community recipes across two partitions, ordered by updatedAt', async () => {
+    const expected: string[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      const owner = index % 2 === 0 ? USER_A : USER_B;
+      const created = await repo.createVersioned(owner, makeInput({ name: `Published ${index}` }));
+      await repo.setVisibility(owner, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: false });
+      const container = ctx!.database.container('recipes');
+      const { resource } = await container.item(created.recipe.id, owner).read<Record<string, unknown>>();
+      resource!.updatedAt = `2026-10-0${index + 1}T12:00:00.000Z`;
+      await container.item(created.recipe.id, owner).replace(resource!);
+      expected.unshift(created.recipe.id);
+    }
+    await repo.create(USER_A, makeInput({ name: 'Private A' }));
+    await repo.create(USER_B, makeInput({ name: 'Private B' }));
+    const ids: string[] = [];
+    let continuationToken: string | undefined;
+    let pages = 0;
+    do {
+      const page = await repo.listCommunity({ limit: 2, continuationToken });
+      expect(page.recipes.length).toBeLessThanOrEqual(2);
+      ids.push(...page.recipes.map((recipe) => recipe.id));
+      continuationToken = page.continuationToken;
+      pages += 1;
+      if (pages > 20) throw new Error('Community pagination did not terminate');
+    } while (continuationToken);
+    expect(ids).toEqual(expected);
+    expect(pages).toBeGreaterThan(1);
+    expect(await repo.get(USER_B, expected[0])).toBeNull();
+    expect((await repo.getCommunityById(expected[0]))?.ownerUserId).toBe(USER_A);
+  });
+
+  it('rejects foreign/stale publication writes and preserves publication on content, image and usage writes', async () => {
+    const created = await repo.createVersioned(USER_A, makeInput());
+    expect(created.recipe.visibility).toBe('private');
+    expect(await repo.setVisibility(USER_B, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: true })).toBeNull();
+    const published = await repo.setVisibility(USER_A, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: true });
+    expect(published?.recipe.communityPublication?.contentConfirmedAt).toBeTruthy();
+    expect(await repo.setVisibility(USER_A, created.recipe.id, created.etag, { visibility: 'private' })).toBeNull();
+    await repo.update(USER_A, created.recipe.id, { name: 'Changed', images: [{ id: 'image', blobName: 'private/blob', order: 1 }] });
+    await repo.incrementUsage(USER_A, created.recipe.id);
+    const current = await repo.getVersioned(USER_A, created.recipe.id);
+    expect(current?.recipe.communityPublication).toEqual(published?.recipe.communityPublication);
+    expect(current?.recipe.visibility).toBe('community');
+    expect(await repo.setVisibility(USER_A, created.recipe.id, published!.etag, { visibility: 'private' })).toBeNull();
+    const revoked = await repo.setVisibility(USER_A, created.recipe.id, current!.etag, { visibility: 'private' });
+    expect(revoked?.recipe.communityPublication).toBeUndefined();
+    const { resource } = await ctx!.database.container('recipes').item(created.recipe.id, USER_A).read<Record<string, unknown>>();
+    expect(resource).not.toHaveProperty('communityPublication');
+    expect(await repo.getCommunityById(created.recipe.id)).toBeNull();
+  });
+
+  it('fails closed for duplicate IDs, even when the other partition contains a private recipe', async () => {
+    const created = await repo.createVersioned(USER_A, makeInput());
+    await repo.setVisibility(USER_A, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: false });
+    const container = ctx!.database.container('recipes');
+    const { resource } = await container.item(created.recipe.id, USER_A).read<Record<string, unknown>>();
+    await container.items.create({ ...resource, userId: USER_B, ownerUserId: USER_B, visibility: 'private' });
+    expect(await repo.getCommunityById(created.recipe.id)).toBeNull();
+    expect((await repo.listCommunity()).recipes).toEqual([]);
+    expect((await resolveRecipeForRead(USER_B, created.recipe.id, repo)).access).toBe('owner');
+    expect(await repo.get(USER_A, created.recipe.id)).not.toBeNull();
+  });
+
+  it('projects missing consent anonymously and reads only the current consenting profile', async () => {
+    const created = await repo.createVersioned(USER_A, makeInput());
+    const published = await repo.setVisibility(USER_A, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: false });
+    const imagePath = (recipeId: string, imageId: string) => `/api/test-recipes/${recipeId}/images/${imageId}`;
+    await ctx!.database.container('nutritionProfiles').items.upsert({ id: 'profile', userId: USER_A, displayName: 'Current author' });
+    expect((await projectCommunityRecipe(published!.recipe, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('Anonymous');
+    const consented = await repo.setVisibility(USER_A, created.recipe.id, published!.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: true });
+    expect((await projectCommunityRecipe(consented!.recipe, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('Current author');
+    await ctx!.database.container('nutritionProfiles').items.upsert({ id: 'profile', userId: USER_A, displayName: 'New name' });
+    expect((await projectCommunityRecipe(consented!.recipe, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('New name');
+    const container = ctx!.database.container('recipes');
+    const { resource } = await container.item(created.recipe.id, USER_A).read<Record<string, unknown>>();
+    delete resource!.communityPublication;
+    await container.item(created.recipe.id, USER_A).replace(resource!);
+    const legacy = await repo.getCommunityById(created.recipe.id);
+    expect((await projectCommunityRecipe(legacy!, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('Anonymous');
+  });
+
+  it('snapshots provenance from owner-only library, retains legacy unknown and rejects new contradictions', async () => {
+    const library = getReusableItemsRepository();
+    const manual = await library.create({ userId: USER_A, name: 'Manual', sourceType: 'manual', nutritionBasis: 'per100g', nutritionPer100g: baseIngredient.nutritionPer100g, isComplete: true });
+    const foreign = await library.create({ userId: USER_B, name: 'Foreign', sourceType: 'manual', nutritionBasis: 'per100g', nutritionPer100g: baseIngredient.nutritionPer100g, isComplete: true });
+    const created = await repo.create(USER_A, makeInput({ ingredients: [
+      { ...baseIngredient, linkedProductId: manual.id },
+      { ...baseIngredient, id: 'foreign', linkedReusableItemId: foreign.id },
+      { ...baseIngredient, id: 'unknown' },
+      { ...baseIngredient, id: 'ai', isAiEstimate: true },
+    ] }));
+    expect(created.ingredients.map((ingredient) => ingredient.nutritionSource)).toEqual(['manual', 'unknown', 'unknown', 'ai']);
+    const container = ctx!.database.container('recipes');
+    const { resource } = await container.item(created.id, USER_A).read<Record<string, unknown>>();
+    const oldIngredients = resource!.ingredients as Array<Record<string, unknown>>;
+    delete oldIngredients[0].nutritionSource;
+    oldIngredients[3].nutritionSource = 'manual';
+    await container.item(created.id, USER_A).replace(resource!);
+    const legacy = await repo.getVersioned(USER_A, created.id);
+    const updated = await repo.compareAndReplace(USER_A, created.id, legacy!.etag, { ingredients: legacy!.recipe.ingredients });
+    expect(updated?.recipe.ingredients.map((ingredient) => ingredient.nutritionSource)).toEqual(['unknown', 'unknown', 'unknown', 'ai']);
+    await expect(repo.create(USER_A, makeInput({ ingredients: [{ ...baseIngredient, isAiEstimate: true, nutritionSource: 'manual' }] }))).rejects.toThrow('Contradictory');
+  });
+
+  it('keeps recipe references at original IDs and access status response-only', async () => {
+    const created = await repo.createVersioned(USER_A, makeInput());
+    const relation = { id: `${USER_B}:${created.recipe.id}`, userId: USER_B, foodRefType: 'recipe' as const, foodRef: created.recipe.id, displayName: 'Snapshot', isFavorite: true, lastUsedAt: null, usageCount: 0, createdAt: new Date().toISOString() };
+    await ctx!.database.container('userFoodRelations').items.create(relation);
+    const projected = await projectRecipeReferenceAccess(USER_B, relation, repo);
+    expect(projected.recipeAccess).toBe('unavailable');
+    expect(projected.foodRef).toBe(created.recipe.id);
+    const raw = await ctx!.database.container('userFoodRelations').item(relation.id, USER_B).read<Record<string, unknown>>();
+    expect(raw.resource).not.toHaveProperty('recipeAccess');
+  });
+
+  it('resolves existing OFF, AI and label-scan sources and retains their snapshots after library changes', async () => {
+    const productId = 'openFoodFacts:contract-community';
+    await ctx!.database.container('foodProducts').items.upsert({ id: productId, source: 'openFoodFacts', name: 'Catalog ingredient' });
+    const ai = await getReusableItemsRepository().create({ userId: USER_A, name: 'AI', sourceType: 'ai', nutritionBasis: 'per100g', nutritionPer100g: baseIngredient.nutritionPer100g, isComplete: true });
+    const label = await getReusableItemsRepository().create({ userId: USER_A, name: 'Label', sourceType: 'label-scan', nutritionBasis: 'per100g', nutritionPer100g: baseIngredient.nutritionPer100g, isComplete: true });
+    const created = await repo.create(USER_A, makeInput({ ingredients: [
+      { ...baseIngredient, linkedProductId: productId },
+      { ...baseIngredient, id: 'ai-source', linkedReusableItemId: ai.id, isAiEstimate: true },
+      { ...baseIngredient, id: 'label-source', linkedReusableItemId: label.id },
+      { ...baseIngredient, id: 'missing-source', linkedProductId: 'openFoodFacts:missing' },
+    ] }));
+    expect(created.ingredients.map((ingredient) => ingredient.nutritionSource)).toEqual(['openFoodFacts', 'ai', 'label-scan', 'unknown']);
+    await ctx!.database.container('reusableMealItems').item(label.id, USER_A).replace({ ...label, sourceType: 'manual' });
+    const updated = await repo.update(USER_A, created.id, { ingredients: created.ingredients });
+    expect(updated?.ingredients[2].nutritionSource).toBe('label-scan');
+  });
+
+  it('allows exactly one concurrent visibility write against a revision', async () => {
+    const created = await repo.createVersioned(USER_A, makeInput());
+    const results = await Promise.all([
+      repo.setVisibility(USER_A, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: true }),
+      repo.setVisibility(USER_A, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: false }),
+    ]);
+    expect(results.filter((result) => result !== null)).toHaveLength(1);
+    const winner = results.find((result) => result !== null)!;
+    expect((await repo.get(USER_A, created.recipe.id))?.communityPublication).toEqual(winner.recipe.communityPublication);
+  });
+
   // ---- create + get roundtrip -------------------------------------------
 
   it('create stores the recipe and get retrieves it by id', async () => {

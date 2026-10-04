@@ -18,6 +18,7 @@
         "@azure/storage-queue": "^12.30.0",
         "@resvg/resvg-js": "~2.6.2",
         "@tabler/icons": "~3.46.0",
+        "hyphen": "^1.14.1",
         "jose": "^6.2.3",
         "lucide-static": "~1.46.0",
         "openai": "^4.104.0",

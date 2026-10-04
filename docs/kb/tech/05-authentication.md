@@ -98,9 +98,21 @@ Note: `isAdmin` and `tier = 'internal'` both achieve unlimited quota but via dif
 
 ## Authorization Model
 
-- All user data is scoped by `userId` (partition key in Cosmos)
+- User-owned data remains scoped by the JWT `userId` (the `/userId` Cosmos partition key). Recipe sharing is a narrow exception: only dedicated authenticated community reads, and recipe-reference resolution for favorites/logging, may cross partitions, and only for a recipe whose current visibility is explicitly `community`.
 - No role-based access control beyond tier assignment
 - There is no admin UI — internal users get unlimited quota only
+
+| Recipe operation | Authorization |
+|---|---|
+| Owner recipe list/detail/create/update/delete, image management, export, and scale | Authenticated owner only; foreign recipe IDs remain not found |
+| Community list/detail/image bytes | Any valid signed-in user, but only for currently published (`visibility: 'community'`) recipes; image requests recheck visibility and require the Bearer token |
+| Favorite or recipe log reference | Owner, or another signed-in user while the recipe is currently published; private, deleted, or revoked foreign references cannot be newly opened/logged |
+
+This exception does not relax access to any other user's data or turn a
+community recipe into an owner-managed recipe. Setting a recipe private removes
+community access but leaves its owner's normal access unchanged. Community
+image bytes use the authenticated API proxy, not an anonymous SAS URL; the
+ordinary owner image routes retain their existing short-lived SAS contract.
 
 ## Authentication by Environment
 

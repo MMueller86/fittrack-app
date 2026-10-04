@@ -5,17 +5,21 @@
 // (blobName + order only — no transient SAS URLs stored).
 
 import { randomUUID } from 'node:crypto';
-import type { Recipe, RecipeImage, RecipeStep } from '@fittrack/shared';
+import type { Recipe, RecipeImage, RecipeStep, RecipeVisibilityInput } from '@fittrack/shared';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { getCosmos } from '../cosmos';
 import type {
   CreateRecipeInput,
+  CommunityRecipeRepositoryPage,
+  ListCommunityRecipesOptions,
   ListRecipesOptions,
   RecipesRepository,
   UpdateRecipeInput,
   VersionedRecipe,
 } from './recipesRepository';
 import { withRecipeExportViewStatus } from './recipeExport';
+import { applyRecipeVisibility, communityPageSize, effectiveRecipeVisibility } from './recipePublication';
+import { resolveRecipeIngredientProvenance } from './recipeIngredientProvenance';
 
 // Cosmos stores ownerUserId as the partition key field.
 // The document shape mirrors Recipe exactly, plus a `userId` field
@@ -26,6 +30,10 @@ type CosmosRecipeDoc = Omit<Recipe, 'images' | 'exportViewStatus'> & { images: S
 
 function isCosmosRecipeDoc(resource: CosmosRecipeDoc | undefined): resource is CosmosRecipeDoc {
   return Boolean(resource?.id && resource.ownerUserId && resource.userId && resource.name);
+}
+
+function cosmosPageResources<T>(page: { resources?: unknown } | null | undefined): T[] {
+  return Array.isArray(page?.resources) ? page.resources : [];
 }
 
 function toStoredImages(images: RecipeImage[] | undefined): StoredRecipeImage[] {
@@ -61,8 +69,9 @@ function toRecipe(doc: CosmosRecipeDoc): Recipe {
     nutritionTotal: doc.nutritionTotal,
     nutritionPerPortion: doc.nutritionPerPortion,
     ...(doc.exportView !== undefined ? { exportView: doc.exportView } : {}),
-    visibility: doc.visibility,
-    sharedWithUserIds: doc.sharedWithUserIds,
+    visibility: effectiveRecipeVisibility(doc.visibility),
+    ...(doc.communityPublication !== undefined ? { communityPublication: doc.communityPublication } : {}),
+    sharedWithUserIds: doc.sharedWithUserIds ?? [],
     tags: doc.tags,
     lastUsedAt: doc.lastUsedAt,
     usageCount: doc.usageCount,
@@ -94,6 +103,7 @@ function toStoredRecipe(recipe: Recipe, userId: string): CosmosRecipeDoc {
     userId,
   };
   if (recipe.exportView !== undefined) doc.exportView = recipe.exportView;
+  if (recipe.communityPublication !== undefined) doc.communityPublication = recipe.communityPublication;
   return doc;
 }
 
@@ -109,6 +119,53 @@ function isPreconditionFailed(error: unknown): boolean {
 }
 
 export class CosmosRecipesRepository implements RecipesRepository {
+  async getCommunityById(id: string): Promise<Recipe | null> {
+    const { containers } = await getCosmos();
+    const published = containers.recipes.items.query<CosmosRecipeDoc>({
+      query: "SELECT * FROM c WHERE c.visibility = 'community' AND c.id = @id",
+      parameters: [{ name: '@id', value: id }],
+    });
+    let candidate: CosmosRecipeDoc | undefined;
+    while (published.hasMoreResults()) {
+      const page = await published.fetchNext();
+      for (const doc of cosmosPageResources<CosmosRecipeDoc>(page)) {
+        if (candidate || !isCosmosRecipeDoc(doc) || doc.ownerUserId !== doc.userId) return null;
+        candidate = doc;
+      }
+    }
+    if (!candidate) return null;
+    const identities = containers.recipes.items.query<{ userId: string }>({
+      query: 'SELECT c.userId FROM c WHERE c.id = @id',
+      parameters: [{ name: '@id', value: id }],
+    });
+    let count = 0;
+    while (identities.hasMoreResults()) {
+      const page = await identities.fetchNext();
+      count += cosmosPageResources<{ userId: string }>(page).length;
+      if (count > 1) return null;
+    }
+    return count === 1 ? toRecipe(candidate) : null;
+  }
+
+  async listCommunity(opts: ListCommunityRecipesOptions = {}): Promise<CommunityRecipeRepositoryPage> {
+    const { containers } = await getCosmos();
+    const page = await containers.recipes.items.query<CosmosRecipeDoc>({
+      query: "SELECT * FROM c WHERE c.visibility = 'community' ORDER BY c.updatedAt DESC",
+    }, { maxItemCount: communityPageSize(opts.limit), continuationToken: opts.continuationToken }).fetchNext();
+    const recipes: Recipe[] = [];
+    for (const doc of cosmosPageResources<CosmosRecipeDoc>(page)) {
+      const recipe = await this.getCommunityById(doc.id);
+      if (recipe) recipes.push(recipe);
+    }
+    return { recipes, ...(page.continuationToken ? { continuationToken: page.continuationToken } : {}) };
+  }
+
+  async setVisibility(userId: string, id: string, expectedEtag: string, input: RecipeVisibilityInput): Promise<VersionedRecipe | null> {
+    const existing = await this.getVersioned(userId, id);
+    if (!existing || existing.etag !== expectedEtag) return null;
+    return this.replaceIfMatch(userId, id, applyRecipeVisibility(existing.recipe, input), expectedEtag);
+  }
+
   async list(userId: string, opts?: ListRecipesOptions): Promise<Recipe[]> {
     const { containers } = await getCosmos();
     const { resources } = await containers.recipes.items
@@ -137,7 +194,7 @@ export class CosmosRecipesRepository implements RecipesRepository {
   async getVersioned(userId: string, id: string): Promise<VersionedRecipe | null> {
     const { containers } = await getCosmos();
     const { resource, etag } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!isCosmosRecipeDoc(resource)) return null;
+    if (!isCosmosRecipeDoc(resource) || resource.ownerUserId !== userId || resource.userId !== userId) return null;
     return { recipe: toRecipe(resource), etag: requireCosmosEtag(etag) };
   }
 
@@ -148,6 +205,7 @@ export class CosmosRecipesRepository implements RecipesRepository {
 
   async createVersioned(userId: string, input: CreateRecipeInput): Promise<VersionedRecipe> {
     const { containers } = await getCosmos();
+    const ingredients = await resolveRecipeIngredientProvenance(userId, input.ingredients);
     const now = new Date().toISOString();
     const recipe: Recipe = {
       id: randomUUID(),
@@ -155,7 +213,7 @@ export class CosmosRecipesRepository implements RecipesRepository {
       name: input.name,
       description: input.description,
       portions: input.portions,
-      ingredients: input.ingredients,
+      ingredients,
       steps: input.steps,
       images: [],
       nutritionTotal: input.nutritionTotal,
@@ -192,12 +250,20 @@ export class CosmosRecipesRepository implements RecipesRepository {
   ): Promise<VersionedRecipe | null> {
     const { containers } = await getCosmos();
     const { resource: existing } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!isCosmosRecipeDoc(existing)) return null;
+    if (!isCosmosRecipeDoc(existing) || existing.ownerUserId !== userId || existing.userId !== userId) return null;
 
     const existingRecipe = toRecipe(existing);
+    const ingredients = input.ingredients === undefined ? existingRecipe.ingredients
+      : await resolveRecipeIngredientProvenance(userId, input.ingredients, existingRecipe.ingredients);
     const updatedRecipe: Recipe = {
       ...existingRecipe,
       ...input,
+      id: existingRecipe.id,
+      ownerUserId: existingRecipe.ownerUserId,
+      visibility: existingRecipe.visibility,
+      communityPublication: existingRecipe.communityPublication,
+      sharedWithUserIds: existingRecipe.sharedWithUserIds,
+      ingredients,
       images: input.images ?? existingRecipe.images,
       updatedAt: new Date().toISOString(),
     };
@@ -227,7 +293,7 @@ export class CosmosRecipesRepository implements RecipesRepository {
   async delete(userId: string, id: string): Promise<boolean> {
     const { containers } = await getCosmos();
     const { resource: existing } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!isCosmosRecipeDoc(existing)) return false;
+    if (!isCosmosRecipeDoc(existing) || existing.ownerUserId !== userId || existing.userId !== userId) return false;
     await containers.recipes.item(id, userId).delete();
     return true;
   }

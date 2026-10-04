@@ -34,6 +34,7 @@ import {
   type RecipeShareMediaSession,
 } from '../../services/recipeShareMediaService';
 import { computeRecipeQuickEntryData } from './recipeUtils';
+import CommunityRecipeDetailScreen from './CommunityRecipeDetailScreen';
 import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
 import { RecipeIngredientGroup } from './RecipeIngredientGroup';
 import { RecipeImageHeroImage } from './RecipeImageHeroImage';
@@ -77,6 +78,13 @@ import LogRecipeModal from './LogRecipeModal';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeDetail'>;
 
+export default function RecipeDetailScreen(props: Props) {
+  if (props.route.params.source === 'community') {
+    return <CommunityRecipeDetailScreen {...props} />;
+  }
+  return <OwnerRecipeDetailScreen {...props} />;
+}
+
 const RECIPE_SCALE_LOADING_MESSAGE =
   'Die KI passt die Texte an die neuen Rezeptmengen an. Die KI kann Fehler machen.';
 const RECIPE_SHARE_PREPARING_MESSAGE = 'Exportvorschau wird vorbereitet.';
@@ -86,6 +94,8 @@ const RECIPE_SHARE_AI_PREPARING_MESSAGE =
 function clampTargetPortions(value: number): number {
   return Math.min(RECIPE_PORTION_MAX, Math.max(RECIPE_PORTION_MIN, value));
 }
+
+type RecipeVisibilityTarget = 'community' | 'private';
 
 type RecipeShareStage = 'closed' | 'preparing' | 'preview';
 type RecipeShareNoticeKind =
@@ -233,13 +243,16 @@ function describeShareError(error: unknown): string {
   }
 }
 
-export default function RecipeDetailScreen({ route, navigation }: Props) {
+function OwnerRecipeDetailScreen({ route, navigation }: Props) {
   const { id } = route.params;
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [logVisible, setLogVisible] = useState(false);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [visibilityTarget, setVisibilityTarget] = useState<RecipeVisibilityTarget | null>(null);
+  const [displayNameConsent, setDisplayNameConsent] = useState(false);
+  const [visibilityBusy, setVisibilityBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [imgIndex, setImgIndex] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -261,6 +274,10 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
   const [sharePreparationMessage, setSharePreparationMessage] = useState<string | null>(null);
   const [sharePreflightRequest, setSharePreflightRequest] = useState<RecipeSharePreflightRequest | null>(null);
   const recipeRef = useRef<Recipe | null>(null);
+  const visibilityEtagRef = useRef<string | null>(null);
+  const visibilityRequestRevisionRef = useRef(0);
+  const visibilityRequestControllerRef = useRef<AbortController | null>(null);
+  const visibilityBusyRef = useRef(false);
   const logIntentConsumedRef = useRef(false);
   const targetPortionsRef = useRef(RECIPE_PORTION_MIN);
   const recipeIdRef = useRef(id);
@@ -956,6 +973,8 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
   useEffect(() => () => {
     mountedRef.current = false;
+    visibilityRequestControllerRef.current?.abort();
+    visibilityRequestRevisionRef.current += 1;
     shareFlowRevisionRef.current += 1;
     shareFlowActiveRef.current = false;
     sharePreparationInFlightRef.current = false;
@@ -988,6 +1007,115 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
       setLoading(false);
     }
   }, [id, scalePreviewController]);
+
+  const handleStartVisibilityChange = useCallback(async (target: RecipeVisibilityTarget) => {
+    if (visibilityBusyRef.current || !recipeRef.current) return;
+
+    if (target === 'community') {
+      setDisplayNameConsent(false);
+      setVisibilityTarget(target);
+      return;
+    }
+
+    visibilityRequestControllerRef.current?.abort();
+    const controller = new AbortController();
+    visibilityRequestControllerRef.current = controller;
+    const requestRevision = ++visibilityRequestRevisionRef.current;
+    const isCurrentRequest = () => mountedRef.current
+      && recipeIdRef.current === id
+      && !controller.signal.aborted
+      && visibilityRequestRevisionRef.current === requestRevision;
+    visibilityBusyRef.current = true;
+    setVisibilityBusy(true);
+
+    try {
+      const versioned = await recipeApi.getVersioned(id, controller.signal);
+      if (!isCurrentRequest()) return;
+
+      recipeRef.current = versioned.recipe;
+      setRecipe(versioned.recipe);
+      visibilityEtagRef.current = versioned.etag;
+      if (versioned.recipe.visibility === target) {
+        setErrorNotice({
+          title: 'Sichtbarkeit bereits aktualisiert',
+          body: 'Das Rezept ist bereits privat.',
+        });
+        return;
+      }
+      setVisibilityTarget(target);
+    } catch (error: unknown) {
+      if (!isCurrentRequest()) return;
+      setErrorNotice({
+        title: 'Sichtbarkeit konnte nicht geprüft werden',
+        body: isRecipeRevisionConflict(error)
+          ? 'Das Rezept wurde zwischenzeitlich geändert. Bitte lade es neu und prüfe den aktuellen Status.'
+          : 'Bitte prüfe deine Verbindung und versuche es erneut.',
+      });
+    } finally {
+      if (visibilityRequestRevisionRef.current === requestRevision) {
+        visibilityBusyRef.current = false;
+        if (mountedRef.current) setVisibilityBusy(false);
+      }
+    }
+  }, [id]);
+
+  const handleConfirmVisibilityChange = useCallback(async (
+    target: RecipeVisibilityTarget,
+    displayNameConsent = false,
+  ) => {
+    if (visibilityBusyRef.current) return;
+    visibilityBusyRef.current = true;
+    setVisibilityBusy(true);
+    setVisibilityTarget(null);
+
+    try {
+      let etag = visibilityEtagRef.current;
+      if (target === 'community') {
+        const versioned = await recipeApi.getVersioned(id);
+        if (!mountedRef.current || recipeIdRef.current !== id) return;
+        recipeRef.current = versioned.recipe;
+        setRecipe(versioned.recipe);
+        if (versioned.recipe.visibility === target) {
+          setErrorNotice({
+            title: 'Sichtbarkeit bereits aktualisiert',
+            body: 'Das Rezept ist bereits in der Community veröffentlicht.',
+          });
+          return;
+        }
+        etag = versioned.etag;
+      }
+
+      if (!etag) {
+        setErrorNotice({
+          title: 'Sichtbarkeit konnte nicht aktualisiert werden',
+          body: 'Die aktuelle Rezeptfassung fehlt. Bitte lade das Rezept neu und versuche es erneut.',
+        });
+        return;
+      }
+
+      const input = target === 'community'
+        ? { visibility: 'community' as const, confirmContentSharing: true as const, displayNameConsent }
+        : { visibility: 'private' as const };
+      visibilityEtagRef.current = null;
+      const versioned = await recipeApi.setVisibility(id, input, etag);
+      if (!mountedRef.current || recipeIdRef.current !== id) return;
+      recipeRef.current = versioned.recipe;
+      setRecipe(versioned.recipe);
+    } catch (error: unknown) {
+      if (!mountedRef.current || recipeIdRef.current !== id) return;
+      const revisionConflict = isRecipeRevisionConflict(error);
+      setErrorNotice({
+        title: revisionConflict ? 'Rezept wurde geändert' : 'Sichtbarkeit konnte nicht aktualisiert werden',
+        body: revisionConflict
+          ? 'Das Rezept wurde zwischenzeitlich geändert. Die aktuelle Fassung wurde neu geladen; bitte prüfe den Status erneut.'
+          : 'Die Sichtbarkeit wurde nicht bestätigt. Bitte prüfe deine Verbindung und lade den aktuellen Status neu.',
+      });
+      void load();
+    } finally {
+      visibilityBusyRef.current = false;
+      if (mountedRef.current) setVisibilityBusy(false);
+    }
+  }, [id, load]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1191,6 +1319,42 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         )}
 
         {recipe.description && <Text style={styles.description}>{recipe.description}</Text>}
+
+        <View style={styles.visibilityRow}>
+          <View style={styles.visibilityCopy}>
+            <Text style={styles.visibilityLabel}>Community-Freigabe</Text>
+            <Text style={styles.visibilityValue}>
+              {recipe.visibility === 'community' ? 'Veröffentlicht' : 'Privat'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.visibilityAction}
+            onPress={() => void handleStartVisibilityChange(
+              recipe.visibility === 'community' ? 'private' : 'community',
+            )}
+            disabled={visibilityBusy}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Rezept-Sichtbarkeit ändern"
+            accessibilityState={{ disabled: visibilityBusy }}
+          >
+            {visibilityBusy ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Icon
+                  lib="ion"
+                  name={recipe.visibility === 'community' ? 'eye-off-outline' : 'people-outline'}
+                  size="sm"
+                  color={colors.primaryBright}
+                />
+                <Text style={styles.visibilityActionText}>
+                  {recipe.visibility === 'community' ? 'Privat stellen' : 'Veröffentlichen'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.portionsSection}>
           <View style={styles.portionSummaryRow}>
@@ -1417,6 +1581,39 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
         onClose={() => setDeleteConfirmVisible(false)}
       />
 
+      <ConfirmSheet
+        visible={visibilityTarget === 'community'}
+        title="Rezept veröffentlichen?"
+        subtitle="Andere angemeldete FitTrack-Nutzer können deine Rezepttexte, Zutaten, Zubereitung und hochgeladenen Bilder ansehen."
+        checkbox={{
+          label: 'Meinen FitTrack-Anzeigenamen für dieses Rezept anzeigen',
+          checked: displayNameConsent,
+          onChange: setDisplayNameConsent,
+        }}
+        actions={[{
+          label: 'Veröffentlichen',
+          onPress: () => void handleConfirmVisibilityChange('community', displayNameConsent),
+        }]}
+        onClose={() => {
+          setVisibilityTarget(null);
+          setDisplayNameConsent(false);
+        }}
+      />
+
+      <ConfirmSheet
+        visible={visibilityTarget === 'private'}
+        title="Rezept privat stellen?"
+        subtitle="Das Rezept verschwindet aus der Community. Bereits gespeicherte Tagebucheinträge bleiben unverändert."
+        actions={[
+          {
+            label: 'Privat stellen',
+            destructive: true,
+            onPress: () => void handleConfirmVisibilityChange('private'),
+          },
+        ]}
+        onClose={() => setVisibilityTarget(null)}
+      />
+
       <RecipeInstagramPreview
         visible={shareStage === 'preparing' || shareStage === 'preview'}
         preparationMessage={shareStage === 'preparing'
@@ -1504,6 +1701,36 @@ export default function RecipeDetailScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  visibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  visibilityCopy: { flex: 1, minWidth: 0 },
+  visibilityLabel: { ...typography.caption, color: colors.textMuted },
+  visibilityValue: { ...typography.body2, color: colors.text, fontWeight: '600', marginTop: 2 },
+  visibilityAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    minHeight: 48,
+    maxWidth: '58%',
+    paddingHorizontal: spacing.sm,
+  },
+  visibilityActionText: {
+    ...typography.button,
+    color: colors.primaryBright,
+    flexShrink: 1,
+    textAlign: 'right',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',

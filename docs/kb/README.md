@@ -62,6 +62,7 @@ Every document is intentionally focused. Cross-references are used instead of du
 - **Database:** Azure Cosmos DB (serverless), partition key `/userId` for all user data
 - **AI:** Azure OpenAI (gpt-4o-mini), Azure Document Intelligence — backend-only, **shared across environments**
 - **Auth:** Entra External ID (CIAM) — PKCE OAuth2 from mobile, JWKS validation on backend, **shared across environments**
+- **Recipe sharing:** Recipes are private by default; other authenticated users can read only explicitly published recipe content through dedicated community routes. All other user data remains owner/partition-scoped. See [tech/09-api-reference.md](tech/09-api-reference.md#authenticated-community-recipe-routes) and [domain/06-recipes.md](domain/06-recipes.md#visibility-and-community-publication).
 - **Monorepo packages:** `backend`, `mobile`, `shared` — cross-linked via npm workspaces
 
 → Full runtime environment breakdown: [tech/01-system-overview.md](tech/01-system-overview.md#runtime-environments)

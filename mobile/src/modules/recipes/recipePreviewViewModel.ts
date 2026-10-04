@@ -3,8 +3,13 @@ import type {
   RecipeIngredientCategory,
 } from '@fittrack/shared';
 
+type RecipePreviewIngredient = Pick<
+  RecipeIngredient,
+  'id' | 'displayName' | 'inputAmount' | 'amountGrams' | 'unit' | 'amountLabel' | 'isAiEstimate' | 'category'
+>;
+
 export interface RecipePreviewIngredientItem {
-  ingredient: RecipeIngredient;
+  ingredient: RecipePreviewIngredient;
   amountLabel: string | null;
 }
 
@@ -30,7 +35,7 @@ function formatAmount(value: number | null, unit: string): string | null {
   return normalizedUnit.length > 0 ? `${formattedValue} ${normalizedUnit}` : formattedValue;
 }
 
-export function formatRecipeIngredientAmount(ingredient: RecipeIngredient): string | null {
+export function formatRecipeIngredientAmount(ingredient: RecipePreviewIngredient): string | null {
   const amountLabel = ingredient.amountLabel?.trim();
   if (ingredient.category === 'seasoning') {
     if (amountLabel) return amountLabel;
@@ -44,7 +49,7 @@ export function formatRecipeIngredientAmount(ingredient: RecipeIngredient): stri
 }
 
 export function buildRecipePreviewViewModel(
-  ingredients: RecipeIngredient[],
+  ingredients: readonly RecipePreviewIngredient[],
 ): RecipePreviewViewModel {
   return {
     groups: PREVIEW_GROUPS.map(({ category, title }) => ({

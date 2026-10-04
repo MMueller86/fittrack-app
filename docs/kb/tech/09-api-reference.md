@@ -116,15 +116,112 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | POST | `/api/recipes` | Yes | Create recipe |
 | GET | `/api/recipes/{id}` | Yes | |
 | PUT | `/api/recipes/{id}` | Yes | |
+| PUT | `/api/recipes/{id}/visibility` | Yes | Owner-only private/community transition; explicit content confirmation required to publish |
 | DELETE | `/api/recipes/{id}` | Yes | |
 | POST | `/api/recipes/{id}/images` | Yes | Multipart upload; returns one `RecipeImage` |
 | PUT | `/api/recipes/{id}/images/{imageId}/hero-crop` | Yes | Updates validated hero-crop metadata; returns one `RecipeImage` |
 | PUT | `/api/recipes/{id}/images/order` | Yes | Reorders existing images; returns `{ images: RecipeImage[] }` |
 | DELETE | `/api/recipes/{id}/images/{imageId}` | Yes | Deletes the blob and compacts remaining image order; `204` with no body |
-| POST | `/api/recipes/{id}/log` | Yes | Logs a portion snapshot into a diary meal |
+| POST | `/api/recipes/{id}/log` | Yes | Logs an owner or currently published community recipe from server-loaded values into a diary meal snapshot |
 | POST | `/api/recipes/{id}/export-view/prepare` | Yes | Transient export-view preparation; uses the `recipe-analyze` quota |
 | POST | `/api/recipes/{id}/instagram-render` | Yes | Renders the server-owned recipe as a direct `1080 x 1350` PNG; no render result is persisted |
 | POST | `/api/recipes/{id}/share-bundle` | Yes | Atomically renders Instagram and recipe-detail PNGs from an optional request draft or confirmed stored view, including stale snapshots; no result is persisted |
+
+### Visibility and authorization
+
+Recipe list, detail, create, update, delete, image-management, export, and scale
+operations remain scoped to the authenticated owner's recipe. New recipes are
+private. A legacy recipe without a visibility value is read as private;
+`sharedWithUserIds` is reserved and does not grant access. Only the dedicated
+authenticated community routes below, and server-side recipe-reference reads
+for a recipe whose current visibility is `community`, allow another signed-in
+user to read that published recipe. This is not a general relaxation of
+user-partition access, and it does not grant foreign edit, delete, image
+management, export, or AI-scale rights.
+
+`PUT /api/recipes/{id}/visibility` is owner-only. Its strict request body is
+one of:
+
+```json
+{ "visibility": "private" }
+```
+
+```json
+{
+	"visibility": "community",
+	"confirmContentSharing": true,
+	"displayNameConsent": false
+}
+```
+
+Publishing always requires `confirmContentSharing: true` and an explicit
+`displayNameConsent` boolean. The Mobile consent starts unchecked; the backend
+does not infer consent from a profile field or token. When consent is true, the
+community projection resolves the owner's current profile `displayName`; if
+consent is false or the name is unavailable, it returns exactly `Anonymous`.
+The projection does not expose the owner ID or other profile fields. Switching
+to private removes the publication record, so community list, detail, and
+image routes stop serving the recipe to other users; foreign
+favorite-resolution/log checks return unavailable or not found. The owner
+retains normal owner access.
+
+The route returns the updated owner `Recipe` and ETag. `If-Match` is optional;
+when supplied it must exactly match the current ETag. The repository also uses
+compare-and-replace, so a stale precondition or write race returns `412` with
+`{ "error": "recipe_revision_conflict" }`. Visibility/publication fields are
+not accepted through ordinary recipe create/update bodies; those return
+`400 { "error": "recipe_visibility_requires_dedicated_endpoint" }`.
+
+### Authenticated community recipe routes
+
+| Method | Route | Auth | Contract |
+|---|---|---|---|
+| GET | `/api/community-recipes?limit=<n>&continuationToken=<token>` | Yes | Paginated published recipes; default limit 20, maximum 50; `{ recipes: CommunityRecipe[], continuationToken? }` |
+| GET | `/api/community-recipes/{id}` | Yes | One current community recipe; private, deleted, or unknown IDs return 404 |
+| GET | `/api/community-recipes/{id}/images/{imageId}` | Yes | Protected JPEG/PNG bytes; visibility is rechecked on every request; never returns a SAS URL |
+
+An invalid limit returns `400 { "error": "invalid_community_limit" }`; an
+empty or invalid continuation token returns
+`400 { "error": "invalid_community_continuation_token" }`. The continuation
+token is opaque and is passed back unchanged.
+
+`CommunityRecipe` is a safe read projection containing the recipe's name,
+description, portions, ingredients, steps, nutrition, tags, image metadata,
+timestamps, `authorDisplayName`, `isOwnRecipe`, and
+`ingredientNotices: { containsAiEstimates, containsManualIngredients }`.
+Ingredient source-link IDs are omitted. Ingredient provenance is projected as
+`nutritionSource: 'openFoodFacts' | 'manual' | 'ai' | 'label-scan' | 'unknown'`;
+unknown history is not presented as a verified source. The DTO does not expose
+`ownerUserId`, `userId`, `sharedWithUserIds`, `communityPublication`, or
+`usageCount`.
+
+Each community image's `url` is a relative authenticated API path of the form
+`/api/community-recipes/{id}/images/{imageId}`, not a SAS URL. The image route
+returns the bytes with the stored JPEG/PNG content type,
+`Cache-Control: no-store`, and `X-Content-Type-Options: nosniff`; it returns 404
+when the recipe is no longer currently published or the image is unavailable,
+415 for an unsupported image type, and 422 when the image exceeds the 8 MB
+limit. Owner recipe endpoints continue to use their existing short-lived
+read-only SAS URLs; the protected community route is a separate contract.
+
+### Recipe logging and snapshots
+
+`POST /api/recipes/{id}/log` accepts `{ "portions": number, "mealId": string }`.
+The meal must belong to the authenticated user. The server resolves the current
+recipe as owner or currently published community content, then writes the
+recipe's current name, portion count, and scaled `nutritionPerPortion` as a
+`MealItem` snapshot (`sourceType: 'recipe'`, recipe reference, and logged
+portions). Client-supplied nutrition is not the authority for this route. A
+private, deleted, or revoked foreign recipe returns 404; invalid portions
+return 400.
+
+The recipe branch of `POST /api/diary/meals/{mealId}/items` uses the same
+server-side snapshot/access helper rather than accepting client macros. Mobile
+recipe logging and recipe Quick Add use `/api/recipes/{id}/log`. A later recipe
+edit, privacy change, or deletion does not rewrite existing diary item names,
+portions, or nutrition snapshots. The stored reference may no longer resolve
+for a new open or log action, but the historical item remains readable with
+its original snapshot.
 
 ### Recipe create/update body
 
@@ -523,15 +620,24 @@ partial image pair. A request draft is not persisted.
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/favorites[?context=MealType&localDate=YYYY-MM-DD]` | Yes | All favorites for user; context-ranked requests require a valid local reference date |
-| POST | `/api/favorites` | Yes | Add or update favorite |
-| DELETE | `/api/favorites/{foodRef}` | Yes | Remove favorite |
-| GET | `/api/food-relations/recent` | Yes | Top 10 recently used items (sorted by `lastUsedAt` DESC) |
+| GET | `/api/favorites[?context=MealType&localDate=YYYY-MM-DD]` | Yes | All favorites for user; recipe references include current `recipeAccess` and no stale recipe caches; context-ranked requests require a valid local reference date |
+| POST | `/api/favorites` | Yes | Add/update favorite; recipe references must currently resolve as owner or community and are stored without recipe nutrition/image caches |
+| DELETE | `/api/favorites/{foodRef}` | Yes | Remove the user's favorite, including an unavailable recipe reference |
+| GET | `/api/food-relations/recent` | Yes | Recently used items; recipe references include current access projection |
+| GET | `/api/food-relations/frequent` | Yes | Frequently used items; recipe references include current access projection |
 
 When `context` is supplied, `localDate` is required and must be a real local
 `YYYY-MM-DD` calendar date. The backend uses it as the reference date for the
 date-only `usageDates` ranking window; `lastUsedAt`, `favoritedAt`, and
 `createdAt` remain UTC timestamps/instants.
+
+For `foodRefType: 'recipe'`, relation reads resolve access against the current
+recipe and return `recipeAccess: 'owner' | 'community' | 'unavailable'` as a
+response projection. Adding a recipe favorite resolves its current recipe and
+uses the server's recipe name; supplied display, nutrition, portion, or image
+caches do not grant access or create a recipe/food copy. When access is
+unavailable the relation can still be removed, but it cannot open or authorize
+a new diary log.
 
 ## AI Endpoints (Quota Enforced)
 

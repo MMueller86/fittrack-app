@@ -31,6 +31,7 @@ import {
   reorderImagesHandler,
   updateImageHeroCropHandler,
   logRecipeHandler,
+  setRecipeVisibilityHandler,
   prepareRecipeExportViewHandler,
 } from './recipes';
 import { analyzeRecipeText } from '../lib/openai';
@@ -38,6 +39,7 @@ import { enforceQuota, trackUsage } from '../lib/quota';
 import { validateRecipeExportPreparationOutput } from '../lib/recipeAnalyzeValidation';
 import { __resetRecipesRepositoryForTests, getRecipesRepository } from '../lib/repositories/recipesRepository';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
+import { __resetUserFoodRelationRepositoryForTests, getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
 import {
   makeContext,
   makeAuthRequest,
@@ -60,6 +62,7 @@ afterAll(() => {
 beforeEach(() => {
   __resetRecipesRepositoryForTests();
   __resetDiaryRepositoryForTests();
+  __resetUserFoodRelationRepositoryForTests();
   vi.mocked(analyzeRecipeText).mockReset();
   vi.mocked(enforceQuota).mockReset().mockResolvedValue(null);
   vi.mocked(trackUsage).mockReset().mockResolvedValue(undefined);
@@ -71,6 +74,14 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 const ctx = makeContext();
+
+async function makeAuthRequestAs(userId: string, init: Parameters<typeof makeRequest>[0] = {}) {
+  const token = await signTestToken(userId);
+  return makeRequest({
+    ...init,
+    headers: { ...init.headers, authorization: `Bearer ${token}` },
+  });
+}
 
 const baseIngredient = {
   id: '00000000-0000-0000-0000-000000000001',
@@ -755,6 +766,12 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
   it('does not expose another user\'s recipe to a V2 preparation request', async () => {
     const recipe = await createTestRecipe();
     const recipeId = String(recipe['id']);
+    const ownerVersion = await getRecipesRepository().getVersioned(TEST_USER_ID, recipeId);
+    await getRecipesRepository().setVisibility(TEST_USER_ID, recipeId, ownerVersion!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
     const etag = await getRecipeEtag(recipeId);
     const token = await signTestToken('other-user');
     const response = await prepareRecipeExportViewHandler(
@@ -770,6 +787,100 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(enforceQuota).not.toHaveBeenCalled();
     expect(analyzeRecipeText).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe('PUT /recipes/:id/visibility', () => {
+  it('requires strict sharing confirmation and uses an optional ETag precondition', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const initialEtag = await getRecipeEtag(recipeId);
+
+    const missingConfirmation = await setRecipeVisibilityHandler(
+      await makeAuthRequest({
+        params: { id: recipeId },
+        body: { visibility: 'community', displayNameConsent: false },
+      }),
+      ctx,
+    );
+    const extraField = await setRecipeVisibilityHandler(
+      await makeAuthRequest({
+        params: { id: recipeId },
+        body: { visibility: 'community', confirmContentSharing: true, displayNameConsent: false, ownerUserId: 'forged' },
+      }),
+      ctx,
+    );
+    expect(missingConfirmation.status).toBe(400);
+    expect(extraField.status).toBe(400);
+    expect((await getRecipesRepository().get(TEST_USER_ID, recipeId))?.visibility).toBe('private');
+
+    const published = await setRecipeVisibilityHandler(
+      await makeAuthRequest({
+        params: { id: recipeId },
+        headers: { 'if-match': initialEtag },
+        body: { visibility: 'community', confirmContentSharing: true, displayNameConsent: false },
+      }),
+      ctx,
+    );
+    expect(published.status).toBe(200);
+    expect(responseEtag(published)).not.toBe(initialEtag);
+    expect(published.jsonBody).toMatchObject({
+      visibility: 'community',
+      communityPublication: { displayNameConsent: false, contentConfirmedAt: expect.any(String) },
+    });
+
+    const staleWrite = await setRecipeVisibilityHandler(
+      await makeAuthRequest({
+        params: { id: recipeId },
+        headers: { 'if-match': initialEtag },
+        body: { visibility: 'private' },
+      }),
+      ctx,
+    );
+    expect(staleWrite.status).toBe(412);
+    expect(staleWrite.jsonBody).toEqual({ error: 'recipe_revision_conflict' });
+
+    const unpublished = await setRecipeVisibilityHandler(
+      await makeAuthRequest({ params: { id: recipeId }, body: { visibility: 'private' } }),
+      ctx,
+    );
+    expect(unpublished.status).toBe(200);
+    expect(unpublished.jsonBody).toMatchObject({ visibility: 'private' });
+    expect(unpublished.jsonBody).not.toHaveProperty('communityPublication');
+  });
+
+  it('requires authentication, keeps visibility owner-only and rejects publication fields on ordinary mutations', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const unauthenticated = await setRecipeVisibilityHandler(
+      makeRequest({ params: { id: recipeId }, body: { visibility: 'private' } }),
+      ctx,
+    );
+    const foreignWrite = await setRecipeVisibilityHandler(
+      await makeAuthRequestAs('other-user', {
+        params: { id: recipeId },
+        body: { visibility: 'community', confirmContentSharing: true, displayNameConsent: true },
+      }),
+      ctx,
+    );
+    const injectedCreate = await createRecipeHandler(await makeAuthRequest({
+      body: {
+        name: 'Injected', portions: 1, ingredients: [], steps: [], tags: [],
+        visibility: 'community',
+        communityPublication: { contentConfirmedAt: new Date().toISOString(), displayNameConsent: true },
+      },
+    }), ctx);
+    const injectedUpdate = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: recipeId },
+      body: { communityPublication: { contentConfirmedAt: new Date().toISOString(), displayNameConsent: true } },
+    }), ctx);
+
+    expect(unauthenticated.status).toBe(401);
+    expect(foreignWrite.status).toBe(404);
+    expect(injectedCreate.status).toBe(400);
+    expect(injectedCreate.jsonBody).toEqual({ error: 'recipe_visibility_requires_dedicated_endpoint' });
+    expect(injectedUpdate.status).toBe(400);
+    expect((await getRecipesRepository().get(TEST_USER_ID, recipeId))?.visibility).toBe('private');
   });
 });
 
@@ -1353,7 +1464,7 @@ describe('DELETE /recipes/:id — deleteRecipe', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /recipes/:id/log — logRecipe', () => {
-  it('creates diary item with snapshot nutrition', async () => {
+  it.each([0.5, 1, 2])('creates an authoritative snapshot for %s portions with existing rounding', async (portions) => {
     const created = await createTestRecipe();
 
     // Create a diary meal first
@@ -1368,20 +1479,24 @@ describe('POST /recipes/:id/log — logRecipe', () => {
 
     const req = await makeAuthRequest({
       params: { id: String(created['id']) },
-      body: { portions: 2, mealId: meal.id },
+      body: { portions, mealId: meal.id },
     });
     const res = await logRecipeHandler(req, ctx);
     expect(res.status).toBe(200);
 
     const updatedMeal = res.jsonBody as { items: Array<Record<string, unknown>> };
     expect(updatedMeal.items).toHaveLength(1);
-    const item = updatedMeal.items[0];
+    const item = updatedMeal.items[0]!;
     expect(item['sourceType']).toBe('recipe');
     expect(item['recipeId']).toBe(created['id']);
-    expect(item['recipePortions']).toBe(2);
-    // Nutrition must be a snapshot (2 portions)
-    const perPortion = (created['nutritionPerPortion'] as Record<string, number>)['calories'];
-    expect((item['macros'] as Record<string, number>)['calories']).toBeCloseTo(perPortion * 2, 0);
+    expect(item['recipePortions']).toBe(portions);
+    expect(item['quantity']).toBe(portions);
+    expect(item['unit']).toBe(portions === 1 ? 'Portion' : 'Portionen');
+    const perPortion = created['nutritionPerPortion'] as Record<string, number>;
+    const macros = item['macros'] as Record<string, number>;
+    for (const nutrient of ['calories', 'protein', 'carbs', 'fat', 'fiber']) {
+      expect(macros[nutrient]).toBe(Math.round(perPortion[nutrient]! * portions * 10) / 10);
+    }
   });
 
   it('returns 404 for unknown recipe id', async () => {
@@ -1412,6 +1527,107 @@ describe('POST /recipes/:id/log — logRecipe', () => {
     const res = await logRecipeHandler(req, ctx);
     expect(res.status).toBe(400);
   });
+
+  it('allows another user to log a published recipe from the current owner snapshot', async () => {
+    const created = await createTestRecipe();
+    const recipeId = String(created['id']);
+    const versioned = await getRecipesRepository().getVersioned(TEST_USER_ID, recipeId);
+    await getRecipesRepository().setVisibility(TEST_USER_ID, recipeId, versioned!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+    const { getDiaryRepository } = await import('../lib/repositories/diaryRepository');
+    const diary = getDiaryRepository();
+    const meal = await diary.createMeal({
+      userId: 'reader-user',
+      date: '2026-10-02',
+      type: 'dinner',
+      name: 'Abendessen',
+    });
+
+    const response = await logRecipeHandler(
+      await makeAuthRequestAs('reader-user', {
+        params: { id: recipeId },
+        body: { portions: 2, mealId: meal.id },
+      }),
+      ctx,
+    );
+    expect(response.status).toBe(200);
+    const loggedItem = (response.jsonBody as { items: Array<Record<string, unknown>> }).items[0]!;
+    expect(loggedItem).toMatchObject({ name: 'Sauerteigbrot', sourceType: 'recipe', recipeId, recipePortions: 2 });
+    const expectedCalories = (created['nutritionPerPortion'] as Record<string, number>).calories * 2;
+    expect((loggedItem['macros'] as Record<string, number>).calories).toBeCloseTo(expectedCalories, 0);
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    expect((await getRecipesRepository().get(TEST_USER_ID, recipeId))?.usageCount).toBe(1);
+    expect(await getUserFoodRelationRepository().getByFoodRef('reader-user', recipeId)).toMatchObject({
+      foodRefType: 'recipe',
+      usageDates: [{ date: '2026-10-02', mealType: 'dinner' }],
+    });
+
+    const itemSnapshot = structuredClone(loggedItem);
+    await getRecipesRepository().update(TEST_USER_ID, recipeId, {
+      name: 'Edited recipe',
+      nutritionPerPortion: { calories: 1, protein: 1, carbs: 1, fat: 1, fiber: 1 },
+    });
+    const updated = await getRecipesRepository().getVersioned(TEST_USER_ID, recipeId);
+    await getRecipesRepository().setVisibility(TEST_USER_ID, recipeId, updated!.etag, { visibility: 'private' });
+    expect((await diary.getMealById('reader-user', meal.id))?.items[0]).toEqual(itemSnapshot);
+
+    const afterRevocation = await logRecipeHandler(
+      await makeAuthRequestAs('reader-user', {
+        params: { id: recipeId },
+        body: { portions: 1, mealId: meal.id },
+      }),
+      ctx,
+    );
+    expect(afterRevocation.status).toBe(404);
+    expect((await diary.getMealById('reader-user', meal.id))?.items).toEqual([itemSnapshot]);
+    expect((await getRecipesRepository().get(TEST_USER_ID, recipeId))?.usageCount).toBe(1);
+    expect(await getUserFoodRelationRepository().getByFoodRef('reader-user', recipeId)).toMatchObject({
+      usageCount: 1,
+      usageDates: [{ date: '2026-10-02', mealType: 'dinner' }],
+    });
+
+    const deleted = await deleteRecipeHandler(
+      await makeAuthRequest({ params: { id: recipeId } }),
+      ctx,
+    );
+    expect(deleted.status).toBe(204);
+    expect((await diary.getMealById('reader-user', meal.id))?.items).toEqual([itemSnapshot]);
+  });
+
+  it('rejects a foreign meal ID and a private recipe owned by another user', async () => {
+    const created = await createTestRecipe();
+    const recipeId = String(created['id']);
+    const { getDiaryRepository } = await import('../lib/repositories/diaryRepository');
+    const diary = getDiaryRepository();
+    const foreignMeal = await diary.createMeal({
+      userId: 'other-user', date: '2026-10-02', type: 'dinner', name: 'Foreign meal',
+    });
+    const readerMeal = await diary.createMeal({
+      userId: 'reader-user', date: '2026-10-02', type: 'dinner', name: 'Reader meal',
+    });
+
+    const foreignMealResponse = await logRecipeHandler(
+      await makeAuthRequest({ params: { id: recipeId }, body: { portions: 1, mealId: foreignMeal.id } }),
+      ctx,
+    );
+    const privateRecipeResponse = await logRecipeHandler(
+      await makeAuthRequestAs('reader-user', {
+        params: { id: recipeId },
+        body: { portions: 1, mealId: readerMeal.id },
+      }),
+      ctx,
+    );
+
+    expect(foreignMealResponse.status).toBe(404);
+    expect(foreignMealResponse.jsonBody).toEqual({ error: 'Meal not found' });
+    expect(privateRecipeResponse.status).toBe(404);
+    expect(privateRecipeResponse.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect((await diary.getMealById('reader-user', readerMeal.id))?.items).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1432,6 +1648,48 @@ function makeImageFormData(
   }
   return fd;
 }
+
+describe('owner-only mutations for published recipes', () => {
+  it('rejects foreign content, delete, upload and reorder requests', async () => {
+    const created = await createTestRecipe();
+    const recipeId = String(created['id']);
+    await uploadImageHandler(
+      await makeAuthRequest({ params: { id: recipeId }, formData: makeImageFormData() }),
+      ctx,
+    );
+    const repo = getRecipesRepository();
+    const current = await repo.getVersioned(TEST_USER_ID, recipeId);
+    await repo.setVisibility(TEST_USER_ID, recipeId, current!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+
+    const update = await updateRecipeHandler(
+      await makeAuthRequestAs('other-user', { params: { id: recipeId }, body: { name: 'Forged update' } }),
+      ctx,
+    );
+    const remove = await deleteRecipeHandler(
+      await makeAuthRequestAs('other-user', { params: { id: recipeId } }),
+      ctx,
+    );
+    const upload = await uploadImageHandler(
+      await makeAuthRequestAs('other-user', { params: { id: recipeId }, formData: makeImageFormData() }),
+      ctx,
+    );
+    const reorder = await reorderImagesHandler(
+      await makeAuthRequestAs('other-user', { params: { id: recipeId }, body: { imageIds: ['img1'] } }),
+      ctx,
+    );
+
+    expect([update.status, remove.status, upload.status, reorder.status]).toEqual([404, 404, 404, 404]);
+    expect(await repo.get(TEST_USER_ID, recipeId)).toMatchObject({
+      name: 'Sauerteigbrot',
+      visibility: 'community',
+      images: [{ id: 'img1' }],
+    });
+  });
+});
 
 describe('POST /recipes/:id/images — uploadImage', () => {
   it('returns 201 and appends image to recipe', async () => {
@@ -1636,6 +1894,25 @@ describe('DELETE /recipes/:id/images/:imageId — deleteImage', () => {
     expect(res.status).toBe(404);
   });
 
+  it('does not allow another user to delete an image from a published recipe', async () => {
+    const { recipeId, imageId } = await createRecipeWithImage();
+    const repo = getRecipesRepository();
+    const current = await repo.getVersioned(TEST_USER_ID, recipeId);
+    await repo.setVisibility(TEST_USER_ID, recipeId, current!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+
+    const response = await deleteImageHandler(
+      await makeAuthRequestAs('other-user', { params: { id: recipeId, imageId } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(404);
+    expect((await repo.get(TEST_USER_ID, recipeId))?.images.map((image) => image.id)).toContain(imageId);
+  });
+
   it('returns 401 without token', async () => {
     const { makeRequest } = await import('../test-utils/http');
     const req = makeRequest({ params: { id: 'any', imageId: 'img1' } });
@@ -1787,8 +2064,15 @@ describe('PUT /recipes/:id/images/:imageId/hero-crop — updateImageHeroCrop', (
     expect(res.status).toBe(400);
   });
 
-  it('does not allow another user to update the image metadata', async () => {
+  it('does not allow another user to update published image metadata', async () => {
     const recipeId = await createRecipeWithImage();
+    const repo = getRecipesRepository();
+    const current = await repo.getVersioned(TEST_USER_ID, recipeId);
+    await repo.setVisibility(TEST_USER_ID, recipeId, current!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
     const token = await signTestToken('different-user');
     const res = await updateImageHeroCropHandler(
       makeRequest({

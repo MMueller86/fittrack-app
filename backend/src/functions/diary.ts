@@ -13,6 +13,7 @@ import { getProfileRepository } from '../lib/repositories/profileRepository';
 import { getHintStateRepository } from '../lib/repositories/hintStateRepository';
 import { evaluateHint } from '../lib/hintEngine';
 import { resolveCalorieTargetSnapshot } from '../lib/weeklyTargetSnapshot';
+import { addRecipeDiarySnapshot } from '../lib/recipeDiary';
 import type { DayTargets } from '../../../shared/types/nutrition';
 
 // GET /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
@@ -96,6 +97,9 @@ const AddItemSchema = z
   })
   .refine(
     (d) => {
+      if (d.sourceType === 'recipe') {
+        return d.productId != null && d.inputMode != null && d.inputAmount != null;
+      }
       const hasFlat = d.calories != null && d.protein != null && d.carbs != null && d.fat != null;
       const hasCalculated = d.quantityMode != null && d.quantity != null;
       const hasProduct = d.productName != null && d.amountGrams != null && d.calculatedNutrition != null;
@@ -313,6 +317,30 @@ export const addItemHandler = withHandler(
     if (!parsed.ok) return parsed.response;
 
     const d = parsed.data;
+
+    if (d.sourceType === 'recipe') {
+      const result = await addRecipeDiarySnapshot(userId, d.productId!, mealId, {
+        inputMode: d.inputMode!,
+        inputAmount: d.inputAmount!,
+      });
+      if (!result.ok) {
+        if (result.reason === 'invalid_portions') {
+          return { status: 400, jsonBody: { error: 'invalid_recipe_portions' } };
+        }
+        return {
+          status: 404,
+          jsonBody: { error: result.reason === 'meal_not_found' ? 'Meal not found' : 'Recipe not found' },
+        };
+      }
+      return { status: 201, jsonBody: { meal: result.meal } };
+    }
+
+    if (d.productId) {
+      const relation = await getUserFoodRelationRepository().getByFoodRef(userId, d.productId);
+      if (relation?.foodRefType === 'recipe') {
+        return { status: 404, jsonBody: { error: 'Recipe not found' } };
+      }
+    }
 
     // Resolve the display name: explicit > productName
     const itemName = d.name ?? d.productName!;

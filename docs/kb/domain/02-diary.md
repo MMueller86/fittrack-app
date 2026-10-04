@@ -21,9 +21,11 @@ Each day can have multiple meals, including multiple meals of the same type.
 
 Key fields:
 - `id` — UUID
-- `foodRef` — reference to the original food item (catalog ID or reusable item ID)
+- `sourceId?` — source item ID for catalog/reusable foods; recipe entries use `recipeId`
 - `sourceType: MealItemSourceType` — how it was logged
-- `nutrition: NutritionValues` — **snapshot** at the time of logging
+- `macros: MealItemMacros` — **snapshot** at the time of logging (`calories`, `protein`, `carbs`, `fat`, `fiber`)
+- `recipeId?` — source recipe ID when `sourceType: 'recipe'`
+- `recipePortions?` — logged recipe portion count, including fractional portions
 - `amountGrams` — effective amount used for calculation
 - `isAiEstimate` — true for AI-estimated items
 - `confidence` — AI confidence (0–1), null for non-AI items
@@ -41,6 +43,24 @@ Key fields:
 | `ai` | From AI food estimator |
 | `ai-meal-estimate` | From AI meal image estimate |
 | `recipe` | Added from a recipe |
+
+### Recipe Log Snapshots
+
+`POST /api/recipes/{id}/log` resolves the recipe on the server at write time.
+The authenticated owner may log a private or published recipe; another signed-in
+user may log it only while its visibility is currently `community`. The
+recipe-specific branch of `POST /api/diary/meals/{mealId}/items` uses the same
+access and snapshot helper and does not trust client-supplied recipe macros.
+Both paths snapshot the current recipe name, logged portion count, and scaled
+per-portion macros into the new `MealItem` with `sourceType: 'recipe'`.
+
+The recipe reference is not a live nutrition join. Editing, making private, or
+deleting the source recipe does not rewrite a previously stored diary item's
+name, `recipePortions`, or `macros`. A revoked/deleted foreign recipe cannot
+be opened or logged again through the reference, while the historical meal
+entry remains readable from its saved snapshot. See
+[tech/09-api-reference.md](../tech/09-api-reference.md#recipe-logging-and-snapshots)
+for the route request contract.
 
 ## Day Meta
 

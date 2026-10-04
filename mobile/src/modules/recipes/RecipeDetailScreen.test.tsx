@@ -17,6 +17,8 @@ import type { WizardExportDraft } from './recipeWizardTypes';
 const mocks = vi.hoisted(() => ({
   recipeApi: {
     get: vi.fn(),
+    getVersioned: vi.fn(),
+    setVisibility: vi.fn(),
     prepareExportView: vi.fn(),
     update: vi.fn(),
     renderShareBundle: vi.fn(),
@@ -253,6 +255,7 @@ function makePreparationQuotaError() {
 
 type DetailParams = RecipeStackParamList['RecipeDetail'];
 type NoticeAction = { label: string; onPress: () => void };
+type ConsentCheckbox = { label: string; checked: boolean; onChange: (checked: boolean) => void };
 
 async function renderDetail(params: DetailParams = { id: 'recipe-1' }) {
   const navigation = { goBack: vi.fn(), navigate: vi.fn(), setParams: vi.fn() };
@@ -325,6 +328,124 @@ async function pressShare(renderer: ReactTestRenderer): Promise<void> {
   });
 }
 
+describe('RecipeDetailScreen visibility', () => {
+  async function openVisibilityConfirmation(renderer: ReactTestRenderer): Promise<ReactTestInstance> {
+    await settle();
+    const button = findOne(
+      renderer,
+      (node) => node.type === 'TouchableOpacity'
+        && node.props.accessibilityLabel === 'Rezept-Sichtbarkeit ändern',
+      'recipe visibility action',
+    );
+    await act(async () => {
+      (button.props.onPress as (() => void) | undefined)?.();
+      await Promise.resolve();
+    });
+    await settle();
+    return findOne(
+      renderer,
+      (node) => node.type === 'ConfirmSheet' && Boolean(node.props.visible),
+      'visible visibility confirmation',
+    );
+  }
+
+  async function chooseVisibilityAction(sheet: ReactTestInstance, label: string): Promise<void> {
+    const action = (sheet.props.actions as NoticeAction[]).find((candidate) => candidate.label === label);
+    if (!action) throw new Error(`Expected visibility action "${label}"`);
+    await act(async () => {
+      action.onPress();
+      await Promise.resolve();
+    });
+    await settle();
+  }
+
+  it('requires explicit content confirmation and defaults publication to Anonymous', async () => {
+    const { renderer } = await renderDetail();
+    const sheet = await openVisibilityConfirmation(renderer);
+
+    expect(sheet.props.title).toBe('Rezept veröffentlichen?');
+    expect(sheet.props.subtitle).toContain('Rezepttexte, Zutaten, Zubereitung und hochgeladenen Bilder');
+    expect(sheet.props.checkbox).toMatchObject({
+      label: 'Meinen FitTrack-Anzeigenamen für dieses Rezept anzeigen',
+      checked: false,
+    });
+    const actions = sheet.props.actions as NoticeAction[];
+    expect(actions.map((action) => action.label)).toEqual(['Veröffentlichen']);
+    expect(mocks.recipeApi.getVersioned).not.toHaveBeenCalled();
+    expect(mocks.recipeApi.setVisibility).not.toHaveBeenCalled();
+    await chooseVisibilityAction(sheet, 'Veröffentlichen');
+
+    expect(mocks.recipeApi.getVersioned).toHaveBeenCalledWith('recipe-1');
+    expect(mocks.recipeApi.setVisibility).toHaveBeenCalledWith('recipe-1', {
+      visibility: 'community',
+      confirmContentSharing: true,
+      displayNameConsent: false,
+    }, '"recipe-rev-1"');
+  });
+
+  it('sends display-name consent only when the per-publication checkbox is checked', async () => {
+    const { renderer } = await renderDetail();
+    const sheet = await openVisibilityConfirmation(renderer);
+    const checkbox = sheet.props.checkbox as ConsentCheckbox;
+    expect(checkbox.checked).toBe(false);
+    await act(async () => {
+      checkbox.onChange(true);
+    });
+    await chooseVisibilityAction(sheet, 'Veröffentlichen');
+    expect(mocks.recipeApi.setVisibility).toHaveBeenCalledWith('recipe-1', {
+      visibility: 'community',
+      confirmContentSharing: true,
+      displayNameConsent: true,
+    }, '"recipe-rev-1"');
+  });
+
+  it('does not send a request when publication confirmation is cancelled', async () => {
+    const { renderer } = await renderDetail();
+    const sheet = await openVisibilityConfirmation(renderer);
+    const checkbox = sheet.props.checkbox as ConsentCheckbox;
+
+    await act(async () => {
+      checkbox.onChange(true);
+    });
+
+    await act(async () => {
+      (sheet.props.onClose as (() => void) | undefined)?.();
+    });
+
+    expect(mocks.recipeApi.getVersioned).not.toHaveBeenCalled();
+    expect(mocks.recipeApi.setVisibility).not.toHaveBeenCalled();
+
+    const nextSheet = await openVisibilityConfirmation(renderer);
+    expect((nextSheet.props.checkbox as ConsentCheckbox).checked).toBe(false);
+    expect(mocks.recipeApi.getVersioned).not.toHaveBeenCalled();
+    expect(mocks.recipeApi.setVisibility).not.toHaveBeenCalled();
+  });
+
+  it('requires confirmation to privatize a published recipe and reports stale ETags', async () => {
+    mocks.recipeApi.get.mockResolvedValue(makeRecipe({ visibility: 'community' }));
+    mocks.recipeApi.getVersioned.mockResolvedValue({
+      recipe: makeRecipe({ visibility: 'community' }),
+      etag: '"published-rev-7"',
+    });
+    mocks.recipeApi.setVisibility.mockRejectedValueOnce(makeRevisionConflictError());
+    const { renderer } = await renderDetail();
+    const sheet = await openVisibilityConfirmation(renderer);
+
+    expect(sheet.props.title).toBe('Rezept privat stellen?');
+    expect(sheet.props.subtitle).toContain('Tagebucheinträge bleiben unverändert');
+    await chooseVisibilityAction(sheet, 'Privat stellen');
+
+    expect(mocks.recipeApi.setVisibility).toHaveBeenCalledWith(
+      'recipe-1',
+      { visibility: 'private' },
+      '"published-rev-7"',
+    );
+    expect(mocks.recipeApi.get).toHaveBeenCalledTimes(2);
+    expect(getVisibleNotice(renderer, 'Rezept wurde geändert').props.body)
+      .toContain('aktuelle Fassung wurde neu geladen');
+  });
+});
+
 let previewUriSequence = 0;
 
 beforeEach(() => {
@@ -332,6 +453,14 @@ beforeEach(() => {
   mocks.focusEffect = undefined;
   previewUriSequence = 0;
   mocks.recipeApi.get.mockImplementation(async () => makeRecipe());
+  mocks.recipeApi.getVersioned.mockResolvedValue({
+    recipe: makeRecipe(),
+    etag: '"recipe-rev-1"',
+  });
+  mocks.recipeApi.setVisibility.mockResolvedValue({
+    recipe: makeRecipe({ visibility: 'community' }),
+    etag: '"recipe-rev-2"',
+  });
   mocks.recipeApi.prepareExportView.mockImplementation(async (recipeId: string) => makePreparationResponse(recipeId));
   mocks.recipeApi.renderShareBundle.mockImplementation(async (recipeId: string) => makeBundle(recipeId));
   mocks.favoritesApi.listFavorites.mockResolvedValue([]);
