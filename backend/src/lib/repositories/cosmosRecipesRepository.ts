@@ -36,6 +36,15 @@ function cosmosPageResources<T>(page: { resources?: unknown } | null | undefined
   return Array.isArray(page?.resources) ? page.resources : [];
 }
 
+function communityOffset(continuationToken?: string): number {
+  if (continuationToken === undefined) return 0;
+  const offset = Number(continuationToken);
+  if (!Number.isSafeInteger(offset) || offset < 0 || String(offset) !== continuationToken) {
+    throw new Error('Invalid community continuation token');
+  }
+  return offset;
+}
+
 function toStoredImages(images: RecipeImage[] | undefined): StoredRecipeImage[] {
   return (images ?? []).map(({ id, blobName, order, heroCrop }) => ({
     id,
@@ -149,15 +158,25 @@ export class CosmosRecipesRepository implements RecipesRepository {
 
   async listCommunity(opts: ListCommunityRecipesOptions = {}): Promise<CommunityRecipeRepositoryPage> {
     const { containers } = await getCosmos();
+    const limit = communityPageSize(opts.limit);
+    const offset = communityOffset(opts.continuationToken);
     const page = await containers.recipes.items.query<CosmosRecipeDoc>({
-      query: "SELECT * FROM c WHERE c.visibility = 'community' ORDER BY c.updatedAt DESC",
-    }, { maxItemCount: communityPageSize(opts.limit), continuationToken: opts.continuationToken }).fetchNext();
+      query: "SELECT * FROM c WHERE c.visibility = 'community' ORDER BY c.updatedAt DESC OFFSET @offset LIMIT @limit",
+      parameters: [
+        { name: '@offset', value: offset },
+        { name: '@limit', value: limit },
+      ],
+    }).fetchAll();
+    const resources = cosmosPageResources<CosmosRecipeDoc>(page);
     const recipes: Recipe[] = [];
-    for (const doc of cosmosPageResources<CosmosRecipeDoc>(page)) {
+    for (const doc of resources) {
       const recipe = await this.getCommunityById(doc.id);
       if (recipe) recipes.push(recipe);
     }
-    return { recipes, ...(page.continuationToken ? { continuationToken: page.continuationToken } : {}) };
+    return {
+      recipes,
+      ...(resources.length === limit ? { continuationToken: String(offset + limit) } : {}),
+    };
   }
 
   async setVisibility(userId: string, id: string, expectedEtag: string, input: RecipeVisibilityInput): Promise<VersionedRecipe | null> {

@@ -75,6 +75,7 @@ export async function createTestDatabase(databaseId: string): Promise<EmulatorCo
   const containerDefs: Array<{ id: string; partitionKey: string; compositeIndexes?: object[][] }> = [
     { id: 'users', partitionKey: '/id' },
     { id: 'nutritionProfiles', partitionKey: '/userId' },
+    { id: 'profiles', partitionKey: '/userId' },
     { id: 'weights', partitionKey: '/userId' },
     { id: 'nutritionDiaryMeals', partitionKey: '/userId' },
     { id: 'reusableMealItems', partitionKey: '/userId' },

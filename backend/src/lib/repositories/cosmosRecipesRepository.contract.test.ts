@@ -202,11 +202,11 @@ describe('CosmosRecipesRepository (contract)', () => {
     const created = await repo.createVersioned(USER_A, makeInput());
     const published = await repo.setVisibility(USER_A, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: false });
     const imagePath = (recipeId: string, imageId: string) => `/api/test-recipes/${recipeId}/images/${imageId}`;
-    await ctx!.database.container('nutritionProfiles').items.upsert({ id: 'profile', userId: USER_A, displayName: 'Current author' });
+    await ctx!.database.container('profiles').items.upsert({ id: 'profile', userId: USER_A, displayName: 'Current author' });
     expect((await projectCommunityRecipe(published!.recipe, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('Anonymous');
     const consented = await repo.setVisibility(USER_A, created.recipe.id, published!.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: true });
     expect((await projectCommunityRecipe(consented!.recipe, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('Current author');
-    await ctx!.database.container('nutritionProfiles').items.upsert({ id: 'profile', userId: USER_A, displayName: 'New name' });
+    await ctx!.database.container('profiles').items.upsert({ id: 'profile', userId: USER_A, displayName: 'New name' });
     expect((await projectCommunityRecipe(consented!.recipe, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('New name');
     const container = ctx!.database.container('recipes');
     const { resource } = await container.item(created.recipe.id, USER_A).read<Record<string, unknown>>();

@@ -44,7 +44,8 @@ All user-data containers use `/userId` as partition key.
 | Container | Partition Key | Notes |
 |---|---|---|
 | `users` | `/id` | User account documents |
-| `nutritionProfiles` | `/userId` | One profile per user |
+| `nutritionProfiles` | `/userId` | Retained container; the current profile repository uses `profiles` |
+| `profiles` | `/userId` | Current user profile document |
 | `nutritionDiaryMeals` | `/userId` | Diary meal documents |
 | `reusableMealItems` | `/userId` | Personal food library |
 | `recipes` | `/userId` | User recipes |

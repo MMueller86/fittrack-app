@@ -129,7 +129,7 @@ If the calorie target is very low (e.g., at the minimum guardrail), carbs can re
 
 ## Stored Profile Document
 
-`UserProfile` — the complete document stored in Cosmos `nutritionProfiles` container.
+`UserProfile` — the complete document stored in Cosmos `profiles` container.
 
 - All `ProfileInput` fields
 - `targets: ProfileTargets` — `{ rest: DayTargets, training: DayTargets }`
