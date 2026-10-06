@@ -244,6 +244,60 @@ state solely because the requested date differs from the current local date.
 - [Rule] `isAiEstimate: true` must be preserved on all diary items that originated from AI.
 - [Rule] The hint engine must never be an AI call — it is a pure rule evaluation.
 
+### Bulk item mutations
+
+Bulk delete, move, and copy operate on explicit `{ mealId, itemId }`
+references and are all-or-nothing. Delete removes only selected items from
+the source date and keeps the Meal documents, even when a meal becomes empty.
+Move directly removes the selected items from their source Meals and appends
+snapshot-preserving copies with new item IDs to one different meal on the same
+date. A newly selected move target is created in the same transaction.
+
+Copy targets exactly one explicitly selected meal on the same or a different
+date. The target may already exist or be created in the same transaction. Each
+stored MealItem snapshot is cloned with a fresh ID, preserving all item fields
+and nutrition values; snapshot cloning does not resolve current reusable-item
+or recipe data. When the target is the same Meal as a source, its original
+items remain and the clones are appended to that Meal. When the target is a
+different Meal, the source Meals remain unchanged. A repeated request after a
+successful copy is a new mutation: it appends new clones with fresh IDs and is
+not deduplicated. A single-item copy uses the same bulk-copy request with one
+reference.
+
+When the target is also a source Meal, Copy updates only that target by
+appending clones; the all-or-nothing behavior is unchanged.
+
+Delete and Move do not create or compensate food-usage history, change
+`UserFoodRelation` fields, or change `ReusableItem.usageCount` /
+`Recipe.usageCount`. Existing usage data remains untouched; no historical
+correction or migration is performed.
+
+After the successful atomic Diary commit, Copy records best-effort usage once
+per copied item with a persisted source reference, using the target Meal's date
+and type (also for same-day copies). Repeating a successful request records
+usage for each new copy. The stored references, not `MealItem.sourceType`,
+determine the source class because existing add paths do not consistently
+persist `sourceType`:
+
+- `recipeId` records a `recipe` relation for the copying user. The recipe
+  owner's `usageCount` is incremented only when `resolveRecipeForRead()` still
+  resolves an owner or currently published community recipe. A deleted,
+  private, or otherwise unavailable recipe snapshot remains copyable and still
+  records the copying user's relation, but does not increment an owner counter.
+- A `sourceId` beginning with `openFoodFacts:` records a `catalog` relation;
+  there is no catalog product counter.
+- Any other `sourceId` records a `personal` relation. The ReusableItem's
+  `usageCount` is incremented only when that user's item resolves with
+  `nutritionPer100g`.
+- Items without `recipeId` or `sourceId` create no usage relation or source
+  counter.
+
+Repeated copies of the same source are tracked once per copied item. Tracking
+failures do not roll back the committed Diary mutation. This uses existing
+documents and repository operations; no schema change or migration is needed.
+The API error and transaction contract is documented in
+[tech/09-api-reference.md](../tech/09-api-reference.md#bulk-diary-item-mutations).
+
 ## Related Documents
 
 - [domain/03-food-catalog.md](03-food-catalog.md) — food sources used to populate diary items

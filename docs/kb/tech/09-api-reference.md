@@ -38,6 +38,9 @@ Request body for POST/PUT: `ProfileInput` — validated with Zod.
 | POST | `/api/diary/meals/{mealId}/items` | Yes | Add item to meal |
 | PUT | `/api/diary/meals/{mealId}/items/{itemId}` | Yes | Update item |
 | DELETE | `/api/diary/meals/{mealId}/items/{itemId}` | Yes | |
+| POST | `/api/diary/items/bulk-delete` | Yes | Atomically remove selected items from one diary date |
+| POST | `/api/diary/items/bulk-move` | Yes | Atomically move selected items to another meal on the same date |
+| POST | `/api/diary/items/bulk-copy` | Yes | Atomically copy selected item snapshots to one meal on the same or a different date |
 | PUT | `/api/diary/day/{date}/meta` | Yes | Set dayType / workoutType |
 | PUT | `/api/diary/day/{date}/special-activity` | Yes | Record a hiking or cycling activity and calculate activity bonus |
 | DELETE | `/api/diary/day/{date}/special-activity` | Yes | Remove the special activity for a day |
@@ -47,6 +50,104 @@ current local device date used for local state decisions. Both must be real
 `YYYY-MM-DD` calendar dates. `localHour` accepts an integer from `0` through
 `23`; a missing, non-integer, or out-of-range value is represented as unknown
 and never replaced with a server or UTC hour.
+
+### Bulk diary item mutations
+
+All three bulk routes require a Bearer token and accept only meal/item references;
+the authenticated user's ID and stored meal snapshots are authoritative.
+Empty and duplicate reference lists return
+`400 { "error": "invalid_diary_bulk_request" }`. Malformed bodies, invalid
+dates, and unknown fields also return `400` (schema errors may name the field).
+
+`POST /api/diary/items/bulk-delete` accepts:
+
+```json
+{
+	"sourceDate": "2026-05-08",
+	"items": [
+		{ "mealId": "meal-1", "itemId": "item-1" },
+		{ "mealId": "meal-2", "itemId": "item-2" }
+	]
+}
+```
+
+Success (`200`) returns
+`{ "deletedCount": 2, "deletedItemIds": ["item-1", "item-2"] }`.
+Only referenced embedded items are removed; source Meal documents remain,
+including when their item arrays become empty.
+
+`POST /api/diary/items/bulk-move` accepts the same `sourceDate` and `items`,
+plus exactly one target selector: `{ "mealId": "target-meal" }` for an
+existing meal or `{ "newMealType": "dinner" }` to create a meal as part of
+the transaction. The target must differ from all source meals and belong to
+the authenticated user and same date. Success (`200`) returns
+`{ "movedCount": 2, "removedItemIds": ["item-1", "item-2"], "targetMeal": Meal }`;
+each moved snapshot is preserved and receives a new item ID in `targetMeal`.
+
+`POST /api/diary/items/bulk-copy` accepts:
+
+```json
+{
+	"sourceDate": "2026-05-08",
+	"targetDate": "2026-05-09",
+	"items": [
+		{ "mealId": "meal-1", "itemId": "item-1" },
+		{ "mealId": "meal-2", "itemId": "item-2" }
+	],
+	"target": { "mealId": "target-meal" }
+}
+```
+
+The `target` must contain exactly one selector: an existing meal ID or
+`{ "newMealType": "dinner" }` to create the target meal in the same
+transaction. `targetDate` may equal `sourceDate`; every source reference must
+belong to `sourceDate`, and an existing target must belong to `targetDate` and
+the authenticated user. The route clones stored `MealItem` snapshots without
+resolving live food or recipe data for the clone, assigns a fresh ID to each
+clone, and appends all copies to the one selected target. If the target Meal is
+also a source Meal, it is read once and that snapshot and ETag are used for one
+ETag-guarded `Replace` in the atomic batch; the original items remain and the
+clones are appended. With a different same-date target, the source Meals remain
+unchanged. Post-commit tracking may resolve current source state only to apply
+the documented counters; it never changes the clone. Success (`200`) returns
+`{ "copiedCount": 2, "targetMeal": Meal }`.
+
+Single-item copy uses this same route with one entry in `items`; there is no
+separate copy mutation contract.
+Repeating an identical request after success performs another copy with new
+item IDs; the API has no request idempotency key and does not deduplicate
+successful submissions. Duplicate `{ mealId, itemId }` references within one
+request remain invalid.
+
+Delete, Move, and Copy are all-or-nothing. The backend validates every
+reference before writing and commits all changed Meal documents in one
+`nutritionDiaryMeals` partition-scoped Transactional Batch, using read ETags
+for existing documents. Copy writes only its target meal; Move writes its
+source meals and target; Delete writes only source meals. Requests are never
+chunked or retried as partial work. Errors:
+
+- `401` — missing or invalid Bearer token
+- `404 { "error": "diary_bulk_reference_not_found" }` — a meal, item, date, or target is unavailable to the authenticated user
+- `409 { "error": "diary_bulk_conflict" }` — an ETag/write conflict; no Meal changes are committed
+- `413 { "error": "diary_bulk_operation_limit_exceeded" }` — the batch exceeds Cosmos limits (100 operations or 2 MB)
+
+Delete and Move do not write, decrement, or reattribute food-usage relations
+or source counters. They do not alter any pre-existing usage history.
+
+After the atomic Diary commit succeeds, Copy records best-effort usage once per
+copied referenced item using the target Meal's date and type. Classification is
+based on persisted references, not `MealItem.sourceType`: `recipeId` records a
+recipe relation for the copying user and increments the owner's recipe counter
+only while the recipe resolves for its owner or as published community content;
+an unavailable recipe snapshot still copies and records the user relation but
+does not increment an owner counter. A `sourceId` with the `openFoodFacts:`
+prefix records a catalog relation and has no product counter; any other
+`sourceId` records a personal relation and increments `ReusableItem.usageCount`
+only if the user's reusable item resolves with `nutritionPer100g`. Items without
+either reference create no usage. Each copied item is tracked separately, so
+repeated copies of one source add repeated usage. A failed Diary commit creates
+no usage, and a later usage failure does not roll back the committed copy. No
+schema or migration change is required.
 
 ### PUT /api/diary/day/{date}/special-activity
 

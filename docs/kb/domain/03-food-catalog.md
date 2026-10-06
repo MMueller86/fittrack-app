@@ -123,6 +123,12 @@ The internal `recordUsage` contract requires the explicit diary meal date for
 `usageDates`; a missing date fails closed instead of falling back to the server
 UTC date. Existing usage dates are not rewritten or migrated.
 
+Bulk diary Copy records one relation use per copied referenced item only after
+the Diary commit. It classifies catalog references from the `openFoodFacts:`
+`sourceId` prefix and other personal references from `sourceId`, independently
+of the legacy `MealItem.sourceType` value. Delete and Move leave usage history
+and source counters unchanged; see [domain/02-diary.md](02-diary.md#bulk-item-mutations).
+
 `@deprecated` fields (kept for backward compat with existing documents):
 - `shortName?: string` — no longer generated or used; `displayName` is used everywhere
 

@@ -6,16 +6,34 @@
 // cross-partition joins and keeps meal reads cheap.
 
 import { randomUUID } from 'node:crypto';
-import type { Meal, MealItem } from '@fittrack/shared';
+import type { OperationInput } from '@azure/cosmos';
+import type {
+  DiaryBulkDeleteRequest,
+  DiaryBulkDeleteResponse,
+  DiaryBulkCopyRequest,
+  DiaryBulkCopyResponse,
+  DiaryBulkMoveRequest,
+  DiaryBulkMoveResponse,
+  Meal,
+  MealItem,
+} from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
 import type {
   AddItemInput,
   CreateMealInput,
+  DiaryBulkMutationErrorCode,
   DiaryDayResult,
   DiaryRepository,
   UpdateItemInput,
 } from './diaryRepository';
-import { computeSummary, recalcMacros } from './diaryRepository';
+import {
+  assertDiaryBulkBatchLimits,
+  computeSummary,
+  DiaryBulkMutationError,
+  groupDiaryItemReferences,
+  recalcMacros,
+  resolveDiaryBulkSourceMeals,
+} from './diaryRepository';
 
 export class CosmosDiaryRepository implements DiaryRepository {
   async getDay(userId: string, date: string): Promise<DiaryDayResult> {
@@ -141,6 +159,273 @@ export class CosmosDiaryRepository implements DiaryRepository {
     }
   }
 
+  async bulkDeleteItems(
+    userId: string,
+    request: DiaryBulkDeleteRequest,
+  ): Promise<DiaryBulkDeleteResponse> {
+    const { containers } = await getCosmos();
+    const container = containers.nutritionDiaryMeals;
+    const groupedReferences = groupDiaryItemReferences(request.items);
+    const mealRecords = await Promise.all([...groupedReferences.keys()].map(async (mealId) => {
+      const record = await this.readBulkMeal(container, userId, mealId);
+      return [mealId, record] as const;
+    }));
+    const recordsById = new Map<string, { meal: Meal; etag: string }>();
+    for (const [mealId, record] of mealRecords) {
+      if (record) recordsById.set(mealId, record);
+    }
+    const mealsById = new Map([...recordsById].map(([mealId, record]) => [mealId, record.meal]));
+    const sourceMeals = resolveDiaryBulkSourceMeals(
+      userId,
+      request.sourceDate,
+      groupedReferences,
+      mealsById,
+    );
+
+    const updatedMeals = new Map<string, Meal>();
+    for (const [mealId, meal] of sourceMeals) {
+      const itemIds = groupedReferences.get(mealId)!;
+      updatedMeals.set(mealId, {
+        ...meal,
+        items: (meal.items ?? []).filter((item) => !itemIds.has(item.id)),
+      });
+    }
+    const operations: OperationInput[] = [...updatedMeals.values()].map((meal) => ({
+      operationType: 'Replace',
+      id: meal.id,
+      resourceBody: meal,
+      ifMatch: recordsById.get(meal.id)!.etag,
+    } as unknown as OperationInput));
+    assertDiaryBulkBatchLimits(operations);
+    await this.executeBulkBatch(container, userId, operations);
+
+    return {
+      deletedCount: request.items.length,
+      deletedItemIds: request.items.map((reference) => reference.itemId),
+    };
+  }
+
+  async bulkMoveItems(
+    userId: string,
+    request: DiaryBulkMoveRequest,
+  ): Promise<DiaryBulkMoveResponse> {
+    const { containers } = await getCosmos();
+    const container = containers.nutritionDiaryMeals;
+    const groupedReferences = groupDiaryItemReferences(request.items);
+    const sourceMealIds = [...groupedReferences.keys()];
+    const targetMealId = 'mealId' in request.target ? request.target.mealId : undefined;
+    const newMealType = 'newMealType' in request.target ? request.target.newMealType : undefined;
+    if (Boolean(targetMealId) === Boolean(newMealType)) {
+      throw new DiaryBulkMutationError('invalid_diary_bulk_request');
+    }
+    if (targetMealId && groupedReferences.has(targetMealId)) {
+      throw new DiaryBulkMutationError('invalid_diary_bulk_request');
+    }
+
+    const mealIdsToRead = [...sourceMealIds, ...(targetMealId ? [targetMealId] : [])];
+    const mealRecords = await Promise.all(mealIdsToRead.map(async (mealId) => {
+      const record = await this.readBulkMeal(container, userId, mealId);
+      return [mealId, record] as const;
+    }));
+    const recordsById = new Map<string, { meal: Meal; etag: string }>();
+    for (const [mealId, record] of mealRecords) {
+      if (record) recordsById.set(mealId, record);
+    }
+    const mealsById = new Map([...recordsById].map(([mealId, record]) => [mealId, record.meal]));
+    const sourceMeals = resolveDiaryBulkSourceMeals(
+      userId,
+      request.sourceDate,
+      groupedReferences,
+      mealsById,
+    );
+
+    let targetMeal: Meal;
+    let isNewTarget = false;
+    if (targetMealId) {
+      const targetRecord = recordsById.get(targetMealId);
+      if (!targetRecord || targetRecord.meal.date !== request.sourceDate) {
+        throw new DiaryBulkMutationError('diary_bulk_reference_not_found');
+      }
+      targetMeal = targetRecord.meal;
+    } else if (newMealType) {
+      targetMeal = {
+        id: randomUUID(),
+        userId,
+        date: request.sourceDate,
+        type: newMealType,
+        name: newMealType.charAt(0).toUpperCase() + newMealType.slice(1),
+        items: [],
+        createdAt: new Date().toISOString(),
+      };
+      isNewTarget = true;
+    } else {
+      throw new DiaryBulkMutationError('invalid_diary_bulk_request');
+    }
+
+    const movedItems = request.items.map((reference) => {
+      const meal = sourceMeals.get(reference.mealId)!;
+      const item = (meal.items ?? []).find((candidate) => candidate.id === reference.itemId)!;
+      return { ...structuredClone(item), id: randomUUID() };
+    });
+    const updatedSources = new Map<string, Meal>();
+    for (const [mealId, meal] of sourceMeals) {
+      const itemIds = groupedReferences.get(mealId)!;
+      updatedSources.set(mealId, {
+        ...meal,
+        items: (meal.items ?? []).filter((item) => !itemIds.has(item.id)),
+      });
+    }
+    const updatedTarget: Meal = { ...targetMeal, items: [...(targetMeal.items ?? []), ...movedItems] };
+    const operations: OperationInput[] = [];
+    for (const meal of updatedSources.values()) {
+      operations.push({
+        operationType: 'Replace',
+        id: meal.id,
+        resourceBody: meal,
+        ifMatch: recordsById.get(meal.id)!.etag,
+      } as unknown as OperationInput);
+    }
+    if (isNewTarget) {
+      operations.push({
+        operationType: 'Create',
+        resourceBody: updatedTarget,
+      } as unknown as OperationInput);
+    } else {
+      operations.push({
+        operationType: 'Replace',
+        id: updatedTarget.id,
+        resourceBody: updatedTarget,
+        ifMatch: recordsById.get(updatedTarget.id)!.etag,
+      } as unknown as OperationInput);
+    }
+    assertDiaryBulkBatchLimits(operations);
+    await this.executeBulkBatch(container, userId, operations);
+
+    return {
+      movedCount: movedItems.length,
+      removedItemIds: request.items.map((reference) => reference.itemId),
+      targetMeal: updatedTarget,
+    };
+  }
+
+  async bulkCopyItems(
+    userId: string,
+    request: DiaryBulkCopyRequest,
+  ): Promise<DiaryBulkCopyResponse> {
+    const { containers } = await getCosmos();
+    const container = containers.nutritionDiaryMeals;
+    const groupedReferences = groupDiaryItemReferences(request.items);
+    const targetMealId = 'mealId' in request.target ? request.target.mealId : undefined;
+    const newMealType = 'newMealType' in request.target ? request.target.newMealType : undefined;
+    if (Boolean(targetMealId) === Boolean(newMealType)) {
+      throw new DiaryBulkMutationError('invalid_diary_bulk_request');
+    }
+
+    const mealIdsToRead = [...new Set([
+      ...groupedReferences.keys(),
+      ...(targetMealId ? [targetMealId] : []),
+    ])];
+    const mealRecords = await Promise.all(mealIdsToRead.map(async (mealId) => {
+      const record = await this.readBulkMeal(container, userId, mealId);
+      return [mealId, record] as const;
+    }));
+    const recordsById = new Map<string, { meal: Meal; etag: string }>();
+    for (const [mealId, record] of mealRecords) {
+      if (record) recordsById.set(mealId, record);
+    }
+    const mealsById = new Map([...recordsById].map(([mealId, record]) => [mealId, record.meal]));
+    const sourceMeals = resolveDiaryBulkSourceMeals(
+      userId,
+      request.sourceDate,
+      groupedReferences,
+      mealsById,
+    );
+
+    let targetMeal: Meal;
+    let targetEtag: string | undefined;
+    let isNewTarget = false;
+    if (targetMealId) {
+      const targetRecord = recordsById.get(targetMealId);
+      if (!targetRecord || targetRecord.meal.date !== request.targetDate) {
+        throw new DiaryBulkMutationError('diary_bulk_reference_not_found');
+      }
+      targetMeal = targetRecord.meal;
+      targetEtag = targetRecord.etag;
+    } else if (newMealType) {
+      targetMeal = {
+        id: randomUUID(),
+        userId,
+        date: request.targetDate,
+        type: newMealType,
+        name: newMealType.charAt(0).toUpperCase() + newMealType.slice(1),
+        items: [],
+        createdAt: new Date().toISOString(),
+      };
+      isNewTarget = true;
+    } else {
+      throw new DiaryBulkMutationError('invalid_diary_bulk_request');
+    }
+
+    const copiedItems = request.items.map((reference) => {
+      const meal = sourceMeals.get(reference.mealId)!;
+      const item = (meal.items ?? []).find((candidate) => candidate.id === reference.itemId)!;
+      return { ...structuredClone(item), id: randomUUID() };
+    });
+    const updatedTarget: Meal = { ...targetMeal, items: [...(targetMeal.items ?? []), ...copiedItems] };
+    const operations: OperationInput[] = isNewTarget
+      ? [{ operationType: 'Create', resourceBody: updatedTarget } as unknown as OperationInput]
+      : [{
+          operationType: 'Replace',
+          id: updatedTarget.id,
+          resourceBody: updatedTarget,
+          ifMatch: targetEtag,
+        } as unknown as OperationInput];
+    assertDiaryBulkBatchLimits(operations);
+    await this.executeBulkBatch(container, userId, operations);
+
+    return { copiedCount: copiedItems.length, targetMeal: updatedTarget };
+  }
+
+  private async readBulkMeal(
+    container: Awaited<ReturnType<typeof getCosmos>>['containers']['nutritionDiaryMeals'],
+    userId: string,
+    mealId: string,
+  ): Promise<{ meal: Meal; etag: string } | null> {
+    try {
+      const response = await container.item(mealId, userId).read<Meal>();
+      if (!response.resource) return null;
+      if (!response.etag) throw new Error('Cosmos diary meal read returned no ETag');
+      return { meal: response.resource, etag: response.etag };
+    } catch (error) {
+      if (cosmosStatusCode(error) === 404) return null;
+      throw error;
+    }
+  }
+
+  private async executeBulkBatch(
+    container: Awaited<ReturnType<typeof getCosmos>>['containers']['nutritionDiaryMeals'],
+    userId: string,
+    operations: OperationInput[],
+  ): Promise<void> {
+    const response = await container.items.batch(operations, userId);
+    const operationResults = response.result ?? [];
+    const responseCode = response.code ?? 500;
+    const operationStatusCodes = operationResults.map((operation) => operation.statusCode);
+    const statusCodes = [responseCode, ...operationStatusCodes];
+    const failed = operationResults.find((operation) => operation.statusCode < 200 || operation.statusCode >= 300);
+    if (!failed && responseCode < 400) return;
+
+    const statusCode = failed?.statusCode ?? responseCode;
+    if (statusCodes.includes(409) || statusCodes.includes(412)) {
+      throw new DiaryBulkMutationError('diary_bulk_conflict');
+    }
+    if (statusCodes.includes(413)) {
+      throw new DiaryBulkMutationError('diary_bulk_operation_limit_exceeded');
+    }
+    if (statusCodes.includes(404)) throw new DiaryBulkMutationError('diary_bulk_reference_not_found');
+    throw new Error(`Cosmos diary bulk batch failed with status ${statusCode}`);
+  }
+
   async countBySourceId(userId: string, sourceId: string): Promise<number> {
     const { containers } = await getCosmos();
     const { resources } = await containers.nutritionDiaryMeals.items
@@ -220,4 +505,11 @@ export class CosmosDiaryRepository implements DiaryRepository {
       cursor: page.hasMoreResults ? page.continuationToken : undefined,
     };
   }
+}
+
+function cosmosStatusCode(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null) return undefined;
+  if ('code' in error && typeof error.code === 'number') return error.code;
+  if ('statusCode' in error && typeof error.statusCode === 'number') return error.statusCode;
+  return undefined;
 }

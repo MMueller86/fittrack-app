@@ -73,6 +73,14 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-052 | US-11 recipe gram quick-add prefill | Non-blocking | Frontend | Closed |
 | FT-QA-2026-053 | US-11 D-1 plan execution status | Non-blocking | Documentation | Closed |
 | FT-QA-2026-054 | US-11 name-consent interaction | Non-blocking | Frontend | Closed |
+| FT-QA-2026-055 | US-01 diary multi-select, AC-10 | Blocking | Frontend | Closed |
+| FT-QA-2026-056 | US-01 move target semantics, AC-8 | Suggestion | Planner | Closed |
+| FT-QA-2026-057 | US-01 multi-source Move repository contract, AC-8 | Blocking | Backend | Closed |
+| FT-QA-2026-058 | US-01 persisted plan approval status | Non-blocking | Planner | Closed |
+| FT-QA-2026-059 | US-01 Move picker source-target test, AC-8 | Non-blocking | Frontend | Closed |
+| FT-QA-2026-060 | US-01 selection date-reset screen test | Non-blocking | Frontend | Closed |
+| FT-QA-2026-061 | US-01 foreign-user bulk reference test, AC-11 | Non-blocking | Backend | Closed |
+| FT-QA-2026-062 | US-01 Same-Day Copy Cosmos guard, AC-SD-1 | Blocking | Backend | Closed |
 
 ## Actionable Findings
 
@@ -779,6 +787,110 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** User requested correction on 2026-10-04; Frontend aligned the publication interaction to an initially unchecked name-consent checkbox. QA re-review verified the correction.
 - **History:** 2026-10-03 - Imported from the validated US-11 QA report. No correction started. 2026-10-04 - User requested correction; Frontend implemented the unchecked consent checkbox and interaction tests. QA re-review verified default-off consent, request behavior, and accessibility tests; closed.
 
+### FT-QA-2026-055
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`
+- **Acceptance criterion:** AC-10
+- **Description:** Explicitly cancelling a bulk action does not exit selection mode or clear the selected references. Reproduction: enter selection mode, select an item, open Move or Copy and press `Abbrechen`; the sheet closes but the selection toolbar and selected item remain. The same occurs when cancelling or dismissing the Delete `ConfirmSheet`. Failed requests correctly retain valid selection as required by PO-2; this finding is limited to explicit cancellation.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** `docs/qa/reports/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md` (AC-10); `mobile/src/modules/nutrition/DiaryScreen.tsx`, where `closeConfirmSheet`, `closeMoveSheet`, and `closeCopySheet` do not clear selection mode or selected references.
+- **Recommendation:** Make each explicit bulk-action abort clear selection mode and selected references, while preserving selection on failed requests. Add screen tests for cancelling/backing out of Delete confirmation, Move, and Copy.
+- **Status:** Closed
+- **Decision:** Frontend corrected explicit cancellation for Delete, Move, and Copy while preserving valid selection on failed requests. QA re-review verified the implementation and focused regression tests.
+- **History:** 2026-10-04 - Imported from the validated US-01 QA report; correction was paused pending plan clarification and reapproval. 2026-10-05 - User approved the revised plan. Frontend updated the action-cancellation handlers and added screen regression coverage; 13 focused tests and mobile typecheck passed. 2026-10-05 - QA re-review verified AC-10; closed.
+
+### FT-QA-2026-056
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`
+- **Acceptance criterion:** AC-8
+- **Description:** The approved plan is inconsistent about moving into a meal that is also a source meal. Confirmed move semantics describe a different or newly created target, while Risks and Edge Cases specify behavior for a target equal to a source meal. The implementation rejects a target that is among the selected source meals, matching the different-target contract but not the edge-case text.
+- **Criticality:** Suggestion
+- **Owner:** Planner
+- **Evidence:** `docs/qa/reports/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md` (AC-8); `backend/src/lib/repositories/cosmosDiaryRepository.ts`; `docs/kb/tech/09-api-reference.md`.
+- **Recommendation:** Clarify whether a target may be one of the source meals; align the risk note and API contract before treating this edge case as an acceptance expectation.
+- **Status:** Closed
+- **Decision:** Planner aligned the plan's Move target rule, API contract, AC-8, tests, and edge-case guidance: an existing target must differ from every source meal; a new same-day target remains allowed. The user approved this revised plan on 2026-10-05. QA re-review verified the plan, API, implementation, and test alignment.
+- **History:** 2026-10-04 - Imported from the validated US-01 QA report; routed to Planner and execution paused pending revised plan approval. 2026-10-05 - Planner updated the approved-plan clarification and the user approved the revised plan. 2026-10-05 - QA re-review verified alignment; closed.
+
+### FT-QA-2026-057
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`
+- **Acceptance criterion:** AC-8
+- **Description:** Runtime guards and the API contract agree that an existing Move target in the source-meal set is rejected, and the handler test covers the single-source case. However, the approved test strategy requires an in-memory case where the target matches one of multiple source meals and a Cosmos contract proving rejection without partial commit; neither regression is present. The required no-mutation edge case therefore lacks repository-level test evidence.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** The required cases are specified in the approved plan's Test Strategy. The single-source handler case is in `backend/src/functions/diary.test.ts`; the in-memory guard is in `backend/src/lib/repositories/diaryRepository.ts` and the Cosmos pre-check is in `backend/src/lib/repositories/cosmosDiaryRepository.ts`. The corresponding repository test files do not cover a multi-source rejection or Cosmos no-commit Move contract.
+- **Recommendation:** Add an in-memory regression where the existing target equals one source among multiple selected meals and assert every Diary meal is unchanged on rejection. Add a Cosmos contract for the same case that verifies no partial batch commit, then run it against the emulator.
+- **Status:** Closed
+- **Decision:** Backend added the multi-source in-memory regression and Cosmos contract asserting `400 invalid_diary_bulk_request` with no Diary changes. QA re-review verified the handler/in-memory behavior and confirmed the Cosmos contract source. Cosmos runtime execution remains `UNVERIFIED` because the emulator was unreachable.
+- **History:** 2026-10-05 - Imported from the validated US-01 QA re-review; first B1 correction attempt authorized and routed to Backend. 2026-10-05 - Backend added repository and Cosmos regression tests; in-memory/handler tests and typecheck passed. Cosmos contract test stopped before execution because `127.0.0.1:18081` was unreachable. 2026-10-05 - QA re-review verified AC-8 source coverage and in-memory behavior; closed with Cosmos runtime remaining unverified.
+
+### FT-QA-2026-058
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`
+- **Acceptance criterion:** N/A (approval/execution status)
+- **Description:** The QA assignment records that the revised plan was approved on 2026-10-05, but the plan header still says fresh user approval is outstanding and section 21 says execution remains paused until reapproval. The QA assignment's approval statement was treated as authoritative for the review; the durable plan status remains stale.
+- **Criticality:** Non-blocking
+- **Owner:** Planner
+- **Evidence:** Approval-pending status in the plan header and paused execution wording in section 21 conflict with the user's 2026-10-05 approval recorded in this workflow.
+- **Recommendation:** Update the plan's approval/execution status to record the 2026-10-05 approval without changing approved requirements or scope.
+- **Status:** Closed
+- **Decision:** Planner recorded the user's 2026-10-05 approval and current execution/QA follow-up status without changing approved scope or requirements. Final QA re-review verified the header and execution section; closed.
+- **History:** 2026-10-05 - Imported from the validated US-01 QA re-review; awaiting the user's decision. 2026-10-05 - User requested correction; Planner updated the plan status metadata and section 21. 2026-10-05 - Final QA re-review verified approval/execution status and unchanged scope; closed.
+
+### FT-QA-2026-059
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`
+- **Acceptance criterion:** AC-8
+- **Description:** The Move picker filters all selected source meals from existing targets, but the approved mobile API/service test strategy calls for verifying that behavior and no focused `MoveItemSheet` test exists. `DiaryScreen` tests mock the sheet, so they do not exercise its filtering rule. Backend rejection protects data integrity if a source target is submitted directly.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** The approved test strategy requires Move target-selection coverage; source filtering is implemented in `mobile/src/modules/nutrition/MoveItemSheet.tsx`, while `DiaryScreen.f2.test.tsx` mocks the sheet. No `MoveItemSheet` test file exists.
+- **Recommendation:** Add a focused component test with multiple source meal IDs, asserting none is offered as an existing target while an eligible same-day target remains selectable.
+- **Status:** Closed
+- **Decision:** Frontend added a focused `MoveItemSheet` regression for multiple selected source meals. Final QA verified both source meals are excluded, an eligible same-day target is selectable, and the focused test/typecheck pass; closed.
+- **History:** 2026-10-05 - Imported from the validated US-01 QA re-review; awaiting the user's decision. 2026-10-05 - User requested correction; Frontend added `MoveItemSheet.test.tsx`; focused test and mobile typecheck passed. 2026-10-05 - Final QA re-review verified the component test and behavior; closed.
+
+### FT-QA-2026-060
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`
+- **Acceptance criterion:** N/A (plan sections 5 and 18: selection reset on date change)
+- **Description:** DiaryScreen clears selection when its date changes, but no screen test changes the diary date while selection is active. Existing tests cover reference normalization and action success/cancel/failure, not this explicit date transition. This leaves the F1 handoff's date-reset test claim without a corresponding focused regression in the workspace.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** Date-change reset is implemented in `mobile/src/modules/nutrition/DiaryScreen.tsx`. The screen tests in `mobile/src/modules/nutrition/DiaryScreen.f2.test.tsx` do not change the route/date during selection. The approved plan's mobile selection test strategy explicitly lists reset on date change.
+- **Recommendation:** Add a DiaryScreen regression that starts selection, changes the displayed date through navigation or route params, and asserts selection mode and old references are cleared.
+- **Status:** Closed
+- **Decision:** Frontend added a `DiaryScreen` route-date regression that selects an item, changes the displayed date, and verifies selection mode and old references are cleared. Final QA verified the route transition, focused test, and typecheck; closed.
+- **History:** 2026-10-05 - Imported from the validated US-01 QA re-review; awaiting the user's decision. 2026-10-05 - User requested correction; Frontend added the route-date test to `DiaryScreen.f2.test.tsx`; focused test and mobile typecheck passed. 2026-10-05 - Final QA re-review verified date reset and test coverage; closed.
+
+### FT-QA-2026-061
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`, section 18
+- **Acceptance criterion:** AC-11
+- **Description:** The approved test strategy calls for backend coverage of both missing and foreign IDs. Existing bulk handler tests cover unauthenticated requests and unknown references with no partial mutation, but no bulk test submits a meal ID owned by a second user under the first user's authenticated context. The implementation is user-scoped by inspection: handlers pass the token `userId`, the in-memory resolver filters by owner, and Cosmos point reads/batches use that user's partition. No cross-user access or mutation was observed; the distinct foreign-reference regression remains unexercised.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** Unknown-reference/no-partial-mutation cases are in `backend/src/functions/diary.test.ts` and `backend/src/lib/repositories/diaryRepository.test.ts`. Owner filtering is in `backend/src/lib/repositories/diaryRepository.ts`; partition-scoped reads/batches are in `backend/src/lib/repositories/cosmosDiaryRepository.ts`. The approved test requirement is in the plan's Test Strategy.
+- **Recommendation:** Add a focused bulk handler or repository test that seeds a source/target meal for user B, submits its reference as authenticated user A, and asserts the same not-found response as an unknown ID with no change to either user's Diary.
+- **Status:** Closed
+- **Decision:** Backend added bulk handler, in-memory repository, and Cosmos contract coverage for a user-B meal reference submitted as user A, including a mixed valid-A/foreign-B request with no changes to either user's Diary. Final QA re-review verified the handler/in-memory assertions and confirmed the Cosmos contract source. Cosmos runtime execution remains `UNVERIFIED` because the emulator was unreachable.
+- **History:** 2026-10-05 - Imported from the validated US-01 final QA report; awaiting the user's decision. 2026-10-05 - User requested correction; routed to Backend. 2026-10-05 - Backend added the foreign-reference and mixed-request regressions; 84 focused handler/in-memory tests, typecheck, and diff check passed. Cosmos contract suite stopped before execution because `127.0.0.1:18081` was unreachable. 2026-10-05 - Final QA re-review verified the foreign-reference no-mutation assertions; closed with Cosmos runtime remaining unverified.
+
+### FT-QA-2026-062
+
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl_Addendum_Same-Day-Copy.md`, section 9
+- **Acceptance criterion:** AC-SD-1 (also blocks the persistent-path evidence for AC-SD-2 through AC-SD-5 and AC-SD-7)
+- **Description:** `CosmosDiaryRepository.bulkCopyItems()` still rejects `sourceDate === targetDate` with `invalid_diary_bulk_request` before reading or writing. This prevents valid same-day copies to the same existing meal, a different existing meal, or a new target on the persistent Cosmos path; handler and in-memory tests do not expose this Cosmos-only guard.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** The initial QA report `docs/qa/reports/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl_Addendum_Same-Day-Copy_Revision-B.md`, finding `Q5-RB-001`; the correction re-review confirmed the guard is absent and the same-meal source/target uses one deduplicated record/ETag for one Replace. Cosmos contract runtime remains `UNVERIFIED` because the emulator was unreachable and all 21 tests were skipped.
+- **Recommendation:** Remove the stale equal-date rejection from the Cosmos Copy path only, preserve Move/Delete behavior and the existing request/response shape, then run the focused Cosmos contract suite with the local emulator.
+- **Status:** Closed
+- **Decision:** The user explicitly approved same-day copy with fresh item IDs and requested immediate implementation on 2026-10-05. Backend removed the stale Cosmos equal-date guard; final QA correction re-review verified the source fix and issued Revision B verdict `PASS`. Cosmos runtime remains separately `UNVERIFIED`.
+- **History:** 2026-10-05 - Revision B QA reported blocking finding `Q5-RB-001`; assigned `FT-QA-2026-062` and routed to Backend. Cosmos contract runtime remains unverified. 2026-10-05 - Backend removed the Cosmos Copy equal-date guard; focused tests, full backend unit suite, typecheck, and build verification passed. Contract execution remains unverified because the local emulator was unreachable. 2026-10-05 - Q5 correction re-review verified the stale guard was removed and closed the finding with Revision B QA verdict `PASS`; emulator runtime remains unverified.
+
 ## Verification Notes (Not Findings)
 
 These items were reported as unverified environment checks. They must not lower a QA verdict and must not enter the actionable finding list unless a defect is demonstrated.
@@ -792,8 +904,8 @@ These items were reported as unverified environment checks. They must not lower 
 ### VER-2026-002 - Cosmos contract tests
 
 - **State:** `UNVERIFIED`
-- **Reason:** The local Cosmos emulator was not running during the review.
-- **Manual action:** Start the approved local emulator or rely on the CI service container, then run `cd backend && npm run test:contract`.
+- **Reason:** The local Cosmos emulator was unavailable during review. Revision B Q5 could not reach `http://127.0.0.1:18081`; all 21 focused contract tests were skipped before assertions.
+- **Manual action:** After closing FT-QA-2026-062, start the approved local emulator or use the CI service container, then run `npm --prefix backend run test:contract -- src/lib/repositories/cosmosDiaryRepository.contract.test.ts`. Verify same-Meal one-read/one-Replace behavior, target creation, and stale-ETag conflict.
 
 ### VER-2026-003 - Real-device and viewport checks
 
@@ -872,3 +984,21 @@ These items were reported as unverified environment checks. They must not lower 
 - **Manual action:** After the normal merge and Dev rollout, complete the plan's two-user checks for route registration, publication/revocation, authenticated image bytes without SAS or redirect, and paginated Cosmos reads. Proceed to Alpha only after those gates pass, then repeat the two-user smoke there.
 - **Expected result:** Dev and Alpha checks pass for publication, revocation, protected image delivery, pagination, and preservation of existing diary snapshots.
 - **Result:** `UNVERIFIED`; no deployment or environment changes were made.
+
+### VER-2026-013 - US-01 Cosmos persistence contracts
+
+- **State:** `UNVERIFIED`
+- **Reason:** The local Cosmos emulator at `127.0.0.1:18081` was unreachable; the full contract suite failed during setup and the focused Move contract run skipped all 16 tests, so Cosmos transaction assertions did not execute.
+- **Evidence:** `docs/qa/reports/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`; full contract command exited 1 with nine suites/90 tests skipped, and focused `npm test --prefix backend -- --config vitest.contract.config.mts --reporter=basic --silent src/lib/repositories/cosmosDiaryRepository.contract.test.ts` exited 1 with 16 tests skipped.
+- **Manual action:** Start the local Cosmos emulator or use the emulator-backed CI service, then rerun `npx vitest run --config vitest.contract.config.mts` from `backend/`.
+- **Expected result:** Bulk delete/move/copy atomicity, ETag conflicts, target creation, user-partition isolation, and existing document roundtrips pass against Cosmos Emulator.
+- **Result:** Not run against Cosmos in this QA environment.
+
+### VER-2026-014 - US-01 Android visual and accessibility validation
+
+- **State:** `MANUAL VALIDATION REQUIRED`
+- **Reason:** `adb` was unavailable; no Android device/emulator interaction or TalkBack check was performed.
+- **Evidence:** `docs/qa/reports/PLAN_US-01_Ernährungstagebuch_Mehrfachauswahl.md`.
+- **Manual action:** On an Android Dev Build, exercise item and meal selection, partial/full/empty meal states, action-bar spacing, confirmation/cancel flows, and TalkBack announcements using a diary day with multiple meals and an empty meal.
+- **Expected result:** Controls remain visible and accessible; selected, mixed, and empty states are announced accurately; cancelling and error behavior match AC-10.
+- **Result:** Not run (`adb` unavailable).

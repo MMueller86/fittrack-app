@@ -27,6 +27,15 @@ function findCheckbox(renderer: ReactTestRenderer): ReactTestInstance {
   return matches[0]!;
 }
 
+function findButtonByText(renderer: ReactTestRenderer, label: string): ReactTestInstance {
+  const matches = renderer.root.findAll(
+    (node) => node.type === 'TouchableOpacity'
+      && node.findAll((child) => child.type === 'Text' && child.props.children === label).length > 0,
+  );
+  if (matches.length !== 1) throw new Error(`Expected one button labeled ${label}, found ${matches.length}`);
+  return matches[0]!;
+}
+
 function ControlledConfirmSheet() {
   const [checked, setChecked] = React.useState(false);
   return (
@@ -61,5 +70,39 @@ describe('ConfirmSheet checkbox', () => {
 
     expect(findCheckbox(renderer).props.accessibilityState).toEqual({ checked: true });
     expect(renderer.root.findAll((node) => node.type === 'Icon')).toHaveLength(1);
+  });
+});
+
+describe('ConfirmSheet dismissal', () => {
+  it('notifies explicit dismissals without treating an action as a cancellation', async () => {
+    const onClose = vi.fn();
+    const onDismiss = vi.fn();
+    const onConfirm = vi.fn();
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(
+        <ConfirmSheet
+          visible
+          title="Änderung bestätigen?"
+          actions={[{ label: 'Bestätigen', onPress: onConfirm }]}
+          onClose={onClose}
+          onDismiss={onDismiss}
+        />,
+      );
+    });
+
+    await act(async () => {
+      (findButtonByText(renderer, 'Abbrechen').props.onPress as (() => void) | undefined)?.();
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    await act(async () => {
+      (findButtonByText(renderer, 'Bestätigen').props.onPress as (() => void) | undefined)?.();
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 });

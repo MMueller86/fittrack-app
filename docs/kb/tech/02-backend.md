@@ -50,6 +50,7 @@ Health check: `GET /api/health` — anonymous, always returns `{ status: 'ok' }`
 | `documentIntelligence.ts` | Azure Document Intelligence client |
 | `storage.ts` | Azure Blob Storage client |
 | `hintEngine.ts` | Rule-based hint evaluation (no AI) |
+| `diaryItemUsage.ts` | Best-effort, source-specific usage tracking after a successful diary copy commit |
 | `progressIntelligence.ts` | Behavioural signal computation for daily insight |
 | `labelParser.ts` | Post-processing of OCR + AI label results |
 | `nutritionCalculator.ts` | Nutrition scaling per portion/grams |

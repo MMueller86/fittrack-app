@@ -1,13 +1,78 @@
-// diaryItemUtils — helpers for copying/moving diary items while preserving sourceId links.
-//
-// buildCopyPayload() implements 4-case logic:
-//   1. gram-based item WITH sourceId  → productId + amountGrams (server recalculates from ReusableItem)
-//   2. portion-based item WITH sourceId + portionWeightGrams → productId + amountGrams (derived) + portion mode
-//   3. portion-based item WITH sourceId but NO portionWeightGrams → flat macros fallback
-//   4. no sourceId (AI, manual) → flat macros + all aiMealEstimate* fields
+// diaryItemUtils — helpers for diary-item selection and meal creation.
 
-import type { DiaryDayResponse, MealItem, MealType, ReusableItem } from '@fittrack/shared';
-import type { AddItemInput } from '../../shared/api/diaryApi';
+import type { DiaryDayResponse, Meal, MealType } from '@fittrack/shared';
+
+export interface DiaryItemReference {
+  mealId: string;
+  itemId: string;
+}
+
+export type DiaryMealSelectionState = 'none' | 'partial' | 'all';
+
+export function getDiaryItemSelectionKey(reference: DiaryItemReference): string {
+  return JSON.stringify([reference.mealId, reference.itemId]);
+}
+
+export function toggleDiaryItemSelection(
+  selection: ReadonlySet<string>,
+  reference: DiaryItemReference,
+): Set<string> {
+  const next = new Set(selection);
+  const key = getDiaryItemSelectionKey(reference);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  return next;
+}
+
+export function getDiaryMealSelectionState(
+  meal: Pick<Meal, 'id' | 'items'>,
+  selection: ReadonlySet<string>,
+): DiaryMealSelectionState {
+  const itemKeys = new Set(
+    (meal.items ?? []).map((item) => getDiaryItemSelectionKey({ mealId: meal.id, itemId: item.id })),
+  );
+  if (itemKeys.size === 0) return 'none';
+
+  const selectedCount = [...itemKeys].filter((key) => selection.has(key)).length;
+  if (selectedCount === 0) return 'none';
+  return selectedCount === itemKeys.size ? 'all' : 'partial';
+}
+
+export function toggleDiaryMealSelection(
+  selection: ReadonlySet<string>,
+  meal: Pick<Meal, 'id' | 'items'>,
+): Set<string> {
+  const next = new Set(selection);
+  const itemKeys = new Set(
+    (meal.items ?? []).map((item) => getDiaryItemSelectionKey({ mealId: meal.id, itemId: item.id })),
+  );
+  if (itemKeys.size === 0) return next;
+
+  const shouldClear = [...itemKeys].every((key) => next.has(key));
+  for (const key of itemKeys) {
+    if (shouldClear) {
+      next.delete(key);
+    } else {
+      next.add(key);
+    }
+  }
+  return next;
+}
+
+export function normalizeDiaryItemSelection(
+  selection: ReadonlySet<string>,
+  meals: readonly Pick<Meal, 'id' | 'items'>[],
+): Set<string> {
+  const existingKeys = new Set(
+    meals.flatMap((meal) =>
+      (meal.items ?? []).map((item) => getDiaryItemSelectionKey({ mealId: meal.id, itemId: item.id })),
+    ),
+  );
+  return new Set([...selection].filter((key) => existingKeys.has(key)));
+}
 
 export async function applyAddMeal(params: {
   type: MealType;
@@ -38,75 +103,4 @@ export async function applyAddMeal(params: {
     );
     showSnackbar({ message: 'Ansicht konnte nicht aktualisiert werden. Bitte einmal nach unten ziehen.' });
   }
-}
-
-export function buildCopyPayload(
-  item: MealItem,
-  sourceProduct: ReusableItem | null,
-): AddItemInput {
-  const portionWeightGrams = sourceProduct?.portion?.weightGrams;
-
-  // Case 1: gram-based with sourceId — server recalculates authoritative macros
-  if (item.sourceId && item.unit === 'g') {
-    return {
-      productId: item.sourceId,
-      productName: item.name,
-      inputMode: 'grams',
-      inputAmount: item.quantity,
-      amountGrams: item.quantity,
-      calculatedNutrition: {
-        calories: item.macros.calories,
-        protein: item.macros.protein,
-        carbs: item.macros.carbs,
-        fat: item.macros.fat,
-        fiber: item.macros.fiber,
-      },
-    };
-  }
-
-  // Case 2: portion-based with sourceId AND portionWeightGrams available
-  if (item.sourceId && item.unit === 'portion' && portionWeightGrams) {
-    return {
-      productId: item.sourceId,
-      productName: item.name,
-      inputMode: 'portion',
-      inputAmount: item.quantity,
-      amountGrams: item.quantity * portionWeightGrams,
-      calculatedNutrition: {
-        calories: item.macros.calories,
-        protein: item.macros.protein,
-        carbs: item.macros.carbs,
-        fat: item.macros.fat,
-        fiber: item.macros.fiber,
-      },
-    };
-  }
-
-  // Case 3 & 4: flat macros fallback (portion without portionGrams, or no sourceId)
-  const base: AddItemInput = {
-    name: item.name,
-    calories: item.macros.calories,
-    protein: item.macros.protein,
-    carbs: item.macros.carbs,
-    fat: item.macros.fat,
-    fiber: item.macros.fiber,
-    quantity: item.quantity,
-    unit: item.unit,
-    isAiEstimate: item.isAiEstimate,
-  };
-
-  // Preserve AI meal estimate metadata for Case 4
-  if (item.sourceType === 'ai-meal-estimate') {
-    return {
-      ...base,
-      sourceType: 'ai-meal-estimate',
-      ...(item.aiMealEstimateComponents ? { aiMealEstimateComponents: item.aiMealEstimateComponents } : {}),
-      ...(item.aiMealEstimateContext ? { aiMealEstimateContext: item.aiMealEstimateContext } : {}),
-      ...(item.aiMealEstimateConfidence ? { aiMealEstimateConfidence: item.aiMealEstimateConfidence } : {}),
-      ...(item.aiMealEstimateAssumptions ? { aiMealEstimateAssumptions: item.aiMealEstimateAssumptions } : {}),
-      ...(item.aiMealEstimatePhotoUsed ? { aiMealEstimatePhotoUsed: item.aiMealEstimatePhotoUsed } : {}),
-    };
-  }
-
-  return base;
 }

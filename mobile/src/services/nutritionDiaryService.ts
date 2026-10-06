@@ -2,7 +2,16 @@
 
 import { diaryApi } from '../shared/api/diaryApi';
 import { nutritionSyncService } from './health/nutritionSyncService';
-import type { Meal, MealType } from '@fittrack/shared';
+import type {
+  DiaryBulkCopyRequest,
+  DiaryBulkCopyResponse,
+  DiaryBulkDeleteRequest,
+  DiaryBulkDeleteResponse,
+  DiaryBulkMoveRequest,
+  DiaryBulkMoveResponse,
+  Meal,
+  MealType,
+} from '@fittrack/shared';
 import type { AddItemInput } from '../shared/api/diaryApi';
 
 export const nutritionDiaryService = {
@@ -32,6 +41,39 @@ export const nutritionDiaryService = {
   async deleteItem(mealId: string, itemId: string): Promise<{ meal: Meal }> {
     const result = await diaryApi.deleteItem(mealId, itemId);
     void nutritionSyncService.syncNutritionDelete(itemId);
+    return result;
+  },
+
+  async bulkDeleteItems(input: DiaryBulkDeleteRequest): Promise<DiaryBulkDeleteResponse> {
+    const result = await diaryApi.bulkDeleteItems(input);
+    for (const itemId of result.deletedItemIds) {
+      void nutritionSyncService.syncNutritionDelete(itemId);
+    }
+    return result;
+  },
+
+  async bulkMoveItems(input: DiaryBulkMoveRequest): Promise<DiaryBulkMoveResponse> {
+    const result = await diaryApi.bulkMoveItems(input);
+    for (const itemId of result.removedItemIds) {
+      void nutritionSyncService.syncNutritionDelete(itemId);
+    }
+    const movedItemIds = result.movedCount > 0
+      ? result.targetMeal.items.slice(-result.movedCount).map((item) => item.id)
+      : [];
+    if (movedItemIds.length > 0) {
+      void nutritionSyncService.syncNutritionUpsert(result.targetMeal, movedItemIds);
+    }
+    return result;
+  },
+
+  async bulkCopyItems(input: DiaryBulkCopyRequest): Promise<DiaryBulkCopyResponse> {
+    const result = await diaryApi.bulkCopyItems(input);
+    const copiedItemIds = result.copiedCount > 0
+      ? result.targetMeal.items.slice(-result.copiedCount).map((item) => item.id)
+      : [];
+    if (copiedItemIds.length > 0) {
+      void nutritionSyncService.syncNutritionUpsert(result.targetMeal, copiedItemIds);
+    }
     return result;
   },
 

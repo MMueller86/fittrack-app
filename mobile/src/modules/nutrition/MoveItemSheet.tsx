@@ -1,6 +1,4 @@
-// MoveItemSheet — moves a diary item to another meal on the same day.
-// API sequence: addItem(targetMealId) → deleteItem(sourceMealId) → reload.
-// sourceId-Preservation: uses buildCopyPayload() for correct product linking.
+// MoveItemSheet — selects an existing or transactionally-created meal on the same day.
 
 import React, { useState } from 'react';
 import {
@@ -13,11 +11,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Meal, MealItem, MealType } from '@fittrack/shared';
+import type { DiaryBulkMoveTarget, DiaryItemReference, Meal, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
-import { buildCopyPayload } from './diaryItemUtils';
-import { useSourceProduct } from './useSourceProduct';
 
 const MEAL_ICONS: Record<MealType, string> = {
   breakfast: '🌅', lunch: '☀️', dinner: '🌙',
@@ -26,69 +21,57 @@ const MEAL_ICONS: Record<MealType, string> = {
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
+  breakfast: 'Frühstück', lunch: 'Mittagessen', dinner: 'Abendessen',
   snack: 'Snack', preworkout: 'Pre-Workout', postworkout: 'Post-Workout',
 };
 
 interface Props {
   visible: boolean;
-  item: MealItem;
-  sourceMealId: string;
-  date: string;
+  items: DiaryItemReference[];
+  itemLabel: string;
   meals: Meal[];
-  onMoved: () => void;
+  onMove: (items: DiaryItemReference[], target: DiaryBulkMoveTarget) => Promise<boolean>;
   onClose: () => void;
-  onShowSnackbar: (message: string) => void;
 }
 
 export default function MoveItemSheet({
-  visible, item, sourceMealId, date, meals, onMoved, onClose, onShowSnackbar,
+  visible, items, itemLabel, meals, onMove, onClose,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [movingTo, setMovingTo] = useState<string | null>(null);
-  const { product: sourceProduct } = useSourceProduct(item.sourceId);
 
+  const sourceMealIds = new Set(items.map((reference) => reference.mealId));
   const existingTypes = new Set(meals.map((m) => m.type));
   const missingTypes = MEAL_ORDER.filter((t) => !existingTypes.has(t));
 
   const targetMeals = meals
-    .filter((m) => m.id !== sourceMealId)
+    .filter((m) => !sourceMealIds.has(m.id))
     .sort((a, b) => MEAL_ORDER.indexOf(a.type) - MEAL_ORDER.indexOf(b.type));
 
-  const doMove = async (targetMealId: string, targetMealName: string, createType?: MealType) => {
-    if (movingTo) return;
-    setMovingTo(targetMealId);
+  const doMove = async (targetKey: string, target: DiaryBulkMoveTarget) => {
+    if (movingTo || items.length === 0) return;
+    setMovingTo(targetKey);
     try {
-      let resolvedMealId = targetMealId;
-
-      // Create meal first if needed
-      if (createType) {
-        const { meal } = await diaryApi.createMeal(date, createType);
-        resolvedMealId = meal.id;
-      }
-
-      const payload = buildCopyPayload(item, sourceProduct);
-      await diaryApi.addItem(resolvedMealId, payload);
-      await diaryApi.deleteItem(sourceMealId, item.id);
-      onMoved();
-      onClose();
-      onShowSnackbar(`Verschoben nach ${targetMealName} ✓`);
-    } catch {
-      onShowSnackbar('Verschieben fehlgeschlagen.');
+      if (await onMove(items, target)) onClose();
     } finally {
       setMovingTo(null);
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => { if (!movingTo) onClose(); }}
+    >
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={movingTo ? undefined : onClose} />
       <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
         <View style={styles.handle} />
 
         {/* Header */}
         <Text style={styles.title}>Verschieben nach</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>{itemLabel}</Text>
 
         <View style={styles.divider} />
 
@@ -100,8 +83,8 @@ export default function MoveItemSheet({
               <TouchableOpacity
                 key={meal.id}
                 style={styles.mealRow}
-                onPress={() => doMove(meal.id, meal.name)}
-                disabled={!!movingTo}
+                onPress={() => { void doMove(meal.id, { mealId: meal.id }); }}
+                disabled={!!movingTo || items.length === 0}
                 activeOpacity={0.7}
               >
                 <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
@@ -131,8 +114,8 @@ export default function MoveItemSheet({
                   <TouchableOpacity
                     key={type}
                     style={styles.chip}
-                    onPress={() => doMove(`new-${type}`, MEAL_LABELS[type], type)}
-                    disabled={!!movingTo}
+                    onPress={() => { void doMove(`new-${type}`, { newMealType: type }); }}
+                    disabled={!!movingTo || items.length === 0}
                   >
                     <Text style={styles.chipIcon}>{MEAL_ICONS[type]}</Text>
                     <Text style={styles.chipLabel}>{MEAL_LABELS[type]}</Text>
@@ -146,7 +129,7 @@ export default function MoveItemSheet({
         </ScrollView>
 
         {/* Cancel */}
-        <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+        <TouchableOpacity style={styles.cancelBtn} onPress={onClose} disabled={!!movingTo}>
           <Text style={styles.cancelLabel}>Abbrechen</Text>
         </TouchableOpacity>
       </View>

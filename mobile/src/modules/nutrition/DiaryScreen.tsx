@@ -13,13 +13,24 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
+import axios from 'axios';
+import type {
+  DiaryBulkCopyResponse,
+  DiaryBulkCopyTarget,
+  DiaryBulkMoveTarget,
+  DiaryDayResponse,
+  DiaryItemReference,
+  Meal,
+  MealItem,
+  MealType,
+} from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { DayStoryCard } from '../../shared/components/DayStoryCard';
 import type { MealMacroSummary } from '../../shared/components/DayStoryCard';
 import type { MacroTarget } from '../../shared/components/MacroSummaryCard';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
+import { Icon } from '../../shared/components/Icon';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -36,7 +47,14 @@ import EditItemSheet from './EditItemSheet';
 import MoveItemSheet from './MoveItemSheet';
 import CopyItemSheet from './CopyItemSheet';
 import { useFoodEntryHubStore } from './hub/useFoodEntryHubStore';
-import { applyAddMeal } from './diaryItemUtils';
+import {
+  applyAddMeal,
+  getDiaryItemSelectionKey,
+  getDiaryMealSelectionState,
+  normalizeDiaryItemSelection,
+  toggleDiaryItemSelection,
+  toggleDiaryMealSelection,
+} from './diaryItemUtils';
 import { ActivityBonusSheet } from './components/ActivityBonusSheet';
 import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
 import { addLocalDays, getLocalIsoDate, isValidDateOnly } from '../../shared/date/localDate';
@@ -81,6 +99,46 @@ function clamp(value: number, max: number): number {
   return Math.min(value / max, 1);
 }
 
+function getBulkMutationErrorMessage(error: unknown, action: 'delete' | 'move' | 'copy'): string {
+  let errorCode: string | undefined;
+  if (axios.isAxiosError<{ error?: unknown }>(error)) {
+    const apiError = error.response?.data?.error;
+    if (typeof apiError === 'string') errorCode = apiError;
+  }
+
+  switch (errorCode) {
+    case 'invalid_diary_bulk_request':
+      return action === 'copy'
+        ? 'Die Auswahl, das Datum oder die Zielmahlzeit ist ungültig. Bitte prüfe sie und versuche es erneut.'
+        : 'Die Auswahl oder das Ziel ist ungültig. Bitte passe sie an und versuche es erneut.';
+    case 'diary_bulk_reference_not_found':
+      return 'Mindestens ein Eintrag oder die Zielmahlzeit ist nicht mehr verfügbar. Die Tagebuchansicht wurde aktualisiert.';
+    case 'diary_bulk_conflict':
+      return 'Das Tagebuch wurde gleichzeitig geändert. Die Ansicht wurde aktualisiert. Bitte prüfe deine Auswahl und versuche es erneut.';
+    case 'diary_bulk_operation_limit_exceeded':
+      return action === 'delete'
+        ? 'Zu viele Einträge für eine einzelne Löschaktion. Bitte wähle weniger Einträge aus.'
+        : action === 'move'
+          ? 'Zu viele Einträge für eine einzelne Verschiebeaktion. Bitte wähle weniger Einträge aus.'
+          : 'Zu viele Einträge für eine einzelne Kopieraktion. Bitte wähle weniger Einträge aus.';
+    default:
+      return action === 'delete'
+        ? 'Einträge konnten nicht gelöscht werden. Bitte versuche es erneut.'
+        : action === 'move'
+          ? 'Einträge konnten nicht verschoben werden. Bitte versuche es erneut.'
+          : 'Einträge konnten nicht kopiert werden. Bitte versuche es erneut.';
+  }
+}
+
+function getMoveItemLabel(references: readonly DiaryItemReference[], meals: readonly Meal[]): string {
+  if (references.length !== 1) return `${references.length} Einträge ausgewählt`;
+  const reference = references[0];
+  const item = reference
+    ? meals.find((meal) => meal.id === reference.mealId)?.items.find((candidate) => candidate.id === reference.itemId)
+    : undefined;
+  return item?.name ?? 'Eintrag';
+}
+
 /** Animated item row: slides in from below on mount (250ms). */
 function AnimatedItem({ children, index }: { children: React.ReactNode; index: number }) {
   const opacity = useSharedValue(0);
@@ -116,25 +174,60 @@ function getCurrentMealType(): MealType {
 function MealCard({
   meal,
   isToday,
+  selectionMode,
+  selectedItemKeys,
   onAddItem,
   onDeleteItem,
   onEditItem,
   onDeleteMeal,
+  onOpenMealOptions,
+  onStartItemSelection,
+  onToggleItemSelection,
+  onToggleMealSelection,
 }: {
   meal: Meal;
   isToday: boolean;
+  selectionMode: boolean;
+  selectedItemKeys: ReadonlySet<string>;
   onAddItem: (mealId: string, mealName: string) => void;
   onDeleteItem: (mealId: string, itemId: string, name: string) => void;
   onEditItem: (mealId: string, item: MealItem) => void;
   onDeleteMeal: (meal: Meal) => void;
+  onOpenMealOptions: (meal: Meal) => void;
+  onStartItemSelection: (mealId: string, itemId: string) => void;
+  onToggleItemSelection: (mealId: string, itemId: string) => void;
+  onToggleMealSelection: (meal: Meal) => void;
 }) {
   const items = meal.items ?? [];
   const totalCal = items.reduce((s, i) => s + i.macros.calories, 0);
   const isEmpty = items.length === 0;
   const isCurrent = isToday && isEmpty && getCurrentMealType() === meal.type;
+  const mealSelectionState = getDiaryMealSelectionState(meal, selectedItemKeys);
+  const mealSelectionIcon = mealSelectionState === 'all'
+    ? 'check-square'
+    : mealSelectionState === 'partial' ? 'minus-square' : 'square';
+  const mealSelectionColor = mealSelectionState === 'none' ? colors.textMuted : colors.primary;
 
   // State B: compact single-row for empty meals
   if (isEmpty) {
+    const compactContent = (
+      <>
+        <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
+        <Text style={styles.mealName}>{meal.name}</Text>
+        {!selectionMode && <Text style={styles.compactAddHint}>+ Hinzufügen</Text>}
+      </>
+    );
+
+    if (selectionMode) {
+      return (
+        <View style={styles.mealCardCompactWrapper}>
+          <View style={[styles.mealCardCompact, isCurrent && styles.mealCardCurrent]}>
+            {compactContent}
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.mealCardCompactWrapper}>
         <SwipeableRow onDelete={() => onDeleteMeal(meal)}>
@@ -143,9 +236,7 @@ function MealCard({
             onPress={() => onAddItem(meal.id, meal.name)}
             activeOpacity={0.7}
           >
-            <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
-            <Text style={styles.mealName}>{meal.name}</Text>
-            <Text style={styles.compactAddHint}>+ Hinzufügen</Text>
+            {compactContent}
           </TouchableOpacity>
         </SwipeableRow>
       </View>
@@ -157,6 +248,20 @@ function MealCard({
     <View style={[styles.mealCard, isCurrent && styles.mealCardCurrent]}>
       {/* Meal header */}
       <View style={styles.mealHeader}>
+        {selectionMode && (
+          <TouchableOpacity
+            style={styles.mealSelectionToggle}
+            onPress={() => onToggleMealSelection(meal)}
+            activeOpacity={0.7}
+            accessibilityRole="checkbox"
+            accessibilityLabel={`${meal.name}, ${mealSelectionState === 'all' ? 'vollständig ausgewählt' : mealSelectionState === 'partial' ? 'teilweise ausgewählt' : 'nicht ausgewählt'}`}
+            accessibilityState={{
+              checked: mealSelectionState === 'partial' ? 'mixed' : mealSelectionState === 'all',
+            }}
+          >
+            <Icon lib="feather" name={mealSelectionIcon} size="md" color={mealSelectionColor} />
+          </TouchableOpacity>
+        )}
         <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
         <View style={{ flex: 1 }}>
           <Text style={styles.mealName}>{meal.name}</Text>
@@ -167,41 +272,59 @@ function MealCard({
             </Text>
           )}
         </View>
-        <TouchableOpacity
-          onPress={() => onDeleteMeal(meal)}
-          style={styles.moreBtn}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Text style={styles.moreBtnText}>···</Text>
-        </TouchableOpacity>
+        {!selectionMode && (
+          <TouchableOpacity
+            onPress={() => onOpenMealOptions(meal)}
+            style={styles.moreBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Optionen für ${meal.name}`}
+          >
+            <Text style={styles.moreBtnText}>···</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {/* Items — swipe left to delete, tap to edit */}
-      {items.map((item, index) => (
-        <AnimatedItem key={item.id} index={index}>
-          <SwipeableRow onDelete={() => onDeleteItem(meal.id, item.id, item.name)}>
-            <DiaryItemRow
-              name={item.name}
-              amountLabel={item.unit === 'portion'
-                ? `${item.quantity} Portion${item.quantity !== 1 ? 'en' : ''}`
-                : `${Math.round(item.quantity)} g`}
-              kcal={item.macros.calories}
-              protein={item.macros.protein}
-              aiBadgeLabel={item.sourceType === 'ai-meal-estimate'
-                ? (item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '✨ KI-Schätzung')
-                : undefined}
-              onPress={() => onEditItem(meal.id, item)}
-            />
-          </SwipeableRow>
-        </AnimatedItem>
-      ))}
+      {items.map((item, index) => {
+        const itemRow = (
+          <DiaryItemRow
+            name={item.name}
+            amountLabel={item.unit === 'portion'
+              ? `${item.quantity} Portion${item.quantity !== 1 ? 'en' : ''}`
+              : `${Math.round(item.quantity)} g`}
+            kcal={item.macros.calories}
+            protein={item.macros.protein}
+            aiBadgeLabel={item.sourceType === 'ai-meal-estimate'
+              ? (item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '✨ KI-Schätzung')
+              : undefined}
+            onPress={selectionMode ? undefined : () => onEditItem(meal.id, item)}
+            onLongPress={selectionMode ? undefined : () => onStartItemSelection(meal.id, item.id)}
+            selectionMode={selectionMode}
+            selected={selectedItemKeys.has(getDiaryItemSelectionKey({ mealId: meal.id, itemId: item.id }))}
+            onToggleSelection={selectionMode ? () => onToggleItemSelection(meal.id, item.id) : undefined}
+          />
+        );
+
+        return (
+          <AnimatedItem key={item.id} index={index}>
+            {selectionMode ? itemRow : (
+              <SwipeableRow onDelete={() => onDeleteItem(meal.id, item.id, item.name)}>
+                {itemRow}
+              </SwipeableRow>
+            )}
+          </AnimatedItem>
+        );
+      })}
       {/* Footer add row — slot-style, same rhythm as item rows */}
-      <TouchableOpacity
-        style={styles.inlineAddBtn}
-        onPress={() => onAddItem(meal.id, meal.name)}
-        activeOpacity={0.6}
-      >
-        <Text style={styles.inlineAddBtnText}>+ Eintrag hinzufügen</Text>
-      </TouchableOpacity>
+      {!selectionMode && (
+        <TouchableOpacity
+          style={styles.inlineAddBtn}
+          onPress={() => onAddItem(meal.id, meal.name)}
+          activeOpacity={0.6}
+        >
+          <Text style={styles.inlineAddBtnText}>+ Eintrag hinzufügen</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -222,6 +345,17 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const openHub = useFoodEntryHubStore((s) => s.open);
   const insets = useSafeAreaInsets();
   const [headerRowHeight, setHeaderRowHeight] = useState(0);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedItemKeys, setSelectedItemKeys] = useState<Set<string>>(() => new Set());
+  const [bulkMutation, setBulkMutation] = useState<'delete' | 'move' | 'copy' | null>(null);
+  const bulkMutationInFlight = useRef(false);
+  const [copyingItemReferences, setCopyingItemReferences] = useState<DiaryItemReference[] | null>(null);
+  const [copyingSourceMealType, setCopyingSourceMealType] = useState<MealType | undefined>();
+
+  const clearSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedItemKeys(new Set());
+  }, []);
 
   // Snackbar
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
@@ -249,8 +383,15 @@ export default function DiaryScreen({ navigation, route }: Props) {
     if (consumedRouteDate.current === routeDate) return;
     consumedRouteDate.current = routeDate;
     navigation.setParams({ date: undefined });
+    clearSelectionMode();
     setDate((currentDate) => currentDate === routeDate ? currentDate : routeDate);
-  }, [navigation, routeDate]);
+  }, [clearSelectionMode, navigation, routeDate]);
+
+  useEffect(() => {
+    clearSelectionMode();
+    setCopyingItemReferences(null);
+    setCopyingSourceMealType(undefined);
+  }, [clearSelectionMode, date]);
 
   // ConfirmSheet state
   const [confirmSheet, setConfirmSheet] = useState<{
@@ -258,19 +399,18 @@ export default function DiaryScreen({ navigation, route }: Props) {
     title: string;
     subtitle?: string;
     actions: ConfirmSheetAction[];
+    onDismiss?: () => void;
   }>({ visible: false, title: '', actions: [] });
 
-  const closeConfirmSheet = () => setConfirmSheet((s) => ({ ...s, visible: false }));
+  const closeConfirmSheet = () => setConfirmSheet((s) => ({ ...s, visible: false, onDismiss: undefined }));
 
   // EditItem sheet state
   const [editingItem, setEditingItem] = useState<MealItem | null>(null);
   const [editingMealId, setEditingMealId] = useState<string>('');
 
   // Move / Copy sheet state
-  const [movingItem, setMovingItem] = useState<MealItem | null>(null);
-  const [movingSourceMealId, setMovingSourceMealId] = useState<string>('');
-  const [copyingItem, setCopyingItem] = useState<MealItem | null>(null);
-  const [copyingSourceMealType, setCopyingSourceMealType] = useState<MealType>('breakfast');
+  const [moveSheetVisible, setMoveSheetVisible] = useState(false);
+  const [singleMoveReference, setSingleMoveReference] = useState<DiaryItemReference | null>(null);
 
   // Activity states
   const [activityBonusSheetVisible, setActivityBonusSheetVisible] = useState(false);
@@ -298,6 +438,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
       setError(null);
       const result = await diaryApi.getDay(d);
       setData(result);
+      setSelectedItemKeys((selection) => normalizeDiaryItemSelection(selection, result.meals));
       if (result.dayType != null) {
         hydrateDayType(result.dayType, d, result.workoutType ?? null);
       }
@@ -339,12 +480,36 @@ export default function DiaryScreen({ navigation, route }: Props) {
   );
 
   // Date navigation
-  const prevDay = () => setDate((d) => offsetDate(d, -1));
+  const prevDay = () => {
+    if (bulkMutationInFlight.current) return;
+    clearSelectionMode();
+    setDate((d) => offsetDate(d, -1));
+  };
   const nextDay = () => {
+    if (bulkMutationInFlight.current) return;
     const next = offsetDate(date, 1);
-    if (next <= getLocalIsoDate()) setDate(next);
+    if (next <= getLocalIsoDate()) {
+      clearSelectionMode();
+      setDate(next);
+    }
   };
   const isToday = date === getLocalIsoDate();
+
+  const startSelectionMode = (initialSelection = new Set<string>()) => {
+    setSelectedItemKeys(new Set(initialSelection));
+    setSelectionMode(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+  const handleStartItemSelection = (mealId: string, itemId: string) => {
+    startSelectionMode(new Set([getDiaryItemSelectionKey({ mealId, itemId })]));
+  };
+  const handleToggleItemSelection = (mealId: string, itemId: string) => {
+    setSelectedItemKeys((selection) => toggleDiaryItemSelection(selection, { mealId, itemId }));
+  };
+  const handleToggleMealSelection = (meal: Meal) => {
+    if ((meal.items ?? []).length === 0) return;
+    setSelectedItemKeys((selection) => toggleDiaryMealSelection(selection, meal));
+  };
 
   // Add meal — direkt ohne Bestätigungs-Alert, optimistisches Update
   const handleAddMeal = async (type: MealType) => {
@@ -394,6 +559,17 @@ export default function DiaryScreen({ navigation, route }: Props) {
             }
           },
         },
+      ],
+    });
+  };
+
+  const handleOpenMealOptions = (meal: Meal) => {
+    setConfirmSheet({
+      visible: true,
+      title: meal.name,
+      actions: [
+        { label: 'Einträge auswählen', onPress: () => startSelectionMode() },
+        { label: 'Mahlzeit löschen', destructive: true, onPress: () => handleDeleteMeal(meal) },
       ],
     });
   };
@@ -454,6 +630,131 @@ export default function DiaryScreen({ navigation, route }: Props) {
     ? ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack']
     : ['breakfast', 'lunch', 'dinner', 'snack'];
   const missingTypes = visibleMealTypes.filter((t) => !existingTypes.has(t));
+  const selectedItemReferences = orderedMeals.flatMap((meal) =>
+    (meal.items ?? [])
+      .filter((item) => selectedItemKeys.has(getDiaryItemSelectionKey({ mealId: meal.id, itemId: item.id })))
+      .map((item) => ({ mealId: meal.id, itemId: item.id })),
+  );
+  const moveItemReferences = (selectionMode
+    ? selectedItemReferences
+    : singleMoveReference ? [singleMoveReference] : [])
+    .filter((reference) => orderedMeals.some((meal) =>
+      meal.id === reference.mealId && meal.items.some((item) => item.id === reference.itemId),
+    ));
+  const selectionActionsDisabled = selectedItemReferences.length === 0 || bulkMutation !== null;
+
+  const handleBulkDelete = async () => {
+    const items = selectedItemReferences;
+    if (items.length === 0 || bulkMutationInFlight.current) return;
+
+    bulkMutationInFlight.current = true;
+    setBulkMutation('delete');
+    try {
+      const result = await diaryApi.bulkDeleteItems({ sourceDate: date, items });
+      const reloaded = await loadDay(date);
+      clearSelectionMode();
+      const countLabel = `${result.deletedCount} ${result.deletedCount === 1 ? 'Eintrag' : 'Einträge'}`;
+      showSnackbar({
+        message: reloaded
+          ? `${countLabel} gelöscht.`
+          : `${countLabel} gelöscht. Tagebuchansicht konnte nicht aktualisiert werden.`,
+      });
+    } catch (error) {
+      await loadDay(date);
+      showSnackbar({ message: getBulkMutationErrorMessage(error, 'delete') });
+    } finally {
+      bulkMutationInFlight.current = false;
+      setBulkMutation(null);
+    }
+  };
+
+  const confirmBulkDelete = () => {
+    const count = selectedItemReferences.length;
+    if (count === 0 || bulkMutationInFlight.current) return;
+    setConfirmSheet({
+      visible: true,
+      title: `${count} ${count === 1 ? 'Eintrag' : 'Einträge'} löschen?`,
+      subtitle: 'Nur die ausgewählten Einträge werden aus dem Tagebuch entfernt.',
+      onDismiss: clearSelectionMode,
+      actions: [{
+        label: `${count === 1 ? 'Eintrag' : 'Einträge'} löschen`,
+        destructive: true,
+        onPress: () => { void handleBulkDelete(); },
+      }],
+    });
+  };
+
+  const handleMoveItems = async (
+    items: DiaryItemReference[],
+    target: DiaryBulkMoveTarget,
+  ): Promise<boolean> => {
+    if (items.length === 0 || bulkMutationInFlight.current) return false;
+
+    bulkMutationInFlight.current = true;
+    setBulkMutation('move');
+    try {
+      const result = await diaryApi.bulkMoveItems({ sourceDate: date, items, target });
+      const reloaded = await loadDay(date);
+      clearSelectionMode();
+      const countLabel = `${result.movedCount} ${result.movedCount === 1 ? 'Eintrag' : 'Einträge'}`;
+      showSnackbar({
+        message: reloaded
+          ? `${countLabel} nach ${result.targetMeal.name} verschoben.`
+          : `${countLabel} verschoben. Tagebuchansicht konnte nicht aktualisiert werden.`,
+      });
+      return true;
+    } catch (error) {
+      await loadDay(date);
+      showSnackbar({ message: getBulkMutationErrorMessage(error, 'move') });
+      return false;
+    } finally {
+      bulkMutationInFlight.current = false;
+      setBulkMutation(null);
+    }
+  };
+
+  const handleCopyItems = async (
+    items: DiaryItemReference[],
+    targetDate: string,
+    target: DiaryBulkCopyTarget,
+  ): Promise<DiaryBulkCopyResponse | null> => {
+    if (items.length === 0 || bulkMutationInFlight.current) return null;
+
+    bulkMutationInFlight.current = true;
+    setBulkMutation('copy');
+    try {
+      const result = await diaryApi.bulkCopyItems({ sourceDate: date, targetDate, items, target });
+      const reloaded = await loadDay(date);
+      if (selectionMode) clearSelectionMode();
+      const countLabel = `${result.copiedCount} ${result.copiedCount === 1 ? 'Eintrag' : 'Einträge'}`;
+      showSnackbar({
+        message: reloaded
+          ? `${countLabel} auf ${formatDateLabel(result.targetMeal.date)} in ${result.targetMeal.name} kopiert.`
+          : `${countLabel} kopiert. Tagebuchansicht konnte nicht aktualisiert werden.`,
+      });
+      return result;
+    } catch (error) {
+      await loadDay(date);
+      showSnackbar({ message: getBulkMutationErrorMessage(error, 'copy') });
+      return null;
+    } finally {
+      bulkMutationInFlight.current = false;
+      setBulkMutation(null);
+    }
+  };
+
+  const closeMoveSheet = () => {
+    setMoveSheetVisible(false);
+    setSingleMoveReference(null);
+    clearSelectionMode();
+  };
+
+  const closeCopySheet = () => {
+    if (bulkMutationInFlight.current) return;
+    setCopyingItemReferences(null);
+    setCopyingSourceMealType(undefined);
+    clearSelectionMode();
+  };
 
   // Per-meal macro sums for the breakdown sheet in DayStoryCard
   const mealSummaries: MealMacroSummary[] = orderedMeals
@@ -494,16 +795,34 @@ export default function DiaryScreen({ navigation, route }: Props) {
           <Text style={styles.headerEyebrow}>Ernährung</Text>
           {/* Center: date navigator */}
           <View style={styles.dateNavCenter}>
-            <TouchableOpacity onPress={prevDay} style={styles.dateNavBtn}>
+            <TouchableOpacity
+              onPress={prevDay}
+              style={[styles.dateNavBtn, bulkMutation !== null && styles.dateNavBtnDisabled]}
+              disabled={bulkMutation !== null}
+            >
               <Text style={styles.dateNavArrow}>‹</Text>
             </TouchableOpacity>
             <Text style={styles.dateLabel}>{formatDateLabel(date)}</Text>
-            <TouchableOpacity onPress={nextDay} style={[styles.dateNavBtn, isToday && styles.dateNavBtnDisabled]} disabled={isToday}>
-              <Text style={[styles.dateNavArrow, isToday && styles.dateNavArrowDisabled]}>›</Text>
+            <TouchableOpacity
+              onPress={nextDay}
+              style={[styles.dateNavBtn, (isToday || bulkMutation !== null) && styles.dateNavBtnDisabled]}
+              disabled={isToday || bulkMutation !== null}
+            >
+              <Text style={[styles.dateNavArrow, (isToday || bulkMutation !== null) && styles.dateNavArrowDisabled]}>›</Text>
             </TouchableOpacity>
           </View>
-          {/* Right: spacer mirrors eyebrow width for optical centering */}
-          <View style={styles.headerSpacer} />
+          {selectionMode ? (
+            <TouchableOpacity
+              style={styles.headerAction}
+              onPress={clearSelectionMode}
+              activeOpacity={0.7}
+              disabled={bulkMutation !== null}
+              accessibilityRole="button"
+              accessibilityLabel="Mehrfachauswahl beenden"
+            >
+              <Text style={[styles.headerActionText, styles.headerActionCancelText]}>Abbrechen</Text>
+            </TouchableOpacity>
+          ) : <View style={styles.headerSpacer} />}
         </View>
       </GestureDetector>
 
@@ -553,16 +872,22 @@ export default function DiaryScreen({ navigation, route }: Props) {
               <MealCard
                 meal={meal}
                 isToday={isToday}
+                selectionMode={selectionMode}
+                selectedItemKeys={selectedItemKeys}
                 onAddItem={handleOpenAddItem}
                 onDeleteItem={handleDeleteItem}
                 onEditItem={handleEditItem}
                 onDeleteMeal={handleDeleteMeal}
+                onOpenMealOptions={handleOpenMealOptions}
+                onStartItemSelection={handleStartItemSelection}
+                onToggleItemSelection={handleToggleItemSelection}
+                onToggleMealSelection={handleToggleMealSelection}
               />
             </View>
           ))}
 
           {/* Add meal buttons for missing types */}
-          {missingTypes.length > 0 && (
+          {!selectionMode && missingTypes.length > 0 && (
             <View style={styles.addMealSection}>
               <Text style={styles.addMealSectionTitle}>Weitere Mahlzeit</Text>
               <View style={styles.addMealGrid}>
@@ -581,6 +906,59 @@ export default function DiaryScreen({ navigation, route }: Props) {
       )}
       </Animated.View>
 
+      {selectionMode && (
+        <View style={[styles.selectionActionBar, { paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+          <Text
+            style={styles.selectionCount}
+            accessibilityLiveRegion="polite"
+            accessibilityLabel={`${selectedItemReferences.length} ${selectedItemReferences.length === 1 ? 'Eintrag' : 'Einträge'} ausgewählt`}
+          >
+            {selectedItemReferences.length} {selectedItemReferences.length === 1 ? 'Eintrag ausgewählt' : 'Einträge ausgewählt'}
+          </Text>
+          <View style={styles.selectionActionButtons}>
+            <TouchableOpacity
+              style={[styles.selectionActionButton, selectionActionsDisabled && styles.selectionActionDisabled]}
+              onPress={confirmBulkDelete}
+              disabled={selectionActionsDisabled}
+              accessibilityRole="button"
+              accessibilityLabel="Löschen"
+              accessibilityState={{ disabled: selectionActionsDisabled }}
+            >
+              <Icon lib="feather" name="trash-2" size="sm" color={selectionActionsDisabled ? colors.textDisabled : colors.negative} />
+              <Text style={[styles.selectionActionLabel, selectionActionsDisabled ? styles.selectionActionLabelDisabled : styles.selectionActionLabelDestructive]}>Löschen</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.selectionActionButton, selectionActionsDisabled && styles.selectionActionDisabled]}
+              onPress={() => {
+                setSingleMoveReference(null);
+                setMoveSheetVisible(true);
+              }}
+              disabled={selectionActionsDisabled}
+              accessibilityRole="button"
+              accessibilityLabel="Verschieben"
+              accessibilityState={{ disabled: selectionActionsDisabled }}
+            >
+              <Icon lib="feather" name="move" size="sm" color={selectionActionsDisabled ? colors.textDisabled : colors.primary} />
+              <Text style={[styles.selectionActionLabel, selectionActionsDisabled ? styles.selectionActionLabelDisabled : styles.selectionActionLabelActive]}>Verschieben</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.selectionActionButton, selectionActionsDisabled && styles.selectionActionDisabled]}
+              onPress={() => {
+                setCopyingSourceMealType(undefined);
+                setCopyingItemReferences([...selectedItemReferences]);
+              }}
+              disabled={selectionActionsDisabled}
+              accessibilityRole="button"
+              accessibilityLabel="Kopieren"
+              accessibilityState={{ disabled: selectionActionsDisabled }}
+            >
+              <Icon lib="feather" name="copy" size="sm" color={selectionActionsDisabled ? colors.textDisabled : colors.primary} />
+              <Text style={[styles.selectionActionLabel, selectionActionsDisabled ? styles.selectionActionLabelDisabled : styles.selectionActionLabelActive]}>Kopieren</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {/* Edit Item Sheet */}
       {editingItem && (
         <EditItemSheet
@@ -595,40 +973,40 @@ export default function DiaryScreen({ navigation, route }: Props) {
           onClose={() => setEditingItem(null)}
           onMoveRequest={(item) => {
             setEditingItem(null);
-            setMovingItem(item);
-            setMovingSourceMealId(editingMealId);
+            setSingleMoveReference({ mealId: editingMealId, itemId: item.id });
+            setMoveSheetVisible(true);
           }}
           onCopyRequest={(item) => {
             const sourceMeal = orderedMeals.find((m) => m.id === editingMealId);
             setEditingItem(null);
-            setCopyingItem(item);
-            setCopyingSourceMealType(sourceMeal?.type ?? 'breakfast');
+            setCopyingItemReferences([{ mealId: editingMealId, itemId: item.id }]);
+            setCopyingSourceMealType(sourceMeal?.type);
           }}
         />
       )}
 
       {/* Move Item Sheet */}
-      {movingItem && (
+      {moveSheetVisible && (
         <MoveItemSheet
-          visible={!!movingItem}
-          item={movingItem}
-          sourceMealId={movingSourceMealId}
-          date={date}
+          visible={moveSheetVisible}
+          items={moveItemReferences}
+          itemLabel={getMoveItemLabel(moveItemReferences, orderedMeals)}
           meals={orderedMeals}
-          onMoved={() => { void loadDay(date); }}
-          onClose={() => setMovingItem(null)}
-          onShowSnackbar={(msg) => showSnackbar({ message: msg })}
+          onMove={handleMoveItems}
+          onClose={closeMoveSheet}
         />
       )}
 
       {/* Copy Item Sheet */}
-      {copyingItem && (
+      {copyingItemReferences && (
         <CopyItemSheet
-          visible={!!copyingItem}
-          item={copyingItem}
+          visible
+          sourceDate={date}
+          items={copyingItemReferences}
+          itemLabel={getMoveItemLabel(copyingItemReferences, orderedMeals)}
           sourceMealType={copyingSourceMealType}
-          onClose={() => setCopyingItem(null)}
-          onShowSnackbar={(msg) => showSnackbar({ message: msg })}
+          onCopy={handleCopyItems}
+          onClose={closeCopySheet}
         />
       )}
 
@@ -639,6 +1017,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
         subtitle={confirmSheet.subtitle}
         actions={confirmSheet.actions}
         onClose={closeConfirmSheet}
+        onDismiss={confirmSheet.onDismiss}
       />
 
       {/* Activity bonus breakdown sheet */}
@@ -673,7 +1052,7 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontWeight: '600' as const,
     color: colors.textMuted,
-    width: 72,
+    width: 88,
   },
   dateNavCenter: {
     flexDirection: 'row',
@@ -681,7 +1060,49 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   headerSpacer: {
-    width: 72,
+    width: 88,
+  },
+  headerAction: {
+    width: 88,
+    height: 36,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  headerActionText: { ...typography.caption, color: colors.primary, fontWeight: '600' as const },
+  headerActionCancelText: { color: colors.textSecondary },
+  selectionActionBar: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    gap: spacing.xs,
+  },
+  selectionCount: { ...typography.body2, color: colors.text, fontWeight: '600' as const },
+  selectionActionButtons: { flexDirection: 'row', gap: spacing.sm },
+  selectionActionButton: {
+    flex: 1,
+    minHeight: spacing.xl + spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  selectionActionDisabled: { opacity: 0.55 },
+  selectionActionLabel: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' as const },
+  selectionActionLabelDisabled: { color: colors.textDisabled },
+  selectionActionLabelActive: { color: colors.primary },
+  selectionActionLabelDestructive: { color: colors.negative },
+  mealSelectionToggle: {
+    width: spacing.xxl,
+    height: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.xs,
   },
   dateNavBtn: {
     width: 36,

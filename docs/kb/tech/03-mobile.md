@@ -139,6 +139,38 @@ See [tech/05-authentication.md](05-authentication.md) for full flow.
 - `ProductEditor.tsx` — edit reusable item details
 - `EditItemSheet.tsx`, `CopyItemSheet.tsx`, `MoveItemSheet.tsx` — item management sheets
 
+The diary's multi-selection mode is local to `DiaryScreen` and scoped to the
+displayed date. Selection references combine `mealId` and `itemId`; meal
+checkboxes derive none/partial/all from their current items, empty meals cannot
+be selected, and refresh keeps only references that still exist. Cancel and
+date changes clear the mode. A long press on an item starts selection with
+that item selected immediately and light haptic feedback. The filled meal
+options sheet offers `Einträge auswählen` as an explicit entry point with an
+empty selection; the diary header shows `Abbrechen` only while selection mode
+is active. A normal item tap still opens its edit sheet. Delete, Move, and
+Copy each send one typed bulk request for the complete selection; Delete uses
+one confirmation. Explicitly
+dismissing that confirmation or backing out of Move/Copy also clears the mode
+and selected references. Move reuses
+`MoveItemSheet` for an existing same-day meal or an in-transaction new meal,
+and a single-item Move sends the same request with one reference. Copy reuses
+`CopyItemSheet` for the source date as an explicit Same-Day target or any other
+selected date and one explicitly selected target meal. The source date is
+offered independently of the rolling date-strip range, and selecting it loads
+that exact day. The source Meal itself and other existing same-day Meals remain
+selectable; a new meal is passed as `newMealType` and created atomically with
+the copies. Exactly one target selector is sent. A single-item Copy sends the
+same snapshot-copy request with one reference. After a successful
+mutation, the screen reloads the displayed source day and ends selection mode.
+On failure, Mobile maps the API error to a German message, reloads the source
+day, and keeps still-valid references selected; a failed request is not an
+explicit cancellation. Health Connect sync starts
+only after a successful mutation: Delete removes returned IDs, Move removes
+old IDs and upserts new target IDs, and Copy upserts only copied IDs from the
+returned target meal. Mobile does not write Food Usage; Delete and Move leave
+existing usage history and source counters unchanged, while copy tracking is
+owned by the server-side PO-3 flow.
+
 See [product/04-food-entry-hub.md](../product/04-food-entry-hub.md) for Hub architecture.
 
 In recipe-ingredient context the same hub is opened as an ingredient picker. `useFoodEntryHubStore` carries `purpose: 'recipeIngredient'`, optional initial query/prefilled amount, and ingredient callbacks; successful product selection or explicit single-food AI estimation returns to `RecipeWizardScreen` instead of adding a diary item.

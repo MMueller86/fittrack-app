@@ -79,6 +79,53 @@ export interface Meal {
   createdAt: string;
 }
 
+export interface DiaryItemReference {
+  mealId: string;
+  itemId: string;
+}
+
+export interface DiaryBulkDeleteRequest {
+  sourceDate: string;
+  items: DiaryItemReference[];
+}
+
+export interface DiaryBulkDeleteResponse {
+  deletedCount: number;
+  deletedItemIds: string[];
+}
+
+export type DiaryBulkMoveTarget =
+  | { mealId: string; newMealType?: never }
+  | { newMealType: MealType; mealId?: never };
+
+export interface DiaryBulkMoveRequest {
+  sourceDate: string;
+  items: DiaryItemReference[];
+  target: DiaryBulkMoveTarget;
+}
+
+export interface DiaryBulkMoveResponse {
+  movedCount: number;
+  removedItemIds: string[];
+  targetMeal: Meal;
+}
+
+export type DiaryBulkCopyTarget =
+  | { mealId: string; newMealType?: never }
+  | { newMealType: MealType; mealId?: never };
+
+export interface DiaryBulkCopyRequest {
+  sourceDate: string;
+  targetDate: string;
+  items: DiaryItemReference[];
+  target: DiaryBulkCopyTarget;
+}
+
+export interface DiaryBulkCopyResponse {
+  copiedCount: number;
+  targetMeal: Meal;
+}
+
 export interface DaySummary {
   calories: number;
   protein: number;

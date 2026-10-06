@@ -5,7 +5,11 @@ import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { calculate, NutritionCalculationError } from '../lib/nutritionCalculator';
-import { getDiaryRepository } from '../lib/repositories/diaryRepository';
+import {
+  DiaryBulkMutationError,
+  getDiaryRepository,
+  type DiaryBulkMutationErrorCode,
+} from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository } from '../lib/repositories/dayMetaRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
@@ -14,6 +18,7 @@ import { getHintStateRepository } from '../lib/repositories/hintStateRepository'
 import { evaluateHint } from '../lib/hintEngine';
 import { resolveCalorieTargetSnapshot } from '../lib/weeklyTargetSnapshot';
 import { addRecipeDiarySnapshot } from '../lib/recipeDiary';
+import { recordCopiedDiaryItemUsages } from '../lib/diaryItemUsage';
 import type { DayTargets } from '../../../shared/types/nutrition';
 
 // GET /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
@@ -35,6 +40,35 @@ const isoDate = z
   }, { message: 'must be a real calendar date' });
 
 const MealTypeSchema = z.enum(['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout']);
+
+const DiaryItemReferenceSchema = z.object({
+  mealId: z.string().trim().min(1).max(256),
+  itemId: z.string().trim().min(1).max(256),
+}).strict();
+
+const BulkDeleteItemsSchema = z.object({
+  sourceDate: isoDate,
+  items: z.array(DiaryItemReferenceSchema),
+}).strict();
+
+const BulkMoveItemsSchema = z.object({
+  sourceDate: isoDate,
+  items: z.array(DiaryItemReferenceSchema),
+  target: z.union([
+    z.object({ mealId: z.string().trim().min(1).max(256) }).strict(),
+    z.object({ newMealType: MealTypeSchema }).strict(),
+  ]),
+}).strict();
+
+const BulkCopyItemsSchema = z.object({
+  sourceDate: isoDate,
+  targetDate: isoDate,
+  items: z.array(DiaryItemReferenceSchema),
+  target: z.union([
+    z.object({ mealId: z.string().trim().min(1).max(256) }).strict(),
+    z.object({ newMealType: MealTypeSchema }).strict(),
+  ]),
+}).strict();
 
 const CreateMealSchema = z.object({
   date: isoDate,
@@ -579,6 +613,86 @@ export const deleteItemHandler = withHandler(
   },
 );
 
+function bulkMutationErrorResponse(error: unknown): HttpResponseInit | null {
+  if (!(error instanceof DiaryBulkMutationError)) return null;
+  const statuses: Record<DiaryBulkMutationErrorCode, number> = {
+    invalid_diary_bulk_request: 400,
+    diary_bulk_reference_not_found: 404,
+    diary_bulk_conflict: 409,
+    diary_bulk_operation_limit_exceeded: 413,
+  };
+  return { status: statuses[error.code], jsonBody: { error: error.code } };
+}
+
+export const bulkDeleteItemsHandler = withHandler(
+  'diary.items.bulkDelete',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const parsed = await parseBody(request, BulkDeleteItemsSchema);
+    if (!parsed.ok) return parsed.response;
+
+    try {
+      const result = await getDiaryRepository().bulkDeleteItems(userId, parsed.data);
+      logEvent(ctx, 'info', 'diary.items.bulkDeleted', { userId, deletedCount: result.deletedCount });
+      return { status: 200, jsonBody: result };
+    } catch (error) {
+      const response = bulkMutationErrorResponse(error);
+      if (response) return response;
+      throw error;
+    }
+  },
+);
+
+export const bulkMoveItemsHandler = withHandler(
+  'diary.items.bulkMove',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const parsed = await parseBody(request, BulkMoveItemsSchema);
+    if (!parsed.ok) return parsed.response;
+
+    try {
+      const result = await getDiaryRepository().bulkMoveItems(userId, parsed.data);
+      logEvent(ctx, 'info', 'diary.items.bulkMoved', {
+        userId,
+        movedCount: result.movedCount,
+        targetMealId: result.targetMeal.id,
+      });
+      return { status: 200, jsonBody: result };
+    } catch (error) {
+      const response = bulkMutationErrorResponse(error);
+      if (response) return response;
+      throw error;
+    }
+  },
+);
+
+export const bulkCopyItemsHandler = withHandler(
+  'diary.items.bulkCopy',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const parsed = await parseBody(request, BulkCopyItemsSchema);
+    if (!parsed.ok) return parsed.response;
+
+    try {
+      const result = await getDiaryRepository().bulkCopyItems(userId, parsed.data);
+      const copiedItems = result.copiedCount > 0
+        ? result.targetMeal.items.slice(-result.copiedCount)
+        : [];
+      void recordCopiedDiaryItemUsages(userId, copiedItems, result.targetMeal).catch(() => {});
+      logEvent(ctx, 'info', 'diary.items.bulkCopied', {
+        userId,
+        copiedCount: result.copiedCount,
+        targetMealId: result.targetMeal.id,
+      });
+      return { status: 200, jsonBody: result };
+    } catch (error) {
+      const response = bulkMutationErrorResponse(error);
+      if (response) return response;
+      throw error;
+    }
+  },
+);
+
 // --- Route registrations ---
 
 app.http('diary-get', {
@@ -642,4 +756,25 @@ app.http('diary-items-delete', {
   authLevel: 'anonymous',
   route: 'diary/meals/{id}/items/{itemId}',
   handler: deleteItemHandler,
+});
+
+app.http('diary-items-bulk-delete', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'diary/items/bulk-delete',
+  handler: bulkDeleteItemsHandler,
+});
+
+app.http('diary-items-bulk-move', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'diary/items/bulk-move',
+  handler: bulkMoveItemsHandler,
+});
+
+app.http('diary-items-bulk-copy', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'diary/items/bulk-copy',
+  handler: bulkCopyItemsHandler,
 });

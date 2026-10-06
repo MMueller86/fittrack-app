@@ -1,9 +1,8 @@
-// CopyItemSheet — copies a diary item to a meal on a different day.
+// CopyItemSheet — selects a date and one target meal for diary-item snapshots.
 // Step 1: date selection (quick picks + 14-day strip)
 // Step 2: meal selection on target date
-// sourceId-Preservation via buildCopyPayload().
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -14,12 +13,17 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
+import type {
+  DiaryBulkCopyResponse,
+  DiaryBulkCopyTarget,
+  DiaryDayResponse,
+  DiaryItemReference,
+  Meal,
+  MealType,
+} from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { addLocalDays, getLocalIsoDate } from '../../shared/date/localDate';
-import { buildCopyPayload } from './diaryItemUtils';
-import { useSourceProduct } from './useSourceProduct';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -31,7 +35,7 @@ const MEAL_ICONS: Record<MealType, string> = {
 };
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
+  breakfast: 'Frühstück', lunch: 'Mittagessen', dinner: 'Abendessen',
   snack: 'Snack', preworkout: 'Pre-Workout', postworkout: 'Post-Workout',
 };
 const WEEKDAY_LABELS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -69,68 +73,86 @@ function buildDateStrip(today: string): string[] {
 
 interface Props {
   visible: boolean;
-  item: MealItem;
-  sourceMealType: MealType;
+  sourceDate: string;
+  items: DiaryItemReference[];
+  itemLabel: string;
+  sourceMealType?: MealType;
+  onCopy: (
+    items: DiaryItemReference[],
+    targetDate: string,
+    target: DiaryBulkCopyTarget,
+  ) => Promise<DiaryBulkCopyResponse | null>;
   onClose: () => void;
-  onShowSnackbar: (message: string) => void;
 }
 
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
-export default function CopyItemSheet({ visible, item, sourceMealType, onClose, onShowSnackbar }: Props) {
+export default function CopyItemSheet({
+  visible,
+  sourceDate,
+  items,
+  itemLabel,
+  sourceMealType,
+  onCopy,
+  onClose,
+}: Props) {
   const insets = useSafeAreaInsets();
   const today = isoToday();
-  const dateStrip = useMemo(() => buildDateStrip(today), [today]);
+  const dateStrip = useMemo(
+    () => buildDateStrip(today).filter((date) => date !== sourceDate),
+    [sourceDate, today],
+  );
 
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [targetDayData, setTargetDayData] = useState<DiaryDayResponse | null>(null);
   const [loadingDay, setLoadingDay] = useState(false);
   const [copying, setCopying] = useState<string | null>(null);
-
-  const { product: sourceProduct } = useSourceProduct(item.sourceId);
+  const dateRequestId = useRef(0);
 
   // Reset on open
   useEffect(() => {
-    if (visible) {
-      setStep(1);
-      setSelectedDate(null);
-      setTargetDayData(null);
-      setCopying(null);
+    if (!visible) {
+      dateRequestId.current += 1;
+      return;
     }
+
+    dateRequestId.current += 1;
+    setStep(1);
+    setSelectedDate(null);
+    setTargetDayData(null);
+    setCopying(null);
+
+    return () => {
+      dateRequestId.current += 1;
+    };
   }, [visible]);
 
-  const selectDate = useCallback(async (date: string) => {
-    setSelectedDate(date);
+  const selectDate = useCallback(async (targetDate: string) => {
+    const requestId = dateRequestId.current + 1;
+    dateRequestId.current = requestId;
+    setSelectedDate(targetDate);
     setStep(2);
+    setTargetDayData(null);
     setLoadingDay(true);
     try {
-      const result = await diaryApi.getDay(date);
-      setTargetDayData(result);
+      const result = await diaryApi.getDay(targetDate);
+      if (requestId === dateRequestId.current) setTargetDayData(result);
     } catch {
-      setTargetDayData(null);
+      if (requestId === dateRequestId.current) setTargetDayData(null);
     } finally {
-      setLoadingDay(false);
+      if (requestId === dateRequestId.current) setLoadingDay(false);
     }
   }, []);
 
-  const doCopy = async (targetMealId: string, targetMealName: string, createType?: MealType) => {
-    if (!selectedDate || copying) return;
-    setCopying(targetMealId);
+  const doCopy = async (targetKey: string, target: DiaryBulkCopyTarget) => {
+    if (!selectedDate || loadingDay || copying || items.length === 0) return;
+    setCopying(targetKey);
     try {
-      let resolvedMealId = targetMealId;
-      if (createType) {
-        const { meal } = await diaryApi.createMeal(selectedDate, createType);
-        resolvedMealId = meal.id;
-      }
-      const payload = buildCopyPayload(item, sourceProduct);
-      await diaryApi.addItem(resolvedMealId, payload);
-      onClose();
-      onShowSnackbar(`${item.name} nach ${formatShort(selectedDate)} · ${targetMealName} kopiert ✓`);
-    } catch {
-      onShowSnackbar('Kopieren fehlgeschlagen.');
+      const result = await onCopy(items, selectedDate, target);
+      if (result) onClose();
     } finally {
       setCopying(null);
     }
@@ -141,15 +163,19 @@ export default function CopyItemSheet({ visible, item, sourceMealType, onClose, 
     { label: 'Gestern', date: offsetIso(today, -1) },
     { label: 'Vorgestern', date: offsetIso(today, -2) },
     { label: 'Vor 3 Tagen', date: offsetIso(today, -3) },
-  ];
+  ].filter((pick) => pick.date !== sourceDate);
+
+  const closeSheet = () => {
+    if (!copying) onClose();
+  };
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={closeSheet}>
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeSheet} />
       <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
         <View style={styles.handle} />
 
@@ -157,9 +183,28 @@ export default function CopyItemSheet({ visible, item, sourceMealType, onClose, 
           // ── Step 1: Date selection ──────────────────────────────────────────
           <ScrollView showsVerticalScrollIndicator={false}>
             <Text style={styles.title}>Auf welchen Tag kopieren?</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.subtitle} numberOfLines={1}>{itemLabel}</Text>
+
+            <TouchableOpacity
+              style={styles.todayQuickPickCard}
+              onPress={() => selectDate(sourceDate)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.todayQuickPickLabel}>Gleicher Tag</Text>
+              <Text style={styles.todayQuickPickDate}>{formatShort(sourceDate)}</Text>
+            </TouchableOpacity>
 
             {/* Quick picks */}
+            {today !== sourceDate && (
+              <TouchableOpacity
+                style={styles.todayQuickPickCard}
+                onPress={() => selectDate(today)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.todayQuickPickLabel}>Heute</Text>
+                <Text style={styles.todayQuickPickDate}>{formatShort(today)}</Text>
+              </TouchableOpacity>
+            )}
             <View style={styles.quickPickRow}>
               {quickPicks.map((q) => (
                 <TouchableOpacity
@@ -200,7 +245,7 @@ export default function CopyItemSheet({ visible, item, sourceMealType, onClose, 
               })}
             </ScrollView>
 
-            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={closeSheet}>
               <Text style={styles.cancelLabel}>Abbrechen</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -208,7 +253,12 @@ export default function CopyItemSheet({ visible, item, sourceMealType, onClose, 
           // ── Step 2: Meal selection ──────────────────────────────────────────
           <ScrollView showsVerticalScrollIndicator={false}>
             <View style={styles.step2Header}>
-              <TouchableOpacity onPress={() => setStep(1)} style={styles.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity
+                onPress={() => setStep(1)}
+                style={styles.backBtn}
+                disabled={!!copying}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Text style={styles.backBtnText}>← Zurück</Text>
               </TouchableOpacity>
               <View style={{ flex: 1 }}>
@@ -227,14 +277,14 @@ export default function CopyItemSheet({ visible, item, sourceMealType, onClose, 
                 {(targetDayData?.meals ?? [])
                   .sort((a, b) => MEAL_ORDER.indexOf(a.type) - MEAL_ORDER.indexOf(b.type))
                   .map((meal) => {
-                    const isHighlighted = meal.type === sourceMealType;
+                    const isHighlighted = sourceMealType != null && meal.type === sourceMealType;
                     const isLoading = copying === meal.id;
                     return (
                       <TouchableOpacity
                         key={meal.id}
                         style={[styles.mealRow, isHighlighted && styles.mealRowHighlighted]}
-                        onPress={() => doCopy(meal.id, meal.name)}
-                        disabled={!!copying}
+                        onPress={() => { void doCopy(meal.id, { mealId: meal.id }); }}
+                        disabled={!!copying || items.length === 0}
                         activeOpacity={0.7}
                       >
                         <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
@@ -267,8 +317,8 @@ export default function CopyItemSheet({ visible, item, sourceMealType, onClose, 
                           <TouchableOpacity
                             key={type}
                             style={styles.chip}
-                            onPress={() => doCopy(`new-${type}`, MEAL_LABELS[type], type)}
-                            disabled={!!copying}
+                            onPress={() => { void doCopy(`new-${type}`, { newMealType: type }); }}
+                            disabled={!!copying || items.length === 0}
                           >
                             <Text style={styles.chipIcon}>{MEAL_ICONS[type]}</Text>
                             <Text style={styles.chipLabel}>{MEAL_LABELS[type]}</Text>
@@ -279,7 +329,7 @@ export default function CopyItemSheet({ visible, item, sourceMealType, onClose, 
                   );
                 })()}
 
-                <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={closeSheet} disabled={!!copying}>
                   <Text style={styles.cancelLabel}>Abbrechen</Text>
                 </TouchableOpacity>
               </>
@@ -311,6 +361,15 @@ const styles = StyleSheet.create({
 
   // Quick picks
   quickPickRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
+  todayQuickPickCard: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border,
+    paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  todayQuickPickLabel: { ...typography.body2, color: colors.text, fontWeight: '600' },
+  todayQuickPickDate: { ...typography.body2, color: colors.textSecondary },
   quickPickCard: {
     flex: 1, backgroundColor: colors.surfaceMuted,
     borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border,

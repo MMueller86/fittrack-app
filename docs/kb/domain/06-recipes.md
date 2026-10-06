@@ -20,7 +20,7 @@
 | `communityPublication?` | `RecipeCommunityPublication` | Content-confirmation timestamp and per-recipe display-name consent |
 | `sharedWithUserIds` | `string[]` | Reserved; does not grant access |
 | `tags` | `string[]` | Recipe tags |
-| `usageCount` | `number` | How many times added to diary |
+| `usageCount` | `number` | How many times logged or copied into a diary; a copy increments it only while the recipe resolves as owner or published community content |
 | `lastUsedAt` | `string?` | ISO timestamp of last diary log |
 | `createdAt`, `updatedAt` | `string` | ISO timestamps |
 

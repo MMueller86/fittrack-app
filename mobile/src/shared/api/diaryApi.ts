@@ -2,7 +2,19 @@
 // Uses the shared apiClient (auth interceptors, base URL).
 
 import { apiClient } from './client';
-import type { DiaryDayResponse, MealType, Meal, NutritionValues, SpecialActivity } from '@fittrack/shared';
+import type {
+  DiaryBulkCopyRequest,
+  DiaryBulkCopyResponse,
+  DiaryBulkDeleteRequest,
+  DiaryBulkDeleteResponse,
+  DiaryBulkMoveRequest,
+  DiaryBulkMoveResponse,
+  DiaryDayResponse,
+  MealType,
+  Meal,
+  NutritionValues,
+  SpecialActivity,
+} from '@fittrack/shared';
 import { getLocalDateContext } from '../date/localDate';
 
 export type QuantityMode = 'grams' | 'portions';
@@ -100,6 +112,27 @@ export const diaryApi = {
   ): Promise<{ meal: Meal }> {
     return apiClient
       .put<{ meal: Meal }>(`/diary/meals/${mealId}/items/${itemId}`, input)
+      .then((r) => r.data);
+  },
+
+  /** POST /api/diary/items/bulk-delete */
+  bulkDeleteItems(input: DiaryBulkDeleteRequest): Promise<DiaryBulkDeleteResponse> {
+    return apiClient
+      .post<DiaryBulkDeleteResponse>('/diary/items/bulk-delete', input)
+      .then((r) => r.data);
+  },
+
+  /** POST /api/diary/items/bulk-move */
+  bulkMoveItems(input: DiaryBulkMoveRequest): Promise<DiaryBulkMoveResponse> {
+    return apiClient
+      .post<DiaryBulkMoveResponse>('/diary/items/bulk-move', input)
+      .then((r) => r.data);
+  },
+
+  /** POST /api/diary/items/bulk-copy */
+  bulkCopyItems(input: DiaryBulkCopyRequest): Promise<DiaryBulkCopyResponse> {
+    return apiClient
+      .post<DiaryBulkCopyResponse>('/diary/items/bulk-copy', input)
       .then((r) => r.data);
   },
 

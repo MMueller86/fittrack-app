@@ -210,11 +210,13 @@ class NutritionSyncService {
     syncLogger.info('NutritionSync/runFullExport', `Done: ${totalOk} ok, ${totalFailed} failed`);
   }
 
-  async syncNutritionUpsert(meal: Meal): Promise<void> {
+  async syncNutritionUpsert(meal: Meal, itemIds?: readonly string[]): Promise<void> {
     await this.load();
     if (!this.state.enabled) return;
     await healthPlatformService.initialize();
+    const itemIdFilter = itemIds === undefined ? undefined : new Set(itemIds);
     for (const item of (meal.items ?? [])) {
+      if (itemIdFilter && !itemIdFilter.has(item.id)) continue;
       syncLogger.info('NutritionSync/upsert', `Upserting itemId=${item.id}`);
       try {
         await healthPlatformService.upsertRecord(toNutritionRecord(meal, item));

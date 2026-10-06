@@ -32,15 +32,20 @@ interface Props {
   actions: ConfirmSheetAction[];
   checkbox?: ConfirmSheetCheckbox;
   onClose: () => void;
+  onDismiss?: () => void;
 }
 
-export function ConfirmSheet({ visible, title, subtitle, actions, checkbox, onClose }: Props) {
+export function ConfirmSheet({ visible, title, subtitle, actions, checkbox, onClose, onDismiss }: Props) {
   const insets = useSafeAreaInsets();
+  const dismiss = () => {
+    onDismiss?.();
+    onClose();
+  };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={dismiss}>
       {/* Backdrop */}
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={dismiss} />
 
       {/* Sheet */}
       <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.lg) }]}>
@@ -90,7 +95,7 @@ export function ConfirmSheet({ visible, title, subtitle, actions, checkbox, onCl
         ))}
 
         {/* Cancel */}
-        <TouchableOpacity style={[styles.actionRow, styles.cancelRow]} onPress={onClose} activeOpacity={0.7}>
+        <TouchableOpacity style={[styles.actionRow, styles.cancelRow]} onPress={dismiss} activeOpacity={0.7}>
           <Text style={styles.cancelLabel}>Abbrechen</Text>
         </TouchableOpacity>
       </View>

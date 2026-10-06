@@ -1,11 +1,23 @@
 ﻿import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest';
 
-import { addItemHandler, createMealHandler, updateItemHandler, setDayTypeHandler, getDiaryHandler, listMealsHandler } from './diary';
+import {
+  addItemHandler,
+  bulkCopyItemsHandler,
+  bulkDeleteItemsHandler,
+  bulkMoveItemsHandler,
+  createMealHandler,
+  updateItemHandler,
+  setDayTypeHandler,
+  getDiaryHandler,
+  listMealsHandler,
+} from './diary';
 import { getDiaryRepository, __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
+import { DiaryBulkMutationError } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
 import { getHintStateRepository, __resetHintStateRepositoryForTests } from '../lib/repositories/hintStateRepository';
-import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, signTestToken, teardownTestAuth } from '../test-utils/http';
+import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, signTestToken, teardownTestAuth, TEST_USER_ID } from '../test-utils/http';
 import { getUserFoodRelationRepository, __resetUserFoodRelationRepositoryForTests } from '../lib/repositories/userFoodRelationRepository';
+import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { getRecipesRepository, __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
 import type { SpecialActivity } from '@fittrack/shared';
 
@@ -72,6 +84,805 @@ async function createRecipeForDiary(userId = 'test-user-abc-123') {
     nutritionPerPortion: { calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5 },
   });
 }
+
+describe('POST /api/diary/items/bulk-delete and bulk-move', () => {
+  it('requires authentication and validates strict request bodies', async () => {
+    const unauthorized = await bulkDeleteItemsHandler(
+      await makeRequest({ body: { sourceDate: '2026-05-08', items: [{ mealId: 'meal', itemId: 'item' }] } }),
+      makeContext(),
+    );
+    expect(unauthorized.status).toBe(401);
+
+    const invalidDate = await bulkDeleteItemsHandler(
+      await makeAuthRequest({ body: { sourceDate: '2026-02-30', items: [{ mealId: 'meal', itemId: 'item' }] } }),
+      makeContext(),
+    );
+    expect(invalidDate.status).toBe(400);
+
+    const unknownField = await bulkMoveItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          items: [{ mealId: 'meal', itemId: 'item' }],
+          target: { mealId: 'target' },
+          userId: 'forged-user',
+        },
+      }),
+      makeContext(),
+    );
+    expect(unknownField.status).toBe(400);
+  });
+
+  it('returns stable not-found errors without applying a partial delete', async () => {
+    const repo = getDiaryRepository();
+    const first = await repo.createMeal({
+      userId: 'test-user-abc-123', date: '2026-05-08', type: 'breakfast', name: 'Breakfast',
+    });
+    const item = await repo.addItem('test-user-abc-123', first.id, {
+      name: 'Oats', calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4,
+    });
+    const response = await bulkDeleteItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          items: [
+            { mealId: first.id, itemId: item.items[0].id },
+            { mealId: 'missing-meal', itemId: 'missing-item' },
+          ],
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'diary_bulk_reference_not_found' });
+    expect((await repo.getMealById('test-user-abc-123', first.id))?.items).toHaveLength(1);
+  });
+
+  it('treats foreign meal references like unknown references without mutating either diary', async () => {
+    const userA = TEST_USER_ID;
+    const userB = 'test-user-foreign-456';
+    const date = '2026-05-08';
+    const repo = getDiaryRepository();
+    const userAMeal = await repo.createMeal({ userId: userA, date, type: 'breakfast', name: 'Breakfast' });
+    const userAWithItem = await repo.addItem(userA, userAMeal.id, {
+      name: 'Oats', calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4,
+    });
+    const userBMeal = await repo.createMeal({ userId: userB, date, type: 'breakfast', name: 'Breakfast' });
+    const userBWithItem = await repo.addItem(userB, userBMeal.id, {
+      name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
+    });
+    const mealsBeforeA = structuredClone((await repo.getDay(userA, date)).meals);
+    const mealsBeforeB = structuredClone((await repo.getDay(userB, date)).meals);
+    const deleteItems = async (items: { mealId: string; itemId: string }[]) =>
+      bulkDeleteItemsHandler(
+        await makeAuthRequest({ body: { sourceDate: date, items } }),
+        makeContext(),
+      );
+
+    const unknown = await deleteItems([{ mealId: 'unknown-meal', itemId: 'unknown-item' }]);
+    const foreign = await deleteItems([{
+      mealId: userBMeal.id,
+      itemId: userBWithItem.items[0]!.id,
+    }]);
+    const mixed = await deleteItems([
+      { mealId: userAMeal.id, itemId: userAWithItem.items[0]!.id },
+      { mealId: userBMeal.id, itemId: userBWithItem.items[0]!.id },
+    ]);
+
+    expect({ status: unknown.status, jsonBody: unknown.jsonBody }).toEqual({
+      status: 404,
+      jsonBody: { error: 'diary_bulk_reference_not_found' },
+    });
+    expect({ status: foreign.status, jsonBody: foreign.jsonBody }).toEqual({
+      status: unknown.status,
+      jsonBody: unknown.jsonBody,
+    });
+    expect({ status: mixed.status, jsonBody: mixed.jsonBody }).toEqual({
+      status: unknown.status,
+      jsonBody: unknown.jsonBody,
+    });
+    expect((await repo.getDay(userA, date)).meals).toEqual(mealsBeforeA);
+    expect((await repo.getDay(userB, date)).meals).toEqual(mealsBeforeB);
+  });
+
+  it('leaves usage history and source counters unchanged for every delete and move source class', async () => {
+    const userId = 'test-user-abc-123';
+    const repo = getDiaryRepository();
+    const source = await repo.createMeal({ userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const target = await repo.createMeal({ userId, date: '2026-05-08', type: 'lunch', name: 'Lunch' });
+    const reusableItems = getReusableItemsRepository();
+    const reusable = await reusableItems.create({
+      userId,
+      name: 'Oats',
+      nutritionBasis: 'per100g',
+      nutritionPer100g: { calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10 },
+      isComplete: true,
+      sourceType: 'manual',
+    });
+    await reusableItems.incrementUsageCount(userId, reusable.id);
+    const recipes = getRecipesRepository();
+    const recipe = await createRecipeForDiary(userId);
+    await recipes.incrementUsage(userId, recipe.id);
+    const addSourceItem = async (input: Parameters<typeof repo.addItem>[2]): Promise<string> => {
+      const meal = await repo.addItem(userId, source.id, input);
+      return meal.items[meal.items.length - 1]!.id;
+    };
+    const catalogSourceId = 'openFoodFacts:bulk-mutation-test';
+    const toMovePersonalId = await addSourceItem({
+      name: 'Oats', calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4,
+      sourceId: reusable.id, sourceType: 'reusableItem',
+    });
+    const toMoveCatalogId = await addSourceItem({
+      name: 'Catalog food', calories: 100, protein: 4, carbs: 12, fat: 3, fiber: 2,
+      sourceId: catalogSourceId, sourceType: 'openFoodFacts',
+    });
+    const toMoveRecipeId = await addSourceItem({
+      name: recipe.name, calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5,
+      sourceType: 'recipe', recipeId: recipe.id, recipePortions: 1,
+    });
+    const toMoveManualId = await addSourceItem({
+      name: 'Manual food', calories: 100, protein: 4, carbs: 12, fat: 3, fiber: 2,
+      sourceType: 'manual',
+    });
+    const toMoveAiId = await addSourceItem({
+      name: 'AI food', calories: 100, protein: 4, carbs: 12, fat: 3, fiber: 2,
+      sourceType: 'ai', isAiEstimate: true,
+    });
+    const toMoveAiMealEstimateId = await addSourceItem({
+      name: 'AI meal estimate', calories: 100, protein: 4, carbs: 12, fat: 3, fiber: 2,
+      sourceType: 'ai-meal-estimate',
+    });
+    const toDeletePersonalId = await addSourceItem({
+      name: 'Oats to delete', calories: 150, protein: 5, carbs: 25, fat: 2.5, fiber: 2,
+      sourceId: reusable.id, sourceType: 'reusableItem',
+    });
+    const toDeleteCatalogId = await addSourceItem({
+      name: 'Catalog food to delete', calories: 80, protein: 3, carbs: 10, fat: 2, fiber: 1,
+      sourceId: catalogSourceId, sourceType: 'openFoodFacts',
+    });
+    const toDeleteRecipeId = await addSourceItem({
+      name: recipe.name, calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5,
+      sourceType: 'recipe', recipeId: recipe.id, recipePortions: 1,
+    });
+    const toDeleteManualId = await addSourceItem({
+      name: 'Manual food to delete', calories: 80, protein: 3, carbs: 10, fat: 2, fiber: 1,
+      sourceType: 'manual',
+    });
+    const toDeleteAiId = await addSourceItem({
+      name: 'AI food to delete', calories: 80, protein: 3, carbs: 10, fat: 2, fiber: 1,
+      sourceType: 'ai', isAiEstimate: true,
+    });
+    const toDeleteAiMealEstimateId = await addSourceItem({
+      name: 'AI meal estimate to delete', calories: 80, protein: 3, carbs: 10, fat: 2, fiber: 1,
+      sourceType: 'ai-meal-estimate',
+    });
+    const relations = getUserFoodRelationRepository();
+    await relations.recordUsage(userId, {
+      foodRef: reusable.id,
+      foodRefType: 'personal',
+      displayName: 'Oats',
+      mealType: 'breakfast',
+      usageDate: '2026-05-08',
+    });
+    await relations.recordUsage(userId, {
+      foodRef: catalogSourceId,
+      foodRefType: 'catalog',
+      displayName: 'Catalog food',
+      mealType: 'breakfast',
+      usageDate: '2026-05-08',
+    });
+    await relations.recordUsage(userId, {
+      foodRef: recipe.id,
+      foodRefType: 'recipe',
+      displayName: recipe.name,
+      mealType: 'breakfast',
+      usageDate: '2026-05-08',
+    });
+    const priorPersonalUsage = structuredClone(await relations.getByFoodRef(userId, reusable.id));
+    const priorCatalogUsage = structuredClone(await relations.getByFoodRef(userId, catalogSourceId));
+    const priorRecipeUsage = structuredClone(await relations.getByFoodRef(userId, recipe.id));
+    const priorReusableItem = structuredClone(await reusableItems.getById(userId, reusable.id));
+    const priorRecipe = structuredClone(await recipes.get(userId, recipe.id));
+    const recordUsageSpy = vi.spyOn(relations, 'recordUsage');
+    const reusableUsageSpy = vi.spyOn(reusableItems, 'incrementUsageCount');
+    const recipeUsageSpy = vi.spyOn(recipes, 'incrementUsage');
+
+    const moved = await bulkMoveItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          items: [
+            toMovePersonalId,
+            toMoveCatalogId,
+            toMoveRecipeId,
+            toMoveManualId,
+            toMoveAiId,
+            toMoveAiMealEstimateId,
+          ].map((itemId) => ({ mealId: source.id, itemId })),
+          target: { mealId: target.id },
+        },
+      }),
+      makeContext(),
+    );
+    const deleted = await bulkDeleteItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          items: [
+            toDeletePersonalId,
+            toDeleteCatalogId,
+            toDeleteRecipeId,
+            toDeleteManualId,
+            toDeleteAiId,
+            toDeleteAiMealEstimateId,
+          ].map((itemId) => ({ mealId: source.id, itemId })),
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(moved.status).toBe(200);
+    const movedMeal = (moved.jsonBody as { targetMeal: { items: { id: string; sourceId?: string }[] } }).targetMeal;
+    expect(movedMeal.items).toHaveLength(6);
+    expect(movedMeal.items[0]).toMatchObject({ sourceId: reusable.id });
+    expect(deleted.status).toBe(200);
+    expect(recordUsageSpy).not.toHaveBeenCalled();
+    expect(reusableUsageSpy).not.toHaveBeenCalled();
+    expect(recipeUsageSpy).not.toHaveBeenCalled();
+    expect(await relations.getByFoodRef(userId, reusable.id)).toEqual(priorPersonalUsage);
+    expect(await relations.getByFoodRef(userId, catalogSourceId)).toEqual(priorCatalogUsage);
+    expect(await relations.getByFoodRef(userId, recipe.id)).toEqual(priorRecipeUsage);
+    expect(await reusableItems.getById(userId, reusable.id)).toEqual(priorReusableItem);
+    expect(await recipes.get(userId, recipe.id)).toEqual(priorRecipe);
+  });
+
+  it('maps duplicate references and a same-source target to the invalid-request contract', async () => {
+    const userId = 'test-user-abc-123';
+    const repo = getDiaryRepository();
+    const source = await repo.createMeal({ userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const item = await repo.addItem(userId, source.id, {
+      name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
+    });
+    const reference = { mealId: source.id, itemId: item.items[0].id };
+
+    const duplicate = await bulkDeleteItemsHandler(
+      await makeAuthRequest({ body: { sourceDate: '2026-05-08', items: [reference, reference] } }),
+      makeContext(),
+    );
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.jsonBody).toEqual({ error: 'invalid_diary_bulk_request' });
+
+    const empty = await bulkDeleteItemsHandler(
+      await makeAuthRequest({ body: { sourceDate: '2026-05-08', items: [] } }),
+      makeContext(),
+    );
+    expect(empty.status).toBe(400);
+    expect(empty.jsonBody).toEqual({ error: 'invalid_diary_bulk_request' });
+
+    const sameSourceTarget = await bulkMoveItemsHandler(
+      await makeAuthRequest({
+        body: { sourceDate: '2026-05-08', items: [reference], target: { mealId: source.id } },
+      }),
+      makeContext(),
+    );
+    expect(sameSourceTarget.status).toBe(400);
+    expect(sameSourceTarget.jsonBody).toEqual({ error: 'invalid_diary_bulk_request' });
+    expect((await repo.getMealById(userId, source.id))?.items).toHaveLength(1);
+
+    const secondSource = await repo.createMeal({
+      userId, date: '2026-05-08', type: 'lunch', name: 'Lunch',
+    });
+    const secondSourceItem = await repo.addItem(userId, secondSource.id, {
+      name: 'Apple', calories: 50, protein: 0, carbs: 14, fat: 0, fiber: 2,
+    });
+    await repo.addItem(userId, secondSource.id, {
+      name: 'Toast', calories: 80, protein: 3, carbs: 15, fat: 1, fiber: 1,
+    });
+    const mealsBefore = structuredClone((await repo.getDay(userId, '2026-05-08')).meals);
+    const multiSourceTarget = await bulkMoveItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          items: [
+            { mealId: source.id, itemId: item.items[0].id },
+            { mealId: secondSource.id, itemId: secondSourceItem.items[0].id },
+          ],
+          target: { mealId: secondSource.id },
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(multiSourceTarget.status).toBe(400);
+    expect(multiSourceTarget.jsonBody).toEqual({ error: 'invalid_diary_bulk_request' });
+    expect((await repo.getDay(userId, '2026-05-08')).meals).toEqual(mealsBefore);
+  });
+
+  it('maps transactional conflicts and batch limits to stable HTTP errors', async () => {
+    const repository = getDiaryRepository();
+    const bulkDeleteSpy = vi.spyOn(repository, 'bulkDeleteItems');
+    bulkDeleteSpy
+      .mockRejectedValueOnce(new DiaryBulkMutationError('diary_bulk_conflict'))
+      .mockRejectedValueOnce(new DiaryBulkMutationError('diary_bulk_operation_limit_exceeded'));
+    const body = {
+      sourceDate: '2026-05-08',
+      items: [{ mealId: 'meal', itemId: 'item' }],
+    };
+
+    const conflict = await bulkDeleteItemsHandler(await makeAuthRequest({ body }), makeContext());
+    const limit = await bulkDeleteItemsHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(conflict.status).toBe(409);
+    expect(conflict.jsonBody).toEqual({ error: 'diary_bulk_conflict' });
+    expect(limit.status).toBe(413);
+    expect(limit.jsonBody).toEqual({ error: 'diary_bulk_operation_limit_exceeded' });
+  });
+});
+
+describe('POST /api/diary/items/bulk-copy', () => {
+  it('requires authentication, rejects unknown fields, and accepts same-day copies to the source meal', async () => {
+    const body = {
+      sourceDate: '2026-05-08',
+      targetDate: '2026-05-09',
+      items: [{ mealId: 'meal', itemId: 'item' }],
+      target: { newMealType: 'dinner' },
+    };
+    const unauthorized = await bulkCopyItemsHandler(await makeRequest({ body }), makeContext());
+    expect(unauthorized.status).toBe(401);
+
+    const unknownField = await bulkCopyItemsHandler(
+      await makeAuthRequest({ body: { ...body, extra: true } }),
+      makeContext(),
+    );
+    expect(unknownField.status).toBe(400);
+
+    const userId = TEST_USER_ID;
+    const repository = getDiaryRepository();
+    const sourceMeal = await repository.createMeal({
+      userId,
+      date: body.sourceDate,
+      type: 'breakfast',
+      name: 'Breakfast',
+    });
+    const withItem = await repository.addItem(userId, sourceMeal.id, {
+      name: 'Oats', calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4,
+    });
+    const originalItem = structuredClone(withItem.items[0]!);
+    const sameDay = await bulkCopyItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: body.sourceDate,
+          targetDate: body.sourceDate,
+          items: [{ mealId: sourceMeal.id, itemId: originalItem.id }],
+          target: { mealId: sourceMeal.id },
+        },
+      }),
+      makeContext(),
+    );
+    expect(sameDay.status).toBe(200);
+    const result = sameDay.jsonBody as {
+      copiedCount: number;
+      targetMeal: { id: string; items: typeof withItem.items };
+    };
+    expect(result.copiedCount).toBe(1);
+    expect(result.targetMeal.id).toBe(sourceMeal.id);
+    expect(result.targetMeal.items).toEqual([
+      originalItem,
+      { ...originalItem, id: expect.any(String) },
+    ]);
+    expect(result.targetMeal.items[1]!.id).not.toBe(originalItem.id);
+    expect((await repository.getMealById(userId, sourceMeal.id))?.items[0]).toEqual(originalItem);
+
+    const duplicate = await bulkCopyItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: body.sourceDate,
+          targetDate: body.sourceDate,
+          items: [
+            { mealId: sourceMeal.id, itemId: originalItem.id },
+            { mealId: sourceMeal.id, itemId: originalItem.id },
+          ],
+          target: { mealId: sourceMeal.id },
+        },
+      }),
+      makeContext(),
+    );
+    expect(duplicate.status).toBe(400);
+    expect(duplicate.jsonBody).toEqual({ error: 'invalid_diary_bulk_request' });
+    expect((await repository.getMealById(userId, sourceMeal.id))?.items).toEqual(result.targetMeal.items);
+  });
+
+  it('reuses the same snapshot-copy contract for one selected item and an existing target', async () => {
+    const userId = 'test-user-abc-123';
+    const repo = getDiaryRepository();
+    const source = await repo.createMeal({ userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const target = await repo.createMeal({ userId, date: '2026-05-09', type: 'lunch', name: 'Lunch' });
+    const created = await repo.addItem(userId, source.id, {
+      name: 'Oats', calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4,
+      sourceId: 'openFoodFacts:copy-test', sourceType: 'openFoodFacts',
+    });
+    const originalSnapshot = structuredClone(created.items[0]!);
+
+    const response = await bulkCopyItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          targetDate: '2026-05-09',
+          items: [{ mealId: source.id, itemId: created.items[0]!.id }],
+          target: { mealId: target.id },
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    const result = response.jsonBody as { copiedCount: number; targetMeal: { id: string; items: typeof created.items } };
+    expect(result.copiedCount).toBe(1);
+    expect(result.targetMeal.id).toBe(target.id);
+    expect(result.targetMeal.items[0]).toMatchObject({ ...originalSnapshot, id: expect.any(String) });
+    expect(result.targetMeal.items[0]!.id).not.toBe(originalSnapshot.id);
+    expect((await repo.getMealById(userId, source.id))?.items).toEqual([originalSnapshot]);
+  });
+
+  it('records copy usage by stored references only after the copy commit', async () => {
+    const userId = 'test-user-abc-123';
+    const repository = getDiaryRepository();
+    const source = await repository.createMeal({ userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const target = await repository.createMeal({ userId, date: '2026-05-09', type: 'dinner', name: 'Dinner' });
+    const reusableRepository = getReusableItemsRepository();
+    const reusable = await reusableRepository.create({
+      userId,
+      name: 'Oats',
+      nutritionBasis: 'per100g',
+      nutritionPer100g: { calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10 },
+      isComplete: true,
+      sourceType: 'manual',
+    });
+    const portionOnlyReusable = await reusableRepository.create({
+      userId,
+      name: 'Yogurt',
+      nutritionBasis: 'perPortion',
+      portion: { label: '1 cup', weightGrams: 150 },
+      isComplete: false,
+      sourceType: 'manual',
+    });
+    const recipeRepository = getRecipesRepository();
+    const recipe = await createRecipeForDiary(userId);
+    const references: Array<{ mealId: string; itemId: string }> = [];
+    const addSourceItem = async (input: Parameters<typeof repository.addItem>[2]) => {
+      const meal = await repository.addItem(userId, source.id, input);
+      references.push({ mealId: source.id, itemId: meal.items[meal.items.length - 1]!.id });
+    };
+
+    await addSourceItem({
+      name: 'Oats', calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10,
+      sourceId: reusable.id, sourceType: 'manual', quantity: 100, unit: 'g',
+    });
+    await addSourceItem({
+      name: 'Oats, second serving', calories: 185, protein: 6.5, carbs: 30, fat: 3.5, fiber: 5,
+      sourceId: reusable.id, sourceType: 'manual', quantity: 50, unit: 'g',
+    });
+    await addSourceItem({
+      name: 'Yogurt', calories: 150, protein: 8, carbs: 12, fat: 6, fiber: 0,
+      sourceId: portionOnlyReusable.id, sourceType: 'openFoodFacts', quantity: 1, unit: 'portion',
+    });
+    await addSourceItem({
+      name: 'Catalog food', calories: 100, protein: 4, carbs: 12, fat: 3, fiber: 2,
+      sourceId: 'openFoodFacts:copy-test', sourceType: 'reusableItem', quantity: 100, unit: 'g',
+    });
+    await addSourceItem({
+      name: recipe.name, calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5,
+      recipeId: recipe.id, sourceType: 'manual', quantity: 1, unit: 'Portion',
+    });
+    await addSourceItem({
+      name: recipe.name, calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5,
+      recipeId: recipe.id, sourceType: 'manual', quantity: 1, unit: 'Portion',
+    });
+    await addSourceItem({
+      name: 'Unreferenced manual food', calories: 120, protein: 5, carbs: 14, fat: 4, fiber: 2,
+      sourceType: 'manual',
+    });
+    await addSourceItem({
+      name: 'Unreferenced AI food', calories: 180, protein: 8, carbs: 18, fat: 7, fiber: 2,
+      sourceType: 'ai', isAiEstimate: true,
+    });
+    await addSourceItem({
+      name: 'Unreferenced estimate', calories: 250, protein: 12, carbs: 24, fat: 10, fiber: 3,
+      sourceType: 'ai-meal-estimate',
+    });
+
+    const relations = getUserFoodRelationRepository();
+    const originalRecordUsage = relations.recordUsage.bind(relations);
+    const recordUsageSpy = vi.spyOn(relations, 'recordUsage').mockImplementation(async (trackedUserId, input) => {
+      expect((await repository.getMealById(trackedUserId, target.id))?.items).toHaveLength(references.length);
+      await originalRecordUsage(trackedUserId, input);
+    });
+    const reusableUsageSpy = vi.spyOn(reusableRepository, 'incrementUsageCount');
+    const recipeUsageSpy = vi.spyOn(recipeRepository, 'incrementUsage');
+
+    const response = await bulkCopyItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          targetDate: '2026-05-09',
+          items: references,
+          target: { mealId: target.id },
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(recordUsageSpy).toHaveBeenCalledTimes(6);
+      expect(reusableUsageSpy).toHaveBeenCalledTimes(2);
+      expect(recipeUsageSpy).toHaveBeenCalledTimes(2);
+    });
+
+    expect(await relations.getByFoodRef(userId, reusable.id)).toMatchObject({
+      foodRefType: 'personal',
+      usageCount: 2,
+      usageDates: [
+        { date: '2026-05-09', mealType: 'dinner' },
+        { date: '2026-05-09', mealType: 'dinner' },
+      ],
+    });
+    expect(await relations.getByFoodRef(userId, 'openFoodFacts:copy-test')).toMatchObject({
+      foodRefType: 'catalog',
+      usageCount: 1,
+      usageDates: [{ date: '2026-05-09', mealType: 'dinner' }],
+    });
+    expect(await relations.getByFoodRef(userId, portionOnlyReusable.id)).toMatchObject({
+      foodRefType: 'personal',
+      usageCount: 1,
+      usageDates: [{ date: '2026-05-09', mealType: 'dinner' }],
+    });
+    expect(await relations.getByFoodRef(userId, recipe.id)).toMatchObject({
+      foodRefType: 'recipe',
+      usageCount: 2,
+      usageDates: [
+        { date: '2026-05-09', mealType: 'dinner' },
+        { date: '2026-05-09', mealType: 'dinner' },
+      ],
+    });
+    expect((await reusableRepository.getById(userId, reusable.id))?.usageCount).toBe(2);
+    expect((await reusableRepository.getById(userId, portionOnlyReusable.id))?.usageCount).toBe(0);
+    expect((await recipeRepository.get(userId, recipe.id))?.usageCount).toBe(2);
+    expect(await relations.getByFoodRef(userId, 'Unreferenced manual food')).toBeNull();
+    expect(await relations.getByFoodRef(userId, 'Unreferenced AI food')).toBeNull();
+    expect(await relations.getByFoodRef(userId, 'Unreferenced estimate')).toBeNull();
+  });
+
+  it('tracks each repeated same-day copy against the target meal date after commit', async () => {
+    const userId = TEST_USER_ID;
+    const repository = getDiaryRepository();
+    const sourceMeal = await repository.createMeal({
+      userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast',
+    });
+    const targetMeal = await repository.createMeal({
+      userId, date: '2026-05-08', type: 'dinner', name: 'Dinner',
+    });
+    const reusableRepository = getReusableItemsRepository();
+    const reusable = await reusableRepository.create({
+      userId,
+      name: 'Oats',
+      nutritionBasis: 'per100g',
+      nutritionPer100g: { calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10 },
+      isComplete: true,
+      sourceType: 'manual',
+    });
+    const source = await repository.addItem(userId, sourceMeal.id, {
+      name: 'Oats', calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10,
+      sourceId: reusable.id, sourceType: 'manual',
+    });
+    const originalSnapshot = structuredClone(source.items[0]!);
+    const relations = getUserFoodRelationRepository();
+    const recordUsageSpy = vi.spyOn(relations, 'recordUsage');
+    const reusableUsageSpy = vi.spyOn(reusableRepository, 'incrementUsageCount');
+    const copy = async () => bulkCopyItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          targetDate: '2026-05-08',
+          items: [{ mealId: sourceMeal.id, itemId: originalSnapshot.id }],
+          target: { mealId: targetMeal.id },
+        },
+      }),
+      makeContext(),
+    );
+
+    const first = await copy();
+    const second = await copy();
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(recordUsageSpy).toHaveBeenCalledTimes(2);
+      expect(reusableUsageSpy).toHaveBeenCalledTimes(2);
+    });
+
+    const result = second.jsonBody as {
+      targetMeal: { items: Array<{ id: string }> };
+    };
+    expect(result.targetMeal.items).toHaveLength(2);
+    expect(new Set(result.targetMeal.items.map((item) => item.id)).size).toBe(2);
+    expect((await repository.getMealById(userId, sourceMeal.id))?.items[0]).toEqual(originalSnapshot);
+    expect(await relations.getByFoodRef(userId, reusable.id)).toMatchObject({
+      foodRefType: 'personal',
+      usageCount: 2,
+      usageDates: [
+        { date: '2026-05-08', mealType: 'dinner' },
+        { date: '2026-05-08', mealType: 'dinner' },
+      ],
+    });
+  });
+
+  it('does not record copy usage when the diary commit fails', async () => {
+    const userId = 'test-user-abc-123';
+    const repository = getDiaryRepository();
+    const source = await repository.createMeal({ userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const reusableRepository = getReusableItemsRepository();
+    const reusable = await reusableRepository.create({
+      userId,
+      name: 'Oats',
+      nutritionBasis: 'per100g',
+      nutritionPer100g: { calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10 },
+      isComplete: true,
+      sourceType: 'manual',
+    });
+    const recipeRepository = getRecipesRepository();
+    const recipe = await createRecipeForDiary(userId);
+    const personal = await repository.addItem(userId, source.id, {
+      name: 'Oats', calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10,
+      sourceId: reusable.id, sourceType: 'reusableItem',
+    });
+    const catalog = await repository.addItem(userId, source.id, {
+      name: 'Catalog food', calories: 100, protein: 4, carbs: 12, fat: 3, fiber: 2,
+      sourceId: 'openFoodFacts:failed-copy', sourceType: 'openFoodFacts',
+    });
+    const recipeItem = await repository.addItem(userId, source.id, {
+      name: recipe.name, calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5,
+      recipeId: recipe.id, sourceType: 'recipe',
+    });
+    const originalSourceItems = structuredClone((await repository.getMealById(userId, source.id))!.items);
+    const relations = getUserFoodRelationRepository();
+    const recordUsageSpy = vi.spyOn(relations, 'recordUsage');
+    const reusableUsageSpy = vi.spyOn(reusableRepository, 'incrementUsageCount');
+    const recipeUsageSpy = vi.spyOn(recipeRepository, 'incrementUsage');
+    vi.spyOn(repository, 'bulkCopyItems')
+      .mockRejectedValueOnce(new DiaryBulkMutationError('diary_bulk_conflict'));
+
+    const response = await bulkCopyItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          targetDate: '2026-05-08',
+          items: [personal, catalog, recipeItem].map((meal) => ({
+            mealId: source.id,
+            itemId: meal.items[meal.items.length - 1]!.id,
+          })),
+          target: { mealId: source.id },
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(409);
+    expect(recordUsageSpy).not.toHaveBeenCalled();
+    expect(reusableUsageSpy).not.toHaveBeenCalled();
+    expect(recipeUsageSpy).not.toHaveBeenCalled();
+    expect((await repository.getMealById(userId, source.id))?.items).toEqual(originalSourceItems);
+  });
+
+  it('copies and tracks a recipe snapshot after its source recipe is deleted', async () => {
+    const userId = 'test-user-abc-123';
+    const ownerId = 'deleted-recipe-owner';
+    const recipeRepository = getRecipesRepository();
+    const recipe = await createRecipeForDiary(ownerId);
+    await recipeRepository.delete(ownerId, recipe.id);
+    const repository = getDiaryRepository();
+    const source = await repository.createMeal({ userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const target = await repository.createMeal({ userId, date: '2026-05-09', type: 'dinner', name: 'Dinner' });
+    const sourceItem = await repository.addItem(userId, source.id, {
+      name: recipe.name, calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5,
+      recipeId: recipe.id, sourceType: 'recipe', recipePortions: 1,
+    });
+    const relationRepository = getUserFoodRelationRepository();
+    const recipeUsageSpy = vi.spyOn(recipeRepository, 'incrementUsage');
+
+    const response = await bulkCopyItemsHandler(
+      await makeAuthRequest({
+        body: {
+          sourceDate: '2026-05-08',
+          targetDate: '2026-05-09',
+          items: [{ mealId: source.id, itemId: sourceItem.items[0]!.id }],
+          target: { mealId: target.id },
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(async () => {
+      expect(await relationRepository.getByFoodRef(userId, recipe.id)).toMatchObject({
+        foodRefType: 'recipe',
+        displayName: recipe.name,
+        usageCount: 1,
+        usageDates: [{ date: '2026-05-09', mealType: 'dinner' }],
+      });
+    });
+    expect((response.jsonBody as { targetMeal: { items: { name: string; recipeId?: string }[] } })
+      .targetMeal.items[0]).toMatchObject({ name: recipe.name, recipeId: recipe.id });
+    expect(recipeUsageSpy).not.toHaveBeenCalled();
+  });
+
+  it('increments the owner counter for an available community recipe copied by another user', async () => {
+    const ownerId = 'community-recipe-owner';
+    const userId = 'community-recipe-copier';
+    const recipeRepository = getRecipesRepository();
+    const recipe = await createRecipeForDiary(ownerId);
+    const versioned = await recipeRepository.getVersioned(ownerId, recipe.id);
+    await recipeRepository.setVisibility(ownerId, recipe.id, versioned!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+    const repository = getDiaryRepository();
+    const source = await repository.createMeal({ userId, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const target = await repository.createMeal({ userId, date: '2026-05-09', type: 'dinner', name: 'Dinner' });
+    const sourceItem = await repository.addItem(userId, source.id, {
+      name: recipe.name, calories: 100, protein: 10, carbs: 20, fat: 2, fiber: 5,
+      recipeId: recipe.id, sourceType: 'manual', recipePortions: 1,
+    });
+    const token = await signTestToken(userId);
+    const response = await bulkCopyItemsHandler(
+      await makeRequest({
+        headers: { authorization: `Bearer ${token}` },
+        body: {
+          sourceDate: '2026-05-08',
+          targetDate: '2026-05-09',
+          items: [{ mealId: source.id, itemId: sourceItem.items[0]!.id }],
+          target: { mealId: target.id },
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(async () => {
+      expect(await getUserFoodRelationRepository().getByFoodRef(userId, recipe.id)).toMatchObject({
+        foodRefType: 'recipe',
+        usageCount: 1,
+        usageDates: [{ date: '2026-05-09', mealType: 'dinner' }],
+      });
+      expect((await recipeRepository.get(ownerId, recipe.id))?.usageCount).toBe(1);
+    });
+    expect(await recipeRepository.get(userId, recipe.id)).toBeNull();
+  });
+
+  it('maps copy conflicts and operation limits to the shared bulk error contract', async () => {
+    const repository = getDiaryRepository();
+    const copySpy = vi.spyOn(repository, 'bulkCopyItems');
+    copySpy
+      .mockRejectedValueOnce(new DiaryBulkMutationError('diary_bulk_conflict'))
+      .mockRejectedValueOnce(new DiaryBulkMutationError('diary_bulk_operation_limit_exceeded'));
+    const body = {
+      sourceDate: '2026-05-08',
+      targetDate: '2026-05-09',
+      items: [{ mealId: 'meal', itemId: 'item' }],
+      target: { newMealType: 'dinner' },
+    };
+
+    const conflict = await bulkCopyItemsHandler(await makeAuthRequest({ body }), makeContext());
+    const limit = await bulkCopyItemsHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(conflict.status).toBe(409);
+    expect(conflict.jsonBody).toEqual({ error: 'diary_bulk_conflict' });
+    expect(limit.status).toBe(413);
+    expect(limit.jsonBody).toEqual({ error: 'diary_bulk_operation_limit_exceeded' });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Product input (productId + productName + pre-calculated nutrition)

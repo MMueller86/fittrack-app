@@ -16,6 +16,10 @@ export interface DiaryItemRowProps {
   statusTone?: 'neutral' | 'attention' | 'success';
   aiBadgeLabel?: string;
   onPress?: () => void;
+  onLongPress?: () => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelection?: () => void;
   onConfirm?: () => void;
   confirmAccessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
@@ -33,6 +37,10 @@ export function DiaryItemRow({
   statusTone,
   aiBadgeLabel,
   onPress,
+  onLongPress,
+  selectionMode = false,
+  selected = false,
+  onToggleSelection,
   onConfirm,
   confirmAccessibilityLabel,
   style,
@@ -144,6 +152,24 @@ export function DiaryItemRow({
     style,
   ];
 
+  if (selectionMode) {
+    return (
+      <TouchableOpacity
+        style={[rowStyles, styles.selectionItemRow]}
+        onPress={onToggleSelection}
+        activeOpacity={0.7}
+        accessibilityRole="checkbox"
+        accessibilityLabel={`${name}, ${selected ? 'ausgewählt' : 'nicht ausgewählt'}`}
+        accessibilityState={{ checked: selected }}
+      >
+        <View style={styles.selectionIndicator}>
+          <Icon lib="feather" name={selected ? 'check-square' : 'square'} size="md" color={selected ? colors.primary : colors.textMuted} />
+        </View>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
   if (isRecipeIngredient) {
     return (
       <View style={rowStyles}>
@@ -151,6 +177,7 @@ export function DiaryItemRow({
           <TouchableOpacity
             style={styles.itemRowPressable}
             onPress={onPress}
+            onLongPress={onLongPress}
             activeOpacity={0.7}
           >
             {content}
@@ -188,6 +215,7 @@ export function DiaryItemRow({
           <TouchableOpacity
             style={styles.itemRowPressable}
             onPress={onPress}
+            onLongPress={onLongPress}
             activeOpacity={0.7}
           >
             {content}
@@ -212,6 +240,7 @@ export function DiaryItemRow({
       <TouchableOpacity
         style={rowStyles}
         onPress={onPress}
+        onLongPress={onLongPress}
         activeOpacity={0.7}
       >
         {content}
@@ -257,6 +286,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   itemRowPressable: { flex: 1 },
+  selectionItemRow: { paddingLeft: spacing.xs },
+  selectionIndicator: {
+    width: spacing.lg,
+    alignItems: 'center' as const,
+    paddingTop: spacing.xs,
+    marginRight: spacing.sm,
+  },
   confirmAction: {
     width: spacing.xl,
     height: spacing.xl,

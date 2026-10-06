@@ -252,6 +252,27 @@ describe('nutritionSyncService', () => {
       expect(mockUpsertRecord).toHaveBeenCalledTimes(1);
     });
 
+    it('upserts only the supplied item ids when filtering a meal', async () => {
+      const existingItem = makeItem(200);
+      existingItem.id = 'existing-item';
+      const movedItem = makeItem(300);
+      movedItem.id = 'moved-item';
+      await service.enableSync();
+      mockUpsertRecord.mockClear();
+
+      await service.syncNutritionUpsert(
+        makeMeal('m1', 'dinner', [existingItem, movedItem]),
+        ['moved-item'],
+      );
+
+      expect(mockUpsertRecord).toHaveBeenCalledTimes(1);
+      expect(mockUpsertRecord).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({ clientRecordId: 'moved-item' }),
+        }),
+      );
+    });
+
     it('queues a pendingOp on upsert failure', async () => {
       await service.enableSync();
       mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
