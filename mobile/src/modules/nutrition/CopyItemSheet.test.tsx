@@ -110,7 +110,7 @@ afterEach(() => {
 
 describe('CopyItemSheet', () => {
   it('offers today from yesterday, loads that day, and copies to one explicit target meal', async () => {
-    const targetMeal = makeMeal('today-dinner', 'dinner', 'Abendessen', '2026-08-14');
+    const targetMeal = makeMeal('today-dinner', 'dinner', 'Dinner', '2026-08-14');
     mockGetDay.mockResolvedValue(makeDay([targetMeal]));
     const items = [{ mealId: 'source-meal', itemId: 'source-item' }];
     const { renderer, onCopy, onClose } = await renderSheet({

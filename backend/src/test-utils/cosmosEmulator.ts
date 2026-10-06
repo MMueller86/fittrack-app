@@ -14,9 +14,10 @@
 //
 //   beforeAll(async () => { await setupEmulatorEnv(); ... })
 //
-// Tests must NOT import `getCosmos()` from `lib/cosmos.ts` — that singleton
-// uses the production `fittrack-db` name. Construct a CosmosClient and the
-// containers directly via the helpers below.
+// Use the returned context for setup and cleanup. Tests that inspect or spy
+// on repository SDK calls must get the container from `getCosmos()` so they
+// use the same SDK object handles as the repository; the isolated database id
+// above is also applied to that singleton.
 
 import { CosmosClient, type Container, type Database } from '@azure/cosmos';
 import { randomUUID } from 'node:crypto';

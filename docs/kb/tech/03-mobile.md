@@ -139,6 +139,10 @@ See [tech/05-authentication.md](05-authentication.md) for full flow.
 - `ProductEditor.tsx` — edit reusable item details
 - `EditItemSheet.tsx`, `CopyItemSheet.tsx`, `MoveItemSheet.tsx` — item management sheets
 
+The diary and its copy/move sheets render meal names from the typed `MealType`
+using the shared German label catalog. They do not display `Meal.name`, which
+may contain an English API default.
+
 The diary's multi-selection mode is local to `DiaryScreen` and scoped to the
 displayed date. Selection references combine `mealId` and `itemId`; meal
 checkboxes derive none/partial/all from their current items, empty meals cannot

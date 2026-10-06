@@ -24,6 +24,7 @@ import type {
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { addLocalDays, getLocalIsoDate } from '../../shared/date/localDate';
+import { MEAL_LABELS } from './mealLabels';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -34,10 +35,6 @@ const MEAL_ICONS: Record<MealType, string> = {
   snack: '🍎', preworkout: '⚡', postworkout: '💪',
 };
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Frühstück', lunch: 'Mittagessen', dinner: 'Abendessen',
-  snack: 'Snack', preworkout: 'Pre-Workout', postworkout: 'Post-Workout',
-};
 const WEEKDAY_LABELS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 const MONTH_LABELS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 
@@ -289,7 +286,7 @@ export default function CopyItemSheet({
                       >
                         <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.mealName}>{meal.name}</Text>
+                          <Text style={styles.mealName}>{MEAL_LABELS[meal.type]}</Text>
                           <Text style={styles.mealMeta}>
                             {meal.items.length > 0
                               ? `${meal.items.length} Einträge`

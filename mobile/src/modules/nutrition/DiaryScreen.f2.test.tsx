@@ -429,6 +429,16 @@ afterEach(() => {
 });
 
 describe('DiaryScreen F2 bulk actions', () => {
+    it('renders the German meal label when the API meal name is English', async () => {
+      const renderer = await renderScreen([makeDay([
+        makeMeal('meal-breakfast', 'breakfast', 'Breakfast', [makeItem('item-1', 'Haferflocken')]),
+      ])]);
+
+      expect(getMealOptionsButton(renderer).props.accessibilityLabel).toBe('Optionen für Frühstück');
+      expect(renderer.root.findAll((node) => node.type === 'Text' && node.props.children === 'Frühstück')).not.toHaveLength(0);
+      expect(renderer.root.findAll((node) => node.type === 'Text' && node.props.children === 'Breakfast')).toHaveLength(0);
+    });
+
     it('starts selection from a long press and selects that item immediately', async () => {
       const item = makeItem('item-1', 'Haferflocken');
       const renderer = await renderScreen([makeDay([

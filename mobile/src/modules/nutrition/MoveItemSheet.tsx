@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DiaryBulkMoveTarget, DiaryItemReference, Meal, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { MEAL_LABELS } from './mealLabels';
 
 const MEAL_ICONS: Record<MealType, string> = {
   breakfast: '🌅', lunch: '☀️', dinner: '🌙',
@@ -20,10 +21,6 @@ const MEAL_ICONS: Record<MealType, string> = {
 };
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Frühstück', lunch: 'Mittagessen', dinner: 'Abendessen',
-  snack: 'Snack', preworkout: 'Pre-Workout', postworkout: 'Post-Workout',
-};
 
 interface Props {
   visible: boolean;
@@ -89,7 +86,7 @@ export default function MoveItemSheet({
               >
                 <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.mealName}>{meal.name}</Text>
+                  <Text style={styles.mealName}>{MEAL_LABELS[meal.type]}</Text>
                   <Text style={styles.mealMeta}>
                     {(meal.items?.length ?? 0) > 0
                       ? `${meal.items.length} Eintrag${meal.items.length !== 1 ? 'einträge' : ''}`

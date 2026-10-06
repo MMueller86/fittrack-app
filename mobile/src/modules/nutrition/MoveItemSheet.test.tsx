@@ -85,7 +85,7 @@ describe('MoveItemSheet', () => {
       makeMeal('source-breakfast', 'breakfast', 'Frühstück'),
       makeMeal('source-lunch', 'lunch', 'Mittagessen'),
     ];
-    const eligibleTarget = makeMeal('target-dinner', 'dinner', 'Abendessen');
+    const eligibleTarget = makeMeal('target-dinner', 'dinner', 'Dinner');
     const { renderer, onMove, onClose } = await renderSheet({
       items,
       itemLabel: '2 Einträge ausgewählt',
@@ -98,7 +98,7 @@ describe('MoveItemSheet', () => {
       expect(sourceTargetButtons).toHaveLength(0);
     }
 
-    const targetButton = getButtonContainingText(renderer, eligibleTarget.name);
+    const targetButton = getButtonContainingText(renderer, 'Abendessen');
     expect(targetButton.props.disabled).toBe(false);
     await press(targetButton);
 

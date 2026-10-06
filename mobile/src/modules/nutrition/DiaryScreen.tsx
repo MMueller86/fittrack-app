@@ -55,6 +55,7 @@ import {
   toggleDiaryItemSelection,
   toggleDiaryMealSelection,
 } from './diaryItemUtils';
+import { MEAL_LABELS } from './mealLabels';
 import { ActivityBonusSheet } from './components/ActivityBonusSheet';
 import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
 import { addLocalDays, getLocalIsoDate, isValidDateOnly } from '../../shared/date/localDate';
@@ -64,14 +65,6 @@ type Props = NativeStackScreenProps<NutritionStackParamList, 'DiaryMain'>;
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 // Mahlzeiten, die als leere State-B-Karten immer sichtbar sein sollen (Phase 6)
 export const DEFAULT_MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner'];
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Frühstück',
-  lunch: 'Mittagessen',
-  dinner: 'Abendessen',
-  snack: 'Snack',
-  preworkout: 'Pre-Workout',
-  postworkout: 'Post-Workout',
-};
 const MEAL_ICONS: Record<MealType, string> = {
   breakfast: '🌅',
   lunch: '☀️',
@@ -198,6 +191,7 @@ function MealCard({
   onToggleItemSelection: (mealId: string, itemId: string) => void;
   onToggleMealSelection: (meal: Meal) => void;
 }) {
+  const mealLabel = MEAL_LABELS[meal.type];
   const items = meal.items ?? [];
   const totalCal = items.reduce((s, i) => s + i.macros.calories, 0);
   const isEmpty = items.length === 0;
@@ -213,7 +207,7 @@ function MealCard({
     const compactContent = (
       <>
         <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
-        <Text style={styles.mealName}>{meal.name}</Text>
+        <Text style={styles.mealName}>{mealLabel}</Text>
         {!selectionMode && <Text style={styles.compactAddHint}>+ Hinzufügen</Text>}
       </>
     );
@@ -233,7 +227,7 @@ function MealCard({
         <SwipeableRow onDelete={() => onDeleteMeal(meal)}>
           <TouchableOpacity
             style={[styles.mealCardCompact, isCurrent && styles.mealCardCurrent]}
-            onPress={() => onAddItem(meal.id, meal.name)}
+            onPress={() => onAddItem(meal.id, mealLabel)}
             activeOpacity={0.7}
           >
             {compactContent}
@@ -254,7 +248,7 @@ function MealCard({
             onPress={() => onToggleMealSelection(meal)}
             activeOpacity={0.7}
             accessibilityRole="checkbox"
-            accessibilityLabel={`${meal.name}, ${mealSelectionState === 'all' ? 'vollständig ausgewählt' : mealSelectionState === 'partial' ? 'teilweise ausgewählt' : 'nicht ausgewählt'}`}
+            accessibilityLabel={`${mealLabel}, ${mealSelectionState === 'all' ? 'vollständig ausgewählt' : mealSelectionState === 'partial' ? 'teilweise ausgewählt' : 'nicht ausgewählt'}`}
             accessibilityState={{
               checked: mealSelectionState === 'partial' ? 'mixed' : mealSelectionState === 'all',
             }}
@@ -264,7 +258,7 @@ function MealCard({
         )}
         <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.mealName}>{meal.name}</Text>
+          <Text style={styles.mealName}>{mealLabel}</Text>
           {items.length > 0 && (
             <Text style={styles.mealCal}>
               {Math.round(totalCal)} kcal
@@ -278,7 +272,7 @@ function MealCard({
             style={styles.moreBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityRole="button"
-            accessibilityLabel={`Optionen für ${meal.name}`}
+            accessibilityLabel={`Optionen für ${mealLabel}`}
           >
             <Text style={styles.moreBtnText}>···</Text>
           </TouchableOpacity>
@@ -319,7 +313,7 @@ function MealCard({
       {!selectionMode && (
         <TouchableOpacity
           style={styles.inlineAddBtn}
-          onPress={() => onAddItem(meal.id, meal.name)}
+          onPress={() => onAddItem(meal.id, mealLabel)}
           activeOpacity={0.6}
         >
           <Text style={styles.inlineAddBtnText}>+ Eintrag hinzufügen</Text>
@@ -541,7 +535,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const handleDeleteMeal = (meal: Meal) => {
     setConfirmSheet({
       visible: true,
-      title: `„${meal.name}" löschen?`,
+      title: `„${MEAL_LABELS[meal.type]}" löschen?`,
       subtitle: 'Mahlzeit und alle Einträge werden entfernt.',
       actions: [
         {
@@ -566,7 +560,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const handleOpenMealOptions = (meal: Meal) => {
     setConfirmSheet({
       visible: true,
-      title: meal.name,
+      title: MEAL_LABELS[meal.type],
       actions: [
         { label: 'Einträge auswählen', onPress: () => startSelectionMode() },
         { label: 'Mahlzeit löschen', destructive: true, onPress: () => handleDeleteMeal(meal) },
@@ -699,7 +693,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
       const countLabel = `${result.movedCount} ${result.movedCount === 1 ? 'Eintrag' : 'Einträge'}`;
       showSnackbar({
         message: reloaded
-          ? `${countLabel} nach ${result.targetMeal.name} verschoben.`
+          ? `${countLabel} nach ${MEAL_LABELS[result.targetMeal.type]} verschoben.`
           : `${countLabel} verschoben. Tagebuchansicht konnte nicht aktualisiert werden.`,
       });
       return true;
@@ -729,7 +723,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
       const countLabel = `${result.copiedCount} ${result.copiedCount === 1 ? 'Eintrag' : 'Einträge'}`;
       showSnackbar({
         message: reloaded
-          ? `${countLabel} auf ${formatDateLabel(result.targetMeal.date)} in ${result.targetMeal.name} kopiert.`
+          ? `${countLabel} auf ${formatDateLabel(result.targetMeal.date)} in ${MEAL_LABELS[result.targetMeal.type]} kopiert.`
           : `${countLabel} kopiert. Tagebuchansicht konnte nicht aktualisiert werden.`,
       });
       return result;

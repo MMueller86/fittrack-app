@@ -11,7 +11,7 @@ import {
   destroyTestDatabase,
   setupEmulatorEnv,
 } from '../../test-utils/cosmosEmulator';
-import { __resetCosmosForTests } from '../cosmos';
+import { __resetCosmosForTests, getCosmos } from '../cosmos';
 import { DiaryBulkMutationError } from './diaryRepository';
 import { CosmosDiaryRepository } from './cosmosDiaryRepository';
 
@@ -304,7 +304,8 @@ describe('CosmosDiaryRepository (contract)', () => {
     const selected = await repo.addItem(USER_A, source.id, {
       name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
     });
-    const container = ctx!.database.container('nutritionDiaryMeals');
+    const { containers } = await getCosmos();
+    const container = containers.nutritionDiaryMeals;
     const itemSpy = vi.spyOn(container, 'item');
     const originalBatch = container.items.batch.bind(container.items);
     let operationsSeen: unknown[] = [];
@@ -347,7 +348,8 @@ describe('CosmosDiaryRepository (contract)', () => {
     const selected = await repo.addItem(USER_A, source.id, {
       name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
     });
-    const container = ctx!.database.container('nutritionDiaryMeals');
+    const { containers } = await getCosmos();
+    const container = containers.nutritionDiaryMeals;
     const originalBatch = container.items.batch.bind(container.items);
     const batchSpy = vi.spyOn(container.items, 'batch').mockImplementationOnce(async (operations, partitionKey, options) => {
       await repo.addItem(USER_A, source.id, {
@@ -466,7 +468,8 @@ describe('CosmosDiaryRepository (contract)', () => {
     const selected = await repo.addItem(USER_A, source.id, {
       name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
     });
-    const container = ctx!.database.container('nutritionDiaryMeals');
+    const { containers } = await getCosmos();
+    const container = containers.nutritionDiaryMeals;
     const originalBatch = container.items.batch.bind(container.items);
     const batchSpy = vi.spyOn(container.items, 'batch').mockImplementationOnce(async (operations, partitionKey, options) => {
       await repo.addItem(USER_A, target.id, {
@@ -520,7 +523,8 @@ describe('CosmosDiaryRepository (contract)', () => {
     const selected = await repo.addItem(USER_A, breakfast.id, {
       name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0,
     });
-    const container = ctx!.database.container('nutritionDiaryMeals');
+    const { containers } = await getCosmos();
+    const container = containers.nutritionDiaryMeals;
     const originalBatch = container.items.batch.bind(container.items);
     const batchSpy = vi.spyOn(container.items, 'batch').mockImplementationOnce(async (operations, partitionKey, options) => {
       await repo.addItem(USER_A, breakfast.id, {

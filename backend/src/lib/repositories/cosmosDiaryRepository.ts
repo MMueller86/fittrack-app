@@ -35,6 +35,24 @@ import {
   resolveDiaryBulkSourceMeals,
 } from './diaryRepository';
 
+type CosmosSystemProperties = {
+  _attachments?: string;
+  _etag?: string;
+  _rid?: string;
+  _self?: string;
+  _ts?: number;
+};
+
+function stripCosmosSystemProperties<T extends object>(resource: T & CosmosSystemProperties): T {
+  const document = { ...resource };
+  delete document._attachments;
+  delete document._etag;
+  delete document._rid;
+  delete document._self;
+  delete document._ts;
+  return document;
+}
+
 export class CosmosDiaryRepository implements DiaryRepository {
   async getDay(userId: string, date: string): Promise<DiaryDayResult> {
     const { containers } = await getCosmos();
@@ -50,7 +68,8 @@ export class CosmosDiaryRepository implements DiaryRepository {
         { partitionKey: userId },
       )
       .fetchAll();
-    return { meals: resources, summary: computeSummary(resources) };
+    const meals = resources.map(stripCosmosSystemProperties);
+    return { meals, summary: computeSummary(meals) };
   }
 
   async getMealById(userId: string, mealId: string): Promise<Meal | null> {
