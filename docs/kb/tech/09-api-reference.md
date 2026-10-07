@@ -787,7 +787,7 @@ Cosmos `ttl` is the ceiling of the remaining seconds. The normalized offset is
 included in the input hash, so a changed normalized offset follows the normal
 cache regeneration rules.
 
-This request-boundary validation does not change the Daily v14 prompt, the
+This request-boundary validation does not change the Daily v15 prompt, the
 Structured Output or public AI response contract, or the existing quota and
 failure semantics. For valid requests, quota is still checked before Azure
 OpenAI, successful usage is tracked only after persistence, and context/provider
@@ -803,7 +803,7 @@ failures plus quota exhaustion remain friendly HTTP `200` responses.
 	"cta": "Ernährung öffnen",
 	"ctaTarget": "Nutrition",
 	"generatedAt": "2026-08-20T08:30:00.000Z",
-	"promptVersion": "v14",
+	"promptVersion": "v15",
 	"status": "fresh",
 	"feedbackAvailable": true
 }
@@ -820,12 +820,12 @@ The POST guard remains authoritative and rejects incomplete provenance with
 `feedback_snapshot_unavailable`.
 
 Daily documents are stored as `_docType: "dailyInsight"` under the existing
-`aiInsights` container with `id = ${userId}:${date}`. The selected v14 intent,
+`aiInsights` container with `id = ${userId}:${date}`. The selected v15 intent,
 input context, input hash, exact system/user prompt snapshot, model, token
 usage, and intelligence version are server-owned persistence fields. Daily
 quota is checked before Azure OpenAI and tracked only after a valid response;
 quota exhaustion remains a friendly HTTP `200` response and is not tracked.
-The active v14 prompt and server validator apply the stale-weight guard to all
+The active v15 prompt and server validator apply the stale-weight guard to all
 intents: day 14 remains current, day 15 is stale, stale-as-current wording is
 rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
 accepted. Context, provider, truncation/content-filter, or validation failures
@@ -899,9 +899,9 @@ TTL/expiry.
 | `insightGeneratedAt` | Exact stored Daily `generatedAt`; no rebinding to a later generation |
 | `userComment` | Server-trimmed request comment, 1-500 characters |
 | `response` | Complete server-generated/displayed Daily response |
-| `promptSnapshot.system` | Exact selected v14 system prompt sent to Azure OpenAI |
+| `promptSnapshot.system` | Exact system prompt stored for this Daily instance and sent to Azure OpenAI |
 | `promptSnapshot.user` | Exact serialized user message sent to Azure OpenAI |
-| `promptVersion` | Stored Daily prompt version, currently `v14` |
+| `promptVersion` | Stored Daily prompt version, currently `v15` for new generations |
 | `intent` | Deterministic server-selected `InsightIntent` |
 | `inputContext` | Complete server-built `InsightInputContext` used for generation |
 | `inputHash` | Server-computed hash for the Daily input and active prompt |
@@ -927,7 +927,10 @@ Entra role claim).
 
 Input must contain the exact `userId` partition key and exact `feedbackId`
 document id for an existing feedback document. The repository enforces exact
-partition/id access plus `_docType = "insightFeedback"` before writing.
+partition/id access plus `_docType = "insightFeedback"` before writing. Its
+lookup projects only `id`, `userId`, `_docType`, and `processingStatus` in the
+requested user partition; it does not read feedback content or the source
+Daily snapshot. A successful transition patches only `/processingStatus`.
 
 **Request body:**
 

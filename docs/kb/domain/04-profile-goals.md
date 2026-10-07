@@ -141,6 +141,13 @@ If the calorie target is very low (e.g., at the minimum guardrail), carbs can re
 
 The profile document contains the current `restDay` and `trainingDay` targets only. Updating the profile recalculates and replaces those current targets, but never updates historical `DayMeta.calorieTargetSnapshot` fields. This keeps completed-day targets stable across later weight, goal, activity or intensity changes. The weekly read may use the current matching profile target as a non-persisted fallback for a day that has no explicit snapshot; such legacy/default days are not historical snapshots and can therefore follow later profile changes.
 
+Daily Insight resolves historical targets snapshot-first, then uses a compatible
+stored special-activity target for older activity days. The current profile is a
+read-only fallback only when the historical day has no special activity. That
+fallback is identified as `profile_fallback` and may be used only as a current
+comparison value; it must not be described as the target that was stored for
+that past day. An activity without a usable stored target remains unavailable.
+
 When a user explicitly changes a historical day type, the backend may capture the currently selected profile target into that day's optional snapshot. If no usable profile target exists, the snapshot remains unavailable; no fallback target is invented.
 
 ## Profile Wizard

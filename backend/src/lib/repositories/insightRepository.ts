@@ -61,6 +61,13 @@ export type UpdateFeedbackProcessingStatusResult =
   | { outcome: 'invalid_transition'; status: InsightFeedbackProcessingStatus }
   | { outcome: 'not_found' };
 
+interface FeedbackStatusMetadata {
+  id: string;
+  userId: string;
+  _docType: 'insightFeedback';
+  processingStatus?: InsightFeedbackProcessingStatus;
+}
+
 // ---------------------------------------------------------------------------
 // Cache constants
 // ---------------------------------------------------------------------------
@@ -286,6 +293,22 @@ export function computeInputHash(
   return createHash('sha256').update(JSON.stringify(stable)).digest('hex');
 }
 
+function shouldPreserveV14CacheUntilExpiry(
+  cached: InsightDocument,
+  now: Date,
+  activePromptVersion: string | undefined,
+): boolean {
+  const expiresAt = Date.parse(cached.expiresAt);
+  return activePromptVersion === 'v15'
+    && cached.promptVersion === 'v14'
+    && Number.isFinite(expiresAt)
+    && expiresAt > now.getTime()
+    && cached.promptFingerprint != null
+    && cached.systemPromptHash != null
+    && cached.intent != null
+    && cached.promptSnapshot != null;
+}
+
 // ---------------------------------------------------------------------------
 // Regeneration decision logic
 // ---------------------------------------------------------------------------
@@ -311,6 +334,7 @@ export function shouldRegenerate(
   activePromptSnapshot?: InsightPromptSnapshot,
 ): boolean {
   if (!cached) return true;
+  if (shouldPreserveV14CacheUntilExpiry(cached, now, activePromptVersion)) return false;
 
   if (activePromptVersion != null && cached.promptVersion !== activePromptVersion) {
     return true;
@@ -594,20 +618,22 @@ export class CosmosInsightRepository implements InsightRepository {
     const { containers } = await getCosmos();
     const item = containers.aiInsights.item(feedbackId, userId);
 
-    const readFeedback = async (): Promise<InsightFeedbackDocument | null> => {
-      try {
-        const { resource } = await item.read<InsightFeedbackDocument>();
-        if (!resource || resource._docType !== 'insightFeedback') return null;
-        return normalizeFeedbackDocument(stripCosmosSystemFields(resource));
-      } catch (e) {
-        if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
-          return null;
-        }
-        throw e;
-      }
+    const readFeedbackStatusMetadata = async (): Promise<FeedbackStatusMetadata | null> => {
+      const { resources } = await containers.aiInsights.items
+        .query<FeedbackStatusMetadata>({
+          query: `SELECT VALUE { id: c.id, userId: c.userId, _docType: c._docType, processingStatus: c.processingStatus }
+                  FROM c
+                  WHERE c.id = @feedbackId AND c.userId = @userId AND c._docType = 'insightFeedback'`,
+          parameters: [
+            { name: '@feedbackId', value: feedbackId },
+            { name: '@userId', value: userId },
+          ],
+        }, { partitionKey: userId })
+        .fetchAll();
+      return resources[0] ?? null;
     };
 
-    const current = await readFeedback();
+    const current = await readFeedbackStatusMetadata();
     if (!current) return { outcome: 'not_found' };
 
     const currentStatus = getEffectiveFeedbackProcessingStatus(current);
@@ -628,6 +654,16 @@ export class CosmosInsightRepository implements InsightRepository {
         operations: [{ op: 'set', path: '/processingStatus', value: nextStatus }],
         condition,
       });
+      const updated = await readFeedbackStatusMetadata();
+      if (
+        updated == null
+        || updated.id !== feedbackId
+        || updated.userId !== userId
+        || updated._docType !== 'insightFeedback'
+        || getEffectiveFeedbackProcessingStatus(updated) !== nextStatus
+      ) {
+        throw new Error('Feedback processing status postcondition failed');
+      }
       return { outcome: 'updated', status: nextStatus };
     } catch (e) {
       if (
@@ -636,7 +672,7 @@ export class CosmosInsightRepository implements InsightRepository {
         && 'code' in e
         && [404, 412].includes((e as { code?: number }).code ?? 0)
       ) {
-        const refreshed = await readFeedback();
+        const refreshed = await readFeedbackStatusMetadata();
         if (!refreshed) return { outcome: 'not_found' };
         const refreshedStatus = getEffectiveFeedbackProcessingStatus(refreshed);
         if (refreshedStatus === nextStatus) return { outcome: 'noop', status: refreshedStatus };

@@ -45,6 +45,7 @@ import {
   makeAuthRequest,
   makeContext,
   makeRequest,
+  signTestToken,
   setupTestAuth,
   teardownTestAuth,
   TEST_USER_ID,
@@ -207,6 +208,24 @@ function makeDaily(
   };
 }
 
+function makeV14Cache(
+  context: InsightInputContext,
+  overrides: Partial<InsightDocument> = {},
+): InsightDocument {
+  return makeDaily(context, {
+    promptVersion: 'v14',
+    promptFingerprint: 'sha256:v14-cache-fingerprint',
+    systemPromptHash: 'sha256:v14-cache-system',
+    promptSnapshot: { system: 'v14 system snapshot', user: 'v14 serialized context' },
+    inputHash: 'v14-cache-input',
+    response: makeResponse({ title: 'Gespeicherte v14 Analyse', promptVersion: 'v14' }),
+    expiresAt: '2026-08-21T00:00:00.000Z',
+    dailyGenerations: 1,
+    lastGeneratedAt: GENERATED_AT,
+    ...overrides,
+  });
+}
+
 function getIdentityMismatch(
   identity: 'intent' | 'system' | 'user',
   current: InsightDocument,
@@ -244,9 +263,18 @@ async function expectFreshForIdentityMismatch(
   expect(generateDailyInsight).toHaveBeenCalledTimes(1);
 }
 
-async function makeDailyRequest(query: Record<string, string> = { date: DATE, timezoneOffsetMinutes: '0' }) {
+async function makeDailyRequest(
+  query: Record<string, string> = { date: DATE, timezoneOffsetMinutes: '0' },
+  isAdmin = false,
+) {
   const search = new URLSearchParams(query).toString();
-  const request = await makeAuthRequest();
+  const request = isAdmin
+    ? makeRequest({
+      headers: {
+        authorization: `Bearer ${await signTestToken(TEST_USER_ID, { roles: ['Admin'] })}`,
+      },
+    })
+    : await makeAuthRequest();
   Object.assign(request, { url: `http://localhost/api/ai/daily-insight${search ? `?${search}` : ''}` });
   return request;
 }
@@ -371,7 +399,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     expect(generateDailyInsight).toHaveBeenCalledTimes(1);
   });
 
-  it('invalidates an old Daily cache entry before returning a fresh v11 response', async () => {
+  it('invalidates an old Daily cache entry before returning a fresh v15 response', async () => {
     const context = makeInputContext();
     const cached = makeDaily(context, {
       promptVersion: 'v9',
@@ -400,6 +428,79 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
       dailyGenerations: 2,
       response: { status: 'fresh', promptVersion: DAILY_INSIGHT_PROMPT_VERSION },
+    });
+  });
+
+  it.each([false, true])('preserves an unexpired v14 same-date cache for Admin=%s', async (isAdmin) => {
+    const context = makeInputContext();
+    const v14 = makeV14Cache(context);
+    await getInsightRepository().upsert(v14);
+
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(undefined, isAdmin),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({
+      title: 'Gespeicherte v14 Analyse',
+      promptVersion: 'v14',
+      status: 'cached',
+    });
+    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toEqual(v14);
+    expect(generateDailyInsight).not.toHaveBeenCalled();
+    expect(quotaCheckMock).not.toHaveBeenCalled();
+    expect(trackUsageMock).not.toHaveBeenCalled();
+  });
+
+  it('regenerates an unexpired v14 cache that has incomplete provenance', async () => {
+    const context = makeInputContext();
+    await getInsightRepository().upsert(makeV14Cache(context, { promptFingerprint: undefined }));
+
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({ status: 'fresh', promptVersion: 'v15' });
+    expect(generateDailyInsight).toHaveBeenCalledTimes(1);
+    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toMatchObject({
+      promptVersion: 'v15',
+      promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
+    });
+  });
+
+  it('generates and stores v15 after a same-date v14 cache expires', async () => {
+    const context = makeInputContext();
+    await getInsightRepository().upsert(makeV14Cache(context, {
+      expiresAt: '2026-08-20T11:59:59.000Z',
+      ttl: 1,
+    }));
+
+    const response = await dailyInsightHandler(
+      await makeDailyRequest(),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({
+      title: 'Dein Fokus heute',
+      promptVersion: 'v15',
+      status: 'fresh',
+      feedbackAvailable: true,
+    });
+    expect(generateDailyInsight).toHaveBeenCalledTimes(1);
+    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toMatchObject({
+      promptVersion: 'v15',
+      promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
+      systemPromptHash: expect.any(String),
+      promptSnapshot: {
+        system: expect.any(String),
+        user: expect.any(String),
+      },
+      dailyGenerations: 2,
+      response: { promptVersion: 'v15', status: 'fresh' },
     });
   });
 

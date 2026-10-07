@@ -329,6 +329,72 @@ describe('buildDailyInsightContext', () => {
     });
   });
 
+  it('prefers a historical day-target snapshot over a conflicting activity target', async () => {
+    const date = '2026-08-13';
+    const repositories = makeRepositories({
+      metas: {
+        [date]: meta(date, {
+          dayType: 'training',
+          calorieTargetSnapshot: {
+            calories: 2300,
+            capturedAt: '2026-08-13T08:00:00.000Z',
+            source: 'profile',
+          },
+          specialActivity: activity({ dailyCalorieTarget: 1600, activityBonus: 600 }),
+        }),
+      },
+    });
+
+    const context = await buildDailyInsightContext({
+      userId: USER_ID,
+      date: REFERENCE_DATE,
+      repositories,
+    });
+
+    expect(context.nutrition.last3Days[0]).toMatchObject({
+      targetSource: 'day_target_snapshot',
+      baseTargetCalories: 2300,
+      activityBonusCalories: 600,
+      effectiveTargetCalories: 2900,
+    });
+  });
+
+  it('keeps a 2250 historical snapshot distinct from the current 2000 profile target', async () => {
+    const historicalDate = '2026-08-13';
+    const repositories = makeRepositories({
+      days: {
+        [REFERENCE_DATE]: diary(REFERENCE_DATE, [meal(1600)]),
+        [historicalDate]: diary(historicalDate, [meal(2100)]),
+      },
+      metas: {
+        [historicalDate]: meta(historicalDate, {
+          calorieTargetSnapshot: {
+            calories: 2250,
+            capturedAt: '2026-08-13T08:00:00.000Z',
+            source: 'profile',
+          },
+        }),
+      },
+    });
+
+    const context = await buildDailyInsightContext({
+      userId: USER_ID,
+      date: REFERENCE_DATE,
+      localHour: 12,
+      repositories,
+    });
+
+    expect(context.nutrition.targets?.calories).toBe(2000);
+    expect(context.nutrition.remainingCalories).toBe(400);
+    expect(context.nutrition.last3Days[0]).toMatchObject({
+      date: historicalDate,
+      calories: 2100,
+      baseTargetCalories: 2250,
+      effectiveTargetCalories: 2250,
+      targetSource: 'day_target_snapshot',
+    });
+  });
+
   it('propagates a historical repository error instead of creating an empty day', async () => {
     const repositories = makeRepositories({ historicalErrorDate: '2026-08-13' });
 

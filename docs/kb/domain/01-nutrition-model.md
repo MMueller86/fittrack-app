@@ -56,6 +56,16 @@ training context is stored, `trainingDay` for an explicitly stored training day.
 This fallback is not written back to the diary, so it does not turn a current profile
 value into historical data.
 
+Daily Insight uses the same source priority for each completed day: a valid day
+target snapshot, then a compatible stored special-activity target, then a
+read-only `profile_fallback` only when no special activity exists. An activity
+without a usable stored target remains `unavailable`; it does not receive an
+invented profile target. Server validation allows target-relative comparisons
+only when that day's nutrition and resolved target are usable, checks the
+comparison against that day's effective target, and never treats a target gap
+as proof of a physiological energy deficit or surplus. A positive current-day
+remainder is still an open budget, not a completed energy balance.
+
 ## Day Summary
 
 `DaySummary` — on-the-fly aggregation of all `MealItem.nutrition` values across all meals for the day.

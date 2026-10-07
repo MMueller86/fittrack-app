@@ -83,6 +83,12 @@ Assigned in Azure Entra ID by adding the user to the **Admin App Role** on the F
 Effect:
 - Bypasses all AI feature quotas completely (`quota.ts`: `if (user.isAdmin) return null`)
 - Bypasses the 3-regeneration-per-day limit on daily insight
+- Authorizes the dedicated `PATCH /api/ai/daily-insight/feedback/status` operational update after normal JWT validation
+
+For this route, the request `userId` selects the target Cosmos partition; it
+does not establish the caller identity or bypass the admin check. The status
+operation is limited to feedback metadata and cannot read the source Daily
+snapshot.
 
 ### `tier` — Env Var (current) / Entra Role (future)
 

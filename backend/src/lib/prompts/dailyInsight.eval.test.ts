@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { generateDailyInsight } from '../openai';
+import { DailyInsightValidationError } from '../dailyInsightValidation';
 import { DAILY_INSIGHT_PROMPT_VERSION } from './dailyInsightPrompt';
 import { DAILY_INSIGHT_EVAL_FIXTURES } from './dailyInsight.eval.fixtures';
 
-const TESTED_PROMPT_VERSION = 'v14';
+const TESTED_PROMPT_VERSION = 'v15';
 
 it('daily insight prompt version matches fixture expectations', () => {
   expect(DAILY_INSIGHT_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);
@@ -17,7 +18,22 @@ describe('dailyInsight: live prompt evaluation', () => {
   it.each(DAILY_INSIGHT_EVAL_FIXTURES)(`[${evaluationStatus}] [$id] $description`, async (fixture) => {
     if (!hasCredentials) return;
 
-    const result = await generateDailyInsight(fixture.input);
+    let result: Awaited<ReturnType<typeof generateDailyInsight>>;
+    try {
+      result = await generateDailyInsight(fixture.input);
+    } catch (error) {
+      const expectedErrors = fixture.expectUnavailableOnValidationError;
+      if (
+        expectedErrors != null
+        && error instanceof DailyInsightValidationError
+        && (Array.isArray(expectedErrors)
+          ? expectedErrors.includes(error.message)
+          : error.message === expectedErrors)
+      ) {
+        return;
+      }
+      throw error;
+    }
 
     expect(result.intent).toBe(fixture.intent);
     expect(result.response.title.length).toBeGreaterThan(0);

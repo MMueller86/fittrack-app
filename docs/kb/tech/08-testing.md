@@ -98,8 +98,9 @@ photos; those local files are not prerequisites for Tier 1.
 The active Daily prompt is tested through
 `backend/src/lib/prompts/dailyInsightPrompt.ts`, which is the sole runtime
 composition root. Unit tests cover all six intent snapshots, deterministic
-canonical-bundle fingerprinting, the append-only v14 manifest, and the
-context-dependent system-prompt hashes. The offline release check
+canonical-bundle fingerprinting, the append-only manifest with retained v14
+and active v15 entries, and the context-dependent system-prompt hashes. The
+offline release check
 `npm run verify:daily-insight-prompt --workspace=backend` verifies the active
 release fingerprint, historical manifest entries, and provider-visible prompt
 or schema changes without calling Azure OpenAI.
@@ -118,6 +119,15 @@ roundtrips verify the server-owned provenance, exact feedback binding, and
 legacy documents without optional identity fields. Legacy documents remain
 readable without a backfill; the Class 0 change is verified by compatibility
 tests rather than a migration.
+
+The v15 semantic validation tests cover historical comparisons against the
+resolved target for that date, missing or ambiguous evidence, contradictory
+comparison direction, unsupported nutrition claims on unlogged prior days,
+and morning intent/source constraints. Context fixtures keep the historical
+2,250 kcal snapshot distinct from the current 2,000 kcal target. Handler tests
+also prove that a complete unexpired same-date v14 cache entry is returned
+unchanged until expiry, while the repository status-operation test constrains
+the read projection to status metadata and the patch to `/processingStatus`.
 
 Prompt evals remain explicit live checks for the tested release. They are not
 part of the normal CI job because they require Azure credentials and incur

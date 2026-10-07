@@ -62,6 +62,28 @@ function response(overrides: Partial<DailyInsightValidatedResponse> = {}): Daily
   };
 }
 
+function historicalDay(
+  overrides: Partial<InsightInputContext['nutrition']['last3Days'][number]> = {},
+): InsightInputContext['nutrition']['last3Days'][number] {
+  return {
+    date: '2026-08-19',
+    calories: 2100,
+    protein: 130,
+    carbs: 200,
+    fat: 70,
+    hasMealItem: true,
+    mealItemCount: 3,
+    baseTargetCalories: 2250,
+    effectiveTargetCalories: 2250,
+    activityBonusCalories: 0,
+    targetSource: 'day_target_snapshot',
+    dayType: 'rest',
+    workoutType: null,
+    specialActivity: null,
+    ...overrides,
+  };
+}
+
 describe('validateDailyInsightResponse', () => {
   it('accepts the strict nullable response shape', () => {
     expect(validateDailyInsightResponse(response(), makeContext())).toEqual(response());
@@ -93,6 +115,17 @@ describe('validateDailyInsightResponse', () => {
       }),
       makeContext({ nutrition: { ...makeContext().nutrition, remainingCalories: -100 } }),
     )).toThrow('calorie budget');
+  });
+
+  it('allows an explicitly tomorrow-oriented meal outlook after budget overage', () => {
+    const context = makeContext({
+      nutrition: { ...makeContext().nutrition, remainingCalories: -100 },
+    });
+    const valid = response({
+      recommendation: 'Morgen kannst du eine proteinreiche Mahlzeit einplanen.',
+    });
+
+    expect(validateDailyInsightResponse(valid, context)).toEqual(valid);
   });
 
   it('rejects additional protein recommendations when the protein target is nearly complete', () => {
@@ -142,6 +175,328 @@ describe('validateDailyInsightResponse', () => {
       context,
       'nutrition_guidance',
     )).toThrow('open day as completed');
+  });
+
+  it('rejects phase-progress calorie-increase advice based on an open budget at noon', () => {
+    const base = makeContext();
+    const context = makeContext({
+      currentHourLocal: 12,
+      nutrition: { ...base.nutrition, remainingCalories: 700, remainingProteinG: 40 },
+      progressIntelligence: {
+        ...base.progressIntelligence,
+        primarySignal: { type: 'phase_context', confidence: 0.9, freshnessScore: 0 },
+        phase: { type: 'progressing' },
+      },
+    });
+    const unsafeResponses: Array<Partial<DailyInsightValidatedResponse>> = [
+      { title: 'Kalorienzufuhr erhöhen' },
+      { summary: 'Nutze die restlichen Kalorien für eine zusätzliche Mahlzeit.' },
+      { recommendation: 'Erhöhe deine Kalorienzufuhr, damit du dein Tagesziel erreichst.' },
+      { cta: 'Kalorienspielraum ausschöpfen', ctaTarget: 'Nutrition' },
+    ];
+
+    for (const fields of unsafeResponses) {
+      expect(() => validateDailyInsightResponse(
+        response(fields),
+        context,
+        'phase_progress',
+      )).toThrow('open calorie budget');
+    }
+
+    const validProgress = response({
+      summary: 'Dein Gewichtsverlauf zeigt weiter in die richtige Richtung.',
+    });
+    expect(validateDailyInsightResponse(validProgress, context, 'phase_progress')).toEqual(validProgress);
+  });
+
+  it('rejects achieved energy-balance claims but allows target-relative wording on an open day', () => {
+    const openContext = makeContext({
+      nutrition: { ...makeContext().nutrition, remainingCalories: 600 },
+    });
+
+    expect(() => validateDailyInsightResponse(
+      response({ summary: 'Du bist heute in einem Energiedefizit.' }),
+      openContext,
+      'phase_progress',
+    )).toThrow('target-relative calorie difference');
+
+    const targetRelativeResponse = response({
+      summary: 'Im Vergleich zu deinem Tagesziel bleibt heute noch Spielraum.',
+    });
+    expect(validateDailyInsightResponse(
+      targetRelativeResponse,
+      openContext,
+      'phase_progress',
+    )).toEqual(targetRelativeResponse);
+  });
+
+  it('rejects achieved deficit or surplus claims in every field for a negative target-relative budget', () => {
+    const base = makeContext();
+    const context = makeContext({
+      nutrition: { ...base.nutrition, remainingCalories: -100 },
+    });
+    const claims = [
+      'Energiedefizit erreicht',
+      'Energieüberschuss erreicht',
+    ];
+    const fields: Array<Partial<DailyInsightValidatedResponse>> = [
+      { title: claims[0] },
+      { summary: claims[0] },
+      { recommendation: claims[0] },
+      { cta: claims[0], ctaTarget: 'Nutrition' },
+      { title: claims[1] },
+      { summary: claims[1] },
+      { recommendation: claims[1] },
+      { cta: claims[1], ctaTarget: 'Nutrition' },
+    ];
+
+    for (const outputFields of fields) {
+      expect(() => validateDailyInsightResponse(
+        response(outputFields),
+        context,
+        'nutrition_guidance',
+      )).toThrow('target-relative calorie difference');
+    }
+  });
+
+  it('allows explicit denial of an achieved balance and supported negative target-relative wording', () => {
+    const base = makeContext();
+    const context = makeContext({
+      nutrition: { ...base.nutrition, remainingCalories: -100 },
+    });
+    const responseWithSupportedComparison = response({
+      summary: 'Deine Aufnahme liegt heute 100 kcal über deinem Tagesziel; daraus lässt sich kein tatsächlich erreichtes Energiedefizit ableiten.',
+    });
+
+    expect(validateDailyInsightResponse(
+      responseWithSupportedComparison,
+      context,
+      'nutrition_guidance',
+    )).toEqual(responseWithSupportedComparison);
+
+    expect(() => validateDailyInsightResponse(
+      response({
+        summary: 'Daraus folgt kein Energiedefizit, aber ein Energieüberschuss liegt vor.',
+      }),
+      context,
+      'nutrition_guidance',
+    )).toThrow('target-relative calorie difference');
+  });
+
+  it('checks historical comparisons against the resolved historical target, not today\'s target', () => {
+    const base = makeContext();
+    const context = makeContext({
+      nutrition: {
+        ...base.nutrition,
+        today: { ...base.nutrition.today!, calories: 1600 },
+        targets: { ...base.nutrition.targets!, calories: 2000 },
+        remainingCalories: 400,
+        last3Days: [historicalDay()],
+      },
+    });
+    const validHistoricalComparison = response({
+      summary: 'Gestern lagen deine Einträge knapp unter dem gespeicherten Tagesziel von 2.250 kcal.',
+    });
+
+    expect(validateDailyInsightResponse(
+      validHistoricalComparison,
+      context,
+      'nutrition_guidance',
+    )).toEqual(validHistoricalComparison);
+
+    expect(() => validateDailyInsightResponse(
+      response({
+        summary: 'Gestern lagen deine Einträge über dem gespeicherten Tagesziel von 2.250 kcal.',
+      }),
+      context,
+      'nutrition_guidance',
+    )).toThrow('historical target comparison');
+  });
+
+  it('validates explicit historical target numbers and rejects an ambiguous source', () => {
+    const base = makeContext();
+    const context = makeContext({
+      currentHourLocal: 8,
+      nutrition: {
+        ...base.nutrition,
+        today: null,
+        remainingCalories: null,
+        remainingProteinG: null,
+        last3Days: [historicalDay()],
+      },
+    });
+    const supportedHistoricalValue = response({
+      summary: 'Gestern lag dein gespeichertes Tagesziel bei 2.250 kcal.',
+    });
+
+    expect(validateDailyInsightResponse(
+      supportedHistoricalValue,
+      context,
+      'morning_orientation',
+    )).toEqual(supportedHistoricalValue);
+
+    expect(() => validateDailyInsightResponse(
+      response({ summary: 'Gestern lag dein gespeichertes Tagesziel bei 2.000 kcal.' }),
+      context,
+      'morning_orientation',
+    )).toThrow('historical target value');
+
+    const ambiguousContext = makeContext({
+      currentHourLocal: 8,
+      nutrition: {
+        ...base.nutrition,
+        today: null,
+        remainingCalories: null,
+        remainingProteinG: null,
+        last3Days: [historicalDay({
+          baseTargetCalories: 2000,
+          effectiveTargetCalories: 2000,
+          targetSource: 'profile_fallback',
+          specialActivity: { dailyCalorieTarget: 1400 } as InsightInputContext['nutrition']['last3Days'][number]['specialActivity'],
+        })],
+      },
+    });
+
+    expect(() => validateDailyInsightResponse(
+      response({ summary: 'Gestern lag dein gespeichertes Tagesziel bei 2.000 kcal.' }),
+      ambiguousContext,
+      'morning_orientation',
+    )).toThrow('historical target source');
+  });
+
+  it('rejects historical target comparisons when the target source is unavailable or ambiguous', () => {
+    const base = makeContext();
+    const context = makeContext({
+      nutrition: {
+        ...base.nutrition,
+        last3Days: [historicalDay({
+          baseTargetCalories: null,
+          effectiveTargetCalories: null,
+          targetSource: 'unavailable',
+          specialActivity: {} as InsightInputContext['nutrition']['last3Days'][number]['specialActivity'],
+        })],
+      },
+    });
+
+    expect(() => validateDailyInsightResponse(
+      response({ summary: 'Gestern lagen deine Einträge über deinem Tagesziel.' }),
+      context,
+      'nutrition_guidance',
+    )).toThrow('historical target source');
+  });
+
+  it('carries the historical day into a following target relation sentence', () => {
+    const base = makeContext();
+    const context = makeContext({
+      currentHourLocal: 8,
+      nutrition: {
+        ...base.nutrition,
+        today: null,
+        remainingCalories: null,
+        remainingProteinG: null,
+        last3Days: [historicalDay({
+          baseTargetCalories: null,
+          effectiveTargetCalories: null,
+          targetSource: 'unavailable',
+          specialActivity: {} as InsightInputContext['nutrition']['last3Days'][number]['specialActivity'],
+        })],
+      },
+    });
+
+    expect(() => validateDailyInsightResponse(
+      response({
+        summary: 'Gestern hast du 2.100 kcal aufgenommen. Deine Kalorienaufnahme liegt über einem verlässlichen Ziel, obwohl kein historischer Vergleich möglich ist.',
+      }),
+      context,
+      'morning_orientation',
+    )).toThrow('historical target source');
+  });
+
+  it('does not present a profile fallback as a historically stored target', () => {
+    const base = makeContext();
+    const context = makeContext({
+      nutrition: {
+        ...base.nutrition,
+        last3Days: [historicalDay({ targetSource: 'profile_fallback' })],
+      },
+    });
+
+    expect(() => validateDailyInsightResponse(
+      response({ summary: 'Gestern lagen deine Einträge unter deinem damaligen Tagesziel.' }),
+      context,
+      'nutrition_guidance',
+    )).toThrow('profile fallback');
+
+    const validReadOnlyComparison = response({
+      summary: 'Verglichen mit dem heutigen Profilziel lagen die gestrigen Einträge leicht darunter.',
+    });
+    expect(validateDailyInsightResponse(
+      validReadOnlyComparison,
+      context,
+      'nutrition_guidance',
+    )).toEqual(validReadOnlyComparison);
+  });
+
+  it('rejects morning output outside the eligible morning context', () => {
+    const base = makeContext();
+    const context = makeContext({
+      currentHourLocal: 12,
+      nutrition: {
+        ...base.nutrition,
+        today: null,
+        remainingCalories: null,
+        remainingProteinG: null,
+      },
+    });
+
+    expect(() => validateDailyInsightResponse(
+      response(),
+      context,
+      'morning_orientation',
+    )).toThrow('morning intent');
+  });
+
+  it('does not treat an unlogged prior day as zero intake in morning output', () => {
+    const base = makeContext();
+    const context = makeContext({
+      currentHourLocal: 8,
+      nutrition: {
+        ...base.nutrition,
+        today: null,
+        remainingCalories: null,
+        remainingProteinG: null,
+        last3Days: [historicalDay({
+          calories: null,
+          protein: null,
+          hasMealItem: false,
+          mealItemCount: 0,
+          baseTargetCalories: 2000,
+          effectiveTargetCalories: 2000,
+          targetSource: 'profile_fallback',
+        })],
+      },
+    });
+
+    for (const unsupportedSummary of [
+      'Gestern hast du nichts gegessen.',
+      'Gestern lag deine Aufnahme bei 0 kcal.',
+      'Gestern lag dein Eiweiß bei null.',
+    ]) {
+      expect(() => validateDailyInsightResponse(
+        response({ summary: unsupportedSummary }),
+        context,
+        'morning_orientation',
+      )).toThrow('historical nutrition claim');
+    }
+
+    const validUnavailableSource = response({
+      summary: 'Zu gestern liegen keine Einträge vor, deshalb lässt sich die Aufnahme nicht verlässlich einordnen.',
+    });
+    expect(validateDailyInsightResponse(
+      validUnavailableSource,
+      context,
+      'morning_orientation',
+    )).toEqual(validUnavailableSource);
   });
 
   it('requires natural effective-target vocabulary for an activity budget context', () => {

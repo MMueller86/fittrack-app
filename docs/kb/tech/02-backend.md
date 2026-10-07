@@ -119,6 +119,16 @@ the diary meal for `usageDates`; it never derives a user date from the server
 clock. `lastUsedAt` and `createdAt` remain UTC instants. Missing internal usage
 dates fail closed in both repository implementations.
 
+### Daily Insight feedback status boundary
+
+The admin-only feedback status operation is intentionally separate from
+feedback submission and source-snapshot reads. `updateFeedbackProcessingStatus`
+queries only `id`, `userId`, `_docType`, and `processingStatus` within the
+requested user partition, then conditionally patches only `/processingStatus`.
+It does not load the feedback comment, prompt/context snapshot, or source Daily
+document. The Cosmos contract test locks both the metadata projection and the
+single-field patch; feedback submission retains its separate exact-Daily read.
+
 ### Recipe image persistence and validation
 
 `cosmosRecipesRepository.ts` stores recipe image metadata as `id`, `blobName`,

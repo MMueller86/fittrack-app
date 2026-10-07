@@ -545,6 +545,49 @@ describe('shouldRegenerate', () => {
     expect(shouldRegenerate(incompleteV10, baseHash, now, false, 'v10')).toBe(true);
   });
 
+  it('preserves an unexpired v14 Daily until expiry when v15 becomes active', () => {
+    const v14 = makeDocument({
+      promptVersion: 'v14',
+      promptFingerprint: 'sha256:v14-fingerprint',
+      systemPromptHash: 'sha256:v14-system',
+      intent: 'general',
+      promptSnapshot: { system: 'v14 system', user: 'v14 user' },
+      expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+      inputHash: 'v14-hash',
+      dailyGenerations: MAX_DAILY_GENERATIONS,
+    });
+    const activeV15 = {
+      promptVersion: 'v15',
+      promptFingerprint: 'sha256:v15-fingerprint',
+      systemPromptHash: 'sha256:v15-system',
+      intent: 'general' as const,
+      promptSnapshot: { system: 'v15 system', user: 'v15 user' },
+    };
+
+    expect(shouldRegenerate(
+      v14,
+      'v15-hash',
+      now,
+      true,
+      activeV15.promptVersion,
+      activeV15.promptFingerprint,
+      activeV15.systemPromptHash,
+      activeV15.intent,
+      activeV15.promptSnapshot,
+    )).toBe(false);
+    expect(shouldRegenerate(
+      { ...v14, expiresAt: new Date(now.getTime() - 1).toISOString() },
+      'v15-hash',
+      now,
+      true,
+      activeV15.promptVersion,
+      activeV15.promptFingerprint,
+      activeV15.systemPromptHash,
+      activeV15.intent,
+      activeV15.promptSnapshot,
+    )).toBe(true);
+  });
+
   it('serves a complete current prompt instance when its hash is unchanged', () => {
     const doc = makeDocument({
       promptVersion: 'v10',

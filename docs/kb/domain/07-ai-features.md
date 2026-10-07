@@ -302,9 +302,9 @@ unchanged for valid requests. Context/provider and server-validation failures
 remain friendly HTTP `200` `unavailable` responses, and quota exhaustion remains
 friendly HTTP `200` `quota_exceeded` without usage tracking.
 
-### v14 prompt, output, and failure contract
+### v15 prompt, output, and failure contract
 
-`DAILY_INSIGHT_PROMPT_VERSION = 'v14'`. The selected focused module is combined
+`DAILY_INSIGHT_PROMPT_VERSION = 'v15'`. The selected focused module is combined
 with the shared German tone/output contract. The backend stores the exact
 `promptSnapshot.system` and serialized `promptSnapshot.user` sent to Azure
 OpenAI. Strict Structured Outputs use `json_schema`, `strict: true`, required
@@ -312,12 +312,14 @@ properties, nullable optional values, and `additionalProperties: false`.
 
 The active composition root is `backend/src/lib/prompts/dailyInsightPrompt.ts`.
 The shared Strict Structured Output schema is defined in
-`backend/src/lib/dailyInsightSchema.ts`, and the append-only v14 release lock
-is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`. The computed
-global v14 content identity is
-`sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`.
-The root relocation kept the v14 provider-facing system and user prompt bytes
-unchanged; offline compatibility tests lock the six system-prompt hashes.
+`backend/src/lib/dailyInsightSchema.ts`, and the append-only release manifest
+is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`. It preserves the
+v14 fingerprint `sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`
+and locks the active v15 fingerprint
+`sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`
+with assembly version `v2`. The v14 provider input remains byte-identical to
+its locked baseline; v15 is the single changed provider release locked by
+offline tests.
 
 The release identity is dual: `promptVersion` is the human-readable release
 identifier and `promptFingerprint` is the SHA-256 identity of the canonical
@@ -328,11 +330,22 @@ intent- and context-dependent `promptSnapshot.system` sent to Azure OpenAI.
 This third value distinguishes the concrete provider system prompt even when
 the global bundle identity and release version are unchanged.
 
+A positive or negative `remainingCalories` value is only a target-relative
+intake difference, not a measured energy balance. Validation rejects
+affirmative achieved deficit/surplus claims across all user-visible text fields
+while allowing explicit denials and supported above/below-target comparisons.
+For an open-day `phase_progress` insight, weight signals remain the progress
+basis; remaining calories are not presented as an eating budget and do not
+justify increasing intake or an eating recommendation/CTA. Independent
+non-nutrition guidance remains possible.
+
 The server validates the parsed response and rejects provider truncation or
 content filtering, empty/invalid/schema-invalid responses, CTA/target
 mismatches, budget/protein contradictions, definitive activity claims,
-stale-as-current weight claims, and forbidden technical wording. The public contract is
-character-based: `title` is at most 40 characters, `summary` at most 600,
+stale-as-current weight claims, unsupported historical target comparisons,
+unsupported claims about unlogged historical nutrition, invalid morning-source
+use, and forbidden technical wording. The public contract is character-based:
+`title` is at most 40 characters, `summary` at most 600,
 `recommendation` at most 240, and `cta` at most 80. There is no server-side
 60-120-word summary validator. A failed context read, provider failure,
 truncation/content-filter result, or server validation failure returns friendly
@@ -340,7 +353,7 @@ truncation/content-filter result, or server validation failure returns friendly
 Daily quota. Quota exhaustion is also a friendly HTTP `200` with
 `status: 'quota_exceeded'` and no tracking.
 
-The v14 stale-weight safety contract is global because the shared tone guard is
+The stale-weight safety contract introduced in v15 remains global because the shared tone guard is
 included in every selected intent, not only the weight-focused modules. For
 `daysSinceLastMeasurement > 14`, weight or trend language is allowed only with
 an explicit stale marker such as `veraltet` or `nicht aktuell`; day 14 remains
@@ -349,13 +362,28 @@ current and day 15 is stale. A stale-as-current sentence such as
 wording such as `Der Trend deines Gewichts ist nicht aktuell.` is accepted.
 The runtime root cause was that the stale rules had previously existed only in
 `promptWeight`, while deterministic `nutrition_guidance` selected
-`promptNutrition`; the fix introduced in v11 remains active in v14 and applies the shared guard to that path and all other
+`promptNutrition`; the fix introduced in v11 remains active in v15 and applies the shared guard to that path and all other
 intents. Server-side validation remains strict and was not weakened.
 
 Negative calorie budget is authoritative. A `remainingProteinG` value of
 `null` is unknown; a value at most 20 is treated as nearly complete. Neither
 state creates an additional protein action, and a negative calorie budget
 blocks further same-day food recommendations.
+
+For v15, a positive `remainingCalories` value is an unfinished target budget,
+not evidence of an achieved energy deficit or a completed energy balance. This
+also applies to `phase_progress`: the open-day guard keeps the narrative based
+on weight signals, does not present the remainder as an eating budget or base
+an eating recommendation/CTA on using it, and deterministic validation rejects
+achieved deficit or surplus language while allowing a target-relative control.
+For `activity_focus`, a positive remainder keeps the day open: the activity
+target is context only, and the response does not compare logged intake or the
+remaining amount against it. Historical target comparisons use that date's resolved effective target and
+consumed calories;
+missing nutrition, an unavailable/ambiguous source, a contradictory comparison
+direction, or a profile fallback presented as a then-stored target is rejected.
+`morning_orientation` is valid only before local hour 10 with no current
+MealItem; a missing prior-day MealItem remains unknown, not zero intake.
 
 The cache hash preserves the prompt's semantic boundaries instead of relying
 only on rounded numeric values. `remainingCalories` is bucketed as
@@ -380,8 +408,11 @@ data, semantic nutrition buckets, current and historical nutrition/targets,
 weight/progress signals, and the other prompt inputs. Missing or mismatched
 prompt version, `promptFingerprint`, `systemPromptHash`, `intent`, or
 `promptSnapshot` is a hard cache invalidation, independent of the regeneration
-interval, daily limit, or admin status. An old response is never returned as a
-new v14 result.
+interval, daily limit, or admin status. A complete, unexpired v14 same-date
+Daily remains cached and is returned unchanged until its existing expiry; v15
+does not overwrite it early. After expiry, the date key may receive a new v15
+document. A v14 entry without complete provenance does not qualify for
+preservation and follows hard invalidation.
 
 An unchanged hash returns `cached`. A changed hash is subject to a 30-minute
 minimum interval and a maximum of three generations for non-admin users;
@@ -396,7 +427,7 @@ document type so documents written before this release remain readable; new
 Daily documents set the complete provenance. No global backfill, migration,
 new container, or partition-key change is used for this prompt-provenance
 change. Legacy Daily documents remain readable through the repository, but
-missing or mismatched current provenance makes them ineligible for a cache hit
+Missing or mismatched current provenance makes them ineligible for a cache hit
 and for new feedback. Legacy feedback documents remain readable with their
 historical fields and are not rewritten or backfilled.
 
@@ -426,7 +457,11 @@ searches. The only allowed transitions are `Open -> Done` and
 `Done` and `Rejected` are terminal and cannot transition to each other or
 back to `Open`. Unresolved operational searches include only feedback with a
 missing status or `Open`; handled searches include only `Done` or `Rejected`.
-Every such search is scoped to `_docType = 'insightFeedback'`.
+Every such search is scoped to `_docType = 'insightFeedback'`. The admin-only
+status operation reads only status metadata in the requested user partition
+and patches only `processingStatus`; it does not read feedback content or the
+source Daily snapshot. Feedback submission retains its separate exact-Daily
+snapshot read.
 
 | Persisted field | Source / meaning |
 |---|---|
@@ -435,7 +470,7 @@ Every such search is scoped to `_docType = 'insightFeedback'`.
 | `userComment` | Exact server-trimmed negative comment |
 | `response` | Complete generated/displayed Daily response |
 | `promptSnapshot.system` / `.user` | Exact provider system prompt and serialized user message |
-| `promptVersion` / `intent` | Stored v14 version and deterministic server intent |
+| `promptVersion` / `intent` | Stored Daily prompt version and deterministic server intent |
 | `promptFingerprint` | Global content identity copied from the exact Daily instance |
 | `systemPromptHash` | SHA-256 identity of the exact context-specific system prompt |
 | `inputContext` / `inputHash` | Complete server input and its cache hash |
@@ -518,4 +553,4 @@ Required: API version ≥ `2024-07-01`, model ≥ `gpt-4o-mini 2024-07-18`.
 
 ## Prompt Versioning
 
-Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v14'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily document in Cosmos. The concrete `systemPromptHash` is stored for the exact composed system prompt used by that instance. When a provider-visible prompt, guard, assembly, or schema change affects output interpretation, the version must be incremented and the append-only release manifest updated.
+Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v15'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily document in Cosmos. The concrete `systemPromptHash` is stored for the exact composed system prompt used by that instance. When a provider-visible prompt, guard, assembly, or schema change affects output interpretation, the version must be incremented and the append-only release manifest updated.

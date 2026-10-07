@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type EmulatorContext,
@@ -400,6 +400,95 @@ describe('CosmosInsightRepository feedback documents (contract)', () => {
     await expect(repo.updateFeedbackProcessingStatus(USER_A, `${USER_A}:not-feedback`, 'Done')).resolves.toEqual({
       outcome: 'not_found',
     });
+  });
+
+  it('reads only feedback status metadata and patches only processingStatus', async () => {
+    const daily = makeDailyDocument();
+    const submissionId = '66666666-6666-4666-8666-666666666666';
+    const feedbackId = makeFeedbackId(USER_A, submissionId);
+    await repo.createFeedbackIfAbsent({
+      id: feedbackId,
+      userId: USER_A,
+      _docType: 'insightFeedback',
+      processingStatus: 'Open',
+      insightId: daily.id,
+      date: daily.date,
+      insightGeneratedAt: daily.generatedAt,
+      submittedAt: '2026-08-20T12:00:00.000Z',
+      submissionId,
+      score: 'negative',
+      userComment: 'Synthetic status-boundary record',
+      response: daily.response,
+      promptSnapshot: daily.promptSnapshot!,
+      promptVersion: daily.promptVersion,
+      promptFingerprint: daily.promptFingerprint,
+      systemPromptHash: daily.systemPromptHash,
+      intent: daily.intent!,
+      inputContext: daily.inputContext,
+      inputHash: daily.inputHash,
+      model: daily.model,
+      intelligenceVersion: daily.intelligenceVersion,
+      tokensUsed: daily.tokensUsed,
+    });
+
+    const container = ctx!.database.container('aiInsights');
+    const originalItem = container.item.bind(container);
+    const patchRequests: unknown[] = [];
+    const itemSpy = vi.spyOn(container, 'item').mockImplementation((id, partitionKey) => {
+      const item = originalItem(id, partitionKey);
+      const originalPatch = item.patch.bind(item);
+      vi.spyOn(item, 'patch').mockImplementation(async (...args) => {
+        patchRequests.push(args[0]);
+        return originalPatch(...args);
+      });
+      return item;
+    });
+    const querySpy = vi.spyOn(container.items, 'query');
+
+    try {
+      await expect(repo.updateFeedbackProcessingStatus(USER_A, feedbackId, 'Done')).resolves.toEqual({
+        outcome: 'updated',
+        status: 'Done',
+      });
+
+      expect(querySpy).toHaveBeenCalledTimes(2);
+      for (const [statusQuery, queryOptions] of querySpy.mock.calls) {
+        expect(statusQuery).toMatchObject({
+          query: expect.stringContaining(
+            'SELECT VALUE { id: c.id, userId: c.userId, _docType: c._docType, processingStatus: c.processingStatus }',
+          ),
+          parameters: [
+            { name: '@feedbackId', value: feedbackId },
+            { name: '@userId', value: USER_A },
+          ],
+        });
+        expect(statusQuery).not.toMatchObject({ query: expect.stringContaining('SELECT *') });
+        expect(queryOptions).toEqual({ partitionKey: USER_A });
+      }
+      expect(patchRequests).toHaveLength(1);
+      expect(patchRequests[0]).toMatchObject({
+        operations: [{ op: 'set', path: '/processingStatus', value: 'Done' }],
+      });
+      expect((patchRequests[0] as { operations: unknown[] }).operations).toHaveLength(1);
+
+      const storedFeedback = await repo.getFeedbackBySubmissionId(USER_A, submissionId);
+      expect(storedFeedback).toMatchObject({
+        id: feedbackId,
+        userId: USER_A,
+        _docType: 'insightFeedback',
+        date: daily.date,
+        submittedAt: '2026-08-20T12:00:00.000Z',
+        promptVersion: daily.promptVersion,
+        processingStatus: 'Done',
+        userComment: 'Synthetic status-boundary record',
+        response: daily.response,
+        promptSnapshot: daily.promptSnapshot,
+        inputContext: daily.inputContext,
+      });
+    } finally {
+      itemSpy.mockRestore();
+      querySpy.mockRestore();
+    }
   });
 
   it('is deterministic for concurrent repeated writes to the same target status', async () => {

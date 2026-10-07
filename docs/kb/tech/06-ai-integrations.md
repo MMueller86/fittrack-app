@@ -160,15 +160,18 @@ Daily quota.
 	source are `null`. `likely_completed` is probabilistic, never a confirmed
 	completion fact; the persisted `SpecialActivity` type is unchanged.
 
-**v14 prompt and validation contract:**
-- `DAILY_INSIGHT_PROMPT_VERSION` is `'v14'`. The selected intent module is
+**v15 prompt and validation contract:**
+- `DAILY_INSIGHT_PROMPT_VERSION` is `'v15'`. The selected intent module is
 	combined with the shared German tone/output contract and the exact system
 	prompt plus serialized user message are persisted as `promptSnapshot`.
 - The active composition root is
 	`backend/src/lib/prompts/dailyInsightPrompt.ts`; its append-only release
 	history is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`.
-	The v14 bundle fingerprint is
-	`sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`.
+	The append-only manifest preserves v14 fingerprint
+	`sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`
+	and locks the active v15 fingerprint
+	`sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`
+	with assembly version `v2`.
 	`promptVersion` plus `promptFingerprint` form the release identity.
 	`systemPromptHash` additionally hashes the exact context-dependent
 	`promptSnapshot.system` sent for the selected intent.
@@ -177,13 +180,15 @@ Daily quota.
 	`additionalProperties: false`. The server additionally validates the
 	response and rejects provider truncation/content filtering, empty or invalid
 	JSON, CTA/target mismatches, budget/protein contradictions, definitive
-	activity claims, stale-as-current weight claims, and forbidden technical wording.
+	activity claims, stale-as-current weight claims, unsupported historical target
+	comparisons, unsupported nutrition claims for unlogged historical days, invalid
+	morning-source use, and forbidden technical wording.
 - The public response contains `title` (maximum 40 characters), `summary`
 	(maximum 600 characters), optional `recommendation` (maximum 240), optional
 	`cta` (maximum 80), optional `ctaTarget`, `generatedAt`, `promptVersion`, and
 	`status`. The provider schema uses nullable optional fields; the public
 	response omits optional fields whose value is `null`.
-- The v14 stale-weight contract is global: the shared tone guard is included
+- The stale-weight contract introduced in v15 remains global: the shared tone guard is included
 	in every selected intent, including `activity_focus`, `nutrition_guidance`,
 	`morning_orientation`, and `general`, not only the weight-focused modules.
 	For `daysSinceLastMeasurement > 14`, weight or trend data is stale; day 14
@@ -192,11 +197,26 @@ Daily quota.
 	claim such as `Dein Gewicht ist heute klar gesunken.` is rejected, while an
 	explicit stale notice such as `Der Trend deines Gewichts ist nicht aktuell.`
 	is accepted.
-- The runtime root cause was corrected in v11 and remains active in v14: stale-weight rules had been
+- The runtime root cause was corrected in v11 and remains active in v15: stale-weight rules had been
 	present only in `promptWeight`, while deterministic `nutrition_guidance`
 	routing selected `promptNutrition`. The shared guard now covers that path
 	and all other intents; server-side validation remains strict and was not
 	weakened.
+- A positive or negative current-day `remainingCalories` is only the difference
+	between logged intake and the effective target, not a measured energy balance.
+	The shared prompt contract permits only target-relative wording. Deterministic
+	validation rejects affirmative achieved deficit/surplus claims in title,
+	summary, recommendation, and CTA while allowing explicit denials. A positive
+	value is an open target budget; `activity_focus` mentions the target only as
+	activity context without comparing it with logged intake. The `phase_progress` guard leaves assessment
+	to weight signals, never presents the remainder as an eating budget, and does
+	not base an eating recommendation or CTA on using it. Independent
+	non-nutrition guidance remains possible. Historical comparisons use the
+	date's resolved effective target,
+	require logged nutrition and a reliable source, and reject a direction that
+	contradicts that target. A read-only `profile_fallback` cannot be called the
+	target stored for that past day. `morning_orientation` requires local hour
+	`0..9` and no current MealItem; a missing prior-day item is not zero intake.
 - A context read failure, provider failure, truncation/content-filter result,
 	or server validation failure returns HTTP `200` with `status: 'unavailable'`.
 	The failed result is not persisted and does not consume or track Daily quota.
@@ -224,9 +244,12 @@ Daily quota.
 	hit therefore requires matching provenance and an unchanged full input
 	hash; a changed prompt cannot remain a cache hit because a manual version
 	was left unchanged.
-- Daily documents retain their existing per-document TTL/expires-at
-	behaviour. Feedback documents are separate and have no TTL; see the API and
-	domain contracts below.
+- A complete, unexpired v14 same-date Daily is returned unchanged until its
+	existing expiry and is not overwritten by v15 early. After expiry, that key
+	can receive a new v15 document. A v14 document without complete provenance
+	does not qualify for this preservation rule. Daily documents retain their
+	existing per-document TTL/expires-at behaviour. Feedback documents are
+	separate and have no TTL; see the API and domain contracts below.
 - These provenance fields are additive Class 0/read-compatible changes in the
 	existing `aiInsights` container. `promptFingerprint` and
 	`systemPromptHash` remain optional legacy-compatible fields on both Daily
@@ -308,7 +331,7 @@ Located in `backend/src/lib/prompts/`:
 - `foodEstimate.ts` — system prompt for food estimation
 - `mealEstimate.ts` — system prompt for meal image estimation
 - `recipeAnalyze.ts` — system prompt for recipe text analysis
-- `dailyInsightPrompt.ts` (active v14 composition root), `dailyInsightPromptManifest.ts` (append-only release locks), and `../dailyInsightSchema.ts` (shared Strict Structured Output schema), plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight prompt (versioned). The root is the only active composition path; it builds the exact snapshot used by the provider.
+- `dailyInsightPrompt.ts` (active v15 composition root), `dailyInsightPromptManifest.ts` (preserved v14 and active v15 release locks), and `../dailyInsightSchema.ts` (shared Strict Structured Output schema), plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight prompt (versioned). The root is the only active composition path; it builds the exact snapshot used by the provider.
 - `dailyInsight.eval.test.ts` and `dailyInsight.eval.fixtures.ts` — live Daily Insight prompt evaluations
 - `weeklyInsightV2.ts` — weekly insight system prompt and sanitized context contract (versioned)
 
