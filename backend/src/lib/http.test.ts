@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 
 import { parseBody, withHandler } from './http';
+import { validationDiagnosticLogFields } from './log';
 import { makeContext, makeRequest } from '../test-utils/http';
 
 describe('withHandler', () => {
@@ -63,6 +64,44 @@ describe('withHandler', () => {
     expect(line).toContain('"event":"handler.response.failure"');
     expect(line).toContain('"status":503');
     expect(line).toContain('"api_code":"UPSTREAM_UNAVAILABLE"');
+  });
+
+  it('logs stable error identifiers without logging human-readable response details', async () => {
+    const ctx = makeContext();
+    const warnSpy = vi.spyOn(ctx, 'warn');
+    const wrapped = withHandler('recipes.shareBundle', async () => ({
+      status: 422,
+      jsonBody: {
+        error: 'invalid_export_view_ingredient',
+        details: 'private recipe content must not be logged',
+      },
+    }));
+
+    await wrapped(makeRequest(), ctx);
+
+    const line = String(warnSpy.mock.calls[0]?.[0]);
+    expect(line).toContain('"api_error_code":"invalid_export_view_ingredient"');
+    expect(line).not.toContain('private recipe content');
+  });
+
+  it('does not treat a human-readable API error as a stable error identifier', async () => {
+    const ctx = makeContext();
+    const warnSpy = vi.spyOn(ctx, 'warn');
+    const wrapped = withHandler('recipes.prepareExportView', async () => ({
+      status: 422,
+      jsonBody: {
+        error: 'Recipe export preparation failed server-side validation',
+        code: 'private response details',
+      },
+    }));
+
+    await wrapped(makeRequest(), ctx);
+
+    const line = String(warnSpy.mock.calls[0]?.[0]);
+    expect(line).not.toContain('api_error_code');
+    expect(line).not.toContain('api_code');
+    expect(line).not.toContain('Recipe export preparation failed server-side validation');
+    expect(line).not.toContain('private response details');
   });
 
   it('returns a generic 500 when the inner handler throws', async () => {
@@ -142,6 +181,7 @@ describe('parseBody', () => {
     if (!result.ok) {
       expect(result.response.status).toBe(400);
       expect(result.response.jsonBody).toEqual({ error: 'Invalid JSON body' });
+      expect(result.diagnostics).toEqual([{ code: 'invalid_json', path: 'body' }]);
     }
   });
 
@@ -161,6 +201,37 @@ describe('parseBody', () => {
     if (!result.ok) {
       const body = result.response.jsonBody as { error: string };
       expect(body.error).toContain('age');
+      expect(result.diagnostics).toEqual([{ code: 'invalid_type', path: 'age' }]);
     }
+  });
+
+  it('logs strict-schema unknown keys without request values and bounds the key list', async () => {
+    const result = await parseBody(
+      makeRequest({ body: { name: 'Ada', age: 36, unexpectedField: 'private request value' } }),
+      Schema.strict(),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.diagnostics).toEqual([{
+      code: 'unrecognized_keys',
+      path: 'body',
+      keys: ['unexpectedField'],
+    }]);
+    const fields = validationDiagnosticLogFields(result.diagnostics);
+    expect(fields).toMatchObject({
+      validation_diagnostic_count: 1,
+      validation_diagnostics: 'unrecognized_keys@body[unexpectedField]',
+      validation_diagnostics_truncated: false,
+    });
+    expect(JSON.stringify(fields)).not.toContain('private request value');
+
+    const boundedFields = validationDiagnosticLogFields([{
+      code: 'unrecognized_keys',
+      path: 'body',
+      keys: Array.from({ length: 10 }, (_value, index) => `extra${index}`),
+    }]);
+    expect(boundedFields.validation_diagnostics).not.toContain('extra8');
+    expect(boundedFields.validation_diagnostics_truncated).toBe(true);
   });
 });

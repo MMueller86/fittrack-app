@@ -19,7 +19,11 @@ import { requireUser } from '../lib/auth';
 import { analyzeRecipeText } from '../lib/openai';
 import { validateRecipeExportPreparationOutput } from '../lib/recipeAnalyzeValidation';
 import { parseBody, withHandler } from '../lib/http';
-import { logEvent } from '../lib/log';
+import {
+  logEvent,
+  type LogFields,
+  validationDiagnosticLogFields,
+} from '../lib/log';
 import { getDiaryRepository } from '../lib/repositories/diaryRepository';
 import { getRecipesRepository } from '../lib/repositories/recipesRepository';
 import { createRecipeExportView } from '../lib/repositories/recipeExport';
@@ -284,7 +288,11 @@ export const createRecipeHandler = withHandler(
     });
     const recipe = versioned.recipe;
 
-    logEvent(ctx, 'info', 'recipe.created', { userId, recipeId: recipe.id });
+    logEvent(ctx, 'info', 'recipe.created', {
+      userId,
+      recipeId: recipe.id,
+      export_view_confirmed: exportViewInput !== undefined,
+    });
     return { status: 201, headers: { ETag: versioned.etag }, jsonBody: recipe };
   },
 );
@@ -417,7 +425,11 @@ export const updateRecipeHandler = withHandler(
     });
     if (!updated) return { status: 412, jsonBody: { error: 'recipe_revision_conflict' } };
 
-    logEvent(ctx, 'info', 'recipe.updated', { userId, recipeId: id });
+    logEvent(ctx, 'info', 'recipe.updated', {
+      userId,
+      recipeId: id,
+      export_view_confirmed: exportViewInput !== undefined,
+    });
     return { status: 200, headers: { ETag: updated.etag }, jsonBody: updated.recipe };
   },
 );
@@ -655,6 +667,37 @@ export const logRecipeHandler = withHandler(
   },
 );
 
+const SAFE_PROVIDER_IDENTIFIER = /^[A-Za-z0-9_.-]{1,100}$/u;
+
+function providerFailureLogFields(error: unknown): LogFields {
+  const record = typeof error === 'object' && error !== null
+    ? error as Record<string, unknown>
+    : undefined;
+  const errorName = error instanceof Error ? error.name : 'NonErrorThrown';
+  const fields: LogFields = {
+    provider: 'azure_openai',
+    provider_error_name: SAFE_PROVIDER_IDENTIFIER.test(errorName) ? errorName : 'unknown',
+  };
+
+  const code = record?.['code'];
+  if (typeof code === 'string' && SAFE_PROVIDER_IDENTIFIER.test(code)) {
+    fields['provider_error_code'] = code;
+  }
+  const type = record?.['type'];
+  if (typeof type === 'string' && SAFE_PROVIDER_IDENTIFIER.test(type)) {
+    fields['provider_error_type'] = type;
+  }
+  const status = record?.['status'] ?? record?.['statusCode'];
+  if (typeof status === 'number' && Number.isInteger(status)) {
+    fields['provider_status_code'] = status;
+  }
+  const requestId = record?.['request_id'] ?? record?.['requestId'];
+  if (typeof requestId === 'string' && SAFE_PROVIDER_IDENTIFIER.test(requestId)) {
+    fields['provider_request_id'] = requestId;
+  }
+  return fields;
+}
+
 function buildRecipePreparationText(recipe: Recipe): string {
   const lines: string[] = [
     `Name: ${recipe.name}`,
@@ -679,39 +722,73 @@ export const prepareRecipeExportViewHandler = withHandler(
     const userContext = await requireUser(request);
     const { userId } = userContext;
     const recipeId = request.params['id'];
-    if (!recipeId) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+    if (!recipeId) {
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.requestValidationFailed', {
+        failure_stage: 'request_validation',
+        failure_code: 'missing_recipe_id',
+      });
+      return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+    }
 
     const parsedBody = await parseBody(request, PrepareRecipeExportViewBodySchema);
     if (!parsedBody.ok) {
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.requestValidationFailed', {
+        failure_stage: 'request_validation',
+        failure_code: 'invalid_request_body',
+        ...validationDiagnosticLogFields(parsedBody.diagnostics),
+      });
       return { status: 400, jsonBody: { error: 'invalid_export_preparation_request' } };
     }
     const ifMatch = request.headers.get('if-match');
 
     const repo = getRecipesRepository();
     const versionedRecipe = await repo.getVersioned(userId, recipeId);
-    if (!versionedRecipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    if (!versionedRecipe) {
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.recipeLookupFailed', {
+        failure_stage: 'recipe_lookup',
+        failure_code: 'recipe_not_found',
+      });
+      return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    }
     if (ifMatch !== null && ifMatch !== versionedRecipe.etag) {
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.revisionConflict', {
+        failure_stage: 'recipe_revision_check',
+        failure_code: 'recipe_revision_conflict',
+        if_match_present: true,
+      });
       return { status: 412, jsonBody: { error: 'recipe_revision_conflict' } };
     }
     const recipe = versionedRecipe.recipe;
 
     const quotaBlock = await enforceQuota(userContext, 'recipe-analyze');
-    if (quotaBlock) return quotaBlock;
+    if (quotaBlock) {
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.quotaBlocked', {
+        failure_stage: 'quota_enforcement',
+        feature: 'recipe-analyze',
+        status: quotaBlock.status ?? 429,
+      });
+      return quotaBlock;
+    }
 
     let analysis: Awaited<ReturnType<typeof analyzeRecipeText>>;
+    const analysisStartedAt = Date.now();
     try {
       analysis = await analyzeRecipeText(buildRecipePreparationText(recipe));
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      logEvent(ctx, 'error', 'recipes.prepareExportView.analysisFailed', {
+        failure_stage: 'azure_openai_analysis',
+        duration_ms: Date.now() - analysisStartedAt,
+        ...providerFailureLogFields(error),
+      });
       return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${message}` } };
     }
 
     const validation = validateRecipeExportPreparationOutput(analysis);
     if (!validation.ok) {
       logEvent(ctx, 'warn', 'recipes.prepareExportView.validationFailed', {
-        userId,
-        recipeId,
-        errorCount: validation.errors.length,
+        failure_stage: 'analysis_output_validation',
+        ...validationDiagnosticLogFields(validation.diagnostics),
       });
       return {
         status: 422,
@@ -737,6 +814,10 @@ export const prepareRecipeExportViewHandler = withHandler(
         steps: suggestion.steps.map(({ order, description }) => ({ order, description })),
       },
     };
+    logEvent(ctx, 'info', 'recipes.prepareExportView.completed', {
+      source_step_count: recipe.steps.length,
+      export_step_count: suggestion.steps.length,
+    });
     return { status: 200, jsonBody: response };
   },
 );

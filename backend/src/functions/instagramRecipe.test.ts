@@ -792,6 +792,57 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     expect(renderInstagramRecipeDetailsTemplateMock).not.toHaveBeenCalled();
   });
 
+  it('logs the stage and reason when the export view is missing', async () => {
+    const recipe = await createRecipe([{ id: 'image-1', blobName: 'server/blob.png', order: 1 }]);
+    const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+
+    try {
+      const response = await shareBundleHandler(
+        await makeAuthRequest({ params: { id: recipe.id }, body: {} }),
+        ctx,
+      );
+
+      expect(response.status).toBe(422);
+      const serializedWarningLogs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(serializedWarningLogs).toContain('"failure_stage":"export_view"');
+      expect(serializedWarningLogs).toContain('"failure_code":"missing_export_view"');
+      expect(serializedWarningLogs).toContain('"api_code":"MISSING_EXPORT_VIEW"');
+    } finally {
+      warningLogs.mockRestore();
+    }
+  });
+
+  it('logs value-free request diagnostics for both render endpoints', async () => {
+    const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+
+    try {
+      const directResponse = await instagramRecipeHandler(
+        await makeAuthRequest({
+          params: { id: 'recipe-1' },
+          body: { unexpectedField: 'private request value' },
+        }),
+        ctx,
+      );
+      const bundleResponse = await shareBundleHandler(
+        await makeAuthRequest({
+          params: { id: 'recipe-1' },
+          body: { unexpectedField: 'private request value' },
+        }),
+        ctx,
+      );
+
+      expect(directResponse.status).toBe(400);
+      expect(bundleResponse.status).toBe(400);
+      const serializedWarningLogs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(serializedWarningLogs).toContain('"event":"recipes.instagramRender.preconditionFailed"');
+      expect(serializedWarningLogs).toContain('"event":"recipes.shareBundle.preconditionFailed"');
+      expect(serializedWarningLogs.match(/unrecognized_keys@body\[unexpectedField\]/gu)).toHaveLength(2);
+      expect(serializedWarningLogs).not.toContain('private request value');
+    } finally {
+      warningLogs.mockRestore();
+    }
+  });
+
   it('logs detailed diagnostics when the Instagram render in a bundle fails', async () => {
     const { recipe } = await createCurrentBundleRecipe();
     const errorLogs = vi.spyOn(ctx, 'error').mockImplementation(() => {});
@@ -814,6 +865,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       expect(response.jsonBody).toEqual({ error: 'Internal server error' });
       const serializedErrorLogs = errorLogs.mock.calls.map(([line]) => String(line)).join('\n');
       expect(serializedErrorLogs).toContain('"event":"recipes.shareBundle.instagramRender.failed"');
+      expect(serializedErrorLogs).toContain('"failure_stage":"instagram_render"');
       expect(serializedErrorLogs).toContain('"error_message":"Instagram recipe rendering failed."');
       expect(serializedErrorLogs).toContain('"error_cause":"Sharp could not decode the source image."');
     } finally {
@@ -849,6 +901,8 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       expect(response.jsonBody).not.toHaveProperty('detail');
       expect((await repo.get(TEST_USER_ID, recipe.id))?.exportView).toEqual(storedExportView);
       const serializedErrorLogs = errorLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(serializedErrorLogs).toContain('"failure_stage":"detail_render"');
+      expect(serializedErrorLogs).toContain('"export_view_source":"request_draft"');
       expect(serializedErrorLogs).toContain('"error_message":"Instagram recipe details template rendering failed."');
       expect(serializedErrorLogs).toContain('"error_cause":"Satori font parsing failed."');
     } finally {
@@ -856,7 +910,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     }
   });
 
-  it('logs the invalid detail item value without returning it', async () => {
+  it('logs the detail field and item index without logging the raw item value', async () => {
     const { recipe } = await createCurrentBundleRecipe();
     const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
     const invalidValue = 'A very long ingredient name that does not fit';
@@ -884,7 +938,10 @@ describe('POST /api/recipes/:id/instagram-render', () => {
         code: 'INVALID_TEMPLATE_INPUT',
       });
       const serializedWarningLogs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
-      expect(serializedWarningLogs).toContain('"item_value":"A very long ingredient name that does not fit"');
+      expect(serializedWarningLogs).toContain('"failure_stage":"detail_render"');
+      expect(serializedWarningLogs).toContain('"item_index":0');
+      expect(serializedWarningLogs).toContain('"item_field":"name"');
+      expect(serializedWarningLogs).not.toContain(invalidValue);
       expect(JSON.stringify(response.jsonBody)).not.toContain(invalidValue);
     } finally {
       warningLogs.mockRestore();

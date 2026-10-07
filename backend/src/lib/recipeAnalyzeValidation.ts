@@ -70,64 +70,136 @@ const RecipeExportPreparationSchema = z.object({
 
 type RecipeExportPreparation = z.infer<typeof RecipeExportPreparationSchema>;
 
+export interface RecipeExportPreparationDiagnostic {
+  phase: 'schema' | 'semantic';
+  code: string;
+  path: string;
+}
+
+interface RecipeExportStepTraceIssue extends RecipeExportPreparationDiagnostic {
+  phase: 'semantic';
+  message: string;
+}
+
 export function validateRecipeExportPreparationOutput(raw: unknown):
   | { ok: true; data: RecipeExportPreparation }
-  | { ok: false; errors: string[] } {
+  | { ok: false; errors: string[]; diagnostics: RecipeExportPreparationDiagnostic[] } {
   const parsed = RecipeExportPreparationSchema.safeParse(raw);
   if (!parsed.success) {
     return {
       ok: false,
       errors: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'output'}: ${issue.message}`),
+      diagnostics: parsed.error.issues.map((issue) => ({
+        phase: 'schema',
+        code: issue.code,
+        path: formatValidationPath(issue.path),
+      })),
     };
   }
-  const errors = validateExportStepTrace(parsed.data);
-  return errors.length > 0 ? { ok: false, errors } : { ok: true, data: parsed.data };
+  const issues = validateExportStepTrace(parsed.data);
+  return issues.length > 0
+    ? {
+        ok: false,
+        errors: issues.map((issue) => issue.message),
+        diagnostics: issues.map(({ phase, code, path }) => ({ phase, code, path })),
+      }
+    : { ok: true, data: parsed.data };
 }
 
-function validateExportStepTrace(data: RecipeExportPreparation): string[] {
-  const errors: string[] = [];
+function formatValidationPath(path: PropertyKey[]): string {
+  let formatted = '';
+  for (const segment of path) {
+    if (typeof segment === 'number') {
+      formatted += `[${segment}]`;
+      continue;
+    }
+    const field = typeof segment === 'string' && /^[A-Za-z][A-Za-z0-9_]*$/u.test(segment)
+      ? segment
+      : 'unknown';
+    formatted += `${formatted.length > 0 ? '.' : ''}${field}`;
+  }
+  return formatted || 'output';
+}
+
+function validateExportStepTrace(data: RecipeExportPreparation): RecipeExportStepTraceIssue[] {
+  const issues: RecipeExportStepTraceIssue[] = [];
   const sourceOrders = data.steps.map((step) => step.order);
   if (new Set(sourceOrders).size !== sourceOrders.length) {
-    errors.push('steps.order must be unique');
+    issues.push({
+      phase: 'semantic',
+      code: 'duplicate_source_step_order',
+      path: 'steps.order',
+      message: 'steps.order must be unique',
+    });
   }
   for (let index = 1; index < sourceOrders.length; index += 1) {
     if (sourceOrders[index]! <= sourceOrders[index - 1]!) {
-      errors.push('steps.order must be in ascending order');
+      issues.push({
+        phase: 'semantic',
+        code: 'source_step_order_not_ascending',
+        path: 'steps.order',
+        message: 'steps.order must be in ascending order',
+      });
       break;
     }
   }
 
   const exportOrders = data.exportSuggestion.steps.map((step) => step.order);
   if (new Set(exportOrders).size !== exportOrders.length) {
-    errors.push('exportSuggestion.steps.order must be unique');
+    issues.push({
+      phase: 'semantic',
+      code: 'duplicate_export_step_order',
+      path: 'exportSuggestion.steps.order',
+      message: 'exportSuggestion.steps.order must be unique',
+    });
   }
   for (let index = 0; index < exportOrders.length; index += 1) {
     if (exportOrders[index] !== index + 1) {
-      errors.push('exportSuggestion.steps.order must start at 1 and be contiguous');
+      issues.push({
+        phase: 'semantic',
+        code: 'export_step_order_not_contiguous',
+        path: 'exportSuggestion.steps.order',
+        message: 'exportSuggestion.steps.order must start at 1 and be contiguous',
+      });
       break;
     }
   }
 
   const flattenedSourceOrders: number[] = [];
-  for (const step of data.exportSuggestion.steps) {
+  for (const [stepIndex, step] of data.exportSuggestion.steps.entries()) {
     for (let index = 1; index < step.sourceStepOrders.length; index += 1) {
       if (step.sourceStepOrders[index]! <= step.sourceStepOrders[index - 1]!) {
-        errors.push(`exportSuggestion step ${step.order} sourceStepOrders must be ascending`);
+        issues.push({
+          phase: 'semantic',
+          code: 'source_step_references_not_ascending',
+          path: `exportSuggestion.steps[${stepIndex}].sourceStepOrders`,
+          message: `exportSuggestion step ${step.order} sourceStepOrders must be ascending`,
+        });
         break;
       }
     }
     for (const sourceOrder of step.sourceStepOrders) {
       if (!sourceOrders.includes(sourceOrder)) {
-        errors.push(`exportSuggestion step ${step.order} references unknown source step: ${sourceOrder}`);
+        issues.push({
+          phase: 'semantic',
+          code: 'unknown_source_step_reference',
+          path: `exportSuggestion.steps[${stepIndex}].sourceStepOrders`,
+          message: `exportSuggestion step ${step.order} references unknown source step: ${sourceOrder}`,
+        });
       }
       flattenedSourceOrders.push(sourceOrder);
     }
   }
   if (flattenedSourceOrders.length !== sourceOrders.length ||
       flattenedSourceOrders.some((order, index) => order !== sourceOrders[index])) {
-    errors.push('exportSuggestion steps must trace every source step exactly once and in order');
+    issues.push({
+      phase: 'semantic',
+      code: 'source_step_coverage_mismatch',
+      path: 'exportSuggestion.steps',
+      message: 'exportSuggestion steps must trace every source step exactly once and in order',
+    });
   }
-  return errors;
+  return issues;
 }
 
 /**
@@ -181,7 +253,7 @@ export function validateRecipeAnalyzeOutput(raw: unknown): RecipeAnalyzeValidati
     previousIncludedIngredientIndex = ingredientIndex;
   }
 
-  errors.push(...validateExportStepTrace(data));
+  errors.push(...validateExportStepTrace(data).map((issue) => issue.message));
   for (const step of data.exportSuggestion.steps) {
     const stepIngredientKeys = new Set<string>();
     for (const key of step.ingredientKeys) {

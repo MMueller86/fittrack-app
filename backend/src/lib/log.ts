@@ -16,6 +16,36 @@ export interface LogFields {
   [key: string]: string | number | boolean | null | undefined;
 }
 
+export interface ValidationDiagnostic {
+  phase?: string;
+  code: string;
+  path: string;
+  keys?: string[];
+}
+
+const MAX_VALIDATION_DIAGNOSTICS_TO_LOG = 8;
+const MAX_UNKNOWN_KEYS_TO_LOG = 8;
+
+export function validationDiagnosticLogFields(
+  diagnostics: readonly ValidationDiagnostic[],
+): LogFields {
+  const visibleDiagnostics = diagnostics.slice(0, MAX_VALIDATION_DIAGNOSTICS_TO_LOG);
+  return {
+    validation_diagnostic_count: diagnostics.length,
+    validation_diagnostics: visibleDiagnostics
+      .map(({ phase, code, path, keys }) => {
+        const safeKeys = keys?.slice(0, MAX_UNKNOWN_KEYS_TO_LOG) ?? [];
+        const keysSuffix = safeKeys.length > 0
+          ? `[${safeKeys.join(',')}${(keys?.length ?? 0) > MAX_UNKNOWN_KEYS_TO_LOG ? ',+' : ''}]`
+          : '';
+        return `${phase ? `${phase}:` : ''}${code}@${path}${keysSuffix}`;
+      })
+      .join(';'),
+    validation_diagnostics_truncated: diagnostics.length > MAX_VALIDATION_DIAGNOSTICS_TO_LOG ||
+      visibleDiagnostics.some((diagnostic) => (diagnostic.keys?.length ?? 0) > MAX_UNKNOWN_KEYS_TO_LOG),
+  };
+}
+
 /**
  * Emit a single structured log line.
  *

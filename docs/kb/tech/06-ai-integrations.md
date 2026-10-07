@@ -269,6 +269,34 @@ Daily quota.
 	`status: 'quota_exceeded'`; feedback is not an AI call and is not quota
 	tracked.
 
+#### Feedback status operations
+
+`PATCH /api/ai/daily-insight/feedback/status` requires a CIAM access token
+validated by `requireUser()` with the signed Entra `Admin` role. The internal
+user tier alone does not authorize this route. For an authorized operator
+operation without that bearer token, the existing Cosmos repository can use
+the Function App's configured `COSMOS_ENDPOINT` and `COSMOS_KEY`; obtain them
+only through existing Azure operator access and never print, log, or store
+their values in source or documentation.
+
+Before changing status, query only the `aiInsights` partition for each exact
+`(userId, date, userComment, submittedAt)` tuple. Project only `date`,
+`userComment`, `submittedAt`, `_docType`, `promptVersion`, `userId`, `id`, and
+`processingStatus`. Require exactly one match per tuple and verify its exact
+partition/id, `_docType: 'insightFeedback'`, `promptVersion: 'v14'`, and stored
+`processingStatus: 'Open'`. Finish all three prechecks before the first write;
+do not use `SELECT *`, enumerate unrelated feedback, or infer a target from the
+operation date.
+
+For each confirmed record, use the Admin route or the existing
+`updateFeedbackProcessingStatus` repository method with the exact `userId` and
+`feedbackId`, setting only `Done`. The repository guards the feedback
+discriminator and current status, patches only `/processingStatus`, and checks
+the resulting status metadata. After each update, reread the approved
+projection and verify the same tuple and `Done`; stop at the first anomaly
+without blind retries or rollback. Do not read or update the past Daily
+Insight, response, prompt snapshot, input context, or source records.
+
 ### 9. Weekly Insight (`GET /api/ai/weekly-insight?date=YYYY-MM-DD`)
 
 The authenticated weekly endpoint returns exactly the seven completed local

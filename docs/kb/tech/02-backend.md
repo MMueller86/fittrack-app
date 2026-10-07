@@ -70,7 +70,7 @@ Health check: `GET /api/health` — anonymous, always returns `{ status: 'ok' }`
 
 All HTTP handlers are wrapped with `withHandler()`. It provides:
 - Structured logging: `handler.start`, `handler.success` (with status + duration ms), and `handler.error`
-- Returned 4xx/5xx responses are logged as `handler.response.failure` at warn/error level with status and any top-level API `code`; response bodies are not logged
+- Returned 4xx/5xx responses are logged as `handler.response.failure` at warn/error level with status and only stable token-shaped top-level API `code`/`error` identifiers; response bodies and human-readable error text are not logged
 - `UnauthorizedError` → 401
 - Any other thrown error → 500 (stack never leaked to client)
 
@@ -259,17 +259,36 @@ compare-and-replace remains the write-race guard even when the client sends no
 ETag. No recipe document, Cosmos container, or infrastructure schema changes
 are required.
 
-Renderer result failures emit structured diagnostic fields in backend logs,
-including the error code, bounded single-line message/cause, and available
-field or layout measurements. Invalid detail-template ingredient and step
-values also log `item_index`, `item_field`, and `item_value`, capped at 200
-characters; `item_value_truncated` marks values clipped for logging. Bundle
-Instagram failures use
-`recipes.shareBundle.instagramRender.unrenderable` or `.failed`; detail-template
-failures use `recipes.shareBundle.unrenderableDetail` or `.detailFailed`.
-Standalone Instagram rendering uses the corresponding
-`recipes.instagramRender.unrenderable` or `.failed` events. Diagnostic details
-are never included in HTTP error responses.
+Recipe share failures are logged with a stage and stable reason where the
+handler can classify them. Export preparation records Azure OpenAI error name,
+sanitized provider code/status/request ID, and duration without logging prompt
+or generated text. Server-validation failures record up to eight phase/code/
+field-path diagnostics plus a truncation flag; they do not log validation
+messages or values. The completion event records source/export step counts.
+Strict request-body failures across preparation and rendering record bounded
+Zod issue codes, sanitized schema paths, and up to eight identifier-shaped
+unknown field names, with issue/key truncation indicated; request values are
+never included.
+Recipe create/update events include `export_view_confirmed` so confirmation
+requests can be distinguished from ordinary edits.
+
+Render failures include the render stage, selected image ID, error code,
+bounded single-line message/cause, and available field or layout measurements.
+Detail-template failures retain `item_index` and `item_field` but never log
+`item_value`. Bundle render events also identify whether they used a request
+draft or stored confirmed view. Storage-download failures record only safe
+error name/code/status metadata. Successful render events record output byte
+counts, not image data. Early failures use
+`recipes.instagramRender.preconditionFailed` or
+`recipes.shareBundle.preconditionFailed`; renderer failures use the existing
+`.unrenderable`/`.failed`, `.unrenderableDetail`, and `.detailFailed` events.
+Classified precondition failures use
+`recipes.instagramRender.preconditionFailed` or
+`recipes.shareBundle.preconditionFailed`; invalid image metadata, oversized
+images, and storage download errors use their dedicated events. Renderer
+failures use the existing `.unrenderable`/`.failed`, `.unrenderableDetail`,
+and `.detailFailed` events. Diagnostic details are never included in HTTP
+error responses.
 
 ### Quota Enforcement
 

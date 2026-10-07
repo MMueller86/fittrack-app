@@ -21,17 +21,19 @@ import type {
 import { z, type ZodSchema } from 'zod';
 
 import { UnauthorizedError } from './auth';
-import { logEvent } from './log';
+import { logEvent, type ValidationDiagnostic } from './log';
 
 export type Handler = (
   request: HttpRequest,
   ctx: InvocationContext,
 ) => Promise<HttpResponseInit>;
 
+const API_ERROR_IDENTIFIER_PATTERN = /^(?:[A-Z][A-Z0-9_]{1,79}|[a-z][a-z0-9]*(?:_[a-z0-9]+)+)$/u;
+
 /**
  * Wrap a handler so it never throws past the host.
  *
- * - Logs `handler.response.failure` with status and any top-level API code
+ * - Logs `handler.response.failure` with status and stable API error codes
  *   for returned 4xx/5xx responses; response bodies are not logged.
  * - Logs structured `handler.start`, `handler.success`, and `handler.error`
  *   entries with handler name, method, and duration.
@@ -55,17 +57,29 @@ export function withHandler(name: string, fn: Handler): Handler {
       const duration_ms = Date.now() - started;
       if (status >= 400) {
         const body: unknown = response.jsonBody;
-        const apiCode =
+        const apiCodeCandidate =
           typeof body === 'object' && body !== null && 'code' in body &&
           typeof body.code === 'string'
             ? body.code
             : undefined;
+        const apiCode = apiCodeCandidate && API_ERROR_IDENTIFIER_PATTERN.test(apiCodeCandidate)
+          ? apiCodeCandidate
+          : undefined;
+        const bodyError =
+          typeof body === 'object' && body !== null && 'error' in body &&
+          typeof body.error === 'string'
+            ? body.error
+            : undefined;
+        const apiErrorCode = bodyError && API_ERROR_IDENTIFIER_PATTERN.test(bodyError)
+          ? bodyError
+          : undefined;
         logEvent(ctx, status >= 500 ? 'error' : 'warn', 'handler.response.failure', {
           handler: name,
           method: request.method,
           status,
           duration_ms,
           ...(apiCode !== undefined ? { api_code: apiCode } : {}),
+          ...(apiErrorCode !== undefined ? { api_error_code: apiErrorCode } : {}),
         });
       } else {
         logEvent(ctx, 'info', 'handler.success', {
@@ -113,16 +127,15 @@ export interface ParseSuccess<T> {
 export interface ParseFailure {
   ok: false;
   response: HttpResponseInit;
+  diagnostics: ValidationDiagnostic[];
 }
 
 /**
  * Parse the JSON body of a request through a Zod schema.
  *
- * On success, returns `{ ok: true, data }`. On any failure (invalid JSON
- * or schema mismatch), returns `{ ok: false, response }` where `response`
- * is a 400 with a single human-readable error message that mentions the
- * first failing field by name (matches the existing error message
- * conventions, e.g. `Field "value" must be ...`).
+ * On success, returns `{ ok: true, data }`. On failure, returns a 400
+ * response and value-free diagnostics containing Zod issue codes, sanitized
+ * paths, and allowlisted unknown-key names for strict schemas.
  */
 export async function parseBody<T>(
   request: HttpRequest,
@@ -135,6 +148,7 @@ export async function parseBody<T>(
     return {
       ok: false,
       response: { status: 400, jsonBody: { error: 'Invalid JSON body' } },
+      diagnostics: [{ code: 'invalid_json', path: 'body' }],
     };
   }
 
@@ -149,7 +163,31 @@ export async function parseBody<T>(
       status: 400,
       jsonBody: { error: formatZodError(parsed.error) },
     },
+    diagnostics: parsed.error.issues.map((issue) => {
+      const diagnostic = {
+        code: issue.code,
+        path: formatSafeZodPath(issue.path),
+      };
+      if (issue.code !== 'unrecognized_keys') return diagnostic;
+      const keys = issue.keys.filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,79}$/u.test(key));
+      return { ...diagnostic, ...(keys.length > 0 ? { keys } : {}) };
+    }),
   };
+}
+
+function formatSafeZodPath(path: PropertyKey[]): string {
+  let formatted = '';
+  for (const segment of path) {
+    if (typeof segment === 'number') {
+      formatted += `[${segment}]`;
+      continue;
+    }
+    const field = typeof segment === 'string' && /^[A-Za-z][A-Za-z0-9_]*$/u.test(segment)
+      ? segment
+      : 'unknown';
+    formatted += `${formatted.length > 0 ? '.' : ''}${field}`;
+  }
+  return formatted || 'body';
 }
 
 /**

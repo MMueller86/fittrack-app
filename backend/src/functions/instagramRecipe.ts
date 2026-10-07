@@ -4,7 +4,11 @@ import type { RecipeImage } from '@fittrack/shared';
 
 import { requireUser } from '../lib/auth';
 import { withHandler, parseBody } from '../lib/http';
-import { logEvent, type LogFields } from '../lib/log';
+import {
+  logEvent,
+  type LogFields,
+  validationDiagnosticLogFields,
+} from '../lib/log';
 import { getRecipesRepository } from '../lib/repositories/recipesRepository';
 import {
   RecipeShareBundleExportDraftSchema,
@@ -88,6 +92,52 @@ const UNRENDERABLE_DETAIL_ERROR_CODES = new Set([
 
 type RendererDiagnosticError = RenderError | RecipeDetailsTemplateRenderError;
 type RenderFailureEventPrefix = 'recipes.instagramRender' | 'recipes.shareBundle.instagramRender';
+type RecipeShareHandlerName = 'recipes.instagramRender' | 'recipes.shareBundle';
+type RecipeShareFailureStage =
+  | 'request_validation'
+  | 'recipe_lookup'
+  | 'export_view'
+  | 'image_selection'
+  | 'image_download';
+
+const SAFE_OPERATION_IDENTIFIER = /^[A-Za-z0-9_.-]{1,100}$/u;
+
+function logSharePreconditionFailure(
+  ctx: InvocationContext,
+  handler: RecipeShareHandlerName,
+  failureStage: RecipeShareFailureStage,
+  failureCode: string,
+  fields: LogFields = {},
+): void {
+  logEvent(ctx, 'warn', `${handler}.preconditionFailed`, {
+    failure_stage: failureStage,
+    failure_code: failureCode,
+    ...fields,
+  });
+}
+
+function storageFailureLogFields(error: unknown): LogFields {
+  const record = typeof error === 'object' && error !== null
+    ? error as Record<string, unknown>
+    : undefined;
+  const errorName = error instanceof Error ? error.name : 'NonErrorThrown';
+  const fields: LogFields = {
+    storage_error_name: SAFE_OPERATION_IDENTIFIER.test(errorName) ? errorName : 'unknown',
+  };
+  const details = record?.['details'];
+  const detailErrorCode = typeof details === 'object' && details !== null
+    ? (details as Record<string, unknown>)['errorCode']
+    : undefined;
+  const code = record?.['code'] ?? detailErrorCode;
+  if (typeof code === 'string' && SAFE_OPERATION_IDENTIFIER.test(code)) {
+    fields['storage_error_code'] = code;
+  }
+  const status = record?.['statusCode'] ?? record?.['status'];
+  if (typeof status === 'number' && Number.isInteger(status)) {
+    fields['storage_status_code'] = status;
+  }
+  return fields;
+}
 
 function boundedLogText(value: string): string {
   return value.replace(/[\r\n\u2028\u2029]+/gu, ' ').slice(0, 1000);
@@ -105,10 +155,6 @@ function rendererErrorLogFields(error: RendererDiagnosticError): LogFields {
   if ('field' in error) fields['field'] = error.field;
   if ('itemIndex' in error && error.itemIndex !== undefined) fields['item_index'] = error.itemIndex;
   if ('itemField' in error && error.itemField !== undefined) fields['item_field'] = error.itemField;
-  if ('itemValue' in error && error.itemValue !== undefined) {
-    fields['item_value'] = error.itemValue.slice(0, 200);
-    if (error.itemValue.length > 200) fields['item_value_truncated'] = true;
-  }
   if ('asset' in error) fields['asset'] = error.asset;
   if ('count' in error) fields['count'] = error.count;
   if ('max' in error) fields['count_max'] = error.max;
@@ -157,11 +203,14 @@ function renderFailureResponse(
   recipeId: string,
   ctx: InvocationContext,
   eventPrefix: RenderFailureEventPrefix = 'recipes.instagramRender',
+  imageId?: string,
 ): HttpResponseInit {
   if (UNRENDERABLE_ERROR_CODES.has(error.code)) {
     logEvent(ctx, 'warn', `${eventPrefix}.unrenderable`, {
       userId,
       recipeId,
+      image_id: imageId,
+      failure_stage: 'instagram_render',
       ...rendererErrorLogFields(error),
     });
     return {
@@ -173,6 +222,8 @@ function renderFailureResponse(
   logEvent(ctx, 'error', `${eventPrefix}.failed`, {
     userId,
     recipeId,
+    image_id: imageId,
+    failure_stage: 'instagram_render',
     ...rendererErrorLogFields(error),
   });
   return { status: 500, jsonBody: { error: 'Internal server error' } };
@@ -183,16 +234,32 @@ export const instagramRecipeHandler = withHandler(
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const recipeId = request.params['id'];
-    if (!recipeId) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+    if (!recipeId) {
+      logSharePreconditionFailure(ctx, 'recipes.instagramRender', 'request_validation', 'missing_recipe_id');
+      return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+    }
 
     const parsed = await parseBody(request, InstagramRecipeRenderRequestSchema);
-    if (!parsed.ok) return parsed.response;
+    if (!parsed.ok) {
+      logSharePreconditionFailure(
+        ctx,
+        'recipes.instagramRender',
+        'request_validation',
+        'invalid_request_body',
+        validationDiagnosticLogFields(parsed.diagnostics),
+      );
+      return parsed.response;
+    }
 
     const repo = getRecipesRepository();
     const recipe = await repo.get(userId, recipeId);
-    if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    if (!recipe) {
+      logSharePreconditionFailure(ctx, 'recipes.instagramRender', 'recipe_lookup', 'recipe_not_found');
+      return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    }
 
     if (!hasValidSelectedTags(parsed.data.selectedTags, recipe.tags)) {
+      logSharePreconditionFailure(ctx, 'recipes.instagramRender', 'request_validation', 'selected_tags_mismatch');
       return {
         status: 400,
         jsonBody: { error: 'selectedTags must be a unique subset of the stored recipe tags' },
@@ -202,8 +269,10 @@ export const instagramRecipeHandler = withHandler(
     const image = selectRecipeImage(recipe, parsed.data.imageId);
     if (!image) {
       if (parsed.data.imageId !== undefined) {
+        logSharePreconditionFailure(ctx, 'recipes.instagramRender', 'image_selection', 'requested_image_not_found');
         return { status: 404, jsonBody: { error: 'Image not found' } };
       }
+      logSharePreconditionFailure(ctx, 'recipes.instagramRender', 'image_selection', 'recipe_image_missing');
       return {
         status: 422,
         jsonBody: {
@@ -217,6 +286,8 @@ export const instagramRecipeHandler = withHandler(
         userId,
         recipeId,
         imageId: image.id,
+        failure_stage: 'image_selection',
+        failure_code: 'empty_blob_name',
       });
       return {
         status: 422,
@@ -233,12 +304,18 @@ export const instagramRecipeHandler = withHandler(
           userId,
           recipeId,
           imageId: image.id,
+          failure_stage: 'image_download',
+          failure_code: 'image_too_large',
         });
         return {
           status: 422,
           jsonBody: { error: 'Recipe image exceeds the 8 MB limit', code: 'IMAGE_TOO_LARGE' },
         };
       }
+      logEvent(ctx, 'error', 'recipes.instagramRender.imageDownloadFailed', {
+        failure_stage: 'image_download',
+        ...storageFailureLogFields(error),
+      });
       throw error;
     }
 
@@ -249,9 +326,15 @@ export const instagramRecipeHandler = withHandler(
       }),
     );
     if (!renderResult.ok) {
-      return renderFailureResponse(renderResult.error, userId, recipeId, ctx);
+      return renderFailureResponse(renderResult.error, userId, recipeId, ctx, 'recipes.instagramRender', image.id);
     }
 
+    logEvent(ctx, 'info', 'recipes.instagramRender.completed', {
+      image_id: image.id,
+      output_width: renderResult.width,
+      output_height: renderResult.height,
+      output_bytes: renderResult.buffer.byteLength,
+    });
     return {
       status: 200,
       body: renderResult.buffer,
@@ -270,23 +353,40 @@ export const shareBundleHandler = withHandler(
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const recipeId = request.params['id'];
-    if (!recipeId) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+    if (!recipeId) {
+      logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'request_validation', 'missing_recipe_id');
+      return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+    }
 
     const parsed = await parseBody(request, ShareBundleRequestSchema);
-    if (!parsed.ok) return parsed.response;
+    if (!parsed.ok) {
+      logSharePreconditionFailure(
+        ctx,
+        'recipes.shareBundle',
+        'request_validation',
+        'invalid_request_body',
+        validationDiagnosticLogFields(parsed.diagnostics),
+      );
+      return parsed.response;
+    }
 
     const repo = getRecipesRepository();
     const recipe = await repo.get(userId, recipeId);
-    if (!recipe) return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    if (!recipe) {
+      logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'recipe_lookup', 'recipe_not_found');
+      return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    }
     const exportViewDraft = parsed.data.exportViewDraft;
     const exportView = exportViewDraft ?? recipe.exportView;
     if (!exportView) {
+      logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'export_view', 'missing_export_view');
       return {
         status: 422,
         jsonBody: { error: 'Recipe export view is required for sharing', code: 'MISSING_EXPORT_VIEW' },
       };
     }
     if (exportViewDraft && validateRecipeExportIngredients(exportViewDraft, recipe.ingredients)) {
+      logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'export_view', 'invalid_ingredient_reference');
       return { status: 400, jsonBody: { error: 'invalid_export_view_ingredient' } };
     }
     const recipeMeta = {
@@ -294,6 +394,7 @@ export const shareBundleHandler = withHandler(
       difficulty: exportView.difficulty,
     };
     if (!hasValidSelectedTags(parsed.data.selectedTags, recipe.tags)) {
+      logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'request_validation', 'selected_tags_mismatch');
       return {
         status: 400,
         jsonBody: { error: 'selectedTags must be a unique subset of the stored recipe tags' },
@@ -303,8 +404,10 @@ export const shareBundleHandler = withHandler(
     const image = selectRecipeImage(recipe, parsed.data.imageId);
     if (!image) {
       if (parsed.data.imageId !== undefined) {
+        logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'image_selection', 'requested_image_not_found');
         return { status: 404, jsonBody: { error: 'Image not found' } };
       }
+      logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'image_selection', 'recipe_image_missing');
       return {
         status: 422,
         jsonBody: {
@@ -314,6 +417,9 @@ export const shareBundleHandler = withHandler(
       };
     }
     if (!image.blobName.trim()) {
+      logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'image_selection', 'empty_blob_name', {
+        image_id: image.id,
+      });
       return {
         status: 422,
         jsonBody: { error: 'Recipe image cannot be rendered', code: 'IMAGE_BLOB_INVALID' },
@@ -325,11 +431,19 @@ export const shareBundleHandler = withHandler(
       imageBuffer = await downloadRecipeImage(image.blobName);
     } catch (error) {
       if (error instanceof RecipeImageTooLargeError) {
+          logSharePreconditionFailure(ctx, 'recipes.shareBundle', 'image_download', 'image_too_large', {
+            image_id: image.id,
+          });
         return {
           status: 422,
           jsonBody: { error: 'Recipe image exceeds the 8 MB limit', code: 'IMAGE_TOO_LARGE' },
         };
       }
+        logEvent(ctx, 'error', 'recipes.shareBundle.imageDownloadFailed', {
+          failure_stage: 'image_download',
+          image_id: image.id,
+          ...storageFailureLogFields(error),
+        });
       throw error;
     }
 
@@ -347,6 +461,7 @@ export const shareBundleHandler = withHandler(
         recipeId,
         ctx,
         'recipes.shareBundle.instagramRender',
+        image.id,
       );
     }
 
@@ -364,6 +479,9 @@ export const shareBundleHandler = withHandler(
         logEvent(ctx, 'warn', 'recipes.shareBundle.unrenderableDetail', {
           userId,
           recipeId,
+          image_id: image.id,
+          failure_stage: 'detail_render',
+          export_view_source: exportViewDraft ? 'request_draft' : 'stored_confirmed',
           ...rendererErrorLogFields(detailRender.error),
         });
         return {
@@ -377,11 +495,20 @@ export const shareBundleHandler = withHandler(
       logEvent(ctx, 'error', 'recipes.shareBundle.detailFailed', {
         userId,
         recipeId,
+        image_id: image.id,
+        failure_stage: 'detail_render',
+        export_view_source: exportViewDraft ? 'request_draft' : 'stored_confirmed',
         ...rendererErrorLogFields(detailRender.error),
       });
       return { status: 500, jsonBody: { error: 'Internal server error' } };
     }
 
+    logEvent(ctx, 'info', 'recipes.shareBundle.completed', {
+      image_id: image.id,
+      export_view_source: exportViewDraft ? 'request_draft' : 'stored_confirmed',
+      instagram_output_bytes: instagramRender.buffer.byteLength,
+      detail_output_bytes: detailRender.buffer.byteLength,
+    });
     return {
       status: 200,
       jsonBody: {

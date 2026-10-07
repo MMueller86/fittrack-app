@@ -6,7 +6,7 @@ import {
   destroyTestDatabase,
   setupEmulatorEnv,
 } from '../../test-utils/cosmosEmulator';
-import { __resetCosmosForTests } from '../cosmos';
+import { __resetCosmosForTests, getCosmos } from '../cosmos';
 import {
   CosmosInsightRepository,
   makeFeedbackId,
@@ -431,7 +431,7 @@ describe('CosmosInsightRepository feedback documents (contract)', () => {
       tokensUsed: daily.tokensUsed,
     });
 
-    const container = ctx!.database.container('aiInsights');
+    const { containers: { aiInsights: container } } = await getCosmos();
     const originalItem = container.item.bind(container);
     const patchRequests: unknown[] = [];
     const itemSpy = vi.spyOn(container, 'item').mockImplementation((id, partitionKey) => {

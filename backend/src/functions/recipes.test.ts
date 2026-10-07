@@ -453,6 +453,28 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
+  it('logs a safe field diagnostic for an invalid preparation request', async () => {
+    const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+
+    try {
+      const response = await prepareRecipeExportViewHandler(
+        await makeAuthRequest({
+          params: { id: 'recipe-1' },
+          body: { contractVersion: 2, privateField: 'private request value' },
+        }),
+        ctx,
+      );
+
+      expect(response.status).toBe(400);
+      const serializedWarningLogs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(serializedWarningLogs).toContain('"failure_stage":"request_validation"');
+      expect(serializedWarningLogs).toContain('"validation_diagnostics":"unrecognized_keys@body[privateField]"');
+      expect(serializedWarningLogs).not.toContain('private request value');
+    } finally {
+      warningLogs.mockRestore();
+    }
+  });
+
   it('rejects a stale V2 If-Match before quota and provider work', async () => {
     const recipe = await createTestRecipe();
     const response = await prepareRecipeExportViewHandler(
@@ -607,25 +629,57 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
   it('does not track usage for a V2 provider failure', async () => {
     const recipe = await createTestRecipe();
     const etag = await getRecipeEtag(String(recipe['id']));
-    vi.mocked(analyzeRecipeText).mockRejectedValue(new Error('provider failed'));
+    const providerError = Object.assign(new Error('private prompt content'), {
+      code: 'rate_limit_exceeded',
+      status: 429,
+      type: 'requests',
+      request_id: 'req-12345678',
+    });
+    vi.mocked(analyzeRecipeText).mockRejectedValue(providerError);
+    const errorSpy = vi.spyOn(ctx, 'error').mockImplementation(() => {});
 
-    const response = await requestV2Preparation(String(recipe['id']), etag);
+    try {
+      const response = await requestV2Preparation(String(recipe['id']), etag);
 
-    expect(response.status).toBe(502);
-    expect(trackUsage).not.toHaveBeenCalled();
-    expect(validateRecipeExportPreparationOutput).not.toHaveBeenCalled();
+      expect(response.status).toBe(502);
+      expect(trackUsage).not.toHaveBeenCalled();
+      expect(validateRecipeExportPreparationOutput).not.toHaveBeenCalled();
+      const lines = errorSpy.mock.calls.map(([line]) => String(line));
+      const analysisFailure = lines.find((line) => line.includes('"event":"recipes.prepareExportView.analysisFailed"'));
+      expect(analysisFailure).toContain('"failure_stage":"azure_openai_analysis"');
+      expect(analysisFailure).toContain('"provider_error_code":"rate_limit_exceeded"');
+      expect(analysisFailure).toContain('"provider_status_code":429');
+      expect(analysisFailure).toContain('"provider_request_id":"req-12345678"');
+      expect(analysisFailure).not.toContain('private prompt content');
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('does not track usage for an invalid V2 AI result', async () => {
     const recipe = await createTestRecipe();
     const etag = await getRecipeEtag(String(recipe['id']));
     vi.mocked(analyzeRecipeText).mockResolvedValue({} as any);
-    vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: false, errors: ['invalid output'] });
+    vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({
+      ok: false,
+      errors: ['private generated text was invalid'],
+      diagnostics: [{ phase: 'semantic', code: 'source_step_coverage_mismatch', path: 'exportSuggestion.steps' }],
+    });
+    const warningSpy = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
 
-    const response = await requestV2Preparation(String(recipe['id']), etag);
+    try {
+      const response = await requestV2Preparation(String(recipe['id']), etag);
 
-    expect(response.status).toBe(422);
-    expect(trackUsage).not.toHaveBeenCalled();
+      expect(response.status).toBe(422);
+      expect(trackUsage).not.toHaveBeenCalled();
+      const lines = warningSpy.mock.calls.map(([line]) => String(line));
+      const validationFailure = lines.find((line) => line.includes('"event":"recipes.prepareExportView.validationFailed"'));
+      expect(validationFailure).toContain('"failure_stage":"analysis_output_validation"');
+      expect(validationFailure).toContain('semantic:source_step_coverage_mismatch@exportSuggestion.steps');
+      expect(validationFailure).not.toContain('private generated text was invalid');
+    } finally {
+      warningSpy.mockRestore();
+    }
   });
 
   it('returns the recipe-analyze quota response without calling the provider or tracking usage', async () => {
@@ -666,7 +720,11 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
   it('does not track usage when server validation rejects the provider result', async () => {
     const recipe = await createTestRecipe();
     vi.mocked(analyzeRecipeText).mockResolvedValue({} as any);
-    vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: false, errors: ['invalid output'] });
+    vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({
+      ok: false,
+      errors: ['invalid output'],
+      diagnostics: [{ phase: 'schema', code: 'invalid_type', path: 'exportSuggestion.teaser' }],
+    });
 
     const etag = await getRecipeEtag(String(recipe['id']));
     const response = await requestV2Preparation(String(recipe['id']), etag);
