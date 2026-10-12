@@ -1,0 +1,22 @@
+{
+  "stage": "listOverall",
+  "startedAt": "2026-10-09T23:51:24.509Z",
+  "finishedAt": "2026-10-09T23:51:26.012Z",
+  "args": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "counts": null,
+  "outputPath": "docs/qa/reports/Q21-CORR1-2026-10-10-listOverall-Output.txt",
+  "outputSha256": "bf473e909fcd30b8bb9477593968c5feeef5f5e3435047c3e95b2c1033eb6f0f",
+  "testReport": null,
+  "reportSha256": null,
+  "synthetic": []
+}

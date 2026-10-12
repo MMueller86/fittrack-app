@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InsightInputContext, InsightIntent } from '@fittrack/shared';
+import { DAILY_INSIGHT_EVAL_FIXTURES } from './dailyInsight.eval.fixtures';
 import {
   DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION,
   DAILY_INSIGHT_PROMPT_BUNDLE,
@@ -21,9 +22,54 @@ const intents: InsightIntent[] = [
   'general',
 ];
 
-describe('daily insight v15 prompts', () => {
-  it('uses the v15 version and has one module for every intent', () => {
-    expect(DAILY_INSIGHT_PROMPT_VERSION).toBe('v15');
+describe('daily insight v17 prompts', () => {
+  it('CORR2 gives the exact unknown-activity context a final activity open-day guard', () => {
+    const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'unknown-activity')!;
+    expect(fixture.intent).toBe('activity_focus');
+    expect(fixture.input.currentHourLocal).toBeNull();
+    expect(fixture.input.activityCompletionStatus).toBe('unknown');
+    expect(fixture.input.nutrition.remainingCalories).toBe(500);
+    expect(fixture.input.nutrition.remainingProteinG).toBe(40);
+    const before = structuredClone(fixture.input);
+    const snapshot = buildDailyInsightPrompt(fixture.intent, fixture.input);
+    expect(snapshot.system).toContain('Abschließender Schutz für activity_focus am offenen Tag');
+    expect(snapshot.system.indexOf('Abschließender Schutz für activity_focus am offenen Tag'))
+      .toBeGreaterThan(snapshot.system.indexOf('## Ausgabe'));
+    expect(snapshot.system).toContain('Nenne weder die bisherige Aufnahme noch den Restbetrag');
+    expect(snapshot.system).toContain('Fueling, Flüssigkeit und Erholung bleiben konditional');
+    expect(snapshot.system).not.toContain('Bei positivem Rest beschreibe nur den noch offenen Spielraum,');
+    expect(JSON.parse(snapshot.user)).toEqual({ intent: fixture.intent, context: before });
+    expect(fixture.input).toEqual(before);
+  });
+
+  it('CORR2 applies the activity guard only to an open activity context without suppressing fueling', () => {
+    const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'unknown-activity')!;
+    const closed = { ...fixture.input, nutrition: { ...fixture.input.nutrition, remainingCalories: 0 } };
+    expect(buildDailyInsightPrompt(fixture.intent, closed).system)
+      .not.toContain('Abschließender Schutz für activity_focus am offenen Tag');
+    expect(buildDailyInsightPrompt('phase_progress', fixture.input).system)
+      .not.toContain('Abschließender Schutz für activity_focus am offenen Tag');
+    const system = buildDailyInsightPrompt(fixture.intent, fixture.input).system;
+    expect(system).toContain('Fueling-Hinweis verpflichtend');
+    expect(system).toContain('Bei "planned" und "unknown" muss dieser Hinweis passend konditional bleiben');
+  });
+
+  it('Q21 gives the actual stale-weight phase context no contradictory below-target instruction', () => {
+    const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'stale-weight')!;
+    expect(fixture.intent).toBe('phase_progress');
+    expect(fixture.input.nutrition.remainingCalories).toBe(500);
+    const before = structuredClone(fixture.input);
+    const snapshot = buildDailyInsightPrompt(fixture.intent, fixture.input);
+    expect(snapshot.system).not.toContain('Formuliere die Differenz nur als Aufnahme über oder unter dem Ziel');
+    expect(snapshot.system).toContain('Bei positivem Rest beschreibe nur den noch offenen Spielraum');
+    expect(snapshot.system).toContain('"unter dem Ziel"');
+    expect(snapshot.system).toContain('Schutz für phase_progress an einem offenen Tag');
+    expect(JSON.parse(snapshot.user)).toEqual({ intent: fixture.intent, context: before });
+    expect(fixture.input).toEqual(before);
+  });
+
+  it('uses the v17 version and has one module for every intent', () => {
+    expect(DAILY_INSIGHT_PROMPT_VERSION).toBe('v17');
     for (const intent of intents) {
       expect(DAILY_INSIGHT_PROMPT_MODULES[intent].length).toBeGreaterThan(0);
     }
@@ -66,7 +112,7 @@ describe('daily insight v15 prompts', () => {
 
     expect(snapshot.system).toContain('nur eine Zielrelation');
     expect(snapshot.system).toContain('keinen tatsächlich erreichten Energieüberschuss');
-    expect(snapshot.system).toContain('Aufnahme über oder unter dem Ziel');
+    expect(snapshot.system).toContain('Bei positivem Rest beschreibe nur den noch offenen Spielraum');
     expect(snapshot.system).toContain('Abschließende Sperre bei negativem Kalorienbudget');
     expect(snapshot.system).toContain('Vorrang vor jedem Protein-Gap und allen Mahlzeitenregeln');
     expect(snapshot.system).toContain('Setze recommendation, cta und ctaTarget exakt auf null');
@@ -257,7 +303,7 @@ describe('daily insight v15 prompts', () => {
     expect(snapshot.system).toContain('keine zusätzliche Proteinquelle');
   });
 
-  it('computes a stable fingerprint for the complete v15 bundle', () => {
+  it('computes a stable fingerprint for the complete v17 bundle', () => {
     expect(DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION).toBe('v2');
     expect(DAILY_INSIGHT_PROMPT_FINGERPRINT).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(computeDailyInsightPromptFingerprint(DAILY_INSIGHT_PROMPT_BUNDLE))

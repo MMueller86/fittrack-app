@@ -16,8 +16,12 @@ import {
 import { calculateRecipeNutrition } from '../../../shared/lib/recipeCalculator';
 
 import { requireUser } from '../lib/auth';
-import { analyzeRecipeText } from '../lib/openai';
-import { validateRecipeExportPreparationOutput } from '../lib/recipeAnalyzeValidation';
+import { performance } from 'node:perf_hooks';
+import { prepareValidatedRecipeExport, recipePreparationAffectedFields } from '../lib/recipePreparation';
+import { RECIPE_PREPARATION_PROMPT_VERSION } from '../lib/prompts/recipeAnalyze';
+import {
+  validateRecipePreparationSource,
+} from '../lib/recipeAnalyzeValidation';
 import { parseBody, withHandler } from '../lib/http';
 import {
   logEvent,
@@ -698,22 +702,21 @@ function providerFailureLogFields(error: unknown): LogFields {
   return fields;
 }
 
-function buildRecipePreparationText(recipe: Recipe): string {
-  const lines: string[] = [
-    `Name: ${recipe.name}`,
-    recipe.description ? `Beschreibung: ${recipe.description}` : 'Beschreibung: -',
-    `Portionen: ${recipe.portions}`,
-    `Tags: ${recipe.tags.join(', ') || 'keine'}`,
-    'Zutaten:',
-    ...recipe.ingredients.map((ingredient) => {
-      const amount = ingredient.amountGrams ?? ingredient.inputAmount ?? 0;
-      const amountText = amount > 0 ? `${amount} ${ingredient.unit}` : ingredient.unit;
-      return `- ${ingredient.displayName}: ${amountText}`;
-    }),
-    'Schritte:',
-    ...recipe.steps.map((step) => `- ${step.order}. ${step.description}`),
-  ];
-  return lines.join('\n');
+function buildRecipePreparationContext(recipe: Recipe) {
+  return {
+    recipeContext: {
+      name: recipe.name,
+      description: recipe.description,
+      portions: recipe.portions,
+      tags: recipe.tags,
+      ingredients: recipe.ingredients.map(({ displayName, amountGrams, inputAmount, unit }) => ({
+        displayName, amountGrams, inputAmount, unit,
+      })),
+    },
+    steps: recipe.steps.map(({ order, title, description }) => ({
+      order, ...(title !== undefined ? { title } : {}), description,
+    })),
+  };
 }
 
 export const prepareRecipeExportViewHandler = withHandler(
@@ -742,7 +745,15 @@ export const prepareRecipeExportViewHandler = withHandler(
     const ifMatch = request.headers.get('if-match');
 
     const repo = getRecipesRepository();
-    const versionedRecipe = await repo.getVersioned(userId, recipeId);
+    let versionedRecipe: Awaited<ReturnType<typeof repo.getVersioned>>;
+    try {
+      versionedRecipe = await repo.getVersioned(userId, recipeId);
+    } catch {
+      logEvent(ctx, 'error', 'recipes.prepareExportView.recipeLookupFailed', {
+        failure_stage: 'recipe_lookup', failure_code: 'RECIPE_LOOKUP_FAILED',
+      });
+      return { status: 500, jsonBody: { error: 'Internal server error' } };
+    }
     if (!versionedRecipe) {
       logEvent(ctx, 'warn', 'recipes.prepareExportView.recipeLookupFailed', {
         failure_stage: 'recipe_lookup',
@@ -760,7 +771,27 @@ export const prepareRecipeExportViewHandler = withHandler(
     }
     const recipe = versionedRecipe.recipe;
 
-    const quotaBlock = await enforceQuota(userContext, 'recipe-analyze');
+    const sourceValidation = validateRecipePreparationSource(recipe.steps);
+    if (!sourceValidation.ok) {
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.validationFailed', {
+        failure_stage: 'saved_source_validation',
+        ...validationDiagnosticLogFields(sourceValidation.diagnostics),
+      });
+      return {
+        status: 422,
+        jsonBody: { error: 'Recipe export preparation failed server-side validation', details: ['Invalid saved cooking source'] },
+      };
+    }
+
+    let quotaBlock: Awaited<ReturnType<typeof enforceQuota>>;
+    try {
+      quotaBlock = await enforceQuota(userContext, 'recipe-analyze');
+    } catch {
+      logEvent(ctx, 'error', 'recipes.prepareExportView.quotaBlocked', {
+        failure_stage: 'quota_enforcement', failure_code: 'QUOTA_CHECK_FAILED',
+      });
+      return { status: 500, jsonBody: { error: 'Internal server error' } };
+    }
     if (quotaBlock) {
       logEvent(ctx, 'warn', 'recipes.prepareExportView.quotaBlocked', {
         failure_stage: 'quota_enforcement',
@@ -770,38 +801,63 @@ export const prepareRecipeExportViewHandler = withHandler(
       return quotaBlock;
     }
 
-    let analysis: Awaited<ReturnType<typeof analyzeRecipeText>>;
-    const analysisStartedAt = Date.now();
-    try {
-      analysis = await analyzeRecipeText(buildRecipePreparationText(recipe));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    const preparationContext = buildRecipePreparationContext(recipe);
+    const result = await prepareValidatedRecipeExport(preparationContext);
+    if (result.status === 'terminal') {
+      const technical = result.kind === 'technical';
       logEvent(ctx, 'error', 'recipes.prepareExportView.analysisFailed', {
-        failure_stage: 'azure_openai_analysis',
-        duration_ms: Date.now() - analysisStartedAt,
-        ...providerFailureLogFields(error),
+        failure_stage: technical ? 'template_probe' : 'azure_openai_analysis',
+        failure_code: result.code,
+        duration_ms: result.elapsedMs,
+        logical_calls: result.logicalCalls,
+        ...(!technical ? providerFailureLogFields(result.error) : {}),
       });
-      return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${message}` } };
+      return { status: technical ? 500 : 502, jsonBody: { error: technical ? 'Internal server error' : 'AI recipe analysis failed' } };
     }
 
-    const validation = validateRecipeExportPreparationOutput(analysis);
-    if (!validation.ok) {
-      logEvent(ctx, 'warn', 'recipes.prepareExportView.validationFailed', {
+    if (result.status === 'exhausted') {
+      const affected = recipePreparationAffectedFields(result.latestDraft, result.diagnostics);
+      logEvent(ctx, 'warn', 'recipes.prepareExportView.correctionsExhausted', {
         failure_stage: 'analysis_output_validation',
-        ...validationDiagnosticLogFields(validation.diagnostics),
+        failure_code: 'CORRECTIONS_EXHAUSTED',
+        prompt_version: RECIPE_PREPARATION_PROMPT_VERSION,
+        invocation_id: ctx.invocationId,
+        corrections: result.corrections,
+        logical_calls: result.logicalCalls,
+        elapsed_ms: result.elapsedMs,
+        source_step_count: recipe.steps.length,
+        export_step_count: Array.isArray((result.latestDraft as { steps?: unknown } | null)?.steps)
+          ? (result.latestDraft as { steps: unknown[] }).steps.length : 0,
+        ...validationDiagnosticLogFields(result.diagnostics),
+        affected_field_count: affected.length,
+        affected_fields: JSON.stringify(affected.map((field) => ({ ...field,
+          diagnoses: field.diagnoses.slice(0, 8), diagnoses_truncated: field.diagnoses.length > 8 }))),
       });
       return {
         status: 422,
         jsonBody: {
           error: 'Recipe export preparation failed server-side validation',
-          details: validation.errors,
+          details: [...new Set(result.diagnostics.slice(0, 8).map(({ phase, code, path }) => `${phase}:${code}@${path}`))],
         },
       };
     }
 
-    await trackUsage(userContext, 'recipe-analyze');
+    if (performance.now() >= result.deadlineAt) {
+      logEvent(ctx, 'error', 'recipes.prepareExportView.analysisFailed', {
+        failure_stage: 'before_usage_booking', failure_code: 'PREPARATION_TIMEOUT',
+      });
+      return { status: 502, jsonBody: { error: 'AI recipe analysis failed' } };
+    }
+    try {
+      await trackUsage(userContext, 'recipe-analyze');
+    } catch (error) {
+      logEvent(ctx, 'error', 'recipes.prepareExportView.usageBookingFailed', {
+        failure_stage: 'usage_booking', failure_code: 'USAGE_BOOKING_FAILED', ...providerFailureLogFields(error),
+      });
+      return { status: 500, jsonBody: { error: 'Internal server error' } };
+    }
 
-    const suggestion = validation.data.exportSuggestion;
+    const suggestion = result.data;
     const response: PrepareRecipeExportViewResponseV2 = {
       contractVersion: 2,
       recipeId,

@@ -1,0 +1,104 @@
+{
+  "status": "STOP_FAILED_DEVELOPMENT_ASSERTION_PARTIAL_IMPLEMENTATION",
+  "runs": [
+    {
+      "command": "node --check docs/User Stories/Reciepe/B-2_Feedback-Loop_Evidence_2026-10-09.mjs",
+      "exit": 0
+    },
+    {
+      "command": "npm exec --workspace=backend -- vitest run src/lib/recipeAnalyzeValidation.test.ts --testNamePattern \"B-2 source authority and diagnostic indices\"",
+      "exit": 0,
+      "executed": 9,
+      "passed": 9,
+      "failed": 0,
+      "skipped": 140,
+      "rawEvidence": "VS Code tool result; summary only in this artifact"
+    },
+    {
+      "command": "npm exec --workspace=backend -- vitest run src/lib/recipePreparation.test.ts --reporter=dot",
+      "exit": 0,
+      "executed": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "rawEvidence": "VS Code tool result; summary only in this artifact"
+    },
+    {
+      "command": "npm exec --workspace=backend -- vitest run src/functions/recipes.test.ts --testNamePattern \"returns a transient, server-generated|logs only the latest affected|does not track usage for a V2 provider failure|rejects empty saved cooking\" --reporter=dot",
+      "exit": 1,
+      "executed": 4,
+      "passed": 3,
+      "failed": 1,
+      "skipped": 101,
+      "rawEvidence": "B-2_Feedback-Loop_Development-Handler-Output_2026-10-09.txt",
+      "outputSha256": "d1bb8430e82349ec86285be49d2c09f5dca4af3b6c4dd430b2bfbe44d8b5fddb",
+      "failure": "Expected only semantic unknown-source diagnostic; newline also produces template:INVALID_TEXT@steps[0].description. No retry or assertion repair performed."
+    }
+  ],
+  "declaredGates": [
+    {
+      "name": "Focused",
+      "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+      "exit": null,
+      "executed": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": null
+    },
+    {
+      "name": "Units",
+      "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+      "exit": null,
+      "executed": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": null
+    },
+    {
+      "name": "Typecheck",
+      "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+      "exit": null,
+      "executed": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": null
+    },
+    {
+      "name": "Build",
+      "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+      "exit": null,
+      "executed": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": null
+    },
+    {
+      "name": "F",
+      "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+      "exit": null,
+      "executed": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": null
+    },
+    {
+      "name": "R",
+      "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+      "exit": null,
+      "executed": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": null
+    },
+    {
+      "name": "G",
+      "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+      "exit": null,
+      "executed": 0,
+      "passed": 0,
+      "failed": 0,
+      "skipped": null
+    }
+  ],
+  "credentialStatus": "NOT_CHECKED; credentials were not read; live checks may use only official runner"
+}

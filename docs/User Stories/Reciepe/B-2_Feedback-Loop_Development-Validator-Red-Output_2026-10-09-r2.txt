@@ -1,0 +1,135 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [31m❯[39m src/lib/recipeAnalyzeValidation.test.ts [2m([22m[2m149 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[90m 84[2mms[22m[39m
+[31m   [31m×[31m Recipe Analyze exact trace regressions[2m > [22mreports the exact QA duplicate trace without repairing it[90m 6[2mms[22m[31m[39m
+[31m     → expected [ { phase: 'semantic', …(7) }, …(3) ] to deep equally contain { phase: 'semantic', …(2) }[39m
+[31m   [31m×[31m validateRecipeExportPreparationOutput diagnostics[2m > [22mreturns schema code and field path without including the invalid value[90m 1[2mms[22m[31m[39m
+[31m     → expected [ { phase: 'schema', …(4) } ] to deep equally contain { phase: 'schema', …(2) }[39m
+[31m   [31m×[31m validateRecipeExportPreparationOutput diagnostics[2m > [22midentifies semantic source-step trace failures with stable codes[90m 1[2mms[22m[31m[39m
+[31m     → expected [ …(3) ] to include 'sourceSteps.order must be unique'[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m146 passed[39m[22m[90m (149)[39m
+[2m   Start at [22m 17:51:02
+[2m   Duration [22m 931ms[2m (transform 95ms, setup 0ms, collect 128ms, tests 84ms, environment 0ms, prepare 145ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Validator-Red-Report_2026-10-09-r2.json
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 3 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipeAnalyzeValidation.test.ts[2m > [22mRecipe Analyze exact trace regressions[2m > [22mreports the exact QA duplicate trace without repairing it
+[31m[1mAssertionError[22m: expected [ { phase: 'semantic', …(7) }, …(3) ] to deep equally contain { phase: 'semantic', …(2) }[39m
+
+[32m- Expected:[39m 
+Object {
+  "code": "duplicate_export_source_reference",
+  "path": "steps",
+  "phase": "semantic",
+}
+
+[31m+ Received:[39m 
+Array [
+  Object {
+    "code": "duplicate_export_source_reference",
+    "constraint": "duplicate_export_source_reference",
+    "explanation": "sourceStepOrders must be globally unique",
+    "offendingReferences": Array [
+      5,
+    ],
+    "path": "steps[3].sourceStepOrders",
+    "phase": "semantic",
+    "stepIndex": 3,
+    "stepOrder": 4,
+  },
+  Object {
+    "code": "export_source_trace_not_ascending",
+    "constraint": "export_source_trace_not_ascending",
+    "explanation": "groups must be ascending by first reference",
+    "offendingReferences": Array [
+      5,
+    ],
+    "path": "steps[3].sourceStepOrders",
+    "phase": "semantic",
+    "stepIndex": 3,
+    "stepOrder": 4,
+  },
+  Object {
+    "code": "export_source_trace_not_ascending",
+    "constraint": "export_source_trace_not_ascending",
+    "explanation": "groups must be ascending by first reference",
+    "offendingReferences": Array [
+      5,
+    ],
+    "path": "steps[4].sourceStepOrders",
+    "phase": "semantic",
+    "stepIndex": 4,
+    "stepOrder": 5,
+  },
+  Object {
+    "code": "duplicate_export_source_reference",
+    "constraint": "duplicate_export_source_reference",
+    "explanation": "sourceStepOrders must be globally unique",
+    "offendingReferences": Array [
+      5,
+    ],
+    "path": "steps[4].sourceStepOrders",
+    "phase": "semantic",
+    "stepIndex": 4,
+    "stepOrder": 5,
+  },
+]
+
+[36m [2m❯[22m src/lib/recipeAnalyzeValidation.test.ts:[2m382:36[22m[39m
+    [90m380| [39m    [34mexpect[39m(validation[33m.[39mok)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m381| [39m    [35mif[39m (validation[33m.[39mok) [35mreturn[39m[33m;[39m
+    [90m382| [39m    [34mexpect[39m(validation[33m.[39mdiagnostics)[33m.[39m[34mtoContainEqual[39m({
+    [90m   | [39m                                   [31m^[39m
+    [90m383| [39m      phase[33m:[39m [32m'semantic'[39m[33m,[39m
+    [90m384| [39m      code[33m:[39m [32m'duplicate_export_source_reference'[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipeAnalyzeValidation.test.ts[2m > [22mvalidateRecipeExportPreparationOutput diagnostics[2m > [22mreturns schema code and field path without including the invalid value
+[31m[1mAssertionError[22m: expected [ { phase: 'schema', …(4) } ] to deep equally contain { phase: 'schema', …(2) }[39m
+
+[32m- Expected:[39m 
+Object {
+  "code": "invalid_type",
+  "path": "teaser",
+  "phase": "schema",
+}
+
+[31m+ Received:[39m 
+Array [
+  Object {
+    "code": "invalid_type",
+    "constraint": "invalid_type",
+    "explanation": "The field must satisfy the strict Preparation schema.",
+    "path": "teaser",
+    "phase": "schema",
+  },
+]
+
+[36m [2m❯[22m src/lib/recipeAnalyzeValidation.test.ts:[2m570:32[22m[39m
+    [90m568| [39m    [34mexpect[39m(result[33m.[39mok)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m569| [39m    [35mif[39m (result[33m.[39mok) [35mreturn[39m[33m;[39m
+    [90m570| [39m    [34mexpect[39m(result[33m.[39mdiagnostics)[33m.[39m[34mtoContainEqual[39m({
+    [90m   | [39m                               [31m^[39m
+    [90m571| [39m      phase[33m:[39m [32m'schema'[39m[33m,[39m
+    [90m572| [39m      code[33m:[39m [32m'invalid_type'[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipeAnalyzeValidation.test.ts[2m > [22mvalidateRecipeExportPreparationOutput diagnostics[2m > [22midentifies semantic source-step trace failures with stable codes
+[31m[1mAssertionError[22m: expected [ …(3) ] to include 'sourceSteps.order must be unique'[39m
+[36m [2m❯[22m src/lib/recipeAnalyzeValidation.test.ts:[2m586:27[22m[39m
+    [90m584| [39m    [34mexpect[39m(result[33m.[39mok)[33m.[39m[34mtoBe[39m([35mfalse[39m)[33m;[39m
+    [90m585| [39m    [35mif[39m (result[33m.[39mok) [35mreturn[39m[33m;[39m
+    [90m586| [39m    [34mexpect[39m(result[33m.[39merrors)[33m.[39m[34mtoContain[39m([32m'sourceSteps.order must be unique'[39m…
+    [90m   | [39m                          [31m^[39m
+    [90m587| [39m    [34mexpect[39m(result[33m.[39mdiagnostics)[33m.[39m[34mtoContainEqual[39m({
+    [90m588| [39m      phase[33m:[39m [32m'semantic'[39m[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+

@@ -1,0 +1,58 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipePreparation.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Loop-Red-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:49:41.106Z",
+  "endedAt": "2026-10-09T15:49:52.661Z",
+  "exit": 1,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "1e46cda64ac356a9905eef14e170a07117b83428c74544ca758c93b241fd5036",
+  "reportSha256": "d74717d763caa55e3bf4e7e7ad9adbaa50bee1d09993513c884c01d2b0bd258e",
+  "counts": {
+    "executed": 41,
+    "passed": 37,
+    "failed": 4,
+    "skipped": 0
+  },
+  "failures": [
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/recipePreparation.test.ts",
+      "name": "B-2 bounded Preparation loop collects real teaser failure and all affected steps, multi=false",
+      "messages": [
+        "AssertionError: expected { status: 'success', …(5) } to match object { status: 'success', logicalCalls: 2 }\n(9 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\recipePreparation.test.ts:114:70\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/recipePreparation.test.ts",
+      "name": "B-2 bounded Preparation loop collects real teaser failure and all affected steps, multi=true",
+      "messages": [
+        "AssertionError: expected [ { phase: 'template', …(11) }, …(3) ] to have a length of 5 but got 4\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1339:22)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\recipePreparation.test.ts:116:85\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/recipePreparation.test.ts",
+      "name": "B-2 bounded Preparation loop treats duplicate-index probe measurements as technical even alongside correctable errors",
+      "messages": [
+        "AssertionError: expected { status: 'exhausted', …(5) } to match object { status: 'terminal', …(2) }\n(9 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\recipePreparation.test.ts:160:10\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/recipePreparation.test.ts",
+      "name": "B-2 bounded Preparation loop treats absent-measured probe measurements as technical even alongside correctable errors",
+      "messages": [
+        "AssertionError: expected { status: 'exhausted', …(5) } to match object { status: 'terminal', …(2) }\n(9 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\recipePreparation.test.ts:160:10\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    }
+  ]
+}

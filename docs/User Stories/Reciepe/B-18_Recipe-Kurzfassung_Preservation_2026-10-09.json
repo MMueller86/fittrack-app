@@ -1,0 +1,181 @@
+{
+  "ownDiffFiles": 9,
+  "ownDiffHunks": 46,
+  "invariants": [
+    {
+      "name": "import input 1",
+      "unchanged": true
+    },
+    {
+      "name": "import constraints 1",
+      "unchanged": true
+    },
+    {
+      "name": "import input 2",
+      "unchanged": true
+    },
+    {
+      "name": "import constraints 2",
+      "unchanged": true
+    },
+    {
+      "name": "import input 3",
+      "unchanged": true
+    },
+    {
+      "name": "import constraints 3",
+      "unchanged": true
+    },
+    {
+      "name": "import input 4",
+      "unchanged": true
+    },
+    {
+      "name": "import constraints 4",
+      "unchanged": true
+    },
+    {
+      "name": "import input 5",
+      "unchanged": true
+    },
+    {
+      "name": "import constraints 5",
+      "unchanged": true
+    },
+    {
+      "name": "import input 6",
+      "unchanged": true
+    },
+    {
+      "name": "import constraints 6",
+      "unchanged": true
+    },
+    {
+      "name": "import input 7",
+      "unchanged": true
+    },
+    {
+      "name": "import constraints 7",
+      "unchanged": true
+    },
+    {
+      "name": "import input 8",
+      "unchanged": true
+    },
+    {
+      "name": "numbered full source rubric",
+      "unchanged": true
+    },
+    {
+      "name": "saved preparation input",
+      "unchanged": true
+    },
+    {
+      "name": "saved full source rubric",
+      "unchanged": true
+    }
+  ],
+  "unchangedArrays": [
+    {
+      "name": "semanticDescriptions",
+      "entries": 8
+    },
+    {
+      "name": "orders",
+      "entries": 8
+    }
+  ],
+  "hunks": [
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.ts",
+      "headers": [
+        "@@ -6,6 +6,7 @@ import {",
+        "@@ -39,7 +40,7 @@ const RecipeAnalyzeExportSuggestionSchema = z.object({",
+        "@@ -63,6 +64,7 @@ const RecipeExportPreparationSchema = z.object({",
+        "@@ -74,13 +76,6 @@ export interface RecipeExportPreparationDiagnostic {",
+        "@@ -108,11 +103,10 @@ export function validateRecipeExportPreparationOutput(raw: unknown):",
+        "@@ -202,29 +196,25 @@ function validateExportStepTrace(data: RecipeExportPreparation): RecipeExportSte"
+      ]
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "headers": [
+        "@@ -46,10 +46,10 @@ function assertStepSemantics(result: AiRecipeRaw): void {",
+        "@@ -98,10 +98,13 @@ describe('Recipe Analyze fixture semantics offline', () => {",
+        "@@ -128,25 +131,103 @@ describe('Recipe Analyze fixture semantics offline', () => {",
+        "@@ -162,15 +243,8 @@ describe('Recipe Analyze exact trace regressions', () => {",
+        "@@ -179,10 +253,13 @@ describe('Recipe Analyze exact trace regressions', () => {",
+        "@@ -214,7 +291,7 @@ function syntheticPreparationRecipe(): AiRecipeRaw {",
+        "@@ -227,13 +304,7 @@ describe('synthetic saved Preparation semantics offline', () => {",
+        "@@ -255,12 +326,10 @@ describe('synthetic saved Preparation semantics offline', () => {",
+        "@@ -280,6 +349,34 @@ describe('synthetic saved Preparation semantics offline', () => {",
+        "@@ -329,25 +426,12 @@ describe('validateRecipeExportPreparationOutput diagnostics', () => {"
+      ]
+    },
+    {
+      "path": "backend/src/functions/recipes.ts",
+      "headers": [
+        "@@ -19,7 +19,6 @@ import { requireUser } from '../lib/auth';",
+        "@@ -718,32 +717,6 @@ function buildRecipePreparationContext(recipe: Recipe) {",
+        "@@ -822,13 +795,9 @@ export const prepareRecipeExportViewHandler = withHandler("
+      ]
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "headers": [
+        "@@ -692,7 +692,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {",
+        "@@ -704,14 +704,14 @@ describe('POST /recipes/{id}/export-view/prepare', () => {",
+        "@@ -756,21 +756,12 @@ describe('POST /recipes/{id}/export-view/prepare', () => {",
+        "@@ -801,16 +792,11 @@ describe('POST /recipes/{id}/export-view/prepare', () => {",
+        "@@ -843,7 +829,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {",
+        "@@ -865,25 +851,48 @@ describe('POST /recipes/{id}/export-view/prepare', () => {"
+      ]
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "headers": [
+        "@@ -3,8 +3,8 @@ import {",
+        "@@ -17,15 +17,14 @@ Du bereitest einen transienten Exportvorschlag zur Nutzerprüfung für ein berei",
+        "@@ -53,24 +52,24 @@ Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahie",
+        "@@ -84,13 +83,8 @@ Lege die vollständige Folge der Quellorder-Gruppen fest, bevor du Exportbeschre"
+      ]
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+      "headers": [
+        "@@ -43,6 +43,7 @@ export interface ExportStepSemanticAssertion {",
+        "@@ -84,7 +85,19 @@ export function assertRecipeStepSemantics(result: AiRecipeRaw, constraints: Reci",
+        "@@ -211,8 +224,12 @@ export const RECIPE_PREPARATION_EVAL_FIXTURE: {",
+        "@@ -347,7 +364,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [",
+        "@@ -364,7 +381,12 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = ["
+      ]
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "headers": [
+        "@@ -43,8 +43,8 @@ vi.mock('../storage', () => ({",
+        "@@ -167,7 +167,8 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () =>",
+        "@@ -219,10 +220,13 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () =>",
+        "@@ -271,7 +275,7 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live",
+        "@@ -312,19 +316,25 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live",
+        "@@ -334,6 +344,7 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live",
+        "@@ -355,7 +366,11 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live",
+        "@@ -366,9 +381,13 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live"
+      ]
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "headers": [
+        "@@ -685,7 +685,7 @@ describe('analyzeRecipeText normalization', () => {",
+        "@@ -896,7 +896,7 @@ describe('POST /api/ai/recipe-analyze', () => {",
+        "@@ -914,9 +914,8 @@ describe('POST /api/ai/recipe-analyze', () => {"
+      ]
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+      "headers": [
+        "@@ -329,6 +329,37 @@ describe(\"Instagram recipe details template\", () => {"
+      ]
+    }
+  ]
+}

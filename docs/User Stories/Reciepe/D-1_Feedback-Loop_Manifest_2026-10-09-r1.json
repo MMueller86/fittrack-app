@@ -1,0 +1,331 @@
+{
+  "task": "D-1-R1",
+  "documentationStatus": "DOCUMENTATION_COMPLETE_FEATURE_PARTIAL_NOT_ACCEPTED",
+  "featureStatus": "IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED",
+  "featureAccepted": false,
+  "release": "CLOSED",
+  "alphaLoopDeployed": false,
+  "findingClosure": "NOT_CLAIMED_PENDING_INDEPENDENT_QA",
+  "implementationGateRuns": 0,
+  "liveCalls": 0,
+  "deployments": 0,
+  "fullPlanRead": false,
+  "requiredSkills": [],
+  "handoff": {
+    "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md",
+    "sha256": "f5ca182079f20fc75f7dcd337e064b0ce8b2a5b514715e95e5388f40ca0a5a73",
+    "bytes": 10231
+  },
+  "baseline": {
+    "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Baseline_2026-10-09-r1.json",
+    "sha256": "0709e0136c9a60092b526dc3e46cc0d9ab9b7a61315d2418422f3f8baf233d73",
+    "bytes": 525998
+  },
+  "ownedDiff": {
+    "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Owned-Diff_2026-10-09-r1.patch",
+    "sha256": "ab19546fddeaaf168c52d55141be0c3a001bcf11fe12103e2657ed1027a90ff0",
+    "bytes": 33122
+  },
+  "preservation": {
+    "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Preservation_2026-10-09-r1.json",
+    "sha256": "5a2679d30891dd2e7a7daedab5cc85f88775b1613823276b75f4fb3b33a49d91",
+    "bytes": 169253
+  },
+  "artifacts": [
+    {
+      "path": "docs/kb/domain/06-recipes.md",
+      "sha256": "c105107017d8d66d8191874bb3aa71325a2a34cc756170fa6b951747e68cf0ee",
+      "bytes": 40254
+    },
+    {
+      "path": "docs/kb/domain/07-ai-features.md",
+      "sha256": "624c809271eb461c15b28c33c3a70c3107646bf3c13307d126a6f383ce302097",
+      "bytes": 43001
+    },
+    {
+      "path": "docs/kb/tech/02-backend.md",
+      "sha256": "c7d2822e9801423a813d473aa71cfa23c42a6b7fb24c023053fc786eed13d7cc",
+      "bytes": 34187
+    },
+    {
+      "path": "docs/kb/tech/06-ai-integrations.md",
+      "sha256": "df85fb663dd9a585e1b31dd53f58bb8a39f106fdb17c55a30617b50888a82660",
+      "bytes": 45689
+    },
+    {
+      "path": "docs/kb/tech/09-api-reference.md",
+      "sha256": "15e35776acb3fb5c84ea6cb752a32b2fe05a2c883ecaed01203ec23bbf9f2de7",
+      "bytes": 65545
+    },
+    {
+      "path": "docs/kb/tech/08-testing.md",
+      "sha256": "f63963374a60872530680c3ec289a16d8d9a961d8a91cd0965e1355e843e241b",
+      "bytes": 14380
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+      "sha256": "5bc55b9ace4180171ee138d7caaf8dea529614159d0dd4a079002ccdae722ade",
+      "bytes": 14140
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Baseline_2026-10-09-r1.json",
+      "sha256": "0709e0136c9a60092b526dc3e46cc0d9ab9b7a61315d2418422f3f8baf233d73",
+      "bytes": 525998
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md",
+      "sha256": "f5ca182079f20fc75f7dcd337e064b0ce8b2a5b514715e95e5388f40ca0a5a73",
+      "bytes": 10231
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Owned-Diff_2026-10-09-r1.patch",
+      "sha256": "ab19546fddeaaf168c52d55141be0c3a001bcf11fe12103e2657ed1027a90ff0",
+      "bytes": 33122
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Preservation_2026-10-09-r1.json",
+      "sha256": "5a2679d30891dd2e7a7daedab5cc85f88775b1613823276b75f4fb3b33a49d91",
+      "bytes": 169253
+    }
+  ],
+  "ownFiles": [
+    {
+      "path": "docs/kb/domain/06-recipes.md",
+      "sha256": "c105107017d8d66d8191874bb3aa71325a2a34cc756170fa6b951747e68cf0ee",
+      "bytes": 40254,
+      "beforeSha256": "cbc6d50139db2cf508bf5441234d71ab45318b4551731bc0763b239f7dc7e0cf",
+      "hunks": [
+        "@@ -183,7 +183,7 @@ duplicate, or seasoning IDs return `400` with",
+        "@@ -242,21 +242,26 @@ in the saved-title context, not whole-image/Share success or general cooking-cor"
+      ]
+    },
+    {
+      "path": "docs/kb/domain/07-ai-features.md",
+      "sha256": "624c809271eb461c15b28c33c3a70c3107646bf3c13307d126a6f383ce302097",
+      "bytes": 43001,
+      "beforeSha256": "8ebdb15efc0a4f2c154c12ca4f34f48ef82ef3806a9b807ead3ec5a085857d5b",
+      "hunks": [
+        "@@ -103,7 +103,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms.",
+        "@@ -168,7 +168,7 @@ This allows the review screen (`RecipeWizardScreen`) to render seasoning items d",
+        "@@ -200,7 +200,7 @@ The prompt requests the recipe-specific cooking core: central preparation and co",
+        "@@ -237,7 +237,7 @@ known, locally ascending and globally unique, ordered by their FIRST reference.",
+        "@@ -252,15 +252,20 @@ The 75000 ms aggregate deadline and 20000 ms per-call ceiling are terminal;"
+      ]
+    },
+    {
+      "path": "docs/kb/tech/02-backend.md",
+      "sha256": "c7d2822e9801423a813d473aa71cfa23c42a6b7fb24c023053fc786eed13d7cc",
+      "bytes": 34187,
+      "beforeSha256": "19d7814e733954ee76e9b2c73115058aa9d29d6f71ecfdd12e34ded10afce60d",
+      "hunks": [
+        "@@ -274,7 +274,7 @@ acceptance prerequisite. Preparation is transient and does not change the",
+        "@@ -318,17 +318,27 @@ and optional ETag remain before quota; valid success alone tracks"
+      ]
+    },
+    {
+      "path": "docs/kb/tech/06-ai-integrations.md",
+      "sha256": "df85fb663dd9a585e1b31dd53f58bb8a39f106fdb17c55a30617b50888a82660",
+      "bytes": 45689,
+      "beforeSha256": "39082632d23a33e765fe9ed5f68d7939196b46c981e2a076fd912b2fc860e26a",
+      "hunks": [
+        "@@ -64,7 +64,7 @@ Mobile shows `MealEstimateReviewScreen`.",
+        "@@ -107,7 +107,7 @@ Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: t",
+        "@@ -137,7 +137,7 @@ full-recipe wrapper, renderer payload or intermediate output. The same lazy",
+        "@@ -156,7 +156,7 @@ metadata/limit violations and extra fields are rejected; exhaustion returns",
+        "@@ -178,12 +178,17 @@ Coverage-only payload/order-list/mismatch helpers remain removed. Only terminal",
+        "@@ -199,6 +204,12 @@ layout, including changed counts and previously fitting fields. Unmeasurable",
+        "@@ -210,6 +221,10 @@ ingredient fidelity and contradiction checks remain independent fixture rubrics",
+        "@@ -234,30 +249,53 @@ No source/context, old/unaffected text, arbitrary object/provider payload,"
+      ]
+    },
+    {
+      "path": "docs/kb/tech/09-api-reference.md",
+      "sha256": "15e35776acb3fb5c84ea6cb752a32b2fe05a2c883ecaed01203ec23bbf9f2de7",
+      "bytes": 65545,
+      "beforeSha256": "1893abe058d0b68b218c128af286a8a7cfe660921db976328f4f6e105dedaa7a",
+      "hunks": [
+        "@@ -401,7 +401,7 @@ the revision it read, independently of the client header.",
+        "@@ -453,7 +453,7 @@ exhausted invalid drafts return 422. Omission alone does not. Empty saved steps",
+        "@@ -464,14 +464,21 @@ limits and teaser sizing remain; no new font fallback, universal 23/11 cap,"
+      ]
+    },
+    {
+      "path": "docs/kb/tech/08-testing.md",
+      "sha256": "f63963374a60872530680c3ec289a16d8d9a961d8a91cd0965e1355e843e241b",
+      "bytes": 14380,
+      "beforeSha256": "381dece01df446807f20c14bd67699c19c58494efa935788921384c43a43a4fc",
+      "hunks": [
+        "@@ -110,7 +110,7 @@ required by these offline probe tests.",
+        "@@ -118,39 +118,56 @@ changes, real-font Alpha overflow, technical precedence, missing/non-finite"
+      ]
+    }
+  ],
+  "evidence": {
+    "currentManifest": {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r3-QA-R1.json",
+      "sha256": "f280679f5737cd3521b9240f627d745817c7a39128381d77412b525579badd32",
+      "bytes": 15137
+    },
+    "historicalManifest": {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json",
+      "sha256": "c6371a237bd25a7eec3b630182dffbfdf074fe1266726044e20c87b80110ee6a",
+      "bytes": 17708
+    },
+    "priorD1Manifest": {
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Manifest_2026-10-09.json",
+      "sha256": "c7158a3b1c7570a292363012350ebb7cf5c14856917db895ab4b8ed524bdbe51",
+      "bytes": 39893
+    },
+    "currentArtifactsVerified": 53,
+    "historicalArtifactsVerified": 83,
+    "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+    "live": {
+      "F": {
+        "exit": 1,
+        "counts": {
+          "executed": 5,
+          "passed": 2,
+          "failed": 3,
+          "skipped": 9
+        },
+        "logicalCalls": 10,
+        "sdkCalls": 9,
+        "outputSha256": "36f4ffdc97fdd9945ca3d6e1e753df2c052f8f48fa0e12f34a8d3f94724546c7",
+        "reportSha256": "4f6520e1069ab596b1c6b1b36ded2e88c83adecc38423c48e59fdcdd9bd6fbe2"
+      },
+      "R": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+      "G": "NOT_RUN_REQUIRED_LIVE_FAILURE"
+    }
+  },
+  "validation": {
+    "status": "PASS",
+    "ownedDocuments": 6,
+    "utf8": "PASS",
+    "linksAndAnchors": "PASS_NO_NEW_ISSUES",
+    "inheritedLinkIssues": [],
+    "versionAndEvidenceAssertions": "PASS",
+    "runtimeReadOnly": true,
+    "foreignFilesVerified": 982,
+    "reportingScript": {
+      "beforeSha256": "c9b81930ec44ca84459f713da16203f8ba56173d1e957fd6114df9575bde39ed",
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+      "sha256": "5bc55b9ace4180171ee138d7caaf8dea529614159d0dd4a079002ccdae722ade",
+      "bytes": 14140,
+      "ownedByThisRound": true
+    },
+    "initialFocusedCheck": {
+      "exit": 1,
+      "reason": "Handoff referenced the three not-yet-generated owned artifacts; generator ordering corrected, no implementation gate failure"
+    },
+    "executedCommands": [
+      {
+        "command": [
+          "node",
+          "--check",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "node",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+          "baseline"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "node",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+          "check"
+        ],
+        "exit": 1,
+        "chronology": "Before generator ordering correction"
+      },
+      {
+        "command": [
+          "node",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+          "check"
+        ],
+        "exit": 0,
+        "chronology": "After local reporting correction"
+      },
+      {
+        "command": [
+          "node",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+          "check"
+        ],
+        "exit": 0,
+        "chronology": "After final publication link correction"
+      },
+      {
+        "command": [
+          "node",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+          "finish"
+        ],
+        "exit": 1,
+        "chronology": "Existing private env path was misclassified as an addition; identical baseline exclusion applied without reading values; created patch retained unchanged"
+      },
+      {
+        "command": [
+          "node",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+          "finish"
+        ],
+        "exit": 0
+      }
+    ],
+    "patchChecks": [
+      {
+        "command": [
+          "git",
+          "apply",
+          "--reverse",
+          "--check",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Owned-Diff_2026-10-09-r1.patch"
+        ],
+        "exit": 0
+      },
+      {
+        "command": [
+          "git",
+          "apply",
+          "--reverse",
+          "--check",
+          "--whitespace=error-all",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Owned-Diff_2026-10-09-r1.patch"
+        ],
+        "exit": 0
+      }
+    ],
+    "command": [
+      "node",
+      "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+      "finish"
+    ],
+    "editorDiagnostics": {
+      "status": "PASS",
+      "errors": 0,
+      "tool": "get_errors",
+      "paths": [
+        "docs/kb/domain/06-recipes.md",
+        "docs/kb/domain/07-ai-features.md",
+        "docs/kb/tech/02-backend.md",
+        "docs/kb/tech/06-ai-integrations.md",
+        "docs/kb/tech/09-api-reference.md",
+        "docs/kb/tech/08-testing.md",
+        "docs/User Stories/Reciepe/D-1_Feedback-Loop_Verification_2026-10-09-r1.mjs",
+        "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md"
+      ]
+    },
+    "scopedSecretReview": {
+      "matches": 0,
+      "scope": "Added KB prose and new handoff; three credential-pattern checks, not exhaustive detection; no private settings read"
+    }
+  },
+  "manifestSelfHashExcluded": true
+}

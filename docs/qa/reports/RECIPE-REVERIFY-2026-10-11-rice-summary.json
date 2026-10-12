@@ -1,0 +1,147 @@
+{
+  "series": "rice",
+  "runs": [
+    {
+      "label": "rice-run01",
+      "exit": 0,
+      "started": "2026-10-11T10:48:39.211Z",
+      "finished": "2026-10-11T10:48:46.020Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run02",
+      "exit": 0,
+      "started": "2026-10-11T10:48:46.601Z",
+      "finished": "2026-10-11T10:48:53.632Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run03",
+      "exit": 0,
+      "started": "2026-10-11T10:48:54.299Z",
+      "finished": "2026-10-11T10:49:00.119Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run04",
+      "exit": 0,
+      "started": "2026-10-11T10:49:00.759Z",
+      "finished": "2026-10-11T10:49:06.073Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run05",
+      "exit": 0,
+      "started": "2026-10-11T10:49:06.728Z",
+      "finished": "2026-10-11T10:49:13.166Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run06",
+      "exit": 0,
+      "started": "2026-10-11T10:49:14.245Z",
+      "finished": "2026-10-11T10:49:19.767Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run07",
+      "exit": 0,
+      "started": "2026-10-11T10:49:20.355Z",
+      "finished": "2026-10-11T10:49:27.474Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run08",
+      "exit": 0,
+      "started": "2026-10-11T10:49:28.073Z",
+      "finished": "2026-10-11T10:49:34.289Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run09",
+      "exit": 0,
+      "started": "2026-10-11T10:49:36.561Z",
+      "finished": "2026-10-11T10:49:43.090Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    },
+    {
+      "label": "rice-run10",
+      "exit": 0,
+      "started": "2026-10-11T10:49:45.462Z",
+      "finished": "2026-10-11T10:49:52.146Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 2,
+        "failed": 0,
+        "pending": 19
+      },
+      "failures": []
+    }
+  ],
+  "passedRuns": 10,
+  "totalRuns": 10
+}

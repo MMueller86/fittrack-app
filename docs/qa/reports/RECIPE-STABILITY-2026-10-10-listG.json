@@ -1,0 +1,228 @@
+{
+  "format": "fittrack-recipe-stability-execution-v1",
+  "stage": "listG",
+  "startedAt": "2026-10-10T13:14:16.770Z",
+  "finishedAt": "2026-10-10T13:14:18.215Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": "01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3",
+  "candidateHashStable": true,
+  "changedPaths": [],
+  "environmentFingerprint": "7276d686a3b55208d50563d3c9e1d30e151edb15ba7c379de172c6d00c8d2cb0",
+  "counts": null,
+  "selection": [
+    {
+      "name": "daily insight prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['phase-progress-open-day'] 'An open target budget is not presente…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['current-effective-activity-budget'] 'An elevated current activity target p…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-source-priority'] 'Morning orientation uses the syntheti…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-unavailable'] 'A missing historical activity target …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-ambiguous-source'] 'A profile fallback and a conflicting …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['planned-activity'] 'A planned activity is not described a…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['likely-completed-activity'] 'A late-day activity is described only…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['unknown-activity'] 'An activity without a usable local ho…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['intensive-endurance-fueling'] 'A long alpine endurance activity rece…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['budget-lock'] 'A negative remaining budget blocks an…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['target-relative-overage-not-achieved-…'] 'A negative target remainder supports …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['protein-gap-with-budget'] 'A real protein gap with remaining cal…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['protein-nearly-complete'] 'A nearly complete protein target is n…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['empty-morning'] 'An empty early morning uses historica…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['morning-unlogged-prior-day'] 'An unlogged prior day remains missing…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['midday-empty-day-not-morning'] 'At local hour 12, an empty current di…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['stale-weight'] 'Stale weight data is not presented as…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "preparation prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['synthetic-saved-eight-steps-rice-serv…'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['synthetic-saved-oven-seven-steps'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['synthetic-saved-pasta-essential-sauce'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['explicit-total-with-untimed-preparati…'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['completely-timed-explicit-sequence'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['component-times-without-explicit-sequ…'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+    },
+    {
+      "name": "recipeScale: live prompt evaluation > ['preserves-step-order-and-unrelated-ba…'] 'Keeps all original steps and preserve…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+    },
+    {
+      "name": "recipeScale: live prompt evaluation > ['missing-description-stays-null'] 'Does not invent a description when th…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+    },
+    {
+      "name": "weekly insight prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+    },
+    {
+      "name": "weeklyInsight: live prompt evaluation > ['mixed-data-and-adjusted-activity-targ…'] 'Interprets a mixed week without treat…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+    },
+    {
+      "name": "weeklyInsight: live prompt evaluation > ['training-day-activitybonus-under-targ…'] 'Keeps three consecutive training days…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+    },
+    {
+      "name": "weeklyInsight: live prompt evaluation > ['zero-calorie-entry-is-data'] 'Does not turn a valid zero-calorie Me…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+    },
+    {
+      "name": "weeklyInsight: special-activity diagnostic eval > weekly insight diagnostic prompt version matches the prepared fixtures",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+    },
+    {
+      "name": "weeklyInsight: special-activity diagnostic eval > ['special-activity-under-effective-targ…'] '3000 kcal exceeds the base target but…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+    },
+    {
+      "name": "weeklyInsight: special-activity diagnostic eval > ['special-activity-at-effective-target'] '3600 kcal is exactly the activity-adj…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+    }
+  ],
+  "allIntendedTestsExecuted": null,
+  "synthetic": [],
+  "failures": [],
+  "rice": null,
+  "outputPath": "docs/qa/reports/RECIPE-STABILITY-2026-10-10-listG-Output.txt",
+  "outputSha256": "a31df415891db33bfbed8eb389cb8c71706ee0ce45f355afb018626dfd8443f9",
+  "testReport": null,
+  "reportSha256": null,
+  "noProviderCalls": true,
+  "liveGate": false,
+  "state": "COMPLETED"
+}

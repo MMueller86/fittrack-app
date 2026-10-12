@@ -1,0 +1,85 @@
+{
+  "stage": "listRecipe",
+  "startedAt": "2026-10-10T00:24:28.637Z",
+  "finishedAt": "2026-10-10T00:24:29.959Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "counts": null,
+  "selection": [
+    {
+      "name": "prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "preparation prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipeAnalyze: live prompt evaluation > ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    }
+  ],
+  "outputPath": "docs/qa/reports/Q21-FINAL2-2026-10-10-listRecipe-Output.txt",
+  "outputSha256": "3e88d1479d5749a39546fb381286610dea10ac56468802a124872921d852be7f",
+  "testReport": null,
+  "reportSha256": null,
+  "synthetic": [],
+  "allIntendedTestsExecuted": null,
+  "liveGate": false,
+  "offlineStage": true
+}

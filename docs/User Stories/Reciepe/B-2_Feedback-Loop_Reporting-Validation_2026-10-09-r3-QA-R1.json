@@ -1,0 +1,44 @@
+{
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "scope": "Post-freeze stored-data reporting only, no provider calls, no gate reruns, no production/runtime edits",
+  "attempts": [
+    {
+      "command": "Evidence r3-QA-R1 reconcile F",
+      "exit": 1,
+      "output": "assert.ok(test) failed because bracket matching did not handle quoted/truncated native Vitest names",
+      "artifactWritten": false
+    },
+    {
+      "command": "Reporting r3-QA-R1 initial reconcile",
+      "exit": 1,
+      "output": "2 !== 4: ANSI color prefixes hid two complete evidence lines",
+      "artifactWritten": false
+    },
+    {
+      "command": "Reporting r3-QA-R1 corrected reconcile",
+      "exit": 0,
+      "fixtures": 4,
+      "logicalCalls": 10,
+      "sdkCalls": 9,
+      "newProviderCalls": 0
+    },
+    {
+      "command": "Reporting r3-QA-R1 patches",
+      "exit": 0,
+      "owned": 8,
+      "findingPatches": 5,
+      "reverseCheck": 0,
+      "worktreePatchApplied": false
+    },
+    {
+      "command": "Reporting r3-QA-R1 preservation",
+      "exit": 0,
+      "foreignFiles": 926,
+      "candidateFiles": 935,
+      "runtimeFiles": 338,
+      "historicalArtifacts": 83
+    }
+  ],
+  "failureOutputCapture": "Tool execution transcript; exact native failure text summarized here. No failure replaced by a successful live record.",
+  "noRetryUntilGreen": true
+}

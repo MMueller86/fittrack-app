@@ -1,0 +1,127 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 2, …(1) }, …(1) ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.716Z","level":"info","event":"handler.start","handler":"recipes.create"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 2, …(1) }, …(1) ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.727Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"c1dfed4e-4b32-4bc6-996c-9e03c09966e9","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:57:05.727Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":11}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 2, …(1) }, …(1) ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.733Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 1, …(1) }, …(1) ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.741Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:57:05.743Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"964e1866-1dfa-4671-895e-27d055e24acf","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:57:05.743Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":2}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 1, …(1) }, …(1) ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.746Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ Array(1) ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.750Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:57:05.752Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"b14565a9-2d24-455c-ac88-e028ca69f1c0","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:57:05.752Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":2}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ Array(1) ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.754Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 1, description: ' ' } ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.760Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:57:05.762Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"a5bc8ee5-cb7d-4009-8409-b7c5e93595f1","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:57:05.762Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":2}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 1, description: ' ' } ]
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.764Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 terminates lookup backend failure without private error logs or usage
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.768Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:57:05.770Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"9e52e974-85f8-4c4c-a8c0-c1948ef2c4b7","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:57:05.770Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":2}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 terminates quota backend failure without private error logs or usage
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.802Z","level":"info","event":"handler.start","handler":"recipes.create"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 terminates quota backend failure without private error logs or usage
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:57:05.803Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"aba0bcca-bdaa-4aa1-b098-c3d3beba1c5a","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:57:05.803Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+ [31m❯[39m src/functions/recipes.test.ts [2m([22m[2m121 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m115 skipped[39m[2m)[22m[90m 197[2mms[22m[39m
+[31m   [31m×[31m POST /recipes/{id}/export-view/prepare[2m > [22mB-2 terminates lookup backend failure without private error logs or usage[90m 35[2mms[22m[31m[39m
+[31m     → expected '[[["{\"ts\":\"2026-10-09T15:57:05.772…' not to contain 'PRIVATE_BACKEND_DETAIL_SENTINEL'[39m
+[31m   [31m×[31m POST /recipes/{id}/export-view/prepare[2m > [22mB-2 terminates quota backend failure without private error logs or usage[90m 13[2mms[22m[31m[39m
+[31m     → expected '[[["{\"ts\":\"2026-10-09T15:57:05.806…' not to contain 'PRIVATE_BACKEND_DETAIL_SENTINEL'[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[2m | [22m[33m115 skipped[39m[90m (121)[39m
+[2m   Start at [22m 17:57:02
+[2m   Duration [22m 3.33s[2m (transform 1.00s, setup 0ms, collect 2.19s, tests 197ms, environment 0ms, prepare 335ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Backend-Privacy-Red-Report_2026-10-09-r2.json
+
+[90mstderr[2m | src/functions/recipes.test.ts
+[22m[39mWARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.
+
+[90mstderr[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 2, …(1) }, …(1) ]
+[22m[39m[ctx.warn] {"ts":"2026-10-09T15:57:05.736Z","level":"warn","event":"recipes.prepareExportView.validationFailed","failure_stage":"saved_source_validation","validation_diagnostic_count":1,"validation_diagnostics":"semantic:source_step_order_not_ascending@sourceSteps[1].order","validation_diagnostics_truncated":false}
+[ctx.warn] {"ts":"2026-10-09T15:57:05.736Z","level":"warn","event":"handler.response.failure","handler":"recipes.prepareExportView","status":422,"duration_ms":3}
+
+[90mstderr[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 1, …(1) }, …(1) ]
+[22m[39m[ctx.warn] {"ts":"2026-10-09T15:57:05.747Z","level":"warn","event":"recipes.prepareExportView.validationFailed","failure_stage":"saved_source_validation","validation_diagnostic_count":3,"validation_diagnostics":"semantic:duplicate_source_step_order@sourceSteps[0].order;semantic:duplicate_source_step_order@sourceSteps[1].order;semantic:source_step_order_not_ascending@sourceSteps[1].order","validation_diagnostics_truncated":false}
+[ctx.warn] {"ts":"2026-10-09T15:57:05.747Z","level":"warn","event":"handler.response.failure","handler":"recipes.prepareExportView","status":422,"duration_ms":1}
+
+[90mstderr[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ Array(1) ]
+[22m[39m[ctx.warn] {"ts":"2026-10-09T15:57:05.757Z","level":"warn","event":"recipes.prepareExportView.validationFailed","failure_stage":"saved_source_validation","validation_diagnostic_count":1,"validation_diagnostics":"schema:too_small@sourceSteps.[0].order","validation_diagnostics_truncated":false}
+[ctx.warn] {"ts":"2026-10-09T15:57:05.757Z","level":"warn","event":"handler.response.failure","handler":"recipes.prepareExportView","status":422,"duration_ms":3}
+
+[90mstderr[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 rejects malformed whole saved source before quota: [ { order: 1, description: ' ' } ]
+[22m[39m[ctx.warn] {"ts":"2026-10-09T15:57:05.765Z","level":"warn","event":"recipes.prepareExportView.validationFailed","failure_stage":"saved_source_validation","validation_diagnostic_count":1,"validation_diagnostics":"schema:custom@sourceSteps.[0].description","validation_diagnostics_truncated":false}
+[ctx.warn] {"ts":"2026-10-09T15:57:05.765Z","level":"warn","event":"handler.response.failure","handler":"recipes.prepareExportView","status":422,"duration_ms":1}
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 2 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/functions/recipes.test.ts[2m > [22mPOST /recipes/{id}/export-view/prepare[2m > [22mB-2 terminates lookup backend failure without private error logs or usage
+[31m[1mAssertionError[22m: expected '[[["{\"ts\":\"2026-10-09T15:57:05.772…' not to contain 'PRIVATE_BACKEND_DETAIL_SENTINEL'[39m
+
+Expected: [32m"PRIVATE_BACKEND_DETAIL_SENTINEL"[39m
+Received: [31m"[[["{\"ts\":\"2026-10-09T15:57:05.772Z\",\"level\":\"info\",\"event\":\"handler.start\",\"handler\":\"recipes.prepareExportView\"}"]],[],[["{\"ts\":\"2026-10-09T15:57:05.788Z\",\"level\":\"error\",\"event\":\"handler.error\",\"handler\":\"recipes.prepareExportView\",\"duration_ms\":16,\"error_message\":\"PRIVATE_BACKEND_DETAIL_SENTINEL\",\"error_stack\":\"Error: PRIVATE_BACKEND_DETAIL_SENTINEL\\n    at C:\\\\Users\\\\mmueller\\\\OneDrive - PRODYNA SE\\\\fittrack-app\\\\backend\\\\src\\\\functions\\\\recipes.test.ts:264:54\\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11\\n    at withEnv (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)\\n    at run (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:112:3)\"}"]]]"[39m
+
+[36m [2m❯[22m src/functions/recipes.test.ts:[2m272:69[22m[39m
+    [90m270| [39m      expect(prepareRecipeExport).not.toHaveBeenCalled();
+    [90m271| [39m      expect(trackUsage).not.toHaveBeenCalled();
+    [90m272| [39m      expect(JSON.stringify(logs.map((log) => log.mock.calls))).not.to…
+    [90m   | [39m                                                                    [31m^[39m
+    [90m273| [39m    } finally { lookup.mockRestore(); logs.forEach((log) => log.mockRe…
+    [90m274| [39m  });
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/functions/recipes.test.ts[2m > [22mPOST /recipes/{id}/export-view/prepare[2m > [22mB-2 terminates quota backend failure without private error logs or usage
+[31m[1mAssertionError[22m: expected '[[["{\"ts\":\"2026-10-09T15:57:05.806…' not to contain 'PRIVATE_BACKEND_DETAIL_SENTINEL'[39m
+
+Expected: [32m"PRIVATE_BACKEND_DETAIL_SENTINEL"[39m
+Received: [31m"[[["{\"ts\":\"2026-10-09T15:57:05.806Z\",\"level\":\"info\",\"event\":\"handler.start\",\"handler\":\"recipes.prepareExportView\"}"]],[],[["{\"ts\":\"2026-10-09T15:57:05.807Z\",\"level\":\"error\",\"event\":\"handler.error\",\"handler\":\"recipes.prepareExportView\",\"duration_ms\":1,\"error_message\":\"PRIVATE_BACKEND_DETAIL_SENTINEL\",\"error_stack\":\"Error: PRIVATE_BACKEND_DETAIL_SENTINEL\\n    at C:\\\\Users\\\\mmueller\\\\OneDrive - PRODYNA SE\\\\fittrack-app\\\\backend\\\\src\\\\functions\\\\recipes.test.ts:265:52\\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11\\n    at withEnv (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)\\n    at run (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:112:3)\"}"]]]"[39m
+
+[36m [2m❯[22m src/functions/recipes.test.ts:[2m272:69[22m[39m
+    [90m270| [39m      expect(prepareRecipeExport).not.toHaveBeenCalled();
+    [90m271| [39m      expect(trackUsage).not.toHaveBeenCalled();
+    [90m272| [39m      expect(JSON.stringify(logs.map((log) => log.mock.calls))).not.to…
+    [90m   | [39m                                                                    [31m^[39m
+    [90m273| [39m    } finally { lookup.mockRestore(); logs.forEach((log) => log.mockRe…
+    [90m274| [39m  });
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+

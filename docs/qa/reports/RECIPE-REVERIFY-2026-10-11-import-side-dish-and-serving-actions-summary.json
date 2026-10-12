@@ -1,0 +1,119 @@
+{
+  "series": "import-side-dish-and-serving-actions",
+  "runs": [
+    {
+      "label": "import-side-dish-and-serving-actions-run01",
+      "exit": 0,
+      "started": "2026-10-11T10:49:53.172Z",
+      "finished": "2026-10-11T10:50:02.346Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-side-dish-and-serving-actions-run02",
+      "exit": 0,
+      "started": "2026-10-11T10:50:03.241Z",
+      "finished": "2026-10-11T10:50:12.652Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-side-dish-and-serving-actions-run03",
+      "exit": 0,
+      "started": "2026-10-11T10:50:13.375Z",
+      "finished": "2026-10-11T10:50:22.435Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-side-dish-and-serving-actions-run04",
+      "exit": 0,
+      "started": "2026-10-11T10:50:23.252Z",
+      "finished": "2026-10-11T10:50:32.996Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-side-dish-and-serving-actions-run05",
+      "exit": 0,
+      "started": "2026-10-11T10:50:33.973Z",
+      "finished": "2026-10-11T10:50:47.972Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-side-dish-and-serving-actions-run06",
+      "exit": 0,
+      "started": "2026-10-11T10:50:48.746Z",
+      "finished": "2026-10-11T10:50:57.787Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-side-dish-and-serving-actions-run07",
+      "exit": 0,
+      "started": "2026-10-11T10:50:58.528Z",
+      "finished": "2026-10-11T10:51:08.003Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-side-dish-and-serving-actions-run08",
+      "exit": 0,
+      "started": "2026-10-11T10:51:09.058Z",
+      "finished": "2026-10-11T10:51:28.333Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    }
+  ],
+  "passedRuns": 8,
+  "totalRuns": 8
+}

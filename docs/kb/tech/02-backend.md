@@ -239,6 +239,30 @@ if its measured layout does not fit. A 12 px clearance separates it from the
 metadata chips. Text is never truncated; an overflow at 18 px remains an error.
 Recipe title, ingredient rows, and preparation text keep their existing sizes.
 
+`probeInstagramRecipeDetailsGeneratedText({ savedTitle, teaser, steps })` is a
+backend-internal text-only entry point in `instagramRenderer/render.ts` and its
+existing barrel. It shares the production title/teaser subtree, preparation
+panel and parent constraints, German breaks, font cache, node collection and
+0.5 px bounds tolerance with the full renderer. It loads only Satori and the
+four bundled fonts, not photos, Blob data, design assets, Sharp or Resvg.
+The complete 1-5 step candidate determines the existing large/compact layout;
+the saved title remains context, not an editable generated field. The teaser
+keeps the existing italic font, terminal-period display rule and 22/21/20/19/18
+selection. Existing input length and single-line constraints remain unchanged.
+
+The discriminated result has `status: success | generated-text-failure |
+technical-failure`, per-field diagnostics and the evaluated `teaserFontSize`.
+Measured diagnostics include actual width/height and assigned bounds; German
+width-only failures have width and its limit but no invented multiline height.
+Invalid/skipped fields are never reported as fitting. Missing or non-finite
+measurements, unavailable/corrupt fonts, Satori errors and invalid/non-fitting
+saved-title context are technical failures, not AI-correctable failures.
+Success establishes only generated teaser/step fit in that title context; it
+does not certify the saved title, ingredients, chips, images or share bundle.
+The full renderer retains its existing first-failure public contract, including
+the legacy height value on German width-break errors. B-1 supplied the probe;
+B-2 now integrates it into the Preparation loop described below.
+
 ### Recipe export preparation and confirmation concurrency
 
 `POST /api/recipes/{id}/export-view/prepare` accepts only the strict V2 body
@@ -248,6 +272,92 @@ server-loaded recipe and a mismatch returns `412` before quota or provider work.
 The response keeps `sourceEtag` for compatibility, but it is not a client-side
 acceptance prerequisite. Preparation is transient and does not change the
 recipe, confirmed export view, ingredient IDs, or ingredient values.
+
+The handler calls `prepareValidatedRecipeExport(context)` from `recipePreparation.ts`,
+which uses `prepareRecipeExport(context, options)` with Preparation v12;
+`analyzeRecipeText(text)` is import-only (v17, full `AiRecipeRaw`, unchanged
+normalization and globally ascending flattened references). Preparation sends
+the complete ID-free saved metadata/ingredient projection and all original
+`order`/optional `title`/`description` steps as untrusted JSON user data.
+The separate Strict `recipe_export_preparation` schema returns backend-only
+`RecipeExportPreparationOutput`: `{ version: 1, teaser, totalTimeMinutes,
+difficulty, steps }`, where steps contain only `{ order, description,
+sourceStepOrders }`. Every field is required and every object is closed; no
+ingredients, keys or model-returned source steps are accepted. The same lazy
+client, deployment/API version, temperature 0.2 and max_tokens 2048 are used for
+each of at most three logical calls (initial plus two corrections). SDK
+`maxRetries: 0`, AbortSignal and at most 20000 ms per call apply only to
+Preparation. The monotonic 75000 ms generation/validation/probe deadline is
+not reset by corrections. Provider/probe awaits are bounded, timers cleaned
+up, pending provider work aborted and late results discarded. A deadline check
+precedes usage booking; booking itself is awaited once, never raced or retried.
+No fallback, wrapper, truncation, padding, sorting or identity repair is added.
+
+Corrections receive immutable original ID-free context, exact latest whole
+draft and structured validation/probe diagnostics. The whole new output and
+complete teaser/step array are revalidated/reprobed, including after count
+changes; technical failures take precedence over content failures. Geometry
+uses the unchanged production fonts, large/compact bounds and 0.5 px tolerance,
+with width-only diagnostics never inventing height. Missing, duplicate or
+non-finite measurements are terminal. Generated-text fit in saved-title context
+does not certify ingredients, title, chips, image or Share. Existing teaser
+22..18 selection remains; no new font/layout fallback, 23/11 cap, three-line
+product rule or ingredient-omission strategy is introduced.
+
+`validateRecipeExportPreparationOutput(output, recipe.steps)` receives the saved
+source separately and checks positive unique ascending source orders, export
+orders 1..K, Shared min1/max5/text90/teaser96/time10080 limits and nullable trimmed
+non-empty single-line difficulty. Known reference groups are non-empty and
+locally ascending, globally unique, and ordered by FIRST reference, not by the
+flattened trace: `[1,4,6],[5]` is allowed only here; `[5],[1,4,6]` is rejected.
+Gaps and non-contiguous source orders are valid. Empty saved steps or exclusively
+blank source descriptions returns 422 before quota/provider work; other
+shape/reference/limit failures can request correction and exhausted invalid
+drafts return 422 without usage. Auth, owner lookup
+and optional ETag remain before quota; valid success alone tracks
+`recipe-analyze` exactly once. Internal references are stripped from the
+unchanged plain V2 App response. Cooking-core preservation, component fit and
+metadata derivation are prompt/fixture/review concerns, not a general runtime
+semantic check. The v11 prompt requests a complete compact detail-image workflow
+by grouping actions after reading the full recipe.
+
+Initial creation and full-draft correction use separate v11 prompts; pure
+measured overflow uses the strict text-only path and merges only target strings.
+All three explicitly preserve source cooking endpoints. Total time must be
+explicitly stated or fully derivable from an entirely timed, explicitly
+sequential source; untimed work/unclear overlap requires `null`. Runtime has
+no new semantic validation. V11 decides time before compression from the full
+source and prioritizes essential separate cooking/endpoints over optional
+details. Free grouping and FIRST-order validation remain unchanged. Q-21's
+second and final correction awaits independent F/R/G and human oven review;
+no deploy is authorized. CORR1 failed; dated evidence remains historical.
+
+QA-R1 font metadata comes from `getRecipeDetailsTextLayoutFields`: large steps
+22/1.25, compact steps 18/1.17 and teaser italic/1.25. Actual geometry is unchanged.
+Unknown-key-only (`unrecognized_keys`) diagnoses and nonstring affected values
+remain metadata-only; eligible known-string failures retain exact latest text
+only on exhaustion. These local corrections are tested, pending independent QA.
+
+[Partial] B-2 r3 / QA-R1 is implemented, NOT ACCEPTED / release CLOSED:
+focused519/full1600 passed, typecheck/build exit0; required F exit1 (5 executed /
+2 passed / 3 failed / 9 skipped); R/G NOT_RUN_REQUIRED_LIVE_FAILURE.
+Version guard and pasta pass. Rice has FIRST 6 before 5 and overflows (422);
+oven fits/200 but source-3 cream action moves into the source-4 group (semantic
+FAIL); forced dough repeats the overflow (422, semantics NOT_REACHED).
+QA established r2 pasta/dough lexical rubric defects, not proven cooking loss;
+narrow test-only repairs do not reclassify old FAIL or close findings.
+No loop Alpha deployment or QA acceptance is established; the historical
+14:12 Alpha release is logging-only. See
+[current r3 evidence](06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1)
+and the [D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+
+[Partial] Historical B-19 v4/v16 is implemented, not accepted: upstream offline gates passed
+(1437 units, typecheck/build); all F/R/G live gates exited 1. All three Preparation
+fixtures executed in each; rice/oven were rejected with 422/usage0/writes0/
+unchanged=true, pasta completed success assertions. Complete all-three
+cooking-core/success-path proof and independent QA remain open. No repair retry,
+deployment, acceptance or release is established; see the
+[B-19 handoff](../../User%20Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md).
 
 An explicit `PUT /api/recipes/{id}` export confirmation also does not require a
 client `If-Match`; a supplied header remains an optional precondition. The
@@ -261,10 +371,36 @@ are required.
 
 Recipe share failures are logged with a stage and stable reason where the
 handler can classify them. Export preparation records Azure OpenAI error name,
-sanitized provider code/status/request ID, and duration without logging prompt
-or generated text. Server-validation failures record up to eight phase/code/
-field-path diagnostics plus a truncation flag; they do not log validation
-messages or values. The completion event records source/export step counts.
+sanitized provider code/status/request ID, and duration. Server-validation
+failures record up to eight phase/code/field-path diagnostics plus a truncation
+flag; validation messages are not logged. With ordered partial traces, the
+coverage-only payload/helpers are removed: no `sourceStepTrace`, expected/actual
+order lists, or first-mismatch fields. Genuine unknown, duplicate, or reordered
+references still produce bounded phase/code/path diagnostics; generic request
+and provider diagnostics remain.
+Preparation logs otherwise exclude recipe/context text, generated source/export
+text, raw provider payloads and ingredient values. The sole new exception is
+`recipes.prepareExportView.correctionsExhausted`, only after the initial draft
+and two completed parsed corrections remain invalid. It records exact latest
+affected known step descriptions, teaser or difficulty, not old/intermediate
+drafts, source/context, arbitrary fields or unaffected text. `affected_fields`
+is JSON escaped; each field includes path/index/order when available, exact
+text/length and up to eight safe diagnoses with a truncation flag. The summary
+is bounded to eight phase/code/path entries; structured diagnoses retain
+constraints, reference values and available measured bounds/font/layout.
+Exact affected text is not truncated; diagnostic limits do not imply a blanket
+provider-payload size bound. This exception does not extend to terminal provider,
+technical, timeout or booking failures, success logs, other flows or HTTP.
+Provider/timeout errors return generic 502, technical probe/lookup/quota-backend/
+booking errors generic 500, and exhausted invalid drafts the existing 422
+validation envelope with bounded phase/code/path details, never raw text,
+measurements or private Error.message. Booking is once after validation and
+deadline check, with no automatic save or late-timeout booking.
+The completion event records source/export step counts. These diagnostics
+describe structural/reference failures against saved `recipe.steps`, not
+general cooking quality, guaranteed preservation, or historical replay. Privacy
+checks cover every log/warn/error argument, including nested values. See
+[Preparation V2 evidence boundary](06-ai-integrations.md#preparation-v2-evidence-boundary).
 Strict request-body failures across preparation and rendering record bounded
 Zod issue codes, sanitized schema paths, and up to eight identifier-shaped
 unknown field names, with issue/key truncation indicated; request values are
@@ -275,7 +411,17 @@ requests can be distinguished from ordinary edits.
 Render failures include the render stage, selected image ID, error code,
 bounded single-line message/cause, and available field or layout measurements.
 Detail-template failures retain `item_index` and `item_field` but never log
-`item_value`. Bundle render events also identify whether they used a request
+`item_value`. For `recipes.shareBundle.unrenderableDetail` with a measured
+step overflow, targeted recipe-text diagnostics additionally include the exact
+affected `step_text`, `step_count`, `step_layout` (large/compact),
+`step_text_length`, `step_longest_word_length`, and `step_explicit_line_breaks`.
+These values come from the actual adapted renderer input, including request
+drafts, not from a potentially different stored export. JSON preserves the
+text and escapes line breaks; only the failing step is logged, not the whole
+recipe, other steps, request, image data or credentials. The HTTP error remains
+unchanged and does not contain the step text. The existing Preparation and
+request-validation content exclusions above are unchanged.
+Bundle render events also identify whether they used a request
 draft or stored confirmed view. Storage-download failures record only safe
 error name/code/status metadata. Successful render events record output byte
 counts, not image data. Early failures use

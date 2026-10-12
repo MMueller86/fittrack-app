@@ -1,0 +1,69 @@
+﻿{
+    "series":  "dough-forced",
+    "file":  "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "filter":  "synthetic-dough-forced",
+    "count":  10,
+    "candidateStable":  true,
+    "runs":  [
+                 {
+                     "run":  1,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  3
+                 },
+                 {
+                     "run":  2,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  2
+                 },
+                 {
+                     "run":  3,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  3
+                 },
+                 {
+                     "run":  4,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  2
+                 },
+                 {
+                     "run":  5,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  22
+                 },
+                 {
+                     "run":  6,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  17
+                 },
+                 {
+                     "run":  7,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  2
+                 },
+                 {
+                     "run":  8,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  3
+                 },
+                 {
+                     "run":  9,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  2
+                 },
+                 {
+                     "run":  10,
+                     "exit":  0,
+                     "tests":  " 1 passed | 20 skipped (21)",
+                     "seconds":  3
+                 }
+             ]
+}

@@ -1,0 +1,80 @@
+{
+  "format": "fittrack-current-recipe-sharing-execution-v1",
+  "stage": "listPreparationCurrent",
+  "startedAt": "2026-10-10T10:26:10.547Z",
+  "finishedAt": "2026-10-10T10:26:12.803Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "--testNamePattern",
+    "preparation prompt version matches fixture expectations|recipePreparation"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": "01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3",
+  "candidateHashStable": true,
+  "changedPaths": [],
+  "state": "COMPLETED",
+  "counts": null,
+  "selection": [
+    {
+      "name": "preparation prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['synthetic-saved-eight-steps-rice-serv…'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['synthetic-saved-oven-seven-steps'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['synthetic-saved-pasta-essential-sauce'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['explicit-total-with-untimed-preparati…'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['completely-timed-explicit-sequence'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: total-time provenance regression > ['component-times-without-explicit-sequ…'] uses only source-supported total time",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    }
+  ],
+  "synthetic": [],
+  "outputPath": "docs/qa/reports/CURRENT-RECIPE-SHARING-2026-10-10-listPreparationCurrent-Output.txt",
+  "outputSha256": "437d3b1bdac9757cc1a9f35ef229622e332a76b88f082839c155a2c7b6d3e7ca",
+  "testReport": null,
+  "reportSha256": null,
+  "allIntendedTestsExecuted": null,
+  "noProviderCalls": true,
+  "liveGate": false
+}

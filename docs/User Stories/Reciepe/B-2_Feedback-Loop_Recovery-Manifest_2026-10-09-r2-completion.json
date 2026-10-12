@@ -1,0 +1,239 @@
+{
+  "status": "IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED",
+  "resumeProgressed": true,
+  "b2Complete": false,
+  "semanticPass": false,
+  "releaseEligible": false,
+  "routing": "Orchestrator scoped disposition of three required F failures; no automatic continuation",
+  "recoveryScope": "Reporting repair and read-only evidence/hash verification only; no implementation, gates, live calls, D-1, QA, deployment or delegation",
+  "handoff": "B-2_Feedback-Loop_Handoff_2026-10-09.md",
+  "head": "b637ee5b59a4f72b7d822443680c1951a01f9dc4",
+  "candidate": {
+    "path": "B-2_Feedback-Loop_Candidate_2026-10-09-r2.json",
+    "sha256": "80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171",
+    "files": 846,
+    "ownedPaths": 12,
+    "allFrozenBytesMatchedDuringRecovery": true,
+    "ownedFileHashesLocation": "candidate.files filtered by candidate.owned",
+    "originalBaseline": "B-2_Feedback-Loop_Baseline_2026-10-09.json",
+    "originalBaselineSha256": "496f84368131202863e5e4452528650ae2d6a89b5de1c97af84d10ce03647a93",
+    "resumeBaseline": "B-2_Feedback-Loop_Resume-Baseline_2026-10-09-r2.json",
+    "resumeBaselineSha256": "bd843a931f94d41c2c3b8d80e42a73d2ae1822d08b2cf041702f832e984720ba",
+    "inheritedContext": "Original/resume bytesBase64, inheritedDiff, status and candidate dependency identities retained; not a clean-HEAD publish",
+    "partialOwnedDiff": "B-2_Feedback-Loop_Owned-Diff_2026-10-09.patch",
+    "partialOwnedDiffSha256": "03e76986b087873226fbd69fa35a1e8e3bcdee9c85149b8e788749629e76c796",
+    "partialDiffIsFinalR2Diff": false
+  },
+  "preservation": {
+    "originalForeignFiles": 834,
+    "resumeForeignFiles": 845,
+    "originalForeignMismatchesBeforeReportingRepair": [],
+    "resumeForeignMismatchesBeforeReportingRepair": [],
+    "authorizedReportingOnlyChangedResumeFile": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09.md",
+    "immutableOriginalFailureAndNotRunEvidenceRetained": true,
+    "finalR2PreservationManifestExists": true,
+    "completion": "B-2_Feedback-Loop_Preservation_2026-10-09-r2-completion.json"
+  },
+  "contract": {
+    "loop": "initial plus at most two corrections; unchanged original ID-free context and latest whole draft/errors; whole-output validation and complete production teaser/step probe every attempt",
+    "diagnostics": "exact paths/index/order/count/layout, numeric references, constraints and font/bounds; technical/duplicate/absent/nonfinite measurement failures are terminal",
+    "providerApi": [
+      "correction",
+      "signal",
+      "timeout"
+    ],
+    "initialJsonKeys": [
+      "recipeContext",
+      "steps"
+    ],
+    "correctionJsonKeys": [
+      "originalPreparation",
+      "latestDraft",
+      "validationErrors"
+    ],
+    "preparationPromptVersion": "v5",
+    "importPromptVersion": "v16",
+    "temperature": 0.2,
+    "maxTokens": 2048,
+    "aggregateDeadlineMs": 75000,
+    "providerRequestMaxMs": 20000,
+    "sdkMaxRetries": 0,
+    "signalRequired": true,
+    "booking": "once after success and deadline check; awaited, never raced/retried",
+    "errorContract": "generic provider/timeout 502; generic technical/backend/booking 500; correction exhaustion 422; no private Error.message HTTP echo",
+    "logging": "exhaustion logs bounded diagnostics and exact latest affected known text only, JSON escaped; success metadata only",
+    "publicSharedContractChanged": false,
+    "persistenceAdded": false
+  },
+  "offline": {
+    "Focused": {
+      "path": "B-2_Feedback-Loop_Focused_2026-10-09-r2.json",
+      "sha256": "0e63ee958d1961c342c44ad7e5fb191dcf9ec7ff232ecc0677c303b712bdf679",
+      "exit": 0,
+      "counts": {
+        "executed": 495,
+        "passed": 495,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "Units": {
+      "path": "B-2_Feedback-Loop_Units_2026-10-09-r2.json",
+      "sha256": "dcd4488feaf6226df32a707c29b0b9489064cc5a919b5e3474b88b9d030a0c2d",
+      "exit": 0,
+      "counts": {
+        "executed": 1576,
+        "passed": 1576,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "Typecheck": {
+      "path": "B-2_Feedback-Loop_Typecheck_2026-10-09-r2.json",
+      "sha256": "dc7b048f0fe7814ee87edaceac146d199644518737548e6f5e287059d79fcb6c",
+      "exit": 0,
+      "counts": null
+    },
+    "Build": {
+      "path": "B-2_Feedback-Loop_Build_2026-10-09-r2.json",
+      "sha256": "3bc532c1496a400b845cdf63932eb184986f73d063985a4dfd39b91669abfa6f",
+      "exit": 0,
+      "counts": null
+    },
+    "exactCommandsAndRawReportHashes": "Each referenced immutable gate JSON; native hashes verified during recovery",
+    "candidateHashGuardAtOfflineExecution": false
+  },
+  "live": {
+    "F": {
+      "path": "B-2_Feedback-Loop_F_2026-10-09-r2.json",
+      "sha256": "bbc417eae6838a197ffb3860d2fed05c3390ffc17f5320cf603430c9e1c6ac6e",
+      "exit": 1,
+      "counts": {
+        "executed": 5,
+        "passed": 2,
+        "failed": 3,
+        "skipped": 9
+      },
+      "logicalCalls": 8,
+      "sdkCalls": 7
+    },
+    "R": {
+      "path": "B-2_Feedback-Loop_R_2026-10-09-r2.json",
+      "sha256": "50196ebb6485a1d7ae3ff286868f87e3d9c98baf165616b47d17b34e02b8a5a5",
+      "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+      "exit": null,
+      "executed": 0,
+      "providerCalls": 0,
+      "semanticPass": false
+    },
+    "G": {
+      "path": "B-2_Feedback-Loop_G_2026-10-09-r2.json",
+      "sha256": "38d4d7b1e39a5280ff769735d469ec8f5d960e0fc4e4b306d93b5c191c5b6522",
+      "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+      "exit": null,
+      "executed": 0,
+      "providerCalls": 0,
+      "semanticPass": false
+    },
+    "reconciliation": {
+      "path": "B-2_Feedback-Loop_Live-Reconciliation_2026-10-09-r2.json",
+      "sha256": "bae4d32b91400a7ea30f2cfa36797e3f922d4809568661be0b1c25ddfacaa30e"
+    },
+    "logicalCallsIncludeOneForcedInitialDraft": true,
+    "allRecordedSdkOptions": {
+      "maxRetries": 0,
+      "timeout": 20000,
+      "signalPresent": true,
+      "finishReason": "stop"
+    },
+    "fixtures": [
+      {
+        "fixture": "synthetic-saved-eight-steps-rice-serving",
+        "logicalCalls": 1,
+        "sdkCalls": 1,
+        "finalSteps": 5,
+        "http": 200,
+        "usageCalls": 1,
+        "fit": true,
+        "fidelityReached": true,
+        "fidelityPassed": true
+      },
+      {
+        "fixture": "synthetic-saved-oven-seven-steps",
+        "logicalCalls": 3,
+        "sdkCalls": 3,
+        "finalSteps": 4,
+        "http": 422,
+        "usageCalls": 0,
+        "fit": false,
+        "fidelityReached": false,
+        "fidelityPassed": false,
+        "failure": "steps[1] repeats 300x112 overflow against 302x105 across all drafts; later V2/booking/semantic assertions not reached"
+      },
+      {
+        "fixture": "synthetic-saved-pasta-essential-sauce",
+        "logicalCalls": 2,
+        "sdkCalls": 2,
+        "finalSteps": 3,
+        "http": 200,
+        "usageCalls": 1,
+        "fit": true,
+        "fidelityReached": true,
+        "fidelityPassed": false,
+        "failure": "independent contradiction rubric at source 5"
+      },
+      {
+        "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+        "logicalCalls": 2,
+        "sdkCalls": 1,
+        "finalSteps": 3,
+        "http": 200,
+        "usageCalls": 1,
+        "fit": true,
+        "fidelityReached": true,
+        "fidelityPassed": false,
+        "failure": "ingredient-explicit preservation rubric at source 1; fitting generic all-ingredients wording is not a fidelity pass"
+      }
+    ],
+    "allRecordedSourcesUnchanged": true,
+    "allRecordedUpdateReplaceCreateCountsZero": true,
+    "retryOrNewLiveExecutionDuringRecovery": false
+  },
+  "missingChecksAndArtifacts": [],
+  "unresolvedForeignFindings": [
+    "Q-19 FAIL",
+    "Earlier accepted-rice fidelity loss",
+    "Earlier absent rice/oven success; one current synthetic rice pass does not close historical findings",
+    "Foreign Import/Daily failures; no new R/G conclusions",
+    "Historical private/Alpha replay limitations"
+  ],
+  "nextBlocker": "Required F failed; ExpectedHandoff evidence is complete, but this frozen r2 candidate remains release blocked.",
+  "manifestSelfHashExcluded": true,
+  "handoffArtifactsComplete": true,
+  "implementationPresent": true,
+  "previousRecoveryManifest": {
+    "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09.json",
+    "sha256": "321f98c4e49838c711cfeff16def6a431965b4c09e4a7922ece8835310a51951",
+    "preserved": true
+  },
+  "expectedHandoffAssets": [
+    "B-2_Feedback-Loop_Owned-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Patch-Audit_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Patch-Audit-Output_2026-10-09-r2-completion.txt",
+    "B-2_Feedback-Loop_Preservation_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Ownership_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Original-To-Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Inherited-Original-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Inherited-Resume-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Recorded-Provider-Evidence_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Secret-Scan_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json"
+  ],
+  "remainingVerificationRequirements": [
+    "Orchestrator disposition/authorization for oven overflow, pasta contradiction and dough ingredient fidelity",
+    "Any authorized successor candidate needs its own verification; no retries authorized by this completion",
+    "Required R/G remain NOT_RUN after F failure",
+    "Independent QA and historical/private Alpha replay remain unverified; Q-19 remains FAIL; no D-1 or deployment"
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "stage": "typecheck",
+  "startedAt": "2026-10-10T00:22:23.317Z",
+  "finishedAt": "2026-10-10T00:22:26.064Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "typecheck",
+    "--workspace=backend"
+  ],
+  "cwd": ".",
+  "exit": 0,
+  "signal": null,
+  "counts": null,
+  "selection": null,
+  "outputPath": "docs/qa/reports/Q21-FINAL2-2026-10-10-typecheck-Output.txt",
+  "outputSha256": "23c579af752749ab52e91e4b158cb5b0963e398b79c00fe844abe59d5ad8271f",
+  "testReport": null,
+  "reportSha256": null,
+  "synthetic": [],
+  "allIntendedTestsExecuted": null,
+  "liveGate": false,
+  "offlineStage": true
+}

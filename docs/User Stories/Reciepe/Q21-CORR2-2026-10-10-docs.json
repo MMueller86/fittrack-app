@@ -1,0 +1,10 @@
+{
+  "exit": 0,
+  "kbFiles": 6,
+  "historicalSections": 4,
+  "currentVersions": {
+    "preparation": "v11",
+    "daily": "v17"
+  },
+  "scope": "Selected dated heading blocks byte-equivalent; full file hashes intentionally changed"
+}

@@ -399,7 +399,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     expect(generateDailyInsight).toHaveBeenCalledTimes(1);
   });
 
-  it('invalidates an old Daily cache entry before returning a fresh v15 response', async () => {
+  it('invalidates an old Daily cache entry before returning a fresh v16 response', async () => {
     const context = makeInputContext();
     const cached = makeDaily(context, {
       promptVersion: 'v9',
@@ -463,15 +463,15 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.jsonBody).toMatchObject({ status: 'fresh', promptVersion: 'v15' });
+    expect(response.jsonBody).toMatchObject({ status: 'fresh', promptVersion: DAILY_INSIGHT_PROMPT_VERSION });
     expect(generateDailyInsight).toHaveBeenCalledTimes(1);
     await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toMatchObject({
-      promptVersion: 'v15',
+      promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
       promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
     });
   });
 
-  it('generates and stores v15 after a same-date v14 cache expires', async () => {
+  it('generates and stores v16 after a same-date v14 cache expires', async () => {
     const context = makeInputContext();
     await getInsightRepository().upsert(makeV14Cache(context, {
       expiresAt: '2026-08-20T11:59:59.000Z',
@@ -486,13 +486,13 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     expect(response.status).toBe(200);
     expect(response.jsonBody).toMatchObject({
       title: 'Dein Fokus heute',
-      promptVersion: 'v15',
+      promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
       status: 'fresh',
       feedbackAvailable: true,
     });
     expect(generateDailyInsight).toHaveBeenCalledTimes(1);
     await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toMatchObject({
-      promptVersion: 'v15',
+      promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
       promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
       systemPromptHash: expect.any(String),
       promptSnapshot: {
@@ -500,7 +500,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
         user: expect.any(String),
       },
       dailyGenerations: 2,
-      response: { promptVersion: 'v15', status: 'fresh' },
+      response: { promptVersion: DAILY_INSIGHT_PROMPT_VERSION, status: 'fresh' },
     });
   });
 

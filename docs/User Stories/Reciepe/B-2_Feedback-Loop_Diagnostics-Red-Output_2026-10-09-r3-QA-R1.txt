@@ -1,0 +1,188 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [31m❯[39m src/lib/recipePreparation.test.ts [2m([22m[2m49 tests[22m[2m | [22m[31m2 failed[39m[2m | [22m[33m45 skipped[39m[2m)[22m[33m 2564[2mms[22m[39m
+[31m   [31m×[31m B-2 bounded Preparation loop[2m > [22mQA-R1 excludes nested unknown-key-only diagnostics from affected text[90m 7[2mms[22m[31m[39m
+[31m     → expected [ { …(6) } ] to deeply equal [][39m
+   [33m[2m✓[22m[39m B-2 bounded Preparation loop[2m > [22mQA-R1 uses production step and teaser font metadata for 4 steps [33m2385[2mms[22m[39m
+[31m   [31m×[31m B-2 bounded Preparation loop[2m > [22mQA-R1 uses production step and teaser font metadata for 5 steps[90m 170[2mms[22m[31m[39m
+[31m     → expected [ { phase: 'template', …(10) }, …(1) ] to deep equally contain ObjectContaining{…}[39m
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mQA-R1 logs metadata only for nested unknown-key-only exhaustion
+[22m[39m[ctx.log] {"ts":"2026-10-09T16:53:31.294Z","level":"info","event":"handler.start","handler":"recipes.create"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mQA-R1 logs metadata only for nested unknown-key-only exhaustion
+[22m[39m[ctx.log] {"ts":"2026-10-09T16:53:31.299Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"dc2d87cd-7bf7-4da4-ae5d-b0022d7b532d","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T16:53:31.299Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":5}
+
+ [31m❯[39m src/functions/recipes.test.ts [2m([22m[2m122 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m121 skipped[39m[2m)[22m[90m 215[2mms[22m[39m
+[31m   [31m×[31m POST /recipes/{id}/export-view/prepare[2m > [22mQA-R1 logs metadata only for nested unknown-key-only exhaustion[90m 159[2mms[22m[31m[39m
+[31m     → expected { …(16) } to match object { affected_field_count: +0, …(3) }
+(12 matching properties omitted from actual)[39m
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[2m | [22m[33m166 skipped[39m[90m (171)[39m
+[2m   Start at [22m 18:53:10
+[2m   Duration [22m 21.10s[2m (transform 492ms, setup 0ms, collect 20.72s, tests 2.78s, environment 0ms, prepare 2.27s)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Red-Report_2026-10-09-r3-QA-R1.json
+[90mstderr[2m | src/functions/recipes.test.ts
+[22m[39mWARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 3 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/functions/recipes.test.ts[2m > [22mPOST /recipes/{id}/export-view/prepare[2m > [22mQA-R1 logs metadata only for nested unknown-key-only exhaustion
+[31m[1mAssertionError[22m: expected { …(16) } to match object { affected_field_count: +0, …(3) }
+(12 matching properties omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Object {[22m
+[32m-   "affected_field_count": 0,[39m
+[32m-   "affected_fields": "[]",[39m
+[31m+   "affected_field_count": 1,[39m
+[31m+   "affected_fields": "[{\"path\":\"steps[0].description\",\"stepIndex\":0,\"stepOrder\":1,\"text\":\"Mische den Teig.\",\"textLength\":16,\"diagnoses\":[{\"phase\":\"schema\",\"code\":\"unrecognized_keys\",\"path\":\"steps[0]\",\"stepIndex\":0,\"stepOrder\":1,\"constraint\":\"unrecognized_keys\",\"explanation\":\"The field must satisfy the strict Preparation schema.\"}],\"diagnoses_truncated\":false}]",[39m
+[2m    "corrections": 2,[22m
+[2m    "logical_calls": 3,[22m
+[2m  }[22m
+
+[36m [2m❯[22m src/functions/recipes.test.ts:[2m262:28[22m[39m
+    [90m260| [39m      const exhausted = events.filter((event) => event.event === 'reci…
+    [90m261| [39m      expect(exhausted).toHaveLength(1);
+    [90m262| [39m      expect(exhausted[0]).toMatchObject({ affected_field_count: 0, af…
+    [90m   | [39m                           [31m^[39m
+    [90m263| [39m      const captured = JSON.stringify(logs.map((log) => log.mock.calls…
+    [90m264| [39m      for (const text of ['Mische den Teig.', 'Goldbraunes Brot', 'UNK…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipePreparation.test.ts[2m > [22mB-2 bounded Preparation loop[2m > [22mQA-R1 excludes nested unknown-key-only diagnostics from affected text
+[31m[1mAssertionError[22m: expected [ { …(6) } ] to deeply equal [][39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- Array [][39m
+[31m+ Array [[39m
+[31m+   Object {[39m
+[31m+     "diagnoses": Array [[39m
+[31m+       Object {[39m
+[31m+         "code": "unrecognized_keys",[39m
+[31m+         "constraint": "unrecognized_keys",[39m
+[31m+         "explanation": "The field must satisfy the strict Preparation schema.",[39m
+[31m+         "path": "steps[0]",[39m
+[31m+         "phase": "schema",[39m
+[31m+         "stepIndex": 0,[39m
+[31m+         "stepOrder": 1,[39m
+[31m+       },[39m
+[31m+     ],[39m
+[31m+     "path": "steps[0].description",[39m
+[31m+     "stepIndex": 0,[39m
+[31m+     "stepOrder": 1,[39m
+[31m+     "text": "Mische den Teig.",[39m
+[31m+     "textLength": 16,[39m
+[31m+   },[39m
+[31m+ ][39m
+
+[36m [2m❯[22m src/lib/recipePreparation.test.ts:[2m26:77[22m[39m
+    [90m 24| [39m    [35mif[39m (validation[33m.[39mok) [35mthrow[39m [35mnew[39m [33mError[39m([32m'Expected unknown-key rejection[39m…
+    [90m 25| [39m    [34mexpect[39m(validation[33m.[39mdiagnostics)[33m.[39m[34mtoMatchObject[39m([{ phase[33m:[39m [32m'schema'[39m[33m,[39m c…
+    [90m 26| [39m    [34mexpect[39m([34mrecipePreparationAffectedFields[39m(output[33m,[39m validation[33m.[39mdiagnost…
+    [90m   | [39m                                                                            [31m^[39m
+    [90m 27| [39m  })[33m;[39m
+    [90m 28| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipePreparation.test.ts[2m > [22mB-2 bounded Preparation loop[2m > [22mQA-R1 uses production step and teaser font metadata for 5 steps
+[31m[1mAssertionError[22m: expected [ { phase: 'template', …(10) }, …(1) ] to deep equally contain ObjectContaining{…}[39m
+
+[32m- Expected:[39m 
+ObjectContaining {
+  "font": Object {
+    "family": "Inter",
+    "lineHeight": 1.17,
+    "size": 18,
+    "style": "normal",
+    "weight": 500,
+  },
+  "layout": "compact",
+  "path": "steps[0].description",
+  "stepCount": 5,
+}
+
+[31m+ Received:[39m 
+Array [
+  Object {
+    "actual": Object {
+      "width": 1774,
+    },
+    "bounds": Object {
+      "tolerance": 0.5,
+      "width": 461,
+    },
+    "code": "TEMPLATE_FIELD_OVERFLOW",
+    "constraint": "measured_text_bounds",
+    "explanation": "Reword the affected text to fit these measured production bounds without changing source-backed meaning.",
+    "font": Object {
+      "family": "Inter",
+      "lineHeight": 1.25,
+      "size": 18,
+      "style": "italic",
+      "weight": 500,
+    },
+    "layout": "compact",
+    "path": "teaser",
+    "phase": "template",
+    "stepCount": 5,
+    "stepIndex": undefined,
+  },
+  Object {
+    "actual": Object {
+      "width": 1663,
+    },
+    "bounds": Object {
+      "tolerance": 0.5,
+      "width": 318,
+    },
+    "code": "TEMPLATE_FIELD_OVERFLOW",
+    "constraint": "measured_text_bounds",
+    "explanation": "Reword the affected text to fit these measured production bounds without changing source-backed meaning.",
+    "font": Object {
+      "family": "Inter",
+      "lineHeight": 1.25,
+      "size": 18,
+      "style": "normal",
+      "weight": 500,
+    },
+    "layout": "compact",
+    "path": "steps[0].description",
+    "phase": "template",
+    "stepCount": 5,
+    "stepIndex": 0,
+    "stepOrder": 1,
+  },
+]
+
+[36m [2m❯[22m src/lib/recipePreparation.test.ts:[2m47:22[22m[39m
+    [90m 45| [39m    [35mif[39m (result[33m.[39mstatus [33m!==[39m [32m'exhausted'[39m) [35mthrow[39m [35mnew[39m [33mError[39m([32m'Expected measu[39m…
+    [90m 46| [39m    [35mfor[39m ([35mconst[39m errors [35mof[39m [result[33m.[39mdiagnostics[33m,[39m [33m...[39mgenerate[33m.[39mmock[33m.[39mcalls[33m.[39m[34ms[39m…
+    [90m 47| [39m      [34mexpect[39m(errors)[33m.[39m[34mtoContainEqual[39m(expect[33m.[39m[34mobjectContaining[39m({ path[33m:[39m [32m's[39m…
+    [90m   | [39m                     [31m^[39m
+    [90m 48| [39m        layout[33m:[39m count [33m===[39m [34m5[39m [33m?[39m [32m'compact'[39m [33m:[39m [32m'large'[39m[33m,[39m stepCount[33m:[39m count[33m,[39m
+    [90m 49| [39m        font[33m:[39m { family[33m:[39m [32m'Inter'[39m[33m,[39m size[33m:[39m count [33m===[39m [34m5[39m [33m?[39m [34m18[39m [33m:[39m [34m22[39m[33m,[39m weight[33m:[39m …
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯[22m[39m
+

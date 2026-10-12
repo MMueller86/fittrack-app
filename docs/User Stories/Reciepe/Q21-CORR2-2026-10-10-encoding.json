@@ -1,0 +1,13 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "scripts/check-encoding.mjs"
+  ],
+  "cwd": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app",
+  "started": "2026-10-10T00:16:03.564Z",
+  "finished": "2026-10-10T00:16:03.806Z",
+  "exit": 0,
+  "counts": null,
+  "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-encoding-Output.txt",
+  "outputSha256": "9e10a18590f8d61167af47c191a36f3a21cdbd7b1a58c010133fb00388343f77"
+}

@@ -1,0 +1,18 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "typecheck",
+    "--workspace=backend"
+  ],
+  "startedAt": "2026-10-09T16:01:07.992Z",
+  "endedAt": "2026-10-09T16:01:14.313Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "23c579af752749ab52e91e4b158cb5b0963e398b79c00fe844abe59d5ad8271f",
+  "reportSha256": null,
+  "counts": null,
+  "failures": []
+}

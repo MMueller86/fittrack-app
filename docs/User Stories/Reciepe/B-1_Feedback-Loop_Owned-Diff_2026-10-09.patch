@@ -1,0 +1,1408 @@
+diff --git a/backend/src/lib/instagramRenderer/render.ts b/backend/src/lib/instagramRenderer/render.ts
+index a59386f..6909b6e 100644
+--- a/backend/src/lib/instagramRenderer/render.ts
++++ b/backend/src/lib/instagramRenderer/render.ts
+@@ -17,6 +17,7 @@ import {
+ import type { PhotoAsset } from "./photo";
+ import {
+   composeRecipeDetailsTemplate,
++  composeRecipeDetailsGeneratedText,
+   getRecipeDetailsTitleLayout,
+   RECIPE_DETAILS_TEMPLATE_CHIP_TOP,
+   RECIPE_DETAILS_TEMPLATE_DESCRIPTION_GAP,
+@@ -40,7 +41,7 @@ import {
+   getRecipeDetailsTextLayoutFields,
+   type RecipeDetailsTemplateTextOverrides,
+ } from "./recipeDetailsTemplateV3";
+-import { addMeasuredGermanBreaks, measureDetailTextWidths } from "./detailTextLayout";
++import { addMeasuredGermanBreaks, measureDetailTextWidths, type DetailTextLayoutField } from "./detailTextLayout";
+ import { loadRecipeMetaIcons, RecipeMetaIconAssetError } from "./recipeMeta";
+ import { TagIconAssetError } from "./tagIcons";
+ import type {
+@@ -48,6 +49,10 @@ import type {
+   RecipeDetailsTemplateField,
+   RecipeDetailsTemplateItemField,
+   RecipeDetailsTemplateRenderResult,
++  RecipeDetailsGeneratedTextProbeInput,
++  RecipeDetailsGeneratedTextProbeResult,
++  RecipeDetailsGeneratedTextProbeDiagnostic,
++  RecipeDetailsGeneratedTextProbeTechnicalCode,
+   RenderInput,
+   RenderResult,
+ } from "./types";
+@@ -105,6 +110,13 @@ const DESIGN_ASSET_FILES = {
+ 
+ let runtimeDependenciesPromise: Promise<RuntimeDependencies> | undefined;
+ let rendererAssetsPromise: Promise<RendererAssets> | undefined;
++let satoriPromise: Promise<SatoriRenderer> | undefined;
++let fontsPromise: Promise<Font[]> | undefined;
++
++function getSatori(): Promise<SatoriRenderer> {
++  satoriPromise ??= import("satori").then((module) => module.default);
++  return satoriPromise;
++}
+ 
+ function errorMessage(error: unknown): string {
+   return error instanceof Error ? error.message : String(error);
+@@ -147,13 +159,13 @@ function toImageError(error: UnreadableImageError): RenderResult {
+ 
+ async function loadRuntimeDependencies(): Promise<RuntimeDependencies> {
+   const [satoriModule, resvgModule, sharpModule] = await Promise.all([
+-    import("satori"),
++    getSatori(),
+     import("@resvg/resvg-js"),
+     import("sharp"),
+   ]);
+ 
+   return {
+-    satori: satoriModule.default,
++    satori: satoriModule,
+     Resvg: resvgModule.Resvg,
+     sharp: (sharpModule.default ?? sharpModule) as SharpFactory,
+   };
+@@ -234,11 +246,8 @@ function toDataUri(buffer: Buffer, mimeType: string): string {
+ async function loadRendererAssets(): Promise<RendererAssets> {
+   const assetRoot = findAssetRoot();
+   const recipeMetaIcons = loadRecipeMetaIcons();
+-  const [medium, mediumItalic, semiBold, displayBold, barbell, highProtein, lowFat] = await Promise.all([
+-    readAsset(assetRoot, FONT_FILES.medium),
+-    readAsset(assetRoot, FONT_FILES.mediumItalic),
+-    readAsset(assetRoot, FONT_FILES.semiBold),
+-    readAsset(assetRoot, FONT_FILES.displayBold),
++  const [fonts, barbell, highProtein, lowFat] = await Promise.all([
++    getRendererFonts(),
+     readAsset(assetRoot, DESIGN_ASSET_FILES.barbell),
+     readAsset(assetRoot, DESIGN_ASSET_FILES.highProtein),
+     readAsset(assetRoot, DESIGN_ASSET_FILES.lowFat),
+@@ -260,12 +269,7 @@ async function loadRendererAssets(): Promise<RendererAssets> {
+   }
+ 
+   return {
+-    fonts: [
+-      { name: "Inter", weight: 500, style: "normal", data: medium },
+-      { name: "Inter", weight: 500, style: "italic", data: mediumItalic },
+-      { name: "Inter", weight: 600, data: semiBold },
+-      { name: "InterDisplay", weight: 700, data: displayBold },
+-    ],
++    fonts,
+     nutritionHighlights: {
+       "high-protein": toDataUri(highProtein, "image/png"),
+       "low-fat": toDataUri(lowFat, "image/png"),
+@@ -282,6 +286,25 @@ function getRendererAssets(): Promise<RendererAssets> {
+   return rendererAssetsPromise;
+ }
+ 
++function getRendererFonts(): Promise<Font[]> {
++  fontsPromise ??= (async () => {
++    const root = findAssetRoot();
++    const [medium, mediumItalic, semiBold, displayBold] = await Promise.all([
++      readAsset(root, FONT_FILES.medium),
++      readAsset(root, FONT_FILES.mediumItalic),
++      readAsset(root, FONT_FILES.semiBold),
++      readAsset(root, FONT_FILES.displayBold),
++    ]);
++    return [
++      { name: "Inter", weight: 500, style: "normal", data: medium },
++      { name: "Inter", weight: 500, style: "italic", data: mediumItalic },
++      { name: "Inter", weight: 600, data: semiBold },
++      { name: "InterDisplay", weight: 700, data: displayBold },
++    ];
++  })();
++  return fontsPromise;
++}
++
+ function invalidZoom(value: number): RenderResult {
+   return {
+     ok: false,
+@@ -618,6 +641,205 @@ type DetailsProbeMeasurements = {
+   steps: Map<number, DetailsProbeMeasurement>;
+ };
+ 
++const DESCRIPTION_FONT_SIZES = [22, 21, 20, 19, 18] as const;
++
++function createDetailsMeasurements(): DetailsProbeMeasurements {
++  return { ingredients: new Map(), steps: new Map() };
++}
++
++function detectDetailsNode(measurements: DetailsProbeMeasurements, node: SatoriNode): void {
++  const marker = getNodeMarker(node) ?? "";
++  const measurement = { width: node.width, height: node.height };
++  if (marker === RECIPE_DETAILS_TEMPLATE_TITLE_NODE) {
++    measurements.title = measurement;
++  } else if (marker === RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) {
++    measurements.description = measurement;
++  } else {
++    const ingredientIndex = getDetailsNodeIndex(marker, RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX);
++    const stepIndex = getDetailsNodeIndex(marker, RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX);
++    if (ingredientIndex !== undefined) measurements.ingredients.set(ingredientIndex, measurement);
++    if (stepIndex !== undefined) measurements.steps.set(stepIndex, measurement);
++  }
++}
++
++function createDetailsTextOverrides(
++  input: Pick<RecipeDetailsTemplateInput, "title" | "description" | "steps"> &
++    Partial<Pick<RecipeDetailsTemplateInput, "ingredients">>,
++  textById: ReadonlyMap<string, string>,
++  descriptionFontSize: number,
++): RecipeDetailsTemplateTextOverrides {
++  return {
++    title: textById.get(RECIPE_DETAILS_TEMPLATE_TITLE_NODE) ?? input.title,
++    descriptionFontSize,
++    ...(input.description === undefined ? {} : {
++      description: textById.get(RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) ?? input.description,
++    }),
++    ingredients: (input.ingredients ?? []).map((ingredient, index) =>
++      textById.get(`${RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX}${index}`) ??
++      `${ingredient.amount} ${ingredient.name}`,
++    ),
++    steps: input.steps.map((step, index) =>
++      textById.get(`${RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX}${index}`) ?? step,
++    ),
++  };
++}
++
++function isInvalidDetailsText(text: string, maxLength: number): boolean {
++  return text.trim().length === 0 || text.trim().length > maxLength || /[\r\n\u2028\u2029]/u.test(text);
++}
++
++function getDetailsMeasurement(
++  field: DetailTextLayoutField,
++  measurements: DetailsProbeMeasurements,
++): DetailsProbeMeasurement | undefined {
++  if (field.field === "title") return measurements.title;
++  if (field.field === "description") return measurements.description;
++  if (field.field === "steps") return measurements.steps.get(field.itemIndex!);
++  return measurements.ingredients.get(field.itemIndex!);
++}
++
++export async function probeInstagramRecipeDetailsGeneratedText(
++  candidate: RecipeDetailsGeneratedTextProbeInput,
++): Promise<RecipeDetailsGeneratedTextProbeResult> {
++  const technicalFailure = (
++    code: RecipeDetailsGeneratedTextProbeTechnicalCode,
++    message: string,
++    diagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[],
++    asset?: string,
++  ): RecipeDetailsGeneratedTextProbeResult => ({
++    ok: false, status: "technical-failure", diagnostics,
++    error: { code, message, ...(asset === undefined ? {} : { asset }) },
++  });
++  if (
++    !candidate || typeof candidate.savedTitle !== "string" ||
++    isInvalidDetailsText(candidate.savedTitle, 60) ||
++    typeof candidate.teaser !== "string" || !Array.isArray(candidate.steps) ||
++    candidate.steps.some((step) => typeof step !== "string")
++  ) {
++    return technicalFailure("INVALID_CONTEXT", "The probe requires a valid saved title and complete text candidate.", [
++      { field: "title", status: "technical-failure", code: "INVALID_CONTEXT" },
++      { field: "teaser", status: "technical-failure", code: "INVALID_CONTEXT" },
++      ...(Array.isArray(candidate?.steps) ? candidate.steps.map((_step, itemIndex) => ({
++        field: "steps" as const, itemIndex, status: "technical-failure" as const, code: "INVALID_CONTEXT" as const,
++      })) : [{ field: "steps" as const, status: "technical-failure" as const, code: "INVALID_CONTEXT" as const }]),
++    ]);
++  }
++
++  const input = { title: candidate.savedTitle, description: candidate.teaser, steps: candidate.steps };
++  const invalidCount = input.steps.length === 0 || input.steps.length > RECIPE_DETAILS_TEMPLATE_MAX_STEPS;
++  const invalidDiagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[] = [];
++  if (isInvalidDetailsText(input.description, 96)) {
++    invalidDiagnostics.push({ field: "teaser", status: "invalid-text", code: "INVALID_TEXT" });
++  }
++  if (invalidCount) {
++    invalidDiagnostics.push({ field: "steps", status: "invalid-text", code: "INVALID_STEP_COUNT" });
++  }
++  input.steps.forEach((step, itemIndex) => {
++    if (invalidCount || isInvalidDetailsText(step, 90)) {
++      invalidDiagnostics.push({
++        field: "steps", itemIndex, status: "invalid-text",
++        code: invalidCount ? "INVALID_STEP_COUNT" : "INVALID_TEXT",
++      });
++    }
++  });
++  const identify = (field: DetailTextLayoutField) => ({
++    field: field.field === "description" ? "teaser" as const : field.field as "title" | "steps",
++    ...(field.itemIndex === undefined ? {} : { itemIndex: field.itemIndex }),
++  });
++
++  try {
++    const [satori, fonts] = await Promise.all([getSatori(), getRendererFonts()]);
++    for (const descriptionFontSize of DESCRIPTION_FONT_SIZES) {
++      const fields = getRecipeDetailsTextLayoutFields(input, descriptionFontSize);
++      const diagnostics = [...invalidDiagnostics];
++      const textById = new Map<string, string>();
++      const measurable: DetailTextLayoutField[] = [];
++      for (const field of fields) {
++        const identity = identify(field);
++        if (invalidDiagnostics.some((item) => item.field === identity.field && item.itemIndex === identity.itemIndex)) {
++          textById.set(field.id, "");
++          continue;
++        }
++        const layout = await addMeasuredGermanBreaks([field], (requests) =>
++          measureDetailTextWidths(satori, fonts, requests),
++        );
++        if (!layout.ok) {
++          textById.set(field.id, "");
++          if (field.field === "title") {
++            diagnostics.push({ ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED" });
++          } else {
++            diagnostics.push({
++              ...identity, status: "width-overflow", fontSize: field.style.fontSize,
++              measured: { width: layout.error.measuredWidth, maxWidth: field.maxWidth },
++            });
++          }
++          continue;
++        }
++        const displayText = layout.textById.get(field.id);
++        if (displayText === undefined) {
++          throw new Error(`The detail text probe did not return source field ${field.id}.`);
++        }
++        textById.set(field.id, displayText);
++        measurable.push(field);
++      }
++
++      const measurements = createDetailsMeasurements();
++      await satori(
++        composeRecipeDetailsGeneratedText(input, createDetailsTextOverrides(input, textById, descriptionFontSize)) as
++          unknown as Parameters<SatoriRenderer>[0],
++        {
++          width: CANVAS_WIDTH, height: CANVAS_HEIGHT, fonts, embedFont: true,
++          onNodeDetected: (node) => detectDetailsNode(measurements, node),
++        },
++      );
++      for (const field of measurable) {
++        const identity = identify(field);
++        const measured = getDetailsMeasurement(field, measurements);
++        if (!measured || !Number.isFinite(measured.width) || !Number.isFinite(measured.height)) {
++          diagnostics.push({
++            ...identity, status: "technical-failure",
++            code: measured ? "NON_FINITE_MEASUREMENT" : "MISSING_MEASUREMENT",
++          });
++        } else if (field.field === "title" && exceedsDetailsBounds(measured, field.maxWidth, field.maxHeight)) {
++          diagnostics.push({ ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED" });
++        } else {
++          diagnostics.push({
++            ...identity,
++            status: exceedsDetailsBounds(measured, field.maxWidth, field.maxHeight) ? "overflow" : "fits",
++            measured: { ...measured, maxWidth: field.maxWidth, maxHeight: field.maxHeight },
++            fontSize: field.style.fontSize, displayText: textById.get(field.id)!,
++          });
++        }
++      }
++      const technical = diagnostics.find((item) => item.status === "technical-failure");
++      if (technical?.status === "technical-failure") {
++        return technicalFailure(technical.code, "Production text geometry could not be established.", diagnostics);
++      }
++      const teaserFailure = diagnostics.find((item) =>
++        item.field === "teaser" && (item.status === "overflow" || item.status === "width-overflow"),
++      );
++      if (teaserFailure && descriptionFontSize > 18) continue;
++      const result = { diagnostics, teaserFontSize: descriptionFontSize };
++      return diagnostics.every((item) => item.status === "fits")
++        ? { ...result, ok: true, status: "success" }
++        : { ...result, ok: false, status: "generated-text-failure" };
++    }
++    return technicalFailure("PROBE_FAILED", "No detail teaser font size was evaluated.", []);
++  } catch (error) {
++    const code: RecipeDetailsGeneratedTextProbeTechnicalCode =
++      error instanceof MissingRendererAssetError ? "MISSING_ASSET" : "FONT_OR_SATORI_FAILED";
++    const diagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[] = [
++      { field: "title", status: "technical-failure", code },
++      { field: "teaser", status: "technical-failure", code },
++      ...input.steps.map((_step, itemIndex) => ({
++        field: "steps" as const, itemIndex, status: "technical-failure" as const, code,
++      })),
++    ];
++    return technicalFailure(code, errorMessage(error), diagnostics,
++      error instanceof MissingRendererAssetError ? error.asset : undefined);
++  }
++}
++
+ function getDetailsNodeIndex(marker: string, prefix: string): number | undefined {
+   if (!marker.startsWith(prefix)) return undefined;
+   const index = Number(marker.slice(prefix.length));
+@@ -804,9 +1026,7 @@ function validateRecipeDetailsTemplate(
+   input: RecipeDetailsTemplateInput,
+ ): RecipeDetailsTemplateRenderResult | undefined {
+   if (
+-    input.title.trim().length === 0 ||
+-    input.title.trim().length > 60 ||
+-    /[\r\n\u2028\u2029]/u.test(input.title)
++    isInvalidDetailsText(input.title, 60)
+   ) {
+     return invalidTemplateInput(
+       "title",
+@@ -815,9 +1035,7 @@ function validateRecipeDetailsTemplate(
+   }
+   if (
+     input.description !== undefined &&
+-    (input.description.trim().length === 0 ||
+-      input.description.trim().length > 96 ||
+-      /[\r\n\u2028\u2029]/u.test(input.description))
++    isInvalidDetailsText(input.description, 96)
+   ) {
+     return invalidTemplateInput(
+       "description",
+@@ -884,9 +1102,7 @@ function validateRecipeDetailsTemplate(
+     );
+   }
+   const invalidStepIndex = input.steps.findIndex((step) =>
+-    step.trim().length === 0 ||
+-    step.trim().length > 90 ||
+-    /[\r\n\u2028\u2029]/u.test(step),
++    isInvalidDetailsText(step, 90),
+   );
+   if (invalidStepIndex >= 0) {
+     return invalidTemplateInput(
+@@ -911,7 +1127,7 @@ export async function renderInstagramRecipeDetailsTemplate(
+   try {
+     const [runtime, assets] = await Promise.all([getRuntimeDependencies(), getRendererAssets()]);
+     const photo = await loadPhoto(runtime.sharp, input.image);
+-    for (const descriptionFontSize of [22, 21, 20, 19, 18]) {
++    for (const descriptionFontSize of DESCRIPTION_FONT_SIZES) {
+       const textFields = getRecipeDetailsTextLayoutFields(input, descriptionFontSize);
+       const textLayout = await addMeasuredGermanBreaks(textFields, (requests) =>
+         measureDetailTextWidths(runtime.satori, assets.fonts, requests),
+@@ -944,28 +1160,8 @@ export async function renderInstagramRecipeDetailsTemplate(
+       }
+ 
+       const textById = textLayout.textById;
+-      const textOverrides: RecipeDetailsTemplateTextOverrides = {
+-        title: textById.get(RECIPE_DETAILS_TEMPLATE_TITLE_NODE) ?? input.title,
+-        descriptionFontSize,
+-        ...(input.description === undefined
+-          ? {}
+-          : {
+-              description:
+-                textById.get(RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) ?? input.description,
+-            }),
+-        ingredients: input.ingredients.map((ingredient, index) =>
+-          textById.get(`${RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX}${index}`) ??
+-          `${ingredient.amount} ${ingredient.name}`,
+-        ),
+-        steps: input.steps.map(
+-          (step, index) =>
+-            textById.get(`${RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX}${index}`) ?? step,
+-        ),
+-      };
+-      const measurements: DetailsProbeMeasurements = {
+-        ingredients: new Map(),
+-        steps: new Map(),
+-      };
++      const textOverrides = createDetailsTextOverrides(input, textById, descriptionFontSize);
++      const measurements = createDetailsMeasurements();
+       const svg = await runtime.satori(
+         composeRecipeDetailsTemplate(input, {
+           photo,
+@@ -978,34 +1174,7 @@ export async function renderInstagramRecipeDetailsTemplate(
+           height: CANVAS_HEIGHT,
+           fonts: assets.fonts,
+           embedFont: true,
+-          onNodeDetected: (node) => {
+-            const marker = getNodeMarker(node);
+-            if (marker === RECIPE_DETAILS_TEMPLATE_TITLE_NODE) {
+-              measurements.title = { width: node.width, height: node.height };
+-            } else if (marker === RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) {
+-              measurements.description = { width: node.width, height: node.height };
+-            } else {
+-              const ingredientIndex = getDetailsNodeIndex(
+-                marker ?? "",
+-                RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX,
+-              );
+-              if (ingredientIndex !== undefined) {
+-                measurements.ingredients.set(ingredientIndex, {
+-                  width: node.width,
+-                  height: node.height,
+-                });
+-                return;
+-              }
+-
+-              const stepIndex = getDetailsNodeIndex(marker ?? "", RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX);
+-              if (stepIndex !== undefined) {
+-                measurements.steps.set(stepIndex, {
+-                  width: node.width,
+-                  height: node.height,
+-                });
+-              }
+-            }
+-          },
++          onNodeDetected: (node) => detectDetailsNode(measurements, node),
+         },
+       );
+       const layoutError = validateMeasuredDetailsTemplate(input, measurements);
+diff --git a/backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts b/backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts
+index 7d742c0..2be9a5f 100644
+--- a/backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts
++++ b/backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts
+@@ -32,6 +32,8 @@ export type RecipeDetailsTemplateTextOverrides = {
+   steps: string[];
+ };
+ 
++type DetailsTextInput = Pick<RecipeDetailsTemplateInput, "title" | "description" | "steps">;
++
+ const MARGIN = 60;
+ const PHOTO_LEFT = 600;
+ const PHOTO_TOP = 78;
+@@ -449,7 +451,7 @@ function getRecipeDetailsTeaserText(description: string): string {
+ }
+ 
+ export function getRecipeDetailsTextLayoutFields(
+-  input: RecipeDetailsTemplateInput,
++  input: DetailsTextInput & Partial<Pick<RecipeDetailsTemplateInput, "ingredients">>,
+   descriptionFontSize = 22,
+ ): DetailTextLayoutField[] {
+   const titleLayout = getRecipeDetailsTitleLayout(input.title);
+@@ -492,7 +494,8 @@ export function getRecipeDetailsTextLayoutFields(
+     });
+   }
+ 
+-  const compactIngredients = input.ingredients.length > 8;
++  const ingredients = input.ingredients ?? [];
++  const compactIngredients = ingredients.length > 8;
+   const ingredientFontSize = compactIngredients ? 15 : 21;
+   const ingredientMaxWidth = compactIngredients
+     ? RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_TEXT_WIDTH
+@@ -501,7 +504,7 @@ export function getRecipeDetailsTextLayoutFields(
+     ? RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_ROW_HEIGHT
+     : RECIPE_DETAILS_TEMPLATE_INGREDIENT_LARGE_ROW_HEIGHT;
+   fields.push(
+-    ...input.ingredients.map((ingredient, index) => ({
++    ...ingredients.map((ingredient, index) => ({
+       id: `${RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX}${index}`,
+       text: `${ingredient.amount} ${ingredient.name}`,
+       maxWidth: ingredientMaxWidth,
+@@ -546,42 +549,12 @@ export function getRecipeDetailsTextLayoutFields(
+   return fields;
+ }
+ 
+-export function composeRecipeDetailsTemplate(
+-  input: RecipeDetailsTemplateInput,
+-  assets: TemplateAssets,
+-  textOverrides?: RecipeDetailsTemplateTextOverrides,
+-): SatoriElement {
++function createTitleAndTeaser(
++  input: DetailsTextInput,
++  textOverrides?: Pick<RecipeDetailsTemplateTextOverrides, "title" | "description" | "descriptionFontSize">,
++): SatoriChild[] {
+   const titleLayout = getRecipeDetailsTitleLayout(input.title);
+-  const ingredientsCount = input.ingredients.length;
+-  const chipLabels = [
+-    `${input.portions} ${input.portions === 1 ? "Portion" : "Portionen"}`,
+-    ...(input.totalTimeMinutes === null ? [] : [`${input.totalTimeMinutes} Min.`]),
+-    `${ingredientsCount} Zutaten`,
+-  ];
+-
+-  const children: SatoriChild[] = [
+-    element("div", {
+-      position: "absolute",
+-      left: 0,
+-      top: 0,
+-      width: CANVAS_WIDTH,
+-      height: CANVAS_HEIGHT,
+-      backgroundColor: COLOR_PANEL,
+-      backgroundImage: ambientBackgroundImage(),
+-    }),
+-    element("div", {
+-      position: "absolute",
+-      left: 88,
+-      top: 118,
+-      color: COLOR_LIME,
+-      fontFamily: "Inter",
+-      fontSize: 18,
+-      fontWeight: 600,
+-      letterSpacing: 4,
+-      lineHeight: 1,
+-      whiteSpace: "normal",
+-      wordBreak: "normal",
+-    }, "FITTRACK REZEPT"),
++  return [
+     element("div", {
+       position: "absolute",
+       left: 88,
+@@ -628,6 +601,75 @@ export function composeRecipeDetailsTemplate(
+         }),
+       ])
+       : null,
++  ];
++}
++
++function createPreparationPanel(input: DetailsTextInput, stepTexts?: readonly string[]): SatoriElement {
++  return createPanel(
++    MARGIN + CARD_WIDTH + CARD_GAP,
++    "So geht's",
++    createStepList(input.steps, stepTexts),
++  );
++}
++
++function createDetailsCanvas(children: SatoriChild[]): SatoriElement {
++  return element("div", {
++    position: "relative",
++    width: CANVAS_WIDTH,
++    height: CANVAS_HEIGHT,
++    display: "flex",
++    flexDirection: "column",
++    overflow: "hidden",
++    backgroundColor: COLOR_PANEL,
++  }, children);
++}
++
++export function composeRecipeDetailsGeneratedText(
++  input: DetailsTextInput,
++  textOverrides: Pick<RecipeDetailsTemplateTextOverrides, "title" | "description" | "descriptionFontSize" | "steps">,
++): SatoriElement {
++  return createDetailsCanvas([
++    ...createTitleAndTeaser(input, textOverrides),
++    createPreparationPanel(input, textOverrides.steps),
++  ]);
++}
++
++export function composeRecipeDetailsTemplate(
++  input: RecipeDetailsTemplateInput,
++  assets: TemplateAssets,
++  textOverrides?: RecipeDetailsTemplateTextOverrides,
++): SatoriElement {
++  const ingredientsCount = input.ingredients.length;
++  const chipLabels = [
++    `${input.portions} ${input.portions === 1 ? "Portion" : "Portionen"}`,
++    ...(input.totalTimeMinutes === null ? [] : [`${input.totalTimeMinutes} Min.`]),
++    `${ingredientsCount} Zutaten`,
++  ];
++
++  const children: SatoriChild[] = [
++    element("div", {
++      position: "absolute",
++      left: 0,
++      top: 0,
++      width: CANVAS_WIDTH,
++      height: CANVAS_HEIGHT,
++      backgroundColor: COLOR_PANEL,
++      backgroundImage: ambientBackgroundImage(),
++    }),
++    element("div", {
++      position: "absolute",
++      left: 88,
++      top: 118,
++      color: COLOR_LIME,
++      fontFamily: "Inter",
++      fontSize: 18,
++      fontWeight: 600,
++      letterSpacing: 4,
++      lineHeight: 1,
++      whiteSpace: "normal",
++      wordBreak: "normal",
++    }, "FITTRACK REZEPT"),
++    ...createTitleAndTeaser(input, textOverrides),
+     createPhoto(input, assets.photo),
+     element("div", {
+       position: "absolute",
+@@ -641,11 +683,7 @@ export function composeRecipeDetailsTemplate(
+       "Zutaten",
+       createIngredientList(input.ingredients, textOverrides?.ingredients),
+     ),
+-    createPanel(
+-      MARGIN + CARD_WIDTH + CARD_GAP,
+-      "So geht's",
+-      createStepList(input.steps, textOverrides?.steps),
+-    ),
++    createPreparationPanel(input, textOverrides?.steps),
+     element("div", {
+       position: "absolute",
+       left: MARGIN,
+@@ -688,13 +726,5 @@ export function composeRecipeDetailsTemplate(
+     }, undefined, { src: imageSource(assets.nutritionHighlights[input.highlight], "image/png") }));
+   }
+ 
+-  return element("div", {
+-    position: "relative",
+-    width: CANVAS_WIDTH,
+-    height: CANVAS_HEIGHT,
+-    display: "flex",
+-    flexDirection: "column",
+-    overflow: "hidden",
+-    backgroundColor: COLOR_PANEL,
+-  }, children);
++  return createDetailsCanvas(children);
+ }
+\ No newline at end of file
+diff --git a/backend/src/lib/instagramRenderer/types.ts b/backend/src/lib/instagramRenderer/types.ts
+index d9f02e4..8efec02 100644
+--- a/backend/src/lib/instagramRenderer/types.ts
++++ b/backend/src/lib/instagramRenderer/types.ts
+@@ -108,4 +108,53 @@ export type RecipeDetailsTemplateRenderError =
+ 
+ export type RecipeDetailsTemplateRenderResult =
+   | RenderOk
+-  | { ok: false; error: RecipeDetailsTemplateRenderError };
+\ No newline at end of file
++  | { ok: false; error: RecipeDetailsTemplateRenderError };
++
++export type RecipeDetailsGeneratedTextProbeInput = {
++  savedTitle: string;
++  teaser: string;
++  steps: string[];
++};
++
++export type RecipeDetailsGeneratedTextProbeField = "title" | "teaser" | "steps";
++
++export type RecipeDetailsGeneratedTextProbeTechnicalCode =
++  | "INVALID_CONTEXT"
++  | "MISSING_ASSET"
++  | "FONT_OR_SATORI_FAILED"
++  | "MISSING_MEASUREMENT"
++  | "NON_FINITE_MEASUREMENT"
++  | "TITLE_LAYOUT_FAILED"
++  | "PROBE_FAILED";
++
++export type RecipeDetailsGeneratedTextProbeDiagnostic = {
++  field: RecipeDetailsGeneratedTextProbeField;
++  itemIndex?: number;
++} & (
++  | {
++      status: "fits" | "overflow";
++      measured: { width: number; height: number; maxWidth: number; maxHeight: number };
++      fontSize: number;
++      displayText: string;
++    }
++  | {
++      status: "width-overflow";
++      measured: { width: number; maxWidth: number };
++      fontSize: number;
++    }
++  | { status: "invalid-text"; code: "INVALID_TEXT" | "INVALID_STEP_COUNT" }
++  | { status: "technical-failure"; code: RecipeDetailsGeneratedTextProbeTechnicalCode }
++);
++
++export type RecipeDetailsGeneratedTextProbeResult = {
++  diagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[];
++  teaserFontSize?: number;
++} & (
++  | { ok: true; status: "success" }
++  | { ok: false; status: "generated-text-failure" }
++  | {
++      ok: false;
++      status: "technical-failure";
++      error: { code: RecipeDetailsGeneratedTextProbeTechnicalCode; message: string; asset?: string };
++    }
++);
+\ No newline at end of file
+diff --git a/backend/src/lib/instagramRenderer/index.ts b/backend/src/lib/instagramRenderer/index.ts
+index 5a61462..bda7b08 100644
+--- a/backend/src/lib/instagramRenderer/index.ts
++++ b/backend/src/lib/instagramRenderer/index.ts
+@@ -1,7 +1,11 @@
+ export * from "./layout";
+ export * from "./types";
+ export { resolveTagIcon } from "./tagIcons";
+-export { renderInstagramRecipe, renderInstagramRecipeDetailsTemplate } from "./render";
++export {
++	renderInstagramRecipe,
++	renderInstagramRecipeDetailsTemplate,
++	probeInstagramRecipeDetailsGeneratedText,
++} from "./render";
+ export {
+ 	adaptRecipeToDetailsTemplateInput,
+ 	adaptRecipeToRenderInput,
+diff --git a/backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts b/backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts
+index fc72259..550b475 100644
+--- a/backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts
++++ b/backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts
+@@ -1,3 +1,4 @@
++import { createHash } from "node:crypto";
+ import { readFile } from "node:fs/promises";
+ import { resolve } from "node:path";
+ 
+@@ -10,9 +11,11 @@ import { gefluegelfrikadellenDetailsFixture as alphaGefluegelfrikadellenDetailsF
+ import { nineIngredientsDetailsFixture as alphaNineIngredientsDetailsFixture } from "../fixtures/nine-ingredients-details";
+ import { quarkbroetchenDetailsFixture } from "../fixtures/quarkbroetchen-details";
+ import { twentyIngredientsDetailsFixture as alphaTwentyIngredientsDetailsFixture } from "../fixtures/twenty-ingredients-details";
+-import { renderInstagramRecipeDetailsTemplate } from "../index";
++import { probeInstagramRecipeDetailsGeneratedText, renderInstagramRecipeDetailsTemplate } from "../index";
++import type { RecipeDetailsTemplateInput } from "../types";
+ import {
+   composeRecipeDetailsTemplate,
++  composeRecipeDetailsGeneratedText,
+   getRecipeDetailsTextLayoutFields,
+   getRecipeDetailsTitleLayout,
+ } from "../recipeDetailsTemplateV3";
+@@ -117,7 +120,351 @@ function flattenTemplateElements(value: unknown): SatoriElement[] {
+   return [value, ...flattenTemplateElements(value.props.children)];
+ }
+ 
++async function captureProductionMeasurements<Result>(action: () => Promise<Result>) {
++  const actual = await vi.importActual<typeof import("satori")>("satori");
++  const measurements = new Map<string, { width: number; height: number }>();
++  const teaserSizes: number[] = [];
++  vi.mocked(satori).mockImplementation(async (root, options) => {
++    const teaser = flattenTemplateElements(root).find(
++      (node) => node.props["data-render-node"] === "recipe-details-description",
++    );
++    if (teaser) teaserSizes.push((teaser.props.style as Record<string, unknown>).fontSize as number);
++    return actual.default(root, {
++      ...options,
++      onNodeDetected: (node) => {
++        const marker = node.props["data-render-node"];
++        if (typeof marker === "string" && marker.startsWith("recipe-details-")) {
++          measurements.set(marker, { width: node.width, height: node.height });
++        }
++        options.onNodeDetected?.(node);
++      },
++    });
++  });
++  try {
++    return { result: await action(), measurements, teaserSizes };
++  } finally {
++    vi.mocked(satori).mockImplementation(actual.default);
++  }
++}
++
++const probeTitles = ["Brötchen", "Herzhafte Quarkbrötchen", "Herzhafte Quarkbrötchen mit Dinkel und Körnern"];
++const denseProbeTeaser = "Goldbraune Quarkbrötchen mit Dinkelmehl und knackigen Körnern für ein sättigendes Frühstück.";
++
++describe("B-1 generated detail text production probe", () => {
++  it.each([1, 2, 3, 4, 5].flatMap((count) => probeTitles.map((title) => ({ count, title }))))(
++    "matches full-render node geometry and teaser decisions for $count steps / $title",
++    async ({ count, title }) => {
++      const input: RecipeDetailsTemplateInput = {
++        ...quarkbroetchenDetailsFixture, title,
++        description: denseProbeTeaser,
++        steps: Array.from({ length: count }, () => "Mische die Zutaten und forme daraus Brötchen."),
++      };
++      const before = JSON.stringify(input);
++      const full = await captureProductionMeasurements(() => renderInstagramRecipeDetailsTemplate(input));
++      const probe = await captureProductionMeasurements(() => probeInstagramRecipeDetailsGeneratedText({
++        savedTitle: title, teaser: input.description!, steps: input.steps,
++      }));
++      expect(full.result.ok).toBe(true);
++      expect(probe.result).toMatchObject({ ok: true, status: "success" });
++      expect(probe.teaserSizes).toEqual(full.teaserSizes);
++      expect(probe.teaserSizes).toEqual(probe.teaserSizes.map((_size, index) => 22 - index));
++      expect(probe.result.teaserFontSize).toBe(full.teaserSizes.at(-1));
++      expect(probe.result.diagnostics).toHaveLength(count + 2);
++      for (const [marker, measurement] of probe.measurements) {
++        expect(measurement, marker).toEqual(full.measurements.get(marker));
++      }
++      expect(probe.result.diagnostics.filter((item) => item.field === "steps"))
++        .toEqual(Array.from({ length: count }, (_step, itemIndex) => expect.objectContaining({
++          itemIndex, status: "fits", fontSize: count === 5 ? 18 : 22,
++          measured: expect.objectContaining({ maxWidth: count === 5 ? 318 : 302, maxHeight: count === 5 ? 84 : 105 }),
++        })));
++      const teaser = probe.result.diagnostics.find((item) => item.field === "teaser");
++      expect(teaser).toMatchObject({ status: "fits", displayText: denseProbeTeaser.slice(0, -1) });
++      expect(JSON.stringify(input)).toBe(before);
++    }, 20000,
++  );
++
++  it("uses exactly the full-render subtrees and parent constraints without images or ingredients", () => {
++    const input = quarkbroetchenDetailsFixture;
++    const overrides = {
++      title: input.title, description: input.description!, descriptionFontSize: 21,
++      steps: input.steps, ingredients: input.ingredients.map((ingredient) => `${ingredient.amount} ${ingredient.name}`),
++    };
++    const full = composeRecipeDetailsTemplate(input, {
++      photo: { src: "data:image/png;base64,", width: 1080, height: 1350 },
++      wordmark: "", wordmarkMimeType: "image/svg+xml", nutritionHighlights: { "high-protein": "", "low-fat": "" },
++    }, overrides);
++    const probe = composeRecipeDetailsGeneratedText(input, overrides);
++    expect(probe.props.style).toEqual(full.props.style);
++    const fullChildren = full.props.children as SatoriElement[];
++    for (const subtree of probe.props.children as SatoriElement[]) {
++      expect(fullChildren).toContainEqual(subtree);
++    }
++    expect(flattenTemplateElements(probe).some((node) => node.type === "img")).toBe(false);
++    expect(JSON.stringify(probe)).not.toContain("recipe-details-ingredient-");
++  });
++
++  it("measures every step despite multiple overflow failures and reevaluates changed counts", async () => {
++    const text = "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.";
++    const candidate = { savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.", steps: Array.from({ length: 4 }, () => text) };
++    const four = await probeInstagramRecipeDetailsGeneratedText(candidate);
++    expect(four).toMatchObject({ status: "generated-text-failure" });
++    expect(four.diagnostics.filter((item) => item.field === "steps" && item.status === "overflow")).toHaveLength(4);
++    const five = await probeInstagramRecipeDetailsGeneratedText({ ...candidate, steps: [...candidate.steps, "Backe die Brötchen."] });
++    expect(five).toMatchObject({ ok: true, status: "success" });
++    expect(five.diagnostics.filter((item) => item.field === "steps")).toHaveLength(5);
++  });
++
++  it("reports width-only failures without inventing a multiline height and still measures other fields", async () => {
++    const result = await probeInstagramRecipeDetailsGeneratedText({
++      savedTitle: "Quarkbrötchen", teaser: "W".repeat(96), steps: ["W".repeat(90), "Backe die Brötchen."],
++    });
++    expect(result).toMatchObject({ ok: false, status: "generated-text-failure", teaserFontSize: 18 });
++    const failures = result.diagnostics.filter((item) => item.status === "width-overflow");
++    expect(failures).toHaveLength(2);
++    for (const failure of failures) {
++      if (failure.status !== "width-overflow") continue;
++      expect(failure.measured.width).toBeGreaterThan(failure.measured.maxWidth);
++      expect(failure.measured).not.toHaveProperty("height");
++      expect(failure.measured).not.toHaveProperty("maxHeight");
++    }
++    expect(result.diagnostics).toContainEqual(expect.objectContaining({ field: "steps", itemIndex: 1, status: "fits" }));
++  });
++
++  it.each(["", " ", "Backe\nBrötchen", "Backe\rBrötchen", "Backe\u2028Brötchen", "Backe\u2029Brötchen", "x".repeat(97)])(
++    "rejects generated invalid text %j without normalization or claiming validation", async (text) => {
++      const candidate = { savedTitle: "Quarkbrötchen", teaser: text, steps: [text, "Backe die Brötchen."] };
++      const before = JSON.stringify(candidate);
++      const result = await probeInstagramRecipeDetailsGeneratedText(candidate);
++      expect(result).toMatchObject({ ok: false, status: "generated-text-failure" });
++      expect(result.diagnostics).toContainEqual({ field: "teaser", status: "invalid-text", code: "INVALID_TEXT" });
++      expect(result.diagnostics).toContainEqual({ field: "steps", itemIndex: 0, status: "invalid-text", code: "INVALID_TEXT" });
++      expect(result.diagnostics).toContainEqual(expect.objectContaining({ field: "steps", itemIndex: 1, status: "fits" }));
++      expect(JSON.stringify(candidate)).toBe(before);
++    },
++  );
++
++  it.each([0, 6])("rejects %i steps and does not claim the skipped steps fit", async (count) => {
++    const result = await probeInstagramRecipeDetailsGeneratedText({
++      savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.", steps: Array.from({ length: count }, () => "Backe Brötchen."),
++    });
++    expect(result).toMatchObject({ status: "generated-text-failure" });
++    expect(result.diagnostics.filter((item) => item.field === "steps" && item.status === "fits")).toHaveLength(0);
++    expect(result.diagnostics).toContainEqual({ field: "steps", status: "invalid-text", code: "INVALID_STEP_COUNT" });
++  });
++
++  it.each([
++    { dimension: "width" as const, extra: 0.5, ok: true },
++    { dimension: "width" as const, extra: 0.5001, ok: false },
++    { dimension: "height" as const, extra: 0.5, ok: true },
++    { dimension: "height" as const, extra: 0.5001, ok: false },
++  ])("shares the 0.5px $dimension boundary with full rendering: $extra", async ({ dimension, extra, ok }) => {
++    const actual = await vi.importActual<typeof import("satori")>("satori");
++    vi.mocked(satori).mockImplementation((root, options) => actual.default(root, {
++      ...options,
++      onNodeDetected: (node) => options.onNodeDetected?.(
++        node.props["data-render-node"] === "recipe-details-step-0"
++          ? { ...node, [dimension]: (dimension === "width" ? 302 : 105) + extra }
++          : node,
++      ),
++    }));
++    try {
++      const input = { ...quarkbroetchenDetailsFixture, steps: ["Backe Brötchen."] };
++      const full = await renderInstagramRecipeDetailsTemplate(input);
++      const probe = await probeInstagramRecipeDetailsGeneratedText({ savedTitle: input.title, teaser: input.description!, steps: input.steps });
++      expect(full.ok).toBe(ok);
++      expect(probe.ok).toBe(ok);
++      expect(probe.status).toBe(ok ? "success" : "generated-text-failure");
++    } finally {
++      vi.mocked(satori).mockImplementation(actual.default);
++    }
++  });
++
++  it.each(["missing", "nan-width", "infinite-height", "missing-word"]) (
++    "fails technically for %s production measurement, even with a correctable overflow", async (failure) => {
++      const actual = await vi.importActual<typeof import("satori")>("satori");
++      vi.mocked(satori).mockImplementation((root, options) => actual.default(root, {
++        ...options,
++        onNodeDetected: (node) => {
++          const marker = node.props["data-render-node"];
++          if (failure === "missing-word" && typeof marker === "string" && marker.startsWith("detail-text-measure-")) return;
++          if (marker === "recipe-details-step-1") {
++            if (failure === "missing") return;
++            if (failure === "nan-width") node = { ...node, width: NaN };
++            if (failure === "infinite-height") node = { ...node, height: Infinity };
++          }
++          options.onNodeDetected?.(node);
++        },
++      }));
++      try {
++        const result = await probeInstagramRecipeDetailsGeneratedText({
++          savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.",
++          steps: ["Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.", "Backe Brötchen."],
++        });
++        expect(result).toMatchObject({ ok: false, status: "technical-failure" });
++        expect(result.diagnostics.some((item) => item.status === "technical-failure")).toBe(true);
++      } finally {
++        vi.mocked(satori).mockImplementation(actual.default);
++      }
++    },
++  );
++
++  it.each(["", "Titel\nZeile", "W".repeat(60)])("never makes the saved title %j AI-correctable", async (savedTitle) => {
++    const result = await probeInstagramRecipeDetailsGeneratedText({ savedTitle, teaser: "Frisch gebacken.", steps: ["Backe Brötchen."] });
++    expect(result).toMatchObject({ ok: false, status: "technical-failure" });
++  });
++
++  it.each([22, 21, 20, 19, 18])("retains identical font-attempt selection through %ipx", async (selectedSize) => {
++    const actual = await vi.importActual<typeof import("satori")>("satori");
++    const attempts: number[] = [];
++    vi.mocked(satori).mockImplementation((root, options) => {
++      const teaser = flattenTemplateElements(root).find((node) => node.props["data-render-node"] === "recipe-details-description");
++      const fontSize = teaser ? (teaser.props.style as Record<string, unknown>).fontSize as number : undefined;
++      if (fontSize !== undefined) attempts.push(fontSize);
++      return actual.default(root, {
++        ...options,
++        onNodeDetected: (node) => options.onNodeDetected?.(
++          node.props["data-render-node"] === "recipe-details-description" && fontSize! > selectedSize
++            ? { ...node, height: 500 }
++            : node,
++        ),
++      });
++    });
++    try {
++      const input = quarkbroetchenDetailsFixture;
++      const full = await renderInstagramRecipeDetailsTemplate(input);
++      const fullAttempts = attempts.splice(0);
++      const probe = await probeInstagramRecipeDetailsGeneratedText({ savedTitle: input.title, teaser: input.description!, steps: input.steps });
++      expect(full.ok).toBe(true);
++      expect(probe).toMatchObject({ ok: true, teaserFontSize: selectedSize });
++      expect(attempts).toEqual(fullAttempts);
++      expect(attempts).toEqual(Array.from({ length: 23 - selectedSize }, (_size, index) => 22 - index));
++    } finally {
++      vi.mocked(satori).mockImplementation(actual.default);
++    }
++  });
++
++  it("matches title-dependent teaser overflow and legal German breaks with the full renderer", async () => {
++    for (const title of probeTitles) {
++      for (const description of ["W".repeat(96), "Grundstücksverkehrsgenehmigungszuständigkeitsübertragungsverordnung"]) {
++        const input = { ...quarkbroetchenDetailsFixture, title, description };
++        const full = await renderInstagramRecipeDetailsTemplate(input);
++        const probe = await probeInstagramRecipeDetailsGeneratedText({ savedTitle: title, teaser: description, steps: input.steps });
++        expect(probe.ok).toBe(full.ok);
++        if (!full.ok) {
++          expect(full.error).toMatchObject({ field: "description", code: "TEMPLATE_FIELD_OVERFLOW" });
++          expect(probe).toMatchObject({ status: "generated-text-failure", teaserFontSize: 18 });
++        } else {
++          const diagnostic = probe.diagnostics.find((item) => item.field === "teaser");
++          expect(diagnostic).toMatchObject({ status: "fits" });
++          if (diagnostic?.status === "fits") {
++            expect(diagnostic.displayText.replace(/-\n/g, "")).toBe(description);
++          }
++        }
++      }
++    }
++  }, 20000);
++
++  it.each(["font-only", "missing-font", "corrupt-font", "satori-failure"])(
++    "cold probe stays text-only and fails closed: %s", async (mode) => {
++      const actualFs = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
++      const actualSatori = await vi.importActual<typeof import("satori")>("satori");
++      const reads: string[] = [];
++      const nativeImport = vi.fn(() => { throw new Error("Native image dependencies must not be loaded by the probe."); });
++      vi.resetModules();
++      vi.doMock("sharp", nativeImport);
++      vi.doMock("@resvg/resvg-js", nativeImport);
++      vi.doMock("node:fs/promises", () => ({
++        ...actualFs,
++        readFile: async (...args: Parameters<typeof actualFs.readFile>) => {
++          const path = String(args[0]).replace(/\\/g, "/");
++          reads.push(path);
++          if (!path.includes("/assets/fonts/") || !path.endsWith(".ttf")) throw new Error("Probe attempted a non-font asset read.");
++          if (mode === "missing-font") throw new Error("Simulated unavailable font.");
++          if (mode === "corrupt-font") return Buffer.from("invalid-font");
++          return actualFs.readFile(...args);
++        },
++      }));
++      vi.doMock("satori", () => ({
++        ...actualSatori,
++        default: mode === "satori-failure" ? async () => { throw new Error("Simulated Satori failure."); } : actualSatori.default,
++      }));
++      try {
++        const { probeInstagramRecipeDetailsGeneratedText: freshProbe } = await import("../render");
++        const result = await freshProbe({ savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.", steps: ["Backe Brötchen."] });
++        if (mode === "font-only") {
++          expect(result).toMatchObject({ ok: true, status: "success" });
++        } else {
++          expect(result).toMatchObject({
++            ok: false, status: "technical-failure",
++            error: { code: mode === "missing-font" ? "MISSING_ASSET" : "FONT_OR_SATORI_FAILED" },
++          });
++          expect(result.diagnostics.every((item) => item.status === "technical-failure")).toBe(true);
++        }
++        expect(nativeImport).not.toHaveBeenCalled();
++        expect(reads).toHaveLength(4);
++      } finally {
++        vi.doUnmock("sharp");
++        vi.doUnmock("@resvg/resvg-js");
++        vi.doUnmock("node:fs/promises");
++        vi.doUnmock("satori");
++        vi.resetModules();
++      }
++    },
++  );
++});
++
+ describe("Instagram recipe details template", () => {
++  it("preserves B-1 Alpha geometry and pre-extraction PNG fingerprints", async () => {
++    const steps = [
++      "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.",
++      "Forme den Teig zu Brötchen.",
++      "Backe die Brötchen im vorgeheizten Ofen.",
++      "Lasse die Brötchen abkühlen.",
++    ];
++    const input = { ...quarkbroetchenDetailsFixture, steps };
++    const overflow = await renderInstagramRecipeDetailsTemplate(input);
++    expect(overflow).toMatchObject({
++      ok: false,
++      error: {
++        code: "TEMPLATE_FIELD_OVERFLOW", field: "steps", itemIndex: 0,
++        measured: { width: 300, height: 112, maxWidth: 302, maxHeight: 105 },
++      },
++    });
++    const probe = await probeInstagramRecipeDetailsGeneratedText({
++      savedTitle: input.title, teaser: input.description!, steps,
++    });
++    expect(probe).toMatchObject({ ok: false, status: "generated-text-failure", teaserFontSize: 22 });
++    expect(probe.diagnostics.find((item) => item.field === "steps" && item.itemIndex === 0)).toMatchObject({
++      status: "overflow", fontSize: 22,
++      measured: { width: 300, height: 112, maxWidth: 302, maxHeight: 105 },
++      displayText: steps[0],
++    });
++    expect(probe.diagnostics.filter((item) => item.field === "steps")).toHaveLength(4);
++    const shorter = {
++      ...input,
++      steps: ["Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig.", ...steps.slice(1)],
++    };
++    const hashes = [
++      "b81a0cc528c389cc3b21113ef7d65ea6d7cc37ba2023b4d9fa035e087573036a",
++      "bc9276a5158de0c1247a9da9b33a4fd5a072268f4fec4c7108b40ac94f460d74",
++      "e1737c8af626890d61ae1cc3decac0a31e6e6de7da8ca98fe2a88982e17b130b",
++    ];
++    for (const [index, candidate] of [quarkbroetchenDetailsFixture, shorter, twentyIngredientsDetailsFixture].entries()) {
++      const result = await renderInstagramRecipeDetailsTemplate(candidate);
++      expect(result.ok).toBe(true);
++      if (result.ok) {
++        expect(createHash("sha256").update(result.buffer).digest("hex")).toBe(hashes[index]);
++      }
++    }
++    const passing = await probeInstagramRecipeDetailsGeneratedText({
++      savedTitle: shorter.title, teaser: shorter.description!, steps: shorter.steps,
++    });
++    expect(passing).toMatchObject({ ok: true, status: "success", teaserFontSize: 22 });
++    expect(passing.diagnostics.filter((item) => item.field === "steps"))
++      .toEqual(expect.arrayContaining([expect.objectContaining({ itemIndex: 0, status: "fits", fontSize: 22 })]));
++  }, 20000);
++
+   it("omits difficulty and applies normal word wrapping to every visible text node", () => {
+     const template = composeRecipeDetailsTemplate(
+       { ...quarkbroetchenDetailsFixture, difficulty: "Einfach" },
+diff --git a/docs/kb/tech/02-backend.md b/docs/kb/tech/02-backend.md
+index 33869d0..81094f1 100644
+--- a/docs/kb/tech/02-backend.md
++++ b/docs/kb/tech/02-backend.md
+@@ -239,6 +239,30 @@ if its measured layout does not fit. A 12 px clearance separates it from the
+ metadata chips. Text is never truncated; an overflow at 18 px remains an error.
+ Recipe title, ingredient rows, and preparation text keep their existing sizes.
+ 
++`probeInstagramRecipeDetailsGeneratedText({ savedTitle, teaser, steps })` is a
++backend-internal text-only entry point in `instagramRenderer/render.ts` and its
++existing barrel. It shares the production title/teaser subtree, preparation
++panel and parent constraints, German breaks, font cache, node collection and
++0.5 px bounds tolerance with the full renderer. It loads only Satori and the
++four bundled fonts, not photos, Blob data, design assets, Sharp or Resvg.
++The complete 1-5 step candidate determines the existing large/compact layout;
++the saved title remains context, not an editable generated field. The teaser
++keeps the existing italic font, terminal-period display rule and 22/21/20/19/18
++selection. Existing input length and single-line constraints remain unchanged.
++
++The discriminated result has `status: success | generated-text-failure |
++technical-failure`, per-field diagnostics and the evaluated `teaserFontSize`.
++Measured diagnostics include actual width/height and assigned bounds; German
++width-only failures have width and its limit but no invented multiline height.
++Invalid/skipped fields are never reported as fitting. Missing or non-finite
++measurements, unavailable/corrupt fonts, Satori errors and invalid/non-fitting
++saved-title context are technical failures, not AI-correctable failures.
++Success establishes only generated teaser/step fit in that title context; it
++does not certify the saved title, ingredients, chips, images or share bundle.
++The full renderer retains its existing first-failure public contract, including
++the legacy height value on German width-break errors. No preparation retry loop
++or provider/handler integration is implemented by this extraction.
++
+ ### Recipe export preparation and confirmation concurrency
+ 
+ `POST /api/recipes/{id}/export-view/prepare` accepts only the strict V2 body
+diff --git a/docs/kb/tech/08-testing.md b/docs/kb/tech/08-testing.md
+index ed77c81..f335708 100644
+--- a/docs/kb/tech/08-testing.md
++++ b/docs/kb/tech/08-testing.md
+@@ -93,6 +93,20 @@ local downloads. Production fonts, text measurements, and PNG rendering run
+ unchanged. Visual approval fixtures and rendering scripts retain their Alpha
+ photos; those local files are not prerequisites for Tier 1.
+ 
++The same existing renderer test file covers the internal generated-text probe:
++real-font/full-render measurement parity for 1-5 steps and three title layouts,
++title-dependent teaser sizing, German breaks, all-field overflow collection and
++invalid/skipped fields. The Alpha four-step sentence measures 300 x 112 px
++against 302 x 105 px; a shorter ingredient-preserving sentence passes at the
++unchanged 22 px step font. Three pre-extraction PNG SHA-256 fingerprints lock
++the full-render output. Boundary tests inject only the final measured dimension
++at 0.5 px / 0.5001 px while retaining real fonts and Satori nodes. Tests for each
++teaser selection size inject overflow in earlier attempts; real-font title
++variants separately exercise natural sizing. Isolated cold-start tests block
++Sharp/Resvg imports and non-font reads and check missing/corrupt fonts and
++Satori failures. No live AI, authenticated photo or confirmed export view is
++required by these offline probe tests.
++
+ ### Daily Insight Prompt and Cache Checks
+ 
+ The active Daily prompt is tested through
+diff --git a/docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs b/docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs
+index e69de29..ecaa864 100644
+--- /dev/null
++++ b/docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs
+@@ -0,0 +1,142 @@
++import { createHash } from "node:crypto";
++import { execFileSync } from "node:child_process";
++import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import { dirname, join, resolve } from "node:path";
++import { createRequire } from "node:module";
++
++const root = process.cwd();
++const directory = "docs/User Stories/Reciepe";
++const prefix = "B-1_Feedback-Loop_";
++const date = "2026-10-09";
++const require = createRequire(import.meta.url);
++const baseline = JSON.parse((await readFile(join(root, directory, `${prefix}Baseline_${date}.json`), "utf8")).replace(/^\uFEFF/u, ""));
++const sha256 = (content) => createHash("sha256").update(content).digest("hex");
++const candidates = new Map(baseline.candidates.map((candidate) => [candidate.path, candidate]));
++const preservation = [];
++for (const record of baseline.files) {
++  if (candidates.has(record.path)) continue;
++  const currentHash = sha256(await readFile(join(root, record.path))).toUpperCase();
++  preservation.push({ path: record.path, startingSha256: record.sha256, currentSha256: currentHash, unchanged: currentHash === record.sha256 });
++}
++if (preservation.some((record) => !record.unchanged)) throw new Error("An unrelated dirty-baseline file changed.");
++
++const temporary = await mkdtemp(join(tmpdir(), "fittrack-b1-"));
++const owned = [];
++let ownedPatch = "";
++try {
++  const paths = [...candidates.keys(),
++    `${directory}/${prefix}Evidence_${date}.mjs`,
++    `${directory}/${prefix}Handoff_${date}.md`,
++  ];
++  for (const path of paths) {
++    const before = candidates.get(path)?.content ?? "";
++    const after = await readFile(join(root, path), "utf8");
++    if (before === after) continue;
++    const beforePath = join(temporary, "before", path);
++    const afterPath = join(temporary, "after", path);
++    await mkdir(dirname(beforePath), { recursive: true });
++    await mkdir(dirname(afterPath), { recursive: true });
++    await writeFile(beforePath, before);
++    await writeFile(afterPath, after);
++    let patch;
++    try {
++      patch = execFileSync("git", ["diff", "--no-index", "--text", "--no-ext-diff", "--", beforePath, afterPath], { encoding: "utf8" });
++    } catch (error) {
++      if (error.status !== 1) throw error;
++      patch = error.stdout;
++    }
++    const lines = patch.split("\n");
++    lines[0] = `diff --git a/${path} b/${path}`;
++    const headerEnd = lines.findIndex((line) => line.startsWith("@@"));
++    for (let index = 1; index < headerEnd; index += 1) {
++      if (lines[index].startsWith("--- ")) lines[index] = `--- ${candidates.has(path) ? `a/${path}` : "/dev/null"}`;
++      if (lines[index].startsWith("+++ ")) lines[index] = `+++ b/${path}`;
++    }
++    const normalizedPatch = lines.join("\n");
++    ownedPatch += normalizedPatch;
++    owned.push({
++      path, newFile: !candidates.has(path),
++      startingSha256: candidates.get(path)?.sha256 ?? null,
++      endingSha256: sha256(await readFile(join(root, path))).toUpperCase(),
++      hunks: lines.filter((line) => line.startsWith("@@")),
++      patchSha256: sha256(normalizedPatch),
++    });
++  }
++} finally {
++  await rm(temporary, { recursive: true, force: true });
++}
++
++const { probeInstagramRecipeDetailsGeneratedText, renderInstagramRecipeDetailsTemplate } = require(resolve(root, "backend/dist/backend/src/lib/instagramRenderer/render.js"));
++const { quarkbroetchenDetailsFixture: sourceFixture } = require(resolve(root, "backend/dist/backend/src/lib/instagramRenderer/fixtures/quarkbroetchen-details.js"));
++const source = { ...sourceFixture, image: { path: resolve(root, "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png") } };
++const { twentyIngredientsDetailsFixture: denseSource } = require(resolve(root, "backend/dist/backend/src/lib/instagramRenderer/fixtures/twenty-ingredients-details.js"));
++const steps = [
++  "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.",
++  "Forme den Teig zu Brötchen.",
++  "Backe die Brötchen im vorgeheizten Ofen.",
++  "Lasse die Brötchen abkühlen.",
++];
++const shorter = ["Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig.", ...steps.slice(1)];
++const summarizeRender = (result) => result.ok
++  ? { ok: true, width: result.width, height: result.height, format: result.format, pngSha256: sha256(result.buffer) }
++  : result;
++const contexts = [];
++for (const [name, input] of [
++  ["alpha-four-step-overflow", { ...source, steps }],
++  ["shorter-ingredient-preserving-candidate", { ...source, steps: shorter }],
++  ["baseline-quarkbroetchen", source],
++  ["baseline-dense-template", { ...denseSource, image: source.image }],
++]) {
++  const probeInput = { savedTitle: input.title, teaser: input.description, steps: input.steps };
++  contexts.push({
++    name, probeInput,
++    renderContext: { title: input.title, description: input.description, ingredients: input.ingredients, steps: input.steps,
++      portions: input.portions, totalTimeMinutes: input.totalTimeMinutes, difficulty: input.difficulty,
++      presentation: input.presentation, highlight: input.highlight,
++      photoFixture: "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png" },
++    probe: await probeInstagramRecipeDetailsGeneratedText(probeInput),
++    fullRender: summarizeRender(await renderInstagramRecipeDetailsTemplate(input)),
++  });
++}
++const expectedHashes = [
++  "bc9276a5158de0c1247a9da9b33a4fd5a072268f4fec4c7108b40ac94f460d74",
++  "b81a0cc528c389cc3b21113ef7d65ea6d7cc37ba2023b4d9fa035e087573036a",
++  "e1737c8af626890d61ae1cc3decac0a31e6e6de7da8ca98fe2a88982e17b130b",
++];
++if (contexts[0].probe.status !== "generated-text-failure" || contexts[0].fullRender.ok) throw new Error("Alpha overflow disagreement.");
++const alphaStep = contexts[0].probe.diagnostics.find((item) => item.field === "steps" && item.itemIndex === 0);
++if (alphaStep?.measured?.width !== 300 || alphaStep.measured.height !== 112 || alphaStep.measured.maxWidth !== 302 || alphaStep.measured.maxHeight !== 105) throw new Error("Alpha geometry changed.");
++const fullAlpha = contexts[0].fullRender.error;
++if (fullAlpha?.code !== "TEMPLATE_FIELD_OVERFLOW" || fullAlpha.field !== "steps" || fullAlpha.itemIndex !== 0 ||
++  JSON.stringify(fullAlpha.measured) !== JSON.stringify(alphaStep.measured)) throw new Error("Compiled full-render Alpha geometry disagreement.");
++for (const [index, context] of contexts.slice(1).entries()) {
++  if (!context.probe.ok || !context.fullRender.ok || context.fullRender.pngSha256 !== expectedHashes[index]) throw new Error(`Candidate parity/fingerprint failure: ${context.name}`);
++}
++const assets = [];
++for (const name of await readdir(join(root, "backend/src/lib/instagramRenderer/assets/fonts"))) {
++  if (name.endsWith(".ttf")) {
++    const path = `backend/src/lib/instagramRenderer/assets/fonts/${name}`;
++    assets.push({ path, sha256: sha256(await readFile(join(root, path))) });
++  }
++}
++const photoPath = "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png";
++assets.push({ path: photoPath, sha256: sha256(await readFile(join(root, photoPath))) });
++const artifacts = [];
++for (const name of await readdir(join(root, directory))) {
++  if (name.startsWith(prefix) && name !== `${prefix}Evidence_${date}.json` && name !== `${prefix}Owned-Diff_${date}.patch`) {
++    artifacts.push({ path: `${directory}/${name}`, sha256: sha256(await readFile(join(root, directory, name))) });
++  }
++}
++await writeFile(join(root, directory, `${prefix}Owned-Diff_${date}.patch`), ownedPatch);
++await writeFile(join(root, directory, `${prefix}Evidence_${date}.json`), `${JSON.stringify({
++  package: "B-1", approvedPlan: "PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09", approvedDate: date,
++  baselineHead: baseline.head, currentHead: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
++  environment: { node: process.version, platform: process.platform, arch: process.arch },
++  owned, preservation, assets, contexts, artifacts,
++  verification: { focused: { files: 1, tests: 83, exit: 0 }, baselineUnits: { files: 66, tests: 1440, exit: 0 },
++    finalUnits: { files: 66, tests: 1488, exit: 0 }, backendTypecheckExit: 0, buildVerifyExit: 0,
++    encodingExit: 0, diffWhitespaceExit: 0, ownedPatchReverseCheckExit: 0, ownedCredentialPatternMatches: 0 },
++  boundary: "Offline renderer extraction only; no live AI, loop integration, deployment, release or independent QA claim.",
++}, null, 2)}\n`);
++console.log(`PASS: ${owned.length} owned files; ${preservation.length} unrelated baseline files preserved; four compiled candidate contexts verified.`);
+\ No newline at end of file
+diff --git a/docs/User Stories/Reciepe/B-1_Feedback-Loop_Handoff_2026-10-09.md b/docs/User Stories/Reciepe/B-1_Feedback-Loop_Handoff_2026-10-09.md
+index e69de29..e6ca2e1 100644
+--- /dev/null
++++ b/docs/User Stories/Reciepe/B-1_Feedback-Loop_Handoff_2026-10-09.md
+@@ -0,0 +1,117 @@
++# B-1 Recipe Preparation Feedback Loop: Renderer Probe Handoff
++
++Scope: ONLY user-approved B-1 of PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09, approved 2026-10-09. Full plan not read. No B-2/D-1 implementation, provider calls, deployment, commit, release claim or independent QA approval.
++
++## Starting Baseline and Ownership
++
++- HEAD: `b637ee5b59a4f72b7d822443680c1951a01f9dc4`.
++- `B-1_Feedback-Loop_Baseline_2026-10-09.json` records complete starting status, hashes of every dirty tracked/untracked file, candidate source snapshots and their pre-existing Git diff.
++- The existing renderer test and backend KB were already dirty. Their existing content, including the selective-summary tests and targeted step-overflow logging documentation, is retained. No existing dirty hunk is owned by B-1.
++- Owned production edits: `backend/src/lib/instagramRenderer/render.ts`, `recipeDetailsTemplateV3.ts`, `types.ts`, `index.ts` in the same directory.
++- Owned adjacent edits: additions/import changes in the existing `__tests__/recipeDetailsTemplate.test.ts`; B-1-only paragraphs in `docs/kb/tech/02-backend.md` and `08-testing.md`.
++- `detailTextLayout.ts` was read but not changed. No Shared, handler, prompt, persistence, mobile or infrastructure changes.
++- `B-1_Feedback-Loop_Owned-Diff_2026-10-09.patch` is generated against the STARTING WORKTREE snapshots, not HEAD. It contains only owned source/document hunks plus this new handoff and its new evidence generator. Generated artifacts are identified and hashed separately in the evidence manifest.
++- `B-1_Feedback-Loop_Evidence_2026-10-09.json` lists owned hunk headers and before/after hashes and checks every unrelated starting dirty file byte-for-byte. The starting baseline artifact is immutable.
++
++## Internal API for B-2
++
++Exported from the existing renderer barrel and implemented in `render.ts`:
++
++```ts
++probeInstagramRecipeDetailsGeneratedText(input: {
++  savedTitle: string;
++  teaser: string;
++  steps: string[];
++}): Promise<RecipeDetailsGeneratedTextProbeResult>
++```
++
++No image, ingredients, selected export, full recipe or provider payload belongs in this input. Supply the complete candidate step array on EVERY call, including after a count/layout change. The saved title is contextual and must never be made AI-editable.
++
++The exported types in renderer `types.ts` are backend-only; no external HTTP or Shared contract changed.
++
++| Result | Meaning |
++| --- | --- |
++| `{ ok: true, status: "success", diagnostics, teaserFontSize }` | Teaser and every generated step fit the production nodes in this saved-title context. |
++| `{ ok: false, status: "generated-text-failure", diagnostics, teaserFontSize }` | Generated text has existing input-rule or geometry failures. Only this classification can support a later generated-text correction. |
++| `{ ok: false, status: "technical-failure", diagnostics, error }` | Geometry/context cannot be established; never an AI-correction signal. |
++
++Diagnostics identify `field: "title" | "teaser" | "steps"` and zero-based `itemIndex` for steps:
++
++- `fits` / `overflow`: actual `measured: { width, height, maxWidth, maxHeight }`, `fontSize`, `displayText`.
++- `width-overflow`: actual `measured: { width, maxWidth }` and `fontSize`; deliberately NO height or multiline-height estimate.
++- `invalid-text`: `INVALID_TEXT` / `INVALID_STEP_COUNT`; no fabricated measurements. Invalid fields are not normalized into acceptance or reported as fitting.
++- `technical-failure`: `INVALID_CONTEXT`, `MISSING_ASSET`, `FONT_OR_SATORI_FAILED`, `MISSING_MEASUREMENT`, `NON_FINITE_MEASUREMENT`, `TITLE_LAYOUT_FAILED` or `PROBE_FAILED`. Result-level `error` supplies the technical code/message and optional missing asset.
++
++The probe collects failures across all generated fields. Any technical diagnostic takes precedence over generated failures. Font/Satori exceptions mark all fields technically unestablished. A `title` diagnostic is contextual only: success DOES NOT certify the saved title, ingredients, metadata chips, photo, full image or atomic share bundle. Future sharing must still validate and render the actual adapted full input.
++
++## Shared Production Ownership
++
++- `recipeDetailsTemplateV3.ts`: extracted exact `createTitleAndTeaser`, `createPreparationPanel` and `createDetailsCanvas` helpers, used by both full composition and `composeRecipeDetailsGeneratedText`. The complete preparation panel, row/marker/text flex hierarchy and original root remain intact. Teaser width, accent, gap, flex/minWidth, italic font, whitespace and word-break behavior are unchanged. No image or ingredient node exists in the text-only tree.
++- `getRecipeDetailsTextLayoutFields`: accepts the existing full input or its title/description/steps subset. All font styles and assigned bounds remain owned here; absent ingredients produce no fields, not invented ingredient content.
++- `detailTextLayout.ts`: unchanged production `addMeasuredGermanBreaks` / `measureDetailTextWidths`, using German pattern positions and measured visible hyphens.
++- `render.ts`: shared Satori loading, four-font cache, text overrides, measurement collection, existing text validity rules, teaser attempt sizes and the existing `exceedsDetailsBounds` 0.5 px tolerance. Probe loads only Satori and bundled fonts. Full runtime/design assets retain their own loading path.
++- Fonts remain Inter Medium 500 normal, Inter Medium Italic 500 italic, Inter SemiBold 600 and InterDisplay Bold 700. Their verified bytes and the offline photo hash are recorded in evidence.
++- Teaser font attempts remain exactly 22, 21, 20, 19, 18, with the existing title-dependent height and terminal-period display omission. Steps remain 22 px for 1-4 rows and 18 px for 5 rows; bounds are 302 x 105 and 318 x 84 respectively.
++- No new cap, three-line acceptance rule, omission, truncation, font/layout/image fallback or normalization of saved/generated content was introduced. Existing title60/teaser96/step90 constraints and 1-5 step capacity remain unchanged; the full renderer preserves its public FIRST failure and its legacy synthetic height on width-break errors. The NEW probe never reports that synthetic height.
++
++## Verified Candidate Context
++
++Source: existing `quarkbroetchenDetailsFixture`, offline versioned `test-fixtures/quarkbroetchen-source.png`, unchanged production fonts. No authenticated Alpha photo or confirmed export view was required.
++
++The exact four-step candidate is:
++
++1. `Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.`
++2. `Forme den Teig zu Brötchen.`
++3. `Backe die Brötchen im vorgeheizten Ofen.`
++4. `Lasse die Brötchen abkühlen.`
++
++Step 1 is the exact approved-package Alpha sentence. Steps 2-4 are deterministic offline context, not a claimed complete authenticated Alpha replay. Saved title, teaser, ingredient rows, full renderer context and every measured diagnostic are persisted in the evidence JSON.
++
++Probe and full renderer both reject step 0 at exactly 300 x 112 px against 302 x 105 px, unchanged 22 px font. A manually selected shorter ingredient-preserving candidate, `Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig.`, passes with the SAME remaining context and font. This is a regression candidate, not a provider correction or general semantic-preservation proof.
++
++Three full-render PNG SHA-256 fingerprints captured BEFORE production extraction are pinned in regression tests and rechecked on compiled output:
++
++| Context | SHA-256 |
++| --- | --- |
++| Original Quarkbroetchen fixture | `b81a0cc528c389cc3b21113ef7d65ea6d7cc37ba2023b4d9fa035e087573036a` |
++| Shorter four-step candidate | `bc9276a5158de0c1247a9da9b33a4fd5a072268f4fec4c7108b40ac94f460d74` |
++| Dense 20-ingredient fixture using the offline photo | `e1737c8af626890d61ae1cc3decac0a31e6e6de7da8ca98fe2a88982e17b130b` |
++
++Parity coverage: all 1-5 step counts across short/medium/long title layouts; identical full/probe node width and height and teaser attempt sequence; natural title-dependent sizing, terminal-period handling and German breaks; all five explicit teaser-size selection paths; count-change rechecks; multiple step and teaser failures; invalid text/count with no claimed validation; 0.5 / 0.5001 px width/height boundaries; absent/non-finite final nodes and absent width nodes; saved-title technical failures; cold starts with Sharp/Resvg imports and non-font reads blocked; missing/corrupt fonts and Satori errors.
++
++Injected-dimension boundary/selection tests retain real fonts and Satori nodes but are not claimed as naturally occurring production layouts. Natural-layout parity is tested separately.
++
++## Validation and Evidence
++
++All commands ran offline from the workspace root. Durable output names use the `B-1_Feedback-Loop_` prefix and date `2026-10-09` in this directory.
++
++| Gate | Result | Durable output |
++| --- | --- | --- |
++| Pre-extraction focused renderer | 35 tests / 1 file passed, exit 0 | Initial focused capture; baseline PNG lines retained in baseline unit output |
++| Pre-production-change backend units | 1440 tests / 66 files passed, exit 0 | `Baseline-Units_2026-10-09.txt` |
++| Extraction focused renderer | 35 tests / 1 file passed, exit 0; three hashes unchanged | `Extraction_2026-10-09.txt` |
++| Alpha probe/full-render check | 1 passed, 34 skipped, exit 0 | `Alpha_2026-10-09.txt` |
++| Final focused renderer | 83 tests / 1 file passed, exit 0 | `Focused_2026-10-09.txt` |
++| Final complete backend units | 1488 tests / 66 files passed, exit 0 | `Units_2026-10-09.txt` |
++| `npm run typecheck --workspace=backend` | Passed, exit 0 | `Typecheck_2026-10-09.txt` |
++| `npm run build:verify --workspace=backend` | Passed, exit 0; asset copy, compiled startup/imports and duplicate function IDs checked | `Build_2026-10-09.txt` |
++| Evidence generator syntax | `node --check`, exit 0 | Reproducible evidence script |
++| Compiled evidence generator | Passed, exit 0; four contexts, three baseline PNG hashes, 9 owned files, 75 unrelated baseline files unchanged | `Evidence_2026-10-09.json`, `Owned-Diff_2026-10-09.patch` |
++| `node scripts/check-encoding.mjs` | Passed, exit 0 | `Encoding_2026-10-09.txt` |
++| `git diff --check` | Passed, exit 0 | Recorded here and in evidence manifest |
++| `git apply --reverse --check` on owned patch | Passed, exit 0; check only, never applied | Recorded here and in evidence manifest |
++| Owned-diff credential-pattern scan | Zero matches; no secrets or settings were read | Recorded here and in evidence manifest |
++
++Development-only corrections: initial typecheck exposed one widened literal in exception diagnostics, repaired before further work; the first expanded suite had three test-expectation failures from an assumed 328 px compact width, corrected to the EXISTING 318 px. The first workspace-root evidence run found the visual fixture's backend-relative photo path; the evidence script now explicitly binds the same versioned offline photo, without a renderer fallback. Same checks reran green. No baseline failures or unrelated fixes.
++
++Reproduce compiled candidate/preservation/hunk evidence AFTER build:
++
++```powershell
++node 'docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs'
++```
++
++The generator verifies actual compiled candidate results and original PNG fingerprints, captures measured diagnostics without image buffers, checks unrelated dirty hashes and writes owned-diff/evidence artifacts. It makes no network/provider/deployment call. Gate counts in its manifest describe the recorded commands above, not commands rerun by the generator.
++
++No architectural/documentation conflict was found in the B-1 renderer slice. No scope deviation. Current full-render width-break height is deliberately preserved as a legacy public-contract detail, not reused as probe geometry.
++
++Remaining boundaries: B-2 integration, live cooking-core/correction evidence, independent QA and release are not performed or claimed by B-1. Contract/emulator tests are not required for this renderer-only change. No B-1 implementation blocker is known.
+\ No newline at end of file

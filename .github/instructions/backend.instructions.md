@@ -157,3 +157,11 @@ When a task requires a new Cosmos container:
 | AI plausibility check fails | Return or throw 422 |
 | Quota exceeded | Return `enforceQuota()` response → 429 |
 | Anything else | Let `withHandler` catch it → 500 (stack never sent to client) |
+
+## Actionable Failure Logging
+
+Error logs must contain enough context to diagnose and reproduce the failure: operation/stage, stable error code, affected field/index, actual versus allowed values, and relevant layout or provider metadata. A status code alone is insufficient.
+
+Recipe text is permitted in targeted failure diagnostics when needed for reproduction. For a detail-template step overflow, log the exact affected step text and step count/layout together with the measured bounds. Do not dump the entire recipe or request, log unrelated fields, or add recipe text to successful-operation logs. Use structured JSON so quotation marks and line breaks remain escaped and reproducible.
+
+Never log credentials, tokens, authorization headers, connection strings, image/base64 bodies, or unrestricted provider/request payloads. Existing narrower content exclusions in other flows remain in force unless explicitly changed; this rule does not authorize blanket logging of all AI output. Detailed diagnostic values belong in server logs, not client error responses. Cover new failure diagnostics with regression tests.

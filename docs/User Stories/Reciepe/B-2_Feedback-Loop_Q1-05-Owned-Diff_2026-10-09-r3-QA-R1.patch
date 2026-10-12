@@ -1,0 +1,112 @@
+diff --git a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+index b14fd3f..ab381cf 100644
+--- a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+@@ -44,6 +44,10 @@ export interface ExportStepSemanticAssertion {
+   sourceStepOrder: number;
+   patterns: RegExp[];
+   contradictions?: RegExp[];
++  sourceBoundWholeIngredientSet?: {
++    sourceSteps: Array<{ order: number; description: string }>;
++    pattern: RegExp;
++  };
+ }
+ 
+ export interface SourceStepSemanticAssertion {
+@@ -84,7 +88,11 @@ export function assertRecipeStepSemantics(result: Pick<AiRecipeRaw, 'steps'> & {
+   for (const assertion of constraints.exportStepSemanticAssertions ?? []) {
+     const step = result.exportSuggestion.steps.find((candidate) => candidate.sourceStepOrders.includes(assertion.sourceStepOrder));
+     expect(step, `Missing export reference ${assertion.sourceStepOrder}: ${assertion.description}`).toBeDefined();
+-    for (const pattern of assertion.patterns) {
++    const equivalence = assertion.sourceBoundWholeIngredientSet;
++    const wholeSetEquivalent = equivalence && equivalence.sourceSteps.length === result.steps.length &&
++      equivalence.sourceSteps.every((source, index) => source.order === result.steps[index]!.order && source.description === result.steps[index]!.description) &&
++      equivalence.pattern.test(step!.description);
++    for (const pattern of wholeSetEquivalent ? [] : assertion.patterns) {
+       expect(step!.description, `Export source ${assertion.sourceStepOrder}: ${assertion.description}`).toMatch(pattern);
+     }
+     for (const pattern of assertion.contradictions ?? []) {
+@@ -357,7 +365,8 @@ export const RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE: {
+   },
+   constraints: { ingredients: [], exportStepSemanticAssertions: [
+     { sourceStepOrder: 1, description: 'mix all original dough ingredients without omission',
+-      patterns: [/(?:misch\w*|vermenge|ruehr\w*|rühr\w*)/iu, /mehl/iu, /quark/iu, /zucker/iu, /backpulver/iu, /\bei\b/iu, /kern/iu, /salz/iu, /teig/iu] },
++      patterns: [/(?:misch\w*|vermenge|ruehr\w*|rühr\w*)/iu, /mehl/iu, /quark/iu, /zucker/iu, /backpulver/iu, /\bei\b/iu, /kern/iu, /salz/iu, /teig/iu],
++      contradictions: [/\b(?:butter|hefe|milch|wasser)\b/iu] },
+     { sourceStepOrder: 2, description: 'form the dough into rolls', patterns: [/form\w*/iu, /br(?:oe|ö)tchen/iu] },
+     { sourceStepOrder: 3, description: 'bake rolls at source-backed temperature and duration', patterns: [/back\w*/iu, /180\s*°\s*C/iu, /20\s*min/iu], contradictions: [/pfanne|anbrat|\b(?:10|30|40)\s*min/iu] },
+   ] },
+@@ -369,6 +378,11 @@ export const RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE: {
+   ] },
+ };
+ 
++RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE.constraints.exportStepSemanticAssertions![0]!.sourceBoundWholeIngredientSet = {
++  sourceSteps: RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE.preparation.steps.map(({ order, description }) => ({ order, description })),
++  pattern: /^(?:vermisch\w*|misch\w*|vermenge|rühr\w*|ruehr\w*)\s+(?:alle|sämtliche|saemtliche)\s+(?:zutaten|teigzutaten)\s+zu\s+(?:einem\s+)?teig(?:\s+und\s+form\w*\s+(?:ihn|(?:den\s+)?teig)\s+zu\s+br(?:ö|oe)tchen)?[.!]?$/iu,
++};
++
+ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+   {
+     id: 'mixed-food-seasoning',
+diff --git a/backend/src/lib/recipeAnalyzeValidation.test.ts b/backend/src/lib/recipeAnalyzeValidation.test.ts
+index f231085..29d4734 100644
+--- a/backend/src/lib/recipeAnalyzeValidation.test.ts
++++ b/backend/src/lib/recipeAnalyzeValidation.test.ts
+@@ -1,7 +1,7 @@
+ import { describe, expect, it } from 'vitest';
+ 
+ import { validateRecipeAnalyzeOutput, validateRecipePreparationSource, validateRecipeExportPreparationOutput as validateCompactPreparation } from './recipeAnalyzeValidation';
+-import { assertRecipeStepSemantics, assertRecipePreparationSemantics, RECIPE_PREPARATION_EVAL_FIXTURES, RECIPE_ANALYZE_EVAL_FIXTURES, RECIPE_PREPARATION_EVAL_FIXTURE } from './prompts/recipeAnalyze.eval.fixtures';
++import { assertRecipeStepSemantics, assertRecipePreparationSemantics, RECIPE_PREPARATION_EVAL_FIXTURES, RECIPE_ANALYZE_EVAL_FIXTURES, RECIPE_PREPARATION_EVAL_FIXTURE, RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE } from './prompts/recipeAnalyze.eval.fixtures';
+ import type { AiRecipeRaw } from './openai';
+ 
+ describe('B-2 source authority and diagnostic indices', () => {
+@@ -108,6 +108,48 @@ function validateRecipeExportPreparationOutput(result: AiRecipeRaw) {
+ }
+ 
+ describe('B-19 three saved-source semantic rubrics', () => {
++
++  function doughOutput(description: string) {
++    return { steps: [
++      { description, sourceStepOrders: [1, 2] },
++      { description: 'Backe die Brötchen im Ofen bei 180°C für 20 Minuten.', sourceStepOrders: [3] },
++    ] };
++  }
++
++  it.each([
++    'Vermische alle Zutaten zu einem Teig und forme ihn zu Brötchen.',
++    'Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig und forme Brötchen.',
++  ])('QA-R1 accepts source-bound complete single-stage dough ingredients: %s', (description) => {
++    const fixture = RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE;
++    assertRecipePreparationSemantics(doughOutput(description), fixture.preparation.steps, fixture.constraints);
++  });
++
++  it.each([
++    'Vermische Mehl und Quark zu einem Teig und forme ihn zu Brötchen.',
++    'Vermische alle Zutaten außer Salz zu einem Teig und forme ihn zu Brötchen.',
++    'Vermische alle Zutaten mit Butter zu einem Teig und forme ihn zu Brötchen.',
++    'Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne, Salz und Butter zu Teig; forme Brötchen.',
++  ])('QA-R1 rejects dough ingredient omission/invention: %s', (description) => {
++    const fixture = RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE;
++    expect(() => assertRecipePreparationSemantics(doughOutput(description), fixture.preparation.steps, fixture.constraints)).toThrow();
++  });
++
++  it.each(['second-mixing-stage', 'different-component'] as const)('QA-R1 rejects generic all-ingredients equivalence for %s source', (kind) => {
++    const fixture = RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE;
++    const saved = structuredClone(fixture.preparation.steps);
++    if (kind === 'second-mixing-stage') saved[3]!.description = 'Mische Quark und Zucker separat als Belag.';
++    else saved[0]!.description = 'Vermische Mehl und Ei zu einem Teig; behalte Quark als Füllung zurück.';
++    expect(() => assertRecipePreparationSemantics(doughOutput('Vermische alle Zutaten zu einem Teig und forme ihn zu Brötchen.'), saved, fixture.constraints)).toThrow();
++  });
++
++  it.each(['time', 'temperature', 'core'] as const)('QA-R1 keeps required dough baking %s negative', (kind) => {
++    const fixture = RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE;
++    const output = doughOutput('Vermische alle Zutaten zu einem Teig und forme ihn zu Brötchen.');
++    output.steps[1]!.description = kind === 'time' ? 'Backe Brötchen bei 180°C für 30 Minuten.'
++      : kind === 'temperature' ? 'Backe Brötchen bei 200°C für 20 Minuten.' : 'Serviere die Brötchen.';
++    expect(() => assertRecipePreparationSemantics(output, fixture.preparation.steps, fixture.constraints)).toThrow();
++  });
++
+   it('allows a single pasta group while keeping independent sauce and pasta actions', () => {
+     const fixture = RECIPE_PREPARATION_EVAL_FIXTURES[2]!;
+     const raw = {

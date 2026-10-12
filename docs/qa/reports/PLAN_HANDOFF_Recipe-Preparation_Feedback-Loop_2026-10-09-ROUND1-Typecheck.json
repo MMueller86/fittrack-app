@@ -1,0 +1,20 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "typecheck",
+    "--workspace=backend"
+  ],
+  "start": "2026-10-09T17:27:04.120Z",
+  "end": "2026-10-09T17:27:08.981Z",
+  "exit": 0,
+  "signal": null,
+  "candidateHash": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "output": "docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Typecheck-Output.txt",
+  "outputSha256": "23c9d65eeb8572d1fe4ec2ca0ea0a4cd5b67699a40d46b72d4a2dbfea253fba0",
+  "report": null,
+  "reportSha256": null,
+  "counts": null,
+  "liveCalls": 0,
+  "buildRuns": 0
+}

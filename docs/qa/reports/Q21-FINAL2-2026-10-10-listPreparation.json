@@ -1,0 +1,51 @@
+{
+  "stage": "listPreparation",
+  "startedAt": "2026-10-10T00:24:26.245Z",
+  "finishedAt": "2026-10-10T00:24:27.592Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "--testNamePattern",
+    "preparation prompt version matches fixture expectations|recipePreparation"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "counts": null,
+  "selection": [
+    {
+      "name": "preparation prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    }
+  ],
+  "outputPath": "docs/qa/reports/Q21-FINAL2-2026-10-10-listPreparation-Output.txt",
+  "outputSha256": "1b6315ab0f5df4250b671b7d8d3bc6b3650801084e627408e3a7b0e1e233b7af",
+  "testReport": null,
+  "reportSha256": null,
+  "synthetic": [],
+  "allIntendedTestsExecuted": null,
+  "liveGate": false,
+  "offlineStage": true
+}

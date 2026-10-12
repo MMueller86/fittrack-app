@@ -1,0 +1,54 @@
+diff --git a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+index b14fd3f..c37b5e4 100644
+--- a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+@@ -303,7 +303,7 @@ export const RECIPE_PREPARATION_EVAL_FIXTURES = [
+         { sourceStepOrder: 1, description: 'cut onion', patterns: [/(?:schneid\w*[^;,.]*zwiebel|zwiebel[^;,.]*schneid\w*)/iu] },
+         { sourceStepOrder: 3, description: 'fry onion', patterns: [/(?:brat\w*[^;,.]*zwiebel|zwiebel[^;,.]*brat\w*)/iu], contradictions: [/brat\w*[^;,.]*pasta/iu] },
+         { sourceStepOrder: 4, description: 'cook the essential tomato sauce', patterns: [/(?:(?:köchel\w*|koch\w*|gar\w*)[^;,.]*(?:tomat|sauce)|(?:tomat|sauce)[^;,.]*(?:köchel\w*|koch\w*|gar\w*))/iu], contradictions: [/(?:tomat|sauce)(?:(?!\bund\b)[^;,.])*\b10\s*min/iu] },
+-        { sourceStepOrder: 5, description: 'cook pasta independently', patterns: [/(?:koch\w*[^;,.]*pasta|pasta[^;,.]*(?:koch\w*|gar\w*))/iu], contradictions: [/pasta(?:(?!\bund\b)[^;,.])*(?:in|mit)[^;,.]*(?:sauce|tomat)/iu, /pasta(?:(?!\bund\b)[^;,.])*\b15\s*min/iu] },
++        { sourceStepOrder: 5, description: 'cook pasta independently', patterns: [/(?:koch\w*(?:(?!\bund\b)[^;,.])*pasta|pasta(?:(?!\bund\b)[^;,.])*(?:koch\w*|gar\w*))/iu], contradictions: [/pasta(?:(?!\bund\b)[^;,.])*(?:in|mit)(?:(?!\bund\b)[^;,.])*(?:sauce|tomat)/iu, /pasta(?:(?!\bund\b)[^;,.])*\b15\s*min/iu] },
+       ],
+     },
+   },
+diff --git a/backend/src/lib/recipeAnalyzeValidation.test.ts b/backend/src/lib/recipeAnalyzeValidation.test.ts
+index f231085..b1c17e7 100644
+--- a/backend/src/lib/recipeAnalyzeValidation.test.ts
++++ b/backend/src/lib/recipeAnalyzeValidation.test.ts
+@@ -108,6 +108,36 @@ function validateRecipeExportPreparationOutput(result: AiRecipeRaw) {
+ }
+ 
+ describe('B-19 three saved-source semantic rubrics', () => {
++  function pastaOutput(description: string) {
++    return { steps: [
++      { description: 'Schneide die Zwiebel und brate die Zwiebel an.', sourceStepOrders: [1, 3] },
++      { description: 'Lasse die Tomatensauce 15 Minuten köcheln.', sourceStepOrders: [4] },
++      { description, sourceStepOrders: [5, 7] },
++    ] };
++  }
++
++  it('QA-R1 accepts the exact recorded separate pasta cooking then sauce mixing sentence', () => {
++    const fixture = RECIPE_PREPARATION_EVAL_FIXTURES[2]!;
++    assertRecipePreparationSemantics(pastaOutput('Koche die Pasta in Salzwasser 10 Minuten und mische sie mit der Sauce.'), fixture.preparation.steps, fixture.constraints);
++  });
++
++  it.each([
++    'Koche die Pasta in der Sauce 10 Minuten.',
++    'Koche die Pasta mit Tomatensauce 10 Minuten.',
++    'Koche die Pasta in Salzwasser 15 Minuten und mische sie mit der Sauce.',
++    'Koche die Tomatensauce in Salzwasser 10 Minuten und mische sie mit Pasta.',
++  ])('QA-R1 rejects actual pasta component/cooking/time contradiction: %s', (description) => {
++    const fixture = RECIPE_PREPARATION_EVAL_FIXTURES[2]!;
++    expect(() => assertRecipePreparationSemantics(pastaOutput(description), fixture.preparation.steps, fixture.constraints)).toThrow();
++  });
++
++  it('QA-R1 rejects swapped sauce and pasta durations in their own components', () => {
++    const fixture = RECIPE_PREPARATION_EVAL_FIXTURES[2]!;
++    const output = pastaOutput('Koche Pasta 15 Minuten in Salzwasser.');
++    output.steps[1]!.description = 'Lasse Tomatensauce 10 Minuten köcheln.';
++    expect(() => assertRecipePreparationSemantics(output, fixture.preparation.steps, fixture.constraints)).toThrow();
++  });
++
+   it('allows a single pasta group while keeping independent sauce and pasta actions', () => {
+     const fixture = RECIPE_PREPARATION_EVAL_FIXTURES[2]!;
+     const raw = {

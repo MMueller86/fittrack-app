@@ -1,0 +1,34 @@
+{
+  "name": "Prompt-Rubric-Green",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipePreparation.test.ts",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "--testNamePattern",
+    "QA-R1",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Prompt-Rubric-Green-Report_2026-10-09-r3-QA-R1.json"
+  ],
+  "start": "2026-10-09T16:56:15.731Z",
+  "end": "2026-10-09T16:56:17.897Z",
+  "exit": 0,
+  "signal": null,
+  "counts": {
+    "executed": 23,
+    "passed": 23,
+    "failed": 0,
+    "skipped": 195
+  },
+  "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Green-Output_2026-10-09-r3-QA-R1.txt",
+  "outputSha256": "342baab1f19186287f46588113a7306fd75815b9b3f1e9e0bb53f03261b74f3b",
+  "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Prompt-Rubric-Green-Report_2026-10-09-r3-QA-R1.json",
+  "reportSha256": "283f67b55c875d3aa843d38823375c414f9cc017928608f8a87499e216bf32f3",
+  "candidateSha256": null
+}

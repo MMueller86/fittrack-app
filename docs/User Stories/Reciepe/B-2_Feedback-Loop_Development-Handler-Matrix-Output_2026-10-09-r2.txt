@@ -1,0 +1,90 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 books exactly once after 0 corrections with no source writes or text logs
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.466Z","level":"info","event":"handler.start","handler":"recipes.create"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 books exactly once after 0 corrections with no source writes or text logs
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.471Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"ba9dabc5-bd6a-47a6-b740-632f0472f062","export_view_confirmed":true}
+[ctx.log] {"ts":"2026-10-09T15:52:50.471Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":5}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 books exactly once after 1 corrections with no source writes or text logs
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.622Z","level":"info","event":"handler.start","handler":"recipes.create"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 books exactly once after 1 corrections with no source writes or text logs
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.623Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"cf38996b-11b2-42f7-aac8-abab4dd1334e","export_view_confirmed":true}
+[ctx.log] {"ts":"2026-10-09T15:52:50.623Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 books exactly once after 2 corrections with no source writes or text logs
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.643Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:52:50.643Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"0f9effb6-b765-4931-8723-80ad32a08da5","export_view_confirmed":true}
+[ctx.log] {"ts":"2026-10-09T15:52:50.643Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":0}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 logs exact latest affected step, teaser and difficulty only after two completed corrections
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.673Z","level":"info","event":"handler.start","handler":"recipes.create"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 logs exact latest affected step, teaser and difficulty only after two completed corrections
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.674Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"42dd3ff3-6018-4cb2-b23b-7af6b42e1ec4","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:52:50.674Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 does not log exhausted text or book on provider failure after 1 completed draft(s)
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.694Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:52:50.695Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"4afb3b7b-24b0-4814-9206-6742f5e62662","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:52:50.695Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 does not log exhausted text or book on provider failure after 2 completed draft(s)
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.707Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:52:50.708Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"5c966d94-f403-4826-80fa-42cf5da65d41","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:52:50.708Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 gives technical font/probe failure precedence and generic HTTP with no text logs or booking
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.722Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:52:50.722Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"dd73e448-fb0a-42b3-85ee-599dda051cf9","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:52:50.722Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":0}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 checks final deadline immediately before booking without starting it
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.726Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:52:50.726Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"b7b22bca-e941-4046-b387-0e1a030ce9db","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:52:50.726Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 checks final deadline immediately before booking without starting it
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.727Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 awaits booking once without race/retry, failing=false
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.728Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:52:50.729Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"cfddc1a0-ac63-42b2-85cc-2807c5420cd8","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:52:50.729Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+[90mstdout[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 awaits booking once without race/retry, failing=true
+[22m[39m[ctx.log] {"ts":"2026-10-09T15:52:50.737Z","level":"info","event":"handler.start","handler":"recipes.create"}
+[ctx.log] {"ts":"2026-10-09T15:52:50.738Z","level":"info","event":"recipe.created","userId":"test-user-abc-123","recipeId":"a1460582-383b-406b-aeb4-2a034de3d427","export_view_confirmed":false}
+[ctx.log] {"ts":"2026-10-09T15:52:50.738Z","level":"info","event":"handler.success","handler":"recipes.create","status":201,"duration_ms":1}
+
+ [32m✓[39m src/functions/recipes.test.ts [2m([22m[2m115 tests[22m[2m | [22m[33m105 skipped[39m[2m)[22m[33m 327[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m10 passed[39m[22m[2m | [22m[33m105 skipped[39m[90m (115)[39m
+[2m   Start at [22m 17:52:48
+[2m   Duration [22m 1.90s[2m (transform 526ms, setup 0ms, collect 1.01s, tests 327ms, environment 0ms, prepare 176ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Matrix-Report_2026-10-09-r2.json
+
+[90mstderr[2m | src/functions/recipes.test.ts
+[22m[39mWARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.
+
+[90mstderr[2m | src/functions/recipes.test.ts[2m > [22m[2mPOST /recipes/{id}/export-view/prepare[2m > [22m[2mB-2 checks final deadline immediately before booking without starting it
+[22m[39m[ctx.error] {"ts":"2026-10-09T15:52:50.727Z","level":"error","event":"recipes.prepareExportView.analysisFailed","failure_stage":"before_usage_booking","failure_code":"PREPARATION_TIMEOUT"}
+[ctx.error] {"ts":"2026-10-09T15:52:50.727Z","level":"error","event":"handler.response.failure","handler":"recipes.prepareExportView","status":502,"duration_ms":0}
+

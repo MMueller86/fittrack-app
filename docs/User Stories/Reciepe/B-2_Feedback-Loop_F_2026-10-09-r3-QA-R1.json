@@ -1,0 +1,28 @@
+{
+  "gate": "F",
+  "start": "2026-10-09T17:02:21.479Z",
+  "end": "2026-10-09T17:03:18.702Z",
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "backend/scripts/run-eval.mjs",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "--testNamePattern",
+    "preparation prompt version matches fixture expectations|recipePreparation",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_F-Report_2026-10-09-r3-QA-R1.json"
+  ],
+  "exit": 1,
+  "signal": null,
+  "counts": {
+    "executed": 5,
+    "passed": 2,
+    "failed": 3,
+    "skipped": 9
+  },
+  "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Output_2026-10-09-r3-QA-R1.txt",
+  "outputSha256": "36f4ffdc97fdd9945ca3d6e1e753df2c052f8f48fa0e12f34a8d3f94724546c7",
+  "report": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Report_2026-10-09-r3-QA-R1.json",
+  "reportSha256": "4f6520e1069ab596b1c6b1b36ded2e88c83adecc38423c48e59fdcdd9bd6fbe2"
+}

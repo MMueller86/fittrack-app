@@ -1,0 +1,106 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [31m❯[39m src/lib/recipeAnalyzeValidation.test.ts [2m([22m[2m167 tests[22m[2m | [22m[31m4 failed[39m[2m | [22m[33m150 skipped[39m[2m)[22m[90m 16[2mms[22m[39m
+[31m   [31m×[31m B-19 three saved-source semantic rubrics[2m > [22mQA-R1 accepts the exact recorded separate pasta cooking then sauce mixing sentence[90m 7[2mms[22m[31m[39m
+[31m     → Contradiction at export source 5: expected 'Koche die Pasta in Salzwasser 10 Minu…' not to match /pasta(?:(?!\bund\b)[^;,.])*(?:in|mi…/iu[39m
+[31m   [31m×[31m B-19 three saved-source semantic rubrics[2m > [22mQA-R1 rejects actual pasta component/cooking/time contradiction: Koche die Tomatensauce in Salzwasser 10 Minuten und mische sie mit Pasta.[90m 1[2mms[22m[31m[39m
+[31m     → expected [Function] to throw an error[39m
+[31m   [31m×[31m B-19 three saved-source semantic rubrics[2m > [22mQA-R1 accepts source-bound complete single-stage dough ingredients: Vermische alle Zutaten zu einem Teig und forme ihn zu Brötchen.[90m 1[2mms[22m[31m[39m
+[31m     → Export source 1: mix all original dough ingredients without omission: expected 'Vermische alle Zutaten zu einem Teig …' to match /mehl/iu[39m
+[31m   [31m×[31m B-19 three saved-source semantic rubrics[2m > [22mQA-R1 rejects dough ingredient omission/invention: Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne, Salz und Butter zu Teig; forme Brötchen.[90m 1[2mms[22m[31m[39m
+[31m     → expected [Function] to throw an error[39m
+ [31m❯[39m src/lib/recipePreparation.test.ts [2m([22m[2m51 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m45 skipped[39m[2m)[22m[33m 521[2mms[22m[39m
+[31m   [31m×[31m B-2 bounded Preparation loop[2m > [22mQA-R1 explicitly directs correction at the measured failing field, not fitting neighbours[90m 5[2mms[22m[31m[39m
+[31m     → expected 'v5' to be 'v6' // Object.is equality[39m
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m5 failed[39m[22m[2m | [22m[1m[32m18 passed[39m[22m[2m | [22m[33m195 skipped[39m[90m (218)[39m
+[2m   Start at [22m 18:55:25
+[2m   Duration [22m 1.41s[2m (transform 320ms, setup 0ms, collect 639ms, tests 537ms, environment 0ms, prepare 224ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Red-Report_2026-10-09-r3-QA-R1.json
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 5 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipeAnalyzeValidation.test.ts[2m > [22mB-19 three saved-source semantic rubrics[2m > [22mQA-R1 accepts the exact recorded separate pasta cooking then sauce mixing sentence
+[31m[1mAssertionError[22m: Contradiction at export source 5: expected 'Koche die Pasta in Salzwasser 10 Minu…' not to match /pasta(?:(?!\bund\b)[^;,.])*(?:in|mi…/iu[39m
+
+[32m- Expected:[39m 
+/pasta(?:(?!\bund\b)[^;,.])*(?:in|mit)[^;,.]*(?:sauce|tomat)/iu
+
+[31m+ Received:[39m 
+"Koche die Pasta in Salzwasser 10 Minuten und mische sie mit der Sauce."
+
+[36m [2m❯[22m assertRecipeStepSemantics src/lib/prompts/recipeAnalyze.eval.fixtures.ts:[2m91:100[22m[39m
+    [90m 89| [39m    }
+    [90m 90| [39m    [35mfor[39m ([35mconst[39m pattern [35mof[39m assertion[33m.[39mcontradictions [33m??[39m []) {
+    [90m 91| [39m      [34mexpect[39m(step[33m![39m[33m.[39mdescription[33m,[39m [32m`Contradiction at export source [39m[36m${[39masse…
+    [90m   | [39m                                                                                                   [31m^[39m
+    [90m 92| [39m    }
+    [90m 93| [39m  }
+[90m [2m❯[22m Module.assertRecipePreparationSemantics src/lib/prompts/recipeAnalyze.eval.fixtures.ts:[2m320:3[22m[39m
+[90m [2m❯[22m src/lib/recipeAnalyzeValidation.test.ts:[2m121:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipeAnalyzeValidation.test.ts[2m > [22mB-19 three saved-source semantic rubrics[2m > [22mQA-R1 rejects actual pasta component/cooking/time contradiction: Koche die Tomatensauce in Salzwasser 10 Minuten und mische sie mit Pasta.
+[31m[1mAssertionError[22m: expected [Function] to throw an error[39m
+[36m [2m❯[22m src/lib/recipeAnalyzeValidation.test.ts:[2m131:126[22m[39m
+    [90m129| [39m  ])([32m'QA-R1 rejects actual pasta component/cooking/time contradiction:[39m…
+    [90m130| [39m    [35mconst[39m fixture [33m=[39m [33mRECIPE_PREPARATION_EVAL_FIXTURES[39m[[34m2[39m][33m![39m[33m;[39m
+    [90m131| [39m    [34mexpect[39m(() [33m=>[39m [34massertRecipePreparationSemantics[39m([34mpastaOutput[39m(descript…
+    [90m   | [39m                                                                                                                             [31m^[39m
+    [90m132| [39m  })[33m;[39m
+    [90m133| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipeAnalyzeValidation.test.ts[2m > [22mB-19 three saved-source semantic rubrics[2m > [22mQA-R1 accepts source-bound complete single-stage dough ingredients: Vermische alle Zutaten zu einem Teig und forme ihn zu Brötchen.
+[31m[1mAssertionError[22m: Export source 1: mix all original dough ingredients without omission: expected 'Vermische alle Zutaten zu einem Teig …' to match /mehl/iu[39m
+
+[32m- Expected:[39m 
+/mehl/iu
+
+[31m+ Received:[39m 
+"Vermische alle Zutaten zu einem Teig und forme ihn zu Brötchen."
+
+[36m [2m❯[22m assertRecipeStepSemantics src/lib/prompts/recipeAnalyze.eval.fixtures.ts:[2m88:105[22m[39m
+    [90m 86| [39m    [34mexpect[39m(step[33m,[39m [32m`Missing export reference [39m[36m${[39massertion[33m.[39msourceStepOrder…
+    [90m 87| [39m    [35mfor[39m ([35mconst[39m pattern [35mof[39m assertion[33m.[39mpatterns) {
+    [90m 88| [39m      [34mexpect[39m(step[33m![39m[33m.[39mdescription[33m,[39m [32m`Export source [39m[36m${[39massertion[33m.[39msourceStepO…
+    [90m   | [39m                                                                                                        [31m^[39m
+    [90m 89| [39m    }
+    [90m 90| [39m    [35mfor[39m ([35mconst[39m pattern [35mof[39m assertion[33m.[39mcontradictions [33m??[39m []) {
+[90m [2m❯[22m Module.assertRecipePreparationSemantics src/lib/prompts/recipeAnalyze.eval.fixtures.ts:[2m320:3[22m[39m
+[90m [2m❯[22m src/lib/recipeAnalyzeValidation.test.ts:[2m153:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipeAnalyzeValidation.test.ts[2m > [22mB-19 three saved-source semantic rubrics[2m > [22mQA-R1 rejects dough ingredient omission/invention: Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne, Salz und Butter zu Teig; forme Brötchen.
+[31m[1mAssertionError[22m: expected [Function] to throw an error[39m
+[36m [2m❯[22m src/lib/recipeAnalyzeValidation.test.ts:[2m163:126[22m[39m
+    [90m161| [39m  ])([32m'QA-R1 rejects dough ingredient omission/invention: %s'[39m[33m,[39m (descrip…
+    [90m162| [39m    [35mconst[39m fixture [33m=[39m [33mRECIPE_PREPARATION_FORCED_DOUGH_FIXTURE[39m[33m;[39m
+    [90m163| [39m    [34mexpect[39m(() [33m=>[39m [34massertRecipePreparationSemantics[39m([34mdoughOutput[39m(descript…
+    [90m   | [39m                                                                                                                             [31m^[39m
+    [90m164| [39m  })[33m;[39m
+    [90m165| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipePreparation.test.ts[2m > [22mB-2 bounded Preparation loop[2m > [22mQA-R1 explicitly directs correction at the measured failing field, not fitting neighbours
+[31m[1mAssertionError[22m: expected 'v5' to be 'v6' // Object.is equality[39m
+
+Expected: [32m"v[7m6[27m"[39m
+Received: [31m"v[7m5[27m"[39m
+
+[36m [2m❯[22m src/lib/recipePreparation.test.ts:[2m22:47[22m[39m
+    [90m 20| [39m[34mdescribe[39m([32m'B-2 bounded Preparation loop'[39m[33m,[39m () [33m=>[39m {
+    [90m 21| [39m  [34mit[39m([32m'QA-R1 explicitly directs correction at the measured failing fiel[39m…
+    [90m 22| [39m    [34mexpect[39m([33mRECIPE_PREPARATION_PROMPT_VERSION[39m)[33m.[39m[34mtoBe[39m([32m'v6'[39m)[33m;[39m
+    [90m   | [39m                                              [31m^[39m
+    [90m 23| [39m    [34mexpect[39m([33mRECIPE_PREPARATION_SYSTEM_PROMPT[39m)[33m.[39m[34mtoContain[39m([32m'path und stepI[39m…
+    [90m 24| [39m    [34mexpect[39m([33mRECIPE_PREPARATION_SYSTEM_PROMPT[39m)[33m.[39m[34mtoContain[39m([32m'unter dem Zeic[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯[22m[39m
+

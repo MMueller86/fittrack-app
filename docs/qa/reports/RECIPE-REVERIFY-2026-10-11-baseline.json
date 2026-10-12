@@ -1,0 +1,2184 @@
+{
+  "format": "fittrack-reverify-baseline-v1",
+  "capturedAt": "2026-10-11T10:23:15.970Z",
+  "liveCallsBeforeThisRecord": 0,
+  "candidateSha256": "daa6124ba68347712a85177a9a0481ffd3cd52c5502ae8ccd5d2f2ac29a4c891",
+  "candidateFileCount": 536,
+  "files": [
+    {
+      "path": "backend/src/lib/recipeImportCookingCheck.ts",
+      "sha256": "8c3373791a21c54e7804848a074cfb5d774834a6f3fbbf17dd29bc683dbf7c4d"
+    },
+    {
+      "path": "backend/src/lib/recipePreparation.test.ts",
+      "sha256": "5af52262a8f3c3ddb4a80415106b1b909d098d81f78da81dc952d302b70997f9"
+    },
+    {
+      "path": "backend/src/lib/recipePreparation.ts",
+      "sha256": "e46aac7f12555f2ff6d6e4f09a8d98db8e7be5d4880015a0e8222be180b098eb"
+    },
+    {
+      "path": "backend/src/lib/recipePreparationOrder.test.ts",
+      "sha256": "3f68bb3b672274a948f596f33d3685ca52ad32251dfc240f24f7d381f982629b"
+    },
+    {
+      "path": "backend/src/lib/recipePreparationOrder.ts",
+      "sha256": "10b9e91a17be14cc4e095c4c8b5dbf23bc27974a1c40dbbd090c888d55ede7a1"
+    },
+    {
+      "path": "backend/src/lib/recipeTotalTimeGuard.test.ts",
+      "sha256": "81d858863143d44267143b08cbad9a89745d69ba840fcc83c1071f94fce9a1b3"
+    },
+    {
+      "path": "backend/src/lib/recipeTotalTimeGuard.ts",
+      "sha256": "bf8daaf79bddeae7f868cc7b00eb68469d71a15c13c6b59a9364074095bac94f"
+    },
+    {
+      "path": "backend/package.json",
+      "sha256": "2bfa28ff4461f71c5a3c01868e6bc499abc1d5d828b8581fd57f9ce0347d9419"
+    },
+    {
+      "path": "backend/scripts/copy-instagram-assets.mjs",
+      "sha256": "6bdff6b5af86b9ea906a8825e6f48c42746d06ceb602d06f8b961d086ed101f9"
+    },
+    {
+      "path": "backend/scripts/dev.mjs",
+      "sha256": "e1f68c76cf0e1a120a6d6a3efb75a2b74d4264164c939bd380b39dbf73acd9d8"
+    },
+    {
+      "path": "backend/scripts/dev.test.mjs",
+      "sha256": "d72a3899654b941eba5728def9a87528d64b72e4b81c52d0b0677a4c33526ec4"
+    },
+    {
+      "path": "backend/scripts/migrate-insight-weight-trend.mjs",
+      "sha256": "b319d5b253bd7af08005ca0f2651b3f974a6f6d79d90e184e810d9ba0e7440c5"
+    },
+    {
+      "path": "backend/scripts/render-gefluegelfrikadellen-details-template.mjs",
+      "sha256": "c59903741abef4ea69bfb312e88f07ce43019830a706a59eedeb925cdb61806e"
+    },
+    {
+      "path": "backend/scripts/render-golden.mjs",
+      "sha256": "334191219708f11da82dfd5a52cd52b7371ff1e865a5205dc62f0e27f1d9127c"
+    },
+    {
+      "path": "backend/scripts/render-nine-ingredients-details-template.mjs",
+      "sha256": "65d28c40b086ced3b273dbd60065ef657c2af34011641367c82a0909bd511850"
+    },
+    {
+      "path": "backend/scripts/render-recipe-details-template.mjs",
+      "sha256": "691504e05a9489a21b2b1d2ed922608d19174e91a434f063ee5674c490d88064"
+    },
+    {
+      "path": "backend/scripts/render-twenty-ingredients-details-template.mjs",
+      "sha256": "e3d44b75fee092de278638c44767fe23c0aaa8a99b994286f7b1d2ffa61008ed"
+    },
+    {
+      "path": "backend/scripts/run-eval.mjs",
+      "sha256": "970b62d87f29584338790fef2246924d6839b022de8af4328697788a823cd769"
+    },
+    {
+      "path": "backend/scripts/run-eval.test.mjs",
+      "sha256": "e02a7361b9eeb9bdab69ecd51388f0f27b93df5a498bbfbb94bf09a112c046b4"
+    },
+    {
+      "path": "backend/scripts/start-azurite.mjs",
+      "sha256": "f200d49b47f40d4a56adae1a3a4d314e4c8067a7b3d3883aad8886e75e975832"
+    },
+    {
+      "path": "backend/scripts/start-cosmos-emulator.ps1",
+      "sha256": "8cfd96fc8ee251270ce1a91dee7ab0f50043160df13e6dd098593f855e1eda64"
+    },
+    {
+      "path": "backend/scripts/stop-cosmos-emulator.ps1",
+      "sha256": "b7ddd043cce3a33b1fc6540b854e4cf8d2c7cf892303c5092b0cbd1d625adbf7"
+    },
+    {
+      "path": "backend/scripts/storage.mjs",
+      "sha256": "78ba3c4315699987a310ec3995e0c0ad28079816ac13a6acc971425d913d3320"
+    },
+    {
+      "path": "backend/scripts/storage.test.mjs",
+      "sha256": "09ade3922fd660b53b9068d974503125bf6c346a98c66adf6ebccfa88919ac9e"
+    },
+    {
+      "path": "backend/scripts/verify-build.mjs",
+      "sha256": "83e4e2c248af2aa47ba4d0ebf8eb6f8bfb7cd2f21ef9d8ebe5ec9ffdecedad60"
+    },
+    {
+      "path": "backend/scripts/verify-daily-insight-prompt.mjs",
+      "sha256": "80e34095718a335c069774f6c2e4549007d9067d50a20eb41d61c873b68867b1"
+    },
+    {
+      "path": "backend/scripts/verify-daily-insight-prompt.test.mjs",
+      "sha256": "7aac1152c7ddfd6d238c352a0cca23c6899475d6e8ec9c6be041bf1f8afd1856"
+    },
+    {
+      "path": "backend/scripts/wait-for-azurite.mjs",
+      "sha256": "3e1d3c1b4e9b7f60fee38bbf82d26bd530423637bd30975f26048ea367d8232d"
+    },
+    {
+      "path": "backend/scripts/wait-for-azurite.test.mjs",
+      "sha256": "c0afb8afa3e52e668475fa4ae55216b482ac59d72b8b09306e06ea18084c7cf7"
+    },
+    {
+      "path": "backend/scripts/wait-for-cosmos.mjs",
+      "sha256": "3c3c1313b84702a703a1286cb248f54d1045d641e1d5739885f7f162d3bbd10f"
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "sha256": "e7f4374c84b359e453aae674e63f415cc32ed9cbf2f275ef1472e2836d463c21"
+    },
+    {
+      "path": "backend/src/functions/ai.ts",
+      "sha256": "d9d91ab42387d8c8d4f943953fdd70da8b8b7fffbe63244341719db1b3fac6a6"
+    },
+    {
+      "path": "backend/src/functions/communityRecipes.test.ts",
+      "sha256": "7eb8e69574c52bef1bd18b4041b59307ba4b8c5861df5daeebc2e25524484682"
+    },
+    {
+      "path": "backend/src/functions/communityRecipes.ts",
+      "sha256": "2b19708c01fc126d98b0da3a76d8a139567cc78a5a91c878cb90d4f91eeacb82"
+    },
+    {
+      "path": "backend/src/functions/dailyInsight.test.ts",
+      "sha256": "2594b796d9a7e18423147561d836a455cc98323c9409673d73316d3c3efa0da1"
+    },
+    {
+      "path": "backend/src/functions/dailyInsight.ts",
+      "sha256": "3530d1b82b0a69e81e8246d84c0880f99963f01596df79043f763c8391b28b5f"
+    },
+    {
+      "path": "backend/src/functions/dailyInsightFeedback.test.ts",
+      "sha256": "2a4724d78d861a23213a78e41a829a02903bb75e27e0e6b121ef88f8be37fcc6"
+    },
+    {
+      "path": "backend/src/functions/dailyInsightFeedback.ts",
+      "sha256": "eb539d88c75b71df755f966f15615f5f27fac05386efedaba19ae661eaa71972"
+    },
+    {
+      "path": "backend/src/functions/diary.test.ts",
+      "sha256": "7c132093934f510fe758052e77beb683b44f52eea01f4c5128f59bf0f12fadbe"
+    },
+    {
+      "path": "backend/src/functions/diary.ts",
+      "sha256": "ec9ba413d2d52a9f4087fba14896a51e4aa41b74b02ec3afb2c514f565e071a0"
+    },
+    {
+      "path": "backend/src/functions/favorites.test.ts",
+      "sha256": "1debcfe6053e2f11dd283accee4f8cf17bc87d8df93fb83e5d8be89784cf940a"
+    },
+    {
+      "path": "backend/src/functions/favorites.ts",
+      "sha256": "5b53fbf8c695cede96fc44cfa6884f30d3603ae6ca144bc08bcb2f37209f6577"
+    },
+    {
+      "path": "backend/src/functions/foodEstimate.test.ts",
+      "sha256": "bc227282b4ddbf844fe5cceb90ac3005ba42ce783d7c8e07a0f4625abe5967df"
+    },
+    {
+      "path": "backend/src/functions/foodEstimate.ts",
+      "sha256": "833ce5759d638cbc450dc0bcdac2abf90c5e1afbd1a057a17804120f85e13b04"
+    },
+    {
+      "path": "backend/src/functions/foodEstimateBatch.ts",
+      "sha256": "5138f64728ba71d4c1880ee8631b0b876f0ad0a5de0cb8a4ffd685628fe2fd2d"
+    },
+    {
+      "path": "backend/src/functions/foodProducts.ts",
+      "sha256": "72af93b50c721e86e5efdb8c1b48ae359c29f33cab51f83eafb906a41f9ac86f"
+    },
+    {
+      "path": "backend/src/functions/foodSearch.test.ts",
+      "sha256": "5ef57b24cf6287fd19de891552d203745b473305962ab1807aa5bcd550b715ab"
+    },
+    {
+      "path": "backend/src/functions/foodSearch.ts",
+      "sha256": "43fe76db04410fb45515112462b0f95f43c834d0012d2c35281743cf36158c29"
+    },
+    {
+      "path": "backend/src/functions/instagramRecipe.test.ts",
+      "sha256": "5fef665be7bbfdba01806c3c295522b40437a1427e16563eb916a2cd56e21a03"
+    },
+    {
+      "path": "backend/src/functions/instagramRecipe.ts",
+      "sha256": "93df4eb6a7b5b81906a875a9bca6556a237817deac6bd69d071f31a3bf7e21d0"
+    },
+    {
+      "path": "backend/src/functions/labelScan.test.ts",
+      "sha256": "bc2195ff0ca7a27f534e2eb4cf9cb9f4e8bbc2ef8dd731bd3eab12d78cce23e8"
+    },
+    {
+      "path": "backend/src/functions/labelScan.ts",
+      "sha256": "a1ad5e8a00455f487b9fca469be0091a6a7afe956c8d237857f8e0a66f700c3b"
+    },
+    {
+      "path": "backend/src/functions/nutritionTargets.ts",
+      "sha256": "08cddc519fd1397c8d3b8ff42dda01fea983c12c15601fd09de52b614ed90732"
+    },
+    {
+      "path": "backend/src/functions/profile.test.ts",
+      "sha256": "f5537b7adc5ffcacbf57684d24d87f10829fd0765a6afbac96f1e8479510d0f2"
+    },
+    {
+      "path": "backend/src/functions/profile.ts",
+      "sha256": "9fef79996b3189b6194852f395305e5cbad307a2e2199aced0814b1e4a2f39c6"
+    },
+    {
+      "path": "backend/src/functions/recipeImageHeroCrop.test.ts",
+      "sha256": "e296b2740d72c110a49a2d83cdc5c9142e14b503c967a0f6edc4c4ae3f69e938"
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "sha256": "adb7b323f253925d0409a21892daa2d792e7f4587d756e4606956bdb0d0632b9"
+    },
+    {
+      "path": "backend/src/functions/recipes.ts",
+      "sha256": "4b58b65d1f6dfe5a34fe41da5900d626714997f7b913580e13765fed7abc1237"
+    },
+    {
+      "path": "backend/src/functions/reusableItems.test.ts",
+      "sha256": "a8319257604f3973deb15e0f5643c990fea85bafc9b318cd7cef471a4ce53408"
+    },
+    {
+      "path": "backend/src/functions/reusableItems.ts",
+      "sha256": "f547fbfe1ff75898e3a7b2ccfef5e2b7308913753bbcc37d265339d8b4cb76ca"
+    },
+    {
+      "path": "backend/src/functions/reusableItemsEnrich.ts",
+      "sha256": "3de1cb7856d40624411479df822cc134db175663487553b4f96b9a35c76e740c"
+    },
+    {
+      "path": "backend/src/functions/reusableItemsEnrichScheduler.ts",
+      "sha256": "9f884136f6d4bd2380a6b4a5dae78d655e285f6dcacdd8fb7c2fb7e275b7d545"
+    },
+    {
+      "path": "backend/src/functions/specialActivity.test.ts",
+      "sha256": "818ac49c59c1a1f2038df31b9a7bbd53945937a9db29425b7c229622af6ac480"
+    },
+    {
+      "path": "backend/src/functions/specialActivity.ts",
+      "sha256": "48a57362855daef2ae44625cf9920d1b7ae87a7b212189aa03ed4c235d098859"
+    },
+    {
+      "path": "backend/src/functions/weeklyInsight.test.ts",
+      "sha256": "8468105fcf02dfa2ce666d5c73b554fc97cd0dd690cc6d60f98fa4a30f11debf"
+    },
+    {
+      "path": "backend/src/functions/weeklyInsight.ts",
+      "sha256": "e1c7b393b8d9b2992d4ee22f3ed340728ea5b4a29527de91dbfdfcbe56df75a3"
+    },
+    {
+      "path": "backend/src/functions/weeklyTargetSnapshot.test.ts",
+      "sha256": "d410c52e8ebad1299683803380a77e13855ca51a4b85b835a70aee6e67ac2938"
+    },
+    {
+      "path": "backend/src/functions/weights.test.ts",
+      "sha256": "26a3cf225b23941ce695a89695e0b122232f83dda3eb2ba78243d82c44d8f7ab"
+    },
+    {
+      "path": "backend/src/functions/weights.ts",
+      "sha256": "e3d1004b9942f54ba2d43692833a9f16ae0d1d6d3e843cbf47acea4e35b56092"
+    },
+    {
+      "path": "backend/src/index.ts",
+      "sha256": "4a359647250e9b44004d4f6625d94bad5402ca5ff2078d5f6812b8257a318e75"
+    },
+    {
+      "path": "backend/src/lib/auth.test.ts",
+      "sha256": "aa709bcdba074b9cc5ef18eb3435ef482b85ad1861bb11a4a6b045fecb94711e"
+    },
+    {
+      "path": "backend/src/lib/auth.ts",
+      "sha256": "7eae0dcbed81c6a903a9829092145e27fed19a54df483dc1eddc813c2d70be38"
+    },
+    {
+      "path": "backend/src/lib/communityRecipes.test.ts",
+      "sha256": "782dea9d28a1d76fb2c543833e610b0bb64fba7afe59ea2d1ec8e343e20cd62b"
+    },
+    {
+      "path": "backend/src/lib/communityRecipes.ts",
+      "sha256": "e99a1e8c68be363112e3ea92ee7bc85e468acc834e6a8f4f338a713693285b35"
+    },
+    {
+      "path": "backend/src/lib/cosmos.ts",
+      "sha256": "cbcd58565c90d6805686d87c7de372e558e5f0ea802d87dd38ca8cb77512047b"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightContext.test.ts",
+      "sha256": "b7a716fd732bb2f67558032f462b6481396ea381df97e8c0b8c8da866b87edc7"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightContext.ts",
+      "sha256": "8c07d69131b32abb119835c2a2bce21b918067d9cbb183a7f99eaa865d5627b7"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightIntent.test.ts",
+      "sha256": "def6f289103c27c8f94b028b57c2c4f67d2e35416626340f561c582e74afb165"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightIntent.ts",
+      "sha256": "1f668ae4ca957a6e74dcc2cc2d7448a149115a25b036099c9ad008ac8683ff23"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightSchema.ts",
+      "sha256": "d128e0ae3d07f4f1345a1467f355f5f11e5be590388bfaa79a5f05f8bb02b585"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightValidation.test.ts",
+      "sha256": "207f22f5907be59573ffb6a073f035372ade6597d8f5cf977544806909a8221c"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightValidation.ts",
+      "sha256": "8d56a7f9c543aa57067ee61db1c91e797294ead8f762068fd0e1e3c1bb836e03"
+    },
+    {
+      "path": "backend/src/lib/diaryItemUsage.ts",
+      "sha256": "e16a86625a7910ecc5b947cea5bd08f11c6bcb65a45ac380d24107867bfbab91"
+    },
+    {
+      "path": "backend/src/lib/documentIntelligence.ts",
+      "sha256": "768acd15879460b0e518a8d498e840348e33acad43ae0d2e56c7dcd43dfc6a55"
+    },
+    {
+      "path": "backend/src/lib/favoritesScoring.test.ts",
+      "sha256": "fa729aea091273a2208130083cf18769b58f75c83dbc0868bc870aed0444cb86"
+    },
+    {
+      "path": "backend/src/lib/favoritesScoring.ts",
+      "sha256": "dd87bd0308e7e0292d2db052853bbccc9becab7a82a19923b51d3eaaaafb73a5"
+    },
+    {
+      "path": "backend/src/lib/hintEngine.test.ts",
+      "sha256": "02772f712ac07811863eb8b38792cabcd9dc78cadc40b00ce7a07967265614fb"
+    },
+    {
+      "path": "backend/src/lib/hintEngine.ts",
+      "sha256": "5ee49027c0b0af9ecb50f4eb36e2ae0cbd72b42019cd71028691c84ee0579b99"
+    },
+    {
+      "path": "backend/src/lib/http.test.ts",
+      "sha256": "c53f1beaefc9134323ba0f7e88063a72aba8932ec21b47cae9faec8f9ffc79fd"
+    },
+    {
+      "path": "backend/src/lib/http.ts",
+      "sha256": "61b3e59d9fdb31134865716e7937b49a259f25ebd4c5d04d03648b4ec31d00bc"
+    },
+    {
+      "path": "backend/src/lib/insightFeedback.ts",
+      "sha256": "3dff40e1bf08776b6cd3bb38ca91e58875dc897583c6ce5e5cb36c8404925fca"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/errors.test.ts",
+      "sha256": "03bbadd514e3d65e13e9758884ff0e0bd44f7c6fff7714270282850df9e94204"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/golden.test.ts",
+      "sha256": "b985262d1311a701ae5d0de66443aa37d85c18fd0786f2e57bda65e797a15bde"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/highlight.test.ts",
+      "sha256": "95a04822f548dc7eedb7df22eb811a922caff8f59e9400456ef8660da4b44cf4"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/nutrition-layout.test.ts",
+      "sha256": "9ff4975fd97291adebee8299ecc0156b2f8f86d77d455c486b2619ead47dc1a5"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/photo.test.ts",
+      "sha256": "a2c315d6ff95f4192e16de5993b036323641102799048644e63ee26ffb3253fc"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/recipe-meta.test.ts",
+      "sha256": "7fb934aa5c2f2e103e04738844a11510748c2e779f8d9d387f4ad36174e5a790"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+      "sha256": "39a44c9b288a29ffd2e4258b81714648d99e1b56919d25f07602c72a0cf13273"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/smoke.test.ts",
+      "sha256": "e8705fd37b9476b689a853e22c0fb054060ffa17025db9f9cadca1e1195fc180"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/tags.test.ts",
+      "sha256": "025d9546d0e4b9e8dae4df7cff31fba302ca3e545e85342753863e3398352f0e"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/ambient.ts",
+      "sha256": "95971abcaa5531cac53dbc0493c917f978a887998d958ffba95b0f000cff55f7"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/branding/fittrack-wordmark.png",
+      "sha256": "042398711a0d231601b2c867ca5f37b5382534fc32b57058d4fe89c96a35942a"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/branding/micha-logo-writing.svg",
+      "sha256": "73777bdbd465f821af74f9e2708ef954a27b1c3a0ebb4fcece10695ff8f35e55"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/Inter-Medium.ttf",
+      "sha256": "1bda81124d6ae26ed16a7201e2bd93766af5a3b14faf79eea14d191ebbd41146"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/Inter-MediumItalic.ttf",
+      "sha256": "51c2c8d7c36f7c26e6e2678b5c3069b329bde9a081154553b0f5bc2d4fc14075"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/Inter-SemiBold.ttf",
+      "sha256": "0dc98e8aa59585394880f25ab89e6d915ad5134522e961b046ca51fad3a18255"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/InterDisplay-Bold.ttf",
+      "sha256": "749369ed6a4b46a5dedaa0a2f3f1595b2f0f046c708bbec48911e949bacf38fa"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/LICENSE.txt",
+      "sha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/nutrition-highlights/high-protein.png",
+      "sha256": "1bfaf67df66b1cf51c9d40afae8182cd2978ce35ea91053d7939e7e4e057653e"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/nutrition-highlights/low-fat.png",
+      "sha256": "760a87ff2adb36f386b39ad769c633f0e11027b02bbaf6e78c7def24ad653f23"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/nutrition/barbell-header-frame.svg",
+      "sha256": "3ead8da8c10c17c0eed14c7d9edcb6785655728c4897fd7d8fb044d082bb798d"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/compose.ts",
+      "sha256": "12f422747f6c3ec648254fcc3284b882ebe93721ffc33e7ca53ab15a68baf7af"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/detailTextLayout.ts",
+      "sha256": "638a39bb8e4c65bb3c44fc0734804850ab61f065894103fe24fcb9ac96b66c5e"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/docs/golden-metrics.md",
+      "sha256": "78b14cd15d321ee332ed4ecf5fa604149ba6c444dc614bb8ecb9dda03288c296"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/docs/tag-icon-mapping.md",
+      "sha256": "de2fbc1ec6b438c227d1aee264ad20a2bf989e715d4ca811d0fa744546c2c9f5"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/fixtures/gefluegelfrikadellen-details.ts",
+      "sha256": "c00b881456a462311cdf9d4ef9fb75cb71e92651dbf485d5bad088525a8c3139"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/fixtures/nine-ingredients-details.ts",
+      "sha256": "0d6080ec71f39184bbd6f269157d7f5dbaeafa90a8482bf264a8f672bee624b6"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/fixtures/quarkbroetchen-details.ts",
+      "sha256": "467a2f958342df6aa702102e8dd3bbd9cd12e39b4ad9919ad0176c7dec671944"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/fixtures/quarkbroetchen-meta.ts",
+      "sha256": "e8878d21211499d518c040874aec5e424d329f8bb9ab5df4b613149091517924"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/fixtures/quarkbroetchen.ts",
+      "sha256": "feccb33cf5fe7c6967423bec1b33f134e338525696dfb9f2522f6aa0d2d19d42"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/fixtures/smoke.ts",
+      "sha256": "275473e67fa44f29799101a35036e33faf92155206b3f05126fa2d439fdeedcf"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/fixtures/twenty-ingredients-details.ts",
+      "sha256": "36cef5f1dbca043350fc3e02102e3bb5bca6d22ab35a8f2dbe4b755ecdcfe2e7"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/index.ts",
+      "sha256": "72ccca0b2dd13c174aa46f64980a61d22d33e75246919411e9c1735e0d19062f"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/layout.ts",
+      "sha256": "29f82c08ff4b2dc4d6e149e767fad817a6cfadc571cbbbb85002a251ae636bed"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/photo.ts",
+      "sha256": "9e0bab769a9f3d682aa75652f4cf2a82ca2ff452dae3fa7effaffd9d10b9629e"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/recipeAdapter.test.ts",
+      "sha256": "0358dc7ae073f5d9d1d4efad84bcdd4457454c17f8dd80d25d83b2dcf7317652"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/recipeAdapter.ts",
+      "sha256": "148333d69855aff4bb85378df1324a4bee3a089fb6766157c8f94cedfd8d5952"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts",
+      "sha256": "f62a49ce6770b38331f7ba825138f59a95df796ff23e00541affb1ff70dae6a8"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/recipeMeta.ts",
+      "sha256": "7e1aff8416bf6f152c2da8903c2ed8c34ba990d7a9fe06997b3c2c84fb67e027"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/render.ts",
+      "sha256": "ac0c60784d4fc7e8d1d78c7d6abefe28e16621c5515f33d651c3af9dcc401929"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/tagIcons.ts",
+      "sha256": "0b4e5eeef87aa29602e0bdb7a5b28279f385f0beca87f744a08f95fe53b86bad"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/test-fixtures/golden/fittrack_instagram_golden_v1_7_unified_ambient.png",
+      "sha256": "68c201c34179c5f30bcdec8fb77df71fd34189dd22eee12ca28242ccf453b58c"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png",
+      "sha256": "4c5b1e99d513833be32bc01c1df845dd2a6d1fbcea2aea6a4d8cec236a6a1dec"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/transition.ts",
+      "sha256": "ae4c5bd17f8290640d7fcd1f2d74a61099367fbe0894bbc1ff0edb9e8683ffa1"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/types.ts",
+      "sha256": "ea11bd0a6c8c7821092df5ba8ebb31d18340f547b3ac45f3ad26889bd2426c22"
+    },
+    {
+      "path": "backend/src/lib/labelParser.ts",
+      "sha256": "cd778ccd6c02f8c13177094c3bea0d4c9b951e974f73a86088f252f9188d4d7b"
+    },
+    {
+      "path": "backend/src/lib/log.ts",
+      "sha256": "10ec85c84657554f1d4cda0880a69be25fff32357224072c2c796b1c8e7695b8"
+    },
+    {
+      "path": "backend/src/lib/nutritionCalculator.test.ts",
+      "sha256": "72f44c8241b490e983766b0ea3a73b78ffae3dfab2395bdc3b90d92d1def6021"
+    },
+    {
+      "path": "backend/src/lib/nutritionCalculator.ts",
+      "sha256": "79903cd2140cf564d13e18cc16fd240f06943fbb81d3a88bd8286005696af294"
+    },
+    {
+      "path": "backend/src/lib/nutritionValidator.test.ts",
+      "sha256": "536e2de86163972427591dcafb840bed22f14e36bbf505ba22032c83e558c6a5"
+    },
+    {
+      "path": "backend/src/lib/nutritionValidator.ts",
+      "sha256": "b9e918996bfd5a7aa16db197fd30b8c4b3fc25501296c28b951b6c97672b6202"
+    },
+    {
+      "path": "backend/src/lib/openFoodFactsClient.test.ts",
+      "sha256": "f807dd557cef910012257fe7384fc76c4790d7d2bf34dc978c8e283f10c10404"
+    },
+    {
+      "path": "backend/src/lib/openFoodFactsClient.ts",
+      "sha256": "e9fc55063d4519cf9eb80a4961a47638ec44399d8f73722da9a1e4e18af58cff"
+    },
+    {
+      "path": "backend/src/lib/openai.daily.test.ts",
+      "sha256": "3bc1b9150e971a02097f1a29b4621cbb7319eb82e08aa2e2d4c3b2908d77b6e7"
+    },
+    {
+      "path": "backend/src/lib/openai.recipeAnalyze.test.ts",
+      "sha256": "0da5aa35de7ceb454a1c201b9b849b82740430345667b5644cff5d2496cf779d"
+    },
+    {
+      "path": "backend/src/lib/openai.ts",
+      "sha256": "2f879f22a235ae4b250280ab765f91b58ba614bb763d88f27074d31bd395c721"
+    },
+    {
+      "path": "backend/src/lib/openai.weekly.test.ts",
+      "sha256": "5dcfc7bf3c1c193d7af83f1760fe0dbb5e8c72807fcfd599c16430b281dd7880"
+    },
+    {
+      "path": "backend/src/lib/progressIntelligence.test.ts",
+      "sha256": "1a290a2f6d961844138feab8f21d33324394868e0da35d360e7a1604c90ec70b"
+    },
+    {
+      "path": "backend/src/lib/progressIntelligence.ts",
+      "sha256": "5b8e0e21664d7a68d05ccb8ba7bb93568811296971bb787bb7e338d89e59549a"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsight.eval.fixtures.ts",
+      "sha256": "1d585a2a3819602e8bc051ea8df5873b3efddf587e06ca7b7661664ffc4535c7"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsight.eval.test.ts",
+      "sha256": "af440c25ae3d38eb82786f7c6cdbfd27aeed61d44e123f5f759c495dc031f239"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsight.ts",
+      "sha256": "1be0b861452bb12a1e233fdeafff8e0ed478a2250b227ee423d4e368def56585"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPrompt.test.ts",
+      "sha256": "219af078e5fd3b770ae88fab4416a86dbc2bbc6b8f4cfa57abaa99f7b34911b9"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPrompt.ts",
+      "sha256": "8b6569fc22fadd0d4f39b3048e4d0e26073e758a415c58aa598c713fea182510"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPromptManifest.test.ts",
+      "sha256": "31fe3a7eaa90956ba3c06e98c04e7332736f0119158b410281bc97cdbfb74981"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPromptManifest.ts",
+      "sha256": "8b6f92d9ff077611a7f42602ac550a9f71e63ac98d995b53d3a5d69fca5135b6"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightV3.ts",
+      "sha256": "b700296800182efc7eaf612c14e166eb5e76ef87b011dbe70081c77e03b83c37"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightV4.ts",
+      "sha256": "b8ca9709752d2f1e83f56663327011b97cbc6610fed70293934838d440614dcc"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightV5.ts",
+      "sha256": "a56fff2f132363a36840c2265d1c50c943425d130c07c74f0a3f72aacad72ffa"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightV6.ts",
+      "sha256": "824af44309c297a7cff94ecf23c17250b28ff1d89f77625f1d950126666510ec"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightV7.ts",
+      "sha256": "70c5414937758562f489f21b484b4badb39b74c64359a6992fcbe29bbdab222a"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightV8.ts",
+      "sha256": "38186ed3e7625cfc46827621d7b9b381fa56bfbc0ebb13bda9f6e8b9365d660f"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightV9.ts",
+      "sha256": "8a5b7327abbe5c67f15fa4e268d2466e8b185e6a56623556abfeb882e979b359"
+    },
+    {
+      "path": "backend/src/lib/prompts/foodEstimate.ts",
+      "sha256": "b918a2bc104ef1e1b2602387be1d5a87129050d58645fe33ce46cab93f4ef956"
+    },
+    {
+      "path": "backend/src/lib/prompts/foodKeywords.ts",
+      "sha256": "ffa283dcc7a43f4fcd62c27a0bdb72574dc50940a30b9b7144856a5e9985a861"
+    },
+    {
+      "path": "backend/src/lib/prompts/labelScan.ts",
+      "sha256": "395f0dc061d5f4119e9c769b2f44c19e104c08e21eebe5e058c1bfbe80d5b8c0"
+    },
+    {
+      "path": "backend/src/lib/prompts/mealEstimate.ts",
+      "sha256": "91b9498989bcaa434e40f18452c5c043965c32e552232e2dbbbad4728891c182"
+    },
+    {
+      "path": "backend/src/lib/prompts/mealParser.ts",
+      "sha256": "2dfb89529c408c3517644dffa5334c340f7cf95ac551f19688edf8ab815cc326"
+    },
+    {
+      "path": "backend/src/lib/prompts/promptActivity.ts",
+      "sha256": "f796e14df2180f0ab842545d29225ba932f6a7fbe421fe628b19af6ce4a3a9fb"
+    },
+    {
+      "path": "backend/src/lib/prompts/promptGeneral.ts",
+      "sha256": "5853b7d1414914b3fdbfb68d5e3f3916d9f40de92c07a23a3bdcf431aa96b18e"
+    },
+    {
+      "path": "backend/src/lib/prompts/promptMorning.ts",
+      "sha256": "9c58a3bbf7c2c63f9bef7a2beb0446471ec5bb487425310e0a13195be74f82e3"
+    },
+    {
+      "path": "backend/src/lib/prompts/promptNutrition.ts",
+      "sha256": "61a10c1090f9cfcd8d90e37cbddba538a9cc84c3cc8ea23ac0c403039b05214d"
+    },
+    {
+      "path": "backend/src/lib/prompts/promptWeight.ts",
+      "sha256": "8cbc8f1d8d46549a21d7860983bb62707fa22886aff74b42e26a090b03757da8"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+      "sha256": "43e004ac541b88402893568b053666ea625ca66cc876258c0f64a62b4f5238cb"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "sha256": "1a3123b7f68bdc0c04be7567fb3c30495e5b91a2f74bd06c5b8242fb1cafc561"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "sha256": "b973dbb1cb80e32f01d93c63ae1ba74b238021f64dd2136497343aa0f2f8e161"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeScale.eval.fixtures.ts",
+      "sha256": "3781695d984fc9f9dc621a126fe061517e5c148bd0e11bf1ec0b66b09625b3a1"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeScale.eval.test.ts",
+      "sha256": "28248d40c8ec108fe7bd0ab43e8152a5dc4608ad88e78774c6c36fe22639cecd"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeScale.ts",
+      "sha256": "1242e4b2c463a6434c7855961035c1b5f75acab99e54c12f885c9703a64dfe1d"
+    },
+    {
+      "path": "backend/src/lib/prompts/sharedTone.ts",
+      "sha256": "f9fd619bef2191724d36b92c1d5d58ef5005d593b80db5ad71539173cf229094"
+    },
+    {
+      "path": "backend/src/lib/prompts/weeklyInsight.eval.fixtures.ts",
+      "sha256": "b3b2843f3e1263d8dc38f29a30d00e311623edd4c4381a3b86c73a9bd77b7052"
+    },
+    {
+      "path": "backend/src/lib/prompts/weeklyInsight.eval.test.ts",
+      "sha256": "ccf6abc3057fc36063c04273861455743b7ea1f5780d9f42c76352a007ce5e90"
+    },
+    {
+      "path": "backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts",
+      "sha256": "f68b5652e02b800bd70ea10fafa7d94229d3d3462dd5d1503870312c06072ea7"
+    },
+    {
+      "path": "backend/src/lib/prompts/weeklyInsightV2.ts",
+      "sha256": "4d907beec8074ab682fd9622d4160acb3ecfac411addb11d2af43863140bbe32"
+    },
+    {
+      "path": "backend/src/lib/queueClient.ts",
+      "sha256": "0802d5f9f86376e86103675b1e8b80760fb673853a0a92467ac41b45f23ccbec"
+    },
+    {
+      "path": "backend/src/lib/quota.test.ts",
+      "sha256": "5b79c6f179ab9591d0fe26b678f145ab92c557c7e7a4faa8d7d32a1d7927f1d1"
+    },
+    {
+      "path": "backend/src/lib/quota.ts",
+      "sha256": "7e76711b8e281207c50eff867b1f42a8adb4c95717249c15125e317ab9a448a8"
+    },
+    {
+      "path": "backend/src/lib/quotaConfig.test.ts",
+      "sha256": "8b76d04cbb774aaaebf7c87cf0672da19d07e064cf9cc3500af8694c2e144da4"
+    },
+    {
+      "path": "backend/src/lib/quotaConfig.ts",
+      "sha256": "21e6dc9867e7ce629a5a575691f122cbf33c2a1b3bc4048ec7c1369bc3c2cd08"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "sha256": "b4ea4deff44fee2fd45be84bf573063eb2dff058550bfa45fa9d03cca18227c8"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.ts",
+      "sha256": "971cfc75502a57e2717f26c95dc92a04ea78d6f805ceb034aab55863e718845c"
+    },
+    {
+      "path": "backend/src/lib/recipeDiary.ts",
+      "sha256": "8b24c6549c8be2c4a79071d1fa5c8dff344745995340fc9f4e9525b7ce8cb3ba"
+    },
+    {
+      "path": "backend/src/lib/recipeValidation.test.ts",
+      "sha256": "3df675de31c50f43bb87e040b7a4fd7ad4ec7bf7ae8f094674508495d74cdce9"
+    },
+    {
+      "path": "backend/src/lib/recipeValidation.ts",
+      "sha256": "2a4433821889794e1d1add7301ca19c48f4ac01c8687296f6a6ba2ad80c67b0c"
+    },
+    {
+      "path": "backend/src/lib/registrations.test.ts",
+      "sha256": "1926667af0519233373c4ba262a62122bfba1d49ef083185302615ac4231d25a"
+    },
+    {
+      "path": "backend/src/lib/repositories/aiUsageRepository.test.ts",
+      "sha256": "e489b0d2a593547e58a0d83263dedce5038c3d96e8a1a7ace270340f8f39bbe2"
+    },
+    {
+      "path": "backend/src/lib/repositories/aiUsageRepository.ts",
+      "sha256": "406801755c1d94342e86a565a892749bda0301e4965c41775a6fa55a3c235e6d"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosAiUsageRepository.contract.test.ts",
+      "sha256": "f507c08e38d3a318a73f4b74cbf39b7866033bbc945f82da574c12ae14bdd2cb"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosAiUsageRepository.ts",
+      "sha256": "b3099d17401c8193823dbbab7ebccbddf8ba3534ea1cff39bb79e46c2d346c1a"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosDayMetaRepository.ts",
+      "sha256": "8b0da2c64946cf1c1f9adeff9248e0d99b7576a217fffb3a0b24d2c82c54288f"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosDiaryRepository.contract.test.ts",
+      "sha256": "3f1d62b2781bfd82d45923edc00968a70df9af953fbff4056c15ebe6c5c08154"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosDiaryRepository.ts",
+      "sha256": "5791233b3c146b89dceb16c2508aff3869bac6279d386a8b3dd98f8f6ba4854e"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosFoodProductRepository.contract.test.ts",
+      "sha256": "8052d15eed3acea970c0141d6700aa8b1120c1b0f4f3e908761b49dc53403f46"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosFoodProductRepository.ts",
+      "sha256": "97be604ae19ee380fb96c940e67dda99d91ca174b9926df0aff2965639c51ce6"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosHintStateRepository.ts",
+      "sha256": "03f43c7682717837b2450c33e8a6418067e51a39d66198bd3736aa7c0ee2478c"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosInsightMigration.contract.test.ts",
+      "sha256": "c6e9cccfcfc083a5d3a072ba6ce60ce7b5b05a8a27f58a8063a012b84794a32f"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosInsightRepository.contract.test.ts",
+      "sha256": "975e66a3777c365af95c5eb02bbb685c3da3cbff9ef76499b6bc7150115977fe"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosProfileRepository.ts",
+      "sha256": "fbbc1cb406497c0c2cd63b7aa134b7c9570b734f5a82168849cb187a627c471c"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosRecipesRepository.contract.test.ts",
+      "sha256": "7ce19d7740b75d2f3324b88445d4b6373ac8b4d2ca26aaa6d3aee0425cd48750"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosRecipesRepository.test.ts",
+      "sha256": "c0daeee4c65f0d0821db7b5f3a483311491893ca0e5982f9609da8ecbe6b86f2"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosRecipesRepository.ts",
+      "sha256": "75d3af29270115f05f5a05896f471c91dab349690a651164edce9685bf5e20ee"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosReusableItemsRepository.contract.test.ts",
+      "sha256": "bc07090cff5cd3e704d0865565f1e625a6955eb950caebe7052ebb8993af60d2"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosReusableItemsRepository.ts",
+      "sha256": "f17f39f2325082f42149894aa87a418ecac509b614e595d343e190e094de1583"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosUserFoodRelationRepository.contract.test.ts",
+      "sha256": "4ca4f1c3ecce79b28637767ea3c325b69c2e635f2ee04d506ef9c79ed9eba622"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosUserFoodRelationRepository.ts",
+      "sha256": "23353f2afe68fccf4c77e6191d5a8e81f0a131cd49401f0a1dfb9e0e758dce21"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosWeightsRepository.contract.test.ts",
+      "sha256": "f982e08697c6602d74c25ef86bb65940d960f639da9ad93d78b5f2c3ff3f9de9"
+    },
+    {
+      "path": "backend/src/lib/repositories/cosmosWeightsRepository.ts",
+      "sha256": "a26a8444d7fb1ee803eac2927cd805760fc20db4a4d4f1d62db68076e80bfd78"
+    },
+    {
+      "path": "backend/src/lib/repositories/dayMetaRepository.test.ts",
+      "sha256": "588ac47697bc4f5f5e27efde013fdf783acb3033e248754c24fb71ca8924b1ba"
+    },
+    {
+      "path": "backend/src/lib/repositories/dayMetaRepository.ts",
+      "sha256": "5291642da7986a35b8084623a9af9295aeca81e0554a55e4a490ce76b3665529"
+    },
+    {
+      "path": "backend/src/lib/repositories/diaryRepository.test.ts",
+      "sha256": "8a4eafc4d17d99f17111e17e9d9c06ebbbb8a585b7ab20e96417dc94208572c4"
+    },
+    {
+      "path": "backend/src/lib/repositories/diaryRepository.ts",
+      "sha256": "ab9dd77fae922faac172f46efe64ecd2b0ca6884f3eed2c8f0f707ac7ce8d7ab"
+    },
+    {
+      "path": "backend/src/lib/repositories/foodProductRepository.test.ts",
+      "sha256": "7225649fc30ba5eef7c8d0f9950e97841efdaafe6afe553d65905593faf6fead"
+    },
+    {
+      "path": "backend/src/lib/repositories/foodProductRepository.ts",
+      "sha256": "b09772ed177c241947f312359f2dcb33fa2ff312f11cc5ac60b2fd74ef6b0569"
+    },
+    {
+      "path": "backend/src/lib/repositories/hintStateRepository.ts",
+      "sha256": "b519c1ef07ce32264d533694ebef3d8ca97310e223c3e682e89c5766515dadf4"
+    },
+    {
+      "path": "backend/src/lib/repositories/insightRepository.test.ts",
+      "sha256": "c8705b8e16bffba4c1b66dadaeff884aac9f18a9fcfd5b85e37ebf9070e6af4e"
+    },
+    {
+      "path": "backend/src/lib/repositories/insightRepository.ts",
+      "sha256": "6ed714b58063a10132b734287748b30099b921d2825c2fb99466db42077ece61"
+    },
+    {
+      "path": "backend/src/lib/repositories/profileRepository.ts",
+      "sha256": "832c6529856814f209d8f6b5e3f238a35aa6f5752a8e38532f7bf5cd05fde489"
+    },
+    {
+      "path": "backend/src/lib/repositories/recipeExport.ts",
+      "sha256": "4eea634f7b9f19854483a3b0b45cf4b3d1dc148f3ca60fcf7de5ce64666c5c3a"
+    },
+    {
+      "path": "backend/src/lib/repositories/recipeIngredientProvenance.ts",
+      "sha256": "3c6ea15b5ad88897fa64e5938c6013fed7b41c87c8347b2bb6405fe42ef1b41e"
+    },
+    {
+      "path": "backend/src/lib/repositories/recipePublication.ts",
+      "sha256": "702e0d0d4aaf980b1ddef00362d8ca69060f2a478a2b06d5b46aa5d51dff5b0e"
+    },
+    {
+      "path": "backend/src/lib/repositories/recipesRepository.test.ts",
+      "sha256": "4d5f43935aefdbb4a1f051a9b44695589f3667c929097270399deb4d18256eca"
+    },
+    {
+      "path": "backend/src/lib/repositories/recipesRepository.ts",
+      "sha256": "0a421416a5d5d115cac0550cbf58313cf069e8ef9d3d6c91a84d50b2508bae9c"
+    },
+    {
+      "path": "backend/src/lib/repositories/reusableItemsRepository.test.ts",
+      "sha256": "89aad30aa7cb0105f6e96664e969b16377a72666f2001af04e882fa244df3132"
+    },
+    {
+      "path": "backend/src/lib/repositories/reusableItemsRepository.ts",
+      "sha256": "2f8315d2c3f3abc0d5e4544f31b9e3d80b4758f668fcfc09316976175e4de30c"
+    },
+    {
+      "path": "backend/src/lib/repositories/userFoodRelationRepository.test.ts",
+      "sha256": "fdff25a6fabe431952297b99dce2cb8481eaa3259efa98753b3f3e1b7039bf6d"
+    },
+    {
+      "path": "backend/src/lib/repositories/userFoodRelationRepository.ts",
+      "sha256": "489e0f50ab850a1cfb0d0d9d5e5a43799999acf156ec9803cd8be13900e08ddd"
+    },
+    {
+      "path": "backend/src/lib/repositories/weightsRepository.test.ts",
+      "sha256": "6d061dc05c7501789c7375f7d94bcda5672dc567d64d4e540b561a7797a1a628"
+    },
+    {
+      "path": "backend/src/lib/repositories/weightsRepository.ts",
+      "sha256": "dbd523698c8873e6d30c49d3d16c5fa89d17b84a0d0e94f76886bb909bb117e0"
+    },
+    {
+      "path": "backend/src/lib/searchRanking.test.ts",
+      "sha256": "54820aea7e4cb011186856b7dc7a134d9070995e7e15cdc50ba60004e082a35f"
+    },
+    {
+      "path": "backend/src/lib/searchRanking.ts",
+      "sha256": "515b901faa368c345b085b695843d237ca01e50c6504c7fe5965eec6feb1766b"
+    },
+    {
+      "path": "backend/src/lib/storage.test.ts",
+      "sha256": "577b2069513b571a5f832b3b6b5bc85ce5b7527299312e907e5c65eb8bcfaa0c"
+    },
+    {
+      "path": "backend/src/lib/storage.ts",
+      "sha256": "dbe6316cedfdc32f401204986940b2acab1e9b849bcc223a26e31dd2b4c86cd3"
+    },
+    {
+      "path": "backend/src/lib/tokenize.ts",
+      "sha256": "02e0587f74b2dc73110d2a7557dad61193217b2be085b72a66f56802a3129858"
+    },
+    {
+      "path": "backend/src/lib/weeklyInsight.test.ts",
+      "sha256": "bac1c3a34a8c99f96848e13d4d23f4c6152fd5c290bb6ec78ad71e5920ae5596"
+    },
+    {
+      "path": "backend/src/lib/weeklyInsight.ts",
+      "sha256": "44164cec2781708099390a285be11ade29139461bf4bcaad89bc65f18a0b46cd"
+    },
+    {
+      "path": "backend/src/lib/weeklyInsightValidation.test.ts",
+      "sha256": "51c15f6a2764da16ccc1d863582ae8bba0f97dbcfc69926e39fa80989df67ab8"
+    },
+    {
+      "path": "backend/src/lib/weeklyInsightValidation.ts",
+      "sha256": "48909f75d6455505f9778becbd87bb671a2a395765a15b46d0afeca84fff0699"
+    },
+    {
+      "path": "backend/src/lib/weeklyTargetSnapshot.test.ts",
+      "sha256": "842e192d474266fdd3e10db456cae8d32d74df2d1c48bbdf141bc011421da323"
+    },
+    {
+      "path": "backend/src/lib/weeklyTargetSnapshot.ts",
+      "sha256": "a073ed448a443b87809a705ab2e210e9f0f2d17541ad746c8e214ba56ccae2a0"
+    },
+    {
+      "path": "backend/src/test-utils/cosmosEmulator.ts",
+      "sha256": "c42b72d57f48f7981e3279fb9fb98ccd88a34a8a4456f3765e706796dc001140"
+    },
+    {
+      "path": "backend/src/test-utils/http.ts",
+      "sha256": "40c8c8226fc81b4188ef8853dd94adf46e55daba849ec6c2652e94099c7c6868"
+    },
+    {
+      "path": "backend/src/test-utils/weeklyInsightEvalSemantics.test.ts",
+      "sha256": "fcd9e37eb4309cfc4df4a7b344591c2ad41d10921468c3f15487e51c1cbb6734"
+    },
+    {
+      "path": "backend/src/test-utils/weeklyInsightEvalSemantics.ts",
+      "sha256": "b558e64928701bf10091c676898b1f9830efbb10809dff05c97be89b5bc0c696"
+    },
+    {
+      "path": "backend/tsconfig.json",
+      "sha256": "b6fa824b46c8859ce37ecf2bcef2d4a5b8cc0180de7c2879309219d4efb8bf44"
+    },
+    {
+      "path": "backend/tsconfig.test.json",
+      "sha256": "812c15a34c0e9c186c54a50d441fb28532c146cab9d473561d2ac62701c221e7"
+    },
+    {
+      "path": "backend/vitest.config.mts",
+      "sha256": "2511605f0af6908783aeaecf6186abb0f4bf51dd7717973938e9ba5b753ae260"
+    },
+    {
+      "path": "backend/vitest.contract.config.mts",
+      "sha256": "70f8f245be021210bd7867996769f867c17463e35cc986428a59df3e1d8f5f74"
+    },
+    {
+      "path": "backend/vitest.eval.config.mts",
+      "sha256": "44e427634cf40f693b9b88ed053e4c1fdf7ee20e027fd537e41d7375d203e364"
+    },
+    {
+      "path": "mobile/index.ts",
+      "sha256": "2f541b1a269dc6a3f4fb432a99068b1a244bbb67eb7439a427f2fdfb01422cf3"
+    },
+    {
+      "path": "mobile/package.json",
+      "sha256": "769011606600a6d0e6b7242e9b52d4b161782012055f4bd7dd3979a8fcb878c7"
+    },
+    {
+      "path": "mobile/src/app/App.tsx",
+      "sha256": "70e8863c4b58b3456ef6ce61c06c8434a0ba532ed5ebdd027d0b760e70520cdf"
+    },
+    {
+      "path": "mobile/src/app/ErrorBoundary.tsx",
+      "sha256": "47ed948e18902c0e49a900b50c2bae346351d88c44bf2a45df52506b5167b540"
+    },
+    {
+      "path": "mobile/src/app/navigation/RootNavigator.tsx",
+      "sha256": "d8c0db4c62be7238660c8bba12e586fceb9c9e532465304d3b15757bae754454"
+    },
+    {
+      "path": "mobile/src/app/navigation/index.ts",
+      "sha256": "7202608a9c3cd34ea5f24c81b6e759244204c75e0729ae784e6529fdab54f4c9"
+    },
+    {
+      "path": "mobile/src/app/theme/index.ts",
+      "sha256": "03ce3f9c4e49b7678e436c2716b9491e2ca7448a70e41203be599c206eaa8c85"
+    },
+    {
+      "path": "mobile/src/assets/icons/TabIcons.tsx",
+      "sha256": "39669369f82dfc0528d613691ec62d2461f1e056b12c4504886fe477b65bed9a"
+    },
+    {
+      "path": "mobile/src/modules/auth/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/modules/auth/LoginScreen.tsx",
+      "sha256": "750a672abda6f24a4d84b801c0b6f2aa85ce11d0e4eedc94d05ef196f81a796f"
+    },
+    {
+      "path": "mobile/src/modules/auth/useAuthStore.ts",
+      "sha256": "15675965da98f9475efbb87c1da1c958f70d563f8d86dfe44c2c8d413bf17653"
+    },
+    {
+      "path": "mobile/src/modules/healthConnect/HealthConnectScreen.tsx",
+      "sha256": "2480bfacd46a3bb96d95ed4c22a680e7004f19c913a79ec3b6d51b70aefd3cbf"
+    },
+    {
+      "path": "mobile/src/modules/healthConnect/SyncStatusSheet.tsx",
+      "sha256": "1bdcbd568748ecbfe693df5ec7b1e679cc4768250a10f5e9ce0b8bb50daa3258"
+    },
+    {
+      "path": "mobile/src/modules/home/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/modules/home/CoachingHeroCard.tsx",
+      "sha256": "8aa0659c2195a16b7d78b21e82041cc12afdf61ae32363ae83af60d69a2fdc0b"
+    },
+    {
+      "path": "mobile/src/modules/home/DayNutritionCard.tsx",
+      "sha256": "34eb25a253f6b1959234cccbcd12d3c7e0605741171f9eccaf985e42956846d1"
+    },
+    {
+      "path": "mobile/src/modules/home/HomeScreen.tsx",
+      "sha256": "42611dd29ff936663e2e823191bc548c97d291558bc9e819094b48eefa7eb2cf"
+    },
+    {
+      "path": "mobile/src/modules/home/InsightCard.test.tsx",
+      "sha256": "c9086cf5dd687c95002b028656e96d6df8c201e2be56fa94a1c9bd43e7a70881"
+    },
+    {
+      "path": "mobile/src/modules/home/InsightCard.tsx",
+      "sha256": "c3256d066cfac8c914d2401042bac65da131b2221882537797b3f926c0b00b3c"
+    },
+    {
+      "path": "mobile/src/modules/home/WeeklyReviewCard.tsx",
+      "sha256": "413d57b0c260bed79682a3cf3926a02320fac23e06eaa30cbb5e094576d55ee3"
+    },
+    {
+      "path": "mobile/src/modules/home/WeightCoachCard.tsx",
+      "sha256": "ed0b27eb2c64cb06df0e8a769f2eb4a12787994c8249315f7fac1ab8648ec733"
+    },
+    {
+      "path": "mobile/src/modules/home/WorkoutTypePicker.tsx",
+      "sha256": "b6a9cdac5d78367535f879024393e3d42057bc451a1411cd028239ff2815a168"
+    },
+    {
+      "path": "mobile/src/modules/home/computeWeightTrend.test.ts",
+      "sha256": "1c0c4dec2ab765e062499e336cec72f4418a51582865486f5420e36a3b2117c1"
+    },
+    {
+      "path": "mobile/src/modules/home/computeWeightTrend.ts",
+      "sha256": "aaeabef2d29ffccabe00296d4b7a315543ccb8c5763712ccbaf0c2caa8bb0595"
+    },
+    {
+      "path": "mobile/src/modules/home/getDayHint.test.ts",
+      "sha256": "0f23e8932997b3d3a72341bb476fcb1bf85d976a686b1644dd08f8ec7c51d7a9"
+    },
+    {
+      "path": "mobile/src/modules/home/getDayHint.ts",
+      "sha256": "4270639f93f46dbaa5a0bf2d80c7041b4a430dda59736ce127930c63e3b6c210"
+    },
+    {
+      "path": "mobile/src/modules/home/homeDate.test.ts",
+      "sha256": "818d5aea66092c3ca550d4ad439dc549c9552de834538acf875f8aba0a6a8c30"
+    },
+    {
+      "path": "mobile/src/modules/home/homeDate.ts",
+      "sha256": "41313a818ee7ed2f475a9b7214212522d77b7de78bfb47b10334388e53d36942"
+    },
+    {
+      "path": "mobile/src/modules/home/homeTrainingPresentation.test.ts",
+      "sha256": "8df2124d16819a872d77270fb9c44fbdb689b8e02ac50c251c1d5c59096ebfcb"
+    },
+    {
+      "path": "mobile/src/modules/home/homeTrainingPresentation.ts",
+      "sha256": "0af6223dc0223388fa3378a4584ed2a214cb75308a5e32098c79f6611bcce652"
+    },
+    {
+      "path": "mobile/src/modules/home/weeklyReviewCardLayout.test.ts",
+      "sha256": "0f9b0caa9c2da15034e013f4574e0607b6871702db0d614fce51f696ebdcde3a"
+    },
+    {
+      "path": "mobile/src/modules/home/weeklyReviewCardLayout.ts",
+      "sha256": "2a74ce3753f576b9cb0ca9312b3e0c0b1ce3bad5d54baf052b8f1fbd799d0366"
+    },
+    {
+      "path": "mobile/src/modules/home/weeklyReviewEvaluationRenderContract.test.ts",
+      "sha256": "6308c6918aeb101438d538969a315678b78fa4fb39b60809b746c04acdae42bf"
+    },
+    {
+      "path": "mobile/src/modules/home/weeklyReviewEvaluationState.test.ts",
+      "sha256": "b9934fbfe4fd276f9c7492fb99eba34e36acbd71ee837d1afbcd99b548fb5ca8"
+    },
+    {
+      "path": "mobile/src/modules/home/weeklyReviewEvaluationState.ts",
+      "sha256": "4c77f79237a040b235b08392a90f0ae53697a82f761f227846ca266d9ae4e249"
+    },
+    {
+      "path": "mobile/src/modules/home/weeklyReviewViewModel.test.ts",
+      "sha256": "c8a739dc7a682a442cde5a35064f7c8b89805d28af1480b9eabf7e787bc8a194"
+    },
+    {
+      "path": "mobile/src/modules/home/weeklyReviewViewModel.ts",
+      "sha256": "6f172bdd733ae3b8e811fd5def0ce13eb21985dd744931b0c221c8239ab997a2"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/AddItemModal.tsx",
+      "sha256": "638110c5e9148bdf6413e17236d4c3b9b456eed49213dbe729a5e0bce124a037"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/CopyItemSheet.test.tsx",
+      "sha256": "f829b37022ba292f07e9fa43dadbba8c107fd912b45375ce30f7285d8a1afcd2"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/CopyItemSheet.tsx",
+      "sha256": "d4fc328ddbc959605b0e7e215e3dc8f778e0efcb29efadf507e37f277a41476b"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/CyclingInputScreen.tsx",
+      "sha256": "4a37b5d089060ca5f0b3fd57bd101533ca722a993f90ff1012bbd27afba5ae88"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/DiaryScreen.f2.test.tsx",
+      "sha256": "983371260147fb6f22820f693969575e5be68cb5d9156f8c5ddeccbd99f83e93"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/DiaryScreen.tsx",
+      "sha256": "9227f627ce87c36e80c0ae4695b4c82100a2d92d649e433c55ee00b9ab78f263"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/EditItemSheet.tsx",
+      "sha256": "faac0bab2f3a026c232835c9b1f36227f423123ed80a81a4e5bba75fa1f21e0f"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/FoodEstimateReviewScreen.tsx",
+      "sha256": "f5d0be199cfdf006e5874f45017a20aea0234244bf4158acc081895e0a9127b4"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/HikingInputScreen.tsx",
+      "sha256": "653b5ab981cc851e8ff002e977de607e16f33275ba426baf588cc4859a472700"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/LabelScanReviewScreen.tsx",
+      "sha256": "4137cae8099638f19c6b26b7b994f56ea77dc7a00b4742b2af62739873eb1215"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/MealEstimateReviewScreen.tsx",
+      "sha256": "feff7e561e48b8680ebdcab8d86e1f6b3a0d9a28c9db3b89b328b902e70c092f"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/MealParserReviewScreen.tsx",
+      "sha256": "57c23b8d20b7a2607aac1434d41786001dc05376105a5b85b41f5b78b5d43fbb"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/MoveItemSheet.test.tsx",
+      "sha256": "d7b4040651adada434f043faa03560017dfd5948cbe1525c1e2ea796c991f3c8"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/MoveItemSheet.tsx",
+      "sha256": "40c16f8534dc69422dc8893bd8a805821212463ef4fe07c4005166f461da2b52"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/ProductEditor.tsx",
+      "sha256": "89407a3971642968e106756ebe040bb46e2d2fd23cdf2ed30644a975ced80b75"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/components/ActivityBonusSheet.tsx",
+      "sha256": "0e5bd871a48e5f2702ec4443cb2c198a0c281fcb9c7b2fdbb602bd7c64847d74"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/components/ActivityCard.tsx",
+      "sha256": "761fc877c284a00f99b81287b20c139d2fd96ffa8c0c3a270731d93e1d1e5a33"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/components/ActivityCtaCard.tsx",
+      "sha256": "f25384eb9ac1ab7a851a18d4c7409f0e9dd0d80cd3b9603b99f1171ceee6c93b"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/components/ActivityPickerSheet.tsx",
+      "sha256": "a6e586c8115772d98027255487131839ac9d816ac9102c490b493a489cc7e5e7"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/diaryItemUtils.test.ts",
+      "sha256": "5d512cec2351723d274e0628542ed99891722865ed8c15ab8330bbb2d697e56c"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/diaryItemUtils.ts",
+      "sha256": "568066163d1021cd502e5be41e38ecc94a49da94f8f31e7b578a1d63fa8064aa"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/AISubFlow.tsx",
+      "sha256": "ed887fac8eb6305a9dc3b555d4ad1ace45e2a4414e615a6669f3a084b970cccb"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/BarcodeSubFlow.tsx",
+      "sha256": "590079867ffb7c8e24994468e3a30491e9b0ea33304a8d977a5eded50b8a3fbf"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/FoodEntryHub.test.ts",
+      "sha256": "1b907a4302bfe6fac36818d21fdba7d4d768cb9adafa1e0a21f37f3817dd10d4"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/FoodEntryHub.tsx",
+      "sha256": "218fda46f4e70b14ac6b5b3c7e1aeac5810ea20620c55edb08297a8880039bad"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/FoodEntryHub.utils.test.ts",
+      "sha256": "b4006aadc842fd571f7a22b915be891455b7857ddfc215ecc9a516331a9e7352"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/FoodEntryHub.utils.ts",
+      "sha256": "e5bd9d2055d8f6abcc098475138042423cbe7c5cac9635edcd8bdde98a92f52d"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/FoodList.tsx",
+      "sha256": "79f71cc18c2a7f34ce0fe2fa61730903a081c5a33e1d0f7e3bae38f32a29e8e0"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/LabelSubFlow.tsx",
+      "sha256": "1a9e508076f32544b4e2488eebcf6f6d5ca14720dc90d8d3f1e9092737a2c307"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/ManuellerSubFlow.tsx",
+      "sha256": "2137e2a423700a3007b5e7f17b8cd5d6ff36c4408e57726f7901eb7ccba20f20"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/QuantityView.tsx",
+      "sha256": "a3c0cdc73f9cc7cb44bf7db927d7d378130cf12cc14d53313a237563e0a7136d"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/RecentItem.tsx",
+      "sha256": "f225e394cc432cd217827bcc3bbcf00ada197b3d8796df653fbc6a041215b524"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/RelationRow.test.ts",
+      "sha256": "b26491242fe0c099217570a3aa4b3862b28eb57000a1ddece991b51c1a2141bc"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/RelationRow.tsx",
+      "sha256": "03c69b33d66d7d44a5daf6c891860c033776ca0ed606c81b6b4644fa47ea4ac0"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/RelationRow.utils.ts",
+      "sha256": "9f1977ba1b530c97101c1c3aada544aef14ff878578efc5dabeb6f30630dd23e"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/SearchState.tsx",
+      "sha256": "a9a7f50b1f0c3ce46c61598b737b3f222ee72fb1105b25be2a2be3610b7a9cae"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/hubReducer.test.ts",
+      "sha256": "163aff6b830d3e8d1ea90011d3358a4ece0021abaa9e56de9332ced3406a3b67"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/hubReducer.ts",
+      "sha256": "0cbf018b6d0617ecb7a0ed4863f471189930caf1e0b08a659b506f880192bd27"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/mealTimeRules.test.ts",
+      "sha256": "0a6dc8a5d2cd9b36311ea236b5cdfe809abadc54ce08d49c0063aeddb65a4632"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/mealTimeRules.ts",
+      "sha256": "95002291ad5c1637e71bab20d2893ee7d7dd4945003ae08bef7da940e1344d39"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/useFoodEntryHubStore.test.ts",
+      "sha256": "4aa22ffc7d8b80af706bf66b1f2821a578360441fda7109f5ce4e6430490dfe9"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/hub/useFoodEntryHubStore.ts",
+      "sha256": "a71cc46bd5fc924d0521b554e6a0de2fa123ea1c82568037553b5408e78f3d64"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/mealLabels.ts",
+      "sha256": "2508abad2a7d0c394ba924e8a9b44a4926db9315018d057172bf8d3fce2d173f"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/nutritionUtils.test.ts",
+      "sha256": "99725d93d129ebd412db61b010b303668693157e7dca945ba6bb4f89518a9de4"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/nutritionUtils.ts",
+      "sha256": "d55f160e33a0e39e573dfe58607b94babc62687937b91eb412e6cbb09fa05cdc"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/useDayTypeStore.ts",
+      "sha256": "f56be0c887cc438506ad5825fb09c9dc4ace1551627a533bab7ffe578a668403"
+    },
+    {
+      "path": "mobile/src/modules/nutrition/useSourceProduct.ts",
+      "sha256": "1443ab5321d4aa8f32e8fedbe03bbf42dda551226da25ba7c60e7f92ab6f7b2a"
+    },
+    {
+      "path": "mobile/src/modules/onboarding/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/modules/onboarding/OnboardingScreen.tsx",
+      "sha256": "fb106f34e329c6ee4699ff949cdcf80a61b4473f5cdf91e377c6fe50d2d8039b"
+    },
+    {
+      "path": "mobile/src/modules/profile/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/modules/profile/LibraryScreen.tsx",
+      "sha256": "5596f9f6b084da1fa2bbd4ec4c0c3623672138be0689a3de0a48785de4317482"
+    },
+    {
+      "path": "mobile/src/modules/profile/MyProductsScreen.tsx",
+      "sha256": "d72da2c1c07722d364f7b7c420b53f5f4df64e670bcb87c89e25fef19113f6e8"
+    },
+    {
+      "path": "mobile/src/modules/profile/ProfileEditScreen.tsx",
+      "sha256": "70f56014a97992c8d5f35be9459aacea03da0925cf6e86093938b2fd02bbc381"
+    },
+    {
+      "path": "mobile/src/modules/profile/ProfileScreen.tsx",
+      "sha256": "17db0683793cc2efa3e2c08e921f39101e79abd642bda020b10b870346c1bfa8"
+    },
+    {
+      "path": "mobile/src/modules/profile/ProfileWizardScreen.tsx",
+      "sha256": "4f7517a5f00d09c7fa54ed7d4ff483a1537e44f922a5aeb375d8d2c5f460a117"
+    },
+    {
+      "path": "mobile/src/modules/progress/ProgressScreen.tsx",
+      "sha256": "d577dcfd01bf51a50b2760545f90b71217decfa0ff3714c237ab9b6468fa6b29"
+    },
+    {
+      "path": "mobile/src/modules/recipes/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/modules/recipes/CommunityRecipeDetailScreen.test.tsx",
+      "sha256": "57a02ad504feb1e4a2c218c2a3a53ef353107730d479529e688d51bce924b778"
+    },
+    {
+      "path": "mobile/src/modules/recipes/CommunityRecipeDetailScreen.tsx",
+      "sha256": "c2e03dfc188a9081943d89029b7e9cfa88799b40538732efc2b07eb2f6a586b3"
+    },
+    {
+      "path": "mobile/src/modules/recipes/LogRecipeModal.tsx",
+      "sha256": "64d47d9d21f461c3c2451e93965a1923a45d8cd19db787680a1de6a32222cdc1"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeDetailScreen.test.tsx",
+      "sha256": "1843a751232c24ab0adf4f6b9a6e4cb47b53aaa408877e1bdc08c6c5dcc128d1"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeDetailScreen.tsx",
+      "sha256": "929ba92f90e54d5d86187aeb78b17e8c97da1e4cd70dde22c9aca1947da8da65"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeImageHeroCropEditor.tsx",
+      "sha256": "6426d49f6e782fc7eef622f21cacb37fa92deb3c656027ce9ff0ef1d29551f8f"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeImageHeroImage.tsx",
+      "sha256": "97ee9785fb54f597a50dda4c23724ba62b9239e389461e38fa62d72f250a187a"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeImageSourcePicker.tsx",
+      "sha256": "8ac1e563e4fd0be1ad3dbf2b7418610120d646d3dae871c76afda32fa8b6868c"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeIngredientGroup.tsx",
+      "sha256": "f57950d3c090b678a5177569af30813320837fbe337caf4104ace7ff826d3ffc"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeInstagramPreview.test.tsx",
+      "sha256": "1fbe6ab300fa822694fe12c216e33667f71caef01eb6f5bfa6b30bc2318b9bcf"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeInstagramPreview.tsx",
+      "sha256": "2ee45892996508c384ad11d561e6ca52c5203dfb534885fa82362fb5b1bc4ad2"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeListScreen.test.tsx",
+      "sha256": "ee9c8a3bc5a17a01f0f0ebf67af573debaa8f3105a296e43b0572277f88acc90"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeListScreen.tsx",
+      "sha256": "97d5370d4a66a4acaea2f471c6cb25192efd2c6f819b34874a2b1ec745252ee4"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeWizardIngredientsPhase.tsx",
+      "sha256": "21437d771599f84bd47d34c009e2aec3a981404b1f7bc24f5c37e4339d6e3450"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeWizardInputPhase.tsx",
+      "sha256": "fc3ae18ab7953ff98625ef6cafd5c76a8c1f7ac8fd885f274db75c53abf02d1a"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeWizardPreviewPhase.test.tsx",
+      "sha256": "4e932241d71b039c716905c7934e48e5ef33999cca0819dd76c4a934a6f91afc"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeWizardPreviewPhase.tsx",
+      "sha256": "f0da254de1d73c7b2d49a8310830b6c9345e30dbc3eefa0204631e0d477545a8"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeWizardScreen.test.tsx",
+      "sha256": "1539bac420e51ee3209008c8fd186d2a165c48df03f00e602e62c01dae78ba52"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeWizardScreen.tsx",
+      "sha256": "da16fa358763f93b352ecdf159aec61f521af26fb32f4b2aa80e0f306089b1f8"
+    },
+    {
+      "path": "mobile/src/modules/recipes/RecipeWizardStepsPhase.tsx",
+      "sha256": "9bf315dacd0540e7058a3a4a84c138814a33cf8be3f4f1b2f043974eb0ec13a1"
+    },
+    {
+      "path": "mobile/src/modules/recipes/ingredientBuilders.test.ts",
+      "sha256": "d3ca33357d8c426245a0c31317ee4b06f703ef313ae91b92f9daca1ead6e99d6"
+    },
+    {
+      "path": "mobile/src/modules/recipes/ingredientBuilders.ts",
+      "sha256": "cf3a26c7925074e686186bcee0c195df202d3d60cf01b52390aedeffd5f1197b"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeImageHeroCropMath.test.ts",
+      "sha256": "31ccc89be9a3aabf21b232d843177330ba2d915e0332d62321b6505191ea9344"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeImageHeroCropMath.ts",
+      "sha256": "ec84aa6da268693b5038586aa9c5ab9f2548deb54c56ed509136188f1d4d2fed"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeImageSource.test.ts",
+      "sha256": "6abe5de99c1346f9d53e08afeed81865361b1cc601f1f72cfc9ae581809cbf68"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeImageSource.ts",
+      "sha256": "4f56b3cabc276bc949d090d67bdb3a33794a504f2862357615c13846e33f07a7"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeInstagramOptions.ts",
+      "sha256": "2451873421a436440a6da171af56aafda7012a6d9519f9155e1a465f68088dbb"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipePreviewViewModel.test.ts",
+      "sha256": "35a6bb4041a8332de8a4f00375ddf318bbdd376332d614430c582b8608c6ea66"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipePreviewViewModel.ts",
+      "sha256": "722a12980fef5783257cc8959b3cff8f06a2bb71675c57a9096deebfe56b2130"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeScalePreviewState.test.ts",
+      "sha256": "a51994d8ff8bfaa452b12beb702056c2a9fe119386f55263284d9c1bc9db9810"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeScalePreviewState.ts",
+      "sha256": "2655b653ff3dbae3f635f7dbcf015c4a59eb32e5546c13e84857f1ecac7f292c"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeShareDraftState.test.ts",
+      "sha256": "a5afd39f84585920c02879840944abc90b2f57b323b6bbb9c3adcfaa95205e1a"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeShareDraftState.ts",
+      "sha256": "38b925844a1f03a488a6edd6a79f1f96b8cb4db24206098e5af172ae5181fd42"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeShareExportView.test.ts",
+      "sha256": "5b47e2c1917cd16ec5e98a752e0741e495f03276582f5affe341a72778646559"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeShareExportView.ts",
+      "sha256": "deeeab74fb35af134218bc8eaa984d362b91074bec253bac9ea5bf7a0263d1d1"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeShareRenderNotice.test.ts",
+      "sha256": "38ac384bd899634fcf8e7dd9898e7601f14a6e2e4da448989e7c6c42d8003b85"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeShareRenderNotice.ts",
+      "sha256": "34938c47ba329b79fe3b9be02faca5b8032c8b8427ad5967ba1187e45a6072a5"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeUtils.test.ts",
+      "sha256": "659136956f416d51a2831edbbc8b819dd24503ffe2851205f76177a944b6610f"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeUtils.ts",
+      "sha256": "fc41366ecee7f1560c2978db7a8b18f693306ed6ecc891632f38c7546ce625cc"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardEditBootstrap.test.ts",
+      "sha256": "7341ec4bccbfa5e5dc9b2b6d1b33cb7f71a44b8ab4b92dd7f89b1a4aa7541b65"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardEditBootstrap.ts",
+      "sha256": "89a99408c2dff77106fed6ec5f2cf1b5890aea1d41328fcb34eec2080126ea65"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardExportView.test.ts",
+      "sha256": "9fe54c6c0a823f3ffe2d83da77b33c95557496e106178c79adac94316cac18ad"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardExportView.ts",
+      "sha256": "4dcdb6650cc86a848dd4ec1234900fd6b4925043a8b56fd88c3304bfa238ef8a"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardImageMutations.test.ts",
+      "sha256": "001723e745a48f69b20966e0c7980ca409b6cea556e82d0c7411f09b5b247db8"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardImageMutations.ts",
+      "sha256": "0cfb298e4172deb0b47733a927c9f8dd43f67d443541d7f1478538bd33d2572d"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardNavigation.test.ts",
+      "sha256": "d8c625cebe3126f970a6f3574bfcfdf9d9c5907b54b1b049f40b9e29aeaf80e9"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardNavigation.ts",
+      "sha256": "0169bfb0fb97df749b1765aa0d647862a71427fed3d9043077457b2e19492d41"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardPortions.test.ts",
+      "sha256": "47a5bf4ac40820375e016ea862ebc95a61ab10051ba68fab1b1a6f58d3885c52"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardPortions.ts",
+      "sha256": "537870fe159d598c7c20054526ba1aa2cdfdc6eee173d24a0a2ffcbe7010deb1"
+    },
+    {
+      "path": "mobile/src/modules/recipes/recipeWizardTypes.ts",
+      "sha256": "f931df8171af2d942f44a37f2ef129eacb1bb86646ed7699f4b0b989033cfd00"
+    },
+    {
+      "path": "mobile/src/modules/scanner/AndroidBarcodeScanner.tsx",
+      "sha256": "598ef6d7db60c138ea02defbcb43ea08fe0a7470b262eabf098a72a645ed7c3f"
+    },
+    {
+      "path": "mobile/src/modules/scanner/BarcodeScannerScreen.tsx",
+      "sha256": "29fe98b4af0cbd4dd2a2376791a46d3569f036e9a25efeb1e59e5009fe0a4b02"
+    },
+    {
+      "path": "mobile/src/modules/weight/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/modules/weight/WeightDetailScreen.tsx",
+      "sha256": "a059dc9469073594857e946e49ab81444c3efc8d90d70a9b224afc7ff2b5e6f4"
+    },
+    {
+      "path": "mobile/src/services/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/services/authConfig.ts",
+      "sha256": "b486a48df0dca56488b5eecf56d436f41488552ea4d25722b9ef28980bc00f82"
+    },
+    {
+      "path": "mobile/src/services/authService.ts",
+      "sha256": "4f0fba8537396dae44d068297e10c3289967a4f57a7dfe79ff68e9c09fc33539"
+    },
+    {
+      "path": "mobile/src/services/health/HealthConnectService.ts",
+      "sha256": "7f536dd338755ae905b7fb9df3a0cc1e16977b6e98a4e69e8403425bd5ce8518"
+    },
+    {
+      "path": "mobile/src/services/health/IHealthPlatformService.ts",
+      "sha256": "fa2762f9218ed74e81d74782b285bfd6bc39515341886b0b752145b209ca61ed"
+    },
+    {
+      "path": "mobile/src/services/health/MockHealthPlatformService.test.ts",
+      "sha256": "194cf15a6f7d3ad5d7f2e8f413aa79381c6195ecca1117f85e84a264b92c6446"
+    },
+    {
+      "path": "mobile/src/services/health/MockHealthPlatformService.ts",
+      "sha256": "b33c3aa8385619f0831cb464289e2c089323bde0cd315c9ce17ab950a3615137"
+    },
+    {
+      "path": "mobile/src/services/health/healthPlatformService.ts",
+      "sha256": "93185bdc470fe6acfe02638b00d24a57df8774885a03b5ebef6f6be0965ecfee"
+    },
+    {
+      "path": "mobile/src/services/health/healthSyncService.test.ts",
+      "sha256": "492e88cab1022cecb6fc243f1e8876dd222eb71d3d98054f9bf16e42f7edcdf6"
+    },
+    {
+      "path": "mobile/src/services/health/healthSyncService.ts",
+      "sha256": "203072090d18e0bc21294ba7923280dea04e55276ce87f4a633f9d3413efa3db"
+    },
+    {
+      "path": "mobile/src/services/health/nutritionSyncService.test.ts",
+      "sha256": "90023382b5e362ccd946695a7d7937ebc4750de8b6839cd2e3f4e98a537f5d0b"
+    },
+    {
+      "path": "mobile/src/services/health/nutritionSyncService.ts",
+      "sha256": "59d2f05c797f988bc2e71e0a274c0a956622ed2a4452ae05df1d79e60809de62"
+    },
+    {
+      "path": "mobile/src/services/health/syncLogger.ts",
+      "sha256": "e04c915affba86e70ca614ee926c6d196d224e0c7944952ad017ce017b25451d"
+    },
+    {
+      "path": "mobile/src/services/imageService.ts",
+      "sha256": "648435da1e5690be7dd2fbd29820654ff6b5708f767861fb01e0cd5a2191fb48"
+    },
+    {
+      "path": "mobile/src/services/insightService.test.ts",
+      "sha256": "3666e550766b176dda9ffae9b4554677929b87d6094b3eaf73fdfbb8fee55e9a"
+    },
+    {
+      "path": "mobile/src/services/insightService.ts",
+      "sha256": "33d796925998387ff3f9e679fb027b9c377f4a717e57f2034a88ee5c7ff891f6"
+    },
+    {
+      "path": "mobile/src/services/nativeShareCandidate.test.ts",
+      "sha256": "eed8b7a82ed10ee25581563c3445b53b5eb4248a032a4fe6897625822db4db5a"
+    },
+    {
+      "path": "mobile/src/services/nativeShareCandidate.ts",
+      "sha256": "be079f40492aa63fc00334768807573a1284f8561ed44267c810682ae0747fa0"
+    },
+    {
+      "path": "mobile/src/services/nutritionDiaryService.test.ts",
+      "sha256": "f9a620ab4077b760503b9d82f118cc2aa0714e14ba18b19dd04fa0d022a0a506"
+    },
+    {
+      "path": "mobile/src/services/nutritionDiaryService.ts",
+      "sha256": "c1a95d6d8d6daf31fe72f68f9afe9f3290b5570fd358856413ef2bb99bb70f82"
+    },
+    {
+      "path": "mobile/src/services/recipeShareMediaService.test.ts",
+      "sha256": "16a8b36d53e520af45640e4fcab8a6900ced5c50e2f1ee6823077aaf0d15a669"
+    },
+    {
+      "path": "mobile/src/services/recipeShareMediaService.ts",
+      "sha256": "f3963af6d2c5283bd8e626e56293b41020f546731844853f74e4616f6b5337f1"
+    },
+    {
+      "path": "mobile/src/services/weightsService.test.ts",
+      "sha256": "e07ff197d52afdb6ab56f759256f741d921a9c83e7662e7481d35dafdb930e33"
+    },
+    {
+      "path": "mobile/src/services/weightsService.ts",
+      "sha256": "25ad1b79ce99088e134c5299757e095f75659a8244060453be5c331d29adbddd"
+    },
+    {
+      "path": "mobile/src/shared/api/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/shared/api/aiApi.test.ts",
+      "sha256": "12b843d4b66a45bbdc80854e92fe1f82f9c16a589f2635f8f225bf799c3f0d8d"
+    },
+    {
+      "path": "mobile/src/shared/api/aiApi.ts",
+      "sha256": "3ed2ff0a3039ef6515f63c57ddd38cc08aa92ec25b9f1d852db26aba7d823264"
+    },
+    {
+      "path": "mobile/src/shared/api/apiError.ts",
+      "sha256": "7136bea3033206c407256749a20eac54f749c17bcaa5982f3ef759f66d362a35"
+    },
+    {
+      "path": "mobile/src/shared/api/client.test.ts",
+      "sha256": "be7364b8251522596c45c5e91fa6371f65fccbde90f23cedccf7af0b276c46d2"
+    },
+    {
+      "path": "mobile/src/shared/api/client.ts",
+      "sha256": "8b8689d0f785c07c8043b60017992437d5ef87748f0462c19e8f7a948969ec0c"
+    },
+    {
+      "path": "mobile/src/shared/api/diaryApi.test.ts",
+      "sha256": "102832eba9960d82d997a8d491fa670cdac0bdb7df450f3559b62f48e8b1e3ba"
+    },
+    {
+      "path": "mobile/src/shared/api/diaryApi.ts",
+      "sha256": "bb1c0b1bc79b19f78b457a331128d8d5b4141676c92da69ef641621038ab1583"
+    },
+    {
+      "path": "mobile/src/shared/api/favoritesApi.test.ts",
+      "sha256": "94cc8a59de04e9a40580839b7b33d0a671e423256d1ac65264e1d0d7e368a45d"
+    },
+    {
+      "path": "mobile/src/shared/api/favoritesApi.ts",
+      "sha256": "9ccec3288c232bee03790e16fc340d096b9c6465c5bcf906cdfbc64fba2f76b5"
+    },
+    {
+      "path": "mobile/src/shared/api/foodApi.ts",
+      "sha256": "e37495e9c0aa2a51184f25b4929c16153eacd995522635df26e0a9e3ee3caa77"
+    },
+    {
+      "path": "mobile/src/shared/api/profileApi.ts",
+      "sha256": "1c5d19c4d3b0f8d52335a05d23ab2d41b6f0797dedec09e6e05f2d738d4d8166"
+    },
+    {
+      "path": "mobile/src/shared/api/recipeApi.test.ts",
+      "sha256": "e462dd824dce748d0ca4a9e2e7ee5e53c73769c4d5c0cb2fa2e8738cb45d27a5"
+    },
+    {
+      "path": "mobile/src/shared/api/recipeApi.ts",
+      "sha256": "d305f43fb751532c31962c182a4fe925b54643c56a8cbd6584e14830d036c593"
+    },
+    {
+      "path": "mobile/src/shared/api/recipeInstagramRenderContract.ts",
+      "sha256": "0c42ec4e1931e321253f979fb984b4291142d6bdd64a3eba2b39e7018413e71f"
+    },
+    {
+      "path": "mobile/src/shared/api/reusableItemsApi.ts",
+      "sha256": "5822bb3ed3f8f1a1615fbd04fb6c3134a8b4599a19b3c1ebe8880b71c410c7af"
+    },
+    {
+      "path": "mobile/src/shared/components/.gitkeep",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "mobile/src/shared/components/BrandAsset.tsx",
+      "sha256": "4e17d3f8074bf853b5bf1b413aa6aa1f27a33128671e5c529dea27fe4117e75c"
+    },
+    {
+      "path": "mobile/src/shared/components/ConfirmSheet.test.tsx",
+      "sha256": "9999def1f811594eec7f41c5d6e2d083834db119010a971a297851546278bed8"
+    },
+    {
+      "path": "mobile/src/shared/components/ConfirmSheet.tsx",
+      "sha256": "609ddd726769c54b3dddd6e160a7b3f30802a5840d93865c2e4b89f7dd885151"
+    },
+    {
+      "path": "mobile/src/shared/components/DayStoryCard.tsx",
+      "sha256": "1617d676fa9350513d52a13243a3556c9f25e624614d5b2f07defcddd9839719"
+    },
+    {
+      "path": "mobile/src/shared/components/DiaryItemRow.tsx",
+      "sha256": "32cd812915eff4bb8fe7971e875a1874dee2590de0a219454bd7d5b3a1281f24"
+    },
+    {
+      "path": "mobile/src/shared/components/ErrorBanner.tsx",
+      "sha256": "d28ea2d684aea5b66885d6696b8aa6b8181489553eb396252a75dd1f81d3fd6e"
+    },
+    {
+      "path": "mobile/src/shared/components/FavoriteChip.tsx",
+      "sha256": "cfb6a133c24fcccc584b2e39e50cf954569c787a9b10fac84b9780165aebd263"
+    },
+    {
+      "path": "mobile/src/shared/components/FoodSearchResultList.tsx",
+      "sha256": "d6b8414281043bf8da68ee50806bfccb741d1167bb5b4108d4d539ff3081a393"
+    },
+    {
+      "path": "mobile/src/shared/components/HistoryList.tsx",
+      "sha256": "24e17f374c208175e5fd83d31d6bb2a62abec6edde117ee46eb64393086c3855"
+    },
+    {
+      "path": "mobile/src/shared/components/Icon.tsx",
+      "sha256": "28a36236d9f62d3db33aaf7548c1a05a6ba4e5f171e64f59e835d08bad2ef42a"
+    },
+    {
+      "path": "mobile/src/shared/components/InfoOverlay.tsx",
+      "sha256": "dc6947248368652bd472feac17aaafa9385183ced07f37ee77d59bd4a27071c6"
+    },
+    {
+      "path": "mobile/src/shared/components/Logo.tsx",
+      "sha256": "840efec9f46f9d548fe73a2067a995c963b8563a5fd3aad7dfff70092a8bc4d0"
+    },
+    {
+      "path": "mobile/src/shared/components/MacroSummaryCard.tsx",
+      "sha256": "3bc15c33fbba5327188ce9375ab2c67c32a8d81b43abfdc47548613d3051673e"
+    },
+    {
+      "path": "mobile/src/shared/components/MealChip.tsx",
+      "sha256": "316e01c6717d02cf5a438cfd9d570da05759a736ec8e2a18bce4713871f62be8"
+    },
+    {
+      "path": "mobile/src/shared/components/NewMeasurementCard.tsx",
+      "sha256": "5a7e819cb9534e111661a8d2f2071d6a866d1ef3371760963f9f9a72a92d2220"
+    },
+    {
+      "path": "mobile/src/shared/components/NutritionTile.tsx",
+      "sha256": "dd4c04a0a673c99651ddd76c90a3dd865f5328c0005f2bf10e99456e93776ae1"
+    },
+    {
+      "path": "mobile/src/shared/components/ProgressHeroCard.test.ts",
+      "sha256": "69df3aa996119f2d4dee25f6ec696c654afa11b235e768d1270077cdfd6b8c3a"
+    },
+    {
+      "path": "mobile/src/shared/components/ProgressHeroCard.tsx",
+      "sha256": "7eeb919f5b0235255a6f81aeba1303f56a2c5b3680fc301741e59c15dc2ee772"
+    },
+    {
+      "path": "mobile/src/shared/components/QuantityInputRow.tsx",
+      "sha256": "b3eb3ed6cd67b28e644947acb02b7797085541033ce1f5e40bf0726e458173c2"
+    },
+    {
+      "path": "mobile/src/shared/components/Snackbar.tsx",
+      "sha256": "94b3d8647351ef3b73a45ab3a55f25472f196f6813791bab66ee381b9c9d3e77"
+    },
+    {
+      "path": "mobile/src/shared/components/SwipeableRow.tsx",
+      "sha256": "3f2728ea741e5f91f60d2862004238984eb3f2e9de3ae8ebbea245fbbf2287ba"
+    },
+    {
+      "path": "mobile/src/shared/components/TrendPill.tsx",
+      "sha256": "a416ab29513096d8826661565e4796b9cef5e284b66409c5087b1df92317436c"
+    },
+    {
+      "path": "mobile/src/shared/components/TrendStatsRow.tsx",
+      "sha256": "858d7a60242b3dedfc76b7108d276ce2a6efb0261ceeb6d3eda18930b926de6b"
+    },
+    {
+      "path": "mobile/src/shared/components/WeightChart.test.ts",
+      "sha256": "8058a54770dad159aec2d382fce0d97ef651e45815c2a0899d0b16550b957f11"
+    },
+    {
+      "path": "mobile/src/shared/components/WeightChart.tsx",
+      "sha256": "007d9d7d78d78431344806b5e4e14c584150c21bca2878580d985daabbb11ef2"
+    },
+    {
+      "path": "mobile/src/shared/components/WeightSummaryCard.tsx",
+      "sha256": "6324eea6583f82f2265d77bb96ac25722527b6e6e77f9ae0487cad9cfb46f08d"
+    },
+    {
+      "path": "mobile/src/shared/components/infoOverlayLayout.test.ts",
+      "sha256": "1fd196ec1d686ba6836e47da552c51fcf8f8aa0fc1bd10bf41750a35d04871d5"
+    },
+    {
+      "path": "mobile/src/shared/components/infoOverlayLayout.ts",
+      "sha256": "108929b79bbc166288e3b354645a7f7503d597964e44ab38516f9e9787016c98"
+    },
+    {
+      "path": "mobile/src/shared/components/weightChartUtils.ts",
+      "sha256": "96a12ca6d63a3fbb9addb67229bae50438fd8d256722e99aa0b255a86ed64368"
+    },
+    {
+      "path": "mobile/src/shared/date/localDate.test.ts",
+      "sha256": "4063a9d6a7e8c2c9c1356d8dd97b63f41fea858232defa21d270188b3d08b9a9"
+    },
+    {
+      "path": "mobile/src/shared/date/localDate.ts",
+      "sha256": "0b6cc2fdf6e1b6685c523372b2379d50149e5eeefa5a2ebab3d124226cf52289"
+    },
+    {
+      "path": "mobile/src/shared/viewModels/recipeLoggingViewModel.test.ts",
+      "sha256": "e9956a90d44469f4cc9444028ac25109fa462347cf9cde3f54b6166a95cb0a65"
+    },
+    {
+      "path": "mobile/src/shared/viewModels/recipeLoggingViewModel.ts",
+      "sha256": "1769d7bc0e94e0226b35b24e0498d3c7b22a4f366e8dc27270eb7908d52e15cb"
+    },
+    {
+      "path": "mobile/src/types/react-test-renderer.d.ts",
+      "sha256": "24943dd1c1d4a15830bd422c3389cf17ee58ed78830ade6ac06f1f2ba3d9f80f"
+    },
+    {
+      "path": "mobile/tsconfig.json",
+      "sha256": "112dd13d4bc38cdfd97f161ddb353b2b81a26ccb85d0839dc41c24a05dc0b7dd"
+    },
+    {
+      "path": "mobile/vitest.config.mts",
+      "sha256": "5ff6ee321a417fba0330a9754e2f5bb404698a64afe131c4f6e31fd2ce89f142"
+    },
+    {
+      "path": "shared/index.ts",
+      "sha256": "a16bb4156ae3becbfa1baaada99450e88299e373990664afd99ef25d09d65a35"
+    },
+    {
+      "path": "shared/lib/activityBonusCalculator.test.ts",
+      "sha256": "3b41423a85110d62a5eedeac65e18cd6ade53b619eb5e87d2f4826786f2021c5"
+    },
+    {
+      "path": "shared/lib/activityBonusCalculator.ts",
+      "sha256": "f2187bb815c260088b39fd1dc84dcfca868c92ae5b5e1e20a280e333c9e590b7"
+    },
+    {
+      "path": "shared/lib/cyclingBonusCalculator.test.ts",
+      "sha256": "1fed785e71cdfdfe5fb9b08d27ea4ffb86801fb6b3884eefaab223dc830fab93"
+    },
+    {
+      "path": "shared/lib/cyclingBonusCalculator.ts",
+      "sha256": "24e4f525e1c793984e77c571d9d3285531519018848ad0f1891f5510085f2716"
+    },
+    {
+      "path": "shared/lib/goalContext.test.ts",
+      "sha256": "7d87a08ba4b8377320c7df104d719c6a02da5495af5b17747738b7365730d9ee"
+    },
+    {
+      "path": "shared/lib/goalContext.ts",
+      "sha256": "1f133e0f23c8b1a1c35fffcdf57d9ed0129f124c00f94fec9c07a9d2ef466826"
+    },
+    {
+      "path": "shared/lib/nutritionCalculator.test.ts",
+      "sha256": "5d537d87d04d4fd664c1f420e35df68b37e88f938a1ccd10edd138e6e09f86d5"
+    },
+    {
+      "path": "shared/lib/nutritionCalculator.ts",
+      "sha256": "18967a72b43cf20e4097b24c5b095bdee5f41ccb00a6281f35c10950012545de"
+    },
+    {
+      "path": "shared/lib/plateauDetector.test.ts",
+      "sha256": "39975d7d292890ba616a8aba0e343b32875a32665a1b41708c72c6e8bc9ce73f"
+    },
+    {
+      "path": "shared/lib/plateauDetector.ts",
+      "sha256": "0052cde93bbe75af42989a0f98bee105928239d23e25794705c640632dd3f906"
+    },
+    {
+      "path": "shared/lib/profileCalculator.test.ts",
+      "sha256": "fc2df5265825a0a5442ac184da0d59693b9ebf4245eefe53cfc020bdb48d7c57"
+    },
+    {
+      "path": "shared/lib/profileCalculator.ts",
+      "sha256": "3dbab96db13cdf3e14fa0d9eddd09e882266f7fee522486c17abb46e6dd1feb8"
+    },
+    {
+      "path": "shared/lib/recipeCalculator.test.ts",
+      "sha256": "6a4f025d7550969a204031a6f1394aecb0a39630378a5afa97d2fa38ec62065d"
+    },
+    {
+      "path": "shared/lib/recipeCalculator.ts",
+      "sha256": "d0d19e7eb4c2054d314caa4e752f714a5d13adb825151aca67e96db94517f7a1"
+    },
+    {
+      "path": "shared/lib/weeklyReviewCalculator.test.ts",
+      "sha256": "4f0fb00e4862665d8c4798a6dcca6af3e0d058aad0aac958a5126fff4ce89840"
+    },
+    {
+      "path": "shared/lib/weeklyReviewCalculator.ts",
+      "sha256": "7c50c0bedfdd611debfdb33cb2f2d4c5e02088e748e955f22e358a96b1fa4ade"
+    },
+    {
+      "path": "shared/lib/weightTrend.test.ts",
+      "sha256": "9d5750a6fa5e0a57aca523f63ef50dba4d3dfc1d05809ae830ac276e88f1a748"
+    },
+    {
+      "path": "shared/lib/weightTrend.ts",
+      "sha256": "d279f566d30546a03c74685f6be754388aa886200a01ae5d774035a1c3b3a5ac"
+    },
+    {
+      "path": "shared/package.json",
+      "sha256": "96b7133e72920640ec8f5a794dd5119de19930d28d93b17b33a125380daa5a35"
+    },
+    {
+      "path": "shared/tsconfig.json",
+      "sha256": "c734b911d83ea3df2c56a2470592abfe948dde3130ac55d870fa522c94f303d5"
+    },
+    {
+      "path": "shared/types/aiMealEstimate.ts",
+      "sha256": "4803459c0b5d06738e56029fde2d72078f5af3a6e3d3bf3dfa4de19343bbc419"
+    },
+    {
+      "path": "shared/types/auth.js",
+      "sha256": "fb05cdd96645a4a37986db052c3a30928cef5367fd20362bb70a6088227ab855"
+    },
+    {
+      "path": "shared/types/auth.js.map",
+      "sha256": "33d74869242645f0fccfccdf333c2c440faf4ef655772ead9350cebf486d3d23"
+    },
+    {
+      "path": "shared/types/auth.ts",
+      "sha256": "7ed3a84c327abca8bf7d6d8f3311eee56008c061da2423c6d161238ff1d34ca6"
+    },
+    {
+      "path": "shared/types/diary.js",
+      "sha256": "5638f57df990a9083eecda6521b7884a7c272ac8e93412522e6f3a6dc1e8d104"
+    },
+    {
+      "path": "shared/types/diary.js.map",
+      "sha256": "1f6831799c82d2564f2f0fd95abb5a4ba41fc87e98785ee57a5889c301894f7c"
+    },
+    {
+      "path": "shared/types/diary.ts",
+      "sha256": "31cf9209968cbb8bcfea5af741da7cd045823e134b7ac154b096b5c3f3c69e6c"
+    },
+    {
+      "path": "shared/types/foodCategory.ts",
+      "sha256": "cccf9f5ac2bec50be691be45b9eb833fef95eaaa225b450fe27d12fd8348a705"
+    },
+    {
+      "path": "shared/types/foodProduct.ts",
+      "sha256": "8364e0028ef9e70652f884e5845b96d7431204afb10005e5e6efda95a9eab238"
+    },
+    {
+      "path": "shared/types/hint.ts",
+      "sha256": "5a2d47ba3ed3670a284f4b26adfc49dac72a30ebba295dafa057da31be2e540a"
+    },
+    {
+      "path": "shared/types/insight.ts",
+      "sha256": "4154d04021b8eac7d644efe88ab06b641e9078edc054211fb215897af1eaf4dc"
+    },
+    {
+      "path": "shared/types/nutrition.js",
+      "sha256": "a6490926d613a538fb62e38a18e6d8bc64e1afd3951dfbd66d3067f095dbbb88"
+    },
+    {
+      "path": "shared/types/nutrition.js.map",
+      "sha256": "4705f3846b7790b6f2898c2ec939920ea6e6797eb3b24a36986efb8a232bc025"
+    },
+    {
+      "path": "shared/types/nutrition.ts",
+      "sha256": "61930fc62acc2c13b26444817d99a5e11dd209046cd6bde1a052d4d18ad9d7ed"
+    },
+    {
+      "path": "shared/types/profile.js",
+      "sha256": "b94e3e181973b88624bbdbbfe9adee8f33710a793a9a577528ac75a9451d5764"
+    },
+    {
+      "path": "shared/types/profile.js.map",
+      "sha256": "dc62b5c2a599ce00edf65b4b7193d7a6852a2311aafda9320f96f1d234bb3d1b"
+    },
+    {
+      "path": "shared/types/profile.ts",
+      "sha256": "855b4dfbb682a0c945118de4e1f3d1b3b470a52620681b5ed3df6385f0c60441"
+    },
+    {
+      "path": "shared/types/quota.ts",
+      "sha256": "cc9835c4fc2e0be4ec14b831240969a774f312820cd778eebd71787e1940174c"
+    },
+    {
+      "path": "shared/types/recipeExport.ts",
+      "sha256": "40817e3e2b91686b0e2488f2f0b00c5571e112b1a5d21b78b8d1bf0ff24b2360"
+    },
+    {
+      "path": "shared/types/recipeImageHeroCrop.ts",
+      "sha256": "e6a9968672e4bea94eb4140d7c7c831c1d56a8e3ca688b53a48a16f04ad2bfe8"
+    },
+    {
+      "path": "shared/types/recipeScale.ts",
+      "sha256": "3ff42386aa3dd6acf44561aa2349d7df426257f3e747f159906a8dac73586915"
+    },
+    {
+      "path": "shared/types/recipes.js",
+      "sha256": "8488f6ae73e744596fbf099e7c803d525f268febe0d3c6de1639b21fdd01d82e"
+    },
+    {
+      "path": "shared/types/recipes.js.map",
+      "sha256": "b18db6642cb698d5948beb98be1103160402ed225d35423f61afcb7a8c7cb34a"
+    },
+    {
+      "path": "shared/types/recipes.test.ts",
+      "sha256": "cef958c3b0cfe84512487db5b1af27a5a6497cb0f487cfe6529f56967b8ce9e2"
+    },
+    {
+      "path": "shared/types/recipes.ts",
+      "sha256": "0e9d395340b96bb584a1b392c345ccdac22793667243e42a1f2c338684dffd4d"
+    },
+    {
+      "path": "shared/types/userFoodRelation.ts",
+      "sha256": "613fc9927dd900bc03b2b5e34774babee98f90e857c8915afc8bbd3d5453c427"
+    },
+    {
+      "path": "shared/types/weeklyReview.ts",
+      "sha256": "b2d0f73f1aec23d08b5768d4eb82bfd5a3478fb641a7b215def1568970ac6fe7"
+    },
+    {
+      "path": "shared/types/weights.js",
+      "sha256": "764ec9734a5db8103689ea3d3ffb7aa559cca36e332cac452729769d14de5955"
+    },
+    {
+      "path": "shared/types/weights.js.map",
+      "sha256": "3b1d8ee340bb69be9a683328e6c61a3660e496b37ce6be5b1f2947d6ff3ce465"
+    },
+    {
+      "path": "shared/types/weights.ts",
+      "sha256": "a10479fc1a057a0feeda35ba8fe397dc5c284a42e439f5b2eb24480486e7276b"
+    },
+    {
+      "path": "shared/vitest.config.mts",
+      "sha256": "89f9c30ca6b1df7d5a4cadb7495156a358ec52c5a5302d1e9022e411a0f0c033"
+    }
+  ],
+  "settingsFingerprint": "410a089d8a5f01c4b33217c3dbbcef49f17c34332dc0bee224382dc87af69a7d",
+  "missingCredentials": [],
+  "acceptanceBarPreRegisteredBeforeAnyLiveRun": {
+    "fullFileRecipeRuns": {
+      "count": 10,
+      "testsPerRun": 21,
+      "passBar": "every run 21/21"
+    },
+    "riceIsolated": {
+      "count": 10,
+      "filter": "synthetic-saved-eight-steps-rice-serv",
+      "passBar": "10/10"
+    },
+    "importIsolated": {
+      "count": 8,
+      "fixtures": [
+        "side-dish-and-serving-actions",
+        "full-recipe-output-fields",
+        "indeterminate-spray-oil-stays-food",
+        "no-lost-or-invented-ingredients"
+      ],
+      "passBar": "8/8 each"
+    },
+    "verdictRules": [
+      "PASS only if every pre-registered live run passes and offline gates are green.",
+      "Any failing live run is diagnosed from its raw output and classified: product defect, eval-rubric artefact, or provider variance. A failure whose served/accepted output is wrong (lost source action, invented value, wrong order) is a product defect and Blocking.",
+      "A failure that is a controlled safe rejection (HTTP 422, usage 0, no writes, no wrong content) in at most 1 of 10 comparable runs is Non-blocking at most (PASS WITH ISSUES), because the stabilisation goal is mechanical robustness, not a statistical guarantee.",
+      "Two or more failures of the same fixture, or any accepted wrong content, keep the verdict FAIL.",
+      "No retry-until-green: failures stay recorded; series are not extended to dilute a failure."
+    ]
+  }
+}

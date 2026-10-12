@@ -1,0 +1,40 @@
+{
+  "format": "fittrack-current-recipe-sharing-execution-v1",
+  "stage": "listPreparation",
+  "startedAt": "2026-10-10T10:25:27.326Z",
+  "finishedAt": "2026-10-10T10:25:29.506Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "--testNamePattern",
+    "preparation prompt version matches fixture expectations|recipePreparation"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": "01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3",
+  "candidateHashStable": true,
+  "changedPaths": [],
+  "state": "COMPLETED",
+  "counts": null,
+  "selection": [
+    {
+      "name": "preparation prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    }
+  ],
+  "synthetic": [],
+  "outputPath": "docs/qa/reports/CURRENT-RECIPE-SHARING-2026-10-10-listPreparation-Output.txt",
+  "outputSha256": "08e5b4d86cbf72ac1772af51ea98c5e549042aee1bfe06740249de29adc2f9b6",
+  "testReport": null,
+  "reportSha256": null,
+  "allIntendedTestsExecuted": null,
+  "noProviderCalls": true,
+  "liveGate": false
+}

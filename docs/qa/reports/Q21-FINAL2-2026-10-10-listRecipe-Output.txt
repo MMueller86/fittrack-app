@@ -1,0 +1,72 @@
+[
+  {
+    "name": "prompt version matches fixture expectations",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "preparation prompt version matches fixture expectations",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  }
+]
+
+WARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.

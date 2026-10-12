@@ -1,0 +1,16 @@
+{
+  "label": "oven-seven-steps-run06",
+  "exit": 0,
+  "started": "2026-10-11T10:57:50.778Z",
+  "finished": "2026-10-11T10:57:57.523Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 2,
+    "failed": 0,
+    "pending": 19
+  },
+  "failures": [],
+  "outputSha256": "5de1b7cc47bbc2310c0f030c9e75973b0efe3a9b72753ec911d6775a5df83c6a",
+  "reportSha256": "c9dc79089e73f2db7d9c823f6077ec363f527a015740e610f2b9ca519983ae1c"
+}

@@ -1,0 +1,30 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "test",
+    "--workspace=backend",
+    "--",
+    "--reporter=dot",
+    "--reporter=json",
+    "--silent",
+    "--outputFile=docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Units-Report.json"
+  ],
+  "start": "2026-10-09T17:26:15.663Z",
+  "end": "2026-10-09T17:27:03.801Z",
+  "exit": 0,
+  "signal": null,
+  "candidateHash": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "output": "docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Units-Output.txt",
+  "outputSha256": "1ac94e51021dc0e5039c1e5b1b266b236d65e5acaf595e4ff92ff5f3dfa9f571",
+  "report": "docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Units-Report.json",
+  "reportSha256": "6227cbbe009884f28ad6f1d7480e49eb578ca55a60cec236e7cd3dee6325d085",
+  "counts": {
+    "executed": 1600,
+    "passed": 1600,
+    "failed": 0,
+    "skipped": 0
+  },
+  "liveCalls": 0,
+  "buildRuns": 0
+}

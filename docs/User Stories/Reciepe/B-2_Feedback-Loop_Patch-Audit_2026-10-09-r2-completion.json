@@ -1,0 +1,16 @@
+{
+  "command": [
+    "git",
+    "apply",
+    "--reverse",
+    "--check",
+    "--whitespace=error",
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Owned-Diff_2026-10-09-r2-completion.patch"
+  ],
+  "exit": 0,
+  "signal": null,
+  "outputSha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+  "patchSha256": "2ccfebafba487c5578e417f055fbaf247f7938076d826b68804450aae03e2fa3",
+  "basis": "ORIGINAL B2 starting worktree; NOT HEAD and NOT resume baseline",
+  "writesOrRollback": false
+}

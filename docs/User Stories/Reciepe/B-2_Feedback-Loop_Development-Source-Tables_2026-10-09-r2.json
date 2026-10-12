@@ -1,0 +1,30 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipePreparation.test.ts",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Source-Tables-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:55:30.592Z",
+  "endedAt": "2026-10-09T15:55:40.106Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "7424184344f4ce695c3ba86485ce800d3c8a59243d3471303e7f0237c2b75111",
+  "reportSha256": "4105271c25b1359f4fe22f1ae7f24523472af97ad2cf5ea8f48b42ba7eca9038",
+  "counts": {
+    "executed": 190,
+    "passed": 190,
+    "failed": 0,
+    "skipped": 0
+  },
+  "failures": []
+}

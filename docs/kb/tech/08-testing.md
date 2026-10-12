@@ -83,6 +83,18 @@ npx tsc --noEmit  # from mobile/ or shared/
 	settings without printing secrets; exit code `2` means `UNVERIFIED` because
 	required credentials are unavailable.
 
+### Weekly Insight Diagnostic Evidence
+
+The Weekly Insight semantic judge must provide a non-empty excerpt present in
+the generated text. The local evidence comparison ignores capitalization only;
+numbers, wording, punctuation and whitespace are not normalized or fuzzily
+matched. The original evidence remains unchanged in diagnostic output. Missing
+or changed evidence and ambiguous judgments remain `UNVERIFIED`; contradictory
+target judgments remain `INCORRECT`. Unit regressions cover the recorded
+`dein` versus `Dein` mismatch and changed calorie/percentage negatives. This is
+an eval-only correction, not a production prompt or calorie-calculation change,
+and does not reclassify previously recorded failed runs.
+
 ### Instagram Detail-Template Fixtures
 
 Detail-template unit tests reuse the versioned
@@ -93,13 +105,100 @@ local downloads. Production fonts, text measurements, and PNG rendering run
 unchanged. Visual approval fixtures and rendering scripts retain their Alpha
 photos; those local files are not prerequisites for Tier 1.
 
+The same existing renderer test file covers the internal generated-text probe:
+real-font/full-render measurement parity for 1-5 steps and three title layouts,
+title-dependent teaser sizing, German breaks, all-field overflow collection and
+invalid/skipped fields. The Alpha four-step sentence measures 300 x 112 px
+against 302 x 105 px; a shorter ingredient-preserving sentence passes at the
+unchanged 22 px step font. Three pre-extraction PNG SHA-256 fingerprints lock
+the full-render output. Boundary tests inject only the final measured dimension
+at 0.5 px / 0.5001 px while retaining real fonts and Satori nodes. Tests for each
+teaser selection size inject overflow in earlier attempts; real-font title
+variants separately exercise natural sizing. Isolated cold-start tests block
+Sharp/Resvg imports and non-font reads and check missing/corrupt fonts and
+Satori failures. No live AI, authenticated photo or confirmed export view is
+required by these offline probe tests.
+
+### Recipe Preparation Feedback Loop Evidence
+
+[Partial] B-1 probe is implemented with passing recorded offline evidence;
+B-2 r3 / QA-R1 loop is implemented, NOT ACCEPTED / release CLOSED. Dedicated colocated
+`recipePreparation.test.ts`, handler/source-validator/SDK tests and the existing
+renderer tests cover initial/correction1/correction2 success and three-draft
+exhaustion, immutable original context/latest draft, complete rechecks/count
+changes, real-font Alpha overflow, technical precedence, missing/non-finite
+measurements, provider/refusal/timeout/late results, once-only quota/booking,
+no writes, generic HTTP and exact latest affected-text exhaustion privacy.
+Injected SDK/time/measurement tests are offline coverage, not evidence that
+every failure mode executed live. V12 Preparation guards are separate from
+unchanged v17 Import; geometry is separate from independent cooking-core,
+ingredient-fidelity and contradiction rubrics and explicit user review.
+
+Q-21 correction-attempt regressions cover source cooking endpoints in all three
+Preparation prompt paths and positive/negative reviewed aggregate-time provenance.
+Final attempt 2 adds pre-compression time-decision and cooking-priority prompt
+checks, rice essential-cooking omission independent of metadata, and reversed
+FIRST-order rejection; free non-adjacent groups remain covered positively.
+The existing live fixtures require `null` total time for unchanged rice, oven,
+pasta and forced dough. Oven metadata checks do not replace its human cooking
+review (`MANUAL VALIDATION REQUIRED`). Final-candidate F/R/G belong to the
+next independent QA run; dated recorded checks below remain historical.
+
+QA-R1 regressions cover unknown-key-only/nonstring metadata-only logging,
+production-derived compact lineHeight1.17, correction path/index guidance and
+recorded-oven replay with an injected fitting final draft. Narrow test-only
+pasta action-boundary and exact single-stage dough whole-set equivalence fixes
+retain negative contradiction/omission/invention/staged-component checks.
+All local corrections are reported tested, pending independent QA; no QA
+finding/register closure or provider-success proof follows from offline replay.
+
+Recorded r3 / QA-R1 commands/results, NOT rerun by documentation-only D-1-R1:
+
+| Check | Recorded command family (exact arguments/hashes in linked records) | Exit | Executed / Passed / Failed / Skipped |
+| --- | --- | --- | --- |
+| Focused final | `npm exec --workspace=backend -- vitest run` on the six owning test files | 0 | 519 / 519 / 0 / 0 |
+| Units | `npm run test --workspace=backend -- --reporter=default --reporter=json --outputFile=<recorded report>` | 0 | 1600 / 1600 / 0 / 0 |
+| Typecheck | `npm run typecheck --workspace=backend` | 0 | non-test |
+| Build | `npm run build:verify --workspace=backend` | 0 | non-test |
+| F | `node backend/scripts/run-eval.mjs src/lib/prompts/recipeAnalyze.eval.test.ts --testNamePattern "preparation prompt version matches fixture expectations\|recipePreparation"` plus recorded reporters | 1 | 5 / 2 / 3 / 9 |
+| R/G | NOT_RUN after required F failure; no command dispatched | null | 0 executed; 0 provider calls |
+
+F's passing v6 version guard plus four fixtures include 10 logical calls (one
+forced initial draft) and 9 SDK calls. Pasta passes independent semantics.
+Rice fails FIRST 6 before 5 and overflows at indices1/2 (300x112 versus302x105),
+422/usage0; forced dough repeats the same literal mixing overflow at index0,
+422/usage0. Both exhaust three logical calls; semantics are NOT_REACHED.
+Oven fits/200/usage1 but fails independent source binding: source-3 cream action
+is in the source-4 group. Fit/reference validity/200 is not semantic PASS.
+R/G are NOT_RUN_REQUIRED_LIVE_FAILURE. Offline records
+predate candidate freeze (`candidateSha256: null`), not hash-guarded gate runs.
+
+The initial focused run (519/518/1/0, stale v5 companion guard) and all Red
+records remain failures; the final focused run is separately recorded.
+Historical r2 F remains FAIL (5/2/3/9, 8 logical/7 SDK calls). QA proved pasta's
+cross-action regex false positive and dough's excess literal-name requirement,
+not actual cooking corruption. New rubric repairs do not retrospectively PASS
+that run, and new dough exhaustion does not reach an equivalence assertion.
+
+See [B-2 r3 recorded commands and hashes](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Gate-Summary_2026-10-09-r3-QA-R1.json),
+[53-artifact inventory](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r3-QA-R1.json)
+and [current evidence boundary](06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1).
+Q-19 FAIL, old B-16/B-18/B-18C/B-19 FAIL/UNVERIFIED and foreign Import/Daily
+failures remain preserved; R/G NOT_RUN cannot close them. No independent QA,
+release or authenticated private/Alpha replay is claimed. The historical
+14:12 Alpha release deployed only logging, not the loop. D-1-R1 performs only
+focused documentation assertions, links/encoding/errors and owned-diff/hash
+preservation checks, not units/typecheck/build/live gates. Its
+[handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md)
+records those separate results; documentation PASS cannot waive feature gates.
+
 ### Daily Insight Prompt and Cache Checks
 
 The active Daily prompt is tested through
 `backend/src/lib/prompts/dailyInsightPrompt.ts`, which is the sole runtime
 composition root. Unit tests cover all six intent snapshots, deterministic
-canonical-bundle fingerprinting, the append-only manifest with retained v14
-and active v15 entries, and the context-dependent system-prompt hashes. The
+canonical-bundle fingerprinting, the append-only manifest with retained v14/v15
+v16 and active v17 entries, and the context-dependent system-prompt hashes. The
 offline release check
 `npm run verify:daily-insight-prompt --workspace=backend` verifies the active
 release fingerprint, historical manifest entries, and provider-visible prompt
@@ -120,7 +219,7 @@ legacy documents without optional identity fields. Legacy documents remain
 readable without a backfill; the Class 0 change is verified by compatibility
 tests rather than a migration.
 
-The v15 semantic validation tests cover historical comparisons against the
+The current semantic validation tests cover historical comparisons against the
 resolved target for that date, missing or ambiguous evidence, contradictory
 comparison direction, unsupported nutrition claims on unlogged prior days,
 and morning intent/source constraints. Context fixtures keep the historical
@@ -128,6 +227,16 @@ and morning intent/source constraints. Context fixtures keep the historical
 also prove that a complete unexpired same-date v14 cache entry is returned
 unchanged until expiry, while the repository status-operation test constrains
 the read projection to status metadata and the patch to `/processingStatus`.
+
+Q-21's separate Daily regression uses the real `stale-weight` fixture's open
+`phase_progress` context and rejects all four completed-day phrases with the
+unchanged validator error. Prompt tests reproduce/remove contradictory
+below-target instructions; no validation relaxation or expected-failure bypass
+is added. Attempt 2 also uses exact unknown-activity inputs (activity_focus,
+unknown local hour, 500 calories remaining, 40 g protein gap) to check the final
+activity open-day guard and unchanged strict rejection of all four phrases.
+Conditional fueling/liquids/recovery and stale-weight regressions remain.
+Offline tests are not a successful new live G execution.
 
 Prompt evals remain explicit live checks for the tested release. They are not
 part of the normal CI job because they require Azure credentials and incur

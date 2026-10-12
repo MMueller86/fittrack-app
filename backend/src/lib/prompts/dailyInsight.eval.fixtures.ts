@@ -691,6 +691,10 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       'der trend zeigt heute',
       'der wochenverlauf zeigt heute',
       'kg weniger als gestern',
+      'zu wenig gegessen',
+      'unter deinem ziel',
+      'unter dem ziel',
+      'dein kalorienverbrauch liegt unter',
     ],
   },
 ];

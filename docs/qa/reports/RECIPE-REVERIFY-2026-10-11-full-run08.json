@@ -1,0 +1,16 @@
+{
+  "label": "full-run08",
+  "exit": 0,
+  "started": "2026-10-11T10:43:38.801Z",
+  "finished": "2026-10-11T10:45:03.522Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 21,
+    "failed": 0,
+    "pending": 0
+  },
+  "failures": [],
+  "outputSha256": "b67700e477ddba5d768d89917001ac495b9e2121206ec95c842194d40ec6e44f",
+  "reportSha256": "5d27baffeff57554c0a20dbfa9b2171fcefda6d4b82e1b03d61e29622088552d"
+}

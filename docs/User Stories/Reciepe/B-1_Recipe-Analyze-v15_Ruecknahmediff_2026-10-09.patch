@@ -1,0 +1,73 @@
+diff --git a/backend/src/lib/prompts/recipeAnalyze.ts b/backend/src/lib/prompts/recipeAnalyze.ts
+index a940e51..91e1326 100644
+--- a/backend/src/lib/prompts/recipeAnalyze.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.ts
+@@ -3,7 +3,7 @@ import {
+   RECIPE_EXPORT_MAX_STEPS,
+ } from '../../../../shared/types/recipeExport';
+ 
+-export const RECIPE_ANALYZE_PROMPT_VERSION = 'v14';
++export const RECIPE_ANALYZE_PROMPT_VERSION = 'v15';
+ 
+ export const RECIPE_ANALYZE_SYSTEM_PROMPT = `Du bist ein Rezept-Assistent für eine deutsche Ernährungs-App.
+ Der Nutzer gibt ein Rezept in freiem Text ein — mit möglichen Tippfehlern, Stichpunkten oder unvollständigen Sätzen.
+@@ -38,7 +38,7 @@ Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahie
+ - **teaser**: Kurzer fitnessorientierter deutscher Teaser mit höchstens 96 Zeichen.
+ - **totalTimeMinutes**: Positive, ganzzahlige realistische Gesamtzeit in Minuten oder null, wenn sie aus dem Rezept nicht verlässlich ableitbar ist. Verwende niemals eine erfundene Standardzeit wie 30.
+ - **difficulty**: Getrimmte, einzeilige deutsche Schwierigkeit beziehungsweise Komplexität oder null, wenn sie nicht verlässlich ableitbar ist. Verwende niemals den Default "Einfach".
+-- **steps**: HARTES LIMIT: genau min(N, ${RECIPE_EXPORT_MAX_STEPS}) Exportschritte für N Quellschritte, niemals ${RECIPE_EXPORT_MAX_STEPS + 1} oder mehr. Jeder Schritt enthält neben order und description auch **sourceStepOrders** (die ursprünglichen order-Werte, die dieser Schritt zusammenfasst, aufsteigend und genau einmal insgesamt) und **ingredientKeys** (die analysisKey-Werte der darin verwendeten Zutaten). Erhalte Reihenfolge, Handlungen, Zutatenbezug, Temperaturen, Garzeiten und Wendepunkte. Erfasse vor dem Gruppieren für jeden Quellschritt intern die Handlung, die betroffenen Zutaten, vorhandene Temperatur- und Zeitangaben, Wendepunkte sowie Beilagen-, Saucen- und Servierbezüge. Plane die Gruppen ausschließlich nach der unten beschriebenen Zuordnung der Exportschritte; übernimm anschließend jeden fachlich relevanten Punkt der zugeordneten Quellschritte ausdrücklich in den jeweiligen Exporttext. Verliere dabei keine Handlung, Temperatur, Zeit oder Wendung. Bei einer Beilage oder Sauce muss ihre Beziehung zur Hauptspeise erkennbar bleiben; bei "als Beilage" oder "zusammen mit" genügen z.B. "Kartoffeln als Beilage" oder "Hähnchen mit Kartoffeln servieren". Eine bloße Zutatennennung oder sourceStepOrders-Referenz reicht nicht. Eine ausdrückliche Anrichten- oder Servierhandlung muss samt den zugehörigen Komponenten erhalten bleiben.
++- **steps**: HARTES LIMIT: höchstens ${RECIPE_EXPORT_MAX_STEPS} Exportschritte, niemals ${RECIPE_EXPORT_MAX_STEPS + 1} oder mehr. Jeder Schritt enthält neben order und description auch **sourceStepOrders** (die ursprünglichen order-Werte, die dieser Schritt zusammenfasst, aufsteigend und genau einmal insgesamt) und **ingredientKeys** (die analysisKey-Werte der darin verwendeten Zutaten). Erhalte Reihenfolge, Handlungen, Zutatenbezug, Temperaturen, Garzeiten und Wendepunkte. Erfasse vor dem Gruppieren für jeden Quellschritt intern die Handlung, die betroffenen Zutaten, vorhandene Temperatur- und Zeitangaben, Wendepunkte sowie Beilagen-, Saucen- und Servierbezüge. Wenn es mehr als ${RECIPE_EXPORT_MAX_STEPS} Ausgangsschritte gibt, plane zuerst höchstens ${RECIPE_EXPORT_MAX_STEPS} semantische Abschnitte und fasse dafür unmittelbar zusammengehörige Ausgangsschritte in einem Exportschritt zusammen. Verliere dabei keine Handlung, Temperatur, Zeit oder Wendung. Bei einer Beilage oder Sauce muss ihre Beziehung zur Hauptspeise erkennbar bleiben; bei "als Beilage" oder "zusammen mit" genügen z.B. "Kartoffeln als Beilage" oder "Hähnchen mit Kartoffeln servieren". Eine bloße Zutatennennung oder sourceStepOrders-Referenz reicht nicht. Eine ausdrückliche Anrichten- oder Servierhandlung muss samt den zugehörigen Komponenten erhalten bleiben.
+ - **description je Exportschritt**: HARTES LIMIT: höchstens ${RECIPE_EXPORT_MAX_STEP_LENGTH} Zeichen einschließlich Leerzeichen. Formuliere bei Überschreitung den ganzen Satz neu und kürzer; niemals nur am Ende abschneiden oder ein Wort mit Bindestrich beziehungsweise unvollständigem Wort abbrechen. Die Kurzbeschreibung muss ein vollständiger, nichtleerer Satz sein und die wesentliche Handlung sowie die zugehörige Temperatur, Zeit und alle für die Handlung nötigen Zutaten und Komponenten erhalten. Kürze zuerst Füllwörter, nicht Handlungen oder Komponenten.
+ - **includedIngredientKeys**: Eine strikte Whitelist der für den Export vorgeschlagenen Zutaten: Nimm ausschließlich die analysisKey-Werte von Zutaten mit category "food", in ihrer ursprünglichen Reihenfolge. Prüfe vor dem Schreiben jeden Schlüssel gegen die Zutatenliste und entferne jeden Schlüssel, dessen category "seasoning" ist — auch wenn dieses Gewürz in einem Exportschritt verwendet wird. Bei fehlenden food-Zutaten ist das Array leer. Erfinde keine Schlüssel.
+ 
+@@ -46,9 +46,9 @@ Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahie
+ Die Ausgabefelder steps und exportSuggestion.steps sind zwei verschiedene Listen. Erstelle zuerst die vollständige Quellschrittliste steps; erst danach planst du die Exportliste. Wenn die Eingabe nummerierte Anweisungen enthält, muss steps genau einen Eintrag je nummerierter Anweisung in derselben Reihenfolge enthalten. Wende das Limit von ${RECIPE_EXPORT_MAX_STEPS} niemals auf steps an. Eine Zusammenfassung mehrerer nummerierter Anweisungen ist ausschließlich in exportSuggestion.steps erlaubt.
+ 
+ ## Zuordnung der Exportschritte
+-Bestimme N ausschließlich aus den Einträgen der fertigen Quellschrittliste steps, nicht aus der Anzahl einzelner Handlungen in ihren Beschreibungen; ihre orders sind 1 bis N. Erzeuge genau M = min(N, ${RECIPE_EXPORT_MAX_STEPS}) Exportschritte mit orders 1 bis M. Bei N <= ${RECIPE_EXPORT_MAX_STEPS} enthält Exportschritt i ausschließlich Quellorder i und alle Handlungen dieses Quellschritts in einer gemeinsamen description. Beispiel für N=5: [1], [2], [3], [4], [5]; auch wenn Quellschritt 5 sowohl Garen als auch Servieren enthält, bleiben beide Handlungen im selben fünften Exportschritt. [1], [2], [3], [4], [5,5] und ein zusätzlicher Exportschritt [5] sind ungültig. Bei N > ${RECIPE_EXPORT_MAX_STEPS} gruppierst du die Quellorders in genau ${RECIPE_EXPORT_MAX_STEPS} nichtleere, zusammenhängende Intervalle. Beispiel für N=8: [1,2], [3,4], [5,6], [7], [8]. Die Beispiele legen keine festen Gruppengrenzen für andere Rezepte fest.
++Bestimme N ausschließlich aus den Einträgen der fertigen Quellschrittliste steps, nicht aus der Anzahl einzelner Handlungen in ihren Beschreibungen; ihre orders sind 1 bis N. Erzeuge genau M = min(N, ${RECIPE_EXPORT_MAX_STEPS}) Exportschritte mit orders 1 bis M. Bei N <= ${RECIPE_EXPORT_MAX_STEPS} enthält Exportschritt i ausschließlich Quellorder i und alle Handlungen dieses Quellschritts in einer gemeinsamen description. Bei N > ${RECIPE_EXPORT_MAX_STEPS} gruppierst du die Quellorders in genau ${RECIPE_EXPORT_MAX_STEPS} nichtleere, zusammenhängende Intervalle. Beispiel für N=8: [1,2], [3,4], [5,6], [7], [8]. Die Beispiele legen keine festen Gruppengrenzen für andere Rezepte fest.
+ 
+-Lege die vollständige Folge der Quellorder-Gruppen fest, bevor du Exportbeschreibungen formulierst. Weise die erste Gruppe order 1, die zweite order 2 usw. zu. Jede Gruppe beginnt genau mit der nächsten noch nicht zugeordneten Quellorder und enthält nur unmittelbar folgende Orders. Nach jeder Gruppe ist die nächste Quellorder eins nach deren letzter Order. Die letzte Gruppe muss bei N enden. Wiederhole oder überspringe keine Order; erstelle keinen zusätzlichen Exportschritt für eine zweite Handlung innerhalb eines Quellschritts. Erhalte mehrere Handlungen desselben Quellschritts gemeinsam in der Beschreibung seiner einen Gruppe. Beim Formulieren darfst du weder die Gruppen noch ihre Anzahl erweitern: Kürze bei Platzmangel den Text in derselben Gruppe, nicht durch einen neuen Eintrag mit derselben Quellorder. Abgeflacht muss sourceStepOrders exakt 1, 2, ..., N ergeben. Andernfalls korrigiere zuerst die Gruppen. Wähle bei N > ${RECIPE_EXPORT_MAX_STEPS} Gruppengrenzen nach inhaltlich zusammengehörigen Handlungen und übernimm alle fachlich relevanten Handlungen, Zutatenbezüge, Zeiten, Temperaturen und Beziehungen in die passenden Exportbeschreibungen.
++Lege die vollständige Folge der Quellorder-Gruppen fest, bevor du Exportbeschreibungen formulierst. Weise die erste Gruppe order 1, die zweite order 2 usw. zu. Jede Gruppe beginnt genau mit der nächsten noch nicht zugeordneten Quellorder und enthält nur unmittelbar folgende Orders. Nach jeder Gruppe ist die nächste Quellorder eins nach deren letzter Order. Die letzte Gruppe muss bei N enden. Wiederhole oder überspringe keine Order. Abgeflacht muss sourceStepOrders exakt 1, 2, ..., N ergeben. Andernfalls korrigiere zuerst die Gruppen. Wähle bei N > ${RECIPE_EXPORT_MAX_STEPS} Gruppengrenzen nach inhaltlich zusammengehörigen Handlungen und übernimm alle fachlich relevanten Handlungen, Zutatenbezüge, Zeiten, Temperaturen und Beziehungen in die passenden Exportbeschreibungen.
+ 
+ ## Regeln
+ - Korrigiere Rechtschreibfehler und Grammatik
+diff --git a/backend/src/lib/prompts/recipeAnalyze.eval.test.ts b/backend/src/lib/prompts/recipeAnalyze.eval.test.ts
+index 05039a5..73ed39f 100644
+--- a/backend/src/lib/prompts/recipeAnalyze.eval.test.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.eval.test.ts
+@@ -29,7 +29,7 @@ import {
+ // ---------------------------------------------------------------------------
+ 
+ /** Update this constant whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-review all fixtures. */
+-const TESTED_PROMPT_VERSION = 'v14';
++const TESTED_PROMPT_VERSION = 'v15';
+ 
+ it('prompt version matches fixture expectations', () => {
+   expect(RECIPE_ANALYZE_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);
+diff --git a/backend/src/lib/openai.ts b/backend/src/lib/openai.ts
+index 3895361..6c0c620 100644
+--- a/backend/src/lib/openai.ts
++++ b/backend/src/lib/openai.ts
+@@ -521,7 +521,7 @@ export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
+         schema: RECIPE_ANALYZE_SCHEMA,
+       },
+     },
+-    temperature: 0,
++    temperature: 0.2,
+     max_tokens: 2048,
+   });
+ 
+diff --git a/backend/src/functions/ai.test.ts b/backend/src/functions/ai.test.ts
+index 403a1f1..4537ef6 100644
+--- a/backend/src/functions/ai.test.ts
++++ b/backend/src/functions/ai.test.ts
+@@ -800,7 +800,7 @@ describe('POST /api/ai/recipe-analyze', () => {
+       };
+     };
+     expect(request).toMatchObject({
+-      temperature: 0,
++      temperature: 0.2,
+       max_tokens: 2048,
+       model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
+     });

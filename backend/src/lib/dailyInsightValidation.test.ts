@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InsightInputContext } from '@fittrack/shared';
+import { DAILY_INSIGHT_EVAL_FIXTURES } from './prompts/dailyInsight.eval.fixtures';
 import {
   validateDailyInsightResponse,
   type DailyInsightValidatedResponse,
@@ -85,6 +86,25 @@ function historicalDay(
 }
 
 describe('validateDailyInsightResponse', () => {
+  it.each(['zu wenig gegessen', 'unter deinem Ziel', 'unter dem Ziel', 'dein Kalorienverbrauch liegt unter'])('CORR2 keeps strict unknown-activity open-day rejection for %s', (phrase) => {
+    const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'unknown-activity')!;
+    expect(() => validateDailyInsightResponse(response({
+      summary: `Die Aktivität ist eingetragen. Heute hast du ${phrase}.`,
+    }), fixture.input, fixture.intent)).toThrow('Daily insight judges an open day as completed');
+    const safe = response({ summary: 'Die Aktivität ist eingetragen; ob sie stattgefunden hat, ist unbekannt. Dein Tagesziel berücksichtigt die Tour. Falls sie ansteht, achte auf Energie aus Kohlenhydraten, Flüssigkeit und Erholung.' });
+    expect(validateDailyInsightResponse(safe, fixture.input, fixture.intent)).toEqual(safe);
+  });
+
+  it.each(['zu wenig gegessen', 'unter deinem Ziel', 'unter dem Ziel', 'dein Kalorienverbrauch liegt unter'])('Q21 keeps the exact G stale-weight open-day rejection for %s', (phrase) => {
+    const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'stale-weight')!;
+    expect(fixture.input.weight.daysSinceLastMeasurement).toBe(20);
+    expect(() => validateDailyInsightResponse(response({
+      summary: `Deine Gewichtsdaten sind veraltet. Heute hast du ${phrase}.`,
+    }), fixture.input, fixture.intent)).toThrow('Daily insight judges an open day as completed');
+    const safe = response({ summary: 'Deine Gewichtsdaten sind veraltet. Für heute bleibt noch Spielraum; dein Tag ist noch offen.' });
+    expect(validateDailyInsightResponse(safe, fixture.input, fixture.intent)).toEqual(safe);
+  });
+
   it('accepts the strict nullable response shape', () => {
     expect(validateDailyInsightResponse(response(), makeContext())).toEqual(response());
   });

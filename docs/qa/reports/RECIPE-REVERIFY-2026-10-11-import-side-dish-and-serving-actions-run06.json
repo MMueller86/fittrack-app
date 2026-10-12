@@ -1,0 +1,16 @@
+{
+  "label": "import-side-dish-and-serving-actions-run06",
+  "exit": 0,
+  "started": "2026-10-11T10:50:48.746Z",
+  "finished": "2026-10-11T10:50:57.787Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 1,
+    "failed": 0,
+    "pending": 20
+  },
+  "failures": [],
+  "outputSha256": "d42793a9728ccadeac50a749340dc4038799df6d733c1fda0ff8ce4e1ec28632",
+  "reportSha256": "b640153d1f04421287e0b4c3ecb2a69bcc1f6c73f223413f917926842d8b18a0"
+}

@@ -1,0 +1,84 @@
+diff --git a/docs/kb/domain/06-recipes.md b/docs/kb/domain/06-recipes.md
+--- a/docs/kb/domain/06-recipes.md
++++ b/docs/kb/domain/06-recipes.md
+@@ -227,4 +227,7 @@
+-The new 2026-10-09 v16/v3 evidence is also not a quality PASS: the focused gate
+-skipped every test (UNVERIFIED); separate Recipe and overall gates failed on
+-missing preparation finish-cooking, despite observed 200/one call/one usage/no
+-writes/unchanged source. Later V2-body/usage-order assertions were not reached.
++The B-18 evidence from 2026-10-09 for v16/v3 is not a quality PASS: the focused gate
++skipped every test (UNVERIFIED); separate Recipe and overall gates failed on
++missing preparation finish-cooking, despite observed 200/one call/one usage/no
++writes/unchanged source. Later V2-body/usage-order assertions were not reached.
++The subsequent B-18C test-only correction accepts the allowed finish-cooking
++and serving combination; its executed F/R/G gates still FAIL. Production
++versions, source/export contract, and runtime quality boundary are unchanged.
+diff --git a/docs/kb/domain/07-ai-features.md b/docs/kb/domain/07-ai-features.md
+--- a/docs/kb/domain/07-ai-features.md
++++ b/docs/kb/domain/07-ai-features.md
+@@ -225,4 +225,8 @@
+-remain historical. New 2026-10-09 v16/v3 evidence has a fully skipped focused
+-gate (UNVERIFIED) and Preparation FAIL in both Recipe and overall gates: missing
+-finish-cooking despite observed 200/one call/usage1/no writes/unchanged source.
+-Later V2-body/usage-order assertions were not reached. Preparation is not a
++remain historical. B-18 evidence from 2026-10-09 for v16/v3 has a fully skipped focused
++gate (UNVERIFIED) and Preparation FAIL in both Recipe and overall gates: missing
++finish-cooking despite observed 200/one call/usage1/no writes/unchanged source.
++Later V2-body/usage-order assertions were not reached. The subsequent B-18C
++test-only correction accepts finish-cooking combined with serving across
++references [6,8], with gap7; real core losses and contradictions remain negative.
++Its executed F/R/G gates still FAIL, without a production version change or
++general runtime semantic validation. Preparation is not a
+diff --git a/docs/kb/tech/06-ai-integrations.md b/docs/kb/tech/06-ai-integrations.md
+--- a/docs/kb/tech/06-ai-integrations.md
++++ b/docs/kb/tech/06-ai-integrations.md
+@@ -177,2 +177,29 @@
+-[Open] Independent Q-18A, final inventory disposition and package/merge/release
+-gates remain open/blocked. The Orchestrator owns further bounded work and the
++[Partial] Subsequent evidence on 2026-10-09: independent
++[Q-18A](../../qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
++returned FAIL. The single authorized
++[B-18C correction](../../User%20Stories/Reciepe/B-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md)
++addresses only FT-QA-2026-072 / Q18A-RUBRIC-FALSE-NEGATIVE-002 within K4/K6:
++the Source6 test contradiction regex no longer treats rice in the serving
++clause as the cooking component. Ten added regressions include the positive
++finish-cooking/serving combination with references [6,8] and allowed gap7;
++missing core/reference6, wrong components, time, swap, and invention remain
++negative. This is a fixture correction, not a new grouping restriction or
++universal parser. Production import v16/preparation v3 and all runtime
++contracts are unchanged.
++
++B-18C records genuine new test-first Red/Green (1 FAIL/9 PASS before the regex
++fix, 10 PASS after), 112 validator / 298 focused / 1407 normal unit tests,
++2/2 offline version guards, typecheck and build PASS. These are Backend
++results, not independent acceptance or D-18C test runs. Its single executed
++F/R/G gates all exited1: F Preparation FAIL/guard PASS; R 2 FAIL/9 PASS
++(Preparation missing finish-cooking and numbered import missing core6);
++G 2 FAIL/37 PASS (Preparation missing finish-cooking and unrelated Daily
++stale-weight failure). Preparation still observed 200/one call/usage1/no
++writes/unchanged source; later V2-body/usage-order assertions were not reached.
++The B-18 focused all-skipped UNVERIFIED remains historical, not overwritten
++by the executed B-18C focus. B-18C records 85/85 protected paths unchanged;
++no correction or closure of Findings001/003/004/005 is established.
++
++[Open] Independent review after B-18C and final package/merge/release gates
++remain open/blocked; Q-18A's FAIL is historical evidence, not a pending review.
++The Orchestrator owns further bounded work and the
+diff --git a/docs/kb/tech/09-api-reference.md b/docs/kb/tech/09-api-reference.md
+--- a/docs/kb/tech/09-api-reference.md
++++ b/docs/kb/tech/09-api-reference.md
+@@ -442,6 +442,8 @@
+-does not verify general cooking semantics. Historical v2 FAILs remain; new
+-2026-10-09 v16/v3 evidence has an all-skipped focused gate (UNVERIFIED) and
+-Recipe/overall Preparation FAIL for missing finish-cooking despite observed
+-200/SDK1/analyze1/usage1/writes0/unchanged=true. Later V2-body/usage-order
+-assertions were not reached. This is no private/Alpha replay or Share-success
+-claim; independent QA and final gates remain open. See
++does not verify general cooking semantics. Historical v2 FAILs remain;
++B-18 evidence from 2026-10-09 for v16/v3 has an all-skipped focused gate (UNVERIFIED) and
++Recipe/overall Preparation FAIL for missing finish-cooking despite observed
++200/SDK1/analyze1/usage1/writes0/unchanged=true. Later V2-body/usage-order
++assertions were not reached. The subsequent B-18C test-only rubric correction
++leaves this API and prompt versions unchanged; its executed F/R/G gates still
++FAIL. Q-18A returned FAIL; independent review after B-18C and final gates remain
++open. This is no private/Alpha replay or Share-success claim. See

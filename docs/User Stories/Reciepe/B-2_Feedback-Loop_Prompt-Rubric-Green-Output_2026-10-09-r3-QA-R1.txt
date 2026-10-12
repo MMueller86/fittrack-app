@@ -1,0 +1,12 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [32m✓[39m src/lib/recipeAnalyzeValidation.test.ts [2m([22m[2m167 tests[22m[2m | [22m[33m150 skipped[39m[2m)[22m[90m 10[2mms[22m[39m
+ [32m✓[39m src/lib/recipePreparation.test.ts [2m([22m[2m51 tests[22m[2m | [22m[33m45 skipped[39m[2m)[22m[33m 509[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m23 passed[39m[22m[2m | [22m[33m195 skipped[39m[90m (218)[39m
+[2m   Start at [22m 18:56:16
+[2m   Duration [22m 1.29s[2m (transform 275ms, setup 0ms, collect 539ms, tests 518ms, environment 0ms, prepare 215ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Green-Report_2026-10-09-r3-QA-R1.json

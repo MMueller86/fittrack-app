@@ -1,0 +1,4414 @@
+{
+  "format": "fittrack-q21-correction-reconciliation-v1",
+  "capturedAt": "2026-10-09T23:56:40.178Z",
+  "selections": {
+    "listPreparation": {
+      "count": 5,
+      "names": [
+        {
+          "name": "preparation prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        }
+      ]
+    },
+    "listRecipe": {
+      "count": 14,
+      "names": [
+        {
+          "name": "prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "preparation prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        }
+      ]
+    },
+    "listOverall": {
+      "count": 42,
+      "names": [
+        {
+          "name": "daily insight prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['phase-progress-open-day'] 'An open target budget is not presente…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['current-effective-activity-budget'] 'An elevated current activity target p…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-source-priority'] 'Morning orientation uses the syntheti…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-unavailable'] 'A missing historical activity target …'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-ambiguous-source'] 'A profile fallback and a conflicting …'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['planned-activity'] 'A planned activity is not described a…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['likely-completed-activity'] 'A late-day activity is described only…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['unknown-activity'] 'An activity without a usable local ho…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['intensive-endurance-fueling'] 'A long alpine endurance activity rece…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['budget-lock'] 'A negative remaining budget blocks an…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['target-relative-overage-not-achieved-…'] 'A negative target remainder supports …'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['protein-gap-with-budget'] 'A real protein gap with remaining cal…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['protein-nearly-complete'] 'A nearly complete protein target is n…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['empty-morning'] 'An empty early morning uses historica…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['morning-unlogged-prior-day'] 'An unlogged prior day remains missing…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['midday-empty-day-not-morning'] 'At local hour 12, an empty current di…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['stale-weight'] 'Stale weight data is not presented as…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+        },
+        {
+          "name": "prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "preparation prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipeAnalyze: live prompt evaluation > ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+        },
+        {
+          "name": "prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+        },
+        {
+          "name": "recipeScale: live prompt evaluation > ['preserves-step-order-and-unrelated-ba…'] 'Keeps all original steps and preserve…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+        },
+        {
+          "name": "recipeScale: live prompt evaluation > ['missing-description-stays-null'] 'Does not invent a description when th…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+        },
+        {
+          "name": "weekly insight prompt version matches fixture expectations",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+        },
+        {
+          "name": "weeklyInsight: live prompt evaluation > ['mixed-data-and-adjusted-activity-targ…'] 'Interprets a mixed week without treat…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+        },
+        {
+          "name": "weeklyInsight: live prompt evaluation > ['training-day-activitybonus-under-targ…'] 'Keeps three consecutive training days…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+        },
+        {
+          "name": "weeklyInsight: live prompt evaluation > ['zero-calorie-entry-is-data'] 'Does not turn a valid zero-calorie Me…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+        },
+        {
+          "name": "weeklyInsight: special-activity diagnostic eval > weekly insight diagnostic prompt version matches the prepared fixtures",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+        },
+        {
+          "name": "weeklyInsight: special-activity diagnostic eval > ['special-activity-under-effective-targ…'] '3000 kcal exceeds the base target but…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+        },
+        {
+          "name": "weeklyInsight: special-activity diagnostic eval > ['special-activity-at-effective-target'] '3600 kcal is exactly the activity-adj…'",
+          "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+        }
+      ]
+    }
+  },
+  "gates": [
+    {
+      "stage": "F",
+      "exit": 1,
+      "counts": {
+        "total": 14,
+        "passed": 2,
+        "failed": 3,
+        "skipped": 9
+      },
+      "startedAt": "2026-10-09T23:51:36.970Z",
+      "finishedAt": "2026-10-09T23:51:50.541Z",
+      "sdkPreparationCalls": 7,
+      "logicalPreparationCalls": 8,
+      "allDomainProviderCalls": "UNVERIFIED_NOT_INSTRUMENTED",
+      "fixtures": [
+        {
+          "fixture": "synthetic-saved-eight-steps-rice-serving",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetische Hähnchenpfanne mit Reis",
+              "description": "Synthetische Preparationfixture für v15 B-2 AC-3/4, kein historisches Rezept.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Hähnchen",
+                  "amountGrams": 350,
+                  "inputAmount": 350,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Reis",
+                  "amountGrams": 150,
+                  "inputAmount": 150,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Olivenöl",
+                  "amountGrams": 15,
+                  "inputAmount": 15,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Salz",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                },
+                {
+                  "displayName": "Pfeffer",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "title": "Schneiden",
+                "description": "Schneide das Hähnchen in Würfel."
+              },
+              {
+                "order": 2,
+                "description": "Würze das Hähnchen mit Salz und Pfeffer."
+              },
+              {
+                "order": 3,
+                "description": "Erhitze Olivenöl in der Pfanne."
+              },
+              {
+                "order": 4,
+                "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+              },
+              {
+                "order": 5,
+                "title": "Separate Beilage",
+                "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+              },
+              {
+                "order": 6,
+                "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+              },
+              {
+                "order": 7,
+                "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+              },
+              {
+                "order": 8,
+                "title": "Servieren",
+                "description": "Serviere Hähnchen mit Reis als Beilage."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "title": "Schneiden",
+              "description": "Schneide das Hähnchen in Würfel."
+            },
+            {
+              "order": 2,
+              "description": "Würze das Hähnchen mit Salz und Pfeffer."
+            },
+            {
+              "order": 3,
+              "description": "Erhitze Olivenöl in der Pfanne."
+            },
+            {
+              "order": 4,
+              "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+            },
+            {
+              "order": 5,
+              "title": "Separate Beilage",
+              "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+            },
+            {
+              "order": 6,
+              "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+            },
+            {
+              "order": 7,
+              "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+            },
+            {
+              "order": 8,
+              "title": "Servieren",
+              "description": "Serviere Hähnchen mit Reis als Beilage."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfaches und schnelles Rezept für eine Hähnchenpfanne mit Reis.",
+            "totalTimeMinutes": 35,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.",
+                "sourceStepOrders": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in der Pfanne.",
+                "sourceStepOrders": [
+                  3
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Brate das Hähnchen 4 Minuten je Seite.",
+                "sourceStepOrders": [
+                  4
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Gare das Hähnchen bei niedriger Hitze weitere 6 Minuten.",
+                "sourceStepOrders": [
+                  6
+                ]
+              },
+              {
+                "order": 5,
+                "description": "Nimm das Hähnchen aus der Pfanne und lasse es 3 Minuten ruhen.",
+                "sourceStepOrders": [
+                  7
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 3,
+            "preparationCalls": 3,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop",
+              "stop",
+              "stop"
+            ],
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              31,
+              38,
+              56,
+              62
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [
+            {
+              "order": 1,
+              "detail": "cut chicken into cubes",
+              "sourcePatterns": [
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 2,
+              "detail": "season chicken with salt and pepper",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 3,
+              "detail": "heat olive oil in the pan",
+              "sourcePatterns": [
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 4,
+              "detail": "fry chicken at medium heat 4 minutes per side",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 5,
+              "detail": "cook rice separately 12 minutes in salted water and drain",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 6,
+              "detail": "lower heat and cook chicken another 6 minutes",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 7,
+              "detail": "remove chicken from pan and rest covered 3 minutes",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 8,
+              "detail": "serve chicken with rice as a side dish",
+              "sourcePatterns": [
+                true,
+                true
+              ]
+            }
+          ],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "prepare chicken by cutting",
+              "group": [
+                1,
+                2
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 4,
+              "core": "fry chicken",
+              "group": [
+                4
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 5,
+              "core": "cook rice independently, not just mention it",
+              "exportPatterns": [
+                false
+              ],
+              "contradictions": [
+                false,
+                false
+              ]
+            },
+            {
+              "order": 6,
+              "core": "finish cooking chicken after frying",
+              "group": [
+                6
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false,
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 4,
+              "present": true
+            },
+            {
+              "order": 5,
+              "present": false
+            },
+            {
+              "order": 6,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_export_preparation",
+            "recipe_export_preparation",
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-saved-oven-seven-steps",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetischer Kartoffelauflauf",
+              "description": "Gespeicherter synthetischer Ofenablauf.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Kartoffeln",
+                  "amountGrams": 400,
+                  "inputAmount": 400,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Sahne",
+                  "amountGrams": 150,
+                  "inputAmount": 150,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Käse",
+                  "amountGrams": 80,
+                  "inputAmount": 80,
+                  "unit": "g"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben."
+              },
+              {
+                "order": 2,
+                "description": "Fette die Auflaufform ein."
+              },
+              {
+                "order": 3,
+                "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+              },
+              {
+                "order": 4,
+                "description": "Streue Käse über die Kartoffeln."
+              },
+              {
+                "order": 5,
+                "description": "Heize den Ofen auf 180°C vor."
+              },
+              {
+                "order": 6,
+                "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+              },
+              {
+                "order": 7,
+                "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Schneide Kartoffeln in dünne Scheiben."
+            },
+            {
+              "order": 2,
+              "description": "Fette die Auflaufform ein."
+            },
+            {
+              "order": 3,
+              "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+            },
+            {
+              "order": 4,
+              "description": "Streue Käse über die Kartoffeln."
+            },
+            {
+              "order": 5,
+              "description": "Heize den Ofen auf 180°C vor."
+            },
+            {
+              "order": 6,
+              "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+            },
+            {
+              "order": 7,
+              "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.",
+            "totalTimeMinutes": 40,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben und fette die Form ein.",
+                "sourceStepOrders": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Schichte die Kartoffeln in die Form und gieße die Sahne darüber.",
+                "sourceStepOrders": [
+                  3
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Streue den Käse über die Kartoffeln und heize den Ofen auf 180°C vor.",
+                "sourceStepOrders": [
+                  4,
+                  5
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Backe den Auflauf 40 Minuten, bis die Kartoffeln gar sind.",
+                "sourceStepOrders": [
+                  6
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 2,
+            "preparationCalls": 2,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop",
+              "stop"
+            ],
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              61,
+              64,
+              69,
+              58
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            },
+            {
+              "order": 6,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": true,
+          "humanReview": "NOT_PERFORMED_MANUAL_VALIDATION_REQUIRED",
+          "sdkSchemas": [
+            "recipe_export_preparation",
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-saved-pasta-essential-sauce",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetische Pasta mit Tomatensauce",
+              "description": "Gespeicherter synthetischer Pastaablauf.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Pasta",
+                  "amountGrams": 200,
+                  "inputAmount": 200,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Tomaten",
+                  "amountGrams": 400,
+                  "inputAmount": 400,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Zwiebel",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Olivenöl",
+                  "amountGrams": 15,
+                  "inputAmount": 15,
+                  "unit": "g"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Schneide die Zwiebel klein."
+            },
+            {
+              "order": 2,
+              "description": "Erhitze Olivenöl in einer Pfanne."
+            },
+            {
+              "order": 3,
+              "description": "Brate die Zwiebel in der Pfanne an."
+            },
+            {
+              "order": 4,
+              "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+            },
+            {
+              "order": 5,
+              "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+            },
+            {
+              "order": 6,
+              "description": "Gieße die Pasta ab."
+            },
+            {
+              "order": 7,
+              "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+            "totalTimeMinutes": 25,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                "sourceStepOrders": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                "sourceStepOrders": [
+                  4
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                "sourceStepOrders": [
+                  5,
+                  6
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                "sourceStepOrders": [
+                  7
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              58,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "cut onion",
+              "group": [
+                1,
+                2,
+                3
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 3,
+              "core": "fry onion",
+              "group": [
+                1,
+                2,
+                3
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 4,
+              "core": "cook the essential tomato sauce",
+              "group": [
+                4
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 5,
+              "core": "cook pasta independently",
+              "group": [
+                5,
+                6
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            },
+            {
+              "order": 4,
+              "present": true
+            },
+            {
+              "order": 5,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Quarkbroetchen",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Mehl",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Quark",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Zucker",
+                  "amountGrams": 10,
+                  "inputAmount": 10,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Backpulver",
+                  "amountGrams": 5,
+                  "inputAmount": 5,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Ei",
+                  "amountGrams": 50,
+                  "inputAmount": 50,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Kerne",
+                  "amountGrams": 10,
+                  "inputAmount": 10,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Salz",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig."
+              },
+              {
+                "order": 2,
+                "description": "Forme den Teig zu Broetchen."
+              },
+              {
+                "order": 3,
+                "description": "Backe die Broetchen im vorgeheizten Ofen bei 180°C fuer 20 Minuten."
+              },
+              {
+                "order": 4,
+                "description": "Lasse die Broetchen abkuehlen."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig."
+            },
+            {
+              "order": 2,
+              "description": "Forme den Teig zu Broetchen."
+            },
+            {
+              "order": 3,
+              "description": "Backe die Broetchen im vorgeheizten Ofen bei 180°C fuer 20 Minuten."
+            },
+            {
+              "order": 4,
+              "description": "Lasse die Broetchen abkuehlen."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Goldbraune Broetchen",
+            "totalTimeMinutes": null,
+            "difficulty": null,
+            "steps": [
+              {
+                "order": 1,
+                "description": "Mehl, Quark, Zucker, Backpulver, Ei, Kerne, Salz zu Teig vermischen.",
+                "sourceStepOrders": [
+                  1
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Forme den Teig zu Broetchen.",
+                "sourceStepOrders": [
+                  2
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Backe die Broetchen im Ofen bei 180°C fuer 20 Minuten.",
+                "sourceStepOrders": [
+                  3
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Lasse die Broetchen abkuehlen.",
+                "sourceStepOrders": [
+                  4
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+            "sdkCalls": 1,
+            "preparationCalls": 2,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 4,
+            "exportCount": 4,
+            "lengths": [
+              68,
+              28,
+              54,
+              30
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "mix all original dough ingredients without omission",
+              "group": [
+                1
+              ],
+              "exportPatterns": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 2,
+              "core": "form the dough into rolls",
+              "group": [
+                2
+              ],
+              "exportPatterns": [
+                true,
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 3,
+              "core": "bake rolls at source-backed temperature and duration",
+              "group": [
+                3
+              ],
+              "exportPatterns": [
+                true,
+                true,
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 2,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": true,
+          "independentCookingAssertionReached": true,
+          "independentCookingAssertionPassed": true,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_text_correction"
+          ]
+        }
+      ],
+      "imports": [],
+      "suites": [
+        {
+          "file": "recipeAnalyze.eval.test.ts",
+          "assertions": [
+            {
+              "name": "prompt version matches fixture expectations",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "preparation prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+              "status": "skipped",
+              "failures": []
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 35 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 40 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 25 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "R",
+      "exit": 1,
+      "counts": {
+        "total": 14,
+        "passed": 11,
+        "failed": 3,
+        "skipped": 0
+      },
+      "startedAt": "2026-10-09T23:51:56.615Z",
+      "finishedAt": "2026-10-09T23:53:16.910Z",
+      "sdkPreparationCalls": 5,
+      "logicalPreparationCalls": 6,
+      "allDomainProviderCalls": "UNVERIFIED_NOT_INSTRUMENTED",
+      "fixtures": [
+        {
+          "fixture": "synthetic-saved-eight-steps-rice-serving",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetische Hähnchenpfanne mit Reis",
+              "description": "Synthetische Preparationfixture für v15 B-2 AC-3/4, kein historisches Rezept.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Hähnchen",
+                  "amountGrams": 350,
+                  "inputAmount": 350,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Reis",
+                  "amountGrams": 150,
+                  "inputAmount": 150,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Olivenöl",
+                  "amountGrams": 15,
+                  "inputAmount": 15,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Salz",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                },
+                {
+                  "displayName": "Pfeffer",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "title": "Schneiden",
+                "description": "Schneide das Hähnchen in Würfel."
+              },
+              {
+                "order": 2,
+                "description": "Würze das Hähnchen mit Salz und Pfeffer."
+              },
+              {
+                "order": 3,
+                "description": "Erhitze Olivenöl in der Pfanne."
+              },
+              {
+                "order": 4,
+                "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+              },
+              {
+                "order": 5,
+                "title": "Separate Beilage",
+                "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+              },
+              {
+                "order": 6,
+                "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+              },
+              {
+                "order": 7,
+                "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+              },
+              {
+                "order": 8,
+                "title": "Servieren",
+                "description": "Serviere Hähnchen mit Reis als Beilage."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "title": "Schneiden",
+              "description": "Schneide das Hähnchen in Würfel."
+            },
+            {
+              "order": 2,
+              "description": "Würze das Hähnchen mit Salz und Pfeffer."
+            },
+            {
+              "order": 3,
+              "description": "Erhitze Olivenöl in der Pfanne."
+            },
+            {
+              "order": 4,
+              "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+            },
+            {
+              "order": 5,
+              "title": "Separate Beilage",
+              "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+            },
+            {
+              "order": 6,
+              "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+            },
+            {
+              "order": 7,
+              "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+            },
+            {
+              "order": 8,
+              "title": "Servieren",
+              "description": "Serviere Hähnchen mit Reis als Beilage."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein schnelles und einfaches Rezept für eine Hähnchenpfanne mit Reis.",
+            "totalTimeMinutes": 35,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.",
+                "sourceStepOrders": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in der Pfanne und brate das Hähnchen 4 Minuten je Seite.",
+                "sourceStepOrders": [
+                  3,
+                  4
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Koche den Reis 12 Minuten in Salzwasser und gieße ihn ab.",
+                "sourceStepOrders": [
+                  5
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Gare das Hähnchen bei niedriger Hitze weitere 6 Minuten und lasse es 3 Minuten ruhen.",
+                "sourceStepOrders": [
+                  6,
+                  7
+                ]
+              },
+              {
+                "order": 5,
+                "description": "Serviere das Hähnchen mit dem Reis als Beilage.",
+                "sourceStepOrders": [
+                  8
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 2,
+            "preparationCalls": 2,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop",
+              "stop"
+            ],
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              73,
+              57,
+              85,
+              47
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [
+            {
+              "order": 1,
+              "detail": "cut chicken into cubes",
+              "sourcePatterns": [
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 2,
+              "detail": "season chicken with salt and pepper",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 3,
+              "detail": "heat olive oil in the pan",
+              "sourcePatterns": [
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 4,
+              "detail": "fry chicken at medium heat 4 minutes per side",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 5,
+              "detail": "cook rice separately 12 minutes in salted water and drain",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 6,
+              "detail": "lower heat and cook chicken another 6 minutes",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 7,
+              "detail": "remove chicken from pan and rest covered 3 minutes",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 8,
+              "detail": "serve chicken with rice as a side dish",
+              "sourcePatterns": [
+                true,
+                true
+              ]
+            }
+          ],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "prepare chicken by cutting",
+              "group": [
+                1,
+                2
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 4,
+              "core": "fry chicken",
+              "group": [
+                3,
+                4
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 5,
+              "core": "cook rice independently, not just mention it",
+              "group": [
+                5
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false
+              ]
+            },
+            {
+              "order": 6,
+              "core": "finish cooking chicken after frying",
+              "group": [
+                6,
+                7
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false,
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 4,
+              "present": true
+            },
+            {
+              "order": 5,
+              "present": true
+            },
+            {
+              "order": 6,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_export_preparation",
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-saved-oven-seven-steps",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetischer Kartoffelauflauf",
+              "description": "Gespeicherter synthetischer Ofenablauf.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Kartoffeln",
+                  "amountGrams": 400,
+                  "inputAmount": 400,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Sahne",
+                  "amountGrams": 150,
+                  "inputAmount": 150,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Käse",
+                  "amountGrams": 80,
+                  "inputAmount": 80,
+                  "unit": "g"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben."
+              },
+              {
+                "order": 2,
+                "description": "Fette die Auflaufform ein."
+              },
+              {
+                "order": 3,
+                "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+              },
+              {
+                "order": 4,
+                "description": "Streue Käse über die Kartoffeln."
+              },
+              {
+                "order": 5,
+                "description": "Heize den Ofen auf 180°C vor."
+              },
+              {
+                "order": 6,
+                "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+              },
+              {
+                "order": 7,
+                "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Schneide Kartoffeln in dünne Scheiben."
+            },
+            {
+              "order": 2,
+              "description": "Fette die Auflaufform ein."
+            },
+            {
+              "order": 3,
+              "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+            },
+            {
+              "order": 4,
+              "description": "Streue Käse über die Kartoffeln."
+            },
+            {
+              "order": 5,
+              "description": "Heize den Ofen auf 180°C vor."
+            },
+            {
+              "order": 6,
+              "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+            },
+            {
+              "order": 7,
+              "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.",
+            "totalTimeMinutes": 40,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben und fette die Auflaufform ein.",
+                "sourceStepOrders": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Schichte Kartoffeln in die Form, gieße Sahne darüber und streue Käse darüber.",
+                "sourceStepOrders": [
+                  3,
+                  4
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Heize den Ofen auf 180°C vor und backe den Auflauf für 40 Minuten.",
+                "sourceStepOrders": [
+                  5,
+                  6
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 7,
+            "exportCount": 3,
+            "lengths": [
+              68,
+              77,
+              66
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            },
+            {
+              "order": 6,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": false,
+          "humanReview": "NOT_PERFORMED_MANUAL_VALIDATION_REQUIRED",
+          "sdkSchemas": [
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-saved-pasta-essential-sauce",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetische Pasta mit Tomatensauce",
+              "description": "Gespeicherter synthetischer Pastaablauf.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Pasta",
+                  "amountGrams": 200,
+                  "inputAmount": 200,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Tomaten",
+                  "amountGrams": 400,
+                  "inputAmount": 400,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Zwiebel",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Olivenöl",
+                  "amountGrams": 15,
+                  "inputAmount": 15,
+                  "unit": "g"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Schneide die Zwiebel klein."
+            },
+            {
+              "order": 2,
+              "description": "Erhitze Olivenöl in einer Pfanne."
+            },
+            {
+              "order": 3,
+              "description": "Brate die Zwiebel in der Pfanne an."
+            },
+            {
+              "order": 4,
+              "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+            },
+            {
+              "order": 5,
+              "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+            },
+            {
+              "order": 6,
+              "description": "Gieße die Pasta ab."
+            },
+            {
+              "order": 7,
+              "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+            "totalTimeMinutes": 25,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                "sourceStepOrders": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                "sourceStepOrders": [
+                  4
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                "sourceStepOrders": [
+                  5,
+                  6
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                "sourceStepOrders": [
+                  7
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              58,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "cut onion",
+              "group": [
+                1,
+                2,
+                3
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 3,
+              "core": "fry onion",
+              "group": [
+                1,
+                2,
+                3
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 4,
+              "core": "cook the essential tomato sauce",
+              "group": [
+                4
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 5,
+              "core": "cook pasta independently",
+              "group": [
+                5,
+                6
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            },
+            {
+              "order": 4,
+              "present": true
+            },
+            {
+              "order": 5,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Quarkbroetchen",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Mehl",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Quark",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Zucker",
+                  "amountGrams": 10,
+                  "inputAmount": 10,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Backpulver",
+                  "amountGrams": 5,
+                  "inputAmount": 5,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Ei",
+                  "amountGrams": 50,
+                  "inputAmount": 50,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Kerne",
+                  "amountGrams": 10,
+                  "inputAmount": 10,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Salz",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig."
+              },
+              {
+                "order": 2,
+                "description": "Forme den Teig zu Broetchen."
+              },
+              {
+                "order": 3,
+                "description": "Backe die Broetchen im vorgeheizten Ofen bei 180°C fuer 20 Minuten."
+              },
+              {
+                "order": 4,
+                "description": "Lasse die Broetchen abkuehlen."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig."
+            },
+            {
+              "order": 2,
+              "description": "Forme den Teig zu Broetchen."
+            },
+            {
+              "order": 3,
+              "description": "Backe die Broetchen im vorgeheizten Ofen bei 180°C fuer 20 Minuten."
+            },
+            {
+              "order": 4,
+              "description": "Lasse die Broetchen abkuehlen."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Goldbraune Broetchen",
+            "totalTimeMinutes": null,
+            "difficulty": null,
+            "steps": [
+              {
+                "order": 1,
+                "description": "Mehl, Quark, Zucker, Backpulver, Ei, Kerne, Salz vermischen.",
+                "sourceStepOrders": [
+                  1
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Forme den Teig zu Broetchen.",
+                "sourceStepOrders": [
+                  2
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Backe die Broetchen im Ofen bei 180°C fuer 20 Minuten.",
+                "sourceStepOrders": [
+                  3
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Lasse die Broetchen abkuehlen.",
+                "sourceStepOrders": [
+                  4
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+            "sdkCalls": 1,
+            "preparationCalls": 2,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 4,
+            "exportCount": 4,
+            "lengths": [
+              60,
+              28,
+              54,
+              30
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "mix all original dough ingredients without omission",
+              "group": [
+                1
+              ],
+              "exportPatterns": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 2,
+              "core": "form the dough into rolls",
+              "group": [
+                2
+              ],
+              "exportPatterns": [
+                true,
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 3,
+              "core": "bake rolls at source-backed temperature and duration",
+              "group": [
+                3
+              ],
+              "exportPatterns": [
+                true,
+                true,
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 2,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": true,
+          "independentCookingAssertionReached": true,
+          "independentCookingAssertionPassed": true,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_text_correction"
+          ]
+        }
+      ],
+      "imports": [
+        {
+          "kind": "import semantic evidence",
+          "fixture": "side-dish-and-serving-actions",
+          "source": [
+            {
+              "order": 1,
+              "title": null,
+              "description": "Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab."
+            },
+            {
+              "order": 2,
+              "title": null,
+              "description": "Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab."
+            },
+            {
+              "order": 3,
+              "title": null,
+              "description": "Würze die Hähnchenbrust mit Salz und Pfeffer."
+            },
+            {
+              "order": 4,
+              "title": null,
+              "description": "Erhitze das Olivenöl in einer Pfanne."
+            },
+            {
+              "order": 5,
+              "title": null,
+              "description": "Brate die Hähnchenbrust bei mittlerer Hitze 4 Minuten pro Seite an."
+            },
+            {
+              "order": 6,
+              "title": null,
+              "description": "Reduziere die Hitze und gare das Hähnchen weitere 6 Minuten fertig."
+            },
+            {
+              "order": 7,
+              "title": null,
+              "description": "Nimm das Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+            },
+            {
+              "order": 8,
+              "title": null,
+              "description": "Schneide das Hähnchen auf und serviere es mit den Kartoffeln als Beilage und den Bohnen."
+            }
+          ],
+          "export": [
+            {
+              "order": 1,
+              "description": "Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab.",
+              "sourceStepOrders": [
+                1
+              ],
+              "ingredientKeys": [
+                "ingredient-2"
+              ]
+            },
+            {
+              "order": 2,
+              "description": "Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab.",
+              "sourceStepOrders": [
+                2
+              ],
+              "ingredientKeys": [
+                "ingredient-3"
+              ]
+            },
+            {
+              "order": 3,
+              "description": "Brate die Hähnchenbrust 4 Minuten pro Seite an.",
+              "sourceStepOrders": [
+                5
+              ],
+              "ingredientKeys": [
+                "ingredient-1"
+              ]
+            },
+            {
+              "order": 4,
+              "description": "Gare das Hähnchen weitere 6 Minuten fertig.",
+              "sourceStepOrders": [
+                6
+              ],
+              "ingredientKeys": [
+                "ingredient-1"
+              ]
+            },
+            {
+              "order": 5,
+              "description": "Schneide das Hähnchen auf und serviere es mit den Kartoffeln und Bohnen.",
+              "sourceStepOrders": [
+                8
+              ],
+              "ingredientKeys": [
+                "ingredient-1",
+                "ingredient-2",
+                "ingredient-3"
+              ]
+            }
+          ]
+        }
+      ],
+      "suites": [
+        {
+          "file": "recipeAnalyze.eval.test.ts",
+          "assertions": [
+            {
+              "name": "prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "preparation prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 35 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 40 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 25 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "stage": "G",
+      "exit": 1,
+      "counts": {
+        "total": 42,
+        "passed": 38,
+        "failed": 4,
+        "skipped": 0
+      },
+      "startedAt": "2026-10-09T23:53:21.702Z",
+      "finishedAt": "2026-10-09T23:55:21.125Z",
+      "sdkPreparationCalls": 6,
+      "logicalPreparationCalls": 7,
+      "allDomainProviderCalls": "UNVERIFIED_NOT_INSTRUMENTED",
+      "fixtures": [
+        {
+          "fixture": "synthetic-saved-eight-steps-rice-serving",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetische Hähnchenpfanne mit Reis",
+              "description": "Synthetische Preparationfixture für v15 B-2 AC-3/4, kein historisches Rezept.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Hähnchen",
+                  "amountGrams": 350,
+                  "inputAmount": 350,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Reis",
+                  "amountGrams": 150,
+                  "inputAmount": 150,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Olivenöl",
+                  "amountGrams": 15,
+                  "inputAmount": 15,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Salz",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                },
+                {
+                  "displayName": "Pfeffer",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "title": "Schneiden",
+                "description": "Schneide das Hähnchen in Würfel."
+              },
+              {
+                "order": 2,
+                "description": "Würze das Hähnchen mit Salz und Pfeffer."
+              },
+              {
+                "order": 3,
+                "description": "Erhitze Olivenöl in der Pfanne."
+              },
+              {
+                "order": 4,
+                "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+              },
+              {
+                "order": 5,
+                "title": "Separate Beilage",
+                "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+              },
+              {
+                "order": 6,
+                "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+              },
+              {
+                "order": 7,
+                "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+              },
+              {
+                "order": 8,
+                "title": "Servieren",
+                "description": "Serviere Hähnchen mit Reis als Beilage."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "title": "Schneiden",
+              "description": "Schneide das Hähnchen in Würfel."
+            },
+            {
+              "order": 2,
+              "description": "Würze das Hähnchen mit Salz und Pfeffer."
+            },
+            {
+              "order": 3,
+              "description": "Erhitze Olivenöl in der Pfanne."
+            },
+            {
+              "order": 4,
+              "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+            },
+            {
+              "order": 5,
+              "title": "Separate Beilage",
+              "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+            },
+            {
+              "order": 6,
+              "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+            },
+            {
+              "order": 7,
+              "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+            },
+            {
+              "order": 8,
+              "title": "Servieren",
+              "description": "Serviere Hähnchen mit Reis als Beilage."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfaches und schnelles Rezept für eine Hähnchenpfanne mit Reis.",
+            "totalTimeMinutes": 35,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.",
+                "sourceStepOrders": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in der Pfanne.",
+                "sourceStepOrders": [
+                  3
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Brate das Hähnchen 4 Minuten je Seite.",
+                "sourceStepOrders": [
+                  4
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Senke die Hitze und gare das Hähnchen weitere 6 Minuten.",
+                "sourceStepOrders": [
+                  6
+                ]
+              },
+              {
+                "order": 5,
+                "description": "Koche den Reis 12 Minuten in Salzwasser und gieße ihn ab.",
+                "sourceStepOrders": [
+                  5
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 3,
+            "preparationCalls": 3,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop",
+              "stop",
+              "stop"
+            ],
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              31,
+              38,
+              56,
+              57
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [
+            {
+              "order": 1,
+              "detail": "cut chicken into cubes",
+              "sourcePatterns": [
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 2,
+              "detail": "season chicken with salt and pepper",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 3,
+              "detail": "heat olive oil in the pan",
+              "sourcePatterns": [
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 4,
+              "detail": "fry chicken at medium heat 4 minutes per side",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 5,
+              "detail": "cook rice separately 12 minutes in salted water and drain",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 6,
+              "detail": "lower heat and cook chicken another 6 minutes",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 7,
+              "detail": "remove chicken from pan and rest covered 3 minutes",
+              "sourcePatterns": [
+                true,
+                true,
+                true,
+                true
+              ]
+            },
+            {
+              "order": 8,
+              "detail": "serve chicken with rice as a side dish",
+              "sourcePatterns": [
+                true,
+                true
+              ]
+            }
+          ],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "prepare chicken by cutting",
+              "group": [
+                1,
+                2
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 4,
+              "core": "fry chicken",
+              "group": [
+                4
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 5,
+              "core": "cook rice independently, not just mention it",
+              "group": [
+                5
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false
+              ]
+            },
+            {
+              "order": 6,
+              "core": "finish cooking chicken after frying",
+              "group": [
+                6
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false,
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 4,
+              "present": true
+            },
+            {
+              "order": 5,
+              "present": true
+            },
+            {
+              "order": 6,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": false,
+          "metadataAssertionReached": false,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_export_preparation",
+            "recipe_export_preparation",
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-saved-oven-seven-steps",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetischer Kartoffelauflauf",
+              "description": "Gespeicherter synthetischer Ofenablauf.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Kartoffeln",
+                  "amountGrams": 400,
+                  "inputAmount": 400,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Sahne",
+                  "amountGrams": 150,
+                  "inputAmount": 150,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Käse",
+                  "amountGrams": 80,
+                  "inputAmount": 80,
+                  "unit": "g"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben."
+              },
+              {
+                "order": 2,
+                "description": "Fette die Auflaufform ein."
+              },
+              {
+                "order": 3,
+                "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+              },
+              {
+                "order": 4,
+                "description": "Streue Käse über die Kartoffeln."
+              },
+              {
+                "order": 5,
+                "description": "Heize den Ofen auf 180°C vor."
+              },
+              {
+                "order": 6,
+                "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+              },
+              {
+                "order": 7,
+                "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Schneide Kartoffeln in dünne Scheiben."
+            },
+            {
+              "order": 2,
+              "description": "Fette die Auflaufform ein."
+            },
+            {
+              "order": 3,
+              "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+            },
+            {
+              "order": 4,
+              "description": "Streue Käse über die Kartoffeln."
+            },
+            {
+              "order": 5,
+              "description": "Heize den Ofen auf 180°C vor."
+            },
+            {
+              "order": 6,
+              "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+            },
+            {
+              "order": 7,
+              "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.",
+            "totalTimeMinutes": 40,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben und fette die Auflaufform ein.",
+                "sourceStepOrders": [
+                  1,
+                  2
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Schichte Kartoffeln in die Form, gieße Sahne darüber und streue Käse darauf.",
+                "sourceStepOrders": [
+                  3,
+                  4
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Heize den Ofen auf 180°C vor und backe den Auflauf für 40 Minuten.",
+                "sourceStepOrders": [
+                  5,
+                  6
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 7,
+            "exportCount": 3,
+            "lengths": [
+              68,
+              76,
+              66
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            },
+            {
+              "order": 6,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": false,
+          "humanReview": "NOT_PERFORMED_MANUAL_VALIDATION_REQUIRED",
+          "sdkSchemas": [
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-saved-pasta-essential-sauce",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Synthetische Pasta mit Tomatensauce",
+              "description": "Gespeicherter synthetischer Pastaablauf.",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Pasta",
+                  "amountGrams": 200,
+                  "inputAmount": 200,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Tomaten",
+                  "amountGrams": 400,
+                  "inputAmount": 400,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Zwiebel",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Olivenöl",
+                  "amountGrams": 15,
+                  "inputAmount": 15,
+                  "unit": "g"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Schneide die Zwiebel klein."
+            },
+            {
+              "order": 2,
+              "description": "Erhitze Olivenöl in einer Pfanne."
+            },
+            {
+              "order": 3,
+              "description": "Brate die Zwiebel in der Pfanne an."
+            },
+            {
+              "order": 4,
+              "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+            },
+            {
+              "order": 5,
+              "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+            },
+            {
+              "order": 6,
+              "description": "Gieße die Pasta ab."
+            },
+            {
+              "order": 7,
+              "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+            "totalTimeMinutes": 25,
+            "difficulty": "einfach",
+            "steps": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                "sourceStepOrders": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                "sourceStepOrders": [
+                  4
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                "sourceStepOrders": [
+                  5,
+                  6
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                "sourceStepOrders": [
+                  7
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              58,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "cut onion",
+              "group": [
+                1,
+                2,
+                3
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 3,
+              "core": "fry onion",
+              "group": [
+                1,
+                2,
+                3
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 4,
+              "core": "cook the essential tomato sauce",
+              "group": [
+                4
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 5,
+              "core": "cook pasta independently",
+              "group": [
+                5,
+                6
+              ],
+              "exportPatterns": [
+                true
+              ],
+              "contradictions": [
+                false,
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            },
+            {
+              "order": 4,
+              "present": true
+            },
+            {
+              "order": 5,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": false,
+          "independentCookingAssertionReached": false,
+          "independentCookingAssertionPassed": false,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_export_preparation"
+          ]
+        },
+        {
+          "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+          "savedContext": {
+            "recipeContext": {
+              "name": "Quarkbroetchen",
+              "portions": 2,
+              "tags": [],
+              "ingredients": [
+                {
+                  "displayName": "Mehl",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Quark",
+                  "amountGrams": 100,
+                  "inputAmount": 100,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Zucker",
+                  "amountGrams": 10,
+                  "inputAmount": 10,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Backpulver",
+                  "amountGrams": 5,
+                  "inputAmount": 5,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Ei",
+                  "amountGrams": 50,
+                  "inputAmount": 50,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Kerne",
+                  "amountGrams": 10,
+                  "inputAmount": 10,
+                  "unit": "g"
+                },
+                {
+                  "displayName": "Salz",
+                  "amountGrams": null,
+                  "inputAmount": null,
+                  "unit": "nach Geschmack"
+                }
+              ]
+            },
+            "steps": [
+              {
+                "order": 1,
+                "description": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig."
+              },
+              {
+                "order": 2,
+                "description": "Forme den Teig zu Broetchen."
+              },
+              {
+                "order": 3,
+                "description": "Backe die Broetchen im vorgeheizten Ofen bei 180°C fuer 20 Minuten."
+              },
+              {
+                "order": 4,
+                "description": "Lasse die Broetchen abkuehlen."
+              }
+            ]
+          },
+          "savedSource": [
+            {
+              "order": 1,
+              "description": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig."
+            },
+            {
+              "order": 2,
+              "description": "Forme den Teig zu Broetchen."
+            },
+            {
+              "order": 3,
+              "description": "Backe die Broetchen im vorgeheizten Ofen bei 180°C fuer 20 Minuten."
+            },
+            {
+              "order": 4,
+              "description": "Lasse die Broetchen abkuehlen."
+            }
+          ],
+          "finalOutput": {
+            "version": 1,
+            "teaser": "Goldbraune Broetchen",
+            "totalTimeMinutes": null,
+            "difficulty": null,
+            "steps": [
+              {
+                "order": 1,
+                "description": "Mehl, Quark, Zucker, Backpulver, Ei, Kerne, Salz vermischen.",
+                "sourceStepOrders": [
+                  1
+                ]
+              },
+              {
+                "order": 2,
+                "description": "Forme den Teig zu Broetchen.",
+                "sourceStepOrders": [
+                  2
+                ]
+              },
+              {
+                "order": 3,
+                "description": "Backe die Broetchen im Ofen bei 180°C fuer 20 Minuten.",
+                "sourceStepOrders": [
+                  3
+                ]
+              },
+              {
+                "order": 4,
+                "description": "Lasse die Broetchen abkuehlen.",
+                "sourceStepOrders": [
+                  4
+                ]
+              }
+            ]
+          },
+          "counts": {
+            "kind": "preparation counts and handler evidence",
+            "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+            "sdkCalls": 1,
+            "preparationCalls": 2,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReasons": [
+              "stop"
+            ],
+            "sourceCount": 4,
+            "exportCount": 4,
+            "lengths": [
+              60,
+              28,
+              54,
+              30
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          },
+          "sourceMatrix": [],
+          "exportCoreMatrix": [
+            {
+              "order": 1,
+              "core": "mix all original dough ingredients without omission",
+              "group": [
+                1
+              ],
+              "exportPatterns": [
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true,
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            },
+            {
+              "order": 2,
+              "core": "form the dough into rolls",
+              "group": [
+                2
+              ],
+              "exportPatterns": [
+                true,
+                true
+              ],
+              "contradictions": []
+            },
+            {
+              "order": 3,
+              "core": "bake rolls at source-backed temperature and duration",
+              "group": [
+                3
+              ],
+              "exportPatterns": [
+                true,
+                true,
+                true
+              ],
+              "contradictions": [
+                false
+              ]
+            }
+          ],
+          "sourceCoreReferencePresence": [
+            {
+              "order": 1,
+              "present": true
+            },
+            {
+              "order": 2,
+              "present": true
+            },
+            {
+              "order": 3,
+              "present": true
+            }
+          ],
+          "finalFit": true,
+          "protectionAssertionsReached": true,
+          "metadataAssertionReached": true,
+          "metadataPassed": true,
+          "independentCookingAssertionReached": true,
+          "independentCookingAssertionPassed": true,
+          "ovenEndpointPresent": null,
+          "humanReview": null,
+          "sdkSchemas": [
+            "recipe_text_correction"
+          ]
+        }
+      ],
+      "imports": [
+        {
+          "kind": "import semantic evidence",
+          "fixture": "side-dish-and-serving-actions",
+          "source": [
+            {
+              "order": 1,
+              "title": null,
+              "description": "Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab."
+            },
+            {
+              "order": 2,
+              "title": null,
+              "description": "Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab."
+            },
+            {
+              "order": 3,
+              "title": null,
+              "description": "Würze die Hähnchenbrust mit Salz und Pfeffer."
+            },
+            {
+              "order": 4,
+              "title": null,
+              "description": "Erhitze das Olivenöl in einer Pfanne."
+            },
+            {
+              "order": 5,
+              "title": null,
+              "description": "Brate die Hähnchenbrust bei mittlerer Hitze 4 Minuten pro Seite an."
+            },
+            {
+              "order": 6,
+              "title": null,
+              "description": "Reduziere die Hitze und gare das Hähnchen weitere 6 Minuten fertig."
+            },
+            {
+              "order": 7,
+              "title": null,
+              "description": "Nimm das Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+            },
+            {
+              "order": 8,
+              "title": null,
+              "description": "Schneide das Hähnchen auf und serviere es mit den Kartoffeln als Beilage und den Bohnen."
+            }
+          ],
+          "export": [
+            {
+              "order": 1,
+              "description": "Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab.",
+              "sourceStepOrders": [
+                1
+              ],
+              "ingredientKeys": [
+                "ingredient-2"
+              ]
+            },
+            {
+              "order": 2,
+              "description": "Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab.",
+              "sourceStepOrders": [
+                2
+              ],
+              "ingredientKeys": [
+                "ingredient-3"
+              ]
+            },
+            {
+              "order": 3,
+              "description": "Brate die Hähnchenbrust bei mittlerer Hitze 4 Minuten pro Seite an.",
+              "sourceStepOrders": [
+                5
+              ],
+              "ingredientKeys": [
+                "ingredient-1",
+                "ingredient-5",
+                "ingredient-6"
+              ]
+            },
+            {
+              "order": 4,
+              "description": "Reduziere die Hitze und gare das Hähnchen weitere 6 Minuten fertig.",
+              "sourceStepOrders": [
+                6
+              ],
+              "ingredientKeys": [
+                "ingredient-1"
+              ]
+            },
+            {
+              "order": 5,
+              "description": "Schneide das Hähnchen auf und serviere es mit den Kartoffeln und den Bohnen.",
+              "sourceStepOrders": [
+                8
+              ],
+              "ingredientKeys": [
+                "ingredient-1",
+                "ingredient-2",
+                "ingredient-3"
+              ]
+            }
+          ]
+        }
+      ],
+      "suites": [
+        {
+          "file": "dailyInsight.eval.test.ts",
+          "assertions": [
+            {
+              "name": "daily insight prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['phase-progress-open-day'] 'An open target budget is not presente…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['current-effective-activity-budget'] 'An elevated current activity target p…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['historical-target-source-priority'] 'Morning orientation uses the syntheti…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['historical-target-unavailable'] 'A missing historical activity target …'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['historical-target-ambiguous-source'] 'A profile fallback and a conflicting …'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['planned-activity'] 'A planned activity is not described a…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['likely-completed-activity'] 'A late-day activity is described only…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['unknown-activity'] 'An activity without a usable local ho…'",
+              "status": "failed",
+              "failures": [
+                "DailyInsightValidationError: Daily insight judges an open day as completed\n    at validateBudgetSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:230:11)\n    at validateDailyInsightSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:382:3)\n    at Module.validateDailyInsightResponse (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:399:3)\n    at Module.generateDailyInsight (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\openai.ts:949:21)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\dailyInsight.eval.test.ts:23:16\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)"
+              ]
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['intensive-endurance-fueling'] 'A long alpine endurance activity rece…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['budget-lock'] 'A negative remaining budget blocks an…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['target-relative-overage-not-achieved-…'] 'A negative target remainder supports …'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['protein-gap-with-budget'] 'A real protein gap with remaining cal…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['protein-nearly-complete'] 'A nearly complete protein target is n…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['empty-morning'] 'An empty early morning uses historica…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['morning-unlogged-prior-day'] 'An unlogged prior day remains missing…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['midday-empty-day-not-morning'] 'At local hour 12, an empty current di…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "dailyInsight: live prompt evaluation [VERIFIED] ['stale-weight'] 'Stale weight data is not presented as…'",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "recipeAnalyze.eval.test.ts",
+          "assertions": [
+            {
+              "name": "prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "preparation prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeAnalyze: live prompt evaluation ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: expected { ok: false, errors: [ …(2) ], …(1) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:452:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 40 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+              "status": "failed",
+              "failures": [
+                "AssertionError: Preparation total time must match independently reviewed source provenance: expected 25 to be null // Object.is equality\n    at Module.assertRecipePreparationMetadata (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:330:8)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:487:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11"
+              ]
+            },
+            {
+              "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "recipeScale.eval.test.ts",
+          "assertions": [
+            {
+              "name": "prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeScale: live prompt evaluation ['preserves-step-order-and-unrelated-ba…'] 'Keeps all original steps and preserve…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "recipeScale: live prompt evaluation ['missing-description-stays-null'] 'Does not invent a description when th…'",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "weeklyInsight.eval.test.ts",
+          "assertions": [
+            {
+              "name": "weekly insight prompt version matches fixture expectations",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "weeklyInsight: live prompt evaluation ['mixed-data-and-adjusted-activity-targ…'] 'Interprets a mixed week without treat…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "weeklyInsight: live prompt evaluation ['training-day-activitybonus-under-targ…'] 'Keeps three consecutive training days…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "weeklyInsight: live prompt evaluation ['zero-calorie-entry-is-data'] 'Does not turn a valid zero-calorie Me…'",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        },
+        {
+          "file": "weeklyInsight.special-activity.diagnostic.eval.test.ts",
+          "assertions": [
+            {
+              "name": "weeklyInsight: special-activity diagnostic eval weekly insight diagnostic prompt version matches the prepared fixtures",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "weeklyInsight: special-activity diagnostic eval ['special-activity-under-effective-targ…'] '3000 kcal exceeds the base target but…'",
+              "status": "passed",
+              "failures": []
+            },
+            {
+              "name": "weeklyInsight: special-activity diagnostic eval ['special-activity-at-effective-target'] '3600 kcal is exactly the activity-adj…'",
+              "status": "passed",
+              "failures": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "regressions": [
+    {
+      "name": "GET /api/ai/daily-insight handler contract invalidates an old Daily cache entry before returning a fresh v16 response",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract preserves an unexpired v14 same-date cache for Admin=false",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract preserves an unexpired v14 same-date cache for Admin=true",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract regenerates an unexpired v14 cache that has incomplete provenance",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract generates and stores v16 after a same-date v14 cache expires",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract hard-invalidates a current Daily with a mismatched intent snapshot identity during the recent-cache interval",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract hard-invalidates a current Daily with a mismatched system snapshot identity during the recent-cache interval",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract hard-invalidates a current Daily with a mismatched user snapshot identity during the recent-cache interval",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract hard-invalidates a current Daily with a mismatched intent snapshot identity at the generation limit",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract hard-invalidates a current Daily with a mismatched system snapshot identity at the generation limit",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract hard-invalidates a current Daily with a mismatched user snapshot identity at the generation limit",
+      "status": "passed"
+    },
+    {
+      "name": "GET /api/ai/daily-insight handler contract serves an unchanged complete current identity from cache despite cache limits",
+      "status": "passed"
+    },
+    {
+      "name": "POST /recipes — createRecipe persists a server-fingerprinted exportView and returns current status",
+      "status": "passed"
+    },
+    {
+      "name": "POST /recipes — createRecipe rejects a client-owned sourceFingerprint and invalid ingredient references",
+      "status": "passed"
+    },
+    {
+      "name": "PUT /recipes/:id — updateRecipe re-fingerprints an explicitly replaced exportView against the effective update",
+      "status": "passed"
+    },
+    {
+      "name": "POST /recipes/:id/images — uploadImage returns 400 for unsupported MIME type",
+      "status": "passed"
+    },
+    {
+      "name": "validateDailyInsightResponse Q21 keeps the exact G stale-weight open-day rejection for zu wenig gegessen",
+      "status": "passed"
+    },
+    {
+      "name": "validateDailyInsightResponse Q21 keeps the exact G stale-weight open-day rejection for unter deinem Ziel",
+      "status": "passed"
+    },
+    {
+      "name": "validateDailyInsightResponse Q21 keeps the exact G stale-weight open-day rejection for unter dem Ziel",
+      "status": "passed"
+    },
+    {
+      "name": "validateDailyInsightResponse Q21 keeps the exact G stale-weight open-day rejection for dein Kalorienverbrauch liegt unter",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects unsupported total 42 for saved fixture +0 without inventing preparation or overlap",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects unsupported total 35 for saved fixture +0 without inventing preparation or overlap",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects unsupported total 50 for saved fixture 1 without inventing preparation or overlap",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects unsupported total 40 for saved fixture 1 without inventing preparation or overlap",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects unsupported total 35 for saved fixture 2 without inventing preparation or overlap",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects unsupported total 25 for saved fixture 2 without inventing preparation or overlap",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance retains a reviewed supported total 50 from 'Gesamtzeit: 50 Minuten.'",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance retains a reviewed supported total 15 from 'Führe alle Schritte ausschließlich na…'",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects recorded unsupported rice total 42 in the independent rubric",
+      "status": "passed"
+    },
+    {
+      "name": "Q21 Preparation aggregate-time provenance rejects recorded unsupported rice total 35 in the independent rubric",
+      "status": "passed"
+    },
+    {
+      "name": "Recipe Analyze fixture semantics offline keeps full source assertions separate from selective export cooking core",
+      "status": "passed"
+    },
+    {
+      "name": "Recipe Analyze fixture semantics offline rejects source 6 loss: Reduziere -> Erhöhe with valid counts and trace",
+      "status": "passed"
+    },
+    {
+      "name": "Recipe Analyze fixture semantics offline rejects source 6 loss: weitere -> insgesamt with valid counts and trace",
+      "status": "passed"
+    },
+    {
+      "name": "Recipe Analyze fixture semantics offline rejects source 6 loss: 6 -> 4 with valid counts and trace",
+      "status": "passed"
+    },
+    {
+      "name": "Recipe Analyze fixture semantics offline rejects source 6 loss: gare -> wasche with valid counts and trace",
+      "status": "passed"
+    },
+    {
+      "name": "Recipe Analyze fixture semantics offline rejects source 6 loss: Hähnchen -> Bohnen with valid counts and trace",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'minimal finish cooking'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'finish cooking combined with serving'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'missing finish-cooking reference'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'missing finish-cooking action'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'wrong component'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'wrong component despite chicken menti…'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'wrong component alongside correct coo…'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'wrong additional time'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'invented temperature'",
+      "status": "passed"
+    },
+    {
+      "name": "synthetic saved Preparation semantics offline checks source 6 rubric with valid structure: 'swapped rice and finish-cooking texts'",
+      "status": "passed"
+    },
+    {
+      "name": "B-2 bounded Preparation loop Q21 requires source-supported totals and cooking endpoints in full-output prompts",
+      "status": "passed"
+    },
+    {
+      "name": "B-2 bounded Preparation loop Q21 requires source-supported totals and cooking endpoints in full-output prompts",
+      "status": "passed"
+    },
+    {
+      "name": "B-2 bounded Preparation loop Q21 preserves cooking endpoints when shortening text without the original source",
+      "status": "passed"
+    },
+    {
+      "name": "B-2 bounded Preparation loop QA-R1 reproduces the recorded oven field and preserves cooking core in a complete corrected draft",
+      "status": "passed"
+    },
+    {
+      "name": "weekly insight diagnostic manifest reports NO_RED only when both semantic cases are verified",
+      "status": "passed"
+    },
+    {
+      "name": "weekly insight diagnostic manifest reports RED_CONFIRMED_B only for a structured incorrect AI result",
+      "status": "passed"
+    },
+    {
+      "name": "weekly insight diagnostic manifest reports UNVERIFIED when a semantic case cannot be proven",
+      "status": "passed"
+    },
+    {
+      "name": "weekly insight diagnostic manifest reports RED_CONFIRMED_A when the deterministic payload gate fails",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts Q21 gives the actual stale-weight phase context no contradictory below-target instruction",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts uses the v16 version and has one module for every intent",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts builds an exact server-owned snapshot for activity_focus",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts builds an exact server-owned snapshot for weight_signal",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts builds an exact server-owned snapshot for phase_progress",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts builds an exact server-owned snapshot for morning_orientation",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts builds an exact server-owned snapshot for nutrition_guidance",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts builds an exact server-owned snapshot for general",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts includes the stale-weight guard in the active activity_focus prompt snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts includes the stale-weight guard in the active weight_signal prompt snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts includes the stale-weight guard in the active phase_progress prompt snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts includes the stale-weight guard in the active morning_orientation prompt snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts includes the stale-weight guard in the active nutrition_guidance prompt snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts includes the stale-weight guard in the active general prompt snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts keeps activity uncertainty and the nutrition budget lock in the selected modules",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts clarifies that a negative target remainder is not an achieved energy surplus",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts keeps phase progress concrete when describing an outlier context",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts makes qualitative endurance signals require an explicit fueling hint",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts treats a missing protein gap as unknown instead of an invitation to infer one",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts protects an open day when protein is already nearly complete",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts adds the phase-progress open-day guard only while target-relative intake is still open",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts uses only resolved historical targets and declines unavailable or ambiguous comparisons",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts withholds read-only profile fallback targets from the morning model input",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts adds the exact yesterday source decision to the morning system prompt",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts prioritizes an open calorie budget with a material protein gap",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts hardens the current effective activity budget contract",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts computes a stable fingerprint for the complete v16 bundle",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when shared tone changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when output contract changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when activity intent module changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when general intent module changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when morning intent module changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when nutrition intent module changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when shared weight intent module changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when guard text changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when guard policy changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when assembly version changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight v16 prompts changes the fingerprint when strict schema changes",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight prompt release manifest locks the active release to the computed bundle fingerprint",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight prompt release manifest preserves the v14 release record exactly",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight prompt release manifest preserves v15 exactly and appends v16 as the only active release",
+      "status": "passed"
+    },
+    {
+      "name": "daily insight prompt release manifest keeps release IDs unique and monotonically increasing",
+      "status": "passed"
+    },
+    {
+      "name": "Instagram recipe details template preserves B-1 Alpha geometry and pre-extraction PNG fingerprints",
+      "status": "passed"
+    }
+  ],
+  "baselineFiles": 1044,
+  "changedSinceReviewStart": [],
+  "originalBaselineCategories": {
+    "renderer": {
+      "checked": 44,
+      "changed": []
+    },
+    "weekly": {
+      "checked": 16,
+      "changed": []
+    },
+    "apiProviderQuotaLoopShared": {
+      "checked": 38,
+      "changed": []
+    }
+  },
+  "importBodyBytePreservation": "UNVERIFIED_NO_PRE_CORRECTION_TEXT_BASELINE",
+  "manualOvenReview": "NOT_PERFORMED_MANUAL_VALIDATION_REQUIRED",
+  "liveGatesAttempted": 3,
+  "retries": 0
+}

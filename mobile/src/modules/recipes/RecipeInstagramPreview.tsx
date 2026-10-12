@@ -27,7 +27,10 @@ import {
 import type { WizardExportDraft } from './recipeWizardTypes';
 import {
   RECIPE_EXPORT_MAX_INGREDIENTS,
+  RECIPE_EXPORT_MAX_STEP_LENGTH,
   RECIPE_EXPORT_MAX_STEPS,
+  RECIPE_EXPORT_MAX_TEASER_LENGTH,
+  RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES,
 } from '../../../../shared/types/recipeExport';
 import type {
   RecipeShareAssetStatus,
@@ -38,6 +41,16 @@ import type {
 
 const SHARE_PREVIEW_ASPECT_RATIO = 1080 / 1350;
 type PreviewAsset = 'instagram' | 'detail';
+
+function CharacterCounter({ length, max, testID }: { length: number; max: number; testID: string }) {
+  const remaining = Math.max(0, max - length);
+  const nearLimit = remaining <= Math.ceil(max / 10);
+  return (
+    <Text style={[styles.characterCount, nearLimit && styles.characterCountNear]} testID={testID}>
+      Noch {remaining} von {max} Zeichen frei
+    </Text>
+  );
+}
 
 export interface RecipeInstagramPreviewProps {
   visible: boolean;
@@ -97,12 +110,12 @@ export function RecipeInstagramPreview({
   canAdjustCrop,
   busy,
   onClose,
-  onChangeExportDraft,
-  onToggleIncludedIngredient,
+  onChangeExportDraft: emitExportDraftChange,
+  onToggleIncludedIngredient: emitIncludedIngredientToggle,
   onUpdatePreview,
   onSaveExportDraft,
   onAdjustCrop,
-  onChangeOptions,
+  onChangeOptions: emitOptionsChange,
   onRetryRender,
   onSaveAndShare,
 }: RecipeInstagramPreviewProps) {
@@ -111,6 +124,8 @@ export function RecipeInstagramPreview({
   const [viewerLayout, setViewerLayout] = useState({ width: 0, height: 0 });
   const viewerWidth = viewerLayout.width || windowWidth;
   const [editingOptionsAndTexts, setEditingOptionsAndTexts] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<PreviewAsset>('instagram');
+  const [previewOutdated, setPreviewOutdated] = useState(false);
   const [expandedAsset, setExpandedAsset] = useState<PreviewAsset | null>(null);
   const [viewerIndex, setViewerIndex] = useState(0);
   const viewerIndexRef = useRef(0);
@@ -124,15 +139,19 @@ export function RecipeInstagramPreview({
   const canSave = hasPair
     && renderStatus === 'ready'
     && exportDraftValid
+    && !previewOutdated
     && !isSaving;
   const canRefreshPreview = exportDraftValid && !isSaving && !isRendering;
-  const canSaveExport = exportDraftSaveValid
-    && exportDraftNeedsSaving
-    && !isSaving
-    && !isRendering;
+  const savesOnRefresh = exportDraftSaveValid && exportDraftNeedsSaving;
+  const hasEditorErrors = previewErrors.length > 0 || saveErrors.length > 0;
+  const editorStatus = savesOnRefresh
+    ? 'Geänderte Texte werden beim Aktualisieren im Rezept gespeichert.'
+    : null;
   const cropDisabled = !hasPair || isSaving || isRendering || !canAdjustCrop;
   useEffect(() => {
     setEditingOptionsAndTexts(false);
+    setSelectedAsset('instagram');
+    setPreviewOutdated(false);
     setExpandedAsset(null);
   }, [visible]);
 
@@ -148,9 +167,29 @@ export function RecipeInstagramPreview({
     setViewerIndex(index);
   }, [expandedAsset, viewerWidth, instagramUri, detailUri]);
 
-  const handleSaveExportDraft = async () => {
-    if (!canSaveExport) return;
-    if (await onSaveExportDraft()) setEditingOptionsAndTexts(false);
+  // Editor changes do not re-render; until the next refresh the PNGs no longer match the draft.
+  const onChangeExportDraft = (draft: WizardExportDraft) => {
+    setPreviewOutdated(true);
+    emitExportDraftChange(draft);
+  };
+  const onToggleIncludedIngredient = (ingredientId: string) => {
+    setPreviewOutdated(true);
+    emitIncludedIngredientToggle(ingredientId);
+  };
+  const onChangeOptions = (options: RecipeInstagramOptions) => {
+    setPreviewOutdated(true);
+    emitOptionsChange(options);
+  };
+
+  const handleRefreshPreview = async () => {
+    if (!canRefreshPreview) return;
+    if (savesOnRefresh) {
+      if (!(await onSaveExportDraft())) return;
+    } else {
+      onUpdatePreview();
+    }
+    setPreviewOutdated(false);
+    setEditingOptionsAndTexts(false);
   };
 
   if (preparationMessage != null) {
@@ -283,6 +322,7 @@ export function RecipeInstagramPreview({
             <TouchableOpacity
               style={[styles.primaryButton, (isSaving || !canChangeOptions || !exportDraft) && styles.primaryButtonDisabled]}
               onPress={() => {
+                setSelectedAsset(viewerAssets[viewerIndex] ?? expandedAsset);
                 setExpandedAsset(null);
                 setEditingOptionsAndTexts(true);
               }}
@@ -333,7 +373,7 @@ export function RecipeInstagramPreview({
               </TouchableOpacity>
             ) : null}
             <Text style={styles.title}>
-              {editingOptionsAndTexts ? 'Texte & Optionen' : 'Bildvorschauen'}
+              {editingOptionsAndTexts ? 'Bilder anpassen' : 'Rezept teilen'}
             </Text>
             <TouchableOpacity
               style={styles.closeButton}
@@ -348,19 +388,66 @@ export function RecipeInstagramPreview({
             </TouchableOpacity>
           </View>
 
+          {editingOptionsAndTexts ? (
+            <View
+              style={styles.assetSelector}
+              testID="recipe-share-asset-selector"
+              accessibilityRole="tablist"
+            >
+              {previewAssets.map((asset) => {
+                const label = asset === 'instagram' ? 'Titelbild' : 'Detailbild';
+                const selected = asset === selectedAsset;
+                return (
+                  <TouchableOpacity
+                    key={asset}
+                    style={[styles.assetTab, selected && styles.assetTabSelected]}
+                    onPress={() => setSelectedAsset(asset)}
+                    hitSlop={{ top: spacing.xs, bottom: spacing.xs }}
+                    activeOpacity={0.8}
+                    accessibilityRole="tab"
+                    accessibilityLabel={`${label} auswählen`}
+                    accessibilityHint="Zeigt nur das ausgewählte Bild in der Vorschau."
+                    accessibilityState={{ selected }}
+                  >
+                    <Icon
+                      lib="feather"
+                      name={asset === 'instagram' ? 'image' : 'file-text'}
+                      size="sm"
+                      color={selected ? colors.primaryBright : colors.textSecondary}
+                    />
+                    <Text style={[styles.assetTabText, selected && styles.assetTabTextSelected]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ) : null}
+
           <ScrollView
             style={styles.contentScroll}
             contentContainerStyle={styles.content}
             showsVerticalScrollIndicator
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.previewPair} testID="recipe-share-preview-pair">
+            <View
+              style={editingOptionsAndTexts ? [styles.previewPair, styles.previewStage] : styles.previewPair}
+              testID={editingOptionsAndTexts ? 'recipe-share-preview-selected' : 'recipe-share-preview-pair'}
+            >
               {previewAssets.map((asset) => {
                 const label = asset === 'instagram' ? 'Titelbild' : 'Detailbild';
                 const uri = asset === 'instagram' ? instagramUri : detailUri;
+                const hidden = editingOptionsAndTexts && asset !== selectedAsset;
                 return (
-                  <View key={asset} style={styles.previewColumn}>
-                    <Text style={styles.fieldLabel}>{label}</Text>
+                  <View
+                    key={asset}
+                    testID={`recipe-share-preview-column-${asset}`}
+                    style={[
+                      styles.previewColumn,
+                      editingOptionsAndTexts ? styles.previewSingleColumn : null,
+                      hidden ? styles.previewColumnHidden : null,
+                    ]}
+                  >
                     <Pressable
                       onPress={() => {
                         if (!uri || isRendering || isSaving) return;
@@ -383,7 +470,6 @@ export function RecipeInstagramPreview({
                           resizeMode="contain"
                           style={styles.previewImage}
                           entering={FadeIn.duration(180)}
-                          exiting={FadeOut.duration(150)}
                         />
                       ) : isRendering ? (
                         <View style={styles.loadingState}>
@@ -414,21 +500,34 @@ export function RecipeInstagramPreview({
                       ) : null}
                     </View>
                     </Pressable>
+                    {hidden ? null : (
+                      <Text style={styles.stageCaption}>
+                        {editingOptionsAndTexts && uri && !isRendering
+                          ? `${label} · Tippen zum Vergrößern`
+                          : label}
+                      </Text>
+                    )}
                   </View>
                 );
               })}
             </View>
 
-            {renderStatus === 'ready' && hasPair ? (
+            {previewOutdated && hasPair && !editingOptionsAndTexts ? (
+              <Text style={[styles.previewHint, styles.previewHintOutdated]}>
+                Deine Änderungen sind noch nicht in den Bildern. Öffne „Optionen &amp; Texte bearbeiten“ und aktualisiere die Vorschau.
+              </Text>
+            ) : null}
+
+            {renderStatus === 'ready' && hasPair && !editingOptionsAndTexts && !previewOutdated ? (
               <Text style={styles.previewHint}>
-                Check beide Bilder kurz durch. Die Texte kannst du jederzeit noch anpassen.
+                Check beide Bilder kurz durch. Texte, Ausschnitt und Tags kannst du jederzeit anpassen.
               </Text>
             ) : null}
 
             {editingOptionsAndTexts && exportDraft ? (
               <>
+                {selectedAsset === 'instagram' ? (
                 <View style={styles.editorSection} testID="recipe-share-editor-title-section">
-                  <Text style={styles.sectionHeading}>Titelbild</Text>
                   <TouchableOpacity
                     style={[styles.secondaryButton, cropDisabled && styles.disabledButton]}
                     onPress={onAdjustCrop}
@@ -444,7 +543,7 @@ export function RecipeInstagramPreview({
 
                   <View style={styles.metadataRow}>
                     <View style={styles.metadataField}>
-                      <Text style={styles.fieldLabel}>Zubereitungszeit (Minuten)</Text>
+                      <Text style={styles.fieldLabel}>Zeit (Min.)</Text>
                       <TextInput
                         style={styles.input}
                         value={exportDraft.totalTimeMinutes}
@@ -457,6 +556,9 @@ export function RecipeInstagramPreview({
                         placeholderTextColor={colors.textMuted}
                         accessibilityLabel="Zubereitungszeit in Minuten"
                       />
+                      <Text style={styles.fieldHint}>
+                        1 bis {RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES.toLocaleString('de-DE')} Minuten
+                      </Text>
                     </View>
                     <View style={styles.metadataField}>
                       <Text style={styles.fieldLabel}>Schwierigkeit</Text>
@@ -468,6 +570,9 @@ export function RecipeInstagramPreview({
                         placeholderTextColor={colors.textMuted}
                         accessibilityLabel="Export-Schwierigkeit"
                       />
+                      <Text style={styles.fieldHint}>
+                        Eine Zeile, kurz halten
+                      </Text>
                     </View>
                   </View>
 
@@ -526,20 +631,24 @@ export function RecipeInstagramPreview({
                     />
                   </View>
                 </View>
-
+                ) : (
                 <View style={styles.editorSection} testID="recipe-share-editor-detail-section">
-                  <Text style={styles.sectionHeading}>Detailbild</Text>
                   <Text style={styles.fieldLabel}>Teaser</Text>
                   <TextInput
                     style={[styles.input, styles.multilineInput]}
                     value={exportDraft.teaser}
                     onChangeText={(teaser) => onChangeExportDraft({ ...exportDraft, teaser })}
-                    maxLength={96}
+                    maxLength={RECIPE_EXPORT_MAX_TEASER_LENGTH}
                     multiline
                     textAlignVertical="top"
                     placeholder="Kurzer Text für das Bild"
                     placeholderTextColor={colors.textMuted}
                     accessibilityLabel="Export-Teaser"
+                  />
+                  <CharacterCounter
+                    length={exportDraft.teaser.length}
+                    max={RECIPE_EXPORT_MAX_TEASER_LENGTH}
+                    testID="recipe-share-teaser-character-count"
                   />
                   {showIngredientSelection ? (
                     <>
@@ -609,12 +718,17 @@ export function RecipeInstagramPreview({
                             ...(stepIndex === index ? { description } : {}),
                           })),
                         })}
-                        maxLength={90}
+                        maxLength={RECIPE_EXPORT_MAX_STEP_LENGTH}
                         multiline
                         textAlignVertical="top"
                         placeholder={`Zubereitungsschritt ${index + 1}`}
                         placeholderTextColor={colors.textMuted}
                         accessibilityLabel={`Exportschritt ${index + 1}`}
+                      />
+                      <CharacterCounter
+                        length={step.description.length}
+                        max={RECIPE_EXPORT_MAX_STEP_LENGTH}
+                        testID={`recipe-share-step-character-count-${index}`}
                       />
                     </View>
                   ))}
@@ -637,73 +751,57 @@ export function RecipeInstagramPreview({
                     </TouchableOpacity>
                   ) : null}
                 </View>
-
-                {previewErrors.length > 0 || saveErrors.length > 0 ? (
-                  <View style={styles.validationErrors}>
-                    {[...new Set([...previewErrors, ...saveErrors])].map((error, index) => (
-                      <Text key={`${error}-${index}`} style={styles.validationError}>{error}</Text>
-                    ))}
-                  </View>
-                ) : null}
+                )}
               </>
-            ) : exportDraft ? (
-              <TouchableOpacity
-                style={styles.editTextsButton}
-                onPress={() => setEditingOptionsAndTexts(true)}
-                disabled={isSaving || !canChangeOptions}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Optionen & Texte bearbeiten"
-                accessibilityState={{ disabled: isSaving || !canChangeOptions }}
-              >
-                <Icon lib="feather" name="edit-3" size="sm" color={colors.primaryBright} />
-                <Text style={styles.editTextsButtonText}>Optionen &amp; Texte bearbeiten</Text>
-              </TouchableOpacity>
             ) : null}
           </ScrollView>
+
+          {editingOptionsAndTexts && hasEditorErrors ? (
+            <View style={styles.validationErrors}>
+              {[...new Set([...previewErrors, ...saveErrors])].map((error, index) => (
+                <Text key={`${error}-${index}`} style={styles.validationError}>{error}</Text>
+              ))}
+            </View>
+          ) : null}
 
           <View style={styles.actions}>
               {editingOptionsAndTexts ? (
                 <>
+                  {editorStatus ? <Text style={styles.editorStatus}>{editorStatus}</Text> : null}
                   <TouchableOpacity
-                    style={[styles.secondaryButton, (!canRefreshPreview) && styles.disabledButton]}
-                    onPress={onUpdatePreview}
+                    style={[styles.primaryButton, !canRefreshPreview && styles.primaryButtonDisabled]}
+                    onPress={() => void handleRefreshPreview()}
                     disabled={!canRefreshPreview}
                     activeOpacity={0.8}
                     accessibilityRole="button"
                     accessibilityLabel="Vorschau aktualisieren"
-                    accessibilityState={{ disabled: !canRefreshPreview }}
+                    accessibilityState={{ disabled: !canRefreshPreview, busy: isSaving || isRendering }}
                   >
-                    {isRendering ? <ActivityIndicator color={colors.primaryBright} size="small" /> : null}
-                    <Text style={styles.secondaryButtonText}>Vorschau aktualisieren</Text>
-                  </TouchableOpacity>
-              <TouchableOpacity
-                    style={[styles.primaryButton, !canSaveExport && styles.primaryButtonDisabled]}
-                    onPress={() => void handleSaveExportDraft()}
-                    disabled={!canSaveExport}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Exportansicht speichern"
-                    accessibilityState={{ disabled: !canSaveExport, busy: isSaving }}
-                  >
-                    {isSaving ? <ActivityIndicator color={colors.background} size="small" /> : null}
-                    <Text style={styles.primaryButtonText}>Speichern</Text>
+                    {isRendering || isSaving
+                      ? <ActivityIndicator color={colors.background} size="small" />
+                      : <Icon lib="feather" name="refresh-cw" size="sm" color={colors.background} />}
+                    <Text style={styles.primaryButtonText}>Vorschau aktualisieren</Text>
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
-                  <TouchableOpacity
-                    style={[styles.secondaryButton, cropDisabled && styles.disabledButton]}
-                    onPress={onAdjustCrop}
-                    disabled={cropDisabled}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Ausschnitt anpassen"
-                    accessibilityState={{ disabled: cropDisabled }}
-                  >
-                    <Icon lib="feather" name="crop" size="md" color={colors.primaryBright} />
-                    <Text style={styles.secondaryButtonText}>Ausschnitt anpassen</Text>
-                  </TouchableOpacity>
+                  {exportDraft ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.secondaryButton,
+                        (isSaving || !canChangeOptions) && styles.disabledButton,
+                      ]}
+                      onPress={() => setEditingOptionsAndTexts(true)}
+                      disabled={isSaving || !canChangeOptions}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Optionen & Texte bearbeiten"
+                      accessibilityState={{ disabled: isSaving || !canChangeOptions }}
+                    >
+                      <Icon lib="feather" name="edit-3" size="sm" color={colors.primaryBright} />
+                      <Text style={styles.secondaryButtonText}>Optionen &amp; Texte bearbeiten</Text>
+                    </TouchableOpacity>
+                  ) : null}
 
                   {renderStatus === 'error' ? (
                     <TouchableOpacity
@@ -854,10 +952,60 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  previewColumnHidden: {
+    display: 'none',
+  },
+  previewSingleColumn: {
+    width: '68%',
+    alignItems: 'center',
+  },
+  previewStage: {
+    justifyContent: 'center',
+  },
+  stageCaption: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   previewColumn: {
     width: '48%',
     gap: spacing.sm,
+  },
+  assetSelector: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    padding: spacing.xs,
+    marginBottom: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
+  },
+  assetTab: {
+    flex: 1,
+    minHeight: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
+    borderRadius: radius.sm,
+  },
+  assetTabSelected: {
+    backgroundColor: colors.primarySoft,
+  },
+  assetTabText: {
+    ...typography.body2,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    flexShrink: 1,
+  },
+  assetTabTextSelected: {
+    color: colors.primaryBright,
   },
   contentScroll: {
     flexShrink: 1,
@@ -869,20 +1017,15 @@ const styles = StyleSheet.create({
   },
   editorSection: {
     gap: spacing.sm,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  sectionHeading: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.sm,
+    paddingBottom: spacing.sm,
   },
   previewHint: {
     ...typography.body2,
     color: colors.textSecondary,
     lineHeight: spacing.lg,
+  },
+  previewHintOutdated: {
+    color: colors.warning,
   },
   helperText: {
     ...typography.body2,
@@ -916,6 +1059,22 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '600',
   },
+  fieldHint: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  characterCount: {
+    ...typography.caption,
+    color: colors.textMuted,
+    textAlign: 'right',
+  },
+  characterCountNear: {
+    color: colors.warning,
+  },
+  editorStatus: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
   input: {
     ...typography.body2,
     color: colors.text,
@@ -931,7 +1090,7 @@ const styles = StyleSheet.create({
     minHeight: spacing.xxl * 1.5,
   },
   metadataRow: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     gap: spacing.sm,
   },
   metadataField: {
@@ -998,6 +1157,7 @@ const styles = StyleSheet.create({
   },
   validationErrors: {
     gap: spacing.xs,
+    marginTop: spacing.sm,
     padding: spacing.sm,
     backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
@@ -1013,30 +1173,20 @@ const styles = StyleSheet.create({
     aspectRatio: SHARE_PREVIEW_ASPECT_RATIO,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   previewImage: {
     width: '100%',
     height: '100%',
-  },
-  editTextsButton: {
-    minHeight: spacing.xxl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primarySoft,
-  },
-  editTextsButtonText: {
-    ...typography.button,
-    color: colors.primaryBright,
-    flexShrink: 1,
-    textAlign: 'center',
   },
   loadingState: {
     alignItems: 'center',

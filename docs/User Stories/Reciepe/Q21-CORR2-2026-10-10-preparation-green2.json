@@ -1,0 +1,22 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "../node_modules/vitest/vitest.mjs",
+    "run",
+    "src/lib/recipePreparation.test.ts",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green2-Report.json"
+  ],
+  "cwd": "backend",
+  "started": "2026-10-10T00:07:35.029Z",
+  "finished": "2026-10-10T00:07:37.382Z",
+  "exit": 0,
+  "counts": {
+    "total": 233,
+    "passed": 233,
+    "failed": 0,
+    "skipped": 0
+  }
+}

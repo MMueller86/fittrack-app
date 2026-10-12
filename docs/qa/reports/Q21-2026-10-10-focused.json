@@ -1,0 +1,31 @@
+{
+  "stage": "focused",
+  "startedAt": "2026-10-09T23:04:35.038Z",
+  "finishedAt": "2026-10-09T23:05:33.184Z",
+  "args": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "src/functions/recipes.test.ts",
+    "src/functions/ai.test.ts",
+    "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+    "src/test-utils/weeklyInsightEvalSemantics.test.ts",
+    "--silent",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\qa\\reports\\Q21-2026-10-10-focused-Report.json"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "counts": {
+    "total": 463,
+    "passed": 463,
+    "failed": 0,
+    "skipped": 0
+  },
+  "outputPath": "docs/qa/reports/Q21-2026-10-10-focused-Output.txt",
+  "outputSha256": "3dfd3e9b6fcea5918e1b77f2bcb759f9a7fdbde6cc9589c5afea0f4fddfa1709",
+  "testReport": "docs/qa/reports/Q21-2026-10-10-focused-Report.json",
+  "synthetic": []
+}

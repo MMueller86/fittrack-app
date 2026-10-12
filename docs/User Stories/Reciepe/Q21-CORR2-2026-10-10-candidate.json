@@ -1,0 +1,94 @@
+{
+  "versions": {
+    "preparation": "v11",
+    "import": "v16",
+    "daily": "v17",
+    "assembly": "v2"
+  },
+  "retry_counts": {
+    "Preparation": 2,
+    "Daily": 2
+  },
+  "files": [
+    {
+      "path": "backend/src/lib/recipePreparation.test.ts",
+      "sha256": "486760a14ce15bccaad99c4d1bb818d4f7a0c07e7b0b6d9e94564788f0719ca6"
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "sha256": "f7bc65e5168530d6f371831adea9e75e48ebaed4f857f99d82f94580131f3e8b"
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "sha256": "8504896e140ef2c0a05eebbb618284969ce3ae0baa237a754ab9049c9163c26f"
+    },
+    {
+      "path": "backend/src/lib/dailyInsightValidation.test.ts",
+      "sha256": "207f22f5907be59573ffb6a073f035372ade6597d8f5cf977544806909a8221c"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsight.eval.test.ts",
+      "sha256": "af440c25ae3d38eb82786f7c6cdbfd27aeed61d44e123f5f759c495dc031f239"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPrompt.test.ts",
+      "sha256": "219af078e5fd3b770ae88fab4416a86dbc2bbc6b8f4cfa57abaa99f7b34911b9"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPrompt.ts",
+      "sha256": "8b6569fc22fadd0d4f39b3048e4d0e26073e758a415c58aa598c713fea182510"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPromptManifest.test.ts",
+      "sha256": "31fe3a7eaa90956ba3c06e98c04e7332736f0119158b410281bc97cdbfb74981"
+    },
+    {
+      "path": "backend/src/lib/prompts/dailyInsightPromptManifest.ts",
+      "sha256": "8b6f92d9ff077611a7f42602ac550a9f71e63ac98d995b53d3a5d69fca5135b6"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "sha256": "c76b66195d8064b58900de122a5b10156dc4692e069200514668493d824dfcf9"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "sha256": "cfc8587f4b0213e6f7148d970130d3e6ede27739046315b5425773f9c1759dd3"
+    },
+    {
+      "path": "backend/src/lib/prompts/sharedTone.ts",
+      "sha256": "f9fd619bef2191724d36b92c1d5d58ef5005d593b80db5ad71539173cf229094"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "sha256": "b4ea4deff44fee2fd45be84bf573063eb2dff058550bfa45fa9d03cca18227c8"
+    },
+    {
+      "path": "backend/src/lib/repositories/insightRepository.ts",
+      "sha256": "6ed714b58063a10132b734287748b30099b921d2825c2fb99466db42077ece61"
+    },
+    {
+      "path": "docs/kb/domain/06-recipes.md",
+      "sha256": "1ab68a8f7bf9211339c559915975adfa82e28e8ddecde25ff9c94db4302cb6b1"
+    },
+    {
+      "path": "docs/kb/domain/07-ai-features.md",
+      "sha256": "d53dd5153638e7fe2684032468215b8eb370263493181135e49014823727b32c"
+    },
+    {
+      "path": "docs/kb/tech/02-backend.md",
+      "sha256": "9114b2fd933992855b7221c3618db0b3c940661ad8c8131988434a3628262703"
+    },
+    {
+      "path": "docs/kb/tech/06-ai-integrations.md",
+      "sha256": "bdd8dd0b2f7399797192477e596848b28aae733df2c502b3a52d0594ca106f71"
+    },
+    {
+      "path": "docs/kb/tech/08-testing.md",
+      "sha256": "6eed828a0dba5bb7bf12d647d71dead902712eb469f1a7b39294dfc29350f4cf"
+    },
+    {
+      "path": "docs/kb/tech/09-api-reference.md",
+      "sha256": "6d73a8643e14c9e3ef8b025ec8d9adde3d5096b9306ba91859baf4d3815f9ebd"
+    }
+  ]
+}

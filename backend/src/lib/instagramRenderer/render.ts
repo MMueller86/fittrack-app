@@ -17,6 +17,7 @@ import {
 import type { PhotoAsset } from "./photo";
 import {
   composeRecipeDetailsTemplate,
+  composeRecipeDetailsGeneratedText,
   getRecipeDetailsTitleLayout,
   RECIPE_DETAILS_TEMPLATE_CHIP_TOP,
   RECIPE_DETAILS_TEMPLATE_DESCRIPTION_GAP,
@@ -40,7 +41,7 @@ import {
   getRecipeDetailsTextLayoutFields,
   type RecipeDetailsTemplateTextOverrides,
 } from "./recipeDetailsTemplateV3";
-import { addMeasuredGermanBreaks, measureDetailTextWidths } from "./detailTextLayout";
+import { addMeasuredGermanBreaks, measureDetailTextWidths, type DetailTextLayoutField } from "./detailTextLayout";
 import { loadRecipeMetaIcons, RecipeMetaIconAssetError } from "./recipeMeta";
 import { TagIconAssetError } from "./tagIcons";
 import type {
@@ -48,6 +49,10 @@ import type {
   RecipeDetailsTemplateField,
   RecipeDetailsTemplateItemField,
   RecipeDetailsTemplateRenderResult,
+  RecipeDetailsGeneratedTextProbeInput,
+  RecipeDetailsGeneratedTextProbeResult,
+  RecipeDetailsGeneratedTextProbeDiagnostic,
+  RecipeDetailsGeneratedTextProbeTechnicalCode,
   RenderInput,
   RenderResult,
 } from "./types";
@@ -105,6 +110,13 @@ const DESIGN_ASSET_FILES = {
 
 let runtimeDependenciesPromise: Promise<RuntimeDependencies> | undefined;
 let rendererAssetsPromise: Promise<RendererAssets> | undefined;
+let satoriPromise: Promise<SatoriRenderer> | undefined;
+let fontsPromise: Promise<Font[]> | undefined;
+
+function getSatori(): Promise<SatoriRenderer> {
+  satoriPromise ??= import("satori").then((module) => module.default);
+  return satoriPromise;
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -147,13 +159,13 @@ function toImageError(error: UnreadableImageError): RenderResult {
 
 async function loadRuntimeDependencies(): Promise<RuntimeDependencies> {
   const [satoriModule, resvgModule, sharpModule] = await Promise.all([
-    import("satori"),
+    getSatori(),
     import("@resvg/resvg-js"),
     import("sharp"),
   ]);
 
   return {
-    satori: satoriModule.default,
+    satori: satoriModule,
     Resvg: resvgModule.Resvg,
     sharp: (sharpModule.default ?? sharpModule) as SharpFactory,
   };
@@ -234,11 +246,8 @@ function toDataUri(buffer: Buffer, mimeType: string): string {
 async function loadRendererAssets(): Promise<RendererAssets> {
   const assetRoot = findAssetRoot();
   const recipeMetaIcons = loadRecipeMetaIcons();
-  const [medium, mediumItalic, semiBold, displayBold, barbell, highProtein, lowFat] = await Promise.all([
-    readAsset(assetRoot, FONT_FILES.medium),
-    readAsset(assetRoot, FONT_FILES.mediumItalic),
-    readAsset(assetRoot, FONT_FILES.semiBold),
-    readAsset(assetRoot, FONT_FILES.displayBold),
+  const [fonts, barbell, highProtein, lowFat] = await Promise.all([
+    getRendererFonts(),
     readAsset(assetRoot, DESIGN_ASSET_FILES.barbell),
     readAsset(assetRoot, DESIGN_ASSET_FILES.highProtein),
     readAsset(assetRoot, DESIGN_ASSET_FILES.lowFat),
@@ -260,12 +269,7 @@ async function loadRendererAssets(): Promise<RendererAssets> {
   }
 
   return {
-    fonts: [
-      { name: "Inter", weight: 500, style: "normal", data: medium },
-      { name: "Inter", weight: 500, style: "italic", data: mediumItalic },
-      { name: "Inter", weight: 600, data: semiBold },
-      { name: "InterDisplay", weight: 700, data: displayBold },
-    ],
+    fonts,
     nutritionHighlights: {
       "high-protein": toDataUri(highProtein, "image/png"),
       "low-fat": toDataUri(lowFat, "image/png"),
@@ -280,6 +284,25 @@ async function loadRendererAssets(): Promise<RendererAssets> {
 function getRendererAssets(): Promise<RendererAssets> {
   rendererAssetsPromise ??= loadRendererAssets();
   return rendererAssetsPromise;
+}
+
+function getRendererFonts(): Promise<Font[]> {
+  fontsPromise ??= (async () => {
+    const root = findAssetRoot();
+    const [medium, mediumItalic, semiBold, displayBold] = await Promise.all([
+      readAsset(root, FONT_FILES.medium),
+      readAsset(root, FONT_FILES.mediumItalic),
+      readAsset(root, FONT_FILES.semiBold),
+      readAsset(root, FONT_FILES.displayBold),
+    ]);
+    return [
+      { name: "Inter", weight: 500, style: "normal", data: medium },
+      { name: "Inter", weight: 500, style: "italic", data: mediumItalic },
+      { name: "Inter", weight: 600, data: semiBold },
+      { name: "InterDisplay", weight: 700, data: displayBold },
+    ];
+  })();
+  return fontsPromise;
 }
 
 function invalidZoom(value: number): RenderResult {
@@ -618,6 +641,205 @@ type DetailsProbeMeasurements = {
   steps: Map<number, DetailsProbeMeasurement>;
 };
 
+const DESCRIPTION_FONT_SIZES = [22, 21, 20, 19, 18] as const;
+
+function createDetailsMeasurements(): DetailsProbeMeasurements {
+  return { ingredients: new Map(), steps: new Map() };
+}
+
+function detectDetailsNode(measurements: DetailsProbeMeasurements, node: SatoriNode): void {
+  const marker = getNodeMarker(node) ?? "";
+  const measurement = { width: node.width, height: node.height };
+  if (marker === RECIPE_DETAILS_TEMPLATE_TITLE_NODE) {
+    measurements.title = measurement;
+  } else if (marker === RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) {
+    measurements.description = measurement;
+  } else {
+    const ingredientIndex = getDetailsNodeIndex(marker, RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX);
+    const stepIndex = getDetailsNodeIndex(marker, RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX);
+    if (ingredientIndex !== undefined) measurements.ingredients.set(ingredientIndex, measurement);
+    if (stepIndex !== undefined) measurements.steps.set(stepIndex, measurement);
+  }
+}
+
+function createDetailsTextOverrides(
+  input: Pick<RecipeDetailsTemplateInput, "title" | "description" | "steps"> &
+    Partial<Pick<RecipeDetailsTemplateInput, "ingredients">>,
+  textById: ReadonlyMap<string, string>,
+  descriptionFontSize: number,
+): RecipeDetailsTemplateTextOverrides {
+  return {
+    title: textById.get(RECIPE_DETAILS_TEMPLATE_TITLE_NODE) ?? input.title,
+    descriptionFontSize,
+    ...(input.description === undefined ? {} : {
+      description: textById.get(RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) ?? input.description,
+    }),
+    ingredients: (input.ingredients ?? []).map((ingredient, index) =>
+      textById.get(`${RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX}${index}`) ??
+      `${ingredient.amount} ${ingredient.name}`,
+    ),
+    steps: input.steps.map((step, index) =>
+      textById.get(`${RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX}${index}`) ?? step,
+    ),
+  };
+}
+
+function isInvalidDetailsText(text: string, maxLength: number): boolean {
+  return text.trim().length === 0 || text.trim().length > maxLength || /[\r\n\u2028\u2029]/u.test(text);
+}
+
+function getDetailsMeasurement(
+  field: DetailTextLayoutField,
+  measurements: DetailsProbeMeasurements,
+): DetailsProbeMeasurement | undefined {
+  if (field.field === "title") return measurements.title;
+  if (field.field === "description") return measurements.description;
+  if (field.field === "steps") return measurements.steps.get(field.itemIndex!);
+  return measurements.ingredients.get(field.itemIndex!);
+}
+
+export async function probeInstagramRecipeDetailsGeneratedText(
+  candidate: RecipeDetailsGeneratedTextProbeInput,
+): Promise<RecipeDetailsGeneratedTextProbeResult> {
+  const technicalFailure = (
+    code: RecipeDetailsGeneratedTextProbeTechnicalCode,
+    message: string,
+    diagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[],
+    asset?: string,
+  ): RecipeDetailsGeneratedTextProbeResult => ({
+    ok: false, status: "technical-failure", diagnostics,
+    error: { code, message, ...(asset === undefined ? {} : { asset }) },
+  });
+  if (
+    !candidate || typeof candidate.savedTitle !== "string" ||
+    isInvalidDetailsText(candidate.savedTitle, 60) ||
+    typeof candidate.teaser !== "string" || !Array.isArray(candidate.steps) ||
+    candidate.steps.some((step) => typeof step !== "string")
+  ) {
+    return technicalFailure("INVALID_CONTEXT", "The probe requires a valid saved title and complete text candidate.", [
+      { field: "title", status: "technical-failure", code: "INVALID_CONTEXT" },
+      { field: "teaser", status: "technical-failure", code: "INVALID_CONTEXT" },
+      ...(Array.isArray(candidate?.steps) ? candidate.steps.map((_step, itemIndex) => ({
+        field: "steps" as const, itemIndex, status: "technical-failure" as const, code: "INVALID_CONTEXT" as const,
+      })) : [{ field: "steps" as const, status: "technical-failure" as const, code: "INVALID_CONTEXT" as const }]),
+    ]);
+  }
+
+  const input = { title: candidate.savedTitle, description: candidate.teaser, steps: candidate.steps };
+  const invalidCount = input.steps.length === 0 || input.steps.length > RECIPE_DETAILS_TEMPLATE_MAX_STEPS;
+  const invalidDiagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[] = [];
+  if (isInvalidDetailsText(input.description, 96)) {
+    invalidDiagnostics.push({ field: "teaser", status: "invalid-text", code: "INVALID_TEXT" });
+  }
+  if (invalidCount) {
+    invalidDiagnostics.push({ field: "steps", status: "invalid-text", code: "INVALID_STEP_COUNT" });
+  }
+  input.steps.forEach((step, itemIndex) => {
+    if (invalidCount || isInvalidDetailsText(step, 90)) {
+      invalidDiagnostics.push({
+        field: "steps", itemIndex, status: "invalid-text",
+        code: invalidCount ? "INVALID_STEP_COUNT" : "INVALID_TEXT",
+      });
+    }
+  });
+  const identify = (field: DetailTextLayoutField) => ({
+    field: field.field === "description" ? "teaser" as const : field.field as "title" | "steps",
+    ...(field.itemIndex === undefined ? {} : { itemIndex: field.itemIndex }),
+  });
+
+  try {
+    const [satori, fonts] = await Promise.all([getSatori(), getRendererFonts()]);
+    for (const descriptionFontSize of DESCRIPTION_FONT_SIZES) {
+      const fields = getRecipeDetailsTextLayoutFields(input, descriptionFontSize);
+      const diagnostics = [...invalidDiagnostics];
+      const textById = new Map<string, string>();
+      const measurable: DetailTextLayoutField[] = [];
+      for (const field of fields) {
+        const identity = identify(field);
+        if (invalidDiagnostics.some((item) => item.field === identity.field && item.itemIndex === identity.itemIndex)) {
+          textById.set(field.id, "");
+          continue;
+        }
+        const layout = await addMeasuredGermanBreaks([field], (requests) =>
+          measureDetailTextWidths(satori, fonts, requests),
+        );
+        if (!layout.ok) {
+          textById.set(field.id, "");
+          if (field.field === "title") {
+            diagnostics.push({ ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED" });
+          } else {
+            diagnostics.push({
+              ...identity, status: "width-overflow", fontSize: field.style.fontSize,
+              measured: { width: layout.error.measuredWidth, maxWidth: field.maxWidth },
+            });
+          }
+          continue;
+        }
+        const displayText = layout.textById.get(field.id);
+        if (displayText === undefined) {
+          throw new Error(`The detail text probe did not return source field ${field.id}.`);
+        }
+        textById.set(field.id, displayText);
+        measurable.push(field);
+      }
+
+      const measurements = createDetailsMeasurements();
+      await satori(
+        composeRecipeDetailsGeneratedText(input, createDetailsTextOverrides(input, textById, descriptionFontSize)) as
+          unknown as Parameters<SatoriRenderer>[0],
+        {
+          width: CANVAS_WIDTH, height: CANVAS_HEIGHT, fonts, embedFont: true,
+          onNodeDetected: (node) => detectDetailsNode(measurements, node),
+        },
+      );
+      for (const field of measurable) {
+        const identity = identify(field);
+        const measured = getDetailsMeasurement(field, measurements);
+        if (!measured || !Number.isFinite(measured.width) || !Number.isFinite(measured.height)) {
+          diagnostics.push({
+            ...identity, status: "technical-failure",
+            code: measured ? "NON_FINITE_MEASUREMENT" : "MISSING_MEASUREMENT",
+          });
+        } else if (field.field === "title" && exceedsDetailsBounds(measured, field.maxWidth, field.maxHeight)) {
+          diagnostics.push({ ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED" });
+        } else {
+          diagnostics.push({
+            ...identity,
+            status: exceedsDetailsBounds(measured, field.maxWidth, field.maxHeight) ? "overflow" : "fits",
+            measured: { ...measured, maxWidth: field.maxWidth, maxHeight: field.maxHeight },
+            fontSize: field.style.fontSize, displayText: textById.get(field.id)!,
+          });
+        }
+      }
+      const technical = diagnostics.find((item) => item.status === "technical-failure");
+      if (technical?.status === "technical-failure") {
+        return technicalFailure(technical.code, "Production text geometry could not be established.", diagnostics);
+      }
+      const teaserFailure = diagnostics.find((item) =>
+        item.field === "teaser" && (item.status === "overflow" || item.status === "width-overflow"),
+      );
+      if (teaserFailure && descriptionFontSize > 18) continue;
+      const result = { diagnostics, teaserFontSize: descriptionFontSize };
+      return diagnostics.every((item) => item.status === "fits")
+        ? { ...result, ok: true, status: "success" }
+        : { ...result, ok: false, status: "generated-text-failure" };
+    }
+    return technicalFailure("PROBE_FAILED", "No detail teaser font size was evaluated.", []);
+  } catch (error) {
+    const code: RecipeDetailsGeneratedTextProbeTechnicalCode =
+      error instanceof MissingRendererAssetError ? "MISSING_ASSET" : "FONT_OR_SATORI_FAILED";
+    const diagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[] = [
+      { field: "title", status: "technical-failure", code },
+      { field: "teaser", status: "technical-failure", code },
+      ...input.steps.map((_step, itemIndex) => ({
+        field: "steps" as const, itemIndex, status: "technical-failure" as const, code,
+      })),
+    ];
+    return technicalFailure(code, errorMessage(error), diagnostics,
+      error instanceof MissingRendererAssetError ? error.asset : undefined);
+  }
+}
+
 function getDetailsNodeIndex(marker: string, prefix: string): number | undefined {
   if (!marker.startsWith(prefix)) return undefined;
   const index = Number(marker.slice(prefix.length));
@@ -804,9 +1026,7 @@ function validateRecipeDetailsTemplate(
   input: RecipeDetailsTemplateInput,
 ): RecipeDetailsTemplateRenderResult | undefined {
   if (
-    input.title.trim().length === 0 ||
-    input.title.trim().length > 60 ||
-    /[\r\n\u2028\u2029]/u.test(input.title)
+    isInvalidDetailsText(input.title, 60)
   ) {
     return invalidTemplateInput(
       "title",
@@ -815,9 +1035,7 @@ function validateRecipeDetailsTemplate(
   }
   if (
     input.description !== undefined &&
-    (input.description.trim().length === 0 ||
-      input.description.trim().length > 96 ||
-      /[\r\n\u2028\u2029]/u.test(input.description))
+    isInvalidDetailsText(input.description, 96)
   ) {
     return invalidTemplateInput(
       "description",
@@ -884,9 +1102,7 @@ function validateRecipeDetailsTemplate(
     );
   }
   const invalidStepIndex = input.steps.findIndex((step) =>
-    step.trim().length === 0 ||
-    step.trim().length > 90 ||
-    /[\r\n\u2028\u2029]/u.test(step),
+    isInvalidDetailsText(step, 90),
   );
   if (invalidStepIndex >= 0) {
     return invalidTemplateInput(
@@ -911,7 +1127,7 @@ export async function renderInstagramRecipeDetailsTemplate(
   try {
     const [runtime, assets] = await Promise.all([getRuntimeDependencies(), getRendererAssets()]);
     const photo = await loadPhoto(runtime.sharp, input.image);
-    for (const descriptionFontSize of [22, 21, 20, 19, 18]) {
+    for (const descriptionFontSize of DESCRIPTION_FONT_SIZES) {
       const textFields = getRecipeDetailsTextLayoutFields(input, descriptionFontSize);
       const textLayout = await addMeasuredGermanBreaks(textFields, (requests) =>
         measureDetailTextWidths(runtime.satori, assets.fonts, requests),
@@ -944,28 +1160,8 @@ export async function renderInstagramRecipeDetailsTemplate(
       }
 
       const textById = textLayout.textById;
-      const textOverrides: RecipeDetailsTemplateTextOverrides = {
-        title: textById.get(RECIPE_DETAILS_TEMPLATE_TITLE_NODE) ?? input.title,
-        descriptionFontSize,
-        ...(input.description === undefined
-          ? {}
-          : {
-              description:
-                textById.get(RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) ?? input.description,
-            }),
-        ingredients: input.ingredients.map((ingredient, index) =>
-          textById.get(`${RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX}${index}`) ??
-          `${ingredient.amount} ${ingredient.name}`,
-        ),
-        steps: input.steps.map(
-          (step, index) =>
-            textById.get(`${RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX}${index}`) ?? step,
-        ),
-      };
-      const measurements: DetailsProbeMeasurements = {
-        ingredients: new Map(),
-        steps: new Map(),
-      };
+      const textOverrides = createDetailsTextOverrides(input, textById, descriptionFontSize);
+      const measurements = createDetailsMeasurements();
       const svg = await runtime.satori(
         composeRecipeDetailsTemplate(input, {
           photo,
@@ -978,34 +1174,7 @@ export async function renderInstagramRecipeDetailsTemplate(
           height: CANVAS_HEIGHT,
           fonts: assets.fonts,
           embedFont: true,
-          onNodeDetected: (node) => {
-            const marker = getNodeMarker(node);
-            if (marker === RECIPE_DETAILS_TEMPLATE_TITLE_NODE) {
-              measurements.title = { width: node.width, height: node.height };
-            } else if (marker === RECIPE_DETAILS_TEMPLATE_DESCRIPTION_NODE) {
-              measurements.description = { width: node.width, height: node.height };
-            } else {
-              const ingredientIndex = getDetailsNodeIndex(
-                marker ?? "",
-                RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX,
-              );
-              if (ingredientIndex !== undefined) {
-                measurements.ingredients.set(ingredientIndex, {
-                  width: node.width,
-                  height: node.height,
-                });
-                return;
-              }
-
-              const stepIndex = getDetailsNodeIndex(marker ?? "", RECIPE_DETAILS_TEMPLATE_STEP_NODE_PREFIX);
-              if (stepIndex !== undefined) {
-                measurements.steps.set(stepIndex, {
-                  width: node.width,
-                  height: node.height,
-                });
-              }
-            }
-          },
+          onNodeDetected: (node) => detectDetailsNode(measurements, node),
         },
       );
       const layoutError = validateMeasuredDetailsTemplate(input, measurements);

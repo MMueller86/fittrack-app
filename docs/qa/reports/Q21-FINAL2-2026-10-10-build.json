@@ -1,0 +1,25 @@
+{
+  "stage": "build",
+  "startedAt": "2026-10-10T00:22:27.083Z",
+  "finishedAt": "2026-10-10T00:22:31.166Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "build:verify",
+    "--workspace=backend"
+  ],
+  "cwd": ".",
+  "exit": 0,
+  "signal": null,
+  "counts": null,
+  "selection": null,
+  "outputPath": "docs/qa/reports/Q21-FINAL2-2026-10-10-build-Output.txt",
+  "outputSha256": "4d1b4ff4d6092664a7b2dd9fbb89bd2d18be84abf6e98f62ae2739e6682fca1b",
+  "testReport": null,
+  "reportSha256": null,
+  "synthetic": [],
+  "allIntendedTestsExecuted": null,
+  "liveGate": false,
+  "offlineStage": true
+}

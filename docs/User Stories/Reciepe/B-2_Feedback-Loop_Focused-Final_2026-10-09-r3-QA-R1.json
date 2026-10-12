@@ -1,0 +1,36 @@
+{
+  "name": "Focused-Final",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "src/functions/recipes.test.ts",
+    "src/functions/ai.test.ts",
+    "src/lib/openai.recipeAnalyze.test.ts",
+    "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+    "src/lib/recipePreparation.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Focused-Final-Report_2026-10-09-r3-QA-R1.json"
+  ],
+  "start": "2026-10-09T16:58:17.283Z",
+  "end": "2026-10-09T16:59:03.066Z",
+  "exit": 0,
+  "signal": null,
+  "counts": {
+    "executed": 519,
+    "passed": 519,
+    "failed": 0,
+    "skipped": 0
+  },
+  "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Final-Output_2026-10-09-r3-QA-R1.txt",
+  "outputSha256": "c064698289e648fd6b93cd572199bc4d64a7782ae56996554066654ad01600ca",
+  "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Focused-Final-Report_2026-10-09-r3-QA-R1.json",
+  "reportSha256": "00417e2c2fbfb6578892b4190be7dd5189f6cb2e3d84c15162dd568e27b03950",
+  "candidateSha256": null
+}

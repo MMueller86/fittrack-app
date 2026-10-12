@@ -1,0 +1,66 @@
+{
+  "task": "B-19",
+  "date": "2026-10-09",
+  "status": "IMPLEMENTED_LIVE_GATES_FAIL_STOP_FOR_DECISION",
+  "workspace": "c:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app",
+  "handoffPath": "c:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-19_Recipe-Preparation_Handoff_2026-10-09.md",
+  "versions": { "import": "v16", "preparation": "v4" },
+  "changedCodeFiles": [
+    "backend/src/lib/openai.ts",
+    "backend/src/lib/prompts/recipeAnalyze.ts",
+    "backend/src/lib/recipeAnalyzeValidation.ts",
+    "backend/src/lib/recipeAnalyzeValidation.test.ts",
+    "backend/src/functions/recipes.ts",
+    "backend/src/functions/recipes.test.ts",
+    "backend/src/functions/ai.test.ts",
+    "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts"
+  ],
+  "evidencePaths": [
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_EigenerDiff_2026-10-09.patch",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_OfflineEvidence_2026-10-09.json",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_LiveEvidence_2026-10-09.json",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Output_2026-10-09.txt",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Output_2026-10-09.txt",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Output_2026-10-09.txt",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Report_2026-10-09.json",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Report_2026-10-09.json",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Report_2026-10-09.json",
+    "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Verification_2026-10-09.mjs"
+  ],
+  "tests": {
+    "red": { "exit": 1, "executed": 351, "pass": 348, "fail": 3, "skip": 0 },
+    "focusGreen": { "exit": 0, "executed": 356, "pass": 356, "fail": 0, "skip": 0 },
+    "finalValidator": { "exit": 0, "executed": 140, "pass": 140, "fail": 0, "skip": 0 },
+    "finalBackendUnits": { "exit": 0, "executed": 1437, "pass": 1437, "fail": 0, "skip": 0 },
+    "typecheck": { "exit": 0 },
+    "buildVerify": { "exit": 0 },
+    "encoding": { "exit": 0 },
+    "diffCheck": { "exit": 0 },
+    "liveF": { "exit": 1, "executed": 4, "pass": 2, "fail": 2, "skip": 9, "preparationExecuted": 3 },
+    "liveR": { "exit": 1, "executed": 13, "pass": 10, "fail": 3, "skip": 0, "preparationExecuted": 3 },
+    "liveG": { "exit": 1, "executed": 41, "pass": 35, "fail": 6, "skip": 0, "preparationExecuted": 3 }
+  },
+  "acceptanceMapping": {
+    "AC1": "PASS_OFFLINE",
+    "AC2": "PASS_OFFLINE",
+    "AC3": "PASS_OFFLINE_AND_RENDERER",
+    "AC4": "PASS_OFFLINE",
+    "AC5": "FAIL_LIVE_RICE_GROUP_START_ORDER",
+    "AC6": "FAIL_LIVE_OVEN_DUPLICATE_REFERENCE_PASTA_PASS",
+    "AC7": "PASS_OFFLINE_LIVE_SUCCESS_ASSERTIONS_COMPLETE_ONLY_FOR_PASTA",
+    "AC8": "PASS_OFFLINE",
+    "AC9": "ALL_THREE_GATES_EXECUTED_ONCE_FAIL_NO_OVERALL_PASS"
+  },
+  "deviations": [
+    "Rejected npm exec proposed Node installation before live test start; used existing runtime and npm CLI.",
+    "Recovered ANSI-prefixed raw transcript records after live without new calls; post-capture validation not retroactive live assertion execution.",
+    "Rice and oven fail before later V2 success and usage-order assertions; requirement remains unmet, not PASS.",
+    "Metadata source derivation is not independently proven by structural/core assertions.",
+    "KB intentionally unchanged by B-19; D-19 owns documented v3-to-v4 divergence."
+  ],
+  "noDeployment": true,
+  "noCommit": true,
+  "noNewDependencies": true,
+  "nextAction": "STOP_FOR_ORCHESTRATOR_DECISION_NO_RETRY"
+}

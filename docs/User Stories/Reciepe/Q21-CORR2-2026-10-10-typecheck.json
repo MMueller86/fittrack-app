@@ -1,0 +1,16 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "typecheck",
+    "--workspace=backend"
+  ],
+  "cwd": ".",
+  "started": "2026-10-10T00:15:03.736Z",
+  "finished": "2026-10-10T00:15:06.488Z",
+  "exit": 0,
+  "counts": null,
+  "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-typecheck-Output.txt",
+  "outputSha256": "23c9d65eeb8572d1fe4ec2ca0ea0a4cd5b67699a40d46b72d4a2dbfea253fba0"
+}

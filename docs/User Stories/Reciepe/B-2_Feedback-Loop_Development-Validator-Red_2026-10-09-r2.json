@@ -1,0 +1,51 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Validator-Red-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:51:01.586Z",
+  "endedAt": "2026-10-09T15:51:03.780Z",
+  "exit": 1,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "e7be8b0d5462b495b9d55aa64182ca926d0bc7b980d1320cd415bda5dfb52a8c",
+  "reportSha256": "59f355c9f4d6538f211d09affd1a6abf930fbf204ddcf5cc9ed81cf57e0f5104",
+  "counts": {
+    "executed": 149,
+    "passed": 146,
+    "failed": 3,
+    "skipped": 0
+  },
+  "failures": [
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "name": "Recipe Analyze exact trace regressions reports the exact QA duplicate trace without repairing it",
+      "messages": [
+        "AssertionError: expected [ { phase: 'semantic', …(7) }, …(3) ] to deep equally contain { phase: 'semantic', …(2) }\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\recipeAnalyzeValidation.test.ts:382:36\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:146:14\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:11\n    at runWithTimeout (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:39:7)\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:17)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "name": "validateRecipeExportPreparationOutput diagnostics returns schema code and field path without including the invalid value",
+      "messages": [
+        "AssertionError: expected [ { phase: 'schema', …(4) } ] to deep equally contain { phase: 'schema', …(2) }\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\recipeAnalyzeValidation.test.ts:570:32\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:146:14\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:11\n    at runWithTimeout (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:39:7)\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:17)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "name": "validateRecipeExportPreparationOutput diagnostics identifies semantic source-step trace failures with stable codes",
+      "messages": [
+        "AssertionError: expected [ …(3) ] to include 'sourceSteps.order must be unique'\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1196:17)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\recipeAnalyzeValidation.test.ts:586:27\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:146:14\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:11\n    at runWithTimeout (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:39:7)\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:17)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)"
+      ]
+    }
+  ]
+}

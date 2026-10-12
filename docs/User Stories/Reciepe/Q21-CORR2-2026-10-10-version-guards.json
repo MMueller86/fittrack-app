@@ -1,0 +1,32 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "../node_modules/vitest/vitest.mjs",
+    "run",
+    "--config",
+    "vitest.eval.config.mts",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "src/lib/prompts/dailyInsight.eval.test.ts",
+    "--testNamePattern",
+    "prompt version matches fixture expectations",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards-Report.json"
+  ],
+  "cwd": "backend",
+  "started": "2026-10-10T00:15:12.048Z",
+  "finished": "2026-10-10T00:15:13.426Z",
+  "exit": 0,
+  "counts": {
+    "total": 32,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 29
+  },
+  "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards-Output.txt",
+  "outputSha256": "7b8cc346be2c205a3df5ecbcda96a331b30352f08d01eaa9052f6fd8857181b3",
+  "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards-Report.json",
+  "reportSha256": "32d6f641abd34f5eac3925f1eed2b1c5e492d58a280c44fcc40f0bb3fa1b858b",
+  "liveCalls": 0,
+  "notFRG": true
+}

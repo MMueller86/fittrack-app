@@ -37,13 +37,22 @@ describe('daily insight prompt release manifest', () => {
     });
   });
 
-  it('uses v15 as the only active release after the preserved v14 record', () => {
-    expect(DAILY_INSIGHT_PROMPT_RELEASES).toHaveLength(2);
-    expect(DAILY_INSIGHT_PROMPT_RELEASES[1]).toMatchObject({
+  it('preserves v15 and v16 exactly and appends v17 as the only active release', () => {
+    expect(DAILY_INSIGHT_PROMPT_RELEASES).toHaveLength(4);
+    expect(DAILY_INSIGHT_PROMPT_RELEASES[1]).toEqual({
       releaseId: 'v15',
       promptVersion: 'v15',
       assemblyVersion: 'v2',
+      promptFingerprint: 'sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264',
       providerInputCompatibility: 'changed',
+    });
+    expect(DAILY_INSIGHT_PROMPT_RELEASES[2]).toEqual({
+      releaseId: 'v16', promptVersion: 'v16', assemblyVersion: 'v2',
+      promptFingerprint: 'sha256:3e68d4dd0b6e49003936a278f3e65d693645ebfb41ee5ced3ea7daa3efa70893',
+      providerInputCompatibility: 'changed',
+    });
+    expect(DAILY_INSIGHT_ACTIVE_PROMPT_RELEASE).toMatchObject({
+      releaseId: 'v17', promptVersion: 'v17', assemblyVersion: 'v2', providerInputCompatibility: 'changed',
     });
   });
 

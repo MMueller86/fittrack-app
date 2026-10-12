@@ -1,0 +1,28 @@
+{
+  "format": "fittrack-q21-final2-validation-v1",
+  "checkedAt": "2026-10-10T00:37:21.659Z",
+  "exit": 0,
+  "verdict": "FAIL",
+  "criteria": [
+    "AC-1",
+    "AC-2",
+    "AC-3",
+    "AC-4",
+    "AC-5",
+    "AC-6",
+    "AC-7",
+    "AC-8",
+    "AC-9",
+    "AC-10",
+    "US-10 AC-15",
+    "US-10 AC-16"
+  ],
+  "findings": 4,
+  "baselineFilesUnchangedExceptReport": 1124,
+  "candidateFilesStable": 20,
+  "priorReportHashVerified": true,
+  "reportSha256": "bfbdb45753cd0c89ef41c067b50588c0748ffa4fec779b0dfaf268c5e959a56f",
+  "utf8ScopedSecretScanFiles": 58,
+  "secretExposure": "NONE_IN_QA_ARTIFACT_SCOPE",
+  "liveCalls": 0
+}

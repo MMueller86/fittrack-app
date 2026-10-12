@@ -1,0 +1,121 @@
+{
+  "format": "fittrack-current-recipe-sharing-execution-v1",
+  "stage": "listOverall",
+  "startedAt": "2026-10-10T10:25:35.207Z",
+  "finishedAt": "2026-10-10T10:25:37.535Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": "01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3",
+  "candidateHashStable": true,
+  "changedPaths": [],
+  "state": "COMPLETED",
+  "counts": null,
+  "selection": [
+    {
+      "name": "daily insight prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['phase-progress-open-day'] 'An open target budget is not presente…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['current-effective-activity-budget'] 'An elevated current activity target p…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['historical-target-source-priority'] 'Morning orientation uses the syntheti…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['historical-target-unavailable'] 'A missing historical activity target …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['historical-target-ambiguous-source'] 'A profile fallback and a conflicting …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['planned-activity'] 'A planned activity is not described a…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['likely-completed-activity'] 'A late-day activity is described only…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['unknown-activity'] 'An activity without a usable local ho…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['intensive-endurance-fueling'] 'A long alpine endurance activity rece…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['budget-lock'] 'A negative remaining budget blocks an…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['target-relative-overage-not-achieved-…'] 'A negative target remainder supports …'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['protein-gap-with-budget'] 'A real protein gap with remaining cal…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['protein-nearly-complete'] 'A nearly complete protein target is n…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['empty-morning'] 'An empty early morning uses historica…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['morning-unlogged-prior-day'] 'An unlogged prior day remains missing…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['midday-empty-day-not-morning'] 'At local hour 12, an empty current di…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "dailyInsight: live prompt evaluation > [UNVERIFIED] ['stale-weight'] 'Stale weight data is not presented as…'",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+    },
+    {
+      "name": "prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "preparation prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+    },
+    {
+      "name": "prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+    },
+    {
+      "name": "weekly insight prompt version matches fixture expectations",
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+    }
+  ],
+  "synthetic": [],
+  "outputPath": "docs/qa/reports/CURRENT-RECIPE-SHARING-2026-10-10-listOverall-Output.txt",
+  "outputSha256": "7949b8a821d4960e102cefd479f65197b6a6d840ea7490018622530e1ea1accf",
+  "testReport": null,
+  "reportSha256": null,
+  "allIntendedTestsExecuted": null,
+  "noProviderCalls": true,
+  "liveGate": false
+}

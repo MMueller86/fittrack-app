@@ -1,0 +1,13 @@
+{
+  "command": [
+    "git",
+    "apply",
+    "--reverse",
+    "--check",
+    "docs/User Stories/Reciepe/B-2_Feedback-Loop_Owned-Diff_2026-10-09-r3-QA-R1.patch"
+  ],
+  "exit": 0,
+  "output": "",
+  "appliedToWorktree": false,
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44"
+}

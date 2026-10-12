@@ -1,0 +1,483 @@
+warning: in the working copy of 'backend/src/functions/ai.test.ts', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'backend/src/lib/openai.ts', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'backend/src/lib/prompts/recipeAnalyze.eval.test.ts', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'backend/src/lib/prompts/recipeAnalyze.ts', CRLF will be replaced by LF the next time Git touches it
+diff --git a/backend/src/functions/ai.test.ts b/backend/src/functions/ai.test.ts
+index 62bbc69..403a1f1 100644
+--- a/backend/src/functions/ai.test.ts
++++ b/backend/src/functions/ai.test.ts
+@@ -24,6 +24,7 @@ import type { ReusableItemsRepository } from '../lib/repositories/reusableItemsR
+ import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
+ import {
+   makeContext,
++  makeRequest,
+   makeAuthRequest,
+   setupTestAuth,
+   teardownTestAuth,
+@@ -682,6 +683,62 @@ describe('analyzeRecipeText normalization', () => {
+ });
+ 
+ describe('POST /api/ai/recipe-analyze', () => {
++  it('authenticates before quota, provider and usage tracking', async () => {
++    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
++    const response = await recipeAnalyzeHandler(
++      makeRequest({ body: { text: 'Synthetischer Import ohne Anmeldung' } }),
++      makeContext(),
++    );
++    expect(response.status).toBe(401);
++    expect(enforceQuota).not.toHaveBeenCalled();
++    expect(create).not.toHaveBeenCalled();
++    expect(trackUsage).not.toHaveBeenCalled();
++  });
++
++  it('returns 429 before provider work and does not track usage', async () => {
++    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
++    const quotaResponse = { status: 429, jsonBody: { error: 'quota_exceeded', feature: 'recipe-analyze' } };
++    vi.mocked(enforceQuota).mockResolvedValueOnce(quotaResponse);
++    const response = await recipeAnalyzeHandler(
++      await makeAuthRequest({ body: { text: 'Synthetischer Import mit Quotalimit' } }),
++      makeContext(),
++    );
++    expect(response).toEqual(quotaResponse);
++    expect(create).not.toHaveBeenCalled();
++    expect(trackUsage).not.toHaveBeenCalled();
++  });
++
++  it.each(['', 'not-json'])('returns 502 for invalid provider content %j without tracking', async (content) => {
++    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
++    create.mockReset().mockResolvedValueOnce({ choices: [{ message: { content } }] });
++    const response = await recipeAnalyzeHandler(
++      await makeAuthRequest({ body: { text: 'Synthetischer Import mit Providerfehler' } }),
++      makeContext(),
++    );
++    expect(response.status).toBe(502);
++    expect(create).toHaveBeenCalledTimes(1);
++    expect(trackUsage).not.toHaveBeenCalled();
++  });
++
++  it('does not persist a valid import preview and tracks its one AI call once', async () => {
++    const repository = getRecipesRepository();
++    const createRecipe = vi.spyOn(repository, 'create');
++    const updateRecipe = vi.spyOn(repository, 'update');
++    const before = await repository.list(TEST_USER_ID);
++    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW_WITH_EXPORT_KEYS);
++    mockFoodRepo([]);
++    const response = await recipeAnalyzeHandler(
++      await makeAuthRequest({ body: { text: 'Synthetischer Import ohne Persistenz' } }),
++      makeContext(),
++    );
++    expect(response.status).toBe(200);
++    expect(create).toHaveBeenCalledTimes(1);
++    expect(trackUsage).toHaveBeenCalledTimes(1);
++    expect(createRecipe).not.toHaveBeenCalled();
++    expect(updateRecipe).not.toHaveBeenCalled();
++    expect(await repository.list(TEST_USER_ID)).toEqual(before);
++  });
++
+   it('returns 400 when text is missing', async () => {
+     mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+     mockFoodRepo([]);
+@@ -725,7 +782,11 @@ describe('POST /api/ai/recipe-analyze', () => {
+       includedIngredientKeys: ['ingredient-chicken', 'ingredient-onion'],
+     });
+ 
++    expect(create).toHaveBeenCalledTimes(1);
+     const request = create.mock.calls[0]?.[0] as {
++      temperature: number;
++      max_tokens: number;
++      model: string;
+       response_format: {
+         type: string;
+         json_schema: {
+@@ -738,6 +799,11 @@ describe('POST /api/ai/recipe-analyze', () => {
+         };
+       };
+     };
++    expect(request).toMatchObject({
++      temperature: 0,
++      max_tokens: 2048,
++      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
++    });
+     expect(request.response_format).toMatchObject({
+       type: 'json_schema',
+       json_schema: { name: 'recipe_analyze', strict: true },
+diff --git a/backend/src/lib/openai.ts b/backend/src/lib/openai.ts
+index 6c0c620..3895361 100644
+--- a/backend/src/lib/openai.ts
++++ b/backend/src/lib/openai.ts
+@@ -521,7 +521,7 @@ export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
+         schema: RECIPE_ANALYZE_SCHEMA,
+       },
+     },
+-    temperature: 0.2,
++    temperature: 0,
+     max_tokens: 2048,
+   });
+ 
+diff --git a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+index 27caaec..d4e09c6 100644
+--- a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+@@ -1,6 +1,6 @@
+ // Canonical eval fixtures for the recipeAnalyze prompt (recipeAnalyze.ts).
+ //
+-// All category classifications are derived from the documented rules in the prompt:
++// All category classifications are derived from docs/kb/domain/07-ai-features.md:
+ //   - food:      Fleisch, Fisch, Gemüse, Obst, Hülsenfrüchte, Getreideprodukte,
+ //                Milchprodukte, Eier, Nüsse, Samen, Öle und Fette, Zucker, Mehl, Sahne.
+ //                Knoblauch und Zwiebeln are explicitly food.
+@@ -8,7 +8,7 @@
+ //                Küchenkräuter are seasoning (Petersilie, Basilikum, Thymian, Oregano,
+ //                Rosmarin, Schnittlauch, etc.) unless nutritionally dominant.
+ //
+-// All amountGrams ranges are derived from the documented unit conversions:
++// All amountGrams ranges are derived from docs/kb/tech/06-ai-integrations.md:
+ //   "1 EL → ~15g", "1 TL → ~5g", "1 Prise → ~1g"
+ // Explicit gram/ml values in the input should pass through unchanged.
+ // A food item with a genuinely indeterminate amount must remain food with amountGrams = null
+@@ -17,6 +17,9 @@
+ //
+ // Update this file whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-run evals.
+ 
++import { expect } from 'vitest';
++import type { AiRecipeRaw } from '../openai';
++
+ export type AmountGramsConstraint =
+   | null                           // must be null
+   | 'not-null'                     // must be non-null (estimated when no quantity given)
+@@ -35,6 +38,20 @@ export interface IngredientConstraint {
+   kitchenAmountText?: KitchenAmountTextConstraint;
+ }
+ 
++export interface ExportStepSemanticAssertion {
++  description: string;
++  /** The export step must trace this source order; all patterns match its description. */
++  sourceStepOrder: number;
++  patterns: RegExp[];
++}
++
++export interface SourceStepSemanticAssertion {
++  description: string;
++  sourceStepOrder: number;
++  /** All patterns must match the source-step description. */
++  patterns: RegExp[];
++}
++
+ export interface RecipeEvalFixture {
+   id: string;
+   description: string;
+@@ -42,12 +59,112 @@ export interface RecipeEvalFixture {
+   constraints: {
+     /** Exact ingredient count — detects lost or invented items. */
+     exactIngredientCount?: number;
++    /** Exact count required when explicit numbered source instructions are present. */
++    sourceStepCountExact?: number;
+     suggestedPortionsMin?: number;
+     suggestedPortionsMax?: number;
+     ingredients: IngredientConstraint[];
++    sourceStepSemanticAssertions?: SourceStepSemanticAssertion[];
++    exportStepSemanticAssertions?: ExportStepSemanticAssertion[];
+   };
+ }
+ 
++export function assertRecipeStepSemantics(result: AiRecipeRaw, constraints: RecipeEvalFixture['constraints']): void {
++  for (const assertion of constraints.sourceStepSemanticAssertions ?? []) {
++    const step = result.steps.find((candidate) => candidate.order === assertion.sourceStepOrder);
++    expect(step, `Missing source step ${assertion.sourceStepOrder}: ${assertion.description}`).toBeDefined();
++    for (const pattern of assertion.patterns) {
++      expect(step!.description, `Source ${assertion.sourceStepOrder}: ${assertion.description}`).toMatch(pattern);
++    }
++    expect(step!.description, 'Do not invent a numeric temperature').not.toMatch(/\d+\s*(?:°\s*[CF]|Grad|Celsius|Fahrenheit)/iu);
++  }
++  for (const assertion of constraints.exportStepSemanticAssertions ?? []) {
++    const step = result.exportSuggestion.steps.find((candidate) => candidate.sourceStepOrders.includes(assertion.sourceStepOrder));
++    expect(step, `Missing export reference ${assertion.sourceStepOrder}: ${assertion.description}`).toBeDefined();
++    for (const pattern of assertion.patterns) {
++      expect(step!.description, `Export source ${assertion.sourceStepOrder}: ${assertion.description}`).toMatch(pattern);
++    }
++    expect(step!.description, 'Do not invent a numeric temperature').not.toMatch(/\d+\s*(?:°\s*[CF]|Grad|Celsius|Fahrenheit)/iu);
++  }
++}
++
++const numberedInstructionSemantics: SourceStepSemanticAssertion[] = [
++  {
++    sourceStepOrder: 1,
++    description: 'cook potatoes in salted water for 18 minutes, then drain them',
++    patterns: [
++      /(?:koch\w*[^;,]*kartoffel|kartoffel[^;,]*(?:koch\w*|gar\w*|sied\w*))/iu,
++      /kartoffel[^;,]*\b18\s*min(?:uten)?/iu,
++      /salzwasser/iu,
++      /(?:\b(?:gieß\w*|giess\w*)[^;]*\bab\b|\bab(?:gieß\w*|giess\w*)|\babtropf\w*)/iu,
++    ],
++  },
++  {
++    sourceStepOrder: 2,
++    description: 'cook beans for 8 minutes until al dente, then drain them',
++    patterns: [
++      /(?:gar\w*[^;,]*bohn|koch\w*[^;,]*bohn|bohn\w*[^;,]*(?:gar\w*|koch\w*))/iu,
++      /bohn\w*[^;,]*\b8\s*min(?:uten)?/iu,
++      /bissfest/iu,
++      /(?:\b(?:gieß\w*|giess\w*)[^;]*\bab\b|\bab(?:gieß\w*|giess\w*)|\babtropf\w*)/iu,
++    ],
++  },
++  {
++    sourceStepOrder: 3,
++    description: 'season the chicken with salt and pepper',
++    patterns: [
++      /(?:(?:würz\w*|salze|salzen)[^;]*hähnchen|hähnchen[^;]*(?:würz\w*|salze|salzen))/iu,
++      /hähnchen[^;]*salz/iu,
++      /hähnchen[^;]*pfeffer/iu,
++    ],
++  },
++  {
++    sourceStepOrder: 4,
++    description: 'heat olive oil in the pan',
++    patterns: [
++      /(?:erhitz\w*[^;]*olivenöl|olivenöl[^;]*erhitz\w*)/iu,
++      /olivenöl[^;]*pfanne/iu,
++    ],
++  },
++  {
++    sourceStepOrder: 5,
++    description: 'fry chicken at medium heat for 4 minutes per side, not 4 minutes total',
++    patterns: [
++      /(?:brat\w*[^;]*hähnchen|hähnchen[^;]*brat\w*)/iu,
++      /hähnchen[^;]*mittler\w*\s+hitze/iu,
++      /(?:\b4\s*min(?:uten)?\.?\s*(?:pro|je|auf jeder)\s+seite|(?:pro|je)\s+seite\s*4\s*min(?:uten)?)/iu,
++    ],
++  },
++  {
++    sourceStepOrder: 6,
++    description: 'reduce heat after frying and continue cooking chicken for another 6 minutes',
++    patterns: [
++      /hähnchen/iu,
++      /(?:reduzier\w*|senk\w*|verringer\w*)[^;]*hitze|hitze[^;]*(?:reduzier\w*|senk\w*|verringer\w*)/iu,
++      /(?:gar\w*[^;]*weitere\s+6\s*min(?:uten)?|weitere\s+6\s*min(?:uten)?[^;]*gar\w*)/iu,
++    ],
++  },
++  {
++    sourceStepOrder: 7,
++    description: 'remove chicken from the pan and rest it covered for 3 minutes',
++    patterns: [
++      /(?:nimm[^;]*hähnchen[^;]*aus[^;]*pfanne|(?:entnimm|entnehm\w*|hol\w*)[^;]*hähnchen[^;]*pfanne|hähnchen[^;]*pfanne[^;]*(?:nehm\w*|nimm))/iu,
++      /(?:zugedeckt|abgedeckt)/iu,
++      /(?:\b3\s*min(?:uten)?[^;]*ruh\w*|ruh\w*[^;]*\b3\s*min(?:uten)?)/iu,
++    ],
++  },
++  {
++    sourceStepOrder: 8,
++    description: 'slice chicken and serve it with potatoes as a side dish and beans',
++    patterns: [
++      /(?:schneid\w*[^;]*hähnchen[^;]*\bauf\b|hähnchen[^;]*aufschneid\w*|schneid\w*[^;]*hähnchen[^;]*(?:scheiben|stücke))/iu,
++      /(?:servier\w*[^;]*(?:hähnchen|\bes\b)|hähnchen[^;]*servier\w*)/iu,
++      /(?:mit|dazu|zusammen)[^;]*kartoffel[^;]*beilage/iu,
++      /(?:mit|dazu|zusammen)[^;]*bohn/iu,
++    ],
++  },
++];
++
+ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+   {
+     id: 'mixed-food-seasoning',
+@@ -59,11 +176,11 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+         // Exact gram values stated in input — pass through unchanged
+         { displayNameContains: 'hähnchen', category: 'food', amountGrams: { min: 295, max: 305 } },
+         { displayNameContains: 'reis', category: 'food', amountGrams: { min: 195, max: 205 } },
+-        // 2 EL × ~15g = 30g; prompt: "1 EL → ~15g"; Olivenöl is food (Öle und Fette)
++        // KB tech/06: 2 EL × ~15g = 30g; Olivenöl is food (Öle und Fette).
+         { displayNameContains: 'olivenöl', category: 'food', amountGrams: { min: 25, max: 35 } },
+-        // Prompt: "Knoblauch und Zwiebeln sind ebenfalls food"
++        // KB domain/07: nutritionally relevant vegetables remain food.
+         { displayNameContains: 'zwiebel', category: 'food' },
+-        // Prompt: "Frische und getrocknete Küchenkräuter sind grundsätzlich seasoning"
++        // KB domain/07: ordinary fresh and dried kitchen herbs are seasoning.
+         { displayNameContains: 'petersilie', category: 'seasoning', kitchenAmountText: 'non-empty' },
+         { displayNameContains: 'salz', category: 'seasoning', kitchenAmountText: 'non-empty' },
+         { displayNameContains: 'pfeffer', category: 'seasoning', kitchenAmountText: 'non-empty' },
+@@ -73,13 +190,13 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+   {
+     id: 'borderline-classification',
+     description:
+-      'Knoblauch and Zwiebeln must be food (explicit prompt rule); Basilikum must be seasoning',
++      'Knoblauch and Zwiebeln must be food; Basilikum must be seasoning per KB domain/07',
+     input:
+       '400g Spaghetti, 3 Knoblauchzehen, 2 Zwiebeln, frisches Basilikum, 30ml Olivenöl, Salz',
+     constraints: {
+       ingredients: [
+         { displayNameContains: 'spaghetti', category: 'food', amountGrams: { min: 395, max: 405 } },
+-        // CRITICAL: prompt explicitly states "Knoblauch und Zwiebeln sind ebenfalls food"
++        // KB domain/07: vegetables remain food; kitchen herbs below are seasoning.
+         { displayNameContains: 'knoblauch', category: 'food' },
+         { displayNameContains: 'zwiebel', category: 'food' },
+         // Basilikum = Küchenkraut = seasoning (not used in nutritionally dominant quantity here)
+@@ -98,7 +215,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+       ingredients: [
+         // Gram values stated explicitly — must pass through as-is
+         { displayNameContains: 'rinderhack', category: 'food', amountGrams: { min: 245, max: 255 } },
+-        // 3 EL × ~15g = 45g (prompt: "1 EL → ~15g")
++        // KB tech/06: 3 EL × ~15g = 45g.
+         { displayNameContains: 'tomatenmark', category: 'food', amountGrams: { min: 40, max: 50 } },
+         { displayNameContains: 'dosentomaten', category: 'food', amountGrams: { min: 395, max: 405 } },
+         // 2 EL × ~15g = 30g; dairy remains a food ingredient
+@@ -115,7 +232,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+     input: 'Hähnchenbrust, Knoblauch, Olivenöl, Rosmarin, Thymian',
+     constraints: {
+       ingredients: [
+-        // Prompt: "schätze eine sinnvolle Menge für die angegebenen Portionen"
++        // KB domain/07: estimate a plausible quantity when no amount is given.
+         // → food items must receive an estimated weight, not null
+         { displayNameContains: 'hähnchen', category: 'food', amountGrams: 'not-null' },
+         { displayNameContains: 'knoblauch', category: 'food' },
+@@ -144,7 +261,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+     description: 'All 6 named ingredients appear in output — nothing dropped, nothing invented',
+     input: '200g Spaghetti, 100g Speck, 2 Eier, 50g Parmesan, Salz, Pfeffer',
+     constraints: {
+-      // Prompt: "Erfinde keine Zutaten oder Schritte, die der Nutzer nicht erwähnt hat"
++      // Input and US-10: preserve all named ingredients without inventing others.
+       exactIngredientCount: 6,
+       ingredients: [
+         { displayNameContains: 'spaghetti', category: 'food', amountGrams: { min: 195, max: 205 } },
+@@ -179,4 +296,26 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
+       ],
+     },
+   },
++  {
++    id: 'side-dish-and-serving-actions',
++    description: 'Compression preserves an explicit side-dish role and the final serving action',
++    input: `Hähnchenbrust mit Kartoffeln und grünen Bohnen für 2 Portionen.
++  Zutaten: 350g Hähnchenbrust, 400g Kartoffeln, 200g grüne Bohnen, 1 EL Olivenöl, Salz, Pfeffer.
++  Zubereitung:
++  1. Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab.
++  2. Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab.
++  3. Würze die Hähnchenbrust mit Salz und Pfeffer.
++  4. Erhitze das Olivenöl in einer Pfanne.
++  5. Brate die Hähnchenbrust bei mittlerer Hitze 4 Minuten pro Seite an.
++  6. Reduziere die Hitze und gare das Hähnchen weitere 6 Minuten fertig.
++  7. Nimm das Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen.
++  8. Schneide das Hähnchen auf und serviere es mit den Kartoffeln als Beilage und den Bohnen.`,
++    constraints: {
++      sourceStepCountExact: 8,
++      ingredients: [],
++      // US-10 AC-15/16 and unchanged numbered input: reviewed semantic matrix 1..8.
++      sourceStepSemanticAssertions: numberedInstructionSemantics,
++      exportStepSemanticAssertions: numberedInstructionSemantics.map((assertion) => ({ ...assertion })),
++    },
++  },
+ ];
+diff --git a/backend/src/lib/prompts/recipeAnalyze.eval.test.ts b/backend/src/lib/prompts/recipeAnalyze.eval.test.ts
+index 3363dfd..05039a5 100644
+--- a/backend/src/lib/prompts/recipeAnalyze.eval.test.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.eval.test.ts
+@@ -17,6 +17,7 @@ import type { AiRecipeIngredientLine } from '../openai';
+ import { RECIPE_ANALYZE_PROMPT_VERSION } from './recipeAnalyze';
+ import {
+   RECIPE_ANALYZE_EVAL_FIXTURES,
++  assertRecipeStepSemantics,
+   type AmountGramsConstraint,
+   type KitchenAmountTextConstraint,
+   type IngredientConstraint,
+@@ -28,7 +29,7 @@ import {
+ // ---------------------------------------------------------------------------
+ 
+ /** Update this constant whenever RECIPE_ANALYZE_PROMPT_VERSION changes and re-review all fixtures. */
+-const TESTED_PROMPT_VERSION = 'v11';
++const TESTED_PROMPT_VERSION = 'v14';
+ 
+ it('prompt version matches fixture expectations', () => {
+   expect(RECIPE_ANALYZE_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);
+@@ -140,7 +141,10 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () =>
+       result.exportSuggestion.difficulty === null ||
+         (result.exportSuggestion.difficulty.trim().length > 0 && !/[\r\n]/u.test(result.exportSuggestion.difficulty)),
+     ).toBe(true);
+-    expect(result.exportSuggestion.steps.length).toBeLessThanOrEqual(5);
++    expect(result.exportSuggestion.steps).toHaveLength(Math.min(result.steps.length, 5));
++    expect(result.exportSuggestion.steps.map((step) => step.order)).toEqual(
++      result.exportSuggestion.steps.map((_, index) => index + 1),
++    );
+     expect(new Set(result.exportSuggestion.includedIngredientKeys).size).toBe(
+       result.exportSuggestion.includedIngredientKeys.length,
+     );
+@@ -179,8 +183,17 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () =>
+ 
+     const sourceOrders = result.steps.map((step) => step.order);
+     expect(sourceOrders).toEqual(sourceOrders.map((_, index) => index + 1));
++    if (constraints.sourceStepCountExact !== undefined) {
++      expect(
++        result.steps.length,
++        `expected exactly ${constraints.sourceStepCountExact} source steps for the numbered input; received: ${result.steps.map((step) => `${step.order}: ${step.description}`).join(' | ')}`,
++      ).toBe(constraints.sourceStepCountExact);
++    }
+     const tracedOrders = result.exportSuggestion.steps.flatMap((step) => step.sourceStepOrders);
+-    expect(tracedOrders).toEqual(sourceOrders);
++    const exportStepTrace = result.exportSuggestion.steps
++      .map((step) => `${step.order} [${step.sourceStepOrders.join(',')}]: ${step.description}`)
++      .join(' | ');
++    expect(tracedOrders, `export step trace: ${exportStepTrace}`).toEqual(sourceOrders);
+     for (const step of result.exportSuggestion.steps) {
+       expect(step.description.trim()).not.toBe('');
+       expect(step.description.length).toBeLessThanOrEqual(90);
+@@ -213,5 +226,7 @@ describe.skipIf(!hasCredentials)('recipeAnalyze: live prompt evaluation', () =>
+     for (const ic of constraints.ingredients) {
+       assertIngredientConstraint(result.ingredients, ic);
+     }
++
++    assertRecipeStepSemantics(result, constraints);
+   });
+ });
+diff --git a/backend/src/lib/prompts/recipeAnalyze.ts b/backend/src/lib/prompts/recipeAnalyze.ts
+index d189abc..a940e51 100644
+--- a/backend/src/lib/prompts/recipeAnalyze.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.ts
+@@ -3,7 +3,7 @@ import {
+   RECIPE_EXPORT_MAX_STEPS,
+ } from '../../../../shared/types/recipeExport';
+ 
+-export const RECIPE_ANALYZE_PROMPT_VERSION = 'v11';
++export const RECIPE_ANALYZE_PROMPT_VERSION = 'v14';
+ 
+ export const RECIPE_ANALYZE_SYSTEM_PROMPT = `Du bist ein Rezept-Assistent für eine deutsche Ernährungs-App.
+ Der Nutzer gibt ein Rezept in freiem Text ein — mit möglichen Tippfehlern, Stichpunkten oder unvollständigen Sätzen.
+@@ -31,17 +31,25 @@ Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahie
+   z. B. "1 TL", "½ TL", "1 Prise", "1 Msp.", "nach Geschmack", "1 Handvoll". Leite sie aus der Originalangabe
+   ab (z. B. "1 EL" bleibt "1 EL") oder schätze eine realistische Kücheneinheit. Für food-Zutaten: null.
+ 
+-**steps**: Die Zubereitungsschritte als geordnete Liste. Schreibe jeden Schritt als vollständigen, klaren Satz oder kurzen Absatz auf Deutsch. Konvertiere Stichpunkte in lesbare Anleitungen. Schätze bei Bedarf realistische Zeitangaben (durationMinutes). title ist ein optionaler kurzer Überschrift pro Schritt (z.B. "Teig vorbereiten", "Anbraten"), null wenn kein sinnvoller Titel passt.
++**steps**: Die Zubereitungsschritte als geordnete Liste. Wenn die Eingabe ausdrücklich nummerierte Zubereitungsanweisungen enthält, übernimm jede nummerierte Anweisung genau einmal als eigenen Quellschritt und in exakt derselben Reihenfolge. Die Nummer der Eingabe bestimmt dabei die Reihenfolge im Array: Eingabe 1 wird steps.order 1, Eingabe 2 wird steps.order 2 usw. Fasse, überspringe, zerlege oder vertausche nummerierte Anweisungen nicht in steps; erhalte ihre Handlungen, Zutatenbezüge sowie Temperatur- und Zeitangaben. Das Limit von fünf Schritten gilt ausschließlich für exportSuggestion.steps und niemals für steps. Verdichten und Gruppieren ist ausschließlich für exportSuggestion.steps erlaubt, dort nur für unmittelbar benachbarte Quellschritte. Schreibe jeden Schritt als vollständigen, klaren Satz oder kurzen Absatz auf Deutsch. Konvertiere Stichpunkte in lesbare Anleitungen. Schätze bei Bedarf realistische Zeitangaben (durationMinutes). title ist ein optionaler kurzer Überschrift pro Schritt (z.B. "Teig vorbereiten", "Anbraten"), null wenn kein sinnvoller Titel passt.
+ 
+ **exportSuggestion**: Ein gemeinsamer, nur zur Nutzerprüfung bestimmter Exportvorschlag. Erzeugt die Exportinformationen in derselben Analyse und niemals durch einen zweiten KI-Aufruf.
+ - **version**: Immer die Zahl 1.
+ - **teaser**: Kurzer fitnessorientierter deutscher Teaser mit höchstens 96 Zeichen.
+ - **totalTimeMinutes**: Positive, ganzzahlige realistische Gesamtzeit in Minuten oder null, wenn sie aus dem Rezept nicht verlässlich ableitbar ist. Verwende niemals eine erfundene Standardzeit wie 30.
+ - **difficulty**: Getrimmte, einzeilige deutsche Schwierigkeit beziehungsweise Komplexität oder null, wenn sie nicht verlässlich ableitbar ist. Verwende niemals den Default "Einfach".
+-- **steps**: HARTES LIMIT: höchstens ${RECIPE_EXPORT_MAX_STEPS} Exportschritte, niemals ${RECIPE_EXPORT_MAX_STEPS + 1} oder mehr. Jeder Schritt enthält neben order und description auch **sourceStepOrders** (die ursprünglichen order-Werte, die dieser Schritt zusammenfasst, aufsteigend und genau einmal insgesamt) und **ingredientKeys** (die analysisKey-Werte der darin verwendeten Zutaten). Erhalte Reihenfolge, Handlungen, Zutatenbezug, Temperaturen, Garzeiten und Wendepunkte. Wenn es mehr als ${RECIPE_EXPORT_MAX_STEPS} Ausgangsschritte gibt, plane zuerst höchstens ${RECIPE_EXPORT_MAX_STEPS} semantische Abschnitte und fasse dafür unmittelbar zusammengehörige Ausgangsschritte in einem Exportschritt zusammen. Verliere dabei keine Handlung, Temperatur, Zeit oder Wendung.
+-- **description je Exportschritt**: HARTES LIMIT: höchstens ${RECIPE_EXPORT_MAX_STEP_LENGTH} Zeichen einschließlich Leerzeichen. Formuliere bei Überschreitung den ganzen Satz neu und kürzer; niemals nur am Ende abschneiden. Die Kurzbeschreibung muss die wesentliche Handlung sowie die zugehörige Temperatur, Zeit und den Zutatenbezug erhalten.
++- **steps**: HARTES LIMIT: genau min(N, ${RECIPE_EXPORT_MAX_STEPS}) Exportschritte für N Quellschritte, niemals ${RECIPE_EXPORT_MAX_STEPS + 1} oder mehr. Jeder Schritt enthält neben order und description auch **sourceStepOrders** (die ursprünglichen order-Werte, die dieser Schritt zusammenfasst, aufsteigend und genau einmal insgesamt) und **ingredientKeys** (die analysisKey-Werte der darin verwendeten Zutaten). Erhalte Reihenfolge, Handlungen, Zutatenbezug, Temperaturen, Garzeiten und Wendepunkte. Erfasse vor dem Gruppieren für jeden Quellschritt intern die Handlung, die betroffenen Zutaten, vorhandene Temperatur- und Zeitangaben, Wendepunkte sowie Beilagen-, Saucen- und Servierbezüge. Plane die Gruppen ausschließlich nach der unten beschriebenen Zuordnung der Exportschritte; übernimm anschließend jeden fachlich relevanten Punkt der zugeordneten Quellschritte ausdrücklich in den jeweiligen Exporttext. Verliere dabei keine Handlung, Temperatur, Zeit oder Wendung. Bei einer Beilage oder Sauce muss ihre Beziehung zur Hauptspeise erkennbar bleiben; bei "als Beilage" oder "zusammen mit" genügen z.B. "Kartoffeln als Beilage" oder "Hähnchen mit Kartoffeln servieren". Eine bloße Zutatennennung oder sourceStepOrders-Referenz reicht nicht. Eine ausdrückliche Anrichten- oder Servierhandlung muss samt den zugehörigen Komponenten erhalten bleiben.
++- **description je Exportschritt**: HARTES LIMIT: höchstens ${RECIPE_EXPORT_MAX_STEP_LENGTH} Zeichen einschließlich Leerzeichen. Formuliere bei Überschreitung den ganzen Satz neu und kürzer; niemals nur am Ende abschneiden oder ein Wort mit Bindestrich beziehungsweise unvollständigem Wort abbrechen. Die Kurzbeschreibung muss ein vollständiger, nichtleerer Satz sein und die wesentliche Handlung sowie die zugehörige Temperatur, Zeit und alle für die Handlung nötigen Zutaten und Komponenten erhalten. Kürze zuerst Füllwörter, nicht Handlungen oder Komponenten.
+ - **includedIngredientKeys**: Eine strikte Whitelist der für den Export vorgeschlagenen Zutaten: Nimm ausschließlich die analysisKey-Werte von Zutaten mit category "food", in ihrer ursprünglichen Reihenfolge. Prüfe vor dem Schreiben jeden Schlüssel gegen die Zutatenliste und entferne jeden Schlüssel, dessen category "seasoning" ist — auch wenn dieses Gewürz in einem Exportschritt verwendet wird. Bei fehlenden food-Zutaten ist das Array leer. Erfinde keine Schlüssel.
+ 
++## Zwei getrennte Schrittlisten
++Die Ausgabefelder steps und exportSuggestion.steps sind zwei verschiedene Listen. Erstelle zuerst die vollständige Quellschrittliste steps; erst danach planst du die Exportliste. Wenn die Eingabe nummerierte Anweisungen enthält, muss steps genau einen Eintrag je nummerierter Anweisung in derselben Reihenfolge enthalten. Wende das Limit von ${RECIPE_EXPORT_MAX_STEPS} niemals auf steps an. Eine Zusammenfassung mehrerer nummerierter Anweisungen ist ausschließlich in exportSuggestion.steps erlaubt.
++
++## Zuordnung der Exportschritte
++Bestimme N ausschließlich aus den Einträgen der fertigen Quellschrittliste steps, nicht aus der Anzahl einzelner Handlungen in ihren Beschreibungen; ihre orders sind 1 bis N. Erzeuge genau M = min(N, ${RECIPE_EXPORT_MAX_STEPS}) Exportschritte mit orders 1 bis M. Bei N <= ${RECIPE_EXPORT_MAX_STEPS} enthält Exportschritt i ausschließlich Quellorder i und alle Handlungen dieses Quellschritts in einer gemeinsamen description. Beispiel für N=5: [1], [2], [3], [4], [5]; auch wenn Quellschritt 5 sowohl Garen als auch Servieren enthält, bleiben beide Handlungen im selben fünften Exportschritt. [1], [2], [3], [4], [5,5] und ein zusätzlicher Exportschritt [5] sind ungültig. Bei N > ${RECIPE_EXPORT_MAX_STEPS} gruppierst du die Quellorders in genau ${RECIPE_EXPORT_MAX_STEPS} nichtleere, zusammenhängende Intervalle. Beispiel für N=8: [1,2], [3,4], [5,6], [7], [8]. Die Beispiele legen keine festen Gruppengrenzen für andere Rezepte fest.
++
++Lege die vollständige Folge der Quellorder-Gruppen fest, bevor du Exportbeschreibungen formulierst. Weise die erste Gruppe order 1, die zweite order 2 usw. zu. Jede Gruppe beginnt genau mit der nächsten noch nicht zugeordneten Quellorder und enthält nur unmittelbar folgende Orders. Nach jeder Gruppe ist die nächste Quellorder eins nach deren letzter Order. Die letzte Gruppe muss bei N enden. Wiederhole oder überspringe keine Order; erstelle keinen zusätzlichen Exportschritt für eine zweite Handlung innerhalb eines Quellschritts. Erhalte mehrere Handlungen desselben Quellschritts gemeinsam in der Beschreibung seiner einen Gruppe. Beim Formulieren darfst du weder die Gruppen noch ihre Anzahl erweitern: Kürze bei Platzmangel den Text in derselben Gruppe, nicht durch einen neuen Eintrag mit derselben Quellorder. Abgeflacht muss sourceStepOrders exakt 1, 2, ..., N ergeben. Andernfalls korrigiere zuerst die Gruppen. Wähle bei N > ${RECIPE_EXPORT_MAX_STEPS} Gruppengrenzen nach inhaltlich zusammengehörigen Handlungen und übernimm alle fachlich relevanten Handlungen, Zutatenbezüge, Zeiten, Temperaturen und Beziehungen in die passenden Exportbeschreibungen.
++
+ ## Regeln
+ - Korrigiere Rechtschreibfehler und Grammatik
+ - Verwende durchgehend die Du-Form — in description und allen Schritten, niemals Sie-Form
+@@ -55,8 +63,12 @@ Deine Aufgabe ist es, daraus ein vollständiges, gut lesbares Rezept zu extrahie
+ - Jeder analysisKey darf nur einmal vorkommen; includedIngredientKeys und ingredientKeys dürfen nur vorhandene analysisKeys referenzieren.
+ - includedIngredientKeys darf ausschließlich auf Zutaten mit category "food" zeigen; kein seasoning-Schlüssel darf dort vorkommen. Prüfe diese Kategoriebedingung vor dem Absenden noch einmal für jeden einzelnen Schlüssel.
+ - sourceStepOrders müssen alle ursprünglichen steps.order-Werte genau einmal und in ihrer Reihenfolge abdecken; kein Ausgangsschritt darf verloren gehen.
++- Wenn die Nutzereingabe nummerierte Zubereitungsschritte enthält, zählt deren Anzahl exakt als Anzahl der steps-Einträge. Prüfe diesen Gleichstand vor der Ausgabe; eine Verdichtung ist nur in exportSuggestion.steps zulässig.
+ - Gib die Quell-steps in Zubereitungsreihenfolge mit lückenlosen 1-basierten order-Werten 1 bis N aus; order entspricht der Array-Position.
+ - Erzeuge Exportsteps durch einen Durchlauf der Quell-steps von order 1 an. Fasse ausschließlich unmittelbar benachbarte Quellschritte zusammen und ordne sie niemals nach Zutaten, Wichtigkeit oder Erzählfluss um. Aneinandergehängt müssen alle sourceStepOrders in Exportreihenfolge exakt 1, 2, ..., N ergeben.
+-- Prüfe vor dem Absenden des JSON ausdrücklich: exportSuggestion.steps.length <= ${RECIPE_EXPORT_MAX_STEPS}, jede exportSuggestion.steps[].description.length <= ${RECIPE_EXPORT_MAX_STEP_LENGTH}, und die vollständige sourceStepOrders-Abdeckung bleibt erhalten. Eine Ausgabe, die eine dieser Bedingungen verletzt, ist ungültig und muss vor der Ausgabe überarbeitet werden.
++- Baue sourceStepOrders vor dem Formulieren der Exportbeschreibungen als lückenlose, nicht überlappende Gruppen: Jeder Quellorder gehört genau einem Exportschritt. Prüfe, dass das abgeflachte Array exakt 1, 2, ..., N enthält und kein Quellorder doppelt vorkommt.
++- Die sourceStepOrders aller Exportschritte bilden eine Partition der Quellorders: Jeder Exportschritt hat mindestens einen Quellorder, kein Quellorder erscheint in mehreren Exportschritten und es gibt keine zusätzlichen Exportschritte mit wiederholten Quellorders.
++- Vergleiche vor dem Absenden jede Quellhandlung mit dem Exporttext. Prüfe ausdrücklich, ob Beilagen, Saucen und ihre Beziehungen erhalten sind und ob jede explizite Anrichten- oder Servierhandlung mitsamt den genannten Komponenten lesbar bleibt; ein vollständiger sourceStepOrders-Trace allein belegt keine semantische Erhaltung.
++- Prüfe vor dem Absenden des JSON ausdrücklich: exportSuggestion.steps.length = min(steps.length, ${RECIPE_EXPORT_MAX_STEPS}), Exportorders sind 1 bis M, jede exportSuggestion.steps[].description ist nichtleer, ein vollständiger Satz mit höchstens ${RECIPE_EXPORT_MAX_STEP_LENGTH} Zeichen und die vollständige sourceStepOrders-Abdeckung bleibt erhalten. Prüfe jede Beschreibung gegen genau ihre referenzierten Quellschritte; Details in anderen Gruppen zählen nicht. Eine Ausgabe, die eine dieser Bedingungen verletzt, ist ungültig und muss vor der Ausgabe überarbeitet werden.
+ - totalTimeMinutes und difficulty bleiben null, wenn keine belastbare Ableitung möglich ist. Setze niemals 30 Minuten oder "Einfach" als Ersatzwert.
+ - Antworte NUR mit dem strukturierten JSON-Output`;

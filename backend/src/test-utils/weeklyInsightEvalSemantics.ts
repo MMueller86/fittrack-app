@@ -223,7 +223,7 @@ export function classifyWeeklyInsightJudgeOutput(
   }
 
   const { basis, relation, evidence } = validated.data;
-  if (evidence == null || evidence.length === 0 || !generatedText.includes(evidence)) {
+  if (evidence == null || evidence.length === 0 || !generatedText.toLowerCase().includes(evidence.toLowerCase())) {
     return {
       status: 'UNVERIFIED',
       basis,

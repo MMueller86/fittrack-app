@@ -11,7 +11,7 @@ import { DAILY_INSIGHT_MORNING_MODULE } from './promptMorning';
 import { DAILY_INSIGHT_NUTRITION_MODULE } from './promptNutrition';
 import { DAILY_INSIGHT_WEIGHT_MODULE } from './promptWeight';
 
-export const DAILY_INSIGHT_PROMPT_VERSION = 'v15' as const;
+export const DAILY_INSIGHT_PROMPT_VERSION = 'v17' as const;
 export const DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION = 'v2' as const;
 
 export interface DailyInsightPromptSnapshot {
@@ -40,6 +40,7 @@ export const DAILY_INSIGHT_PROMPT_GUARD_POLICY = {
 } as const;
 
 export const DAILY_INSIGHT_PROMPT_GUARD_TEXTS = {
+  activityOpenDay: '## Abschließender Schutz für activity_focus am offenen Tag\nremainingCalories ist positiv. Dieser Schutz gilt im gesamten JSON unabhängig von der Proteinlücke und der unbekannten oder vorhandenen Ortszeit. Nenne weder die bisherige Aufnahme noch den Restbetrag; bewerte die Aufnahme nicht als zu niedrig oder den Tag als abgeschlossen. Verwende nicht "zu wenig gegessen", "unter deinem Ziel", "unter dem Ziel" oder "dein Kalorienverbrauch liegt unter", auch nicht für historische Tage. Ordne nur ein, dass das Tagesziel die eingetragene Aktivität berücksichtigt. Der Aktivitätsabschluss richtet sich allein nach activityCompletionStatus: unknown bleibt neutral, planned geplant und likely_completed unsicher. Fueling, Flüssigkeit und Erholung bleiben konditional bei planned oder unknown; diese Hinweise sind keine Bewertung einer abgeschlossenen Tagesaufnahme. Behalte die vorhandenen Protein- und Budget-Sperren bei.',
   finalNegativeBudget: `## Abschließende Sperre bei negativem Kalorienbudget
 remainingCalories ist negativ. Diese Budget-Sperre hat Vorrang vor jedem Protein-Gap und allen Mahlzeitenregeln, auch wenn remainingProteinG größer als 20 ist. Empfiehl für heute keine Mahlzeit, keinen Snack und keine zusätzliche Proteinquelle. Setze recommendation, cta und ctaTarget exakt auf null: {"recommendation": null, "cta": null, "ctaTarget": null}. Eine Empfehlung oder ein CTA für eine proteinreiche nächste Mahlzeit ist ebenfalls verboten.`,
   openBudgetWithProteinGap: '## Zwingender Vertrag für Proteinlücke bei offenem Kalorienbudget\nremainingCalories ist positiv und remainingProteinG ist größer als 20. Der Tag ist noch offen und die materielle Proteinlücke ist ein vorausschauendes Signal für die nächste Mahlzeit, keine abgeschlossene Tagesbewertung. Formuliere im gesamten JSON ausschließlich offen und vorausschauend: Bewerte die bisherige Kalorienaufnahme nicht als zu gering und stelle den Tag nicht als abgeschlossen dar. Verwende insbesondere nicht "zu wenig gegessen", "unter deinem Ziel", "unter dem Ziel" oder "dein Kalorienverbrauch liegt unter". Gib eine konkrete proteinreiche nächste Mahlzeit als einzigen Ernährungshinweis; widersprüchliche Aussagen wie "Proteinziel ist erreicht" oder "fast optimal" sind unzulässig.',
@@ -250,6 +251,10 @@ export function buildDailyInsightPrompt(
     ...(effectiveActivityBudgetGuard === null ? [] : [effectiveActivityBudgetGuard]),
     ...(finalOutputGuard === null ? [] : [finalOutputGuard]),
     ...(finalNegativeBudgetGuard === null ? [] : [finalNegativeBudgetGuard]),
+    ...(intent === 'activity_focus'
+      && remainingCalories != null
+      && remainingCalories > DAILY_INSIGHT_PROMPT_GUARD_POLICY.openCalorieBudget.threshold
+      ? [DAILY_INSIGHT_PROMPT_GUARD_TEXTS.activityOpenDay] : []),
   ].join('\n\n');
   const user = JSON.stringify({ intent, context: buildPromptInputContext(intent, context) });
   return { system, user };

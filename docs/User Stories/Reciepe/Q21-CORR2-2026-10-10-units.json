@@ -1,0 +1,27 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "test",
+    "--workspace=backend",
+    "--",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Report.json"
+  ],
+  "cwd": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app",
+  "started": "2026-10-10T00:14:09.854Z",
+  "finished": "2026-10-10T00:15:02.285Z",
+  "exit": 0,
+  "counts": {
+    "total": 1639,
+    "passed": 1639,
+    "failed": 0,
+    "skipped": 0
+  },
+  "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Output.txt",
+  "outputSha256": "d20ad726f8487a7842b18067ee226999a425c393646427ef8e72b53a55f4d8f5",
+  "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Report.json",
+  "reportSha256": "e01e7471ff76c1894f00e222ff8a4c2211e1f86473a9b9625616b1d0dbf12a54"
+}

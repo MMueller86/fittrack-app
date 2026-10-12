@@ -1,0 +1,119 @@
+{
+  "series": "import-indeterminate-spray-oil-stays-food",
+  "runs": [
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run01",
+      "exit": 0,
+      "started": "2026-10-11T10:53:16.619Z",
+      "finished": "2026-10-11T10:53:22.422Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run02",
+      "exit": 0,
+      "started": "2026-10-11T10:53:23.150Z",
+      "finished": "2026-10-11T10:53:30.780Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run03",
+      "exit": 0,
+      "started": "2026-10-11T10:53:31.659Z",
+      "finished": "2026-10-11T10:53:37.828Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run04",
+      "exit": 0,
+      "started": "2026-10-11T10:53:39.558Z",
+      "finished": "2026-10-11T10:53:46.537Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run05",
+      "exit": 0,
+      "started": "2026-10-11T10:53:47.191Z",
+      "finished": "2026-10-11T10:53:53.206Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run06",
+      "exit": 0,
+      "started": "2026-10-11T10:53:53.876Z",
+      "finished": "2026-10-11T10:54:05.974Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run07",
+      "exit": 0,
+      "started": "2026-10-11T10:54:06.651Z",
+      "finished": "2026-10-11T10:54:12.372Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-indeterminate-spray-oil-stays-food-run08",
+      "exit": 0,
+      "started": "2026-10-11T10:54:13.049Z",
+      "finished": "2026-10-11T10:54:20.509Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    }
+  ],
+  "passedRuns": 8,
+  "totalRuns": 8
+}

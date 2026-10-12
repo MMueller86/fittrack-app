@@ -1,0 +1,16 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "build:verify",
+    "--workspace=backend"
+  ],
+  "cwd": ".",
+  "started": "2026-10-10T00:15:06.490Z",
+  "finished": "2026-10-10T00:15:10.621Z",
+  "exit": 0,
+  "counts": null,
+  "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-build-Output.txt",
+  "outputSha256": "db74fdead4e458190f942dfda81f0e0876ff3e9104e2f140d84023ecc7189d37"
+}

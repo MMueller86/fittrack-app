@@ -1,11 +1,12 @@
 import { z } from 'zod';
-import type { AiRecipeIngredientLine, AiRecipeRaw } from './openai';
+import type { AiRecipeIngredientLine, AiRecipeRaw, RecipePreparationContext, RecipeExportPreparationOutput } from './openai';
 import {
   RECIPE_EXPORT_MAX_INGREDIENTS,
   RECIPE_EXPORT_MAX_STEP_LENGTH,
   RECIPE_EXPORT_MAX_STEPS,
   RECIPE_EXPORT_MAX_TEASER_LENGTH,
   RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES,
+  RECIPE_EXPORT_MIN_STEPS,
 } from '../../../shared/types/recipeExport';
 
 const NonEmptyTextSchema = z.string().min(1).refine((value) => value.trim().length > 0);
@@ -39,7 +40,7 @@ const RecipeAnalyzeExportSuggestionSchema = z.object({
   teaser: z.string().min(1).max(RECIPE_EXPORT_MAX_TEASER_LENGTH).refine((value) => value.trim().length > 0),
   totalTimeMinutes: z.number().finite().int().positive().max(RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES).nullable(),
   difficulty: SingleLineTextSchema.nullable(),
-  steps: z.array(RecipeAnalyzeExportStepSchema).max(RECIPE_EXPORT_MAX_STEPS),
+  steps: z.array(RecipeAnalyzeExportStepSchema).min(RECIPE_EXPORT_MIN_STEPS).max(RECIPE_EXPORT_MAX_STEPS),
   includedIngredientKeys: z.array(AnalysisKeySchema).max(RECIPE_EXPORT_MAX_INGREDIENTS),
 }).strict();
 
@@ -58,22 +59,36 @@ export type RecipeAnalyzeValidationResult =
   | { ok: false; errors: string[] };
 
 const RecipeExportPreparationSchema = z.object({
-  steps: z.array(RecipeAnalyzeSourceStepSchema),
-  exportSuggestion: RecipeAnalyzeExportSuggestionSchema
-    .omit({ includedIngredientKeys: true })
-    .extend({
-      steps: z.array(RecipeAnalyzeExportStepSchema.omit({ ingredientKeys: true }).strip())
-        .max(RECIPE_EXPORT_MAX_STEPS),
-    })
-    .strip(),
-});
+  version: z.literal(1),
+  teaser: z.string().min(1).max(RECIPE_EXPORT_MAX_TEASER_LENGTH).refine((value) => value.trim().length > 0),
+  totalTimeMinutes: z.number().finite().int().positive().max(RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES).nullable(),
+  difficulty: SingleLineTextSchema.refine((value) => value === value.trim()).nullable(),
+  steps: z.array(RecipeAnalyzeExportStepSchema.omit({ ingredientKeys: true }))
+    .min(RECIPE_EXPORT_MIN_STEPS).max(RECIPE_EXPORT_MAX_STEPS),
+}).strict();
 
-type RecipeExportPreparation = z.infer<typeof RecipeExportPreparationSchema>;
+const RecipePreparationSourceSchema = z.array(z.object({
+  order: z.number().finite().int().positive(),
+  title: z.string().optional(),
+  description: NonEmptyTextSchema,
+}).strict()).min(1);
 
 export interface RecipeExportPreparationDiagnostic {
-  phase: 'schema' | 'semantic';
+  phase: 'schema' | 'semantic' | 'template';
   code: string;
   path: string;
+  stepIndex?: number;
+  stepOrder?: number;
+  constraint?: string;
+  allowedRange?: { min?: number; max?: number };
+  offendingReferences?: number[];
+  explanation?: string;
+  layout?: 'large' | 'compact';
+  stepCount?: number;
+  font?: { family: string; size: number; weight: number; style: string; lineHeight: number };
+  actual?: { width: number; height?: number };
+  bounds?: { width: number; height?: number; tolerance: number };
+  textLength?: number;
 }
 
 interface RecipeExportStepTraceIssue extends RecipeExportPreparationDiagnostic {
@@ -81,29 +96,114 @@ interface RecipeExportStepTraceIssue extends RecipeExportPreparationDiagnostic {
   message: string;
 }
 
-export function validateRecipeExportPreparationOutput(raw: unknown):
-  | { ok: true; data: RecipeExportPreparation }
+function preparationSchemaDiagnostics(issues: z.ZodIssue[], prefix = '', raw?: unknown): RecipeExportPreparationDiagnostic[] {
+  return issues.map((issue) => {
+    const stepIndex = issue.path[0] === 'steps' && typeof issue.path[1] === 'number' ? issue.path[1] : undefined;
+    const candidate = raw as { steps?: Array<{ order?: unknown; sourceStepOrders?: unknown[] }> } | undefined;
+    const order = stepIndex !== undefined ? candidate?.steps?.[stepIndex]?.order : undefined;
+    const referenceIndex = issue.path[2] === 'sourceStepOrders' && typeof issue.path[3] === 'number' ? issue.path[3] : undefined;
+    const reference = stepIndex !== undefined && referenceIndex !== undefined ? candidate?.steps?.[stepIndex]?.sourceStepOrders?.[referenceIndex] : undefined;
+    return {
+      phase: 'schema', code: issue.code, path: prefix + formatValidationPath(issue.path),
+      ...(stepIndex !== undefined ? { stepIndex } : {}),
+      ...(typeof order === 'number' && Number.isFinite(order) ? { stepOrder: order } : {}),
+      ...(typeof reference === 'number' && Number.isFinite(reference) ? { offendingReferences: [reference] } : {}),
+      constraint: issue.code,
+      ...(issue.code === 'too_big' && typeof issue.maximum === 'number' ? { allowedRange: { max: issue.maximum } } : {}),
+      ...(issue.code === 'too_small' && typeof issue.minimum === 'number' ? { allowedRange: { min: issue.minimum } } : {}),
+      explanation: 'The field must satisfy the strict Preparation schema.',
+    };
+  });
+}
+
+export function validateRecipePreparationSource(savedSource: unknown):
+  | { ok: true; data: RecipePreparationContext['steps'] }
+  | { ok: false; errors: string[]; diagnostics: RecipeExportPreparationDiagnostic[] } {
+  const source = RecipePreparationSourceSchema.safeParse(savedSource);
+  if (!source.success) {
+    const diagnostics = preparationSchemaDiagnostics(source.error.issues, 'sourceSteps.');
+    return { ok: false, diagnostics, errors: diagnostics.map(({ code, path }) => `${code}@${path}`) };
+  }
+  const diagnostics: RecipeExportPreparationDiagnostic[] = [];
+  const indicesByOrder = new Map<number, number[]>();
+  source.data.forEach((step, index) => indicesByOrder.set(step.order, [...(indicesByOrder.get(step.order) ?? []), index]));
+  source.data.forEach((step, index) => {
+    if (indicesByOrder.get(step.order)!.length > 1) {
+      diagnostics.push({ phase: 'semantic', code: 'duplicate_source_step_order', path: `sourceSteps[${index}].order` });
+    }
+    if (index > 0 && step.order <= source.data[index - 1]!.order) {
+      diagnostics.push({ phase: 'semantic', code: 'source_step_order_not_ascending', path: `sourceSteps[${index}].order` });
+    }
+  });
+  return diagnostics.length ? { ok: false, diagnostics, errors: diagnostics.map(({ code, path }) => `${code}@${path}`) }
+    : { ok: true, data: source.data };
+}
+
+export function validateRecipeExportPreparationOutput(raw: unknown, savedSource: RecipePreparationContext['steps']):
+  | { ok: true; data: RecipeExportPreparationOutput }
   | { ok: false; errors: string[]; diagnostics: RecipeExportPreparationDiagnostic[] } {
   const parsed = RecipeExportPreparationSchema.safeParse(raw);
   if (!parsed.success) {
     return {
       ok: false,
       errors: parsed.error.issues.map((issue) => `${issue.path.join('.') || 'output'}: ${issue.message}`),
-      diagnostics: parsed.error.issues.map((issue) => ({
-        phase: 'schema',
-        code: issue.code,
-        path: formatValidationPath(issue.path),
-      })),
+      diagnostics: preparationSchemaDiagnostics(parsed.error.issues, '', raw),
     };
   }
-  const issues = validateExportStepTrace(parsed.data);
+  const source = validateRecipePreparationSource(savedSource);
+  if (!source.ok) return source;
+  const issues: RecipeExportStepTraceIssue[] = [];
+  const report = (code: string, index: number, field: string, message: string, offendingReferences?: number[]) => {
+    issues.push({ phase: 'semantic', code, path: `steps[${index}].${field}`, stepIndex: index,
+      stepOrder: parsed.data.steps[index]!.order, constraint: code, explanation: message, message,
+      ...(offendingReferences ? { offendingReferences } : {}) });
+  };
+  const sourceOrders = source.data.map((step) => step.order);
+  const knownOrders = new Set(sourceOrders);
+  const referenceIndices = new Map<number, Set<number>>();
+  parsed.data.steps.forEach((step, index) => step.sourceStepOrders.forEach((order) => {
+    const indices = referenceIndices.get(order) ?? new Set<number>();
+    indices.add(index);
+    referenceIndices.set(order, indices);
+  }));
+  let previousFirstReference = 0;
+  for (const [index, step] of parsed.data.steps.entries()) {
+    if (step.order !== index + 1) {
+      report('export_step_order_not_contiguous', index, 'order', 'steps.order must start at 1 and be contiguous');
+    }
+    if (step.sourceStepOrders[0]! <= previousFirstReference) {
+      for (const affected of [index - 1, index]) {
+        report('export_source_trace_not_ascending', affected, 'sourceStepOrders', 'groups must be ascending by first reference',
+          [parsed.data.steps[affected]!.sourceStepOrders[0]!]);
+      }
+    }
+    previousFirstReference = step.sourceStepOrders[0]!;
+    for (const [referenceIndex, order] of step.sourceStepOrders.entries()) {
+      if (referenceIndex > 0 && order <= step.sourceStepOrders[referenceIndex - 1]!) {
+        report('source_step_references_not_ascending', index, 'sourceStepOrders', 'sourceStepOrders must be ascending within each group', [order]);
+      }
+      if (!knownOrders.has(order)) {
+        report('unknown_source_step_reference', index, 'sourceStepOrders', 'sourceStepOrders references an unknown saved step', [order]);
+      }
+      if (referenceIndices.get(order)!.size > 1 || step.sourceStepOrders.filter((value) => value === order).length > 1) {
+        report('duplicate_export_source_reference', index, 'sourceStepOrders', 'sourceStepOrders must be globally unique', [order]);
+      }
+    }
+  }
   return issues.length > 0
     ? {
         ok: false,
         errors: issues.map((issue) => issue.message),
-        diagnostics: issues.map(({ phase, code, path }) => ({ phase, code, path })),
+        diagnostics: issues.map(({ message: _message, ...diagnostic }) => diagnostic),
       }
     : { ok: true, data: parsed.data };
+}
+
+/** Semantic contract violations of an otherwise schema-valid import analysis, for one directed model correction. */
+export function importContractViolations(raw: unknown): string[] {
+  if (!RecipeAnalyzeOutputSchema.safeParse(raw).success) return [];
+  const result = validateRecipeAnalyzeOutput(raw);
+  return result.ok ? [] : result.errors;
 }
 
 function formatValidationPath(path: PropertyKey[]): string {
@@ -121,7 +221,7 @@ function formatValidationPath(path: PropertyKey[]): string {
   return formatted || 'output';
 }
 
-function validateExportStepTrace(data: RecipeExportPreparation): RecipeExportStepTraceIssue[] {
+function validateExportStepTrace(data: Pick<AiRecipeRaw, 'steps' | 'exportSuggestion'>): RecipeExportStepTraceIssue[] {
   const issues: RecipeExportStepTraceIssue[] = [];
   const sourceOrders = data.steps.map((step) => step.order);
   if (new Set(sourceOrders).size !== sourceOrders.length) {
@@ -190,14 +290,24 @@ function validateExportStepTrace(data: RecipeExportPreparation): RecipeExportSte
       flattenedSourceOrders.push(sourceOrder);
     }
   }
-  if (flattenedSourceOrders.length !== sourceOrders.length ||
-      flattenedSourceOrders.some((order, index) => order !== sourceOrders[index])) {
+  if (new Set(flattenedSourceOrders).size !== flattenedSourceOrders.length) {
     issues.push({
       phase: 'semantic',
-      code: 'source_step_coverage_mismatch',
+      code: 'duplicate_export_source_reference',
       path: 'exportSuggestion.steps',
-      message: 'exportSuggestion steps must trace every source step exactly once and in order',
+      message: 'exportSuggestion source references must be globally unique',
     });
+  }
+  for (let index = 1; index < flattenedSourceOrders.length; index += 1) {
+    if (flattenedSourceOrders[index]! <= flattenedSourceOrders[index - 1]!) {
+      issues.push({
+        phase: 'semantic',
+        code: 'export_source_trace_not_ascending',
+        path: 'exportSuggestion.steps',
+        message: 'exportSuggestion source trace must be strictly ascending',
+      });
+      break;
+    }
   }
   return issues;
 }

@@ -1,0 +1,669 @@
+{
+  "task": "D-1",
+  "approval": "2026-10-09",
+  "documentationStatus": "DOCUMENTATION_COMPLETE_FEATURE_PARTIAL_NOT_ACCEPTED",
+  "featureStatus": "IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED",
+  "featureAccepted": false,
+  "releaseEligible": false,
+  "alphaLoopDeployed": false,
+  "implementationGateRuns": 0,
+  "liveCalls": 0,
+  "deployments": 0,
+  "delegations": 0,
+  "fullPlanRead": false,
+  "planStatusChanged": false,
+  "head": "b637ee5b59a4f72b7d822443680c1951a01f9dc4",
+  "createdAt": "2026-10-09T16:29:50.140Z",
+  "handoff": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+  "baseline": {
+    "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Baseline_2026-10-09.json",
+    "sha256": "f0c253673fad8ebe531065009b601784a992d562901545c74cd67f7d99140b56",
+    "existingFiles": 929,
+    "foreignFiles": 922,
+    "scope": "Tracked and nonignored untracked regular files; no settings/secrets read; owned docs retain starting bytes; foreign files hashes only"
+  },
+  "ownedDiff": {
+    "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Owned-Diff_2026-10-09.patch",
+    "sha256": "ae3675d08b1a24b9c2e5c063562c19faf7d2de0b01010ffd27c710237bcce984",
+    "relativeTo": "D-1 starting worktree snapshots, not HEAD; new handoff added; generated JSON inventoried separately"
+  },
+  "ownFiles": [
+    {
+      "path": "docs/kb/domain/06-recipes.md",
+      "beforeSha256": "9606617b3023334aa79b38e8ae701cff5fc1d1111859a1c45fc195f0c44a084f",
+      "afterSha256": "cbc6d50139db2cf508bf5441234d71ab45318b4551731bc0763b239f7dc7e0cf",
+      "hunks": [
+        "@@ -182,7 +182,8 @@ duplicate, or seasoning IDs return `400` with",
+        "@@ -195,7 +196,9 @@ data. The Strict `recipe_export_preparation` provider schema returns only",
+        "@@ -228,19 +231,34 @@ saving still requires the separate explicit confirmation flow."
+      ]
+    },
+    {
+      "path": "docs/kb/domain/07-ai-features.md",
+      "beforeSha256": "a99d3e69c797fa0dd8d2a45b1e4335db02438543f360123e9d73f1dd401c975b",
+      "afterSha256": "8ebdb15efc0a4f2c154c12ca4f34f48ef82ef3806a9b807ead3ec5a085857d5b",
+      "hunks": [
+        "@@ -103,7 +103,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms.",
+        "@@ -168,7 +168,7 @@ This allows the review screen (`RecipeWizardScreen`) to render seasoning items d",
+        "@@ -200,7 +200,7 @@ The prompt requests the recipe-specific cooking core: central preparation and co",
+        "@@ -210,7 +210,10 @@ The Strict `recipe_export_preparation` output is only",
+        "@@ -219,7 +222,7 @@ before quota or provider work. The transient response contains only the",
+        "@@ -233,14 +236,33 @@ known, locally ascending and globally unique, ordered by their FIRST reference."
+      ]
+    },
+    {
+      "path": "docs/kb/tech/02-backend.md",
+      "beforeSha256": "ca76f2dcad6751541311d6c039a7a8bb0ae0929a99392150a204f05c0068ec7a",
+      "afterSha256": "19d7814e733954ee76e9b2c73115058aa9d29d6f71ecfdd12e34ded10afce60d",
+      "hunks": [
+        "@@ -260,8 +260,8 @@ saved-title context are technical failures, not AI-correctable failures.",
+        "@@ -273,7 +273,8 @@ The response keeps `sourceEtag` for compatibility, but it is not a client-side",
+        "@@ -284,7 +285,24 @@ difficulty, steps }`, where steps contain only `{ order, description,",
+        "@@ -294,15 +312,25 @@ locally ascending, globally unique, and ordered by FIRST reference, not by the",
+        "@@ -329,8 +357,24 @@ coverage-only payload/helpers are removed: no `sourceStepTrace`, expected/actual"
+      ]
+    },
+    {
+      "path": "docs/kb/tech/06-ai-integrations.md",
+      "beforeSha256": "c78459c0574eba9daae1e0ad3c53319ed2fb9b66f169a18934c02694a6ae2f99",
+      "afterSha256": "39082632d23a33e765fe9ed5f68d7939196b46c981e2a076fd912b2fc860e26a",
+      "hunks": [
+        "@@ -64,7 +64,7 @@ Mobile shows `MealEstimateReviewScreen`.",
+        "@@ -106,7 +106,8 @@ Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: t",
+        "@@ -133,8 +134,10 @@ The dedicated Strict `recipe_export_preparation` schema returns only backend-onl",
+        "@@ -148,11 +151,12 @@ need not ascend: `[1,4,6],[5]` is valid for Preparation, `[5],[1,4,6]` is not;",
+        "@@ -167,13 +171,96 @@ response with `sourceEtag`, teaser, nullable metadata and `{ order, description",
+        "@@ -208,7 +295,7 @@ fixtures remains unmet; metadata derivation is not independently proven by the",
+        "@@ -276,8 +363,9 @@ The B-18 focused all-skipped UNVERIFIED remains historical, not overwritten"
+      ]
+    },
+    {
+      "path": "docs/kb/tech/09-api-reference.md",
+      "beforeSha256": "1cdaca5b15c2b6b902385f6b99bca474fedcacf455ca37e398213b873575c6c0",
+      "afterSha256": "1893abe058d0b68b218c128af286a8a7cfe660921db976328f4f6e105dedaa7a",
+      "hunks": [
+        "@@ -400,8 +400,8 @@ the revision it read, independently of the client header.",
+        "@@ -412,7 +412,14 @@ The Strict `recipe_export_preparation` output contains only",
+        "@@ -441,17 +448,32 @@ order; references are globally unique and groups ascend by FIRST reference.",
+        "@@ -494,10 +516,10 @@ open. This is no private/Alpha replay or Share-success claim. See"
+      ]
+    },
+    {
+      "path": "docs/kb/tech/08-testing.md",
+      "beforeSha256": "69a6b0f1ce83afa1a4d2213bf8654b581eb290121a72943d03a751400a37c3ca",
+      "afterSha256": "381dece01df446807f20c14bd67699c19c58494efa935788921384c43a43a4fc",
+      "hunks": [
+        "@@ -107,6 +107,52 @@ Sharp/Resvg imports and non-font reads and check missing/corrupt fonts and"
+      ]
+    },
+    {
+      "path": "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+      "beforeSha256": "1d364da46997eb1428c8cc4ee7b8967b554bad1809ef8dcfe27fd8d24adc734c",
+      "afterSha256": "3b9ca46cf52b4b5ba0adde5070bcfac146ae740753395b76c26af97db58b8185",
+      "hunks": [
+        "@@ -3,6 +3,14 @@"
+      ]
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+      "beforeSha256": null,
+      "afterSha256": "fd4b1d2276cedb6f89addb6d84d6c5415d909ef5b066d751fe9f5f04a5989371",
+      "hunks": [
+        "@@ -0,0 +1,142 @@"
+      ]
+    }
+  ],
+  "inheritedDirtyChanges": "Preserved in starting owned byte snapshots and foreign hashes; no inherited hunks owned by D-1",
+  "b2Evidence": {
+    "candidate": {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Candidate_2026-10-09-r2.json",
+      "sha256": "80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171",
+      "frozenFiles": 846,
+      "unchangedFiles": 839,
+      "authorizedPostFreezeDocumentationDeltas": [
+        "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+        "docs/kb/domain/06-recipes.md",
+        "docs/kb/domain/07-ai-features.md",
+        "docs/kb/tech/02-backend.md",
+        "docs/kb/tech/06-ai-integrations.md",
+        "docs/kb/tech/08-testing.md",
+        "docs/kb/tech/09-api-reference.md"
+      ]
+    },
+    "completion": {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json",
+      "sha256": "0f3a9a17fe77851d09c18858e8f34fb6692d079d9187648ebd52af01ae3be21e"
+    },
+    "artifactManifest": {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json",
+      "sha256": "c6371a237bd25a7eec3b630182dffbfdf074fe1266726044e20c87b80110ee6a",
+      "entriesVerified": 83
+    },
+    "records": [
+      {
+        "name": "Focused",
+        "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused_2026-10-09-r2.json",
+        "sha256": "0e63ee958d1961c342c44ad7e5fb191dcf9ec7ff232ecc0677c303b712bdf679",
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+          "exec",
+          "--workspace=backend",
+          "--",
+          "vitest",
+          "run",
+          "src/lib/recipeAnalyzeValidation.test.ts",
+          "src/functions/recipes.test.ts",
+          "src/functions/ai.test.ts",
+          "src/lib/openai.recipeAnalyze.test.ts",
+          "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+          "src/lib/recipePreparation.test.ts",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Focused-Report_2026-10-09-r2.json"
+        ],
+        "exit": 0,
+        "counts": {
+          "executed": 495,
+          "passed": 495,
+          "failed": 0,
+          "skipped": 0
+        },
+        "status": null,
+        "candidateSha256": null,
+        "outputSha256": "6db0620b9bd9b4dbe118e3366828091e3965baecadb4bac8774ac7176a71253f",
+        "reportSha256": "3f274d34e307dcdc1792141e9d4867f67a220762e5c421f50e2fc2fd9f9a5486",
+        "executedByD1": false
+      },
+      {
+        "name": "Units",
+        "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units_2026-10-09-r2.json",
+        "sha256": "dcd4488feaf6226df32a707c29b0b9489064cc5a919b5e3474b88b9d030a0c2d",
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "test",
+          "--workspace=backend",
+          "--",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Units-Report_2026-10-09-r2.json"
+        ],
+        "exit": 0,
+        "counts": {
+          "executed": 1576,
+          "passed": 1576,
+          "failed": 0,
+          "skipped": 0
+        },
+        "status": null,
+        "candidateSha256": null,
+        "outputSha256": "74cf089c90dbc2bf0e47cfe30dba63bdae939a4334aa247812011842062a0616",
+        "reportSha256": "15d6aa236dc7e7f0a442fb812d01b9e45f1544872e7319df666be24f3a31c09c",
+        "executedByD1": false
+      },
+      {
+        "name": "Typecheck",
+        "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Typecheck_2026-10-09-r2.json",
+        "sha256": "dc7b048f0fe7814ee87edaceac146d199644518737548e6f5e287059d79fcb6c",
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "typecheck",
+          "--workspace=backend"
+        ],
+        "exit": 0,
+        "counts": null,
+        "status": null,
+        "candidateSha256": null,
+        "outputSha256": "23c579af752749ab52e91e4b158cb5b0963e398b79c00fe844abe59d5ad8271f",
+        "reportSha256": null,
+        "executedByD1": false
+      },
+      {
+        "name": "Build",
+        "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build_2026-10-09-r2.json",
+        "sha256": "3bc532c1496a400b845cdf63932eb184986f73d063985a4dfd39b91669abfa6f",
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+          "run",
+          "build:verify",
+          "--workspace=backend"
+        ],
+        "exit": 0,
+        "counts": null,
+        "status": null,
+        "candidateSha256": null,
+        "outputSha256": "4d1b4ff4d6092664a7b2dd9fbb89bd2d18be84abf6e98f62ae2739e6682fca1b",
+        "reportSha256": null,
+        "executedByD1": false
+      },
+      {
+        "name": "F",
+        "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F_2026-10-09-r2.json",
+        "sha256": "bbc417eae6838a197ffb3860d2fed05c3390ffc17f5320cf603430c9e1c6ac6e",
+        "command": [
+          "C:\\Program Files\\nodejs\\node.exe",
+          "backend/scripts/run-eval.mjs",
+          "src/lib/prompts/recipeAnalyze.eval.test.ts",
+          "--testNamePattern",
+          "preparation prompt version matches fixture expectations|recipePreparation",
+          "--reporter=default",
+          "--reporter=json",
+          "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_F-Report_2026-10-09-r2.json"
+        ],
+        "exit": 1,
+        "counts": {
+          "executed": 5,
+          "passed": 2,
+          "failed": 3,
+          "skipped": 9
+        },
+        "status": null,
+        "candidateSha256": "80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171",
+        "outputSha256": "220fd741cbe6f1cc9010c508a0ea2e10b15f1487f666a7f58b852f68c0de0c0c",
+        "reportSha256": "7cf9cb2e1c9cd527bbb586667966c1d1025aa41c536d1581aef942a23302fec0",
+        "executedByD1": false
+      },
+      {
+        "name": "R",
+        "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_R_2026-10-09-r2.json",
+        "sha256": "50196ebb6485a1d7ae3ff286868f87e3d9c98baf165616b47d17b34e02b8a5a5",
+        "command": null,
+        "exit": null,
+        "counts": null,
+        "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+        "candidateSha256": null,
+        "outputSha256": null,
+        "reportSha256": null,
+        "executedByD1": false
+      },
+      {
+        "name": "G",
+        "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_G_2026-10-09-r2.json",
+        "sha256": "38d4d7b1e39a5280ff769735d469ec8f5d960e0fc4e4b306d93b5c191c5b6522",
+        "command": null,
+        "exit": null,
+        "counts": null,
+        "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+        "candidateSha256": null,
+        "outputSha256": null,
+        "reportSha256": null,
+        "executedByD1": false
+      }
+    ],
+    "offlineCandidateExecutionHashGuard": false,
+    "fixtures": [
+      {
+        "fixture": "synthetic-saved-eight-steps-rice-serving",
+        "logicalCalls": 1,
+        "sdkCalls": 1,
+        "finalSteps": 5,
+        "http": 200,
+        "usageCalls": 1,
+        "fit": true,
+        "fidelityReached": true,
+        "fidelityPassed": true
+      },
+      {
+        "fixture": "synthetic-saved-oven-seven-steps",
+        "logicalCalls": 3,
+        "sdkCalls": 3,
+        "finalSteps": 4,
+        "http": 422,
+        "usageCalls": 0,
+        "fit": false,
+        "fidelityReached": false,
+        "fidelityPassed": false,
+        "failure": "steps[1] repeats 300x112 overflow against 302x105 across all drafts; later V2/booking/semantic assertions not reached"
+      },
+      {
+        "fixture": "synthetic-saved-pasta-essential-sauce",
+        "logicalCalls": 2,
+        "sdkCalls": 2,
+        "finalSteps": 3,
+        "http": 200,
+        "usageCalls": 1,
+        "fit": true,
+        "fidelityReached": true,
+        "fidelityPassed": false,
+        "failure": "independent contradiction rubric at source 5"
+      },
+      {
+        "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+        "logicalCalls": 2,
+        "sdkCalls": 1,
+        "finalSteps": 3,
+        "http": 200,
+        "usageCalls": 1,
+        "fit": true,
+        "fidelityReached": true,
+        "fidelityPassed": false,
+        "failure": "ingredient-explicit preservation rubric at source 1; fitting generic all-ingredients wording is not a fidelity pass"
+      }
+    ],
+    "logicalCalls": 8,
+    "sdkCalls": 7,
+    "unresolvedFindings": [
+      "Q-19 FAIL",
+      "Earlier accepted-rice fidelity loss",
+      "Earlier absent rice/oven success; one current synthetic rice pass does not close historical findings",
+      "Foreign Import/Daily failures; no new R/G conclusions",
+      "Historical private/Alpha replay limitations"
+    ],
+    "requiredRG": "NOT_RUN after required F failure; not waived"
+  },
+  "validationExecution": {
+    "command": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "-e",
+      "const fs=require('node:fs'),cp=require('node:child_process'),crypto=require('node:crypto'),assert=require('node:assert/strict'),path=require('node:path'),os=require('node:os');const prefix='docs/User Stories/Reciepe/D-1_Feedback-Loop_',p='docs/User Stories/Reciepe/',root=process.cwd(),baselinePath=prefix+'Baseline_2026-10-09.json',handoffPath=prefix+'Handoff_2026-10-09.md',patchPath=prefix+'Owned-Diff_2026-10-09.patch',manifestPath=prefix+'Manifest_2026-10-09.json',read=f=>JSON.parse(fs.readFileSync(f,'utf8').replace(/^\\uFEFF/u,'')),hash=x=>crypto.createHash('sha256').update(x).digest('hex'),b=read(baselinePath),owned=[...b.owned,handoffPath];assert.ok(fs.existsSync(manifestPath));assert.ok(fs.existsSync(patchPath));const validations=[];const foreign=b.files.filter(f=>!b.owned.includes(f.path));for(const f of foreign)assert.equal(hash(fs.readFileSync(f.path)),f.sha256,f.path);validations.push({name:'preservation',result:'PASS',foreignFiles:foreign.length,ownedStartingSnapshots:b.owned.length});const completionPath=p+'B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json',inventoryPath=p+'B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json',m=read(completionPath),a=read(inventoryPath),candidatePath=p+m.candidate.path,c=read(candidatePath);for(const f of a.artifacts)assert.equal(hash(fs.readFileSync(f.path)),f.sha256,f.path);assert.equal(hash(fs.readFileSync(candidatePath)),m.candidate.sha256);const postFreezeDocs=[];let unchangedCandidate=0;for(const f of c.files){if(hash(fs.readFileSync(f.path))!==f.sha256){assert.ok(b.owned.includes(f.path),f.path);postFreezeDocs.push(f.path);}else unchangedCandidate++;}validations.push({name:'immutableB2EvidenceAndCandidateBoundary',result:'PASS',artifactEntries:a.artifacts.length,frozenCandidateFiles:c.files.length,unchangedCandidateFiles:unchangedCandidate,authorizedPostFreezeDocs:postFreezeDocs});const records=Object.entries(m.offline).filter(([_,r])=>r&&typeof r==='object'&&r.path).concat([['F',m.live.F],['R',m.live.R],['G',m.live.G]]).map(([name,e])=>{const f=p+e.path,j=read(f);assert.equal(hash(fs.readFileSync(f)),e.sha256,f);if(j.outputSha256)assert.equal(hash(fs.readFileSync(f.replace('_2026','-Output_2026').replace('.json','.txt'))),j.outputSha256);if(j.reportSha256)assert.equal(hash(fs.readFileSync(f.replace('_2026','-Report_2026'))),j.reportSha256);return {name,path:f,sha256:e.sha256,command:j.command??null,exit:j.exit??null,counts:j.counts??null,status:j.status??null,candidateSha256:j.candidateSha256??null,outputSha256:j.outputSha256??null,reportSha256:j.reportSha256??null,executedByD1:false};});assert.deepEqual(m.offline.Focused.counts,{executed:495,passed:495,failed:0,skipped:0});assert.deepEqual(m.offline.Units.counts,{executed:1576,passed:1576,failed:0,skipped:0});assert.deepEqual(m.live.F.counts,{executed:5,passed:2,failed:3,skipped:9});assert.equal(m.live.F.exit,1);assert.equal(m.live.R.executed,0);assert.equal(m.live.G.executed,0);for(const f of b.owned.slice(0,6)){const t=fs.readFileSync(f,'utf8');assert.match(t,/\\[Partial\\]/u,f);assert.match(t,/v5|V5/u,f);assert.match(t,/495/u,f);assert.match(t,/1576/u,f);assert.match(t,/R\\/G.*NOT_RUN|R\\/G were NOT_RUN/u,f);assert.match(t,/14:12/u,f);}const ai=fs.readFileSync('docs/kb/tech/06-ai-integrations.md','utf8');for(const needle of ['75000','20000','maxRetries: 0','AbortSignal','originalPreparation','latestDraft','validationErrors','NOT ACCEPTED','NOT deployed','source-5','source-1','Q-19 FAIL','0.5 px'])assert.ok(ai.includes(needle),needle);const spec=fs.readFileSync(b.owned[6],'utf8'),originalSpec=Buffer.from(b.files.find(f=>f.path===b.owned[6]).bytesBase64,'base64').toString('utf8');assert.equal(spec.replace(/> \\[Deprecated\\][\\s\\S]*?Der historische Entwurf bleibt unveraendert dokumentiert\\.\\r?\\n\\r?\\n/u,''),originalSpec);validations.push({name:'focusedDocumentationAssertions',result:'PASS',kbDocs:6,specPointerOnly:true,recordedGateCountsVerified:true});const decoder=new TextDecoder('utf-8',{fatal:true}),bad=['\\u00c3\\u00a4','\\u00c3\\u00b6','\\u00c3\\u00bc','\\u00c3\\u0178','\\u00e2\\u20ac\\u2122','\\ufffd'];for(const f of owned){const t=decoder.decode(fs.readFileSync(f));for(const pattern of bad)assert.ok(!t.includes(pattern),'encoding '+f);}validations.push({name:'focusedUtf8Mojibake',result:'PASS',files:owned.length,scope:'Owned Markdown only; strict UTF-8 and selected common mojibake/replacement sequences, not the code-only repository scanner'});const temp=fs.mkdtempSync(path.join(os.tmpdir(),'fittrack-d1-docs-')),run=(args,cwd=temp)=>{const r=cp.spawnSync('git',args,{cwd,encoding:'utf8'});assert.equal(r.status,0,r.stderr||r.stdout);return r;};run(['init','--quiet']);run(['config','core.autocrlf','false']);for(const f of b.files.filter(f=>b.owned.includes(f.path))){const dest=path.join(temp,f.path);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,Buffer.from(f.bytesBase64,'base64'));}run(['add','--',...b.owned]);for(const f of owned){const dest=path.join(temp,f);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.copyFileSync(path.join(root,f),dest);}run(['add','--intent-to-add','--',handoffPath]);const whitespace=run(['-c','core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol','diff','--check','--',...owned]);const patch=run(['diff','--no-ext-diff','--binary','--',...owned]).stdout;fs.writeFileSync(patchPath,patch);const audit=run(['apply','--reverse','--check',path.join(root,patchPath)],root);validations.push({name:'ownedDiffWhitespace',result:'PASS',command:['git','-c','core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol','diff','--check','--',...owned],exit:whitespace.status,stdout:whitespace.stdout,stderr:whitespace.stderr,scope:'Temporary index of original D-1 document bytes, no commit or worktree patch application'});validations.push({name:'ownedPatchReverseApplicability',result:'PASS',command:['git','apply','--reverse','--check',patchPath],exit:audit.status,stdout:audit.stdout,stderr:audit.stderr,applied:false});const added=patch.split('\\n').filter(line=>line.startsWith('+')&&!line.startsWith('+++')).map(line=>line.slice(1)),newProse=added.join('\\n');assert.ok(!/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----|AccountKey=[A-Za-z0-9+/=]{20,}|Bearer\\s+[A-Za-z0-9_.-]{20,}|sk-[A-Za-z0-9]{20,}/u.test(newProse));validations.push({name:'newProseSecretPatternReview',result:'PASS',matches:0,scope:'Added prose only; private-key/account-key/bearer/OpenAI-key patterns; no settings read or universal absence claim'});fs.writeFileSync(manifestPath,JSON.stringify({status:'GENERATING_DOCUMENTATION_EVIDENCE'})+'\\n');const slug=t=>t.toLowerCase().replace(/[^\\p{L}\\p{N}\\s_-]/gu,'').replace(/ /gu,'-');let links=0;const patchSections=patch.split(/^diff --git /mu).slice(1);const changedLinks=[];for(const section of patchSections){const line=section.split('\\n')[0],f=line.slice(line.indexOf(' b/')+3);const content=section.split('\\n').filter(t=>t.startsWith('+')&&!t.startsWith('+++')).map(t=>t.slice(1)).join('\\n');for(const match of content.matchAll(/\\[[^\\]]*\\]\\(([^)]+)\\)/gu)){const target=match[1];if(/^(?:https?:|mailto:)/u.test(target))continue;const [raw,anchor]=target.split('#'),resolved=raw?path.resolve(root,path.dirname(f),decodeURIComponent(raw)):path.resolve(root,f);assert.ok(fs.existsSync(resolved),'link '+f+' -> '+target);if(anchor&&/\\.md$/iu.test(resolved)){const text=fs.readFileSync(resolved,'utf8'),seen=new Map(),anchors=[];for(const heading of text.matchAll(/^#{1,6}\\s+(.+)\\r?$/gmu)){const s=slug(heading[1].trim()),count=seen.get(s)||0;seen.set(s,count+1);anchors.push(s+(count?'-'+count:''));}assert.ok(anchors.includes(decodeURIComponent(anchor))||/^L\\d+(?:-L\\d+)?$/u.test(anchor),'anchor '+f+' -> '+target);}changedLinks.push({source:f,target});links++;}}validations.push({name:'changedLinksAndHeadingAnchors',result:'PASS',linksChecked:links,scope:'Links in D-1-added lines only; existing unrelated links not reclassified'});const ownFiles=owned.map(f=>{const original=b.files.find(e=>e.path===f);const section=patchSections.find(s=>s.split('\\n')[0].endsWith(' b/'+f));return {path:f,beforeSha256:original?.sha256??null,afterSha256:hash(fs.readFileSync(f)),hunks:section?section.split('\\n').filter(l=>l.startsWith('@@')):[]};});const additions=cp.execFileSync('git',['ls-files','-z','--cached','--others','--exclude-standard'],{cwd:root,encoding:'utf8'}).split('\\0').filter(Boolean).filter(f=>!b.files.some(e=>e.path===f)&&!b.excluded.includes(f));const expected=[baselinePath,handoffPath,patchPath,manifestPath];assert.deepEqual(additions.sort(),expected.sort());validations.push({name:'exactDocumentationScope',result:'PASS',existingDocsEdited:7,newReportingArtifacts:expected,unexpectedNewFiles:[]});const manifest={task:'D-1',approval:'2026-10-09',documentationStatus:'DOCUMENTATION_COMPLETE_FEATURE_PARTIAL_NOT_ACCEPTED',featureStatus:m.status,featureAccepted:false,releaseEligible:false,alphaLoopDeployed:false,implementationGateRuns:0,liveCalls:0,deployments:0,delegations:0,fullPlanRead:false,planStatusChanged:false,head:b.head,createdAt:new Date().toISOString(),handoff:handoffPath,baseline:{path:baselinePath,sha256:hash(fs.readFileSync(baselinePath)),existingFiles:b.files.length,foreignFiles:foreign.length,scope:b.scope},ownedDiff:{path:patchPath,sha256:hash(fs.readFileSync(patchPath)),relativeTo:'D-1 starting worktree snapshots, not HEAD; new handoff added; generated JSON inventoried separately'},ownFiles,inheritedDirtyChanges:'Preserved in starting owned byte snapshots and foreign hashes; no inherited hunks owned by D-1',b2Evidence:{candidate:{path:candidatePath,sha256:m.candidate.sha256,frozenFiles:c.files.length,unchangedFiles:unchangedCandidate,authorizedPostFreezeDocumentationDeltas:postFreezeDocs},completion:{path:completionPath,sha256:hash(fs.readFileSync(completionPath))},artifactManifest:{path:inventoryPath,sha256:hash(fs.readFileSync(inventoryPath)),entriesVerified:a.artifacts.length},records,offlineCandidateExecutionHashGuard:false,fixtures:m.live.fixtures,logicalCalls:m.live.F.logicalCalls,sdkCalls:m.live.F.sdkCalls,unresolvedFindings:m.unresolvedForeignFindings,requiredRG:'NOT_RUN after required F failure; not waived'},validationExecution:{command:[process.execPath,...process.execArgv],result:'PASS',exit:0,results:validations,editorErrors:{tool:'get_errors',existingOwnedDocs:7,errors:0,handoff:{tool:\"get_errors\",errors:0},manifest:{tool:\"get_errors\",errors:0}},changedLinks,temporaryIndex:temp,noCommit:true,noWorktreePatchApplied:true},preservation:{foreignMismatches:[],historicalArtifactsUnchanged:true,settingsRead:false,ignoredFilesNotScanned:true},remainingRequirements:['Orchestrator scoped disposition of required F failures','Required R/G remain NOT_RUN and unwaived','Independent QA and release approval absent','Historical Q-19 FAIL and private/Alpha replay limits remain unresolved'],manifestSelfHashExcluded:true};fs.writeFileSync(manifestPath,JSON.stringify(manifest,null,2)+'\\n');console.log(JSON.stringify({documentationValidation:'PASS',ownedDocs:ownFiles.length,foreignFilesPreserved:foreign.length,b2ArtifactsVerified:a.artifacts.length,candidateFilesUnchanged:unchangedCandidate,postFreezeDocumentationDeltas:postFreezeDocs,changedLinksChecked:links,ownHunks:ownFiles.map(f=>({path:f.path,hunks:f.hunks.length})),manifest:manifestPath,implementationGateRuns:0,liveCalls:0,featureStatus:m.status},null,2));"
+    ],
+    "result": "PASS",
+    "exit": 0,
+    "results": [
+      {
+        "name": "preservation",
+        "result": "PASS",
+        "foreignFiles": 922,
+        "ownedStartingSnapshots": 7
+      },
+      {
+        "name": "immutableB2EvidenceAndCandidateBoundary",
+        "result": "PASS",
+        "artifactEntries": 83,
+        "frozenCandidateFiles": 846,
+        "unchangedCandidateFiles": 839,
+        "authorizedPostFreezeDocs": [
+          "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+          "docs/kb/domain/06-recipes.md",
+          "docs/kb/domain/07-ai-features.md",
+          "docs/kb/tech/02-backend.md",
+          "docs/kb/tech/06-ai-integrations.md",
+          "docs/kb/tech/08-testing.md",
+          "docs/kb/tech/09-api-reference.md"
+        ]
+      },
+      {
+        "name": "focusedDocumentationAssertions",
+        "result": "PASS",
+        "kbDocs": 6,
+        "specPointerOnly": true,
+        "recordedGateCountsVerified": true
+      },
+      {
+        "name": "focusedUtf8Mojibake",
+        "result": "PASS",
+        "files": 8,
+        "scope": "Owned Markdown only; strict UTF-8 and selected common mojibake/replacement sequences, not the code-only repository scanner"
+      },
+      {
+        "name": "ownedDiffWhitespace",
+        "result": "PASS",
+        "command": [
+          "git",
+          "-c",
+          "core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol",
+          "diff",
+          "--check",
+          "--",
+          "docs/kb/domain/06-recipes.md",
+          "docs/kb/domain/07-ai-features.md",
+          "docs/kb/tech/02-backend.md",
+          "docs/kb/tech/06-ai-integrations.md",
+          "docs/kb/tech/09-api-reference.md",
+          "docs/kb/tech/08-testing.md",
+          "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "scope": "Temporary index of original D-1 document bytes, no commit or worktree patch application"
+      },
+      {
+        "name": "ownedPatchReverseApplicability",
+        "result": "PASS",
+        "command": [
+          "git",
+          "apply",
+          "--reverse",
+          "--check",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Owned-Diff_2026-10-09.patch"
+        ],
+        "exit": 0,
+        "stdout": "",
+        "stderr": "",
+        "applied": false
+      },
+      {
+        "name": "newProseSecretPatternReview",
+        "result": "PASS",
+        "matches": 0,
+        "scope": "Added prose only; private-key/account-key/bearer/OpenAI-key patterns; no settings read or universal absence claim"
+      },
+      {
+        "name": "changedLinksAndHeadingAnchors",
+        "result": "PASS",
+        "linksChecked": 39,
+        "scope": "Links in D-1-added lines only; existing unrelated links not reclassified"
+      },
+      {
+        "name": "exactDocumentationScope",
+        "result": "PASS",
+        "existingDocsEdited": 7,
+        "newReportingArtifacts": [
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Baseline_2026-10-09.json",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Manifest_2026-10-09.json",
+          "docs/User Stories/Reciepe/D-1_Feedback-Loop_Owned-Diff_2026-10-09.patch"
+        ],
+        "unexpectedNewFiles": []
+      }
+    ],
+    "editorErrors": {
+      "tool": "get_errors",
+      "existingOwnedDocs": 7,
+      "errors": 0,
+      "handoff": {
+        "tool": "get_errors",
+        "errors": 0
+      },
+      "manifest": {
+        "tool": "get_errors",
+        "errors": 0
+      }
+    },
+    "changedLinks": [
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../kb/domain/06-recipes.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../kb/domain/07-ai-features.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../kb/tech/02-backend.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../kb/tech/06-ai-integrations.md#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../kb/tech/09-api-reference.md#post-apirecipesidexport-viewprepare"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../kb/tech/08-testing.md#recipe-preparation-feedback-loop-evidence"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "D-1_Feedback-Loop_Manifest_2026-10-09.json"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "D-1_Feedback-Loop_Baseline_2026-10-09.json"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "D-1_Feedback-Loop_Owned-Diff_2026-10-09.patch"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "B-2_Feedback-Loop_Candidate_2026-10-09-r2.json"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../qa/reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "../../../infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "B-1_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md",
+        "target": "B-2_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+        "target": "PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md"
+      },
+      {
+        "source": "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+        "target": "../../kb/tech/06-ai-integrations.md#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/kb/domain/06-recipes.md",
+        "target": "../tech/06-ai-integrations.md#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/kb/domain/06-recipes.md",
+        "target": "../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/kb/domain/07-ai-features.md",
+        "target": "../tech/06-ai-integrations.md#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/kb/domain/07-ai-features.md",
+        "target": "../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/kb/tech/02-backend.md",
+        "target": "06-ai-integrations.md#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/kb/tech/02-backend.md",
+        "target": "../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/kb/tech/06-ai-integrations.md",
+        "target": "#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/kb/tech/06-ai-integrations.md",
+        "target": "../../../infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md"
+      },
+      {
+        "source": "docs/kb/tech/06-ai-integrations.md",
+        "target": "../../User%20Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/kb/tech/06-ai-integrations.md",
+        "target": "../../User%20Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json"
+      },
+      {
+        "source": "docs/kb/tech/06-ai-integrations.md",
+        "target": "../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json"
+      },
+      {
+        "source": "docs/kb/tech/06-ai-integrations.md",
+        "target": "08-testing.md#recipe-preparation-feedback-loop-evidence"
+      },
+      {
+        "source": "docs/kb/tech/06-ai-integrations.md",
+        "target": "../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/kb/tech/08-testing.md",
+        "target": "../../User%20Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json"
+      },
+      {
+        "source": "docs/kb/tech/08-testing.md",
+        "target": "../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json"
+      },
+      {
+        "source": "docs/kb/tech/08-testing.md",
+        "target": "06-ai-integrations.md#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/kb/tech/08-testing.md",
+        "target": "../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md"
+      },
+      {
+        "source": "docs/kb/tech/09-api-reference.md",
+        "target": "06-ai-integrations.md#preparation-feedback-loop-current-r2"
+      },
+      {
+        "source": "docs/kb/tech/09-api-reference.md",
+        "target": "../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md"
+      }
+    ],
+    "temporaryIndex": "C:\\Users\\mmueller\\AppData\\Local\\Temp\\fittrack-d1-docs-jCk0Zo",
+    "noCommit": true,
+    "noWorktreePatchApplied": true,
+    "wrapperFailures": [
+      {
+        "stage": "PowerShell refresh wrapper parsing",
+        "exit": 1,
+        "nodeDispatched": false,
+        "filesChanged": false,
+        "error": "MissingArgument caused by quote escaping; corrected wrapper succeeded; no gate/live execution"
+      }
+    ],
+    "refreshWrapperCommand": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "-e",
+      "const fs=require('node:fs'),cp=require('node:child_process'),assert=require('node:assert/strict'),p='docs/User Stories/Reciepe/D-1_Feedback-Loop_Manifest_2026-10-09.json',m=JSON.parse(fs.readFileSync(p,'utf8'));let script=m.validationExecution.command[2];assert.equal(m.validationExecution.command[1],'-e');script=script.replace('assert.ok(!fs.existsSync(manifestPath));','assert.ok(fs.existsSync(manifestPath));').replace('assert.ok(!fs.existsSync(patchPath));','assert.ok(fs.existsSync(patchPath));').replace(/handoff:'Checked separately before final delivery'/u,'handoff:{tool:'+JSON.stringify('get_errors')+',errors:0},manifest:{tool:'+JSON.stringify('get_errors')+',errors:0}');const result=cp.spawnSync(process.execPath,['-e',script],{encoding:'utf8'});console.log(result.stdout);if(result.stderr)console.error(result.stderr);assert.equal(result.status,0);const final=JSON.parse(fs.readFileSync(p,'utf8'));final.validationExecution.wrapperFailures=[{stage:'PowerShell refresh wrapper parsing',exit:1,nodeDispatched:false,filesChanged:false,error:'MissingArgument caused by quote escaping; corrected wrapper succeeded; no gate/live execution'}];final.validationExecution.refreshWrapperCommand=[process.execPath,...process.execArgv];fs.writeFileSync(p,JSON.stringify(final,null,2)+'\\n');"
+    ]
+  },
+  "preservation": {
+    "foreignMismatches": [],
+    "historicalArtifactsUnchanged": true,
+    "settingsRead": false,
+    "ignoredFilesNotScanned": true
+  },
+  "remainingRequirements": [
+    "Orchestrator scoped disposition of required F failures",
+    "Required R/G remain NOT_RUN and unwaived",
+    "Independent QA and release approval absent",
+    "Historical Q-19 FAIL and private/Alpha replay limits remain unresolved"
+  ],
+  "manifestSelfHashExcluded": true
+}

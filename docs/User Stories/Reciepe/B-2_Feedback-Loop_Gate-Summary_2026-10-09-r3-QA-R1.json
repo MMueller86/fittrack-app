@@ -1,0 +1,520 @@
+{
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "offline": {
+    "Diagnostics-Red": {
+      "name": "Diagnostics-Red",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "exec",
+        "--workspace=backend",
+        "--",
+        "vitest",
+        "run",
+        "src/lib/recipePreparation.test.ts",
+        "src/functions/recipes.test.ts",
+        "--testNamePattern",
+        "QA-R1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Diagnostics-Red-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "start": "2026-10-09T16:52:43.547Z",
+      "end": "2026-10-09T16:53:31.571Z",
+      "exit": 1,
+      "signal": null,
+      "counts": {
+        "executed": 5,
+        "passed": 2,
+        "failed": 3,
+        "skipped": 166
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Red-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "57b73c3a3261eddabd772b473c871523c75d00be39cf359d335171596ed50aa5",
+      "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Diagnostics-Red-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "70d107e2f07f937b72d3f399845ca3849b7940565aeb90eea4207e8eaca7a65d",
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Red_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "fab0bfbe12d0374a87ca4745815ed54f4a51a9f86f52a5d7346560d3c0c1a540"
+    },
+    "Diagnostics-Green": {
+      "name": "Diagnostics-Green",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "exec",
+        "--workspace=backend",
+        "--",
+        "vitest",
+        "run",
+        "src/lib/recipePreparation.test.ts",
+        "src/functions/recipes.test.ts",
+        "--testNamePattern",
+        "QA-R1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Diagnostics-Green-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "start": "2026-10-09T16:53:49.839Z",
+      "end": "2026-10-09T16:53:52.061Z",
+      "exit": 0,
+      "signal": null,
+      "counts": {
+        "executed": 5,
+        "passed": 5,
+        "failed": 0,
+        "skipped": 166
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Green-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "203ffc11f7f6d92381d79ac7462eac86956f2ee68d8020c9186b06645300cdf8",
+      "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Diagnostics-Green-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "eb2e76a481330100f3972afac21fcaafef29eb1544801703f6fd7842df9bf127",
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Green_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "526f845ecbe658bc5b8c8d9d326f1851c8814a0a608d1b2e091a25e1611b5662"
+    },
+    "Prompt-Rubric-Red": {
+      "name": "Prompt-Rubric-Red",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "exec",
+        "--workspace=backend",
+        "--",
+        "vitest",
+        "run",
+        "src/lib/recipePreparation.test.ts",
+        "src/lib/recipeAnalyzeValidation.test.ts",
+        "--testNamePattern",
+        "QA-R1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Prompt-Rubric-Red-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "start": "2026-10-09T16:55:24.333Z",
+      "end": "2026-10-09T16:55:26.796Z",
+      "exit": 1,
+      "signal": null,
+      "counts": {
+        "executed": 23,
+        "passed": 18,
+        "failed": 5,
+        "skipped": 195
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Red-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "5270e1b85867c6504ac13f13def38e58ecaaf0bec7ae137f264956815df62455",
+      "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Prompt-Rubric-Red-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "0532c063302dbc5a37d32e6ead8f9f1019e394a98a965189e4d1d477b3e82508",
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Red_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "9bb34511ca63b7c08e05ff5a7a0cb337302d2d1dc4787667fe2c157ed975a43e"
+    },
+    "Prompt-Rubric-Green": {
+      "name": "Prompt-Rubric-Green",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "exec",
+        "--workspace=backend",
+        "--",
+        "vitest",
+        "run",
+        "src/lib/recipePreparation.test.ts",
+        "src/lib/recipeAnalyzeValidation.test.ts",
+        "--testNamePattern",
+        "QA-R1",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Prompt-Rubric-Green-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "start": "2026-10-09T16:56:15.731Z",
+      "end": "2026-10-09T16:56:17.897Z",
+      "exit": 0,
+      "signal": null,
+      "counts": {
+        "executed": 23,
+        "passed": 23,
+        "failed": 0,
+        "skipped": 195
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Green-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "342baab1f19186287f46588113a7306fd75815b9b3f1e9e0bb53f03261b74f3b",
+      "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Prompt-Rubric-Green-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "283f67b55c875d3aa843d38823375c414f9cc017928608f8a87499e216bf32f3",
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Green_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "0436e37292271e73d724b190ed12d2b1dc5f47438dc44c623860732ed2ccf8e8"
+    },
+    "Focused": {
+      "name": "Focused",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "exec",
+        "--workspace=backend",
+        "--",
+        "vitest",
+        "run",
+        "src/lib/recipeAnalyzeValidation.test.ts",
+        "src/functions/recipes.test.ts",
+        "src/functions/ai.test.ts",
+        "src/lib/openai.recipeAnalyze.test.ts",
+        "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+        "src/lib/recipePreparation.test.ts",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Focused-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "start": "2026-10-09T16:57:03.073Z",
+      "end": "2026-10-09T16:57:49.182Z",
+      "exit": 1,
+      "signal": null,
+      "counts": {
+        "executed": 519,
+        "passed": 518,
+        "failed": 1,
+        "skipped": 0
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "ee76d0536fc9bbca15792cbf36f86e0e8a2fa73eb000906c13518e762cc6bb7d",
+      "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Focused-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "7c5f58ad506d97705f46c5a9a523183ef5de09e3a0371cc6e2f102958f9490f2",
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "aeffb5d6e4248be2c29c28f081fe31b029f854685c4b9a14f5e65ddad442a8f6"
+    },
+    "Focused-Final": {
+      "name": "Focused-Final",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "exec",
+        "--workspace=backend",
+        "--",
+        "vitest",
+        "run",
+        "src/lib/recipeAnalyzeValidation.test.ts",
+        "src/functions/recipes.test.ts",
+        "src/functions/ai.test.ts",
+        "src/lib/openai.recipeAnalyze.test.ts",
+        "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+        "src/lib/recipePreparation.test.ts",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Focused-Final-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "start": "2026-10-09T16:58:17.283Z",
+      "end": "2026-10-09T16:59:03.066Z",
+      "exit": 0,
+      "signal": null,
+      "counts": {
+        "executed": 519,
+        "passed": 519,
+        "failed": 0,
+        "skipped": 0
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Final-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "c064698289e648fd6b93cd572199bc4d64a7782ae56996554066654ad01600ca",
+      "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Focused-Final-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "00417e2c2fbfb6578892b4190be7dd5189f6cb2e3d84c15162dd568e27b03950",
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Final_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "f4f7445487c0adc6a240c3dc63961727a82232f6b3414e78b1a0610ac3d95dd0"
+    },
+    "Units": {
+      "name": "Units",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test",
+        "--workspace=backend",
+        "--",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Units-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "start": "2026-10-09T16:59:10.507Z",
+      "end": "2026-10-09T17:00:00.356Z",
+      "exit": 0,
+      "signal": null,
+      "counts": {
+        "executed": 1600,
+        "passed": 1600,
+        "failed": 0,
+        "skipped": 0
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "5da66e44e583d43d2fc41217cccdadf7d70e84d43931ec4948c660a511aa2310",
+      "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Units-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "e64bcecd63f110b997e118527f79cc146a16d36fe6078caf3189c0c931d6d759",
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "d38096ded480c99d94eb9db973d99e497e6195f0c5a136c180ab5ee1168061c4"
+    },
+    "Typecheck": {
+      "name": "Typecheck",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "typecheck",
+        "--workspace=backend"
+      ],
+      "start": "2026-10-09T17:00:00.638Z",
+      "end": "2026-10-09T17:00:05.349Z",
+      "exit": 0,
+      "signal": null,
+      "counts": null,
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Typecheck-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "23c9d65eeb8572d1fe4ec2ca0ea0a4cd5b67699a40d46b72d4a2dbfea253fba0",
+      "report": null,
+      "reportSha256": null,
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Typecheck_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "15806e5588bb3609c72d3f27554f6b7926ad84acbb47580d75929b54d1cb1b8a"
+    },
+    "Build": {
+      "name": "Build",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build:verify",
+        "--workspace=backend"
+      ],
+      "start": "2026-10-09T17:00:16.633Z",
+      "end": "2026-10-09T17:00:51.078Z",
+      "exit": 0,
+      "signal": null,
+      "counts": null,
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "db74fdead4e458190f942dfda81f0e0876ff3e9104e2f140d84023ecc7189d37",
+      "report": null,
+      "reportSha256": null,
+      "candidateSha256": null,
+      "recordPath": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build_2026-10-09-r3-QA-R1.json",
+      "recordSha256": "c46d72255690a09c4915bdab15fb928084aaec2f8cc96f04966408af61e35045"
+    }
+  },
+  "live": {
+    "F": {
+      "gate": "F",
+      "start": "2026-10-09T17:02:21.479Z",
+      "end": "2026-10-09T17:03:18.702Z",
+      "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "backend/scripts/run-eval.mjs",
+        "src/lib/prompts/recipeAnalyze.eval.test.ts",
+        "--testNamePattern",
+        "preparation prompt version matches fixture expectations|recipePreparation",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_F-Report_2026-10-09-r3-QA-R1.json"
+      ],
+      "exit": 1,
+      "signal": null,
+      "counts": {
+        "executed": 5,
+        "passed": 2,
+        "failed": 3,
+        "skipped": 9
+      },
+      "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Output_2026-10-09-r3-QA-R1.txt",
+      "outputSha256": "36f4ffdc97fdd9945ca3d6e1e753df2c052f8f48fa0e12f34a8d3f94724546c7",
+      "report": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Report_2026-10-09-r3-QA-R1.json",
+      "reportSha256": "4f6520e1069ab596b1c6b1b36ded2e88c83adecc38423c48e59fdcdd9bd6fbe2"
+    },
+    "R": {
+      "gate": "R",
+      "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+      "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+      "blockedBy": "F",
+      "exit": null,
+      "counts": {
+        "executed": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      "logicalCalls": 0,
+      "sdkCalls": 0,
+      "verified": false,
+      "dispatched": false
+    },
+    "G": {
+      "gate": "G",
+      "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+      "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+      "blockedBy": "F",
+      "exit": null,
+      "counts": {
+        "executed": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      "logicalCalls": 0,
+      "sdkCalls": 0,
+      "verified": false,
+      "dispatched": false
+    }
+  },
+  "liveLogicalCalls": 10,
+  "liveSdkCalls": 9,
+  "actualModel": "gpt-4o-mini",
+  "actualApiVersion": "2024-08-01-preview",
+  "sdkMaxRetries": 0,
+  "actualTemperature": 0.2,
+  "actualMaxTokens": 2048,
+  "finishReasonEverySdkCall": "stop",
+  "dependencies": [
+    {
+      "path": "node_modules/openai/package.json",
+      "name": "openai",
+      "version": "4.104.0",
+      "sha256": "c9fccdc76efa16a6979dbeae4c991d2c0e3983e2d546aeafc1d37fbb1510b424"
+    },
+    {
+      "path": "node_modules/satori/package.json",
+      "name": "satori",
+      "version": "0.33.4",
+      "sha256": "32350b32c00c9eb59c29d9f52a7376d26af71bfbc82cdc4ad5d5b3fdc812b4db"
+    },
+    {
+      "path": "node_modules/hyphen/package.json",
+      "name": "hyphen",
+      "version": "1.14.1",
+      "sha256": "49fed99b945add2de7b3f7287d8572d2d5634effdb5773111e4121738812f0db"
+    },
+    {
+      "path": "node_modules/sharp/package.json",
+      "name": "sharp",
+      "version": "0.34.5",
+      "sha256": "e6be69319929151be3aa240bf1485f25a3477cb6d2286f92510b9fceb3cbef26"
+    },
+    {
+      "path": "node_modules/@resvg/resvg-js/package.json",
+      "name": "@resvg/resvg-js",
+      "version": "2.6.2",
+      "sha256": "2669617af27d91b0dfc0828cc2190ba87b8d8ea6e4cf08619a23784a2f1d8c95"
+    },
+    {
+      "path": "node_modules/vitest/package.json",
+      "name": "vitest",
+      "version": "2.1.9",
+      "sha256": "6ea35e567829660d9832744086c18526b9ddebd5358c4a0cadfb0a355925f917"
+    },
+    {
+      "path": "node_modules/typescript/package.json",
+      "name": "typescript",
+      "version": "5.9.3",
+      "sha256": "822ef7ca6452205657b6288b066481ecf508bfbf43455d715cf7d3ec457561e6"
+    }
+  ],
+  "candidateSourceFiles": 935,
+  "candidateRuntimeFiles": 338,
+  "inheritedChangesComparedWithR2": [
+    {
+      "path": "backend/src/lib/recipePreparation.test.ts",
+      "sha256": "cf181e19f465294087573cdbb6d009d609b32af735767ea6811f9a13a9cb1574",
+      "currentSha256": "365a5932e153d3919fe3506d3c792904e77bb3daad4d44457c260f069475f9d0",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "backend/src/lib/recipePreparation.ts",
+      "sha256": "e813202160536a47acb9b362f4fb418bff1e4cf8c4af3962d07871f92e0e1549",
+      "currentSha256": "e46aac7f12555f2ff6d6e4f09a8d98db8e7be5d4880015a0e8222be180b098eb",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+      "sha256": "1d364da46997eb1428c8cc4ee7b8967b554bad1809ef8dcfe27fd8d24adc734c",
+      "currentSha256": "3b9ca46cf52b4b5ba0adde5070bcfac146ae740753395b76c26af97db58b8185",
+      "scope": "inherited post-r2; preserved from round baseline"
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "sha256": "5ed23c7a0d30dc9bcf0d784ff3ce3cd221568f1392cdd893968966cf490331ca",
+      "currentSha256": "b08247fa69e0034976dd2158a8b571b9292eac3d363c4eb9133555e0e0e0c0d5",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "sha256": "dddd1f3c2300325173987371c8dbacbaf8214ea3cf6f238cd31bd07e31668a04",
+      "currentSha256": "f9991e52fd692fd3a60c4fc1ddedc70fefa3dec1d14b445dd138d33852b2d6bb",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+      "sha256": "e446f5805fff51912ec6d1836982c302fa9e008ac765373a4c77ee7b6f205f7f",
+      "currentSha256": "60d089e3fb5e37c986e2945e14e4e413f70ee847d753663884b5ee7612b247f3",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "sha256": "c9082ef8063744e291aff224bcfc116ce43d214f81acebb8953510a6ce1b6b39",
+      "currentSha256": "b5481bf921939ad4f187caee4d369fb09f4ef683e2e5b3e2484aa9f1c6ed3697",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "sha256": "90ce693b3864043cf0e6d07b3f56337f30562b488e92aad4d3c62a0dace9b804",
+      "currentSha256": "ad57db8d728b39e67f16845afbc72d8132693cb4f51eb9a2a7fa2882d03ce220",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "sha256": "8ffa33c626b2825d4796241514cd11d9b1a34b2a449147496de4b6262ff1c75f",
+      "currentSha256": "6734e138c096197fc84fb3863a331d2c2582758ca6ad598a0fa44eec7535570a",
+      "scope": "QA-R1 owned"
+    },
+    {
+      "path": "docs/kb/domain/06-recipes.md",
+      "sha256": "9606617b3023334aa79b38e8ae701cff5fc1d1111859a1c45fc195f0c44a084f",
+      "currentSha256": "cbc6d50139db2cf508bf5441234d71ab45318b4551731bc0763b239f7dc7e0cf",
+      "scope": "inherited post-r2; preserved from round baseline"
+    },
+    {
+      "path": "docs/kb/domain/07-ai-features.md",
+      "sha256": "a99d3e69c797fa0dd8d2a45b1e4335db02438543f360123e9d73f1dd401c975b",
+      "currentSha256": "8ebdb15efc0a4f2c154c12ca4f34f48ef82ef3806a9b807ead3ec5a085857d5b",
+      "scope": "inherited post-r2; preserved from round baseline"
+    },
+    {
+      "path": "docs/kb/tech/02-backend.md",
+      "sha256": "ca76f2dcad6751541311d6c039a7a8bb0ae0929a99392150a204f05c0068ec7a",
+      "currentSha256": "19d7814e733954ee76e9b2c73115058aa9d29d6f71ecfdd12e34ded10afce60d",
+      "scope": "inherited post-r2; preserved from round baseline"
+    },
+    {
+      "path": "docs/kb/tech/06-ai-integrations.md",
+      "sha256": "c78459c0574eba9daae1e0ad3c53319ed2fb9b66f169a18934c02694a6ae2f99",
+      "currentSha256": "39082632d23a33e765fe9ed5f68d7939196b46c981e2a076fd912b2fc860e26a",
+      "scope": "inherited post-r2; preserved from round baseline"
+    },
+    {
+      "path": "docs/kb/tech/08-testing.md",
+      "sha256": "69a6b0f1ce83afa1a4d2213bf8654b581eb290121a72943d03a751400a37c3ca",
+      "currentSha256": "381dece01df446807f20c14bd67699c19c58494efa935788921384c43a43a4fc",
+      "scope": "inherited post-r2; preserved from round baseline"
+    },
+    {
+      "path": "docs/kb/tech/09-api-reference.md",
+      "sha256": "1cdaca5b15c2b6b902385f6b99bca474fedcacf455ca37e398213b873575c6c0",
+      "currentSha256": "1893abe058d0b68b218c128af286a8a7cfe660921db976328f4f6e105dedaa7a",
+      "scope": "inherited post-r2; preserved from round baseline"
+    },
+    {
+      "path": "docs/qa/findings.md",
+      "sha256": "321fdafa65a9a37ea9752d1a371284cdf36f6f04bae8258e1ddbe0f8e2236f47",
+      "currentSha256": "feafc313b2941aba58e42f791f7122907296fb50ae943917ac3c51f5cc4dff5d",
+      "scope": "inherited post-r2; preserved from round baseline"
+    }
+  ],
+  "status": "REQUIRED_F_FAILED_RELEASE_BLOCKED",
+  "qaFindingClosure": false,
+  "releaseClosed": true,
+  "repeatUntilGreen": false
+}

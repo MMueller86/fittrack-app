@@ -81,8 +81,348 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-060 | US-01 selection date-reset screen test | Non-blocking | Frontend | Closed |
 | FT-QA-2026-061 | US-01 foreign-user bulk reference test, AC-11 | Non-blocking | Backend | Closed |
 | FT-QA-2026-062 | US-01 Same-Day Copy Cosmos guard, AC-SD-1 | Blocking | Backend | Closed |
+| FT-QA-2026-063 | US-10 Recipe Analyze source-step trace, AC-6/AC-16 | Blocking | Backend | In progress |
+| FT-QA-2026-064 | US-10 Recipe Analyze source-step semantic coverage, AC-2/AC-16 | Blocking | Backend | In progress |
+| FT-QA-2026-065 | US-10 pre-existing recipe diagnostic logging scope | Blocking | Backend | In progress |
+| FT-QA-2026-066 | US-10 backend suite timeout, AC-6 | Blocking | Backend | In progress |
+| FT-QA-2026-067 | US-10 Preparation v16 content preservation, AC-2/5 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-068 | US-10 unchanged Import v15 live gate, AC-6 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-069 | v16 overall live gate, foreign Daily Insight failure, AC-6 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-070 | v18 approved short-summary implementation pending, AC-1..5/13 | Blocking | Backend | In progress |
+| FT-QA-2026-071 | v18 Preparation missing finish-cooking action, AC-3/8/14 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-072 | v18 permitted cooking/serving combination rejected, AC-3/13/14 | Blocking | Backend | Closed |
+| FT-QA-2026-073 | v18 Import spray-oil quantity live gate, AC-8/14 | Blocking | Backend | Closed |
+| FT-QA-2026-074 | v18 foreign Daily Insight overall gate, AC-8/14 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-075 | v18 archival capture exit-only classification, AC-8/12/14 | Non-blocking | Backend | Awaiting decision |
+| FT-QA-2026-076 | v18 Import missing finish-cooking core, AC-8/14 | Blocking | Backend | Closed |
+| FT-QA-2026-077 | v19 Preparation invalid source groups, AC-5/6/9 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-078 | v19 foreign Import duplicate source trace, AC-9 | Blocking | Backend | Closed |
+| FT-QA-2026-079 | v19 foreign Daily open-day completion judgment, AC-9 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-080 | v19 obsolete handler test scenario names, AC-8/10 | Suggestion | Backend | Awaiting decision |
+| FT-QA-2026-081 | Preparation feedback loop unaffected-text logging, AC-10 | Blocking | Backend | Closed |
+| FT-QA-2026-082 | Preparation compact diagnostic line height, AC-4/10 | Blocking | Backend | Closed |
+| FT-QA-2026-083 | Preparation mandatory oven fit live gate, AC-11/12 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-084 | Preparation pasta contradiction rubric, AC-11/12 | Blocking | Backend | Closed |
+| FT-QA-2026-085 | Preparation dough ingredient-fidelity rubric, AC-11/12 | Blocking | Backend | Closed |
+| FT-QA-2026-086 | v21 Preparation oven cooking endpoint, AC-6 / US-10 AC-15/16 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-087 | v21 Preparation aggregate-time provenance, AC-2/6 | Blocking | Backend | Closed |
+| FT-QA-2026-088 | v21 overall gate, separate Daily stale-weight failure, AC-9 | Blocking | Backend | Closed |
+| FT-QA-2026-089 | v21 Preparation current-contract KB v6/v9 discrepancy, AC-10 | Non-blocking | Documentation / Backend | Closed |
+| FT-QA-2026-090 | v21 correction rice cooking core and required success, AC-2/5/9 | Blocking | Backend | Closed |
+| FT-QA-2026-091 | v21 correction Daily unknown-activity overall gate, AC-9 | Blocking | Backend | Closed |
+| FT-QA-2026-092 | v21 final Daily phase-progress-open-day overall gate, AC-9 | Blocking | Backend | Closed |
+| FT-QA-2026-093 | Current recipe sharing Import finishing-action loss, US-10 AC-16 | Blocking | Backend | Closed |
+| FT-QA-2026-094 | Current recipe sharing oven shortening action substitution, AC-6 | Blocking | Backend | Closed |
+| FT-QA-2026-095 | Current recipe sharing KB version and ETag contract drift, AC-10 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-096 | Current forced-dough text-only overflow exhaustion, AC-7/8/9 | Blocking | Backend | Closed |
+| FT-QA-2026-097 | Import v17 exhausted-corrections repair drops steps / serves rule violations, AC-4/US-10 AC-16 | Non-blocking | Backend | Closed |
+| FT-QA-2026-098 | Preparation total-time guard edge cases (h+min, all-timed wrong sum), AC-2/6 | Non-blocking | Backend | Closed |
+| FT-QA-2026-099 | KB current-contract drift v16/v11/mandatory If-Match (continuation of FT-095), AC-10 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-100 | Import v17 up to three provider calls without timeout/maxRetries override, AC-7 | Suggestion | Backend | Closed |
+| FT-QA-2026-101 | Oven text correction weakens cheese action ("darüber geben"), AC-6/US-10 AC-16 | Suggestion | Backend | Accepted |
+| FT-QA-2026-102 | Import side-dish source step 8 lost "als Beilage" in 1/8 live runs (provider variance), AC-9/US-10 AC-16 | Non-blocking | Backend | Accepted |
+| FT-QA-2026-103 | `sourceStepOrders` anchors remain in the recipe-analyze HTTP JSON, AC-4 | Suggestion | Backend | Accepted |
+| FT-QA-2026-104 | Total-time guard false positives and quadratic digit-run matching, AC-2/6 | Suggestion | Backend | Accepted |
+| FT-QA-2026-105 | Text-only shortening prompt changed without Preparation version change, AC-10 | Suggestion | Backend | Accepted |
+| FT-QA-2026-106 | `ingredientKeys` remain in the recipe-analyze response (documented contract), AC-4 | Suggestion | Backend | Accepted |
+
+## Current Recipe Sharing Acceptance
+
+- Latest independent report (2026-10-12): [QA_Recipe_Sharing_Targeted_2026-10-12.md](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md). Verdict PASS WITH ISSUES (completed by the Orchestrator from the recorded evidence on the user's instruction; the QA agent returned no final response). No Blocking finding. Offline: tsc 0, backend 1670/1670, shared 450/450, mobile 640/640. Live (recipe evals): full file 8/8, dough 10/10 (2 logical calls), oven 8/8, no-lost-or-invented 10/10, side-dish 7/8 (one provider-variance failure, FT102).
+- Closed on this evidence: FT094, FT095, FT096, FT097, FT098, FT099, FT100. Accepted by the user: FT101-FT106 (Suggestions and the single side-dish variance). Manual oven wording review and device share flow remain MANUAL VALIDATION REQUIRED; no deployment.
+- The 2026-10-11 acceptance block below is retained as history.
+
+### Previous acceptance state (2026-10-11)
+
+- Latest independent report (2026-10-11): [QA_Recipe_Sharing_Reverification_2026-10-11.md](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md). Verdict PASS WITH ISSUES: no Blocking finding open. Candidate Preparation v12, Import v17 (up to three provider calls), server-side order sort, total-time guard and Import correction loop. 280/280 live recipe tests passed (full recipeAnalyze file 10/10, rice 10/10, four Import fixtures 8/8 each, oven 6/6, dough 6/6); unit suite 1659/1659, tsc 0.
+- Closed on this evidence: FT073, FT076, FT078, FT087, FT090, FT093. Not reproduced but not closed: FT094 (see FT101), FT096. FT086 remains the disputed doneness interpretation (oven content = MANUAL VALIDATION REQUIRED). FT095 continues as FT099. New Non-blocking/Suggestion findings: FT097-FT101.
+- Out of scope by user decision: Daily/Weekly Insight overall eval gate (not claimed). Not verified: on-device share flow, Cosmos contract tests, human oven review. No deployment.
+- Historical status below (2026-10-10 FAIL report) is retained for traceability.
+
+### Previous acceptance state (2026-10-10, superseded for Import/Preparation by the report above)
+
+- Latest independent report: [QA_Current_Recipe_Sharing_2026-10-10.md](reports/QA_Current_Recipe_Sharing_2026-10-10.md). Verdict FAIL: no QA acceptance of the current saved feature.
+- Verified candidate: Preparationv12, Importv16, Dailyv17/assemblyv2; SHA-256 01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3. All 548 candidate files stable through the new review; no historical v11 result substituted.
+- Current blockers: FT090/CS-01 required Preparation rice success/FIRST order, FT093/CS-02 Import chicken finishing action and 6min loss, FT094/CS-03 oven shortening changes sprinkle-cheese to pour-cheese. Current non-blocking documentation drift: FT095/CS-04.
+- Fresh live gates once each: F10/11, R19/20, G48/48. Daily18/18 and all18 direct time-provenance cases pass; FT087/088/091/092 narrowly closed on new evidence, not historical result rewriting. Backend1641/1641, Shared450/450, Mobile640/640 and typechecks/build pass.
+- FT086 endpoint interpretation remains Awaiting decision: user disputes the inferred mandatory doneness clause. Latest QA separates product/human clarification from conclusive current blockers; no literal-phrase requirement or user waiver inferred. Its original criticality/evidence remains historical, not a new current blocker.
+- Verification notes: human oven review MANUAL VALIDATION REQUIRED; actual Android sharing, Cosmos contracts and private/Alpha visual replay UNVERIFIED. These are verification limits, not additional defect IDs. No deployment.
+- User authorized current-state QA only. No new implementation correction was started; further corrections require explicit direction after the previous two-attempt stop.
+
+## Latest Current Stability Evidence
+
+- [QA_Recipe_Preparation_Stability_2026-10-10.md](reports/QA_Recipe_Preparation_Stability_2026-10-10.md): FAIL, scoped stability experiment, not a replacement full-feature review. Same Preparationv12/Importv16/Dailyv17 candidate hash as the current full-feature report; direct src imports and exact actual SDK prompt equality independently verified.
+- User explicitly authorized additional live evals. Prespecified five isolated rice runs plus one R and one G, with no replacements: rice4/5 focused and5/7 comparable total pass. Trial4 and G exhaust three calls with FIRST1,3,4,6,5,HTTP422/usage0/no writes. FT090 remains open, no accepted missing-rice claim.
+- R18/20 and G45/48; Daily18/18 remains green. Import finishing loss FT093 reproduced in both. New forced-dough overflow FT096 observed in R. Direct oven time-provenance recurrence reopens FT087 despite earlier finite green evidence; successful handler null checks are separate calls.
+- FT094 cheese-action substitution not reproduced in the two new handler oven outputs, but not independently closed. FT095 documentation drift persists. No implementation, validator, fixture, configuration or historical evidence changed; no deployment.
+
+## Historical Q-21 Correction Stop
+
+- 2026-10-10: Preparation and Daily correction counts both reached 2. No third automatic implementation or live retry; further work requires explicit user direction.
+- Final candidate: Preparationv11, Importv16, Dailyv17/assemblyv2. Independent FINAL2 report: FAIL; focus788/788, units1639/1639, typecheck/build/release checks pass; F2/5, R11/14, G38/42 fail.
+- Remaining blockers: FT086 oven endpoint; FT087 oven/pasta aggregates; FT090 rice core/order; FT088 overall Daily gate with new recurrence FT092. FT091 unknown-activity passes in this finite G sample only, no broad closure. FT089 current-contract KB alignment remains verified.
+- Verification note: HUMAN/MANUAL VALIDATION REQUIRED for oven culinary approval, NOT PERFORMED. Assistant source comparison is not human approval. Daily raw response/causal attribution remains UNVERIFIED. These limits are not additional defect IDs.
+- Historical reports, failed runs and unrelated findings retain their original scope. No deployment performed or authorized in this correction run.
 
 ## Actionable Findings
+
+### FT-QA-2026-086
+
+- **Finding key:** Q21-20261010-OVEN-ENDPOINT.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`.
+- **Acceptance criterion:** AC-6; US-10 AC-15/16.
+- **Description:** All three accepted oven summaries retain baking40min but omit the source condition that potatoes must be cooked. This is a source cooking endpoint, not optional serving/resting or an exact-wording requirement. Manual-tagged oven bypasses automated semantic assertion; HTTP200/fit/reference success does not prove fidelity.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md), F/R/G records, fixture synthetic-saved-oven-seven-steps, savedSource6 versus final outputs; each HTTP200/usage1.
+- **Recommendation:** Scope-bounded fidelity correction, independent new source/export comparison and documented human review. No cooking-criterion or renderer-limit relaxation, no automatic oven semantic-PASS claim.
+- **Status:** Awaiting decision.
+- **Decision:** User requested corrections on 2026-10-10. Route to Backend, correction attempt 1; independent QA required. No deployment.
+- **History:** 2026-10-10 - Registered from validated Q-21 FAIL; historical reports/findings preserved. Human culinary approval remains a separate manual validation limit.
+- **History:** 2026-10-10 - Correction attempt 1 independently reviewed: F endpoint retained, R/G accepted outputs still omit it. Remains open; route final correction attempt 2. CORR1 F2/5, R11/14, G38/42; no deploy.
+- **History:** 2026-10-10 - FINAL2 independently reproduces endpoint loss in all three accepted oven outputs; F loses its initial endpoint during full-draft correction. Two attempts exhausted; STOP awaiting explicit user direction, no third candidate or deploy.
+- **History:** 2026-10-10 - User challenges mandatory doneness clause; current v12 QA treats it as disputed interpretation/product clarification, not an independently conclusive literal-phrase blocker. No waiver or human approval inferred. Awaiting decision; separate current cheese-action defect tracked as FT094.
+- **History:** 2026-10-11 - [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): oven fixture technically green 16/16 (10 full + 6 dedicated); content judgment MANUAL VALIDATION REQUIRED, not a blocker. Status unchanged (Awaiting decision).
+
+### FT-QA-2026-087
+
+- **Finding key:** Q21-20261010-PREP-METADATA.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`.
+- **Acceptance criterion:** AC-2; AC-6; US-10 AC-16.
+- **Description:** Unsupported aggregate times in natural Preparation outputs: rice F42/R42/G35, oven F/R/G50, pasta F/R/G35. Saved contexts/source supply no reliable derivation for these totals; untimed work/possible overlap do not justify arbitrary additions. V9 requires reliably source-derived total or null. Schema/core/fit do not check provenance.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md), F/R/G complete attempt and semantic evidence, original contexts/raw.totalTimeMinutes; oven explicit40min only, no supported50min total.
+- **Recommendation:** Preserve null when reliable source total is absent, focused provenance positive/negative coverage and independent QA. No fixed default or assertion relaxation.
+- **Status:** Closed.
+- **Decision:** User requested corrections on 2026-10-10. Route to Backend, correction attempt 1; independent QA required. No deployment.
+- **History:** 2026-10-10 - Registered from validated Q-21 FAIL; no historical gate reclassification.
+- **History:** 2026-10-10 - Correction attempt 1 independently reproduced unsupported rice35/oven40/pasta25 totals. Null provenance checks fail; route final correction attempt 2 without weakening assertions or adding runtime-parser requirements.
+- **History:** 2026-10-10 - FINAL2 rice raw null improves, but accepted oven40/pasta25 still fail provenance in all three gates. Positive50/15 offline tests remain intact. Two attempts exhausted; STOP awaiting explicit user direction.
+- **History:** 2026-10-10 - Fresh current v12 QA verifies all18 direct provenance cases and all11 successful handler metadata checks; explicit50/sequential15 positives and unsupported-time null negatives pass. Narrow current defect closed; F rice metadata not reached and no universal generation guarantee asserted. Historical failed outputs preserved.
+- **History:** 2026-10-10 - Authorized bounded current stability experiment RS-04 G direct oven provenance returns40 instead ofnull on the same unchanged v12 candidate. Reopened scoped provenance defect; separate saved-handler null successes do not erase this failure. Prior green report preserved. Await user direction, no correction started.
+- **History:** 2026-10-11 - Fix requested by user (stabilization). Server-side `recipeTotalTimeGuard.ts` added. [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md) verified: provenance test 10/10 full runs + 6/6 oven runs. Targeted QA verified; status Closed. Residual guard edge cases tracked as FT098; no universal guarantee.
+
+### FT-QA-2026-088
+
+- **Finding key:** Q21-20261010-DAILY-OVERALL.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`.
+- **Acceptance criterion:** AC-9 (overall gate).
+- **Description:** New overall gate fails on Daily stale-weight: DailyInsightValidationError: Daily insight judges an open day as completed. Recipe14/14, Weekly4/4 and diagnostic3/3 pass. This is a separate Daily failure, not Preparation/Import/Weekly failure or evidence of v9/Weekly-fix causation; mandatory overall gate remains failed.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md), Q21-2026-10-10-G-Report.json and G-Output.txt; dailyInsight.eval.test.ts:23, dailyInsightValidation.ts:230; exit1,41/42.
+- **Recommendation:** Separate Daily diagnosis and scoped correction; preserve failed run, no substitution of other passes or retry-until-green.
+- **Status:** Closed.
+- **Decision:** User requested corrections including this reported blocker on 2026-10-10. Route separately to Backend, correction attempt 1; no broad Daily redesign or historical finding closure. No deployment.
+- **History:** 2026-10-10 - Registered current recurrence separately from historical Daily findings; prior statuses remain untouched.
+- **History:** 2026-10-10 - Independent CORR1 stale-weight passes, but Daily unknown-activity fails with the same strict open-day rejection; overall remains blocked. Track new recurrence as FT091 and route Daily correction attempt 2. Historical failure and statuses preserved.
+- **History:** 2026-10-10 - FINAL2 stale-weight and unknown-activity pass; phase-progress-open-day now rejects intake-increase advice on open budget. Daily17/18 and G38/42 remain failed; new recurrence FT092. Two attempts exhausted; STOP, no overall closure.
+- **History:** 2026-10-10 - Fresh current-state G48/48 and Daily18/18 independently pass, including stale-weight. Narrow current Daily overall recurrence closed; historical failures remain evidence and recipe acceptance still FAIL for distinct current findings.
+
+### FT-QA-2026-089
+
+- **Finding key:** Q21-AC10-DOC-01.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`.
+- **Acceptance criterion:** AC-10.
+- **Description:** Current Preparationv9 contrasts with authoritative current-contract KBv6 sections alongside newer v9 paragraphs. Independently confirmed open discrepancy.
+- **Criticality:** Non-blocking.
+- **Owner:** Documentation; correction routed to Backend for implementation-adjacent KB alignment.
+- **Evidence:** [Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md); domain/07-ai-features.md:106/171/203, tech/06-ai-integrations.md:67/110, tech/02-backend.md:277, tech/09-api-reference.md:404, tech/08-testing.md:133; domain/06-recipes.md already describes v9.
+- **Recommendation:** Align current-contract documentation with verified candidate; preserve dated v6 history and historical evidence.
+- **Status:** Closed.
+- **Decision:** User requested reported corrections on 2026-10-10, including KB discrepancy. Scoped documentation alignment only; verify independently against corrected implementation, not a blanket version replacement.
+- **History:** 2026-10-10 - Registered from validated Q-21 FAIL; no historical document or finding rewritten.
+- **History:** 2026-10-10 - Independent CORR1 QA verifies six current-contract KB sections align Preparationv10, Importv16 and Dailyv16; narrowly closed current-version discrepancy. Historical paragraph byte attribution remains UNVERIFIED, not retroactive history acceptance. Subsequent candidate version changes still require matching documentation.
+- **History:** 2026-10-10 - FINAL2 independently confirms current KB alignment with Preparationv11/Importv16/Dailyv17 and four selected dated blocks preserved. Narrow closure remains valid; no candidate acceptance inferred.
+- **History:** 2026-10-10 - Current v12 QA identifies new current-version/optional-ETag documentation drift, tracked separately as FT095. Prior v11-scoped closure is preserved, not a claim of current alignment.
+
+### FT-QA-2026-090
+
+- **Finding key:** Q21-CORR1-CORE.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`.
+- **Acceptance criterion:** AC-2; AC-5; AC-9; US-10 AC-15/16.
+- **Description:** F accepted rice omits source5 and any independent rice cooking, retaining oil/rest instead; essential side loss, not optional omission. G exhausts three calls with starts6 before5,422/usage0, so mandatory successful rice fixture absent. Validator correctly blocks; no validation defect asserted.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [CORR1 Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md); F refs [1,2],[3],[4],[6],[7],source5/corefalse,200usage1; G refs [1,2],[3],[4],[6],[5], structural failure; CORR1 reconciliation/source/output records.
+- **Recommendation:** Scoped source-backed core/order correction, preserving free grouping, three-call, reference and renderer contracts. No IDs-only coverage, rubric weakening or FT071 closure from R alone.
+- **Status:** Closed.
+- **Decision:** Route with Preparation correction attempt 2 under user-authorized QA correction loop; no new runtime validation or product requirement.
+- **History:** 2026-10-10 - Registered from validated CORR1 FAIL. Existing FT071 and all historical findings unchanged; no deployment.
+- **History:** 2026-10-10 - FINAL2 F accepted rice again lacks separate cooking despite null metadata; R/G exhaust three calls and are correctly blocked for FIRST inversion. No complete rice success. Preparation attempt2 exhausted; STOP awaiting user direction.
+- **History:** 2026-10-10 - Fresh current v12 QA CS-01 F retains separate rice cooking but exhausts three calls with FIRST1,3,4,6,5 and422/usage0. Current defect is required-success/order, not an accepted missing-rice claim. R/G Preparation rice pass but do not replace failed F. Remains Awaiting decision, no third implementation started.
+- **History:** 2026-10-10 - Authorized stability QA RS-01 reproduces FIRST-order exhaustion in trial4 and G:4/5 focused,5/7 total rice samples pass. All seven initial requests/source/schema equal, direct current src execution and prompt equality verified. Two failures remain immutable; no retry-until-green or statistical reliability guarantee.
+- **History:** 2026-10-11 - Fix requested by user. Export steps are now sorted server-side by first source reference (`recipePreparationOrder.ts`); invalid drafts (duplicates, unknown, empty) still exhaust after 3 calls. [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): rice 10/10 isolated (20/20 tests) and 10/10 in full runs. Targeted QA verified; status Closed.
+
+### FT-QA-2026-091
+
+- **Finding key:** Q21-CORR1-DAILY-UNKNOWN-ACTIVITY.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`.
+- **Acceptance criterion:** AC-9 (overall gate).
+- **Description:** G unknown-activity throws DailyInsightValidationError: Daily insight judges an open day as completed. Stale-weight passes, but Daily17/18 and G38/42 remain failed. Separate Daily recurrence, not Preparation/Import/Weekly causation; exact raw phrase unavailable.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [CORR1 Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md), Q21-CORR1-2026-10-10-G-Report.json and G-Output.txt; dailyInsight.eval.test.ts:23, dailyInsightValidation.ts:230, openai.ts:949.
+- **Recommendation:** Separate scoped Daily diagnosis and correction, strict open-day lock retained, failure preserved. No substitution of other passes or live retry-until-green.
+- **Status:** Closed.
+- **Decision:** Route with Daily correction attempt 2. Missing raw output is UNVERIFIED; no invented causal attribution or broad Daily redesign.
+- **History:** 2026-10-10 - Registered from validated CORR1 FAIL, distinct from historical Daily issues and original stale-weight recurrence. No deployment.
+- **History:** 2026-10-10 - FINAL2 actual unknown-activity and strict negative regressions pass. QA recommends acknowledging finite improvement, not broad closure; Daily still fails FT092. Two Daily attempts exhausted, no automatic replay or further correction.
+- **History:** 2026-10-10 - Fresh current QA unknown-activity passes within Daily18/18/G48/48. Narrow recurrence closed on independent current evidence; no raw response or stochastic guarantee claimed, historical CORR1 failure preserved.
+
+### FT-QA-2026-092
+
+- **Finding key:** Q21-FINAL2-DAILY-PHASE-OPEN-DAY.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`.
+- **Acceptance criterion:** AC-9 (overall gate).
+- **Description:** G phase-progress-open-day throws Daily insight recommends increasing intake based on an open calorie budget; Daily17/18 and G38/42 remain failed despite passing stale-weight/unknown-activity. Actual context: phase_progress, hour12, remainingCalories700/protein40. Raw response and exact cause unavailable; no v17 causation or Preparation/Weekly attribution claimed.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [FINAL2 Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md), Q21-FINAL2-2026-10-10-G-Report.json and G-Output.txt; strict dailyInsightValidation.ts:254/provider openai.ts:949; unchanged validator.
+- **Recommendation:** STOP; retain separate Daily overall blocker FT088, failure evidence and strict guard. No third automatic candidate or live replay; further implementation requires explicit direction.
+- **Status:** Closed.
+- **Decision:** Automatic correction limit reached (Daily=2); return to user without claiming acceptance or deployment. Exact raw-response diagnosis remains UNVERIFIED.
+- **History:** 2026-10-10 - Registered from validated FINAL2 FAIL. Original/CORR1 failures preserved; historical findings unchanged.
+- **History:** 2026-10-10 - Fresh current QA phase-progress-open-day passes within Daily18/18/G48/48. Narrow recurrence closed; strict validation unchanged, original FINAL2 failure preserved.
+
+### FT-QA-2026-093
+
+- **Finding key:** CS-02-current-import-finish-cooking-loss.
+- **Plan reference:** Approved v21 preparation plan and US-10 under current sharing overrides; [current QA report](reports/QA_Current_Recipe_Sharing_2026-10-10.md).
+- **Acceptance criterion:** AC-1/8/9; US-10 AC-3/16/25.
+- **Description:** Fresh R current Importv16 export skips chicken finishing/source6 and its additional6min. Five export descriptions retain frying4min per side before slicing/serving, but no reduce-heat/finish-cooking action. Original eight-step source extraction is intact; substantive export action/duration loss, not ID-only or source-extraction failure.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** Current R/C side-dish-and-serving-actions complete source/export; Missing export reference 6: finish cooking chicken after frying; R19/20 exit1. G independently passes this fixture but does not erase R.
+- **Recommendation:** Source-core preservation correction retaining strict Import reference policy and semantic assertion; QA must not patch expectations to hide loss.
+- **Status:** Closed.
+- **Decision:** User requested current-state QA, not new corrective implementation. Report current blocker and await direction; no deployment.
+- **History:** 2026-10-10 - Registered from validated current-candidate FAIL; historical Import findings not automatically closed or relabelled.
+- **History:** 2026-10-10 - Authorized stability QA RS-02 reproduces source6 finishing action and additional6min loss in both R and G on unchanged current Importv16. Remains open; saved-rice fixture is distinct.
+- **History:** 2026-10-11 - Fix requested by user. Import v17 with `cookingEssential` planning flag and up to two directed corrections. [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): side-dish fixture 8/8 isolated and 10/10 in full runs including the source-6 assertion. Targeted QA verified; status Closed. Residual risk of exhausted-corrections path tracked as FT097.
+
+### FT-QA-2026-094
+
+- **Finding key:** CS-03-current-oven-text-correction-action-substitution.
+- **Plan reference:** Approved v21 preparation plan; [current QA report](reports/QA_Current_Recipe_Sharing_2026-10-10.md).
+- **Acceptance criterion:** AC-2/6/8; US-10 AC-16/17/25.
+- **Description:** Current R Preparationv12 text-only overflow correction changes correct pour-cream/sprinkle-cheese into pour-cream-and-cheese. Final text is Kartoffeln in die Form schichten, Sahne und Kaese darueber giessen. Server accepts fit result200/usage1 with refs/layout intact, but changes the retained cheese action. Distinct from disputed doneness clause.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** Current R/C oven source4, initial correct text, sole steps[1].description overflow, strict recipe_text_correction request and final corrected string. F/G retained correct separate actions. Independent content observation, not a claimed automated oven semantic assertion failure.
+- **Recommendation:** Preserve component-action relations when shortening, with separately authorized regression and independent review. No literal endpoint-clause requirement inferred.
+- **Status:** Closed.
+- **Decision:** Record current blocker only; no correction authorized by current QA request. Human oven review remains separate.
+- **History:** 2026-10-10 - Registered from validated current-candidate FAIL; no deployment or historical result rewrite.
+- **History:** 2026-10-10 - Stability QA current R/G oven handler texts preserve pour-cream/sprinkle-cheese correctly. Not reproduced in these two finite samples; no closure recommendation or replacement of prior failed observation.
+- **History:** 2026-10-11 - [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): literal pour-cheese substitution 0/6 oven runs; run06 shows a milder weakening ("Sahne und Käse darüber geben"), tracked as FT101 (Suggestion). Text-correction path unchanged since the finding; not closed, human oven review MANUAL VALIDATION REQUIRED. Status unchanged (Awaiting decision).
+- **History:** 2026-10-11 - Backend check on current code: 12 isolated oven runs plus 10 oven runs inside full runs show cheese kept as "streuen" and cream as "gießen" in every layering text (no pour-cheese, no "geben"; one run groups layering differently but without the substitution). With the 0/6 QA runs: literal defect 0/28. Text-correction prompt now additionally gets a measured `maxCharacters` limit (FT096 change). Status Resolved on this evidence; closing needs a short targeted QA confirmation. Wording judgment stays MANUAL VALIDATION REQUIRED (FT101).
+
+### FT-QA-2026-095
+
+- **Finding key:** CS-04-current-kb-contract-drift.
+- **Plan reference:** Approved v21 preparation plan and R2 sharing override; [current QA report](reports/QA_Current_Recipe_Sharing_2026-10-10.md).
+- **Acceptance criterion:** AC-10; US-10 AC-28; R2-AC-14.
+- **Description:** Current-contract KB prose describes Preparationv11 while saved code/guards arev12. Shared-library prose requires Preparation/confirmation If-Match and response sourceEtag comparison despite approved optional-ETag/current mobile behavior. Explicit historical version prose excluded.
+- **Criticality:** Non-blocking.
+- **Owner:** Documentation.
+- **Evidence:** Current QA CS-04: domain/07-ai-features.md current Preparation sections; tech/02-backend.md:277, tech/09-api-reference.md:404, tech/08-testing.md:133, tech/04-shared-library.md:109; independently verified current API/mobile contracts.
+- **Recommendation:** Align only current versions and optional ETag/sourceEtag contract prose, preserving historical evidence.
+- **Status:** Closed.
+- **Decision:** Await user correction/acceptance/deferral choice; current QA request did not authorize documentation changes.
+- **History:** 2026-10-10 - Registered current documentation drift separately from historical FT089 closure. No KB edits by QA or Orchestrator.
+- **History:** 2026-10-10 - Stability QA confirms current v11 prose/mandatory-ETag drift still conflicts with savedv12/optional-ETag behavior. Remains Awaiting decision.
+- **History:** 2026-10-11 - Re-verification QA: Import v17/up-to-3-call loop documented, but stale v16/v11 statements and mandatory-If-Match prose remain. Continued as FT099 (same scope); status unchanged.
+- **History:** 2026-10-11 - Resolved together with FT-QA-2026-099 (same documentation correction); targeted QA verification pending.
+- **History:** 2026-10-12 - [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md): verified closed by evidence (current-contract statements v17/v12, optional If-Match, compatibility-only sourceEtag). Closed.
+
+### FT-QA-2026-096
+
+- **Finding key:** RS-03-current-dough-text-correction-exhaustion.
+- **Plan reference:** Approved v21 preparation plan; [current stability report](reports/QA_Recipe_Preparation_Stability_2026-10-10.md).
+- **Acceptance criterion:** AC-7/8/9.
+- **Description:** R forced-dough fixture has a synthetic initial draft and two real text-only corrections which repeat the same mixing sentence. Final text measures300x112px against302x105px using production Inter22/lineHeight1.25 with0.5px tolerance. Structure passes but measured fit fails; budget exhaustion yields422/usage0/no writes. G independently succeeds, not a replacement for R.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** RECIPE-STABILITY-2026-10-10-R.json and reconcile-verified.json, forced-dough exact attempts/text/probe; three logical calls/two real SDK calls, final measured overflow and native Rexit1.
+- **Recommendation:** Investigate bounded meaning-preserving text shortening under existing production bounds. No geometry relaxation, ingredient-rubric weakening or automatic live replay.
+- **Status:** Closed.
+- **Decision:** User authorized stability evals, not implementation. Persist actionable finding and await direction; no deployment.
+- **History:** 2026-10-10 - Registered from validated current stability FAIL; no historical oven-fit or dough-rubric finding reopened by implication.
+- **History:** 2026-10-11 - [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): forced-dough 6/6 HTTP 200, semantic assertion passed, 2 SDK / 3 logical calls; earlier 422 not reproduced. Not closed by QA (near-deterministic outputs at temperature 0.2, finite sample). Status unchanged (Awaiting decision).
+- **History:** 2026-10-11 - Recurrence found by Backend: one of ten full live runs exhausted three calls on the forced-dough fixture (both real corrections returned a 76-77 character sentence for a 53-character budget, generated-text-failure, 422 path). Correction: text-only shortening requests now carry a measured `maxCharacters` (25 % below the proportional fit, `textCorrectionLimit`), and the shortening prompt requires dropping conjunctions/target phrases instead of only reordering. Evidence after the change: 14/14 isolated dough runs fit on the first correction (2 logical calls; before: 3 calls with the first correction always failing), 10/10 full recipe runs green. Unit suite 1670/1670. Status Resolved; targeted QA confirmation closes it.
+
+### FT-QA-2026-081
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md`, section 4.6.
+- **Acceptance criterion:** AC-10.
+- **Description:** A nested unrecognized_keys diagnostic at steps[0] is mapped to that step's description even when description/references/geometry are valid. Unknown keys must be metadata-only; exhaustion currently logs unaffected cooking text.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-1 report, Q1-01](reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md); independent reproduction of recipePreparationAffectedFields and handler serialization.
+- **Recommendation:** Classify content-eligible diagnostics before mapping known strings; add unknown-key-only negative regressions without suppressing genuinely implicated reference/text/metadata fields or broadening logging.
+- **Status:** Closed.
+- **Decision:** Independent ROUND1 QA verified unknown-key-only/nonstring negatives and genuine affected-text preservation. Scoped closure only; release remains CLOSED.
+- **History:** 2026-10-09 - Registered Q1-01 from validated FAIL report; no secret-exposure claim or historical closure.
+- **History:** 2026-10-09 - ROUND1 QA independently reproduced the corrected empty affected-field result and passed helper/handler privacy regressions; closed FT081 only.
+
+### FT-QA-2026-082
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md`, sections 4.1/4.2/4.6.
+- **Acceptance criterion:** AC-4, AC-10.
+- **Description:** Overflow diagnostics hardcode lineHeight 1.25; five-step production layout uses font18/lineHeight1.17. Correction input and exhaustion logs misdescribe compact layout; actual measurements/acceptance remain correct.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-1 report, Q1-02](reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md); independent compact probe reproduction versus production text-layout owner.
+- **Recommendation:** Derive diagnostic font metadata from the production layout owner and add compact-step/teaser regressions; no font or bounds changes.
+- **Status:** Closed.
+- **Decision:** Independent ROUND1 QA verified production-derived large/compact/teaser font metadata and unchanged geometry; scoped closure only.
+- **History:** 2026-10-09 - Registered Q1-02; no accepted-overflow or renderer-redesign claim.
+- **History:** 2026-10-09 - ROUND1 QA passed correction/exhaustion metadata regressions and renderer parity; closed FT082 only.
+
+### FT-QA-2026-083
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md`, sections 4.3/7.
+- **Acceptance criterion:** AC-11, AC-12.
+- **Description:** Mandatory oven live case keeps the overflowing assembly sentence through both corrections: steps[1] measures 300x112 against302x105 in all three drafts. Protective422/usage0 works, but required final fit/success checks fail; one run does not establish stochastic root cause or failure frequency.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-1 report, Q1-03](reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md); immutable F provider/reconciliation records linked there.
+- **Recommendation:** Investigate the smallest correction-prompt change using existing failed drafts; preserve source fidelity, template/schema/budgets and three-call maximum. New prompt candidate/version guard and required gates; no repeat-until-green.
+- **Status:** Awaiting decision.
+- **Decision:** ROUND1 QA confirms continuing required-live-success blocker. B-2 QA correction round 2 was routed but could not start: the requested FitTrack Backend agent was not found. Stop without substitute agent, new candidate, live call or deployment; preserve the correction package for an intentional routing retry after user direction.
+- **History:** 2026-10-09 - Registered Q1-03; original failed F retained and Q-19 remains historical FAIL.
+- **History:** 2026-10-09 - v6/r3 ROUND1 F remains FAIL: rice FIRST-order/geometry exhaustion, dough geometry exhaustion, oven fits but source3 cream action is associated with source4-only group. Overall cream is present; no ingredient-disappearance claim. Pasta passes. Independent QA confirms FT083 remains Blocking, with R/G NOT_RUN and release CLOSED.
+- **History:** 2026-10-09 - Second correction invocation returned "Requested agent 'FitTrack Backend' not found" before execution. No second-round implementation or provider run occurred. Workflow stopped under the agent-routing process-error rule; r3 candidate and independently closed FT081/082/084/085 remain preserved.
+
+### FT-QA-2026-084
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md`, AC-11.
+- **Acceptance criterion:** AC-11, AC-12.
+- **Description:** Inherited source5 pasta contradiction regex crosses the action boundary into later sauce mixing, rejecting separate10min salted-water cooking followed by mixing. Independent reproduction establishes a test false positive, not demonstrated cooking corruption.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-1 report, Q1-04](reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md); exact recorded final sentence and regex reproduction.
+- **Recommendation:** Source-backed test-only rubric repair with positive exact separate-cook-then-mix case and negative cooking-in-sauce/component/time-swap regressions. Preserve original source fixtures and failed evidence; no production strategy change for this finding.
+- **Status:** Closed.
+- **Decision:** Independent ROUND1 QA verified exact recorded separate-cook-then-mix positive and cooking-in-sauce/component/time-swap negatives; scoped test-defect closure, not historical F reclassification.
+- **History:** 2026-10-09 - Registered Q1-04; subsequent QA must verify positive and negative rubric behavior.
+- **History:** 2026-10-09 - ROUND1 six source-derived regressions pass and current live pasta passes; closed FT084, preserving original sources and failed history.
+
+### FT-QA-2026-085
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md`, sections 4.3/7.
+- **Acceptance criterion:** AC-11, AC-12.
+- **Description:** Forced-dough rubric requires literal ingredient names even when the single-stage source-backed sentence explicitly mixes all ingredients into dough. Absent names alone do not establish omission; literal repetition is not an approved universal rule.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q-1 report, Q1-05](reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md); recorded final source[1,2] grouping and fixture-authority review.
+- **Recommendation:** Source-specific equivalent ingredient-set assertions with negative omission/invention and staged-component regressions. Do not broadly accept generic all-ingredients wording or prescribe an AI shortening strategy.
+- **Status:** Closed.
+- **Decision:** Independent ROUND1 QA verified exact single-stage source-scoped equivalence and eleven positive/negative regressions. Closure concerns rubric defect only; current live dough semantics were not reached.
+- **History:** 2026-10-09 - Registered Q1-05; no proven production ingredient loss or automatic semantic acceptance claimed.
+- **History:** 2026-10-09 - ROUND1 QA verifies omissions/invention/staged-source/time-temperature/core negatives remain rejected; closed FT085 without accepting arbitrary all-ingredients wording or closing historical failures.
 
 ### FT-QA-2026-001
 
@@ -891,7 +1231,417 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** The user explicitly approved same-day copy with fresh item IDs and requested immediate implementation on 2026-10-05. Backend removed the stale Cosmos equal-date guard; final QA correction re-review verified the source fix and issued Revision B verdict `PASS`. Cosmos runtime remains separately `UNVERIFIED`.
 - **History:** 2026-10-05 - Revision B QA reported blocking finding `Q5-RB-001`; assigned `FT-QA-2026-062` and routed to Backend. Cosmos contract runtime remains unverified. 2026-10-05 - Backend removed the Cosmos Copy equal-date guard; focused tests, full backend unit suite, typecheck, and build verification passed. Contract execution remains unverified because the local emulator was unreachable. 2026-10-05 - Q5 correction re-review verified the stale guard was removed and closed the finding with Revision B QA verdict `PASS`; emulator runtime remains unverified.
 
+### FT-QA-2026-063
+
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md`
+- **Acceptance criterion:** AC-6; US-10 AC-16
+- **Description:** The v12 Recipe Analyze live eval produced duplicate or out-of-order `sourceStepOrders` for two existing fixtures, violating the complete ordered export trace contract. Backend reports a v13 prompt correction with one-to-one preservation of explicitly numbered source instructions and three consecutive 8/8 Recipe Analyze eval passes. That source-step rule changes observable analyzer behavior beyond the approved v12 acceptance wording, so the Planner revised the plan and requires fresh explicit user approval before QA re-verification can proceed. The strict server validator remains unchanged.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** `docs/qa/reports/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md` records the v12 failure and traces `[1,2,3,4,5,5]` and `[1,2,3,4,5,4]`; the revised plan records the Backend-reported v13 correction and test results. The revised plan is awaiting fresh approval, and no v13 QA report exists yet.
+- **Recommendation:** After fresh approval of the revised plan, have QA independently rerun the focused live Recipe Analyze eval and all declared local gates. Close only after QA verifies the v13 source-step contract, strict validation, documentation, and acceptance criteria. Do not weaken validation or deploy as part of this finding.
+- **Status:** In progress
+- **Decision:** The user explicitly approved the revised v13 plan on 2026-10-08. Backend correction is requested after the v13 QA FAIL; the finding remains open until the focused live eval passes and QA verifies it.
+- **History:** 2026-10-07 - QA v12 report returned FAIL; finding `RECIPE-ANALYZE-LIVE-EVAL-001` identified duplicate/out-of-order source references in two existing fixtures. 2026-10-07 - Backend reported prompt v13 and three consecutive 8/8 focused Recipe Analyze eval runs, plus passing focused/full unit, typecheck, build, and diff checks. 2026-10-07 - Planner revised the focused plan to record the one-to-one numbered-source contract; fresh approval is required before QA re-verification. No deployment performed.
+- **Current evidence:** [v16 QA report](reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md), finding `Q16-IMPORT-GATE-002`, confirms an Import trace `[1,2,3,4,5,1]` in the overall live gate. The preceding evidence statement that no v13 report exists is historical and superseded by the repository v13 and v16 reports. This finding remains open; the new Preparation result does not close it.
+- **History:** 2026-10-09 - User approved v16. Independent Q-16 returned FAIL; unchanged Import v15 still violates trace/content constraints. Recorded separate gate finding FT-QA-2026-068 without deleting or closing this historical trace finding. No deployment performed.
+
+### FT-QA-2026-067
+
+- **Finding key:** Q16-PREPARATION-CONTENT-001
+- **Plan reference:** [v16 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md)
+- **Acceptance criterion:** AC-2; AC-5; US-10 AC-16
+- **Subtask:** B-16 / Q-16 Preparation content correction and three-run proof
+- **Description:** The approved exclusive Preparation v2 prompt still produces an incomplete export on the real handler/client/provider path. Independent series run 1 loses medium heat, covered resting and order 8/serving. The handler returns 422, usage is zero, and the separate Recipe gate confirms the same fully captured raw result. No three successful 200 responses or functioning targeted fix is demonstrated.
+- **Criticality:** Blocking
+- **Severity:** Blocking
+- **Owner:** Backend
+- **Evidence:** [v16 QA report](reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md), finding Q16-PREPARATION-CONTENT-001, Synthetic Live Evidence and Tests: series/Recipe gates exit 1, trace 1..7, five groups with lengths 66/73/65/56/62. Content is incomplete despite correct group count.
+- **Recommendation:** Return the evidence to Orchestrator/Planner for the next explicitly approved candidate decision. After an authorized correction, verify the unchanged complete rubric and a newly predefined handler series. Do not loosen assertions/limits, collect replacement passes or introduce unapproved architecture.
+- **Status:** Awaiting decision
+- **Decision:** The v16-approved prompt candidate failed independently. The plan requires explicit approval for a further candidate; no further prompt experiment is authorized by this register entry.
+- **History:** 2026-10-09 - Imported from validated Q-16 report after B-16 implementation and D-16 documentation. Feature correction and release remain blocked; no deployment.
+
+### FT-QA-2026-068
+
+- **Finding key:** Q16-IMPORT-GATE-002
+- **Plan reference:** [v16 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md)
+- **Acceptance criterion:** AC-6; AC-7 (general findings remain open)
+- **Subtask:** Q-16 separate Import/overall gate clarification, outside B-16 repair scope
+- **Description:** The unchanged Import v15 mandatory gate fails with 0/8 Import fixtures in the separate gate and 1/8 in the overall gate. Count differences, empty text, semantic loss and the overall duplicate trace [1,2,3,4,5,1] are demonstrated. FT-QA-2026-063 remains open; causation by B-16 is not established.
+- **Criticality:** Blocking
+- **Severity:** Blocking
+- **Owner:** Backend
+- **Evidence:** [v16 QA report](reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md), finding Q16-IMPORT-GATE-002 and Separate Import And Overall Gates. Both independent commands exit 1; the Import prompt body is identical to the B-1 v15 end state.
+- **Recommendation:** Obtain a separate Import repair assignment through Orchestrator/Planner, not an Import fix in the current Preparation assignment. Mandatory gates must pass before package completion, merge or release; do not close general findings.
+- **Status:** Awaiting decision
+- **Decision:** No separate Import repair scope is approved. Recorded as a mandatory gate blocker, not as authorization to expand the Preparation fix.
+- **History:** 2026-10-09 - Imported from validated Q-16 report. Linked existing trace finding FT-QA-2026-063; no causation claim or deployment.
+
+### FT-QA-2026-069
+
+- **Finding key:** Q16-OVERALL-DAILY-GATE-003
+- **Plan reference:** [v16 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md)
+- **Acceptance criterion:** AC-6 (overall gate)
+- **Subtask:** Q-16 overall gate; foreign Daily Insight result, no Preparation repair assignment
+- **Description:** The mandatory overall gate fails on Daily Insight phase-progress-open-day as well as Recipe. This foreign failed test prevents overall PASS. The specific cause and complete error message were not captured; there is no causation evidence linking it to Preparation changes.
+- **Criticality:** Blocking
+- **Severity:** Blocking
+- **Owner:** Backend
+- **Evidence:** [v16 QA report](reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md), finding Q16-OVERALL-DAILY-GATE-003. Independent npm run test:eval --workspace=backend exits 1 with 9 FAIL/30 PASS; Daily Insight has 1 FAIL/17 PASS. The detailed error remains separately UNVERIFIED.
+- **Recommendation:** Obtain a separate Daily Insight analysis/repair assignment and capture the precise error there. Do not repair or ignore it within the Recipe assignment; the unchanged mandatory overall gate must pass before completion.
+- **Status:** Awaiting decision
+- **Decision:** No Daily Insight repair assignment is approved. The observed test failure is recorded separately from its unverified cause.
+- **History:** 2026-10-09 - Imported from validated Q-16 report as a foreign mandatory-gate blocker; no scope expansion or deployment.
+
+### FT-QA-2026-070
+
+- **Finding key:** Q18R-IMPLEMENTATION-PENDING
+- **Plan reference:** [v18 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+- **Acceptance criterion:** AC-1; AC-2; AC-3; AC-4; AC-5; AC-13
+- **Description:** The approved selective short summary is not yet implemented. The current common validator requires full coverage, prompts/guards are v15/v2 with exact-M/all-details rules, and export tests mirror source-detail obligations. This is expected pre-review phase incompleteness, not a new repair scope or a contradiction of K-1..K-8.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-18R report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Vorreview.md), finding Q18R-IMPLEMENTATION-PENDING; inventory VA-01/02/04, PR-01/04/06/08/09/10, FX-05/07, UT-03/06/07 and PL-01..06. The review gate is READY; 299 focused and 1407 normal units cover the old contract, not the pending fix.
+- **Risk:** Removing coverage/detail tests without successors could hide duplicate/reordered references or missing core cooking actions. Feature approval before implementation would be unsupported.
+- **Recommendation:** Implement only the approved B-18 K-actions with the documented successors, then D-18 and independent Q-18A. No additional schema/framework/model/retry change or automatic closure.
+- **Status:** In progress
+- **Decision:** User approved v18. Validated Q-18R permits K-1..K-8 and records no additional decision findings; no extra simplification assignment is needed. Proceed to B-18, not to release.
+- **History:** 2026-10-09 - Imported from Q-18R. Overall verdict FAIL reflects pending implementation; Review gate READY authorizes the already approved implementation. Historical findings remain open; no deployment.
+
+- **Current evidence:** [Q-18A report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md) verifies implementation of partial references, max-five summaries and authorized simplifications, but reports remaining core loss and a local rubric regression. Pending implementation is no longer the reason for FAIL; final acceptance remains open.
+- **History:** 2026-10-09 - B-18 and D-18 completed. Q-18A returned FAIL with independent 1397-unit PASS and live failures. Recorded FT-071..075; no closure based on implemented code alone.
+- **History:** 2026-10-09 - User approved v19 simplification. B-19 and D-19 delivered the compact Preparation v4 contract, template rules and documentation. [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md) independently verifies implementation and 1437 units/typecheck/build PASS, but mandatory live gates FAIL. Acceptance remains open; no release or automatic further correction.
+
+### FT-QA-2026-071
+
+- **Finding key:** Q18A-PREPARATION-CORE-001
+- **Plan reference:** [v18 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+- **Acceptance criterion:** AC-3; AC-8; AC-14; US-10 AC-15/16
+- **Description:** All three independent real Preparation responses preserve the full source but export only orders 1..5, omitting finish-cooking action 6. Status 200, usage 1 and valid five/90 structure do not establish a usable cooking summary. Optional resting/serving omissions are allowed; action 6 is required by the approved fixture core.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-18A report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md), finding 001 and complete F/R/G synthetic matrix; recipeAnalyze.eval.fixtures.ts source-6 core and recipeAnalyze.eval.test.ts live assertion. Inventory PR-04/FX-05/EV-06/PL-03.
+- **Risk:** A structurally valid but incomplete cooking instruction is offered for user review; runtime does not universally validate cooking quality.
+- **Recommendation:** Obtain an explicit next candidate decision through Orchestrator/Planner. Preserve the input/core rubric and use predefined real handler, Recipe and overall gates after authorized correction; no assertion/limit relaxation or hidden second call.
+- **Status:** Awaiting decision
+- **Decision:** v18 forbids a further unapproved prompt series. This finding is not included in the local rubric correction assignment.
+- **History:** 2026-10-09 - Imported from validated Q-18A FAIL. No deployment or successful feature correction claimed.
+- **Current evidence:** [Q-18C report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Nachpruefung.md), Q18C-PREPARATION-CORE-001, reproduces missing finish-cooking action 6 in all three independent gates. The local rubric fix does not explain or resolve this loss. The single approved follow-up cycle is exhausted; a new explicit candidate decision is required.
+- **Current follow-up key:** Q19-01; v19 AC-5/9 and US-10 AC-15/16.
+- **Current description and evidence:** [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md), G-rice actual output, final semantic assertion and source/core rubric: source6 is referenced, but continuous frying14min replaces frying4min each side followed by lower-heat finishing6min. Structural validation returns200/usage1; the finish-cooking semantic assertion fails. G executed41/pass36/fail5/exit1. This is accepted-output cooking change/loss, not merely invalid reference order; historical cause/replay is not established.
+- **Current recommendation:** Obtain a separately approved Backend correction and QA scope. Preserve the source-backed transition/core assertions; a source6 ID or HTTP200 is not cooking fidelity. Do not weaken the rubric or rerun the frozen candidate.
+- **History:** 2026-10-09 - Approved v19 candidate implemented and independently reviewed. F/R reject reference order; G demonstrates accepted semantic loss. FT-071 remains Awaiting decision and is not closed. Plan v19 explicitly requires stop after FAIL.
+
+### FT-QA-2026-072
+
+- **Finding key:** Q18A-RUBRIC-FALSE-NEGATIVE-002
+- **Plan reference:** [v18 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+- **Acceptance criterion:** AC-3; AC-13; AC-14
+- **Description:** The new K-4 source-6 contradiction regex matches cooking through a later serving clause. The valid text "Gare Haehnchen fertig und serviere es mit Reis." with references [6,8] fails the rubric despite valid source, core, both validators, nonmutation and length. This introduces an unjustified grouping/sentence restriction.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-18A report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md), finding 002 and Independent Rubric Probe; recipeAnalyze.eval.fixtures.ts source-6 contradictions and helper negative loop. Inventory FX-05/FX-02/UT-07/EV-06; B-18 fixture hunk 3, K-4/K-6.
+- **Risk:** Valid summaries are misclassified as failures, encouraging needless prompt changes. This false alarm does not explain the actual missing action in finding 001.
+- **Recommendation:** Correct only this local rubric hunk and add the permitted combination regression. Minimal core/combination must pass; missing action 6, wrong component/time, swaps and inventions must remain negative. Keep all contradiction protection and perform independent follow-up QA.
+- **Status:** Closed
+- **Decision:** Route the demonstrated K-4/K-6 regression through the single approved B-18C -> D-18C -> Q-18C cycle. No production prompt or capture-tool change is authorized.
+- **History:** 2026-10-09 - Imported from validated Q-18A and assigned the precise local correction under existing v18 approval.
+- **Closure evidence:** [Q-18C report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Nachpruefung.md) independently verifies the permitted [6,8] cooking/serving combination and all ten positive/negative regressions. Exactly the authorized two local hunks were changed; wrong components/times, missing core, swaps and invention remain rejected. This closure does not close the feature or mandatory live gates.
+- **History:** 2026-10-09 - B-18C corrected the narrow contradiction regex and added ten regressions; D-18C aligned evidence statements. Independent Q-18C verified the local correction and closed this finding. Overall verdict remains FAIL; no deployment.
+
+### FT-QA-2026-073
+
+- **Finding key:** Q18A-IMPORT-GATE-003
+- **Plan reference:** [v18 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+- **Acceptance criterion:** AC-8; AC-14
+- **Description:** The separate mandatory Recipe gate invents amountGrams 0.01 for indeterminate spray oil instead of null: 7/8 Import fixtures pass. Later overall-gate 8/8 does not supersede the earlier executed failure. Causation by B-18 is not established, and ingredient repair is outside the export correction.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-18A report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md), finding 003 and separate Import results; amount assertion and unchanged spray-oil fixture. Inventory PR-11/FX-01/AT-04/X-01.
+- **Risk:** An invented quantity and unsupported gate closure.
+- **Recommendation:** Obtain a separate bounded Import analysis/correction assignment. Preserve null semantics and all eight inputs/constraints; no random-pass collection or use of overall PASS as a replacement.
+- **Status:** Closed
+- **Decision:** Not part of the approved rubric follow-up. Existing FT-QA-2026-068 remains open.
+- **History:** 2026-10-09 - Imported from validated Q-18A as a distinct live gate defect; no causation claim or deployment.
+- **Follow-up:** Q-18C did not reproduce the spray-oil quantity failure; no ingredient correction was made. The previous executed failure remains recorded, not automatically closed. A new Import core loss is recorded separately as FT-QA-2026-076.
+- **History:** 2026-10-09 - [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md), Q19-03, independently reproduces R indeterminate-spray-oil-stays-food amountGrams0.01 instead of null, Import7/8. v19 AC-9 overall gate fails; no Preparation causation or Import repair authorization. The distinct G duplicate-source defect is FT-078.
+- **History:** 2026-10-11 - Fix requested by user. Food `amountGrams < 0.1` becomes null server-side (`openai.ts`). [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): spray-oil fixture 8/8 isolated and 10/10 in full runs. Targeted QA verified; status Closed.
+
+### FT-QA-2026-074
+
+- **Finding key:** Q18A-OVERALL-DAILY-GATE-004
+- **Plan reference:** [v18 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+- **Acceptance criterion:** AC-8; AC-14
+- **Description:** Four foreign Daily Insight failures block the overall gate: protein-gap-with-budget/stale-weight judge an open day as completed; protein-nearly-complete claims achieved energy balance from a target difference; midday-empty-day-not-morning misses required current-day context. These are outside the Recipe repair scope; B-18 causation is not claimed.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-18A report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md), finding 004; overall exit 1, 5 FAIL/34 PASS, Daily 4 FAIL/14 PASS. Inventory X-07/PL-10; Daily live/budget/energy-balance checks.
+- **Risk:** Incorrect Daily judgments and an unresolved mandatory overall gate.
+- **Recommendation:** Route the four cases separately through Orchestrator/Planner. Preserve Daily/runner/timeout/skip checks, and do not ignore them to claim overall PASS.
+- **Status:** Awaiting decision
+- **Decision:** No Daily repair is authorized in the Recipe follow-up. Existing FT-QA-2026-069 remains open.
+- **History:** 2026-10-09 - Imported from validated Q-18A; no scope expansion or deployment.
+- **Follow-up:** Q-18C overall Daily gate passed 18/18 without a Daily code change. Earlier failures are not causally explained or automatically closed; the current overall gate still fails on Recipe.
+
+### FT-QA-2026-075
+
+- **Finding key:** Q18A-CAPTURE-RESULT-005
+- **Plan reference:** [v18 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+- **Acceptance criterion:** AC-12; AC-14; AC-8
+- **Description:** The archival LiveCapture helper classifies exit 0 as PASS without detecting all-skipped execution. Its historical gate 1 had exit 0/39 skipped; the durable JSON/handoff correctly mark that result UNVERIFIED. The recorded report is not falsely green; the risk is unreviewed helper reuse.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [Q-18A report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md), finding 005; B-18_Recipe-Kurzfassung_LiveCapture_2026-10-09.mjs result classification and corrected LiveEvidence JSON. Inventory NA-08/NA-07/X-02.
+- **Risk:** False green future evidence and an unnecessary reusable tool layer; no production-path impact.
+- **Recommendation:** Choose an archival no-op or a specific classification correction. If reuse is approved, test all-skipped/actual PASS/FAIL/exit 2 locally without provider calls. Preserve original captures; no global verification-framework expansion.
+- **Status:** Awaiting decision
+- **Decision:** User decision pending: fix requested, accepted archival limitation, or deferred. No helper edit is included in B-18C.
+- **History:** 2026-10-09 - Imported from validated Q-18A; helper is archival, not production or normal test/release infrastructure.
+
+### FT-QA-2026-076
+
+- **Finding key:** Q18C-IMPORT-CORE-GATE-006
+- **Plan reference:** [v18 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+- **Acceptance criterion:** AC-8; AC-14; US-10 AC-16
+- **Description:** The independent overall Import side-dish-and-serving-actions output loses core cooking action 6: trace [1,2,3,5,8], while source 6 is present and no text/reference describes the further chicken-cooking phase. The separate Recipe gate passed with [1,2,5,6,8]; its 8/8 result does not supersede overall 7/8. Optional resting/serving omissions and old full coverage are not the defect.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-18C report](reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Nachpruefung.md), finding Q18C-IMPORT-CORE-GATE-006 and exact Recipe/overall synthetic groups. Overall exit 1, 2 FAIL/37 PASS; Missing export reference 6. Inventory FX-07/PR-06/EV-02/PL-03/X-01; import exportStepSemanticAssertions source 6.
+- **Risk:** Missing main-component cooking phase and unsupported gate closure; causation by B-18C is not established.
+- **Recommendation:** Obtain a separate explicit Import-core correction assignment through Orchestrator/Planner. Preserve all eight inputs and ingredient/source/core constraints. Do not substitute the separate Recipe PASS for overall failure, remove action 6 from the rubric or collect random passes.
+- **Status:** Closed
+- **Decision:** The one approved v18 correction cycle is exhausted. This new finding does not authorize another implementation or live series.
+- **History:** 2026-10-09 - Imported from validated Q-18C FAIL; Preparation core failure persists, FT-072 locally closed, archival FT-075 unchanged. No merge/release/deployment approval.
+- **History:** 2026-10-11 - Fix requested by user (Import v17, `cookingEssential` flag, directed corrections). [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): side-dish 8/8 and no-lost-or-invented 8/8 isolated plus 10/10 full runs. Targeted QA verified; status Closed.
+
+### FT-QA-2026-077
+
+- **Finding key:** Q19-02
+- **Plan reference:** [v19 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md)
+- **Acceptance criterion:** AC-5; AC-6; AC-9
+- **Description:** Independent F/R Rice produces group starts6 before5; all independent Oven outputs duplicate source3, and F/G Oven also puts first ref2 after3. Validation correctly returns422/usage0, so mandatory successful saved-rice/oven scenarios are not met. This is not rejection of permitted [1,4,6],[5] interleaving; that policy passes offline/handler tests.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md), all nine live rows/raw outputs, validator and validation assertion. F2 and R2 Preparation failures; G Oven rejected. B-19 showed similar structural failures. Writes0 and saved source unchanged.
+- **Recommendation:** Decide a newly authorized implementation/review scope. Keep known/unique/first-ref validation and fixed single-call parameters; no silent ref sorting, source3 reuse, fallback calls or replacement of failed gates with later passes.
+- **Status:** Awaiting decision
+- **Decision:** v19 candidate frozen; no further correction or live series authorized by this finding.
+- **History:** 2026-10-09 - Imported from validated Q-19 FAIL. Compact implementation remains delivered, not accepted; no deployment.
+
+### FT-QA-2026-078
+
+- **Finding key:** Q19-03 (duplicate-source observation; spray-oil observation associated with FT-073)
+- **Plan reference:** [v19 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md)
+- **Acceptance criterion:** AC-9; defect outside Preparation implementation scope
+- **Description:** Unchanged Import v16 fails G mixed-food-seasoning unique/full ordered trace with duplicate5. Actual flattened trace [1,2,3,4,5,5] uses source5 for mixing and garnish. R separately fails the spray-oil null-quantity constraint with0.01g, recorded under FT-073. Overall gates are not green; no causal attribution to v19 is established.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md), Q19-03, Foreign Gate Failures; R Import7/8 and G Import7/8, trace assertion and concrete duplicate5 output.
+- **Recommendation:** Decide separate Import scope; no Import prompt/schema/normalization repair or retry within Preparation. Preserve earlier gates and source constraints.
+- **Status:** Closed
+- **Decision:** Separate observation, not automatic closure of FT-076 or expansion of v19.
+- **History:** 2026-10-09 - Imported from validated Q-19 FAIL; no Import edit or deployment.
+- **History:** 2026-10-11 - Fix requested by user (server sort plus directed Import correction on duplicate/non-ascending traces). [Re-verification QA](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md): full-recipe-output-fields 8/8 isolated, mixed-food-seasoning in 10/10 full runs. Targeted QA verified; status Closed.
+
+### FT-QA-2026-079
+
+- **Finding key:** Q19-04
+- **Plan reference:** [v19 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md)
+- **Acceptance criterion:** AC-9; defect outside Preparation implementation scope
+- **Description:** G phase-progress-open-day fails validation because Daily insight judges an open day as completed. The separate protein-gap timeout is a verification limitation, not this content finding.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md), Q19-04, G failed test and DailyInsightValidationError, Daily eval. No Daily implementation file changed by B-19 or Q-19.
+- **Recommendation:** Determine historical association and a separate Daily investigation authorization; do not repair foreign Daily logic or rerun the overall gate within this review.
+- **Status:** Awaiting decision
+- **Decision:** Preserve FT-074 history separately; no Daily repair scope granted.
+- **History:** 2026-10-09 - Imported from validated Q-19 FAIL; precise phase-progress case recorded, no Preparation causation claim or deployment.
+
+### FT-QA-2026-080
+
+- **Finding key:** Q19-05
+- **Plan reference:** [v19 plan](../User%20Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md)
+- **Acceptance criterion:** AC-8; AC-10
+- **Description:** Some migrated handler test names still refer to unmatched AI ingredient names or separate AI ingredient keys, although setup now supplies identical compact text-only output without either field. They pass no-resolution checks but do not exercise their named ingredient scenarios. This is test clarity/redundancy, not remaining production full-output dependency.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md), Q19-05, legacy-named tests, setValidPreparationAnalysis and B-19 hunks H12-H14. Unknown-ingredient-field rejection and compact SDK schema are separately tested.
+- **Recommendation:** In a future authorized test-maintenance scope, rename or consolidate duplicate obsolete scenarios while retaining substantive compact/no-resolution/security coverage.
+- **Status:** Awaiting decision
+- **Decision:** User choice pending: fix, accept or defer. No automatic cleanup authorized.
+- **History:** 2026-10-09 - Imported from validated Q-19 FAIL; no test selfpatch.
+
+### FT-QA-2026-097
+
+- **Finding key:** RV-01
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md`
+- **Acceptance criterion:** AC-4 (Import trace rule); US-10 AC-16
+- **Description:** After two failed directed corrections, `analyzeRecipeText` applies `forceAscendingExportReferences`, which silently drops references not continuing the ascending trace and removes steps left without references. Other violated rules (step count vs numbered instructions, missing cookingEssential steps, invented temperatures) are not repaired and the result is still served (HTTP 200, usage tracked). Not observed in any live run; frequency unknown.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [Re-verification report](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md), RV-01; `openai.ts` attempt === 2 branch; probe `RECIPE-REVERIFY-2026-10-11-probe.mjs` (source 5 dropped, garnish step dropped).
+- **Recommendation:** Prefer a controlled failure (422, no usage) or a server warning when forcing drops a cookingEssential step; add a unit test for the exhausted-corrections path.
+- **Status:** Closed
+- **Decision:** User requested the fix on 2026-10-11.
+- **History:** 2026-10-11 - Registered from validated PASS WITH ISSUES report.
+- **History:** 2026-10-11 - Backend correction: the silent step-dropping repair is removed. After the last correction an invalid reference trace is repaired by moving `sourceStepOrders` only (`redistributeExportReferences`; steps, texts and step count never change; the references are server-side anchors absent from mobile/shared and from the API response). Every other remaining violation fails with HTTP 422, no usage (`RecipeAnalysisContractError`); a missing `cookingEssential` reference blocks only with numbered input instructions; numbered-step enforcement applies only below a "Zubereitung"-style heading. Deviation from the QA recommendation (controlled failure for all cases): trace-only exhaustion hit 3/40 live runs on ingredient-only input, a refs-only repair avoids a user-visible 422 without any content loss. Unit suite 1670/1670; targeted QA verification pending.
+
+### FT-QA-2026-098
+
+- **Finding key:** RV-02
+- **Plan reference:** v21 plan AC-2 / AC-6
+- **Acceptance criterion:** AC-2; AC-6
+- **Description:** `enforceSourceBackedTotalTime` nulls legitimate totals ("1 Std. 30 Min." read as 60; prep plus cook sums such as 15 + 30) and keeps any wrong model total when every saved step has a duration (probe: wrong sum 90 kept).
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [Re-verification report](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md), RV-02; probe outputs guardExplicitTotalHoursMinutes null, guardPrepPlusCook null, guardAllTimedWrongSum 90.
+- **Recommendation:** Parse "h + min" combinations; for the all-timed case compare against the sum of step durations; add tests for both.
+- **Status:** Closed
+- **Decision:** User requested the fix on 2026-10-11.
+- **History:** 2026-10-11 - Registered from validated PASS WITH ISSUES report.
+- **History:** 2026-10-11 - Backend correction in `recipeTotalTimeGuard.ts`: compound "h + min" durations are read as one value; a total is kept only if the source states it, all saved step durations add up to it, or two or more durations in the recipe description add up to it (a wrong sum is nulled). Tests in `recipeTotalTimeGuard.test.ts`; targeted QA verification pending.
+
+### FT-QA-2026-099
+
+- **Finding key:** RV-03 (continuation of FT-QA-2026-095)
+- **Plan reference:** v21 plan AC-10; US-10 AC-28
+- **Acceptance criterion:** AC-10
+- **Description:** Current-contract KB prose still names superseded versions or contracts: domain/07-ai-features.md:170-171 and :204 (Import v16 / Preparation v11), tech/06-ai-integrations.md:76 (v16), tech/02-backend.md:277, tech/09-api-reference.md:404, tech/08-testing.md:133 (Preparation v11); tech/04-shared-library.md:109-110 describes a mandatory If-Match / sourceEtag comparison contradicting the optional-ETag docs and code.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** [Re-verification report](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md), RV-03; grep against `recipeAnalyze.ts:9-10` (v17, v12).
+- **Recommendation:** Align only current-version and optional-ETag statements; keep dated historical sections.
+- **Status:** Closed
+- **Decision:** User requested the fix on 2026-10-11. Same scope as FT-QA-2026-095.
+- **History:** 2026-10-11 - Registered from validated PASS WITH ISSUES report.
+- **History:** 2026-10-11 - Documentation correction: current Import v17 / Preparation v12 in domain/07, domain/06, tech/02, tech/06, tech/08, tech/09; optional `If-Match` and compatibility-only `sourceEtag` in tech/04. Dated historical sections unchanged. Targeted QA verification pending.
+- **History:** 2026-10-12 - [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md): verified closed; new behaviour (3 import calls, timeouts, refs-only repair/422, total-time guard, maxCharacters) matches the code. Closed.
+
+### FT-QA-2026-100
+
+- **Finding key:** RV-04
+- **Plan reference:** N/A (new Import v17 behavior)
+- **Acceptance criterion:** AC-7
+- **Description:** The Import loop makes up to three sequential provider calls without per-call timeout, abort signal or maxRetries override (SDK defaults), unlike Preparation (maxRetries 0, 20 s). Worst-case latency and retry volume grow threefold.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [Re-verification report](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md), RV-04; `openai.ts:94` vs `:605`, loop at `:635-660`.
+- **Recommendation:** Pass an explicit timeout and maxRetries for Import calls or bound the total loop time.
+- **Status:** Closed
+- **Decision:** Fixed together with FT-QA-2026-097/098/099 on 2026-10-11.
+- **History:** 2026-10-11 - Registered from validated PASS WITH ISSUES report.
+- **History:** 2026-10-11 - Backend correction: each Import provider call has a 30 s timeout and `maxRetries: 1`; no further correction starts after 45 s. Targeted QA verification pending.
+- **History:** 2026-10-12 - [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md): verified closed (30 s per call, maxRetries 1, 45 s correction deadline; raised 100 s eval timeout does not weaken the gate, assertions unchanged in meaning). Closed.
+
+### FT-QA-2026-101
+
+- **Finding key:** RV-05 (related to FT-QA-2026-094)
+- **Plan reference:** v21 plan AC-6 / US-10 AC-16
+- **Acceptance criterion:** AC-6; US-10 AC-16
+- **Description:** In 1 of 6 recorded oven runs (run06) the text-only correction merged layered steps to "Kartoffeln in die Form schichten, Sahne und Käse darüber geben." The cheese action "streuen" is no longer explicit. The literal FT094 defect ("Käse darüber gießen") was not seen. The manual-tagged oven fixture has no automated component-action assertion.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [Re-verification report](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md), RV-05; `RECIPE-REVERIFY-2026-10-11-oven-seven-steps-run06-Output.txt`.
+- **Recommendation:** Human review of the oven wording; optionally add a component-action contradiction assertion for cheese if "geben" is unacceptable.
+- **Status:** Accepted
+- **Decision:** User closed the targeted QA round as PASS WITH ISSUES on 2026-10-12 and accepted the remaining Suggestions; no correction started. The oven wording stays MANUAL VALIDATION REQUIRED.
+- **History:** 2026-10-11 - Registered from validated PASS WITH ISSUES report.
+- **History:** 2026-10-12 - Targeted QA: cheese "streuen" in 8/8 oven runs, 0/8 weakened wording; not closed by QA (wording judgment). Accepted by the user decision above.
+
+### FT-QA-2026-102
+
+- **Finding key:** RT-01
+- **Plan reference:** v21 plan AC-9; US-10 AC-16
+- **Acceptance criterion:** AC-9; US-10 AC-16
+- **Description:** Import fixture side-dish-and-serving-actions failed in 1 of 8 isolated runs (run 08): source step 8 lost the words "als Beilage". Export steps, ingredients and cooking actions intact. Same fixture 8/8 in the previous round and inside all 8 full runs of the targeted round; classified provider variance.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md), Step 2 series (e); `RECIPE-TARGETED-2026-10-12-import-side-dish-and-serving-actions-run08-Output.txt`.
+- **Recommendation:** Optional prompt or validation tightening for source-step fidelity; otherwise accept as residual provider variance.
+- **Status:** Accepted
+- **Decision:** User closed the round as PASS WITH ISSUES on 2026-10-12 and accepted this variance; no correction started.
+- **History:** 2026-10-12 - Registered from the Targeted QA report.
+
+### FT-QA-2026-103
+
+- **Finding key:** RT-02
+- **Plan reference:** v21 plan AC-4
+- **Acceptance criterion:** AC-4
+- **Description:** `exportSuggestion.steps[].sourceStepOrders` (also after the refs-only repair) remains in the HTTP JSON of `recipe-analyze`; absent from shared and mobile types.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md), RT-02; `functions/ai.ts` response mapping.
+- **Recommendation:** Strip server-side anchors before responding or document them as ignorable wire fields.
+- **Status:** Accepted
+- **Decision:** Accepted by the user decision of 2026-10-12.
+- **History:** 2026-10-12 - Registered from the Targeted QA report.
+
+### FT-QA-2026-104
+
+- **Finding key:** RT-03
+- **Plan reference:** v21 plan AC-2 / AC-6
+- **Acceptance criterion:** AC-2; AC-6
+- **Description:** `recipeTotalTimeGuard` keeps an unsupported total in two probe cases ("insgesamt dreimal ... 40 Minuten", "Gesamtmenge ... 30 Min.") and has quadratic digit-run matching (bounded worst case 822 ms). It only nulls, never invents.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md), RT-03; guard probe outputs.
+- **Recommendation:** Anchor the explicit-total pattern more tightly; bound digit runs.
+- **Status:** Accepted
+- **Decision:** Accepted by the user decision of 2026-10-12.
+- **History:** 2026-10-12 - Registered from the Targeted QA report.
+
+### FT-QA-2026-105
+
+- **Finding key:** RT-04
+- **Plan reference:** v21 plan AC-10
+- **Acceptance criterion:** AC-10
+- **Description:** The text-only shortening prompt changed while the Preparation prompt version stayed v12, so version-based provenance cannot distinguish old and new shortening prompt.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md), RT-04; `lib/prompts/recipeAnalyze.ts`.
+- **Recommendation:** Version the shortening prompt or bump the Preparation version at the next prompt change.
+- **Status:** Accepted
+- **Decision:** Accepted by the user decision of 2026-10-12.
+- **History:** 2026-10-12 - Registered from the Targeted QA report.
+
+### FT-QA-2026-106
+
+- **Finding key:** RT-05
+- **Plan reference:** v21 plan AC-4
+- **Acceptance criterion:** AC-4
+- **Description:** `ingredientKeys` of the import export suggestion remain in the `recipe-analyze` response; this is the documented analysis-local contract.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [Targeted QA report](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md), RT-05; KB tech/04-shared-library.md.
+- **Recommendation:** None required; keep in mind for any future wire clean-up.
+- **Status:** Accepted
+- **Decision:** Accepted by the user decision of 2026-10-12.
+- **History:** 2026-10-12 - Registered from the Targeted QA report.
+
 ## Verification Notes (Not Findings)
+
+### Targeted QA 2026-10-12 Verification Limits
+
+- MANUAL VALIDATION REQUIRED: oven export culinary correctness (FT086 doneness clause, FT094/FT101 cheese wording); on-device share flow and PNG visual check.
+- UNVERIFIED: Cosmos contract tests; frequency of the refs-only import repair (eval logs no attempt counts); statistical stability beyond the executed finite samples.
+- OUT OF SCOPE by user decision: Daily/Weekly Insight overall eval gate (not claimed).
+- Source: [QA_Recipe_Sharing_Targeted_2026-10-12.md](reports/QA_Recipe_Sharing_Targeted_2026-10-12.md).
+
+### Re-verification 2026-10-11 Verification Limits
+
+- MANUAL VALIDATION REQUIRED: oven export culinary correctness (FT086 doneness clause, FT094/FT101 cheese wording); on-device share flow and PNG visual check.
+- UNVERIFIED: Cosmos contract tests (not run, no persistence code changed); statistical stability beyond the executed finite samples at temperature 0.2.
+- OUT OF SCOPE by user decision: Daily/Weekly Insight overall eval gate (not claimed).
+- Source: [QA_Recipe_Sharing_Reverification_2026-10-11.md](reports/QA_Recipe_Sharing_Reverification_2026-10-11.md).
+
+### Q-19 Verification Limits - 2026-10-09
+
+- **Evidence:** [Q-19 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md), Verification Notes; no new actionable defect inferred from these limits.
+- **State:** MANUAL VALIDATION REQUIRED - actual human cooking/domain assessment of all three saved synthetic sources versus frozen F/R/G outputs. AI/read-only assessment is recorded but is not human sign-off. Review core actions, dependency order, grouping, metadata and permitted omissions.
+- **State:** UNVERIFIED - G protein-gap-with-budget timed out at30000ms. The failed-test entry is preserved; its content assertion outcome is unknown. No automatic retry or timeout change.
+- **State:** UNVERIFIED - private historical original/deployed revision and general semantic fidelity/derived total time or difficulty. Finite synthetic tests do not establish universal correctness or historical closure.
+- **State:** MANUAL VALIDATION REQUIRED - deployed Alpha/device/Share replay requires separate authorization. Real-font local PNG tests passed; no release/deployment claimed.
 
 These items were reported as unverified environment checks. They must not lower a QA verdict and must not enter the actionable finding list unless a defect is demonstrated.
 
@@ -1002,3 +1752,11 @@ These items were reported as unverified environment checks. They must not lower 
 - **Manual action:** On an Android Dev Build, exercise item and meal selection, partial/full/empty meal states, action-bar spacing, confirmation/cancel flows, and TalkBack announcements using a diary day with multiple meals and an empty meal.
 - **Expected result:** Controls remain visible and accessible; selected, mixed, and empty states are announced accurately; cancelling and error behavior match AC-10.
 - **Result:** Not run (`adb` unavailable).
+
+### VER-2026-015 - v16 Preparation verification limits
+
+- **State:** `UNVERIFIED` / `MANUAL VALIDATION REQUIRED`
+- **Evidence:** [v16 QA report](reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md), Verification Limits.
+- **Reason:** Series runs 2/3 were stopped after the demonstrated first-run failure. Successful 200/V2/usage assertions were not reached. Full raw Preparation data in the overall gate and the precise foreign Daily Insight error were not captured. The v13-before-v14 snapshot for three unresolved Import hunks is unavailable. These limits are not additional actionable findings.
+- **Manual action:** Only after an authorized candidate correction, run a newly predefined series and capture the complete synthetic evidence. The private historical recipe requires authorized original input and a known deployed revision in a private test context without repository/log content capture. Do not reconstruct missing outputs from other runs or claim synthetic tests reproduce the private original.
+- **Result:** No historical private-recipe, share-bundle, renderer or Alpha success verified; no deployment authorized.

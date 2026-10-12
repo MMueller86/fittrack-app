@@ -1,0 +1,43 @@
+{
+  "format": "fittrack-recipe-stability-execution-v1",
+  "stage": "focused",
+  "startedAt": "2026-10-10T13:13:04.659Z",
+  "finishedAt": "2026-10-10T13:13:16.295Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "src/lib/recipePreparation.test.ts",
+    "src/lib/openai.recipeAnalyze.test.ts",
+    "--silent",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\qa\\reports\\RECIPE-STABILITY-2026-10-10-focused-Report.json"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": "01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3",
+  "candidateHashStable": true,
+  "changedPaths": [],
+  "environmentFingerprint": "7276d686a3b55208d50563d3c9e1d30e151edb15ba7c379de172c6d00c8d2cb0",
+  "counts": {
+    "total": 262,
+    "passed": 262,
+    "failed": 0,
+    "skipped": 0
+  },
+  "selection": null,
+  "allIntendedTestsExecuted": null,
+  "synthetic": [],
+  "failures": [],
+  "rice": null,
+  "outputPath": "docs/qa/reports/RECIPE-STABILITY-2026-10-10-focused-Output.txt",
+  "outputSha256": "f95149c255bc9f97544c2e18c99e22419e494dbafcdc2cf0d41eaaca0f73036d",
+  "testReport": "docs/qa/reports/RECIPE-STABILITY-2026-10-10-focused-Report.json",
+  "reportSha256": "8518e0c560e2c6e88becad57b7876d14af6f8e72ca91ef1c8bdfeeb1ef7dbe94",
+  "noProviderCalls": true,
+  "liveGate": false,
+  "state": "COMPLETED"
+}

@@ -1,0 +1,121 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipeAnalyze: live prompt evaluation[2m > [22m[2m['side-dish-and-serving-actions'] 'Full source extraction and selective …'
+[22m[39mSynthetic import semantic evidence {"fixture":"side-dish-and-serving-actions","source":[{"order":1,"title":null,"description":"Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab."},{"order":2,"title":null,"description":"Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab."},{"order":3,"title":null,"description":"Würze die Hähnchenbrust mit Salz und Pfeffer."},{"order":4,"title":null,"description":"Erhitze das Olivenöl in einer Pfanne."},{"order":5,"title":null,"description":"Brate die Hähnchenbrust bei mittlerer Hitze 4 Minuten pro Seite an."},{"order":6,"title":null,"description":"Reduziere die Hitze und gare das Hähnchen weitere 6 Minuten fertig."},{"order":7,"title":null,"description":"Nimm das Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."},{"order":8,"title":null,"description":"Schneide das Hähnchen auf und serviere es mit den Kartoffeln als Beilage und den Bohnen."}],"export":[{"order":1,"description":"Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab.","sourceStepOrders":[1],"ingredientKeys":["ingredient-2"]},{"order":2,"description":"Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab.","sourceStepOrders":[2],"ingredientKeys":["ingredient-3"]},{"order":3,"description":"Brate die Hähnchenbrust bei mittlerer Hitze 4 Minuten pro Seite an.","sourceStepOrders":[5],"ingredientKeys":["ingredient-1","ingredient-5","ingredient-6"]},{"order":4,"description":"Reduziere die Hitze und gare das Hähnchen weitere 6 Minuten fertig.","sourceStepOrders":[6],"ingredientKeys":["ingredient-1"]},{"order":5,"description":"Schneide das Hähnchen auf und serviere es mit den Kartoffeln und Bohnen.","sourceStepOrders":[8],"ingredientKeys":["ingredient-1","ingredient-2","ingredient-3"]}]}
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core
+[22m[39m[ctx.log] {"ts":"2026-10-09T12:55:39.048Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core
+[22m[39mSynthetic preparation semantic evidence {"fixture":"synthetic-saved-eight-steps-rice-serving","promptVersion":"v4","savedSource":[{"order":1,"title":"Schneiden","description":"Schneide das Hähnchen in Würfel."},{"order":2,"description":"Würze das Hähnchen mit Salz und Pfeffer."},{"order":3,"description":"Erhitze Olivenöl in der Pfanne."},{"order":4,"description":"Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."},{"order":5,"title":"Separate Beilage","description":"Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."},{"order":6,"description":"Senke die Hitze und gare Hähnchen weitere 6 Minuten."},{"order":7,"description":"Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."},{"order":8,"title":"Servieren","description":"Serviere Hähnchen mit Reis als Beilage."}],"raw":{"version":1,"teaser":"Ein einfaches Rezept für eine leckere Hähnchenpfanne mit Reis.","totalTimeMinutes":30,"difficulty":"einfach","steps":[{"order":1,"description":"Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.","sourceStepOrders":[1,2]},{"order":2,"description":"Erhitze Olivenöl in der Pfanne und brate das Hähnchen 4 Minuten je Seite.","sourceStepOrders":[3,4]},{"order":3,"description":"Senke die Hitze und gare das Hähnchen weitere 6 Minuten.","sourceStepOrders":[6]},{"order":4,"description":"Koche den Reis separat 12 Minuten in Salzwasser und gieße ihn ab.","sourceStepOrders":[5]},{"order":5,"description":"Serviere das Hähnchen mit dem Reis als Beilage.","sourceStepOrders":[8]}]},"sourceMatrix":[{"order":1,"detail":"cut chicken into cubes","sourcePatterns":[true,true,true]},{"order":2,"detail":"season chicken with salt and pepper","sourcePatterns":[true,true,true,true]},{"order":3,"detail":"heat olive oil in the pan","sourcePatterns":[true,true,true]},{"order":4,"detail":"fry chicken at medium heat 4 minutes per side","sourcePatterns":[true,true,true,true]},{"order":5,"detail":"cook rice separately 12 minutes in salted water and drain","sourcePatterns":[true,true,true,true,true]},{"order":6,"detail":"lower heat and cook chicken another 6 minutes","sourcePatterns":[true,true,true,true]},{"order":7,"detail":"remove chicken from pan and rest covered 3 minutes","sourcePatterns":[true,true,true,true]},{"order":8,"detail":"serve chicken with rice as a side dish","sourcePatterns":[true,true]}],"exportCoreMatrix":[{"order":1,"core":"prepare chicken by cutting","group":[1,2],"exportPatterns":[true],"contradictions":[]},{"order":4,"core":"fry chicken","group":[3,4],"exportPatterns":[true],"contradictions":[false]},{"order":5,"core":"cook rice independently, not just mention it","group":[5],"exportPatterns":[true],"contradictions":[false,false]},{"order":6,"core":"finish cooking chicken after frying","group":[6],"exportPatterns":[true],"contradictions":[false,false,false]}]}
+Synthetic preparation counts and handler evidence {"fixture":"synthetic-saved-eight-steps-rice-serving","sdkCalls":1,"preparationCalls":1,"model":"gpt-4o-mini","apiVersion":"2024-08-01-preview","temperature":0.2,"maxTokens":2048,"finishReason":"stop","sourceCount":8,"exportCount":5,"lengths":[66,73,56,65,47],"status":422,"usageCalls":0,"writes":{"update":0,"replace":0,"create":0},"unchanged":true}
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core
+[22m[39m[ctx.log] {"ts":"2026-10-09T12:55:41.115Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core
+[22m[39mSynthetic preparation semantic evidence {"fixture":"synthetic-saved-oven-seven-steps","promptVersion":"v4","savedSource":[{"order":1,"description":"Schneide Kartoffeln in dünne Scheiben."},{"order":2,"description":"Fette die Auflaufform ein."},{"order":3,"description":"Schichte Kartoffeln in die Form und gieße Sahne darüber."},{"order":4,"description":"Streue Käse über die Kartoffeln."},{"order":5,"description":"Heize den Ofen auf 180°C vor."},{"order":6,"description":"Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."},{"order":7,"description":"Lasse den Auflauf kurz ruhen und serviere ihn."}],"raw":{"version":1,"teaser":"Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.","totalTimeMinutes":40,"difficulty":"einfach","steps":[{"order":1,"description":"Schneide die Kartoffeln in dünne Scheiben und schichte sie in die gefettete Form.","sourceStepOrders":[1,2,3]},{"order":2,"description":"Gieße die Sahne über die Kartoffeln und streue den Käse darüber.","sourceStepOrders":[3,4]},{"order":3,"description":"Heize den Ofen auf 180°C vor und backe den Auflauf für 40 Minuten.","sourceStepOrders":[5,6]},{"order":4,"description":"Lasse den Auflauf kurz ruhen und serviere ihn.","sourceStepOrders":[7]}]},"sourceMatrix":[],"exportCoreMatrix":[{"order":1,"core":"cut potatoes","group":[1,2,3],"exportPatterns":[true],"contradictions":[]},{"order":3,"core":"assemble potatoes with cream","group":[1,2,3],"exportPatterns":[true,false],"contradictions":[false]},{"order":6,"core":"bake potato casserole to completion in the oven","group":[5,6],"exportPatterns":[true],"contradictions":[false,false,false]}]}
+Synthetic preparation counts and handler evidence {"fixture":"synthetic-saved-oven-seven-steps","sdkCalls":1,"preparationCalls":1,"model":"gpt-4o-mini","apiVersion":"2024-08-01-preview","temperature":0.2,"maxTokens":2048,"finishReason":"stop","sourceCount":7,"exportCount":4,"lengths":[81,64,66,46],"status":422,"usageCalls":0,"writes":{"update":0,"replace":0,"create":0},"unchanged":true}
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core
+[22m[39m[ctx.log] {"ts":"2026-10-09T12:55:44.481Z","level":"info","event":"handler.start","handler":"recipes.prepareExportView"}
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core
+[22m[39m[ctx.log] {"ts":"2026-10-09T12:55:46.281Z","level":"info","event":"recipes.prepareExportView.completed","source_step_count":7,"export_step_count":4}
+[ctx.log] {"ts":"2026-10-09T12:55:46.282Z","level":"info","event":"handler.success","handler":"recipes.prepareExportView","status":200,"duration_ms":1801}
+Synthetic preparation semantic evidence {"fixture":"synthetic-saved-pasta-essential-sauce","promptVersion":"v4","savedSource":[{"order":1,"description":"Schneide die Zwiebel klein."},{"order":2,"description":"Erhitze Olivenöl in einer Pfanne."},{"order":3,"description":"Brate die Zwiebel in der Pfanne an."},{"order":4,"description":"Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."},{"order":5,"description":"Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."},{"order":6,"description":"Gieße die Pasta ab."},{"order":7,"description":"Mische Pasta mit der Tomatensauce und serviere sie."}],"raw":{"version":1,"teaser":"Ein einfaches Rezept für Pasta mit frischer Tomatensauce.","totalTimeMinutes":35,"difficulty":"einfach","steps":[{"order":1,"description":"Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.","sourceStepOrders":[1,2,3]},{"order":2,"description":"Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.","sourceStepOrders":[4]},{"order":3,"description":"Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.","sourceStepOrders":[5,6]},{"order":4,"description":"Mische die Pasta mit der Tomatensauce und serviere sie.","sourceStepOrders":[7]}]},"sourceMatrix":[],"exportCoreMatrix":[{"order":1,"core":"cut onion","group":[1,2,3],"exportPatterns":[true],"contradictions":[]},{"order":3,"core":"fry onion","group":[1,2,3],"exportPatterns":[true],"contradictions":[false]},{"order":4,"core":"cook the essential tomato sauce","group":[4],"exportPatterns":[true],"contradictions":[false]},{"order":5,"core":"cook pasta independently","group":[5,6],"exportPatterns":[true],"contradictions":[false,false]}]}
+Synthetic preparation counts and handler evidence {"fixture":"synthetic-saved-pasta-essential-sauce","sdkCalls":1,"preparationCalls":1,"model":"gpt-4o-mini","apiVersion":"2024-08-01-preview","temperature":0.2,"maxTokens":2048,"finishReason":"stop","sourceCount":7,"exportCount":4,"lengths":[66,67,58,55],"status":200,"usageCalls":1,"writes":{"update":0,"replace":0,"create":0},"unchanged":true}
+Synthetic preparation executed protection assertions {"fixture":"synthetic-saved-pasta-essential-sauce","v2Body":true,"quotaOrder":true,"usageOrder":true,"noWrites":true,"savedSourceUnchanged":true,"compactSchema":true,"sdkCalls":1,"usageCalls":1}
+
+ [31m❯[39m src/lib/prompts/recipeAnalyze.eval.test.ts [2m([22m[2m13 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[33m 81272[2mms[22m[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…' [33m10016[2mms[22m[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …' [33m9588[2mms[22m[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…' [33m10342[2mms[22m[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…' [33m9827[2mms[22m[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…' [33m6511[2mms[22m[39m
+[31m   [31m×[31m recipeAnalyze: live prompt evaluation[2m > [22m['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'[33m 7882[2mms[22m[31m[39m
+[31m     → export step trace: 1 [1]: Koche die Spaghetti in Salzwasser al dente. | 2 [2]: Brate den Speck knusprig und stelle ihn beiseite. | 3 [4,3]: Vermische die Spaghetti mit Speck und der Eier-Parmesan-Mischung.: expected false to be true // Object.is equality[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['full-recipe-output-fields'] 'All required fields present, suggeste…' [33m8788[2mms[22m[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['side-dish-and-serving-actions'] 'Full source extraction and selective …' [33m10984[2mms[22m[39m
+[31m   [31m×[31m recipePreparation: synthetic saved-source live evaluation[2m > [22m['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core[33m 2080[2mms[22m[31m[39m
+[31m     → expected { ok: false, …(2) } to match object { ok: true }
+(2 matching properties omitted from actual)[39m
+[31m   [31m×[31m recipePreparation: synthetic saved-source live evaluation[2m > [22m['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core[33m 3368[2mms[22m[31m[39m
+[31m     → expected { ok: false, …(2) } to match object { ok: true }
+(2 matching properties omitted from actual)[39m
+   [33m[2m✓[22m[39m recipePreparation: synthetic saved-source live evaluation[2m > [22m['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core [33m1817[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[2m | [22m[1m[32m10 passed[39m[22m[90m (13)[39m
+[2m   Start at [22m 14:54:24
+[2m   Duration [22m 82.25s[2m (transform 253ms, setup 0ms, collect 754ms, tests 81.27s, environment 0ms, prepare 56ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Report_2026-10-09.json
+[90mstderr[2m | src/lib/prompts/recipeAnalyze.eval.test.ts
+[22m[39mWARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.
+
+[90mstderr[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core
+[22m[39m[ctx.warn] {"ts":"2026-10-09T12:55:41.091Z","level":"warn","event":"recipes.prepareExportView.validationFailed","failure_stage":"analysis_output_validation","validation_diagnostic_count":1,"validation_diagnostics":"semantic:export_source_trace_not_ascending@steps","validation_diagnostics_truncated":false}
+[ctx.warn] {"ts":"2026-10-09T12:55:41.091Z","level":"warn","event":"handler.response.failure","handler":"recipes.prepareExportView","status":422,"duration_ms":2044}
+
+[90mstderr[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipePreparation: synthetic saved-source live evaluation[2m > [22m[2m['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core
+[22m[39m[ctx.warn] {"ts":"2026-10-09T12:55:44.467Z","level":"warn","event":"recipes.prepareExportView.validationFailed","failure_stage":"analysis_output_validation","validation_diagnostic_count":1,"validation_diagnostics":"semantic:duplicate_export_source_reference@steps","validation_diagnostics_truncated":false}
+[ctx.warn] {"ts":"2026-10-09T12:55:44.467Z","level":"warn","event":"handler.response.failure","handler":"recipes.prepareExportView","status":422,"duration_ms":3352}
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 3 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22mrecipeAnalyze: live prompt evaluation[2m > [22m['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'
+[31m[1mAssertionError[22m: export step trace: 1 [1]: Koche die Spaghetti in Salzwasser al dente. | 2 [2]: Brate den Speck knusprig und stelle ihn beiseite. | 3 [4,3]: Vermische die Spaghetti mit Speck und der Eier-Parmesan-Mischung.: expected false to be true // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- true[39m
+[31m+ false[39m
+
+[36m [2m❯[22m src/lib/prompts/recipeAnalyze.eval.test.ts:[2m226:100[22m[39m
+    [90m224| [39m    [34mexpect[39m([35mnew[39m [33mSet[39m(tracedOrders)[33m.[39msize[33m,[39m [32m`export step trace: [39m[36m${[39mexportSte…
+    [90m225| [39m    [34mexpect[39m(tracedOrders[33m.[39m[34mevery[39m((order[33m,[39m index) [33m=>[39m sourceOrders[33m.[39m[34mincludes[39m(…
+    [90m226| [39m      (index [33m===[39m [34m0[39m [33m||[39m order [33m>[39m tracedOrders[index [33m-[39m [34m1[39m][33m![39m))[33m,[39m [32m`export step[39m…
+    [90m   | [39m                                                                                                   [31m^[39m
+    [90m227| [39m    [35mfor[39m ([35mconst[39m step [35mof[39m result[33m.[39mexportSuggestion[33m.[39msteps) {
+    [90m228| [39m      [34mexpect[39m(step[33m.[39mdescription[33m.[39m[34mtrim[39m())[33m.[39mnot[33m.[39m[34mtoBe[39m([32m''[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22mrecipePreparation: synthetic saved-source live evaluation[2m > [22m['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core
+[31m[1m[7m FAIL [27m[22m[39m src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22mrecipePreparation: synthetic saved-source live evaluation[2m > [22m['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core
+[31m[1mAssertionError[22m: expected { ok: false, …(2) } to match object { ok: true }
+(2 matching properties omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Object {[22m
+[32m-   "ok": true,[39m
+[31m+   "ok": false,[39m
+[2m  }[22m
+
+[36m [2m❯[22m src/lib/prompts/recipeAnalyze.eval.test.ts:[2m367:88[22m[39m
+    [90m365| [39m      [34mexpect[39m(fixture[33m.[39mpreparation)[33m.[39m[34mtoEqual[39m(before)[33m;[39m
+    [90m366| [39m      [34mexpect[39m(result)[33m.[39m[34mtoBeDefined[39m()[33m;[39m
+    [90m367| [39m      [34mexpect[39m([34mvalidateRecipeExportPreparationOutput[39m(result[33m,[39m savedBefore…
+    [90m   | [39m                                                                                       [31m^[39m
+    [90m368| [39m      [34mexpect[39m(result[33m![39m[33m.[39msteps[33m.[39mlength)[33m.[39m[34mtoBeGreaterThanOrEqual[39m([34m1[39m)[33m;[39m
+    [90m369| [39m      [34mexpect[39m(result[33m![39m[33m.[39msteps[33m.[39mlength)[33m.[39m[34mtoBeLessThanOrEqual[39m([34m5[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯[22m[39m
+

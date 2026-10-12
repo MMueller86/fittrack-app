@@ -1,0 +1,16 @@
+{
+  "label": "dough-overflow-run06",
+  "exit": 0,
+  "started": "2026-10-11T10:57:12.326Z",
+  "finished": "2026-10-11T10:57:14.258Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 0,
+    "failed": 0,
+    "pending": 21
+  },
+  "failures": [],
+  "outputSha256": "adc608d7745eecee7fa35e6510ec0af9e0f949e3c8430978f7f9e7d0c252268a",
+  "reportSha256": "3d5c9772fca675d42610e15cecc7e518e153099bd0a68a7edcfce7b921ce73f9"
+}

@@ -1,0 +1,184 @@
+[
+  {
+    "name": "daily insight prompt version matches fixture expectations",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['phase-progress-open-day'] 'An open target budget is not presente…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['current-effective-activity-budget'] 'An elevated current activity target p…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-source-priority'] 'Morning orientation uses the syntheti…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-unavailable'] 'A missing historical activity target …'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['historical-target-ambiguous-source'] 'A profile fallback and a conflicting …'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['planned-activity'] 'A planned activity is not described a…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['likely-completed-activity'] 'A late-day activity is described only…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['unknown-activity'] 'An activity without a usable local ho…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['intensive-endurance-fueling'] 'A long alpine endurance activity rece…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['budget-lock'] 'A negative remaining budget blocks an…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['target-relative-overage-not-achieved-…'] 'A negative target remainder supports …'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['protein-gap-with-budget'] 'A real protein gap with remaining cal…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['protein-nearly-complete'] 'A nearly complete protein target is n…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['empty-morning'] 'An empty early morning uses historica…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['morning-unlogged-prior-day'] 'An unlogged prior day remains missing…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['midday-empty-day-not-morning'] 'At local hour 12, an empty current di…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "dailyInsight: live prompt evaluation > [VERIFIED] ['stale-weight'] 'Stale weight data is not presented as…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/dailyInsight.eval.test.ts"
+  },
+  {
+    "name": "prompt version matches fixture expectations",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "preparation prompt version matches fixture expectations",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['mixed-food-seasoning'] 'Oils, protein, and vegetables are foo…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['borderline-classification'] 'Knoblauch and Zwiebeln must be food; …'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['explicit-quantities-with-unit-convers…'] 'Gram values pass through unchanged; E…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['missing-quantities-food-gets-estimated'] 'Food items without stated amounts rec…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['indeterminate-spray-oil-stays-food'] 'Unmeasurable spray oil stays food wit…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['full-recipe-output-fields'] 'All required fields present, suggeste…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipeAnalyze: live prompt evaluation > ['side-dish-and-serving-actions'] 'Full source extraction and selective …'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "recipePreparation: synthetic saved-source live evaluation > ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts"
+  },
+  {
+    "name": "prompt version matches fixture expectations",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+  },
+  {
+    "name": "recipeScale: live prompt evaluation > ['preserves-step-order-and-unrelated-ba…'] 'Keeps all original steps and preserve…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+  },
+  {
+    "name": "recipeScale: live prompt evaluation > ['missing-description-stays-null'] 'Does not invent a description when th…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeScale.eval.test.ts"
+  },
+  {
+    "name": "weekly insight prompt version matches fixture expectations",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+  },
+  {
+    "name": "weeklyInsight: live prompt evaluation > ['mixed-data-and-adjusted-activity-targ…'] 'Interprets a mixed week without treat…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+  },
+  {
+    "name": "weeklyInsight: live prompt evaluation > ['training-day-activitybonus-under-targ…'] 'Keeps three consecutive training days…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+  },
+  {
+    "name": "weeklyInsight: live prompt evaluation > ['zero-calorie-entry-is-data'] 'Does not turn a valid zero-calorie Me…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.eval.test.ts"
+  },
+  {
+    "name": "weeklyInsight: special-activity diagnostic eval > weekly insight diagnostic prompt version matches the prepared fixtures",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+  },
+  {
+    "name": "weeklyInsight: special-activity diagnostic eval > ['special-activity-under-effective-targ…'] '3000 kcal exceeds the base target but…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+  },
+  {
+    "name": "weeklyInsight: special-activity diagnostic eval > ['special-activity-at-effective-target'] '3600 kcal is exactly the activity-adj…'",
+    "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/weeklyInsight.special-activity.diagnostic.eval.test.ts"
+  }
+]
+
+WARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.

@@ -1,0 +1,20 @@
+{
+  "name": "Build",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "build:verify",
+    "--workspace=backend"
+  ],
+  "start": "2026-10-09T17:00:16.633Z",
+  "end": "2026-10-09T17:00:51.078Z",
+  "exit": 0,
+  "signal": null,
+  "counts": null,
+  "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build-Output_2026-10-09-r3-QA-R1.txt",
+  "outputSha256": "db74fdead4e458190f942dfda81f0e0876ff3e9104e2f140d84023ecc7189d37",
+  "report": null,
+  "reportSha256": null,
+  "candidateSha256": null
+}

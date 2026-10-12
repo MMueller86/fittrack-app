@@ -1,0 +1,16 @@
+{
+  "label": "import-indeterminate-spray-oil-stays-food-run05",
+  "exit": 0,
+  "started": "2026-10-11T10:53:47.191Z",
+  "finished": "2026-10-11T10:53:53.206Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 1,
+    "failed": 0,
+    "pending": 20
+  },
+  "failures": [],
+  "outputSha256": "01e212cfba2fccb91bd55c43b99169d717557075fa3ba6987d700c78d0a52594",
+  "reportSha256": "1a0fda45b49115846c6f644b1ffd1cf98608a64dcc8e7d2d2f500afc5255d4ac"
+}

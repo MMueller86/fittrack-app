@@ -1,0 +1,17 @@
+
+
+[31m⎯⎯⎯⎯[1m[7m Unhandled Rejection [27m[22m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'config')[39m
+[90m [2m❯[22m DefaultReporter.shouldLog ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/index.DsZFoqi9.js:[2m3604:18[22m[39m
+[90m [2m❯[22m DefaultReporter.onUserConsoleLog ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/index.DsZFoqi9.js:[2m4071:15[22m[39m
+[90m [2m❯[22m ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/cli-api.DqsSTaIi.js:[2m11194:58[22m[39m
+[90m [2m❯[22m Vitest.report ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/cli-api.DqsSTaIi.js:[2m11194:38[22m[39m
+[90m [2m❯[22m Proxy.onUserConsoleLog ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:[2m6670:11[22m[39m
+[90m [2m❯[22m EventEmitter.onMessage ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/index.68735LiX.js:[2m91:29[22m[39m
+[90m [2m❯[22m EventEmitter.emit node:events:[2m509:28[22m[39m
+[90m [2m❯[22m Object.postMessage ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/resolveConfig.rBxzbVsl.js:[2m6712:39[22m[39m
+[90m [2m❯[22m ChildProcess.<anonymous> ../../../OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/tinypool/dist/index.js:[2m163:86[22m[39m
+
+
+
+

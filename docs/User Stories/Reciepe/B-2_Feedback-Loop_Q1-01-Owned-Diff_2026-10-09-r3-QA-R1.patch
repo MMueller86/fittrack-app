@@ -1,0 +1,65 @@
+diff --git a/backend/src/lib/recipePreparation.test.ts b/backend/src/lib/recipePreparation.test.ts
+index f9b831c..0c18f20 100644
+--- a/backend/src/lib/recipePreparation.test.ts
++++ b/backend/src/lib/recipePreparation.test.ts
+@@ -16,6 +16,26 @@ function draft(description = 'Mische den Teig.', count = 4): RecipeExportPrepara
+ }
+ 
+ describe('B-2 bounded Preparation loop', () => {
++
++  it('QA-R1 excludes nested unknown-key-only diagnostics from affected text', () => {
++    const output = draft('Mische den Teig.', 1);
++    Object.assign(output.steps[0]!, { extra: 'UNKNOWN_OBJECT_SENTINEL' });
++    const validation = validateRecipeExportPreparationOutput(output, source.steps);
++    expect(validation.ok).toBe(false);
++    if (validation.ok) throw new Error('Expected unknown-key rejection');
++    expect(validation.diagnostics).toMatchObject([{ phase: 'schema', code: 'unrecognized_keys', path: 'steps[0]' }]);
++    expect(recipePreparationAffectedFields(output, validation.diagnostics)).toEqual([]);
++  });
++
++  it('QA-R1 keeps nonstring affected values metadata-only', () => {
++    const output = { ...draft(), teaser: { secret: 'NONSTRING_SENTINEL' }, difficulty: 42,
++      steps: [{ order: 1, description: { secret: 'NONSTRING_SENTINEL' }, sourceStepOrders: [1] }] };
++    const validation = validateRecipeExportPreparationOutput(output, source.steps);
++    expect(validation.ok).toBe(false);
++    if (validation.ok) throw new Error('Expected nonstring rejection');
++    expect(recipePreparationAffectedFields(output, validation.diagnostics)).toEqual([]);
++  });
++
+   it('extracts only exact known affected text for element-level schema references', () => {
+     const output = draft();
+     output.steps[0]!.description = 'Exact "text"\n\\untrimmed ';
+diff --git a/backend/src/functions/recipes.test.ts b/backend/src/functions/recipes.test.ts
+index 37603df..afd28fa 100644
+--- a/backend/src/functions/recipes.test.ts
++++ b/backend/src/functions/recipes.test.ts
+@@ -242,6 +242,29 @@ function expectTextOnlyPreparation(
+ // ---------------------------------------------------------------------------
+ 
+ describe('POST /recipes/{id}/export-view/prepare', () => {
++  it('QA-R1 logs metadata only for nested unknown-key-only exhaustion', async () => {
++    const recipe = await createTestRecipe();
++    const actual = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
++    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actual.validateRecipeExportPreparationOutput);
++    const output = { version: 1 as const, teaser: 'Goldbraunes Brot', totalTimeMinutes: null, difficulty: null,
++      steps: [{ order: 1, description: 'Mische den Teig.', sourceStepOrders: [1], extra: 'UNKNOWN_OBJECT_SENTINEL' }] };
++    vi.mocked(prepareRecipeExport).mockResolvedValue(output);
++    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
++    try {
++      const result = await requestV2Preparation(String(recipe['id']));
++      expect(result).toMatchObject({ status: 422, jsonBody: { details: ['schema:unrecognized_keys@steps[0]'] } });
++      expect(prepareRecipeExport).toHaveBeenCalledTimes(3);
++      expect(enforceQuota).toHaveBeenCalledTimes(1);
++      expect(trackUsage).not.toHaveBeenCalled();
++      const events = logs.flatMap((log) => log.mock.calls.flatMap((args) => args.map((value) => JSON.parse(String(value)))));
++      const exhausted = events.filter((event) => event.event === 'recipes.prepareExportView.correctionsExhausted');
++      expect(exhausted).toHaveLength(1);
++      expect(exhausted[0]).toMatchObject({ affected_field_count: 0, affected_fields: '[]', corrections: 2, logical_calls: 3 });
++      const captured = JSON.stringify(logs.map((log) => log.mock.calls));
++      for (const text of ['Mische den Teig.', 'Goldbraunes Brot', 'UNKNOWN_OBJECT_SENTINEL', 'Zutaten mischen.']) expect(captured).not.toContain(text);
++    } finally { logs.forEach((log) => log.mockRestore()); }
++  });
++
+   it.each([
+     [{ order: 2, description: 'Saved.' }, { order: 1, description: 'Saved.' }],
+     [{ order: 1, description: 'Saved.' }, { order: 1, description: 'Saved again.' }],

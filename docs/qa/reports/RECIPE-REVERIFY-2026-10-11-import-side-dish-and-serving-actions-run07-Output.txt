@@ -1,0 +1,32 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+[90mstdout[2m | src/lib/prompts/recipeAnalyze.eval.test.ts[2m > [22m[2mrecipeAnalyze: live prompt evaluation[2m > [22m[2m['side-dish-and-serving-actions'] 'Full source extraction and selective …'
+[22m[39mSynthetic import semantic evidence {"fixture":"side-dish-and-serving-actions","source":[{"order":1,"title":null,"description":"Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab."},{"order":2,"title":null,"description":"Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab."},{"order":3,"title":null,"description":"Würze die Hähnchenbrust mit Salz und Pfeffer."},{"order":4,"title":null,"description":"Erhitze das Olivenöl in einer Pfanne."},{"order":5,"title":null,"description":"Brate die Hähnchenbrust bei mittlerer Hitze 4 Minuten pro Seite an."},{"order":6,"title":null,"description":"Reduziere die Hitze und gare das Hähnchen weitere 6 Minuten fertig."},{"order":7,"title":null,"description":"Nimm das Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."},{"order":8,"title":null,"description":"Schneide das Hähnchen auf und serviere es mit den Kartoffeln als Beilage und den Bohnen."}],"export":[{"order":1,"description":"Koche die Kartoffeln 18 Minuten in Salzwasser und gieße sie ab.","sourceStepOrders":[1],"ingredientKeys":["ingredient-2"]},{"order":2,"description":"Gare die grünen Bohnen 8 Minuten bissfest und gieße sie ab.","sourceStepOrders":[2],"ingredientKeys":["ingredient-3"]},{"order":3,"description":"Brate die Hähnchenbrust 4 Minuten pro Seite an und gare sie dann 6 Minuten fertig.","sourceStepOrders":[5,6],"ingredientKeys":["ingredient-1","ingredient-4","ingredient-5","ingredient-6"]},{"order":4,"description":"Lasse das Hähnchen 3 Minuten ruhen und schneide es dann auf.","sourceStepOrders":[7,8],"ingredientKeys":["ingredient-1"]}]}
+
+ [32m✓[39m src/lib/prompts/recipeAnalyze.eval.test.ts [2m([22m[2m21 tests[22m[2m | [22m[33m20 skipped[39m[2m)[22m[33m 7629[2mms[22m[39m
+   [33m[2m✓[22m[39m recipeAnalyze: live prompt evaluation[2m > [22m['side-dish-and-serving-actions'] 'Full source extraction and selective …' [33m7629[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m1 passed[39m[22m[2m | [22m[33m20 skipped[39m[90m (21)[39m
+[2m   Start at [22m 12:50:58
+[2m   Duration [22m 9.00s[2m (transform 504ms, setup 0ms, collect 1.16s, tests 7.63s, environment 0ms, prepare 61ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/qa/reports/RECIPE-REVERIFY-2026-10-11-import-side-dish-and-serving-actions-run07-Report.json
+
+--- stderr ---
+[90mstderr[2m | src/lib/prompts/recipeAnalyze.eval.test.ts
+[22m[39mWARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.
+

@@ -1,0 +1,93 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [31m❯[39m src/lib/recipePreparation.test.ts [2m([22m[2m41 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[33m 8644[2mms[22m[39m
+[31m   [31m×[31m B-2 bounded Preparation loop[2m > [22mcollects real teaser failure and all affected steps, multi=false[33m 3937[2mms[22m[31m[39m
+[31m     → expected { status: 'success', …(5) } to match object { status: 'success', logicalCalls: 2 }
+(9 matching properties omitted from actual)[39m
+[31m   [31m×[31m B-2 bounded Preparation loop[2m > [22mcollects real teaser failure and all affected steps, multi=true[33m 3887[2mms[22m[31m[39m
+[31m     → expected [ { phase: 'template', …(11) }, …(3) ] to have a length of 5 but got 4[39m
+[31m   [31m×[31m B-2 bounded Preparation loop[2m > [22mtreats duplicate-index probe measurements as technical even alongside correctable errors[90m 11[2mms[22m[31m[39m
+[31m     → expected { status: 'exhausted', …(5) } to match object { status: 'terminal', …(2) }
+(9 matching properties omitted from actual)[39m
+[31m   [31m×[31m B-2 bounded Preparation loop[2m > [22mtreats absent-measured probe measurements as technical even alongside correctable errors[90m 10[2mms[22m[31m[39m
+[31m     → expected { status: 'exhausted', …(5) } to match object { status: 'terminal', …(2) }
+(9 matching properties omitted from actual)[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m37 passed[39m[22m[90m (41)[39m
+[2m   Start at [22m 17:49:42
+[2m   Duration [22m 10.19s[2m (transform 309ms, setup 0ms, collect 603ms, tests 8.64s, environment 0ms, prepare 218ms)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Loop-Red-Report_2026-10-09-r2.json
+
+[31m⎯⎯⎯⎯⎯⎯⎯[1m[7m Failed Tests 4 [27m[22m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipePreparation.test.ts[2m > [22mB-2 bounded Preparation loop[2m > [22mcollects real teaser failure and all affected steps, multi=false
+[31m[1mAssertionError[22m: expected { status: 'success', …(5) } to match object { status: 'success', logicalCalls: 2 }
+(9 matching properties omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Object {[22m
+[32m-   "logicalCalls": 2,[39m
+[31m+   "logicalCalls": 1,[39m
+[2m    "status": "success",[22m
+[2m  }[22m
+
+[36m [2m❯[22m src/lib/recipePreparation.test.ts:[2m114:70[22m[39m
+    [90m112| [39m    [35mif[39m (multi) [35mfor[39m ([35mconst[39m step [35mof[39m invalid[33m.[39msteps) step[33m.[39mdescription [33m=[39m [32m'V[39m…
+    [90m113| [39m    [35mconst[39m generate [33m=[39m vi[33m.[39m[34mfn[39m()[33m.[39m[34mmockResolvedValueOnce[39m(invalid)[33m.[39m[34mmockResolv[39m…
+    [90m114| [39m    [34mexpect[39m([35mawait[39m [34mprepareValidatedRecipeExport[39m(source[33m,[39m { generate }))[33m.[39m[34mt[39m…
+    [90m   | [39m                                                                     [31m^[39m
+    [90m115| [39m    [35mconst[39m errors [33m=[39m generate[33m.[39mmock[33m.[39mcalls[[34m1[39m][33m![39m[[34m1[39m][33m.[39mcorrection[33m.[39mvalidationErr…
+    [90m116| [39m    [34mexpect[39m(errors[33m.[39m[34mfilter[39m((error[33m:[39m { phase[33m:[39m string }) [33m=>[39m error[33m.[39mphase [33m===[39m…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipePreparation.test.ts[2m > [22mB-2 bounded Preparation loop[2m > [22mcollects real teaser failure and all affected steps, multi=true
+[31m[1mAssertionError[22m: expected [ { phase: 'template', …(11) }, …(3) ] to have a length of 5 but got 4[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 5[39m
+[31m+ 4[39m
+
+[36m [2m❯[22m src/lib/recipePreparation.test.ts:[2m116:85[22m[39m
+    [90m114| [39m    [34mexpect[39m([35mawait[39m [34mprepareValidatedRecipeExport[39m(source[33m,[39m { generate }))[33m.[39m[34mt[39m…
+    [90m115| [39m    [35mconst[39m errors [33m=[39m generate[33m.[39mmock[33m.[39mcalls[[34m1[39m][33m![39m[[34m1[39m][33m.[39mcorrection[33m.[39mvalidationErr…
+    [90m116| [39m    [34mexpect[39m(errors[33m.[39m[34mfilter[39m((error[33m:[39m { phase[33m:[39m string }) [33m=>[39m error[33m.[39mphase [33m===[39m…
+    [90m   | [39m                                                                                    [31m^[39m
+    [90m117| [39m    [34mexpect[39m(errors)[33m.[39m[34mtoContainEqual[39m(expect[33m.[39m[34mobjectContaining[39m({ path[33m:[39m [32m'tea[39m…
+    [90m118| [39m  })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯[22m[39m
+
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipePreparation.test.ts[2m > [22mB-2 bounded Preparation loop[2m > [22mtreats duplicate-index probe measurements as technical even alongside correctable errors
+[31m[1m[7m FAIL [27m[22m[39m src/lib/recipePreparation.test.ts[2m > [22mB-2 bounded Preparation loop[2m > [22mtreats absent-measured probe measurements as technical even alongside correctable errors
+[31m[1mAssertionError[22m: expected { status: 'exhausted', …(5) } to match object { status: 'terminal', …(2) }
+(9 matching properties omitted from actual)[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  Object {[22m
+[32m-   "kind": "technical",[39m
+[32m-   "logicalCalls": 1,[39m
+[32m-   "status": "terminal",[39m
+[31m+   "logicalCalls": 3,[39m
+[31m+   "status": "exhausted",[39m
+[2m  }[22m
+
+[36m [2m❯[22m src/lib/recipePreparation.test.ts:[2m160:10[22m[39m
+    [90m158| [39m      [35mconst[39m generate [33m=[39m vi[33m.[39m[34mfn[39m()[33m.[39m[34mmockResolvedValue[39m({ [33m...[39moutput[33m,[39m totalTim…
+    [90m159| [39m      [34mexpect[39m([35mawait[39m [34mprepareValidatedRecipeExport[39m(source[33m,[39m { generate[33m,[39m pr…
+    [90m160| [39m        [33m.[39m[34mtoMatchObject[39m({ status[33m:[39m [32m'terminal'[39m[33m,[39m kind[33m:[39m [32m'technical'[39m[33m,[39m logica…
+    [90m   | [39m         [31m^[39m
+    [90m161| [39m      [34mexpect[39m(generate)[33m.[39m[34mtoHaveBeenCalledTimes[39m([34m1[39m)[33m;[39m
+    [90m162| [39m    }[33m,[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯[22m[39m
+

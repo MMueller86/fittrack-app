@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-10-10T00:04:27.498Z",
+  "exit": 0,
+  "verdict": "FAIL",
+  "criteria": [
+    "AC-1",
+    "AC-2",
+    "AC-3",
+    "AC-4",
+    "AC-5",
+    "AC-6",
+    "AC-7",
+    "AC-8",
+    "AC-9",
+    "AC-10",
+    "US-10 AC-15",
+    "US-10 AC-16"
+  ],
+  "structuredFindings": 4,
+  "linksChecked": 30,
+  "priorReportHashVerified": true,
+  "utf8FilesChecked": 29,
+  "configuredValueExposure": "NONE_IN_QA_ARTIFACT_SCOPE",
+  "liveCalls": 0
+}

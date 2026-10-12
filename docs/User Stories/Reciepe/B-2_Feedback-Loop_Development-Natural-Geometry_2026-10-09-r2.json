@@ -1,0 +1,29 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipePreparation.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Natural-Geometry-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:58:25.610Z",
+  "endedAt": "2026-10-09T15:58:33.405Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "53809e4ad28c66391fd8d639e1f08fc593db1da2c2d85252ad114afd7eee832f",
+  "reportSha256": "189ec9edc9095ed64a03f96b48eecdc8e90dcce01e02734a28dfde8635413db7",
+  "counts": {
+    "executed": 45,
+    "passed": 45,
+    "failed": 0,
+    "skipped": 0
+  },
+  "failures": []
+}

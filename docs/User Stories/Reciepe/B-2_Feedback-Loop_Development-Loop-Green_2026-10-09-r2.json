@@ -1,0 +1,29 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipePreparation.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Loop-Green-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:50:11.375Z",
+  "endedAt": "2026-10-09T15:50:15.000Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "6e72ae6c0fc2960b4c39f9f23b8861c48355872ab47dee37e055faf6b3524228",
+  "reportSha256": "8ef8c63c7300c4957260e9cf9a8ff17d50eff5c21f84906f62342a2a0f4f56a1",
+  "counts": {
+    "executed": 41,
+    "passed": 41,
+    "failed": 0,
+    "skipped": 0
+  },
+  "failures": []
+}

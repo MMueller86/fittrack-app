@@ -1,0 +1,25 @@
+{
+  "stage": "listPreparation",
+  "startedAt": "2026-10-09T23:51:20.305Z",
+  "finishedAt": "2026-10-09T23:51:21.775Z",
+  "args": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "list",
+    "--disableConsoleIntercept",
+    "--json",
+    "--config",
+    "vitest.eval.config.mts",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "--testNamePattern",
+    "preparation prompt version matches fixture expectations|recipePreparation"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "counts": null,
+  "outputPath": "docs/qa/reports/Q21-CORR1-2026-10-10-listPreparation-Output.txt",
+  "outputSha256": "1b6315ab0f5df4250b671b7d8d3bc6b3650801084e627408e3a7b0e1e233b7af",
+  "testReport": null,
+  "reportSha256": null,
+  "synthetic": []
+}

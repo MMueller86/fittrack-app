@@ -57,3 +57,7 @@ yarn-error.log*
 # OFF Import Tool â€” generated output (large files, regenerate via npm run export:off)
 tools/off-import/output/
 !tools/off-import/output/food-products.sample.100.json
+
+# Zu große Evidence-Dateien (>100 MB, GitHub-Limit)
+docs/User Stories/Reciepe/B-2_Feedback-Loop_Baseline_2026-10-09.json
+docs/User Stories/Reciepe/B-2_Feedback-Loop_Resume-Baseline_2026-10-09-r2.json

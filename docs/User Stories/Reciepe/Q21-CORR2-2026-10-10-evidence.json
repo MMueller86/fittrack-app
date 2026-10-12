@@ -1,0 +1,488 @@
+{
+  "format": "fittrack-q21-corrections-round2-evidence-v1",
+  "status": "LOCAL_OFFLINE_PASS_INDEPENDENT_QA_REQUIRED_NO_DEPLOY",
+  "handoff": {
+    "path": "docs/User Stories/Reciepe/HANDOFF_Q21_Corrections_Round2_2026-10-10.md",
+    "sha256": "6914f5c20f072ba57cdb8c42777da963f04e17ec740b69ec73f46aa6d09a7277"
+  },
+  "versions": {
+    "preparation": "v11",
+    "import": "v16",
+    "daily": "v17",
+    "assembly": "v2"
+  },
+  "retry_counts": {
+    "Preparation": 2,
+    "Daily": 2
+  },
+  "findings": [
+    {
+      "id": "FT086",
+      "result": "SCOPED_CORRECTION_IMPLEMENTED_OFFLINE_TESTED_LIVE_UNVERIFIED",
+      "qaClosure": false
+    },
+    {
+      "id": "FT087",
+      "result": "SCOPED_CORRECTION_IMPLEMENTED_OFFLINE_TESTED_LIVE_UNVERIFIED",
+      "qaClosure": false
+    },
+    {
+      "id": "FT090",
+      "result": "SCOPED_CORRECTION_IMPLEMENTED_OFFLINE_TESTED_LIVE_UNVERIFIED",
+      "qaClosure": false
+    },
+    {
+      "id": "FT088",
+      "result": "SCOPED_CORRECTION_IMPLEMENTED_OFFLINE_TESTED_LIVE_UNVERIFIED",
+      "qaClosure": false
+    },
+    {
+      "id": "FT091",
+      "result": "SCOPED_CORRECTION_IMPLEMENTED_OFFLINE_TESTED_LIVE_UNVERIFIED",
+      "qaClosure": false
+    }
+  ],
+  "FT089": "ALREADY_CLOSED_BY_ORCHESTRATOR_CURRENT_DOCS_ALIGNED_ONLY",
+  "executions": [
+    {
+      "stage": "preparation-red",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-red.json",
+      "recordSha256": "f1c36fa69fb3f4fca949df06f14109b53fd36c950d4312069942b78080e90723",
+      "exit": 1,
+      "counts": {
+        "passed": 0,
+        "failed": 3,
+        "skipped": 54,
+        "total": 57
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-red-Output.txt",
+      "outputSha256": "f42079be3171ca011e46a421d1d0a7347bf661dae633417665f2662a37083605",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-red-Report.json",
+      "reportSha256": "7deae6cd789f7bd82617e602b441832ad8d6e70319b27c8bcce046afee799d37"
+    },
+    {
+      "stage": "preparation-green",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green.json",
+      "recordSha256": "08242f1543328e63bf87fe140b88387511d8cd3bb1123596473814d3e8c28b90",
+      "exit": 1,
+      "counts": {
+        "total": 233,
+        "passed": 232,
+        "failed": 1,
+        "skipped": 0
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green-Output.txt",
+      "outputSha256": "a66f06d39b225b4c84a67cf8a4d2aa14a42733168b40d6720b1eea8ab267ac08",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green-Report.json",
+      "reportSha256": "985d0a1e4dabd1bd90c1e30202e06f83e0682f978d4eaabc79940be45ba595b0"
+    },
+    {
+      "stage": "preparation-green2",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green2.json",
+      "recordSha256": "acdc5233630ce738956e417379f9466a5759f8b9b7324d061d553b3e8f543e06",
+      "exit": 0,
+      "counts": {
+        "total": 233,
+        "passed": 233,
+        "failed": 0,
+        "skipped": 0
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green2-Output.txt",
+      "outputSha256": "0f8253d06f86285664ae9de6f0488c228fd6a9e44375e2a3bbcc8a22639a5cdc",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green2-Report.json",
+      "reportSha256": "cbb8ee5b5e886176b6645e2d60957d0ac34e01f2963a41911af6e16844fb95e8"
+    },
+    {
+      "stage": "daily-red",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-red.json",
+      "recordSha256": "b1286ab32083086e3b4d9c720ea2d30c63d56cbce24972b4a443c463140931d4",
+      "exit": 1,
+      "counts": {
+        "total": 76,
+        "passed": 5,
+        "failed": 1,
+        "skipped": 70
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-red-Output.txt",
+      "outputSha256": "961c5e5973835c4e77b79858e14c16a7d3defa0e743d719294548c6e9689113e",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-red-Report.json",
+      "reportSha256": "583aa876fad1c023adea5ec26ba5f00f2b0a68fc6b0c496f52fceb076b25273d"
+    },
+    {
+      "stage": "daily-green",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-green.json",
+      "recordSha256": "44afd278bc82feefbbf31db402eb1a9fd66444a07b0c24c1474bbd222daf5fda",
+      "exit": 0,
+      "counts": {
+        "total": 188,
+        "passed": 188,
+        "failed": 0,
+        "skipped": 0
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-green-Output.txt",
+      "outputSha256": "2e886da959c1c3e500189de44c6fa984d9c000a29904400c6175d1129c6f359e",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-green-Report.json",
+      "reportSha256": "c9fdb45caa47766fae147cb0acd0cd8e6e2f754d4eca5228971cb66e518bfdc7"
+    },
+    {
+      "stage": "manifest",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-manifest.json",
+      "recordSha256": "48fedb8984d7e44fbffb366e8a5442b4db6b62d649e6c5e2a86d145cd6518dc9",
+      "exit": 0,
+      "counts": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "skipped": 0
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-manifest-Output.txt",
+      "outputSha256": "19a2a2a0b2be83a1f05015172aa1292d6a3cef79a5d179164caeeb527a016c59",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-manifest-Report.json",
+      "reportSha256": "369c3a96e7f8854dec6950bf0a542a5e4789af619f7c95a97f6ebf1df80cdd4a"
+    },
+    {
+      "stage": "rice",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-rice.json",
+      "recordSha256": "3f732fc2df57cf6910c704c46eaeaaba392cdb994586e86974e194809f984354",
+      "exit": 0,
+      "counts": {
+        "total": 177,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 176
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-rice-Output.txt",
+      "outputSha256": "b29960489e133031b285fa2a3b8ab20bb6258a9056534d962d80c652c7e0146c",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-rice-Report.json",
+      "reportSha256": "0d5733c839a7d27f06580120e26027eed586315ee5f2454c1241c739062ffc08"
+    },
+    {
+      "stage": "focus",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus.json",
+      "recordSha256": "de070aab3737500e0b24e046ae51909770fb23782ecf3e074cb8bebf64b74333",
+      "exit": 1,
+      "counts": {
+        "total": 788,
+        "passed": 786,
+        "failed": 2,
+        "skipped": 0
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus-Output.txt",
+      "outputSha256": "02686ba00a608ea8ff547bd9f022470e2c97b7957a3a8cf5caf0450a83f8825c",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus-Report.json",
+      "reportSha256": "0843078ca87e9e18282c2b8d1e59d4a35dc37856b7e8e91164e33fdb722e6070"
+    },
+    {
+      "stage": "focus2",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2.json",
+      "recordSha256": "5374d3457b01e345c73066be4403ba23235a577736e60a02f85eb99e9d358919",
+      "exit": 0,
+      "counts": {
+        "total": 788,
+        "passed": 788,
+        "failed": 0,
+        "skipped": 0
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2-Output.txt",
+      "outputSha256": "1e4fc94a514b7a9787357b8d06a0a7838b1ad05ff6a92c0d15cff3890c77a57a",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2-Report.json",
+      "reportSha256": "a471a7afee2482125ee9e46c8e44fab068dc6d8b7c462527af173339d60ef515"
+    },
+    {
+      "stage": "units",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units.json",
+      "recordSha256": "02e81075a602cc13407ad4295a841a34264b8e5f30db8594b1f5767aede1003e",
+      "exit": 0,
+      "counts": {
+        "total": 1639,
+        "passed": 1639,
+        "failed": 0,
+        "skipped": 0
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Output.txt",
+      "outputSha256": "d20ad726f8487a7842b18067ee226999a425c393646427ef8e72b53a55f4d8f5",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Report.json",
+      "reportSha256": "e01e7471ff76c1894f00e222ff8a4c2211e1f86473a9b9625616b1d0dbf12a54"
+    },
+    {
+      "stage": "typecheck",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-typecheck.json",
+      "recordSha256": "19e1a627d342b4bf0bdb2425d9c33efac723658e8e1045f784d2f7cae46abb12",
+      "exit": 0,
+      "counts": null,
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-typecheck-Output.txt",
+      "outputSha256": "23c9d65eeb8572d1fe4ec2ca0ea0a4cd5b67699a40d46b72d4a2dbfea253fba0"
+    },
+    {
+      "stage": "build",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-build.json",
+      "recordSha256": "1b93f1a8444ddeb34e655f02a64e9002d80bdccdac5a697c5e5de8f2df7b7898",
+      "exit": 0,
+      "counts": null,
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-build-Output.txt",
+      "outputSha256": "db74fdead4e458190f942dfda81f0e0876ff3e9104e2f140d84023ecc7189d37"
+    },
+    {
+      "stage": "daily-release",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-release.json",
+      "recordSha256": "eee1db388cca45eda7456e9e745052f8c194f8376c4e8f73353fca35a94d50f6",
+      "exit": 0,
+      "counts": null,
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-release-Output.txt",
+      "outputSha256": "eaa14fe30d170bbc5cc31b5c439c1ccead7cbda912921f5e280ac46953709fa8"
+    },
+    {
+      "stage": "version-guards",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards.json",
+      "recordSha256": "b07456c34b1786b5832dd7254d3ead4c7cfb5730509ef481a115b46471315def",
+      "exit": 0,
+      "counts": {
+        "total": 32,
+        "passed": 3,
+        "failed": 0,
+        "skipped": 29
+      },
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards-Output.txt",
+      "outputSha256": "7b8cc346be2c205a3df5ecbcda96a331b30352f08d01eaa9052f6fd8857181b3",
+      "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards-Report.json",
+      "reportSha256": "32d6f641abd34f5eac3925f1eed2b1c5e492d58a280c44fcc40f0bb3fa1b858b"
+    },
+    {
+      "stage": "encoding",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-encoding.json",
+      "recordSha256": "262179581316e6855a34a46da102207625c1ef74eaf0ac5860bb70d381d9fe7e",
+      "exit": 0,
+      "counts": null,
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-encoding-Output.txt",
+      "outputSha256": "9e10a18590f8d61167af47c191a36f3a21cdbd7b1a58c010133fb00388343f77"
+    },
+    {
+      "stage": "diff-check",
+      "recordPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-diff-check.json",
+      "recordSha256": "d90ca3c786d6dba9601f6cbba15be96e5ea12138bbf90d9592f35809b8963068",
+      "exit": 0,
+      "counts": null,
+      "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-diff-check-Output.txt",
+      "outputSha256": "501c5c0e5f83be289172b888a1f47e7fb79e6f7d8130449c26f7d13c4a1b0761"
+    }
+  ],
+  "validation": {
+    "executable": "C:\\Program Files\\nodejs\\node.exe",
+    "nativeArgs": [
+      "-e",
+      "const fs=require('node:fs'),cp=require('node:child_process'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');const dir='docs/User Stories/Reciepe/',name='Q21-CORR2-2026-10-10-',prefix=dir+name,handoff=dir+'HANDOFF_Q21_Corrections_Round2_2026-10-10.md',hash=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');const started=new Date().toISOString(),candidate=JSON.parse(fs.readFileSync(prefix+'candidate.json','utf8')),baseline=JSON.parse(fs.readFileSync(prefix+'baseline.json','utf8')),owned=new Set(candidate.files.map(f=>f.path));for(const f of candidate.files)assert.equal(hash(f.path),f.sha256,f.path);let foreign=0;for(const f of baseline.files)if(!owned.has(f.path)){assert.equal(hash(f.path),f.sha256,f.path);foreign++;}const stages=['preparation-red','preparation-green','preparation-green2','daily-red','daily-green','manifest','rice','focus','focus2','units','typecheck','build','daily-release','version-guards','encoding','diff-check'];const executions=stages.map(stage=>{const recordPath=prefix+stage+'.json',r=JSON.parse(fs.readFileSync(recordPath,'utf8'));assert.ok(Array.isArray(r.nativeArgs));assert.ok(Number.isInteger(r.exit));const outputPath=prefix+stage+'-Output.txt';assert.ok(fs.existsSync(outputPath));if(r.outputSha256)assert.equal(hash(outputPath),r.outputSha256);const reportPath=prefix+stage+'-Report.json';if(fs.existsSync(reportPath)){const j=JSON.parse(fs.readFileSync(reportPath,'utf8'));assert.deepEqual(r.counts,{total:j.numTotalTests,passed:j.numPassedTests,failed:j.numFailedTests,skipped:j.numPendingTests});if(r.reportSha256)assert.equal(hash(reportPath),r.reportSha256);}return {stage,recordPath,recordSha256:hash(recordPath),exit:r.exit,counts:r.counts,outputPath,outputSha256:hash(outputPath),...(fs.existsSync(reportPath)?{reportPath,reportSha256:hash(reportPath)}:{})};});assert.equal(executions.find(e=>e.stage==='focus2').counts.passed,788);assert.equal(executions.find(e=>e.stage==='units').counts.passed,1639);const handoffText=fs.readFileSync(handoff,'utf8');for(const value of ['FT086','FT087','FT088','FT089','FT090','FT091','v11','v17','NO DEPLOY','LAST','1639','788','NOT PERFORMED'])assert.ok(handoffText.includes(value),value);const settings=JSON.parse(fs.readFileSync('backend/local.settings.json','utf8').replace(/^\\uFEFF/u,''));const configured=Object.entries(settings.Values??{}).filter(([key,value])=>/KEY|TOKEN|SECRET|PASSWORD|CONNECTION|ENDPOINT/i.test(key)&&typeof value==='string'&&value.length>8).map(([,value])=>value);const files=[...candidate.files.map(f=>f.path),handoff,...fs.readdirSync(dir).filter(f=>f.startsWith(name)).map(f=>dir+f)];for(const file of files){const text=new TextDecoder('utf-8',{fatal:true}).decode(fs.readFileSync(file));assert.ok(!text.includes('\\uFFFD'),file);for(const value of configured)assert.ok(!text.includes(value),'Configured secret exposure in '+file);}const finish={executable:process.execPath,nativeArgs:process.execArgv,cwd:process.cwd(),started,finished:new Date().toISOString(),exit:0,executionRecordsVerified:executions.length,foreignFilesUnchanged:foreign,candidateFilesUnchanged:candidate.files.length,utf8AndSecretScanFiles:files.length,secretExposure:'NONE_IN_CHECKED_SCOPE',scope:'candidate files and new Round2 artifacts; configured sensitive values longer than 8 characters; not universal audit',liveCalls:0};fs.writeFileSync(prefix+'finish.json',JSON.stringify(finish,null,2));const artifacts=fs.readdirSync(dir).filter(f=>f.startsWith(name)&&f!==name+'evidence.json').map(f=>({path:dir+f,sha256:hash(dir+f)}));const evidence={format:'fittrack-q21-corrections-round2-evidence-v1',status:'LOCAL_OFFLINE_PASS_INDEPENDENT_QA_REQUIRED_NO_DEPLOY',handoff:{path:handoff,sha256:hash(handoff)},versions:candidate.versions,retry_counts:candidate.retry_counts,findings:['FT086','FT087','FT090','FT088','FT091'].map(id=>({id,result:'SCOPED_CORRECTION_IMPLEMENTED_OFFLINE_TESTED_LIVE_UNVERIFIED',qaClosure:false})),FT089:'ALREADY_CLOSED_BY_ORCHESTRATOR_CURRENT_DOCS_ALIGNED_ONLY',executions,validation:finish,artifacts,independentFRG:'NOT_RUN_BY_IMPLEMENTATION_REQUIRED_ON_FINAL_BYTES',manualOven:'NOT_PERFORMED_MANUAL_VALIDATION_REQUIRED',deployAuthorized:false};fs.writeFileSync(prefix+'evidence.json',JSON.stringify(evidence,null,2));for(const link of handoffText.matchAll(/\\]\\(([^)]+)\\)/g)){const target=decodeURIComponent(link[1].split('#')[0]);assert.ok(fs.existsSync(path.resolve(path.dirname(handoff),target)),target);}for(const value of configured)assert.ok(!fs.readFileSync(prefix+'evidence.json','utf8').includes(value));console.log(JSON.stringify({exit:0,executionRecordsVerified:executions.length,foreignFilesUnchanged:foreign,candidateFilesStable:candidate.files.length,utf8SecretScanFiles:files.length,liveCalls:0,handoff,evidence:prefix+'evidence.json'}));"
+    ],
+    "cwd": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app",
+    "started": "2026-10-10T00:17:51.153Z",
+    "finished": "2026-10-10T00:17:52.059Z",
+    "exit": 0,
+    "executionRecordsVerified": 16,
+    "foreignFilesUnchanged": 1054,
+    "candidateFilesUnchanged": 20,
+    "utf8AndSecretScanFiles": 69,
+    "secretExposure": "NONE_IN_CHECKED_SCOPE",
+    "scope": "candidate files and new Round2 artifacts; configured sensitive values longer than 8 characters; not universal audit",
+    "liveCalls": 0
+  },
+  "artifacts": [
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-baseline.json",
+      "sha256": "9f4448da0be18eb3f36dde2e110a24197674ed5d4e70a0f58bada362812bcaf8"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-build-Output.txt",
+      "sha256": "db74fdead4e458190f942dfda81f0e0876ff3e9104e2f140d84023ecc7189d37"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-build.json",
+      "sha256": "1b93f1a8444ddeb34e655f02a64e9002d80bdccdac5a697c5e5de8f2df7b7898"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-candidate.json",
+      "sha256": "784b371100ba28bd0aa722435bbd718cd2d1fef89f3b7f565c9c588117b1ad3f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-green-Output.txt",
+      "sha256": "2e886da959c1c3e500189de44c6fa984d9c000a29904400c6175d1129c6f359e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-green-Report.json",
+      "sha256": "c9fdb45caa47766fae147cb0acd0cd8e6e2f754d4eca5228971cb66e518bfdc7"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-green.json",
+      "sha256": "44afd278bc82feefbbf31db402eb1a9fd66444a07b0c24c1474bbd222daf5fda"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-red-Output.txt",
+      "sha256": "961c5e5973835c4e77b79858e14c16a7d3defa0e743d719294548c6e9689113e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-red-Report.json",
+      "sha256": "583aa876fad1c023adea5ec26ba5f00f2b0a68fc6b0c496f52fceb076b25273d"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-red.json",
+      "sha256": "b1286ab32083086e3b4d9c720ea2d30c63d56cbce24972b4a443c463140931d4"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-release-Output.txt",
+      "sha256": "eaa14fe30d170bbc5cc31b5c439c1ccead7cbda912921f5e280ac46953709fa8"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-release.json",
+      "sha256": "eee1db388cca45eda7456e9e745052f8c194f8376c4e8f73353fca35a94d50f6"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-diff-check-Output.txt",
+      "sha256": "501c5c0e5f83be289172b888a1f47e7fb79e6f7d8130449c26f7d13c4a1b0761"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-diff-check.json",
+      "sha256": "d90ca3c786d6dba9601f6cbba15be96e5ea12138bbf90d9592f35809b8963068"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-docs.json",
+      "sha256": "51686b141e6907b00e976f8c68fe9d81b2bd16c2a4d0698eb9b05d99cbcc8ac2"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-encoding-Output.txt",
+      "sha256": "9e10a18590f8d61167af47c191a36f3a21cdbd7b1a58c010133fb00388343f77"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-encoding.json",
+      "sha256": "262179581316e6855a34a46da102207625c1ef74eaf0ac5860bb70d381d9fe7e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-finish.json",
+      "sha256": "37ced5d7fc2cb63f33be0f0edc4af1a66c30b30515a1b44873ca144205616bc1"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus-Output.txt",
+      "sha256": "02686ba00a608ea8ff547bd9f022470e2c97b7957a3a8cf5caf0450a83f8825c"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus-Report.json",
+      "sha256": "0843078ca87e9e18282c2b8d1e59d4a35dc37856b7e8e91164e33fdb722e6070"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus.json",
+      "sha256": "de070aab3737500e0b24e046ae51909770fb23782ecf3e074cb8bebf64b74333"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2-Output.txt",
+      "sha256": "1e4fc94a514b7a9787357b8d06a0a7838b1ad05ff6a92c0d15cff3890c77a57a"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2-Report.json",
+      "sha256": "a471a7afee2482125ee9e46c8e44fab068dc6d8b7c462527af173339d60ef515"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2.json",
+      "sha256": "5374d3457b01e345c73066be4403ba23235a577736e60a02f85eb99e9d358919"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-kb-before.json",
+      "sha256": "86b7bb29753960bbdc9a6a11b32d0b4b4bb423a9e0130fb71e6e3c72d83728d5"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-manifest-Output.txt",
+      "sha256": "19a2a2a0b2be83a1f05015172aa1292d6a3cef79a5d179164caeeb527a016c59"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-manifest-Report.json",
+      "sha256": "369c3a96e7f8854dec6950bf0a542a5e4789af619f7c95a97f6ebf1df80cdd4a"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-manifest.json",
+      "sha256": "48fedb8984d7e44fbffb366e8a5442b4db6b62d649e6c5e2a86d145cd6518dc9"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green-Output.txt",
+      "sha256": "a66f06d39b225b4c84a67cf8a4d2aa14a42733168b40d6720b1eea8ab267ac08"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green-Report.json",
+      "sha256": "985d0a1e4dabd1bd90c1e30202e06f83e0682f978d4eaabc79940be45ba595b0"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green.json",
+      "sha256": "08242f1543328e63bf87fe140b88387511d8cd3bb1123596473814d3e8c28b90"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green2-Output.txt",
+      "sha256": "0f8253d06f86285664ae9de6f0488c228fd6a9e44375e2a3bbcc8a22639a5cdc"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green2-Report.json",
+      "sha256": "cbb8ee5b5e886176b6645e2d60957d0ac34e01f2963a41911af6e16844fb95e8"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-green2.json",
+      "sha256": "acdc5233630ce738956e417379f9466a5759f8b9b7324d061d553b3e8f543e06"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-red-Output.txt",
+      "sha256": "f42079be3171ca011e46a421d1d0a7347bf661dae633417665f2662a37083605"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-red-Report.json",
+      "sha256": "7deae6cd789f7bd82617e602b441832ad8d6e70319b27c8bcce046afee799d37"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preparation-red.json",
+      "sha256": "f1c36fa69fb3f4fca949df06f14109b53fd36c950d4312069942b78080e90723"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-preservation.json",
+      "sha256": "85cfafeb34aee63ba6af77ea60f393f5b57fa5aa58ab54b162c9d8eba6ca0869"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-rice-Output.txt",
+      "sha256": "b29960489e133031b285fa2a3b8ab20bb6258a9056534d962d80c652c7e0146c"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-rice-Report.json",
+      "sha256": "0d5733c839a7d27f06580120e26027eed586315ee5f2454c1241c739062ffc08"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-rice.json",
+      "sha256": "3f732fc2df57cf6910c704c46eaeaaba392cdb994586e86974e194809f984354"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-typecheck-Output.txt",
+      "sha256": "23c9d65eeb8572d1fe4ec2ca0ea0a4cd5b67699a40d46b72d4a2dbfea253fba0"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-typecheck.json",
+      "sha256": "19e1a627d342b4bf0bdb2425d9c33efac723658e8e1045f784d2f7cae46abb12"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Output.txt",
+      "sha256": "d20ad726f8487a7842b18067ee226999a425c393646427ef8e72b53a55f4d8f5"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Report.json",
+      "sha256": "e01e7471ff76c1894f00e222ff8a4c2211e1f86473a9b9625616b1d0dbf12a54"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units.json",
+      "sha256": "02e81075a602cc13407ad4295a841a34264b8e5f30db8594b1f5767aede1003e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards-Output.txt",
+      "sha256": "7b8cc346be2c205a3df5ecbcda96a331b30352f08d01eaa9052f6fd8857181b3"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards-Report.json",
+      "sha256": "32d6f641abd34f5eac3925f1eed2b1c5e492d58a280c44fcc40f0bb3fa1b858b"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-version-guards.json",
+      "sha256": "b07456c34b1786b5832dd7254d3ead4c7cfb5730509ef481a115b46471315def"
+    }
+  ],
+  "independentFRG": "NOT_RUN_BY_IMPLEMENTATION_REQUIRED_ON_FINAL_BYTES",
+  "manualOven": "NOT_PERFORMED_MANUAL_VALIDATION_REQUIRED",
+  "deployAuthorized": false
+}

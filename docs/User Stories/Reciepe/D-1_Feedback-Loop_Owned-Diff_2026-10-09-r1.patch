@@ -1,0 +1,461 @@
+diff --git a/docs/kb/domain/06-recipes.md b/docs/kb/domain/06-recipes.md
+index abe5ab9..de6b545 100644
+--- a/docs/kb/domain/06-recipes.md
++++ b/docs/kb/domain/06-recipes.md
+@@ -183,7 +183,7 @@ duplicate, or seasoning IDs return `400` with
+ 
+ `POST /api/recipes/{id}/export-view/prepare` calls separate backend-only
+ `prepareValidatedRecipeExport(context)` using `prepareRecipeExport(context, options)`
+-with `RECIPE_PREPARATION_SYSTEM_PROMPT` v5 and
++with `RECIPE_PREPARATION_SYSTEM_PROMPT` v6 and
+ the shared `recipe-analyze` quota. `analyzeRecipeText(text)` is import-only,
+ retaining v16, full `AiRecipeRaw`, normalization and validation.
+ Preparation sends the complete ID-free `recipeContext` projection (name,
+@@ -242,21 +242,26 @@ in the saved-title context, not whole-image/Share success or general cooking-cor
+ preservation, component fidelity or metadata derivation. Existing 1..5/90/96
+ limits and fonts/layout remain; no universal 23-character/11-character-word cap,
+ three-line product rule, truncation or new font/layout fallback is introduced.
+-The v5 prompt requests a complete understandable compact detail-image workflow
++The v6 prompt requests a complete understandable compact detail-image workflow
+ by grouping related actions after reading the entire recipe, not selecting
+ five original steps. Central preparation/full cooking, essential separate sides
+ or sauces and necessary transitions are prompt requirements. Optional details
+ may be omitted; retained claims/metadata must be source-backed without invention
+ or contradiction. Fixture rubrics and user review remain separate from runtime.
+ 
+-[Partial] Current B-2 r2 is implemented, NOT ACCEPTED and release blocked:
+-495 focused and 1576 backend units passed; typecheck/build exited 0. Required
+-F exited 1 (5 executed / 2 passed / 3 failed / 9 skipped); R/G were NOT_RUN.
+-Oven exhausts three overflowing drafts, pasta contradicts source 5, and dough
+-loses source-1 ingredient fidelity despite fitting. The loop is NOT deployed
+-to Alpha; the historical 14:12 release deployed only step-overflow logging.
+-See [current evidence and error/logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r2)
+-and the [D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++[Partial] Current B-2 r3 / QA-R1 is implemented, NOT ACCEPTED and release CLOSED:
++519 focused and 1600 backend units passed; typecheck/build exited 0. Required
++F exited 1 (5 executed / 2 passed / 3 failed / 9 skipped): version guard and
++pasta pass. Rice returns 422 (FIRST 6 before 5 and overflows); oven fits/200
++but fails source binding (source-3 cream action appears in the source-4 group);
++forced dough exhausts with the same overflow/422, independent semantics NOT_REACHED.
++The r2 pasta/dough lexical failures were not demonstrated cooking corruption.
++Their narrow test-only corrections are locally tested, pending independent QA;
++historical FAIL records and the QA register remain unchanged. R/G remain
++NOT_RUN_REQUIRED_LIVE_FAILURE. The loop is NOT deployed to Alpha; the historical
++14:12 release deployed only step-overflow logging. See
++[current evidence and error/logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1)
++and the [D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+ 
+ [Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted: upstream offline
+ gates passed (1437 units, typecheck/build), but all executed F/R/G live gates
+diff --git a/docs/kb/domain/07-ai-features.md b/docs/kb/domain/07-ai-features.md
+index 7ac3bf7..a7e8f18 100644
+--- a/docs/kb/domain/07-ai-features.md
++++ b/docs/kb/domain/07-ai-features.md
+@@ -103,7 +103,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms.
+ ## 5. Recipe Analyzer
+ 
+ **Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v16'`;
+-saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v5'`.
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v6'`.
+ 
+ **Endpoint:** `POST /api/ai/recipe-analyze`
+ 
+@@ -168,7 +168,7 @@ This allows the review screen (`RecipeWizardScreen`) to render seasoning items d
+ ### Current Analyzer and Export Suggestion Contract
+ 
+ Import v16 keeps full source extraction and its export suggestion in one
+-`analyzeRecipeText(text)` call. Saved-recipe Preparation v5 uses the separate
++`analyzeRecipeText(text)` call. Saved-recipe Preparation v6 uses the separate
+ small-output `prepareRecipeExport(context)` path below, without source
+ re-extraction. Prompt intent, runtime validation, fixture quality, and user
+ review are distinct; none is a general cooking/safety guarantee.
+@@ -200,7 +200,7 @@ The prompt requests the recipe-specific cooking core: central preparation and co
+ The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. An AI result failing server shape/reference/ingredient validation returns `422` before usage is tracked; this does not test general cooking semantics. Usage is tracked only after server validation. The response, including `exportSuggestion`, is transient: no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Indeterminate food amounts remain visible with `needsReview: true`; seasonings bypass catalog search and remain visible for review.
+ 
+ `POST /api/recipes/{id}/export-view/prepare` calls backend-only
+-`prepareValidatedRecipeExport(context)` with the exclusive v5 system prompt, not
++`prepareValidatedRecipeExport(context)` with the exclusive v6 system prompt, not
+ import v16. `analyzeRecipeText(text)` is import-only and retains its full
+ contract, normalization and globally monotone trace validation. Preparation
+ sends the complete ID-free saved metadata/ingredient projection in
+@@ -237,7 +237,7 @@ known, locally ascending and globally unique, ordered by their FIRST reference.
+ non-contiguous saved source orders are allowed; full coverage is not required.
+ Empty saved steps or exclusively blank source descriptions returns 422 before
+ quota/provider work. There is no sorting, padding, truncation, fallback, identity
+-repair or full-recipe wrapper. The v5 prompt requests a complete understandable compact
++repair or full-recipe wrapper. The v6 prompt requests a complete understandable compact
+ detail-image workflow by grouping actions, not selecting five original steps;
+ retained claims/metadata must be source-backed. Runtime does not independently
+ prove cooking-core preservation, component fit or metadata derivation; test-only
+@@ -252,15 +252,20 @@ The 75000 ms aggregate deadline and 20000 ms per-call ceiling are terminal;
+ quota is enforced once and usage booked once only after validated success.
+ Nothing is automatically saved. Only exhausted two completed corrections may
+ log exact latest affected known text; see the
+-[current loop, error and logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r2).
+-
+-[Partial] Current B-2 r2 is implemented, NOT ACCEPTED / release blocked. Recorded
+-focused495/full1576 pass, typecheck/build exit0; F exit1 (5 executed / 2 passed /
+-3 failed / 9 skipped), R/G NOT_RUN. Oven still overflows; fitting pasta/dough
+-fail independent contradiction/ingredient-fidelity assertions. Q-19 FAIL and
+-older failures remain unresolved. Alpha has only the historical 14:12 logging
+-release, not this loop. See the
+-[D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++[current loop, error and logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1).
++
++[Partial] Current B-2 r3 / QA-R1 is implemented, NOT ACCEPTED / release CLOSED.
++Recorded focused519/full1600 pass, typecheck/build exit0; F exit1 (5 executed /
++2 passed / 3 failed / 9 skipped), only version guard and pasta pass.
++Rice returns 422 (FIRST 6 before 5 plus overflows); oven fits/200 but moves
++source-3 cream action into the source-4 group and fails independent semantics.
++Forced dough repeats the overflow/422; semantics are NOT_REACHED. R/G remain
++NOT_RUN_REQUIRED_LIVE_FAILURE. QA identified r2 pasta/dough lexical rubric
++defects, not demonstrated cooking loss; narrow source-backed test corrections
++are locally tested, pending independent QA, without historical PASS or register
++closure. Q-19 FAIL and older failures remain unresolved. Alpha has only the
++historical 14:12 logging release, not this loop. See the
++[D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+ 
+ [Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+ gates passed (1437 units, typecheck/build); F/R/G all exited 1 with all three
+diff --git a/docs/kb/tech/02-backend.md b/docs/kb/tech/02-backend.md
+index 0be6051..7e2dcf1 100644
+--- a/docs/kb/tech/02-backend.md
++++ b/docs/kb/tech/02-backend.md
+@@ -274,7 +274,7 @@ acceptance prerequisite. Preparation is transient and does not change the
+ recipe, confirmed export view, ingredient IDs, or ingredient values.
+ 
+ The handler calls `prepareValidatedRecipeExport(context)` from `recipePreparation.ts`,
+-which uses `prepareRecipeExport(context, options)` with Preparation v5;
++which uses `prepareRecipeExport(context, options)` with Preparation v6;
+ `analyzeRecipeText(text)` is import-only (v16, full `AiRecipeRaw`, unchanged
+ normalization and globally ascending flattened references). Preparation sends
+ the complete ID-free saved metadata/ingredient projection and all original
+@@ -318,17 +318,27 @@ and optional ETag remain before quota; valid success alone tracks
+ `recipe-analyze` exactly once. Internal references are stripped from the
+ unchanged plain V2 App response. Cooking-core preservation, component fit and
+ metadata derivation are prompt/fixture/review concerns, not a general runtime
+-semantic check. The v5 prompt requests a complete compact detail-image workflow
++semantic check. The v6 prompt requests a complete compact detail-image workflow
+ by grouping actions after reading the full recipe.
+ 
+-[Partial] B-2 r2 is implemented, NOT ACCEPTED / release blocked: focused495 and
+-full1576 passed, typecheck/build exit0; required F exit1 (5 executed / 2 passed /
+-3 failed / 9 skipped); R/G NOT_RUN. F oven repeats 300x112 versus 302x105 through
+-all three drafts (422/usage0); fitting pasta/dough fail source-5 contradiction /
+-source-1 ingredient fidelity. No loop Alpha deployment or QA acceptance is
+-established; the historical 14:12 Alpha release is logging-only. See
+-[current r2 evidence](06-ai-integrations.md#preparation-feedback-loop-current-r2)
+-and the [D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++QA-R1 font metadata comes from `getRecipeDetailsTextLayoutFields`: large steps
++22/1.25, compact steps 18/1.17 and teaser italic/1.25. Actual geometry is unchanged.
++Unknown-key-only (`unrecognized_keys`) diagnoses and nonstring affected values
++remain metadata-only; eligible known-string failures retain exact latest text
++only on exhaustion. These local corrections are tested, pending independent QA.
++
++[Partial] B-2 r3 / QA-R1 is implemented, NOT ACCEPTED / release CLOSED:
++focused519/full1600 passed, typecheck/build exit0; required F exit1 (5 executed /
++2 passed / 3 failed / 9 skipped); R/G NOT_RUN_REQUIRED_LIVE_FAILURE.
++Version guard and pasta pass. Rice has FIRST 6 before 5 and overflows (422);
++oven fits/200 but source-3 cream action moves into the source-4 group (semantic
++FAIL); forced dough repeats the overflow (422, semantics NOT_REACHED).
++QA established r2 pasta/dough lexical rubric defects, not proven cooking loss;
++narrow test-only repairs do not reclassify old FAIL or close findings.
++No loop Alpha deployment or QA acceptance is established; the historical
++14:12 Alpha release is logging-only. See
++[current r3 evidence](06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1)
++and the [D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+ 
+ [Partial] Historical B-19 v4/v16 is implemented, not accepted: upstream offline gates passed
+ (1437 units, typecheck/build); all F/R/G live gates exited 1. All three Preparation
+diff --git a/docs/kb/tech/06-ai-integrations.md b/docs/kb/tech/06-ai-integrations.md
+index 3f2e9e2..e094f5b 100644
+--- a/docs/kb/tech/06-ai-integrations.md
++++ b/docs/kb/tech/06-ai-integrations.md
+@@ -64,7 +64,7 @@ Mobile shows `MealEstimateReviewScreen`.
+ ### 6. Recipe Analyzer (`POST /api/ai/recipe-analyze`)
+ 
+ **Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v16'`;
+-saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v5'`.
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v6'`.
+ 
+ The import contract keeps complete source extraction and a selective export
+ summary in `analyzeRecipeText(text)`. Preparation uses a separate small-output
+@@ -107,7 +107,7 @@ Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: t
+ 
+ `POST /api/recipes/{id}/export-view/prepare` calls backend-only
+ `prepareValidatedRecipeExport(context)` using `prepareRecipeExport(context, options)`
+-with `RECIPE_PREPARATION_SYSTEM_PROMPT` v5.
++with `RECIPE_PREPARATION_SYSTEM_PROMPT` v6.
+ `analyzeRecipeText(text)` is import-only: v16 prompt body, full `AiRecipeRaw`
+ Strict schema, ingredient normalization/validation and globally ascending
+ flattened trace are unchanged. Preparation does not append to the import prompt.
+@@ -137,7 +137,7 @@ full-recipe wrapper, renderer payload or intermediate output. The same lazy
+ client, deployment/API version, temperature 0.2 and max_tokens 2048 remain.
+ Initial generation plus at most two corrections replaces the former single-call
+ behavior; no hidden SDK retry, fallback, sorting, padding, truncation or identity
+-repair is added. See [the current loop contract](#preparation-feedback-loop-current-r2).
++repair is added. See [the current loop contract](#preparation-feedback-loop-current-r3-qa-r1).
+ Shared min1/max5/text90/teaser96/time10080 constants drive the prompt/schema and
+ server checks. Time is nullable or a positive integer; difficulty is nullable
+ or trimmed non-empty single-line text.
+@@ -156,7 +156,7 @@ metadata/limit violations and extra fields are rejected; exhaustion returns
+ steps or exclusively blank source descriptions returns 422 before quota/provider
+ work; no invented reference-based fallback is allowed.
+ 
+-The v5 prompt asks for a complete understandable compact detail-image workflow:
++The v6 prompt asks for a complete understandable compact detail-image workflow:
+ read the full recipe and group related actions instead of selecting five original
+ steps. Central preparation, full cooking of the main component, essential
+ separate sides/sauces and necessary transitions must remain; optional details/
+@@ -178,12 +178,17 @@ Coverage-only payload/order-list/mismatch helpers remain removed. Only terminal
+ correction exhaustion permits exact latest affected known generated text in
+ server logs, as specified below; private context/provider/error payloads remain excluded.
+ 
+-##### Preparation Feedback Loop: Current r2
++<a id="preparation-feedback-loop-current-r2"></a>
+ 
+-[Partial] B-1 probe and B-2 r2 loop are implemented, NOT ACCEPTED; B-2 status is
++The old r2 anchor is retained for immutable historical links; the current
++publication below is r3 / QA-R1, not retrospective r2 acceptance.
++
++##### Preparation Feedback Loop: Current r3 QA-R1
++
++[Partial] B-1 probe and B-2 r3 / QA-R1 loop are implemented, NOT ACCEPTED; B-2 status is
+ `IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED`. Completed handoff
+ evidence satisfies D-1's implementation/evidence dependency only, not failed
+-gates, semantic acceptance, independent QA or release. The loop is NOT deployed
++gates, semantic acceptance, independent QA or release; release is CLOSED. The loop is NOT deployed
+ to Alpha. The [14:12 Alpha release](../../../infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md)
+ deployed targeted Share step-overflow logging only, not this later loop.
+ 
+@@ -199,6 +204,12 @@ layout, including changed counts and previously fitting fields. Unmeasurable
+ shapes are rejected, never certified as fitting. Technical probe/context/font
+ failures, duplicate/absent/non-finite measurements terminate before correction.
+ 
++Preparation v6 changes only correction guidance: zero-based path/index versus
++displayed step order, measured overflow despite a legal character count,
++rewording the diagnosed field rather than fitting neighbours, and preservation
++of source actions/parameters/references. The deterministic recorded-oven replay
++uses an injected shorter final draft; it is not provider-success evidence.
++
+ Existing 1..5 steps, step90/teaser96/time10080 and template rules remain. Large
+ 1..4-step geometry is 302x105 at 22 px; compact five-step geometry is 318x84 at
+ 18 px. Existing title-dependent teaser selection 22/21/20/19/18 remains, not a
+@@ -210,6 +221,10 @@ ingredient fidelity and contradiction checks remain independent fixture rubrics
+ and explicit user review, not a runtime semantic guarantee. Import v16 and its
+ single-call schema/normalization/reference policy are unchanged.
+ 
++QA-R1 diagnostic font metadata is production-derived: large steps 22/1.25,
++compact steps 18/1.17 and italic teaser/1.25. This corrects metadata, not fonts,
++measurement or layout. Width-only failures still have no invented height.
++
+ The monotonic aggregate generation/validation/probe deadline is 75000 ms; each
+ provider call uses at most `min(20000, remainingMs)`, SDK `maxRetries: 0` and
+ AbortSignal. Bounded provider/probe awaits clean up timers, abort pending work
+@@ -234,30 +249,53 @@ No source/context, old/unaffected text, arbitrary object/provider payload,
+ image/base64 or secret is permitted. Success and other terminal failures keep
+ metadata-only logs; the exception does not broaden Import, other flows or HTTP.
+ 
+-Recorded r2 evidence, not D-1 reruns: focused 495/495, full units 1576/1576,
+-typecheck/build exit0. Required F exit1: 5 executed / 2 passed / 3 failed /
+-9 skipped. R/G are NOT_RUN, not passing. F has four fixtures plus a version
+-guard, 8 logical calls including one forced draft, and 7 actual SDK calls:
++QA-R1 excludes `unrecognized_keys` diagnoses from content eligibility and keeps
++nonstring affected values metadata-only. Genuine known-string failures still
++retain exact latest affected text. Q1-01/02 local regressions pass; all local
++corrections remain pending independent QA and no finding closure is claimed.
++
++Q1-04's test-only pasta rubric no longer crosses `und` from separate salted-water
++cooking into later sauce mixing; cooking in sauce and component/time swaps
++remain negative. Q1-05's whole-ingredient equivalence is limited to the exact
++unchanged full single-stage dough source and a narrowly anchored whole-set
++mixing statement. Partial omission, exclusions, invention, staged/other-component
++text and wrong/missing baking core remain negative. These are tested local
++rubric repairs, not a universal semantic validator or shortening strategy.
+ 
+-- Rice: 1 SDK call, fit and this fixture's fidelity pass, 200/usage1.
+-- Oven: 3 SDK calls, all drafts repeat step[1] 300x112 versus 302x105;
+-	final 422/usage0, independent semantic assertion NOT REACHED.
+-- Pasta: 2 SDK calls, final fit/200/usage1, source-5 contradiction FAIL.
+-- Forced dough: 2 logical / 1 SDK call, final fit/200/usage1, source-1
+-	ingredient-explicit fidelity FAIL; generic all-ingredients wording is no pass.
++Recorded r3 / QA-R1 evidence, not D-1-R1 reruns: focused 519/519, full units 1600/1600,
++typecheck/build exit0. Required F exit1: 5 executed / 2 passed / 3 failed /
++9 skipped. R/G are NOT_RUN_REQUIRED_LIVE_FAILURE, not dispatched or passing.
++F has four fixtures plus the passing v6 version guard, 10 logical calls
++including one forced initial draft, and 9 actual SDK calls:
++
++- Rice: 3 logical / 3 SDK calls, final 422/usage0/fit=false; FIRST starts 6
++	before 5, indices1/2 also 300x112 versus 302x105; semantics NOT_REACHED.
++- Oven: 3 logical / 3 SDK calls, final 200/usage1/fit=true; independent semantics
++	FAIL because source-3 cream action moved into the source-4 group.
++- Pasta: 1 logical / 1 SDK call, final 200/usage1/fit=true, independent semantics PASS.
++- Forced dough: 3 logical / 2 SDK calls, final 422/usage0/fit=false; literal mixing
++	text repeats at index0, 300x112 versus 302x105; semantics NOT_REACHED.
++
++The immutable r2 F remains FAIL (focused495/full1576; 8 logical/7 SDK calls).
++QA independently proved its pasta contradiction regex false positive and dough
++literal-name requirement beyond demonstrated fidelity, not actual cooking
++corruption or ingredient loss. Neither local repairs nor the new pasta pass
++retrospectively make r2 PASS. New oven fit/200/usage is not semantic acceptance;
++rice/dough diagnostics do not execute the unreached semantic assertions.
+ 
+ All recorded sources stayed unchanged and write counts were zero. Q-19 FAIL,
+ earlier accepted-rice fidelity loss, foreign Import/Daily failures and private/
+-Alpha replay limits remain open; one synthetic rice pass closes none of them.
+-The [B-2 handoff](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09.md),
+-[completion manifest](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json)
+-and [artifact manifest](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json)
++Alpha replay limits remain open; no foreign flow was fixed or newly verified.
++The [B-2 r3 handoff](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09-r3-QA-R1.md)
++and its [53-artifact manifest](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r3-QA-R1.json)
+ bind recorded commands/output/report hashes. Candidate SHA-256 is
+-`80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171`.
++`59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44`.
+ Offline records predate final freeze and have no candidate-hash execution guard;
+-D-1 documentation is outside the frozen candidate. See
++D-1-R1 is an authorized post-freeze publication-only delta, not a runtime edit.
++The [Q-1 report](../../qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md)
++reviews r2, not independent acceptance of r3; the QA register is unchanged. See
+ [testing boundaries](08-testing.md#recipe-preparation-feedback-loop-evidence)
+-and the [D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++and the [D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+ Historical evidence below is unchanged in meaning, not reclassified as PASS.
+ 
+ [Partial] Historical B-19 evidence (2026-10-09) from the complete
+diff --git a/docs/kb/tech/09-api-reference.md b/docs/kb/tech/09-api-reference.md
+index b3b3f0a..8877f42 100644
+--- a/docs/kb/tech/09-api-reference.md
++++ b/docs/kb/tech/09-api-reference.md
+@@ -401,7 +401,7 @@ the revision it read, independently of the client header.
+ 
+ The route loads a versioned recipe from the JWT user's partition and invokes
+ the backend-only `prepareValidatedRecipeExport(context)` loop with the
+-shared `recipe-analyze` quota and exclusive Preparation v5 system prompt.
++shared `recipe-analyze` quota and exclusive Preparation v6 system prompt.
+ `analyzeRecipeText(text)` is import-only, retaining v16, full `AiRecipeRaw`,
+ normalization and globally monotone reference validation. The user message
+ contains the complete ID-free saved `recipeContext` projection and all unchanged
+@@ -453,7 +453,7 @@ exhausted invalid drafts return 422. Omission alone does not. Empty saved steps
+ descriptions returns 422 before quota/provider work. There is no sorting,
+ padding, truncation, identity repair, full-recipe wrapper or invented fallback.
+ References remain internal and are removed from the unchanged plain V2 response.
+-The v5 prompt requests a complete understandable compact workflow by grouping
++The v6 prompt requests a complete understandable compact workflow by grouping
+ actions, not selecting five original steps; retained claims/metadata must be
+ source-backed. Runtime does not independently prove cooking-core preservation,
+ component fit or metadata derivation; fixture checks/user review are separate.
+@@ -464,14 +464,21 @@ limits and teaser sizing remain; no new font fallback, universal 23/11 cap,
+ three-line product rule or ingredient-omission strategy is added. Only terminal
+ correction exhaustion logs exact latest affected known text on the server;
+ responses never contain raw draft/provider/error text or measurement payloads.
+-See [current loop and logging boundaries](06-ai-integrations.md#preparation-feedback-loop-current-r2).
+-
+-[Partial] Current B-2 r2 is implemented, NOT ACCEPTED / release blocked:
+-focused495/full1576 pass, typecheck/build exit0; F exit1 (5 executed / 2 passed /
+-3 failed / 9 skipped); R/G NOT_RUN. Oven overflows all three drafts; fitting
+-pasta/dough fail independent semantic checks. Alpha has only the historical
++Unknown-key-only diagnoses and nonstring affected values remain metadata-only;
++production-derived font metadata retains compact lineHeight1.17. These tested
++local QA-R1 corrections are pending independent QA, not a public API change.
++See [current loop and logging boundaries](06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1).
++
++[Partial] Current B-2 r3 / QA-R1 is implemented, NOT ACCEPTED / release CLOSED:
++focused519/full1600 pass, typecheck/build exit0; F exit1 (5 executed / 2 passed /
++3 failed / 9 skipped); R/G NOT_RUN_REQUIRED_LIVE_FAILURE. Version guard/pasta
++pass. Rice returns 422 (FIRST 6 before 5 plus overflows); oven fits/200 but
++source-3 cream action is in the source-4 group, semantic FAIL. Forced dough
++repeats the overflow/422, semantics NOT_REACHED. Historical r2 pasta/dough
++lexical failures were not demonstrated cooking loss; narrow test-only repairs
++do not reclassify old FAIL or close findings. Alpha has only the historical
+ 14:12 logging release, not this loop. Q-19 FAIL remains unresolved. See the
+-[D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++[D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+ 
+ [Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+ gates passed (1437 units, typecheck/build); all executed F/R/G live gates exit 1.
+diff --git a/docs/kb/tech/08-testing.md b/docs/kb/tech/08-testing.md
+index 13306d3..1321ea1 100644
+--- a/docs/kb/tech/08-testing.md
++++ b/docs/kb/tech/08-testing.md
+@@ -110,7 +110,7 @@ required by these offline probe tests.
+ ### Recipe Preparation Feedback Loop Evidence
+ 
+ [Partial] B-1 probe is implemented with passing recorded offline evidence;
+-B-2 r2 loop is implemented, NOT ACCEPTED / release blocked. Dedicated colocated
++B-2 r3 / QA-R1 loop is implemented, NOT ACCEPTED / release CLOSED. Dedicated colocated
+ `recipePreparation.test.ts`, handler/source-validator/SDK tests and the existing
+ renderer tests cover initial/correction1/correction2 success and three-draft
+ exhaustion, immutable original context/latest draft, complete rechecks/count
+@@ -118,39 +118,56 @@ changes, real-font Alpha overflow, technical precedence, missing/non-finite
+ measurements, provider/refusal/timeout/late results, once-only quota/booking,
+ no writes, generic HTTP and exact latest affected-text exhaustion privacy.
+ Injected SDK/time/measurement tests are offline coverage, not evidence that
+-every failure mode executed live. V5 Preparation guards are separate from
++every failure mode executed live. V6 Preparation guards are separate from
+ unchanged v16 Import; geometry is separate from independent cooking-core,
+ ingredient-fidelity and contradiction rubrics and explicit user review.
+ 
+-Recorded r2 commands/results, NOT rerun by documentation-only D-1:
++QA-R1 regressions cover unknown-key-only/nonstring metadata-only logging,
++production-derived compact lineHeight1.17, correction path/index guidance and
++recorded-oven replay with an injected fitting final draft. Narrow test-only
++pasta action-boundary and exact single-stage dough whole-set equivalence fixes
++retain negative contradiction/omission/invention/staged-component checks.
++All local corrections are reported tested, pending independent QA; no QA
++finding/register closure or provider-success proof follows from offline replay.
++
++Recorded r3 / QA-R1 commands/results, NOT rerun by documentation-only D-1-R1:
+ 
+ | Check | Recorded command family (exact arguments/hashes in linked records) | Exit | Executed / Passed / Failed / Skipped |
+ | --- | --- | --- | --- |
+-| Focused | `npm exec --workspace=backend -- vitest run` on the six owning test files | 0 | 495 / 495 / 0 / 0 |
+-| Units | `npm run test --workspace=backend -- --reporter=default --reporter=json --outputFile=<recorded report>` | 0 | 1576 / 1576 / 0 / 0 |
++| Focused final | `npm exec --workspace=backend -- vitest run` on the six owning test files | 0 | 519 / 519 / 0 / 0 |
++| Units | `npm run test --workspace=backend -- --reporter=default --reporter=json --outputFile=<recorded report>` | 0 | 1600 / 1600 / 0 / 0 |
+ | Typecheck | `npm run typecheck --workspace=backend` | 0 | non-test |
+ | Build | `npm run build:verify --workspace=backend` | 0 | non-test |
+ | F | `node backend/scripts/run-eval.mjs src/lib/prompts/recipeAnalyze.eval.test.ts --testNamePattern "preparation prompt version matches fixture expectations\|recipePreparation"` plus recorded reporters | 1 | 5 / 2 / 3 / 9 |
+ | R/G | NOT_RUN after required F failure; no command dispatched | null | 0 executed; 0 provider calls |
+ 
+-F's version guard plus four fixtures include 8 logical calls (one forced initial
+-draft) and 7 SDK calls. Rice passes its fit/fidelity checks; oven repeats
+-300x112 versus 302x105 through all three drafts, 422/usage0 and independent
+-semantic assertions NOT REACHED. Pasta fits but fails source-5 contradiction;
+-forced dough fits but fails source-1 ingredient-explicit fidelity. 200/usage1
+-and measured fit on those latter cases are not semantic PASS. Offline records
++F's passing v6 version guard plus four fixtures include 10 logical calls (one
++forced initial draft) and 9 SDK calls. Pasta passes independent semantics.
++Rice fails FIRST 6 before 5 and overflows at indices1/2 (300x112 versus302x105),
++422/usage0; forced dough repeats the same literal mixing overflow at index0,
++422/usage0. Both exhaust three logical calls; semantics are NOT_REACHED.
++Oven fits/200/usage1 but fails independent source binding: source-3 cream action
++is in the source-4 group. Fit/reference validity/200 is not semantic PASS.
++R/G are NOT_RUN_REQUIRED_LIVE_FAILURE. Offline records
+ predate candidate freeze (`candidateSha256: null`), not hash-guarded gate runs.
+ 
+-See [B-2 recorded commands and hashes](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json),
+-[artifact inventory](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json)
+-and [current evidence boundary](06-ai-integrations.md#preparation-feedback-loop-current-r2).
++The initial focused run (519/518/1/0, stale v5 companion guard) and all Red
++records remain failures; the final focused run is separately recorded.
++Historical r2 F remains FAIL (5/2/3/9, 8 logical/7 SDK calls). QA proved pasta's
++cross-action regex false positive and dough's excess literal-name requirement,
++not actual cooking corruption. New rubric repairs do not retrospectively PASS
++that run, and new dough exhaustion does not reach an equivalence assertion.
++
++See [B-2 r3 recorded commands and hashes](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Gate-Summary_2026-10-09-r3-QA-R1.json),
++[53-artifact inventory](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r3-QA-R1.json)
++and [current evidence boundary](06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1).
+ Q-19 FAIL, old B-16/B-18/B-18C/B-19 FAIL/UNVERIFIED and foreign Import/Daily
+ failures remain preserved; R/G NOT_RUN cannot close them. No independent QA,
+ release or authenticated private/Alpha replay is claimed. The historical
+-14:12 Alpha release deployed only logging, not the loop. D-1 performs only
++14:12 Alpha release deployed only logging, not the loop. D-1-R1 performs only
+ focused documentation assertions, links/encoding/errors and owned-diff/hash
+ preservation checks, not units/typecheck/build/live gates. Its
+-[handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md)
++[handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md)
+ records those separate results; documentation PASS cannot waive feature gates.
+ 
+ ### Daily Insight Prompt and Cache Checks

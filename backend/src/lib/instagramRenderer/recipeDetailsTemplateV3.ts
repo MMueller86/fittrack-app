@@ -32,6 +32,8 @@ export type RecipeDetailsTemplateTextOverrides = {
   steps: string[];
 };
 
+type DetailsTextInput = Pick<RecipeDetailsTemplateInput, "title" | "description" | "steps">;
+
 const MARGIN = 60;
 const PHOTO_LEFT = 600;
 const PHOTO_TOP = 78;
@@ -449,7 +451,7 @@ function getRecipeDetailsTeaserText(description: string): string {
 }
 
 export function getRecipeDetailsTextLayoutFields(
-  input: RecipeDetailsTemplateInput,
+  input: DetailsTextInput & Partial<Pick<RecipeDetailsTemplateInput, "ingredients">>,
   descriptionFontSize = 22,
 ): DetailTextLayoutField[] {
   const titleLayout = getRecipeDetailsTitleLayout(input.title);
@@ -492,7 +494,8 @@ export function getRecipeDetailsTextLayoutFields(
     });
   }
 
-  const compactIngredients = input.ingredients.length > 8;
+  const ingredients = input.ingredients ?? [];
+  const compactIngredients = ingredients.length > 8;
   const ingredientFontSize = compactIngredients ? 15 : 21;
   const ingredientMaxWidth = compactIngredients
     ? RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_TEXT_WIDTH
@@ -501,7 +504,7 @@ export function getRecipeDetailsTextLayoutFields(
     ? RECIPE_DETAILS_TEMPLATE_INGREDIENT_COMPACT_ROW_HEIGHT
     : RECIPE_DETAILS_TEMPLATE_INGREDIENT_LARGE_ROW_HEIGHT;
   fields.push(
-    ...input.ingredients.map((ingredient, index) => ({
+    ...ingredients.map((ingredient, index) => ({
       id: `${RECIPE_DETAILS_TEMPLATE_INGREDIENT_NODE_PREFIX}${index}`,
       text: `${ingredient.amount} ${ingredient.name}`,
       maxWidth: ingredientMaxWidth,
@@ -546,42 +549,12 @@ export function getRecipeDetailsTextLayoutFields(
   return fields;
 }
 
-export function composeRecipeDetailsTemplate(
-  input: RecipeDetailsTemplateInput,
-  assets: TemplateAssets,
-  textOverrides?: RecipeDetailsTemplateTextOverrides,
-): SatoriElement {
+function createTitleAndTeaser(
+  input: DetailsTextInput,
+  textOverrides?: Pick<RecipeDetailsTemplateTextOverrides, "title" | "description" | "descriptionFontSize">,
+): SatoriChild[] {
   const titleLayout = getRecipeDetailsTitleLayout(input.title);
-  const ingredientsCount = input.ingredients.length;
-  const chipLabels = [
-    `${input.portions} ${input.portions === 1 ? "Portion" : "Portionen"}`,
-    ...(input.totalTimeMinutes === null ? [] : [`${input.totalTimeMinutes} Min.`]),
-    `${ingredientsCount} Zutaten`,
-  ];
-
-  const children: SatoriChild[] = [
-    element("div", {
-      position: "absolute",
-      left: 0,
-      top: 0,
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
-      backgroundColor: COLOR_PANEL,
-      backgroundImage: ambientBackgroundImage(),
-    }),
-    element("div", {
-      position: "absolute",
-      left: 88,
-      top: 118,
-      color: COLOR_LIME,
-      fontFamily: "Inter",
-      fontSize: 18,
-      fontWeight: 600,
-      letterSpacing: 4,
-      lineHeight: 1,
-      whiteSpace: "normal",
-      wordBreak: "normal",
-    }, "FITTRACK REZEPT"),
+  return [
     element("div", {
       position: "absolute",
       left: 88,
@@ -628,6 +601,75 @@ export function composeRecipeDetailsTemplate(
         }),
       ])
       : null,
+  ];
+}
+
+function createPreparationPanel(input: DetailsTextInput, stepTexts?: readonly string[]): SatoriElement {
+  return createPanel(
+    MARGIN + CARD_WIDTH + CARD_GAP,
+    "So geht's",
+    createStepList(input.steps, stepTexts),
+  );
+}
+
+function createDetailsCanvas(children: SatoriChild[]): SatoriElement {
+  return element("div", {
+    position: "relative",
+    width: CANVAS_WIDTH,
+    height: CANVAS_HEIGHT,
+    display: "flex",
+    flexDirection: "column",
+    overflow: "hidden",
+    backgroundColor: COLOR_PANEL,
+  }, children);
+}
+
+export function composeRecipeDetailsGeneratedText(
+  input: DetailsTextInput,
+  textOverrides: Pick<RecipeDetailsTemplateTextOverrides, "title" | "description" | "descriptionFontSize" | "steps">,
+): SatoriElement {
+  return createDetailsCanvas([
+    ...createTitleAndTeaser(input, textOverrides),
+    createPreparationPanel(input, textOverrides.steps),
+  ]);
+}
+
+export function composeRecipeDetailsTemplate(
+  input: RecipeDetailsTemplateInput,
+  assets: TemplateAssets,
+  textOverrides?: RecipeDetailsTemplateTextOverrides,
+): SatoriElement {
+  const ingredientsCount = input.ingredients.length;
+  const chipLabels = [
+    `${input.portions} ${input.portions === 1 ? "Portion" : "Portionen"}`,
+    ...(input.totalTimeMinutes === null ? [] : [`${input.totalTimeMinutes} Min.`]),
+    `${ingredientsCount} Zutaten`,
+  ];
+
+  const children: SatoriChild[] = [
+    element("div", {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
+      backgroundColor: COLOR_PANEL,
+      backgroundImage: ambientBackgroundImage(),
+    }),
+    element("div", {
+      position: "absolute",
+      left: 88,
+      top: 118,
+      color: COLOR_LIME,
+      fontFamily: "Inter",
+      fontSize: 18,
+      fontWeight: 600,
+      letterSpacing: 4,
+      lineHeight: 1,
+      whiteSpace: "normal",
+      wordBreak: "normal",
+    }, "FITTRACK REZEPT"),
+    ...createTitleAndTeaser(input, textOverrides),
     createPhoto(input, assets.photo),
     element("div", {
       position: "absolute",
@@ -641,11 +683,7 @@ export function composeRecipeDetailsTemplate(
       "Zutaten",
       createIngredientList(input.ingredients, textOverrides?.ingredients),
     ),
-    createPanel(
-      MARGIN + CARD_WIDTH + CARD_GAP,
-      "So geht's",
-      createStepList(input.steps, textOverrides?.steps),
-    ),
+    createPreparationPanel(input, textOverrides?.steps),
     element("div", {
       position: "absolute",
       left: MARGIN,
@@ -688,13 +726,5 @@ export function composeRecipeDetailsTemplate(
     }, undefined, { src: imageSource(assets.nutritionHighlights[input.highlight], "image/png") }));
   }
 
-  return element("div", {
-    position: "relative",
-    width: CANVAS_WIDTH,
-    height: CANVAS_HEIGHT,
-    display: "flex",
-    flexDirection: "column",
-    overflow: "hidden",
-    backgroundColor: COLOR_PANEL,
-  }, children);
+  return createDetailsCanvas(children);
 }

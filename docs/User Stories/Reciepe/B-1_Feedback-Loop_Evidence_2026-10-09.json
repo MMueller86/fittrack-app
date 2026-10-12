@@ -1,0 +1,1333 @@
+{
+  "package": "B-1",
+  "approvedPlan": "PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09",
+  "approvedDate": "2026-10-09",
+  "baselineHead": "b637ee5b59a4f72b7d822443680c1951a01f9dc4",
+  "currentHead": "b637ee5b59a4f72b7d822443680c1951a01f9dc4",
+  "environment": {
+    "node": "v24.15.0",
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "owned": [
+    {
+      "path": "backend/src/lib/instagramRenderer/render.ts",
+      "newFile": false,
+      "startingSha256": "E9EC307B52C3CBA56469D17E0447AE0F2B260B4BF95D20FF73939D2590A2CC05",
+      "endingSha256": "AC0C60784D4FC7E8D1D78C7D6ABEFE28E16621C5515F33D651C3AF9DCC401929",
+      "hunks": [
+        "@@ -17,6 +17,7 @@ import {",
+        "@@ -40,7 +41,7 @@ import {",
+        "@@ -48,6 +49,10 @@ import type {",
+        "@@ -105,6 +110,13 @@ const DESIGN_ASSET_FILES = {",
+        "@@ -147,13 +159,13 @@ function toImageError(error: UnreadableImageError): RenderResult {",
+        "@@ -234,11 +246,8 @@ function toDataUri(buffer: Buffer, mimeType: string): string {",
+        "@@ -260,12 +269,7 @@ async function loadRendererAssets(): Promise<RendererAssets> {",
+        "@@ -282,6 +286,25 @@ function getRendererAssets(): Promise<RendererAssets> {",
+        "@@ -618,6 +641,205 @@ type DetailsProbeMeasurements = {",
+        "@@ -804,9 +1026,7 @@ function validateRecipeDetailsTemplate(",
+        "@@ -815,9 +1035,7 @@ function validateRecipeDetailsTemplate(",
+        "@@ -884,9 +1102,7 @@ function validateRecipeDetailsTemplate(",
+        "@@ -911,7 +1127,7 @@ export async function renderInstagramRecipeDetailsTemplate(",
+        "@@ -944,28 +1160,8 @@ export async function renderInstagramRecipeDetailsTemplate(",
+        "@@ -978,34 +1174,7 @@ export async function renderInstagramRecipeDetailsTemplate("
+      ],
+      "patchSha256": "eca2f92eae59b3642de0e5a5f07938d1b67e84b44ce93565589017c27312c80a"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts",
+      "newFile": false,
+      "startingSha256": "21B9AF06438BFFF196E17435EEFAE91B309A651423E2431C23F04AF36BE0F8F5",
+      "endingSha256": "F62A49CE6770B38331F7BA825138F59A95DF796FF23E00541AFFB1FF70DAE6A8",
+      "hunks": [
+        "@@ -32,6 +32,8 @@ export type RecipeDetailsTemplateTextOverrides = {",
+        "@@ -449,7 +451,7 @@ function getRecipeDetailsTeaserText(description: string): string {",
+        "@@ -492,7 +494,8 @@ export function getRecipeDetailsTextLayoutFields(",
+        "@@ -501,7 +504,7 @@ export function getRecipeDetailsTextLayoutFields(",
+        "@@ -546,42 +549,12 @@ export function getRecipeDetailsTextLayoutFields(",
+        "@@ -628,6 +601,75 @@ export function composeRecipeDetailsTemplate(",
+        "@@ -641,11 +683,7 @@ export function composeRecipeDetailsTemplate(",
+        "@@ -688,13 +726,5 @@ export function composeRecipeDetailsTemplate("
+      ],
+      "patchSha256": "60481ce8fbc536d3aa925519b4fcad94f2f8008b1e8a2ceef5a165c48286f1c3"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/types.ts",
+      "newFile": false,
+      "startingSha256": "6157FE91E774D93B3A0447E5F43308B3C9A5804F1B4F2B318E1D7040CC86A2B8",
+      "endingSha256": "EA11BD0A6C8C7821092DF5BA8EBB31D18340F547B3AC45F3AD26889BD2426C22",
+      "hunks": [
+        "@@ -108,4 +108,53 @@ export type RecipeDetailsTemplateRenderError ="
+      ],
+      "patchSha256": "262e28dd5fde1a9979603992eead6a92c2701c9358d1e0cbbc9fc30e5f557b1d"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/index.ts",
+      "newFile": false,
+      "startingSha256": "A3323BF642472F171A3096D4C71777F01252424B02A040ABFA6F443F4F5E7599",
+      "endingSha256": "72CCCA0B2DD13C174AA46F64980A61D22D33E75246919411E9C1735E0D19062F",
+      "hunks": [
+        "@@ -1,7 +1,11 @@"
+      ],
+      "patchSha256": "1ac7bdd2da7d4d706c0c34b8cffceffef25a3b1c213d66f76d19ba286ffc9887"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+      "newFile": false,
+      "startingSha256": "697E27CFC57E2FCF60C5FF56BA2D3A811BFA664F9EC7DB1B94F29AA5F01590A5",
+      "endingSha256": "39A44C9B288A29FFD2E4258B81714648D99E1B56919D25F07602C72A0CF13273",
+      "hunks": [
+        "@@ -1,3 +1,4 @@",
+        "@@ -10,9 +11,11 @@ import { gefluegelfrikadellenDetailsFixture as alphaGefluegelfrikadellenDetailsF",
+        "@@ -117,7 +120,351 @@ function flattenTemplateElements(value: unknown): SatoriElement[] {"
+      ],
+      "patchSha256": "2dc2a990fdc64965da58e0834c7914063c4eb95bdf542b6527e035915a39712f"
+    },
+    {
+      "path": "docs/kb/tech/02-backend.md",
+      "newFile": false,
+      "startingSha256": "10AF2815C494FF86653F70099725C2D1AC33ED47CC7DC14DB31D9FDEFFA1FE72",
+      "endingSha256": "CA76F2DCAD6751541311D6C039A7A8BB0AE0929A99392150A204F05C0068EC7A",
+      "hunks": [
+        "@@ -239,6 +239,30 @@ if its measured layout does not fit. A 12 px clearance separates it from the"
+      ],
+      "patchSha256": "560442e1bbf7a39ed422a63e2836d683c292d61a06b8e7c5c2f856d0d2a5d192"
+    },
+    {
+      "path": "docs/kb/tech/08-testing.md",
+      "newFile": false,
+      "startingSha256": "650AF5BF85E1FA3A4B3D63891B17A7B6917C9704F7FDBCCCB97C28381A7CBA4E",
+      "endingSha256": "69A6B0F1CE83AFA1A4D2213BF8654B581EB290121A72943D03A751400A37C3CA",
+      "hunks": [
+        "@@ -93,6 +93,20 @@ local downloads. Production fonts, text measurements, and PNG rendering run"
+      ],
+      "patchSha256": "90b24ebbfe58c4217158e37b169821d0cd4626bccfbf7d8e51b35d12a3c45af8"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs",
+      "newFile": true,
+      "startingSha256": null,
+      "endingSha256": "A27BA551AAAA7B3CC4DBA91C8EDB3DAFD4482A60B69DF8669E6E23AB413C0DB5",
+      "hunks": [
+        "@@ -0,0 +1,142 @@"
+      ],
+      "patchSha256": "dc3bdc7f2da0d32c7100c83ac20ca84991db014a59f091af1754742ed0e156b9"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Handoff_2026-10-09.md",
+      "newFile": true,
+      "startingSha256": null,
+      "endingSha256": "61BD865D285345E64028456B6CD4D4980FC9D116268624A093F36F56BBC3A79E",
+      "hunks": [
+        "@@ -0,0 +1,117 @@"
+      ],
+      "patchSha256": "207af50f5ac9e6292c125693cf3aafe5820cacb3e9bfdfbc9552ceb3db22afc4"
+    }
+  ],
+  "preservation": [
+    {
+      "path": ".github/instructions/backend.instructions.md",
+      "startingSha256": "43804DDCF10F65030675C36133F6DB7D3DCA976F0065834E5C33D62971591209",
+      "currentSha256": "43804DDCF10F65030675C36133F6DB7D3DCA976F0065834E5C33D62971591209",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "startingSha256": "0EA4ADB4CFE48E4C4A96CD16C71B352CF55CE332655627C0AFD90271121FBD73",
+      "currentSha256": "0EA4ADB4CFE48E4C4A96CD16C71B352CF55CE332655627C0AFD90271121FBD73",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/functions/instagramRecipe.test.ts",
+      "startingSha256": "5FEF665BE7BBFDBA01806C3C295522B40437A1427E16563EB916A2CD56E21A03",
+      "currentSha256": "5FEF665BE7BBFDBA01806C3C295522B40437A1427E16563EB916A2CD56E21A03",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/functions/instagramRecipe.ts",
+      "startingSha256": "93DF4EB6A7B5B81906A875A9BCA6556A237817DEAC6BD69D071F31A3BF7E21D0",
+      "currentSha256": "93DF4EB6A7B5B81906A875A9BCA6556A237817DEAC6BD69D071F31A3BF7E21D0",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "startingSha256": "70A9F734E742345969C9A0EF158FB01653634F30C0DFFB86DCFF3F5AD5EAE85F",
+      "currentSha256": "70A9F734E742345969C9A0EF158FB01653634F30C0DFFB86DCFF3F5AD5EAE85F",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/functions/recipes.ts",
+      "startingSha256": "3A94E45299640F98047FDDE23CD34ED4310A64A195949FFBA1385C4924CFFD1E",
+      "currentSha256": "3A94E45299640F98047FDDE23CD34ED4310A64A195949FFBA1385C4924CFFD1E",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/lib/openai.ts",
+      "startingSha256": "3FAB86522A4E0C8DB17E85AAD28E52C2415D308B28D48CB209FBC0BA28B656BD",
+      "currentSha256": "3FAB86522A4E0C8DB17E85AAD28E52C2415D308B28D48CB209FBC0BA28B656BD",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+      "startingSha256": "6FF92CE93EF097E88AF20AFE1341935FB6C069652DA49AAFE2B70B075112FC50",
+      "currentSha256": "6FF92CE93EF097E88AF20AFE1341935FB6C069652DA49AAFE2B70B075112FC50",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "startingSha256": "1781B3E81589D603F63ECF059A2C63C48011BFA79241AF3DC779F89278E5938D",
+      "currentSha256": "1781B3E81589D603F63ECF059A2C63C48011BFA79241AF3DC779F89278E5938D",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "startingSha256": "1DE736E90F34DF92A60F8B09F3BBE316090A87095CCFD9D8E9BD04F1B20E49A2",
+      "currentSha256": "1DE736E90F34DF92A60F8B09F3BBE316090A87095CCFD9D8E9BD04F1B20E49A2",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "startingSha256": "89AB89897D0E73EEA6FE11DC9C7F05053E4A77A24DFFBCED2D6AA7FB00346E78",
+      "currentSha256": "89AB89897D0E73EEA6FE11DC9C7F05053E4A77A24DFFBCED2D6AA7FB00346E78",
+      "unchanged": true
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.ts",
+      "startingSha256": "5216FD9F27B2E1197F50B1D64EB15F5E131A1DA4519DF7D818E04632CA97352C",
+      "currentSha256": "5216FD9F27B2E1197F50B1D64EB15F5E131A1DA4519DF7D818E04632CA97352C",
+      "unchanged": true
+    },
+    {
+      "path": "docs/kb/domain/06-recipes.md",
+      "startingSha256": "9606617B3023334AA79B38E8AE701CFF5FC1D1111859A1C45FC195F0C44A084F",
+      "currentSha256": "9606617B3023334AA79B38E8AE701CFF5FC1D1111859A1C45FC195F0C44A084F",
+      "unchanged": true
+    },
+    {
+      "path": "docs/kb/domain/07-ai-features.md",
+      "startingSha256": "A99D3E69C797FA0DD8D2A45B1E4335DB02438543F360123E9D73F1DD401C975B",
+      "currentSha256": "A99D3E69C797FA0DD8D2A45B1E4335DB02438543F360123E9D73F1DD401C975B",
+      "unchanged": true
+    },
+    {
+      "path": "docs/kb/tech/06-ai-integrations.md",
+      "startingSha256": "C78459C0574EBA9DAAE1E0AD3C53319ED2FB9B66F169A18934C02694A6AE2F99",
+      "currentSha256": "C78459C0574EBA9DAAE1E0AD3C53319ED2FB9B66F169A18934C02694A6AE2F99",
+      "unchanged": true
+    },
+    {
+      "path": "docs/kb/tech/09-api-reference.md",
+      "startingSha256": "1CDACA5B15C2B6B902385F6B99BCA474FEDCACF455CA37E398213B873575C6C0",
+      "currentSha256": "1CDACA5B15C2B6B902385F6B99BCA474FEDCACF455CA37E398213B873575C6C0",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/findings.md",
+      "startingSha256": "321FDAFA65A9A37EA9752D1A371284CDF36F6F04BAE8258E1DDBE0F8E2236F47",
+      "currentSha256": "321FDAFA65A9A37EA9752D1A371284CDF36F6F04BAE8258E1DDBE0F8E2236F47",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-16_Recipe-Preparation-v2_EigenerDiff_2026-10-09.patch",
+      "startingSha256": "FA5F46B93F88C229C2A7DC8765A89D55B335BFFA5E01F09E993320917E736163",
+      "currentSha256": "FA5F46B93F88C229C2A7DC8765A89D55B335BFFA5E01F09E993320917E736163",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-16_Recipe-Preparation-v2_Handoff_2026-10-09.md",
+      "startingSha256": "2DF4D7E2AC7A825ADC8F34AE1F9F51D5769E1EC789F03AF239B5F5447A0C2CF3",
+      "currentSha256": "2DF4D7E2AC7A825ADC8F34AE1F9F51D5769E1EC789F03AF239B5F5447A0C2CF3",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md",
+      "startingSha256": "B793B73B02E0E2922CB54BCF909E5B7E99A2D63B72E7EF86618CB935724617AF",
+      "currentSha256": "B793B73B02E0E2922CB54BCF909E5B7E99A2D63B72E7EF86618CB935724617AF",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18C_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch",
+      "startingSha256": "FB87111C7674D38FCF3ED7ED6D3739D641C3230149227DACE09956F090864CBA",
+      "currentSha256": "FB87111C7674D38FCF3ED7ED6D3739D641C3230149227DACE09956F090864CBA",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung-Review_Handoff_2026-10-09.md",
+      "startingSha256": "65B76EF9B844925B11677ABB64F9202DE380F57C917BE5E1DD7F7171CE6C35EC",
+      "currentSha256": "65B76EF9B844925B11677ABB64F9202DE380F57C917BE5E1DD7F7171CE6C35EC",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Ausgangsdiff_2026-10-09.patch",
+      "startingSha256": "096E4CA97562CA6681E6A758F5058AC669EC383165A5673D821E5FA75478FC97",
+      "currentSha256": "096E4CA97562CA6681E6A758F5058AC669EC383165A5673D821E5FA75478FC97",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch",
+      "startingSha256": "934AFD6DAE1DE44BDCB237B49F40D72CD44C129EF3346967B727409D40497312",
+      "currentSha256": "934AFD6DAE1DE44BDCB237B49F40D72CD44C129EF3346967B727409D40497312",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Enddiff_2026-10-09.patch",
+      "startingSha256": "DA861B25B8AF9BBAA91079B039E8F835E3017D4368C63D8CD323EF0474AFB40E",
+      "currentSha256": "DA861B25B8AF9BBAA91079B039E8F835E3017D4368C63D8CD323EF0474AFB40E",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_LiveCapture_2026-10-09.mjs",
+      "startingSha256": "D7ABF648684A959FCC2BEAF4C12503EFCE818EDE1112A7F201E290F88796BDE5",
+      "currentSha256": "D7ABF648684A959FCC2BEAF4C12503EFCE818EDE1112A7F201E290F88796BDE5",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_LiveEvidence_2026-10-09.json",
+      "startingSha256": "CB53195AA57F7E5188562DE1EC4044C60F0BC6953DFF6FEDF10A3E4582D7D771",
+      "currentSha256": "CB53195AA57F7E5188562DE1EC4044C60F0BC6953DFF6FEDF10A3E4582D7D771",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_OfflineEvidence_2026-10-09.json",
+      "startingSha256": "44A87BFD9BB7EAB3C29149C4C6CBE864A30ABEE73F55D5BCA63244DFF5759A82",
+      "currentSha256": "44A87BFD9BB7EAB3C29149C4C6CBE864A30ABEE73F55D5BCA63244DFF5759A82",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Preservation_2026-10-09.json",
+      "startingSha256": "C28111F2A626C9415066D3405F7D1C9D5F3F630ADBDE770BFEADED8108F83013",
+      "currentSha256": "C28111F2A626C9415066D3405F7D1C9D5F3F630ADBDE770BFEADED8108F83013",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Verification_2026-10-09.mjs",
+      "startingSha256": "0C311C38FC5261757B02A8776AB05AB2766E283C2792B3A3C2D371078B47E169",
+      "currentSha256": "0C311C38FC5261757B02A8776AB05AB2766E283C2792B3A3C2D371078B47E169",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_EigenerDiff_2026-10-09.patch",
+      "startingSha256": "7448DB89EBF10796C6F90816A02FEF3369AB0F7445F5E4E04619B05EC3F7E5EB",
+      "currentSha256": "7448DB89EBF10796C6F90816A02FEF3369AB0F7445F5E4E04619B05EC3F7E5EB",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md",
+      "startingSha256": "0F4DB29274158A7556ECC640041AA23DF73410E9EA31683E193841E536A04EAC",
+      "currentSha256": "0F4DB29274158A7556ECC640041AA23DF73410E9EA31683E193841E536A04EAC",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Output_2026-10-09.txt",
+      "startingSha256": "E5C7678994825B7159844C9B32856E408208B27CEEADA197E223E1B2DB6688D3",
+      "currentSha256": "E5C7678994825B7159844C9B32856E408208B27CEEADA197E223E1B2DB6688D3",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Report_2026-10-09.json",
+      "startingSha256": "B851B40FBF46498A800C33BB2E10190E2B9911DFD48F24791462ED37DE626C94",
+      "currentSha256": "B851B40FBF46498A800C33BB2E10190E2B9911DFD48F24791462ED37DE626C94",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Output_2026-10-09.txt",
+      "startingSha256": "312C6E6613E20A34A34EE3B7DA585E83C95FAB63D75F38C1CCF544E560D18D9E",
+      "currentSha256": "312C6E6613E20A34A34EE3B7DA585E83C95FAB63D75F38C1CCF544E560D18D9E",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Report_2026-10-09.json",
+      "startingSha256": "ECC21C60B8BE57C3FD77A91B624B4A7EBBC954A9AA779C40D23862540B69EC18",
+      "currentSha256": "ECC21C60B8BE57C3FD77A91B624B4A7EBBC954A9AA779C40D23862540B69EC18",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Output_2026-10-09.txt",
+      "startingSha256": "55FCEF63A52B14F8080E6715436690DBE7543F682EE82C31936245A21E702178",
+      "currentSha256": "55FCEF63A52B14F8080E6715436690DBE7543F682EE82C31936245A21E702178",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Report_2026-10-09.json",
+      "startingSha256": "2BFD3F3FB4CC2EC68A3F760590DB50848A4992BCFF7E2366C1FCD76F3AF2E866",
+      "currentSha256": "2BFD3F3FB4CC2EC68A3F760590DB50848A4992BCFF7E2366C1FCD76F3AF2E866",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_LiveEvidence_2026-10-09.json",
+      "startingSha256": "CA76BF488C784BD5D7F41FC7A1D1189C5049221FD1C1C1113373243B950A5CD8",
+      "currentSha256": "CA76BF488C784BD5D7F41FC7A1D1189C5049221FD1C1C1113373243B950A5CD8",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Manifest_2026-10-09.json",
+      "startingSha256": "73FFB09B2DD455CEC49DEF1F4BEA2E9E6F4071C1A8C7BA9FA33A0BC345510332",
+      "currentSha256": "73FFB09B2DD455CEC49DEF1F4BEA2E9E6F4071C1A8C7BA9FA33A0BC345510332",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_OfflineEvidence_2026-10-09.json",
+      "startingSha256": "A34FC9BD62D1FC7257B8AD92779C2A5DB5C850DB0229FD17181A1D98A592B7A0",
+      "currentSha256": "A34FC9BD62D1FC7257B8AD92779C2A5DB5C850DB0229FD17181A1D98A592B7A0",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-19_Recipe-Preparation_Verification_2026-10-09.mjs",
+      "startingSha256": "6B0AE1798C4058E2F9D57D5CCAAFD1293ED931FAAD4F72DDB3F4FA0FDA530BAC",
+      "currentSha256": "6B0AE1798C4058E2F9D57D5CCAAFD1293ED931FAAD4F72DDB3F4FA0FDA530BAC",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ausgangsdiff_2026-10-09.txt",
+      "startingSha256": "07FF1F0B20DE4D6590E0D7647975FA92414189FA71174D10B54F24C22CEBC767",
+      "currentSha256": "07FF1F0B20DE4D6590E0D7647975FA92414189FA71174D10B54F24C22CEBC767",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Enddiff_2026-10-09.patch",
+      "startingSha256": "76D9DFF2C42C47A5E4F6A82094B06DD596DD4BBD969242874F614A9C2FB05082",
+      "currentSha256": "76D9DFF2C42C47A5E4F6A82094B06DD596DD4BBD969242874F614A9C2FB05082",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ruecknahme_Handoff_2026-10-09.md",
+      "startingSha256": "AE8F8DD02E143148B6F442CBF49B802586B23A7D09080B52663247A05A5F33CA",
+      "currentSha256": "AE8F8DD02E143148B6F442CBF49B802586B23A7D09080B52663247A05A5F33CA",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ruecknahmediff_2026-10-09.patch",
+      "startingSha256": "F61A4FB4CB75DF84BA82ECA9E43C2EEDDEEB2090E780338F12E5CDABB0DEB5AB",
+      "currentSha256": "F61A4FB4CB75DF84BA82ECA9E43C2EEDDEEB2090E780338F12E5CDABB0DEB5AB",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Recipe-Analyze-v14_Handoff_2026-10-08.md",
+      "startingSha256": "AFBF269BA8043D12C0F9E89266024F433926FEF47EDF5BBCC7AD6BDCD9B34BFD",
+      "currentSha256": "AFBF269BA8043D12C0F9E89266024F433926FEF47EDF5BBCC7AD6BDCD9B34BFD",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Recipe-Preparation-v15_Handoff_2026-10-09.md",
+      "startingSha256": "BF3B6274BBE22AEE48F8A54DA28DA008A4276321B5EA6492B72E70325F91E48A",
+      "currentSha256": "BF3B6274BBE22AEE48F8A54DA28DA008A4276321B5EA6492B72E70325F91E48A",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-16_Recipe-Preparation-v2_EigenerDiff_2026-10-09.patch",
+      "startingSha256": "96DB90866D378B765D51E903BEC3B8C5CCEA7577ACAB5D128C88EF2CC4AAA454",
+      "currentSha256": "96DB90866D378B765D51E903BEC3B8C5CCEA7577ACAB5D128C88EF2CC4AAA454",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-16_Recipe-Preparation-v2_Handoff_2026-10-09.md",
+      "startingSha256": "9508892A3FC9DA0D3DB1508E1251B9DD0149B16A47ED6DCE909300AEB04A8D7B",
+      "currentSha256": "9508892A3FC9DA0D3DB1508E1251B9DD0149B16A47ED6DCE909300AEB04A8D7B",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md",
+      "startingSha256": "669F3634F5592F95E266AE51A7154A3665ADB542596D4CFE79230C44B1F45840",
+      "currentSha256": "669F3634F5592F95E266AE51A7154A3665ADB542596D4CFE79230C44B1F45840",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-18C_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch",
+      "startingSha256": "11FEF0AB63368A1A1E2CFB7AC25D263F321AA2EE42A2F6C318B7D8E3F848D1FB",
+      "currentSha256": "11FEF0AB63368A1A1E2CFB7AC25D263F321AA2EE42A2F6C318B7D8E3F848D1FB",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-18_Recipe-Kurzfassung-Review_Handoff_2026-10-09.md",
+      "startingSha256": "4F038368B60F35B3913372507E26555D37840908E77BB42AD3F3FD1D243778DD",
+      "currentSha256": "4F038368B60F35B3913372507E26555D37840908E77BB42AD3F3FD1D243778DD",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-18_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch",
+      "startingSha256": "C83B661C301C8019789A996A26BD762C8688554D1BE60E66C3FF7A5BA2091285",
+      "currentSha256": "C83B661C301C8019789A996A26BD762C8688554D1BE60E66C3FF7A5BA2091285",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/D-19_Recipe-Preparation_Handoff_2026-10-09.md",
+      "startingSha256": "9D9C1CC876D21F1D6395D44DDC3485A8BB16CD2BC2174137EC3D734BF73130ED",
+      "currentSha256": "9D9C1CC876D21F1D6395D44DDC3485A8BB16CD2BC2174137EC3D734BF73130ED",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md",
+      "startingSha256": "9DCFD6A9BD7DA0378CAC7DA684BEC65D7280570149FF43F97AA2430FD470C631",
+      "currentSha256": "9DCFD6A9BD7DA0378CAC7DA684BEC65D7280570149FF43F97AA2430FD470C631",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md",
+      "startingSha256": "EBFD7E73A1141D8D37345FCFEF48E1432C7220D2A4B0393802418D31B1E89CBF",
+      "currentSha256": "EBFD7E73A1141D8D37345FCFEF48E1432C7220D2A4B0393802418D31B1E89CBF",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md",
+      "startingSha256": "E96CDF5AB42E71B51F7C86222D33D82F079CD72A1B66435183DD12D5F9F82B32",
+      "currentSha256": "E96CDF5AB42E71B51F7C86222D33D82F079CD72A1B66435183DD12D5F9F82B32",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-08-v14.md",
+      "startingSha256": "4D597CA3A1824AEA630F4B0ABAB3DCFC6FF232092E0124CD78E03426FE241D0A",
+      "currentSha256": "4D597CA3A1824AEA630F4B0ABAB3DCFC6FF232092E0124CD78E03426FE241D0A",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Gezielte-Korrektur_2026-10-09-v15.md",
+      "startingSha256": "7EDCFE5AB271CFFC44C2F42A76A0DED9E066F74F163827E3BDB46F4842DFBA3B",
+      "currentSha256": "7EDCFE5AB271CFFC44C2F42A76A0DED9E066F74F163827E3BDB46F4842DFBA3B",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md",
+      "startingSha256": "B695E771DDC8ED16B0ACE7CFF7A21C1316407061A42C60F2261E781E76F1F213",
+      "currentSha256": "B695E771DDC8ED16B0ACE7CFF7A21C1316407061A42C60F2261E781E76F1F213",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md",
+      "startingSha256": "21BD9D5F36A3780B5654889A7772842B097F6304430E5036D8D89EA17278953D",
+      "currentSha256": "21BD9D5F36A3780B5654889A7772842B097F6304430E5036D8D89EA17278953D",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung_2026-10-09-v17.md",
+      "startingSha256": "3E1897019AFE8FBD34BAB35116D0120701FD92A082E4E8C3DC1F78547AD61E11",
+      "currentSha256": "3E1897019AFE8FBD34BAB35116D0120701FD92A082E4E8C3DC1F78547AD61E11",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md",
+      "startingSha256": "48D5D9C6DF4E8FBCDE8F4737AAC500FCD6A8AC276E576ECB5A22BB7AF7F3B262",
+      "currentSha256": "48D5D9C6DF4E8FBCDE8F4737AAC500FCD6A8AC276E576ECB5A22BB7AF7F3B262",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md",
+      "startingSha256": "1D364DA46997EB1428C8CC4EE7B8967B554BAD1809EF8DCFE27FD8D24ADC734C",
+      "currentSha256": "1D364DA46997EB1428C8CC4EE7B8967B554BAD1809EF8DCFE27FD8D24ADC734C",
+      "unchanged": true
+    },
+    {
+      "path": "docs/User Stories/Reciepe/verify-template-text-budget.mjs",
+      "startingSha256": "B4D092DCF382FC402ABA6E86D8F90FB9E63F7B06A8FE65C7181F991A8E248765",
+      "currentSha256": "B4D092DCF382FC402ABA6E86D8F90FB9E63F7B06A8FE65C7181F991A8E248765",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07-v13.md",
+      "startingSha256": "A8B727B2298D6216B40C051F88A5AE7FDC54AC671306FC1B5B00AF5EA4942A3C",
+      "currentSha256": "A8B727B2298D6216B40C051F88A5AE7FDC54AC671306FC1B5B00AF5EA4942A3C",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md",
+      "startingSha256": "4F38F3CE26A0C0639A540095BED5441065D5AF6D306B592853546E350220DF79",
+      "currentSha256": "4F38F3CE26A0C0639A540095BED5441065D5AF6D306B592853546E350220DF79",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md",
+      "startingSha256": "78F1E9DAC84A3019552A199DD80A52CBC72BCF057748B581F95D628540E00CB3",
+      "currentSha256": "78F1E9DAC84A3019552A199DD80A52CBC72BCF057748B581F95D628540E00CB3",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Nachpruefung.md",
+      "startingSha256": "AFC167123E9D297571DE510A7DA2A4CEEF8815487D6BF43FFB50E23637778D62",
+      "currentSha256": "AFC167123E9D297571DE510A7DA2A4CEEF8815487D6BF43FFB50E23637778D62",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Vorreview.md",
+      "startingSha256": "6FD00498496C3D0DE1A7B618DB56274C88F94A21D9BCD24C0167226D7CFFF85E",
+      "currentSha256": "6FD00498496C3D0DE1A7B618DB56274C88F94A21D9BCD24C0167226D7CFFF85E",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md",
+      "startingSha256": "D32308AE7057C3BF64F3389404CD6685A4AD58E2C6CE9514ABBA06965D2F9DC8",
+      "currentSha256": "D32308AE7057C3BF64F3389404CD6685A4AD58E2C6CE9514ABBA06965D2F9DC8",
+      "unchanged": true
+    },
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md",
+      "startingSha256": "F30E91FF2DF0A89AFDC55D012F1F62C200753D65D5B4963D45903903C200E713",
+      "currentSha256": "F30E91FF2DF0A89AFDC55D012F1F62C200753D65D5B4963D45903903C200E713",
+      "unchanged": true
+    },
+    {
+      "path": "infra/release-records/Recipe-Preparation-v19_Alpha-Functions_2026-10-09.md",
+      "startingSha256": "68CD6F49474E8480CE26CD4D746E9B44C40ADEB5915DF46011BD8DF161DE634D",
+      "currentSha256": "68CD6F49474E8480CE26CD4D746E9B44C40ADEB5915DF46011BD8DF161DE634D",
+      "unchanged": true
+    },
+    {
+      "path": "infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md",
+      "startingSha256": "F7CFC9A8432EE07E461A7604C69C304DC7C50734EE891BBFC158061DFBEAE4FF",
+      "currentSha256": "F7CFC9A8432EE07E461A7604C69C304DC7C50734EE891BBFC158061DFBEAE4FF",
+      "unchanged": true
+    }
+  ],
+  "assets": [
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/Inter-Medium.ttf",
+      "sha256": "1bda81124d6ae26ed16a7201e2bd93766af5a3b14faf79eea14d191ebbd41146"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/Inter-MediumItalic.ttf",
+      "sha256": "51c2c8d7c36f7c26e6e2678b5c3069b329bde9a081154553b0f5bc2d4fc14075"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/Inter-SemiBold.ttf",
+      "sha256": "0dc98e8aa59585394880f25ab89e6d915ad5134522e961b046ca51fad3a18255"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/assets/fonts/InterDisplay-Bold.ttf",
+      "sha256": "749369ed6a4b46a5dedaa0a2f3f1595b2f0f046c708bbec48911e949bacf38fa"
+    },
+    {
+      "path": "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png",
+      "sha256": "4c5b1e99d513833be32bc01c1df845dd2a6d1fbcea2aea6a4d8cec236a6a1dec"
+    }
+  ],
+  "contexts": [
+    {
+      "name": "alpha-four-step-overflow",
+      "probeInput": {
+        "savedTitle": "Quarkbrötchen",
+        "teaser": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep.",
+        "steps": [
+          "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.",
+          "Forme den Teig zu Brötchen.",
+          "Backe die Brötchen im vorgeheizten Ofen.",
+          "Lasse die Brötchen abkühlen."
+        ]
+      },
+      "renderContext": {
+        "title": "Quarkbrötchen",
+        "description": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep.",
+        "ingredients": [
+          {
+            "amount": "250 g",
+            "name": "Magerquark"
+          },
+          {
+            "amount": "2",
+            "name": "Eier"
+          },
+          {
+            "amount": "200 g",
+            "name": "Dinkelmehl"
+          },
+          {
+            "amount": "1 Pck.",
+            "name": "Backpulver"
+          },
+          {
+            "amount": "80 g",
+            "name": "Haferflocken"
+          }
+        ],
+        "steps": [
+          "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.",
+          "Forme den Teig zu Brötchen.",
+          "Backe die Brötchen im vorgeheizten Ofen.",
+          "Lasse die Brötchen abkühlen."
+        ],
+        "portions": 8,
+        "totalTimeMinutes": 25,
+        "presentation": {
+          "focusX": 0.5,
+          "focusY": 0.46,
+          "zoom": 1
+        },
+        "highlight": "high-protein",
+        "photoFixture": "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png"
+      },
+      "probe": {
+        "diagnostics": [
+          {
+            "field": "title",
+            "status": "fits",
+            "measured": {
+              "width": 500,
+              "height": 67,
+              "maxWidth": 500,
+              "maxHeight": 112
+            },
+            "fontSize": 64,
+            "displayText": "Quarkbrötchen"
+          },
+          {
+            "field": "teaser",
+            "status": "fits",
+            "measured": {
+              "width": 461,
+              "height": 56,
+              "maxWidth": 461,
+              "maxHeight": 126
+            },
+            "fontSize": 22,
+            "displayText": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep"
+          },
+          {
+            "field": "steps",
+            "itemIndex": 0,
+            "status": "overflow",
+            "measured": {
+              "width": 300,
+              "height": 112,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 1,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Forme den Teig zu Brötchen."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 2,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Backe die Brötchen im vorgeheizten Ofen."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 3,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Lasse die Brötchen abkühlen."
+          }
+        ],
+        "teaserFontSize": 22,
+        "ok": false,
+        "status": "generated-text-failure"
+      },
+      "fullRender": {
+        "ok": false,
+        "error": {
+          "code": "TEMPLATE_FIELD_OVERFLOW",
+          "field": "steps",
+          "message": "Step 1 exceeds its measured detail-template row.",
+          "itemIndex": 0,
+          "itemField": "text",
+          "measured": {
+            "width": 300,
+            "height": 112,
+            "maxWidth": 302,
+            "maxHeight": 105
+          }
+        }
+      }
+    },
+    {
+      "name": "shorter-ingredient-preserving-candidate",
+      "probeInput": {
+        "savedTitle": "Quarkbrötchen",
+        "teaser": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep.",
+        "steps": [
+          "Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig.",
+          "Forme den Teig zu Brötchen.",
+          "Backe die Brötchen im vorgeheizten Ofen.",
+          "Lasse die Brötchen abkühlen."
+        ]
+      },
+      "renderContext": {
+        "title": "Quarkbrötchen",
+        "description": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep.",
+        "ingredients": [
+          {
+            "amount": "250 g",
+            "name": "Magerquark"
+          },
+          {
+            "amount": "2",
+            "name": "Eier"
+          },
+          {
+            "amount": "200 g",
+            "name": "Dinkelmehl"
+          },
+          {
+            "amount": "1 Pck.",
+            "name": "Backpulver"
+          },
+          {
+            "amount": "80 g",
+            "name": "Haferflocken"
+          }
+        ],
+        "steps": [
+          "Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig.",
+          "Forme den Teig zu Brötchen.",
+          "Backe die Brötchen im vorgeheizten Ofen.",
+          "Lasse die Brötchen abkühlen."
+        ],
+        "portions": 8,
+        "totalTimeMinutes": 25,
+        "presentation": {
+          "focusX": 0.5,
+          "focusY": 0.46,
+          "zoom": 1
+        },
+        "highlight": "high-protein",
+        "photoFixture": "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png"
+      },
+      "probe": {
+        "diagnostics": [
+          {
+            "field": "title",
+            "status": "fits",
+            "measured": {
+              "width": 500,
+              "height": 67,
+              "maxWidth": 500,
+              "maxHeight": 112
+            },
+            "fontSize": 64,
+            "displayText": "Quarkbrötchen"
+          },
+          {
+            "field": "teaser",
+            "status": "fits",
+            "measured": {
+              "width": 461,
+              "height": 56,
+              "maxWidth": 461,
+              "maxHeight": 126
+            },
+            "fontSize": 22,
+            "displayText": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep"
+          },
+          {
+            "field": "steps",
+            "itemIndex": 0,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 84,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 1,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Forme den Teig zu Brötchen."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 2,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Backe die Brötchen im vorgeheizten Ofen."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 3,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Lasse die Brötchen abkühlen."
+          }
+        ],
+        "teaserFontSize": 22,
+        "ok": true,
+        "status": "success"
+      },
+      "fullRender": {
+        "ok": true,
+        "width": 1080,
+        "height": 1350,
+        "format": "png",
+        "pngSha256": "bc9276a5158de0c1247a9da9b33a4fd5a072268f4fec4c7108b40ac94f460d74"
+      }
+    },
+    {
+      "name": "baseline-quarkbroetchen",
+      "probeInput": {
+        "savedTitle": "Quarkbrötchen",
+        "teaser": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep.",
+        "steps": [
+          "Backofen auf 180 °C Ober-/Unterhitze vorheizen.",
+          "Quark und Eier glatt verrühren.",
+          "Mehl, Backpulver und Haferflocken unterheben.",
+          "Acht Brötchen formen und 20 Minuten goldbraun backen."
+        ]
+      },
+      "renderContext": {
+        "title": "Quarkbrötchen",
+        "description": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep.",
+        "ingredients": [
+          {
+            "amount": "250 g",
+            "name": "Magerquark"
+          },
+          {
+            "amount": "2",
+            "name": "Eier"
+          },
+          {
+            "amount": "200 g",
+            "name": "Dinkelmehl"
+          },
+          {
+            "amount": "1 Pck.",
+            "name": "Backpulver"
+          },
+          {
+            "amount": "80 g",
+            "name": "Haferflocken"
+          }
+        ],
+        "steps": [
+          "Backofen auf 180 °C Ober-/Unterhitze vorheizen.",
+          "Quark und Eier glatt verrühren.",
+          "Mehl, Backpulver und Haferflocken unterheben.",
+          "Acht Brötchen formen und 20 Minuten goldbraun backen."
+        ],
+        "portions": 8,
+        "totalTimeMinutes": 25,
+        "presentation": {
+          "focusX": 0.5,
+          "focusY": 0.46,
+          "zoom": 1
+        },
+        "highlight": "high-protein",
+        "photoFixture": "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png"
+      },
+      "probe": {
+        "diagnostics": [
+          {
+            "field": "title",
+            "status": "fits",
+            "measured": {
+              "width": 500,
+              "height": 67,
+              "maxWidth": 500,
+              "maxHeight": 112
+            },
+            "fontSize": 64,
+            "displayText": "Quarkbrötchen"
+          },
+          {
+            "field": "teaser",
+            "status": "fits",
+            "measured": {
+              "width": 461,
+              "height": 56,
+              "maxWidth": 461,
+              "maxHeight": 126
+            },
+            "fontSize": 22,
+            "displayText": "Proteinreich, schnell vorbereitet und perfekt für Frühstück oder Meal Prep"
+          },
+          {
+            "field": "steps",
+            "itemIndex": 0,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Backofen auf 180 °C Ober-/Unterhitze vorheizen."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 1,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Quark und Eier glatt verrühren."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 2,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 56,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Mehl, Backpulver und Haferflocken unterheben."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 3,
+            "status": "fits",
+            "measured": {
+              "width": 300,
+              "height": 84,
+              "maxWidth": 302,
+              "maxHeight": 105
+            },
+            "fontSize": 22,
+            "displayText": "Acht Brötchen formen und 20 Minuten goldbraun backen."
+          }
+        ],
+        "teaserFontSize": 22,
+        "ok": true,
+        "status": "success"
+      },
+      "fullRender": {
+        "ok": true,
+        "width": 1080,
+        "height": 1350,
+        "format": "png",
+        "pngSha256": "b81a0cc528c389cc3b21113ef7d65ea6d7cc37ba2023b4d9fa035e087573036a"
+      }
+    },
+    {
+      "name": "baseline-dense-template",
+      "probeInput": {
+        "savedTitle": "Mediterrane Geflügel-Frikadellen-Bowl mit Couscoussalat",
+        "teaser": "Saftige Frikadellen, bunter Couscous und cremiger Dip: proteinreich, frisch, meal-prep-tauglich.",
+        "steps": [
+          "Couscous mit heißer Gemüsebrühe übergießen, 10 Minuten quellen lassen und auflockern.",
+          "Hähnchenhack mit Quark, Ei, Paniermehl, Zwiebel und Paprika gründlich vermengen.",
+          "Aus der Masse 14 Frikadellen formen und im Airfryer bei 180 °C 10–12 Minuten garen.",
+          "Tomaten, Gurke, Oliven, Kichererbsen, Spinat und Avocado für den Salat vorbereiten.",
+          "Joghurt, Tahini, Zitrone und Öl verrühren und alles mit Couscous anrichten."
+        ]
+      },
+      "renderContext": {
+        "title": "Mediterrane Geflügel-Frikadellen-Bowl mit Couscoussalat",
+        "description": "Saftige Frikadellen, bunter Couscous und cremiger Dip: proteinreich, frisch, meal-prep-tauglich.",
+        "ingredients": [
+          {
+            "amount": "500 g",
+            "name": "Hähnchenhackfleisch"
+          },
+          {
+            "amount": "150 g",
+            "name": "Magerquark"
+          },
+          {
+            "amount": "2 Stück",
+            "name": "Eier"
+          },
+          {
+            "amount": "80 g",
+            "name": "Vollkorn-Paniermehl"
+          },
+          {
+            "amount": "1 große",
+            "name": "rote Zwiebel"
+          },
+          {
+            "amount": "1 große",
+            "name": "rote Paprika"
+          },
+          {
+            "amount": "200 g",
+            "name": "Vollkorn-Couscous"
+          },
+          {
+            "amount": "250 ml",
+            "name": "Gemüsebrühe"
+          },
+          {
+            "amount": "250 g",
+            "name": "Kirschtomaten"
+          },
+          {
+            "amount": "1 Stück",
+            "name": "Salatgurke"
+          },
+          {
+            "amount": "80 g",
+            "name": "schwarze Oliven"
+          },
+          {
+            "amount": "1 kleine Dose",
+            "name": "Kichererbsen"
+          },
+          {
+            "amount": "100 g",
+            "name": "Babyspinat"
+          },
+          {
+            "amount": "1 reife",
+            "name": "Avocado"
+          },
+          {
+            "amount": "100 g",
+            "name": "Feta light"
+          },
+          {
+            "amount": "150 g",
+            "name": "griechischer Joghurt"
+          },
+          {
+            "amount": "1 EL (15 ml)",
+            "name": "Tahini"
+          },
+          {
+            "amount": "1 Bio",
+            "name": "Zitrone"
+          },
+          {
+            "amount": "2 EL (30 ml)",
+            "name": "Olivenöl"
+          },
+          {
+            "amount": "1 EL",
+            "name": "Granatapfelkerne"
+          }
+        ],
+        "steps": [
+          "Couscous mit heißer Gemüsebrühe übergießen, 10 Minuten quellen lassen und auflockern.",
+          "Hähnchenhack mit Quark, Ei, Paniermehl, Zwiebel und Paprika gründlich vermengen.",
+          "Aus der Masse 14 Frikadellen formen und im Airfryer bei 180 °C 10–12 Minuten garen.",
+          "Tomaten, Gurke, Oliven, Kichererbsen, Spinat und Avocado für den Salat vorbereiten.",
+          "Joghurt, Tahini, Zitrone und Öl verrühren und alles mit Couscous anrichten."
+        ],
+        "portions": 5,
+        "totalTimeMinutes": 50,
+        "presentation": {
+          "focusX": 0.5,
+          "focusY": 0.46,
+          "zoom": 1
+        },
+        "highlight": "high-protein",
+        "photoFixture": "backend/src/lib/instagramRenderer/test-fixtures/quarkbroetchen-source.png"
+      },
+      "probe": {
+        "diagnostics": [
+          {
+            "field": "title",
+            "status": "fits",
+            "measured": {
+              "width": 500,
+              "height": 126,
+              "maxWidth": 500,
+              "maxHeight": 176
+            },
+            "fontSize": 40,
+            "displayText": "Mediterrane Geflügel-Frikadellen-Bowl mit Couscoussalat"
+          },
+          {
+            "field": "teaser",
+            "status": "fits",
+            "measured": {
+              "width": 461,
+              "height": 46,
+              "maxWidth": 461,
+              "maxHeight": 62
+            },
+            "fontSize": 18,
+            "displayText": "Saftige Frikadellen, bunter Couscous und cremiger Dip: proteinreich, frisch, meal-prep-tauglich"
+          },
+          {
+            "field": "steps",
+            "itemIndex": 0,
+            "status": "fits",
+            "measured": {
+              "width": 316,
+              "height": 63,
+              "maxWidth": 318,
+              "maxHeight": 84
+            },
+            "fontSize": 18,
+            "displayText": "Couscous mit heißer Gemüsebrühe übergießen, 10 Minuten quellen lassen und auflockern."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 1,
+            "status": "fits",
+            "measured": {
+              "width": 316,
+              "height": 63,
+              "maxWidth": 318,
+              "maxHeight": 84
+            },
+            "fontSize": 18,
+            "displayText": "Hähnchenhack mit Quark, Ei, Paniermehl, Zwiebel und Paprika gründlich vermengen."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 2,
+            "status": "fits",
+            "measured": {
+              "width": 316,
+              "height": 63,
+              "maxWidth": 318,
+              "maxHeight": 84
+            },
+            "fontSize": 18,
+            "displayText": "Aus der Masse 14 Frikadellen formen und im Airfryer bei 180 °C 10–12 Minuten garen."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 3,
+            "status": "fits",
+            "measured": {
+              "width": 316,
+              "height": 63,
+              "maxWidth": 318,
+              "maxHeight": 84
+            },
+            "fontSize": 18,
+            "displayText": "Tomaten, Gurke, Oliven, Kichererbsen, Spinat und Avocado für den Salat vorbereiten."
+          },
+          {
+            "field": "steps",
+            "itemIndex": 4,
+            "status": "fits",
+            "measured": {
+              "width": 316,
+              "height": 63,
+              "maxWidth": 318,
+              "maxHeight": 84
+            },
+            "fontSize": 18,
+            "displayText": "Joghurt, Tahini, Zitrone und Öl verrühren und alles mit Couscous anrichten."
+          }
+        ],
+        "teaserFontSize": 18,
+        "ok": true,
+        "status": "success"
+      },
+      "fullRender": {
+        "ok": true,
+        "width": 1080,
+        "height": 1350,
+        "format": "png",
+        "pngSha256": "e1737c8af626890d61ae1cc3decac0a31e6e6de7da8ca98fe2a88982e17b130b"
+      }
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Alpha_2026-10-09.txt",
+      "sha256": "d203ca6cd1c60fef03c4136ec9614994fbdba95b15dda017885f903ce9503c2f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Baseline-Units_2026-10-09.txt",
+      "sha256": "4562387fdf8ca02e66cc427884080c2474e8a65386371dfc714e2bbbb09bcecd"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Baseline_2026-10-09.json",
+      "sha256": "9b7ac0b5e340f289880649a69262189ac4af64656438107aa2c695071330fe3f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Build_2026-10-09.txt",
+      "sha256": "47259d98c999db4380e4df1dd1af03ef4740402a1328a2723a9defab3464fd1a"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Encoding_2026-10-09.txt",
+      "sha256": "634109812240be388e9d688be81a6cbf98b8729f4bbb9967d7c7a299c073d68a"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs",
+      "sha256": "a27ba551aaaa7b3cc4dba91c8edb3dafd4482a60b69df8669e6e23ab413c0db5"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Extraction_2026-10-09.txt",
+      "sha256": "e94f0b1aae8e04d1a562e27a6e8ea762437cce6d5e29b1058b43a8cfbd29eb37"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Focused_2026-10-09.txt",
+      "sha256": "e74d8e819211b2d95ce588cbab9fda639d7b205039e9717aa39c1cfc8b5fa0cf"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Handoff_2026-10-09.md",
+      "sha256": "61bd865d285345e64028456b6cd4d4980fc9d116268624a093f36f56bbc3a79e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Typecheck_2026-10-09.txt",
+      "sha256": "3702cbe4644f5330387b86b4681756471125456c290312faded50872ba3c881c"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-1_Feedback-Loop_Units_2026-10-09.txt",
+      "sha256": "7ee27abcd1068855c01baf290794daa0ce1c814bb1001139583eff647ad78bbd"
+    }
+  ],
+  "verification": {
+    "focused": {
+      "files": 1,
+      "tests": 83,
+      "exit": 0
+    },
+    "baselineUnits": {
+      "files": 66,
+      "tests": 1440,
+      "exit": 0
+    },
+    "finalUnits": {
+      "files": 66,
+      "tests": 1488,
+      "exit": 0
+    },
+    "backendTypecheckExit": 0,
+    "buildVerifyExit": 0,
+    "encodingExit": 0,
+    "diffWhitespaceExit": 0,
+    "ownedPatchReverseCheckExit": 0,
+    "ownedCredentialPatternMatches": 0
+  },
+  "boundary": "Offline renderer extraction only; no live AI, loop integration, deployment, release or independent QA claim."
+}

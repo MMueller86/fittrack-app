@@ -1,0 +1,43 @@
+{
+  "format": "fittrack-current-recipe-sharing-execution-v1",
+  "stage": "versionGuards",
+  "startedAt": "2026-10-10T10:25:23.017Z",
+  "finishedAt": "2026-10-10T10:25:25.214Z",
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "--config",
+    "vitest.eval.config.mts",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "src/lib/prompts/dailyInsight.eval.test.ts",
+    "--testNamePattern",
+    "prompt version matches fixture expectations",
+    "--silent",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\qa\\reports\\CURRENT-RECIPE-SHARING-2026-10-10-versionGuards-Report.json"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": "01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3",
+  "candidateHashStable": true,
+  "changedPaths": [],
+  "state": "COMPLETED",
+  "counts": {
+    "total": 38,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 35
+  },
+  "selection": null,
+  "synthetic": [],
+  "outputPath": "docs/qa/reports/CURRENT-RECIPE-SHARING-2026-10-10-versionGuards-Output.txt",
+  "outputSha256": "27043eefbdcc1516959d52be4fdf0849cf3399b9c352ddb085cf8fdfc802ceac",
+  "testReport": "docs/qa/reports/CURRENT-RECIPE-SHARING-2026-10-10-versionGuards-Report.json",
+  "reportSha256": "e4a6e0e4396125e84160afc8ea8afec60095caa9efbffa25022f9cc3ac0f03d4",
+  "allIntendedTestsExecuted": null,
+  "noProviderCalls": true,
+  "liveGate": false
+}

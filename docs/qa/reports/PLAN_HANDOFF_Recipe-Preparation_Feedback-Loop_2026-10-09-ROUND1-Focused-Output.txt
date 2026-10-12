@@ -1,0 +1,55 @@
+
+ RUN  v2.1.9 C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend
+
+ ✓ src/lib/recipeAnalyzeValidation.test.ts (167 tests) 66ms
+ ✓ src/lib/openai.recipeAnalyze.test.ts (18 tests) 409ms
+ ✓ src/lib/recipePreparation.test.ts (51 tests) 1525ms
+   ✓ B-2 bounded Preparation loop > QA-R1 reproduces the recorded oven field and preserves cooking core in a complete corrected draft 344ms
+ ✓ src/functions/ai.test.ts (78 tests) 152ms
+ ✓ src/functions/recipes.test.ts (122 tests) 835ms
+ ✓ src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts (83 tests) 43271ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 1 steps / 'Brötchen' 934ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen' 786ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1169ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 2 steps / 'Brötchen' 691ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen' 692ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1141ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 3 steps / 'Brötchen' 705ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen' 699ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1135ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 4 steps / 'Brötchen' 700ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen' 694ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1295ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 5 steps / 'Brötchen' 710ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen' 707ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1178ms
+   ✓ B-1 generated detail text production probe > shares the 0.5px 'width' boundary with full rendering: 0.5 729ms
+   ✓ B-1 generated detail text production probe > shares the 0.5px 'height' boundary with full rendering: 0.5 698ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 22px 702ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 21px 833ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 20px 965ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 19px 1100ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 18px 1387ms
+   ✓ B-1 generated detail text production probe > matches title-dependent teaser overflow and legal German breaks with the full renderer 2965ms
+   ✓ Instagram recipe details template > preserves B-1 Alpha geometry and pre-extraction PNG fingerprints 2893ms
+   ✓ Instagram recipe details template > keeps short teasers at 22px and shrinks only overflowing teasers to the largest fitting size 2029ms
+   ✓ Instagram recipe details template > renders the Quarkbroetchen approval fixture as an Instagram PNG 668ms
+   ✓ Instagram recipe details template > renders selective cooking summaries at 1..5 steps including 90 characters 3288ms
+   ✓ Instagram recipe details template > renders the Alpha Gefluegelfrikadellen recipe with an offline reference photo as an Instagram PNG 696ms
+   ✓ Instagram recipe details template > renders seven ingredients with the full serving label at index 6 as an Instagram PNG 676ms
+   ✓ Instagram recipe details template > renders the nine-ingredient two-column boundary as an Instagram PNG 681ms
+   ✓ Instagram recipe details template > keeps eight ingredients in the larger one-column layout 686ms
+   ✓ Instagram recipe details template > renders the fourteen-ingredient compact range as an Instagram PNG 698ms
+   ✓ Instagram recipe details template > renders the 20-ingredient layout prototype as an Instagram PNG 1296ms
+   ✓ Instagram recipe details template > keeps fifteen ingredients in the compact layout without the motif overflow 1306ms
+   ✓ Instagram recipe details template > renders a longer recipe name without changing the fixed Instagram canvas 666ms
+   ✓ Instagram recipe details template > renders a long German teaser compound after a measured legal break 750ms
+   ✓ Instagram recipe details template > omits difficulty from the detail image without affecting the other metadata 2690ms
+   ✓ Instagram recipe details template > omits a null time chip while retaining portions and ingredient count 662ms
+
+ Test Files  6 passed (6)
+      Tests  519 passed (519)
+   Start at  19:24:38
+   Duration  45.97s (transform 1.03s, setup 0ms, collect 32.26s, tests 46.26s, environment 1ms, prepare 6.92s)
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Focused-Report.json

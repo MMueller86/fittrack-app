@@ -1,0 +1,16 @@
+{
+  "label": "rice-run07",
+  "exit": 0,
+  "started": "2026-10-11T10:49:20.355Z",
+  "finished": "2026-10-11T10:49:27.474Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 2,
+    "failed": 0,
+    "pending": 19
+  },
+  "failures": [],
+  "outputSha256": "e40e7ea0fdd7bde56eb9955ce093d0300e38752bf29a35faf88a4688d90e72bc",
+  "reportSha256": "e2b225a6187cc5bbd23b6d80255409b90ea568a064622e7afffd898b191550dd"
+}

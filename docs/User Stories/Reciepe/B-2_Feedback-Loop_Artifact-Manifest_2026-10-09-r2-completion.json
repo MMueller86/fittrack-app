@@ -1,0 +1,357 @@
+{
+  "status": "IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED",
+  "releaseEligible": false,
+  "candidateSha256": "80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171",
+  "expectedHandoffAssets": [
+    "B-2_Feedback-Loop_Owned-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Patch-Audit_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Patch-Audit-Output_2026-10-09-r2-completion.txt",
+    "B-2_Feedback-Loop_Preservation_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Ownership_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Original-To-Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Inherited-Original-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Inherited-Resume-Diff_2026-10-09-r2-completion.patch",
+    "B-2_Feedback-Loop_Recorded-Provider-Evidence_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Secret-Scan_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json",
+    "B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json"
+  ],
+  "artifacts": [
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Baseline_2026-10-09.json",
+      "sha256": "496f84368131202863e5e4452528650ae2d6a89b5de1c97af84d10ce03647a93"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build-Output_2026-10-09-r2.txt",
+      "sha256": "4d1b4ff4d6092664a7b2dd9fbb89bd2d18be84abf6e98f62ae2739e6682fca1b"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build_2026-10-09-r2.json",
+      "sha256": "3bc532c1496a400b845cdf63932eb184986f73d063985a4dfd39b91669abfa6f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Candidate_2026-10-09-r2.json",
+      "sha256": "80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Candidate_2026-10-09.json",
+      "sha256": "0f517b03647a314133c0c4a2a8a957a67fb57d153326cf39ee11a2927cae86e9"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Completion_2026-10-09-r2.mjs",
+      "sha256": "0ecbabec1d57d8d554c7f36db428c8b343bce37d849d3d1706f75fc27d67e0c7"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Backend-Privacy-Green-Output_2026-10-09-r2.txt",
+      "sha256": "1395d61f0fc48637736fef38c84325f84d8dd019606eafc732b70aa01a93b84d"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Backend-Privacy-Green-Report_2026-10-09-r2.json",
+      "sha256": "f6cccb98a991fa6f56ec88ee7d85508c92d16b9f5e5aa67d95c618cbc6da5ba8"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Backend-Privacy-Green_2026-10-09-r2.json",
+      "sha256": "4dc99d6d9e285753734088818d7d20a28c80acd9022be042d517bde043077df0"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Backend-Privacy-Red-Output_2026-10-09-r2.txt",
+      "sha256": "6b39adaaa97ab65bbf618bb2d8be7222cfa2db3a1722e11c3c6080c1206af611"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Backend-Privacy-Red-Report_2026-10-09-r2.json",
+      "sha256": "699681d977fe1ac5db66aba0ea4d3ab50ef775e810361ce527e2f2d9a4dc9bbb"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Backend-Privacy-Red_2026-10-09-r2.json",
+      "sha256": "f53a2900bdd8beab778d5081b135011c9ab314a9ad90f02c6c8457c1d6bdb580"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Eval-Guards-Output_2026-10-09-r2.txt",
+      "sha256": "331431aa8fb2a9b74b6d2b9ee55740f3cd21152b4a289daa14ff2dd51f8d2408"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Eval-Guards-Report_2026-10-09-r2.json",
+      "sha256": "43e6fefdf7cb78a377c778c78da52a1139ee2fa50f6353177cf9e6af1acad2ae"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Eval-Guards_2026-10-09-r2.json",
+      "sha256": "24bc769d10c3a2339de893127e1f954ce73a6f1e65664037a6d1403928bb8060"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Green-Output_2026-10-09-r2.txt",
+      "sha256": "844fea3bd6be7860ec865ab6c4e02bbae4c2f80437996a404ae81508a53a6ce3"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Green-Report_2026-10-09-r2.json",
+      "sha256": "71f0bbec8d9ce55c374f2a5200b10cd64819e7ea44489a4a290550d283aaa069"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Green_2026-10-09-r2.json",
+      "sha256": "394b46ced59f2a8f8d7e04c1dc5b14ca63bd518a9893e5de68442cce7fb1bcf4"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Matrix-Output_2026-10-09-r2.txt",
+      "sha256": "24330c5cb7cb4be53b13cad455a90a0cf28d9ade1d3af595a973a34da7fb5b3e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Matrix-Report_2026-10-09-r2.json",
+      "sha256": "ccb902fbc46d9b336ab943bdf98a98216c48435ed6ada25ac28173e103fceea1"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Matrix_2026-10-09-r2.json",
+      "sha256": "0a5668b11eaba039e0ec810d264a5873968ad194efd1cc1bdf8c82f3a3958cb8"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Output_2026-10-09.txt",
+      "sha256": "d1bb8430e82349ec86285be49d2c09f5dca4af3b6c4dd430b2bfbe44d8b5fddb"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Loop-Green-Output_2026-10-09-r2.txt",
+      "sha256": "6e72ae6c0fc2960b4c39f9f23b8861c48355872ab47dee37e055faf6b3524228"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Loop-Green-Report_2026-10-09-r2.json",
+      "sha256": "8ef8c63c7300c4957260e9cf9a8ff17d50eff5c21f84906f62342a2a0f4f56a1"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Loop-Green_2026-10-09-r2.json",
+      "sha256": "2344d62a2c69490b566ffc12b96060cd87b3c754646265727f2ae4d2c2465a54"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Loop-Red-Output_2026-10-09-r2.txt",
+      "sha256": "1e46cda64ac356a9905eef14e170a07117b83428c74544ca758c93b241fd5036"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Loop-Red-Report_2026-10-09-r2.json",
+      "sha256": "d74717d763caa55e3bf4e7e7ad9adbaa50bee1d09993513c884c01d2b0bd258e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Loop-Red_2026-10-09-r2.json",
+      "sha256": "86fae98eec786621654665958a364c61bfcf8cb9ea03ed9c22a0c857280bbd14"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Natural-Geometry-Output_2026-10-09-r2.txt",
+      "sha256": "53809e4ad28c66391fd8d639e1f08fc593db1da2c2d85252ad114afd7eee832f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Natural-Geometry-Report_2026-10-09-r2.json",
+      "sha256": "189ec9edc9095ed64a03f96b48eecdc8e90dcce01e02734a28dfde8635413db7"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Natural-Geometry_2026-10-09-r2.json",
+      "sha256": "99bcaff9a0f6f3884ea07ce19ee8bef5af9bec8f039adb4d7de0a02128617a15"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Reference-Diagnostics-Output_2026-10-09-r2.txt",
+      "sha256": "ec913a3aed054c5f13b4b0302913085d9bea4a914bcaa3d92a8a27e446c5eb03"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Reference-Diagnostics-Report_2026-10-09-r2.json",
+      "sha256": "95d75e9ea5c6ab3c4490723ee60e2fcf4edfc6e449f527d9a09d721b0f60d960"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Reference-Diagnostics_2026-10-09-r2.json",
+      "sha256": "380512d51e990743b9ed0e3519a5e532231f2671f74c5cabb301af1c487b8ad6"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-SDK-Output_2026-10-09-r2.txt",
+      "sha256": "f9ecb63513d49e2d135c041cedc67d83e273da2ed4d2c0ca621b475a5080be5e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-SDK-Report_2026-10-09-r2.json",
+      "sha256": "42f565c1c73ca863c6bcff4b8a9e076b6f91b251e24b030fff6480556aa4cd47"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-SDK_2026-10-09-r2.json",
+      "sha256": "b03281e88e92b9412cccbdbf84722204b5b492b369ed70c7684df63086629aa9"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Source-Tables-Output_2026-10-09-r2.txt",
+      "sha256": "7424184344f4ce695c3ba86485ce800d3c8a59243d3471303e7f0237c2b75111"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Source-Tables-Report_2026-10-09-r2.json",
+      "sha256": "4105271c25b1359f4fe22f1ae7f24523472af97ad2cf5ea8f48b42ba7eca9038"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Source-Tables_2026-10-09-r2.json",
+      "sha256": "573ce43228bd66a7bf19d203f562e1451bec0f0e9d9bf50f629aae91b5b37dce"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Validator-Green-Output_2026-10-09-r2.txt",
+      "sha256": "8b666de07a16770d03cbbdb5b9c57749dbeac718e72fd6352ade51413a0a89d4"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Validator-Green-Report_2026-10-09-r2.json",
+      "sha256": "b0098eff9747e0a76fae18b08e5ebbac80069ee4e64247cb8cce020a7b1d94fb"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Validator-Green_2026-10-09-r2.json",
+      "sha256": "186b49df3858a14f6ec6e31cfa81f783435378a71eba6fdb46eec1374d6a9f88"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Validator-Red-Output_2026-10-09-r2.txt",
+      "sha256": "e7be8b0d5462b495b9d55aa64182ca926d0bc7b980d1320cd415bda5dfb52a8c"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Validator-Red-Report_2026-10-09-r2.json",
+      "sha256": "59f355c9f4d6538f211d09affd1a6abf930fbf204ddcf5cc9ed81cf57e0f5104"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Validator-Red_2026-10-09-r2.json",
+      "sha256": "7dbda106895b7f5b276d76a6f8f9758a17312731d0f68d49de04e18de5dc872b"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Evidence_2026-10-09-r2.mjs",
+      "sha256": "2ab02560bd9686dbcbe1933b6eba4b3f250834dc7ceca97ba31d9fd567bfb42d"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Evidence_2026-10-09.mjs",
+      "sha256": "1ce9e6cc16a30f3cdd1d22f84e62928a57967a314efb6fbfdc61f2801991b4ab"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Output_2026-10-09-r2.txt",
+      "sha256": "220fd741cbe6f1cc9010c508a0ea2e10b15f1487f666a7f58b852f68c0de0c0c"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Report_2026-10-09-r2.json",
+      "sha256": "7cf9cb2e1c9cd527bbb586667966c1d1025aa41c536d1581aef942a23302fec0"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Output_2026-10-09-r2.txt",
+      "sha256": "6db0620b9bd9b4dbe118e3366828091e3965baecadb4bac8774ac7176a71253f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Report_2026-10-09-r2.json",
+      "sha256": "3f274d34e307dcdc1792141e9d4867f67a220762e5c421f50e2fc2fd9f9a5486"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused_2026-10-09-r2.json",
+      "sha256": "0e63ee958d1961c342c44ad7e5fb191dcf9ec7ff232ecc0677c303b712bdf679"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F_2026-10-09-r2.json",
+      "sha256": "bbc417eae6838a197ffb3860d2fed05c3390ffc17f5320cf603430c9e1c6ac6e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F_2026-10-09.json",
+      "sha256": "084f3513135af7f083e93cf42e1db8bbfbe338b036f9c245d514572aecc53914"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_G_2026-10-09-r2.json",
+      "sha256": "38d4d7b1e39a5280ff769735d469ec8f5d960e0fc4e4b306d93b5c191c5b6522"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_G_2026-10-09.json",
+      "sha256": "084f3513135af7f083e93cf42e1db8bbfbe338b036f9c245d514572aecc53914"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09.md",
+      "sha256": "ddea164e6f0bd4d36c7eff10136946955145321fe9e9a4260789f87cba52658f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Inherited-Original-Diff_2026-10-09-r2-completion.patch",
+      "sha256": "dfb8c08b5ef1617702efea1f7d6024db003acee1fa1d33a8930ea1d844c58fc1"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Inherited-Resume-Diff_2026-10-09-r2-completion.patch",
+      "sha256": "97461d3ebc54f108b4a5b8a0f6e09c0efc04691300cc9eeba6caeb9aadfa9def"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Live-Reconciliation_2026-10-09-r2.json",
+      "sha256": "bae4d32b91400a7ea30f2cfa36797e3f922d4809568661be0b1c25ddfacaa30e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Offline_2026-10-09.json",
+      "sha256": "5512e4a60da2a4d8166944b4c3d45126ef1cc0e875e17765d028a3d5ff940699"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Original-To-Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+      "sha256": "7aad420108cf6b70705bfad804a923f79e3dd1b1c0b54fce14042114fa8594ce"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Owned-Diff_2026-10-09-r2-completion.patch",
+      "sha256": "2ccfebafba487c5578e417f055fbaf247f7938076d826b68804450aae03e2fa3"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Owned-Diff_2026-10-09.patch",
+      "sha256": "03e76986b087873226fbd69fa35a1e8e3bcdee9c85149b8e788749629e76c796"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Ownership_2026-10-09-r2-completion.json",
+      "sha256": "a695ce32584deb5dce9c5abf3842fc21bfa22ca02e45c73a1cd53f9a05d5f2e3"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Patch-Audit-Output_2026-10-09-r2-completion.txt",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Patch-Audit_2026-10-09-r2-completion.json",
+      "sha256": "539db5233591f51d630818fb3789167f1989e2424a7d3210eb5eeb458b14961b"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Preservation_2026-10-09-r2-completion.json",
+      "sha256": "ffb34dfb8e7cce6eaf00abbb59c415410bb2fac07ac2f1b702427eead7f92e1b"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Preservation_2026-10-09.json",
+      "sha256": "49a78942b5284fe1e18cc61890c5f0a634ecedd83f48022178c9655630156a7f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Recorded-Provider-Evidence_2026-10-09-r2-completion.json",
+      "sha256": "c0a3c7a49ba4ca1b56252b4431bbba559a62603fa4fe61f98671623d55a11c7a"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json",
+      "sha256": "0f3a9a17fe77851d09c18858e8f34fb6692d079d9187648ebd52af01ae3be21e"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09.json",
+      "sha256": "321f98c4e49838c711cfeff16def6a431965b4c09e4a7922ece8835310a51951"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Resume-Baseline_2026-10-09-r2.json",
+      "sha256": "bd843a931f94d41c2c3b8d80e42a73d2ae1822d08b2cf041702f832e984720ba"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+      "sha256": "5380394c32c8f8367ac11b421d702db72e18ad4e994291fa54e5c81e279fca2a"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_R_2026-10-09-r2.json",
+      "sha256": "50196ebb6485a1d7ae3ff286868f87e3d9c98baf165616b47d17b34e02b8a5a5"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_R_2026-10-09.json",
+      "sha256": "084f3513135af7f083e93cf42e1db8bbfbe338b036f9c245d514572aecc53914"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Secret-Scan_2026-10-09-r2-completion.json",
+      "sha256": "be584ef0b6af16d5bbc5dede66a5f0095fa71c0e7bbe6b6fe46890f2e66596b6"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Typecheck-Output_2026-10-09-r2.txt",
+      "sha256": "23c579af752749ab52e91e4b158cb5b0963e398b79c00fe844abe59d5ad8271f"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Typecheck_2026-10-09-r2.json",
+      "sha256": "dc7b048f0fe7814ee87edaceac146d199644518737548e6f5e287059d79fcb6c"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units-Output_2026-10-09-r2.txt",
+      "sha256": "74cf089c90dbc2bf0e47cfe30dba63bdae939a4334aa247812011842062a0616"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units-Report_2026-10-09-r2.json",
+      "sha256": "15d6aa236dc7e7f0a442fb812d01b9e45f1544872e7319df666be24f3a31c09c"
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units_2026-10-09-r2.json",
+      "sha256": "dcd4488feaf6226df32a707c29b0b9489064cc5a919b5e3474b88b9d030a0c2d"
+    }
+  ],
+  "selfHashExcluded": true,
+  "gateRuns": 0,
+  "liveCalls": 0
+}

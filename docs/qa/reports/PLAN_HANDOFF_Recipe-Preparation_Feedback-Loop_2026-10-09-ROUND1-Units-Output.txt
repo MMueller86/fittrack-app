@@ -1,0 +1,143 @@
+
+> @fittrack/backend@1.0.0 test
+> vitest run --reporter=dot --reporter=json --silent --outputFile=C:\Users\mmueller\OneDrive - PRODYNA SE\fittrack-app\docs\qa\reports\PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Units-Report.json
+
+
+ RUN  v2.1.9 C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend
+
+ ✓ src/lib/favoritesScoring.test.ts (21 tests) 24ms
+ ✓ src/lib/hintEngine.test.ts (85 tests) 17ms
+ ✓ src/lib/dailyInsightValidation.test.ts (28 tests) 32ms
+ ✓ src/lib/progressIntelligence.test.ts (49 tests) 53ms
+ ✓ src/lib/http.test.ts (15 tests) 26ms
+ ✓ src/lib/prompts/dailyInsightPrompt.test.ts (37 tests) 19ms
+ ✓ src/lib/recipeAnalyzeValidation.test.ts (167 tests) 181ms
+ ✓ src/lib/instagramRenderer/recipeAdapter.test.ts (15 tests) 10ms
+ ✓ src/lib/repositories/userFoodRelationRepository.test.ts (31 tests) 21ms
+ ✓ src/lib/repositories/insightRepository.test.ts (75 tests) 43ms
+ ✓ src/lib/repositories/diaryRepository.test.ts (27 tests) 32ms
+ ✓ src/lib/repositories/foodProductRepository.test.ts (21 tests) 10ms
+ ✓ src/functions/foodSearch.test.ts (9 tests) 15ms
+ ✓ src/lib/communityRecipes.test.ts (13 tests) 21ms
+ ✓ src/lib/dailyInsightContext.test.ts (19 tests) 20ms
+ ✓ src/functions/profile.test.ts (19 tests) 214ms
+ ✓ src/functions/favorites.test.ts (21 tests) 220ms
+ ✓ src/lib/nutritionValidator.test.ts (20 tests) 9ms
+ ✓ src/lib/auth.test.ts (20 tests) 305ms
+ ✓ src/lib/weeklyInsight.test.ts (12 tests) 23ms
+ ✓ src/lib/openai.daily.test.ts (8 tests) 23ms
+ ✓ src/functions/specialActivity.test.ts (28 tests) 370ms
+ ✓ src/functions/dailyInsightFeedback.test.ts (41 tests) 498ms
+ ✓ src/functions/weights.test.ts (25 tests) 165ms
+ ✓ src/lib/nutritionCalculator.test.ts (19 tests) 9ms
+ ✓ src/functions/weeklyInsight.test.ts (16 tests) 349ms
+ ✓ src/functions/dailyInsight.test.ts (37 tests) 359ms
+ ✓ src/test-utils/weeklyInsightEvalSemantics.test.ts (10 tests) 9ms
+ ✓ src/lib/searchRanking.test.ts (14 tests) 7ms
+ ✓ src/lib/repositories/recipesRepository.test.ts (4 tests) 29ms
+ ✓ src/functions/ai.test.ts (78 tests) 455ms
+ ✓ src/lib/dailyInsightIntent.test.ts (10 tests) 6ms
+ ✓ src/lib/recipeValidation.test.ts (5 tests) 9ms
+ ✓ src/lib/instagramRenderer/__tests__/photo.test.ts (8 tests) 76ms
+ ✓ src/lib/quota.test.ts (7 tests) 8ms
+ ✓ src/lib/openai.weekly.test.ts (11 tests) 17ms
+ ✓ src/lib/openFoodFactsClient.test.ts (8 tests) 7ms
+ ✓ src/functions/foodEstimate.test.ts (12 tests) 248ms
+ ✓ src/lib/quotaConfig.test.ts (9 tests) 5ms
+ ✓ src/lib/prompts/dailyInsightPromptManifest.test.ts (4 tests) 7ms
+ ✓ src/lib/repositories/weightsRepository.test.ts (8 tests) 6ms
+ ✓ src/functions/diary.test.ts (60 tests) 1101ms
+ ✓ src/lib/repositories/cosmosRecipesRepository.test.ts (2 tests) 9ms
+ ✓ src/lib/openai.recipeAnalyze.test.ts (18 tests) 590ms
+   ✓ B-2 Preparation SDK contract > binds all three real SDK operations to unchanged original and the latest whole parsed draft and diagnostics 309ms
+ ✓ src/lib/weeklyInsightValidation.test.ts (4 tests) 5ms
+ ✓ src/lib/weeklyTargetSnapshot.test.ts (2 tests) 4ms
+ ✓ src/lib/registrations.test.ts (21 tests) 6ms
+ ✓ src/lib/repositories/reusableItemsRepository.test.ts (8 tests) 10ms
+ ✓ src/lib/repositories/aiUsageRepository.test.ts (9 tests) 8ms
+ ✓ src/functions/weeklyTargetSnapshot.test.ts (3 tests) 100ms
+ ✓ src/lib/repositories/dayMetaRepository.test.ts (5 tests) 9ms
+ ✓ src/functions/labelScan.test.ts (7 tests) 88ms
+ ✓ src/lib/instagramRenderer/__tests__/errors.test.ts (8 tests) 1046ms
+   ✓ Instagram recipe renderer validation > rejects a title that exceeds the fixed width 738ms
+ ✓ src/functions/recipes.test.ts (122 tests) 2120ms
+   ✓ POST /recipes/{id}/export-view/prepare > QA-R1 logs metadata only for nested unknown-key-only exhaustion 311ms
+ ✓ src/lib/recipePreparation.test.ts (51 tests) 3119ms
+   ✓ B-2 bounded Preparation loop > QA-R1 reproduces the recorded oven field and preserves cooking core in a complete corrected draft 476ms
+   ✓ B-2 bounded Preparation loop > QA-R1 uses production step and teaser font metadata for 4 steps 373ms
+   ✓ B-2 bounded Preparation loop > QA-R1 uses production step and teaser font metadata for 5 steps 491ms
+ ✓ src/lib/instagramRenderer/__tests__/smoke.test.ts (1 test) 1364ms
+   ✓ Instagram recipe renderer smoke fixture > renders the alternate recipe without a golden comparison 1363ms
+ ✓ src/lib/instagramRenderer/__tests__/golden.test.ts (1 test) 1831ms
+   ✓ Instagram recipe renderer golden output > keeps the approved composition within the documented V1.7 diagnostic envelope 1829ms
+ ✓ src/functions/recipeImageHeroCrop.test.ts (11 tests) 8ms
+ ✓ src/lib/storage.test.ts (7 tests) 7ms
+ ✓ src/functions/communityRecipes.test.ts (6 tests) 148ms
+ ✓ src/functions/reusableItems.test.ts (34 tests) 174ms
+ ✓ src/functions/instagramRecipe.test.ts (31 tests) 222ms
+ ✓ src/lib/instagramRenderer/__tests__/highlight.test.ts (3 tests) 5710ms
+   ✓ Instagram recipe renderer nutrition highlights > renders exactly one high-protein badge without shifting the remaining layout 3231ms
+   ✓ Instagram recipe renderer nutrition highlights > renders exactly one low-fat badge without shifting the remaining layout 2286ms
+ ✓ src/lib/instagramRenderer/__tests__/nutrition-layout.test.ts (5 tests) 9333ms
+   ✓ shared recipe footer background > renders a greener left footer and a darker right footer 2037ms
+   ✓ Instagram recipe renderer nutrition layout > keeps the PRO PORTION label free of foreign horizontal pixels 3091ms
+   ✓ Instagram recipe renderer nutrition layout > renders the complete symmetric barbell above the card and integrates PRO PORTION 2106ms
+   ✓ Instagram recipe renderer nutrition layout > keeps the null-highlight smoke fixture renderable 2094ms
+ ✓ src/lib/instagramRenderer/__tests__/tags.test.ts (6 tests) 9507ms
+   ✓ Instagram recipe renderer tags > accepts zero, one, and four tags with the expected chip count 5071ms
+   ✓ Instagram recipe renderer tags > keeps the remaining layout fixed when the tag row is omitted 2254ms
+   ✓ Instagram recipe renderer tags > uses the compact chip geometry and preserves the four-tag render bounds 1107ms
+   ✓ Instagram recipe renderer tags > uses text-only fallback chips for unknown tags and Curry 1047ms
+ ✓ src/lib/instagramRenderer/__tests__/recipe-meta.test.ts (26 tests) 11522ms
+   ✓ Instagram recipe renderer meta line > renders one complete centered meta row with three line icons 2338ms
+   ✓ Instagram recipe renderer meta line > keeps every existing pixel outside the optional meta zone unchanged 2894ms
+   ✓ Instagram recipe renderer meta line > keeps the complete meta row when the nutrition highlight is null 1171ms
+   ✓ Instagram recipe renderer meta line > omits null time and difficulty chips while retaining portions 1030ms
+   ✓ Instagram recipe renderer meta line > keeps highlight changes confined to the existing badge zone 2093ms
+   ✓ Instagram recipe renderer meta line > retains distinct footer zones after a 4:5 thumbnail downscale 1777ms
+ ✓ src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts (83 tests) 45890ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 1 steps / 'Brötchen' 1744ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen' 1428ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1852ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 2 steps / 'Brötchen' 1081ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen' 947ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1502ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 3 steps / 'Brötchen' 872ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen' 852ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1209ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 4 steps / 'Brötchen' 706ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen' 672ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1115ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 5 steps / 'Brötchen' 695ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen' 679ms
+   ✓ B-1 generated detail text production probe > matches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' 1123ms
+   ✓ B-1 generated detail text production probe > shares the 0.5px 'width' boundary with full rendering: 0.5 656ms
+   ✓ B-1 generated detail text production probe > shares the 0.5px 'height' boundary with full rendering: 0.5 661ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 22px 679ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 21px 816ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 20px 959ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 19px 1097ms
+   ✓ B-1 generated detail text production probe > retains identical font-attempt selection through 18px 1230ms
+   ✓ B-1 generated detail text production probe > matches title-dependent teaser overflow and legal German breaks with the full renderer 2893ms
+   ✓ Instagram recipe details template > preserves B-1 Alpha geometry and pre-extraction PNG fingerprints 2805ms
+   ✓ Instagram recipe details template > keeps short teasers at 22px and shrinks only overflowing teasers to the largest fitting size 1975ms
+   ✓ Instagram recipe details template > renders the Quarkbroetchen approval fixture as an Instagram PNG 659ms
+   ✓ Instagram recipe details template > renders selective cooking summaries at 1..5 steps including 90 characters 3326ms
+   ✓ Instagram recipe details template > renders the Alpha Gefluegelfrikadellen recipe with an offline reference photo as an Instagram PNG 662ms
+   ✓ Instagram recipe details template > renders seven ingredients with the full serving label at index 6 as an Instagram PNG 658ms
+   ✓ Instagram recipe details template > renders the nine-ingredient two-column boundary as an Instagram PNG 675ms
+   ✓ Instagram recipe details template > keeps eight ingredients in the larger one-column layout 677ms
+   ✓ Instagram recipe details template > renders the fourteen-ingredient compact range as an Instagram PNG 680ms
+   ✓ Instagram recipe details template > renders the 20-ingredient layout prototype as an Instagram PNG 1317ms
+   ✓ Instagram recipe details template > keeps fifteen ingredients in the compact layout without the motif overflow 1270ms
+   ✓ Instagram recipe details template > renders a longer recipe name without changing the fixed Instagram canvas 669ms
+   ✓ Instagram recipe details template > renders a long German teaser compound after a measured legal break 746ms
+   ✓ Instagram recipe details template > omits difficulty from the detail image without affecting the other metadata 2731ms
+   ✓ Instagram recipe details template > omits a null time chip while retaining portions and ingredient count 654ms
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Units-Report.json
+
+ Test Files  67 passed (67)
+      Tests  1600 passed (1600)
+   Start at  19:26:16
+   Duration  47.50s (transform 11.44s, setup 0ms, collect 67.29s, tests 97.89s, environment 15ms, prepare 10.02s)
+

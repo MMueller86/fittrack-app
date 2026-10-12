@@ -1,0 +1,40 @@
+diff --git a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+--- a/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
++++ b/backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts
+@@ -231 +231 @@
+-  { sourceStepOrder: 6, description: 'finish cooking chicken after frying', patterns: [/(?:gar\w*[\s\S]*hähnchen|hähnchen[\s\S]*gar\w*)/iu], contradictions: [/(?:gar\w*[^;,.]*weitere\s+4\s*min|weitere\s+4\s*min[^;,.]*gar\w*)/iu, /erhöh\w*[^;,.]*hitze/iu, /gar\w*[^;,.]*(?:reis|bohn)/iu] },
++  { sourceStepOrder: 6, description: 'finish cooking chicken after frying', patterns: [/(?:gar\w*[\s\S]*hähnchen|hähnchen[\s\S]*gar\w*)/iu], contradictions: [/(?:gar\w*[^;,.]*weitere\s+4\s*min|weitere\s+4\s*min[^;,.]*gar\w*)/iu, /erhöh\w*[^;,.]*hitze/iu, /gar\w*(?:(?!\bservier\w*)[^;,.])*(?:reis|bohn)/iu] },
+diff --git a/backend/src/lib/recipeAnalyzeValidation.test.ts b/backend/src/lib/recipeAnalyzeValidation.test.ts
+--- a/backend/src/lib/recipeAnalyzeValidation.test.ts
++++ b/backend/src/lib/recipeAnalyzeValidation.test.ts
+@@ -293,0 +294,30 @@
++  it.each([
++    { label: 'minimal finish cooking', description: 'Gare Hähnchen fertig.', references: [6], accepted: true },
++    { label: 'finish cooking combined with serving', description: 'Gare Hähnchen fertig und serviere es mit Reis.', references: [6, 8], accepted: true },
++    { label: 'missing finish-cooking reference', description: 'Gare Hähnchen fertig.', references: [7], accepted: false },
++    { label: 'missing finish-cooking action', description: 'Serviere Hähnchen mit Reis.', references: [6, 8], accepted: false },
++    { label: 'wrong component', description: 'Gare Reis fertig.', references: [6], accepted: false },
++    { label: 'wrong component despite chicken mention', description: 'Gare Reis fertig und serviere Hähnchen.', references: [6, 8], accepted: false },
++    { label: 'wrong component alongside correct cooking', description: 'Gare Hähnchen und Reis fertig.', references: [6], accepted: false },
++    { label: 'wrong additional time', description: 'Gare Hähnchen weitere 4 Minuten.', references: [6], accepted: false },
++    { label: 'invented temperature', description: 'Gare Hähnchen bei 180°C fertig.', references: [6], accepted: false },
++    { label: 'swapped rice and finish-cooking texts', description: 'Koche Reis separat.', references: [6], accepted: false },
++  ])('checks source 6 rubric with valid structure: $label', ({ label, description, references, accepted }) => {
++    const result = syntheticPreparationRecipe();
++    result.exportSuggestion.steps = [
++      { order: 1, description: 'Schneide Hähnchen.', sourceStepOrders: [1], ingredientKeys: [] },
++      { order: 2, description: 'Brate Hähnchen an.', sourceStepOrders: [4], ingredientKeys: [] },
++      { order: 3, description: label === 'swapped rice and finish-cooking texts' ? 'Gare Hähnchen fertig.' : 'Koche Reis separat.', sourceStepOrders: [5], ingredientKeys: [] },
++      { order: 4, description, sourceStepOrders: references, ingredientKeys: [] },
++    ];
++    const before = structuredClone(result);
++    expect(validateRecipeAnalyzeOutput(result).ok).toBe(true);
++    expect(validateRecipeExportPreparationOutput(result).ok).toBe(true);
++    if (accepted) {
++      assertRecipeStepSemantics(result, RECIPE_PREPARATION_EVAL_FIXTURE.constraints);
++    } else {
++      expect(() => assertRecipeStepSemantics(result, RECIPE_PREPARATION_EVAL_FIXTURE.constraints)).toThrow();
++    }
++    expect(result).toEqual(before);
++  });
++

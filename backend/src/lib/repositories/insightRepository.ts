@@ -299,7 +299,7 @@ function shouldPreserveV14CacheUntilExpiry(
   activePromptVersion: string | undefined,
 ): boolean {
   const expiresAt = Date.parse(cached.expiresAt);
-  return activePromptVersion === 'v15'
+  return (activePromptVersion === 'v15' || activePromptVersion === 'v16' || activePromptVersion === 'v17')
     && cached.promptVersion === 'v14'
     && Number.isFinite(expiresAt)
     && expiresAt > now.getTime()

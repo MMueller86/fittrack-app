@@ -1,0 +1,232 @@
+diff --git a/docs/kb/domain/06-recipes.md b/docs/kb/domain/06-recipes.md
+--- a/docs/kb/domain/06-recipes.md
++++ b/docs/kb/domain/06-recipes.md
+@@ -182,9 +182,16 @@
+ ### Transient Export-View Preparation
+ 
+ `POST /api/recipes/{id}/export-view/prepare` uses the existing Recipe Analyze
+-call and the shared `recipe-analyze` quota. It does not change the prompt,
+-persist recipe data, or make an additional AI call. The legacy `{}` request
+-accepts only the strict `{ "contractVersion": 2 }` request; `{}`, missing or
++client function and the shared `recipe-analyze` quota. With preparation context,
++`analyzeRecipeText()` selects only `RECIPE_PREPARATION_SYSTEM_PROMPT` v2, without
++the import prompt body; free-text import still uses the unchanged v15 prompt.
++The user message is JSON containing `recipeContext` and the stored `steps` in
++their original array order, with unchanged `order`, `title`, and `description`.
++A missing title is requested as `null` in the model output. The full Strict
++`AiRecipeRaw` provider contract, model selection, temperature 0.2, and 2048-token
++budget remain unchanged: one provider call, no retry, fallback, or extra call.
++The route does not persist recipe data and accepts only the strict
++`{ "contractVersion": 2 }` request; `{}`, missing or
+ invalid JSON, unknown fields, and unsupported versions return
+ `400 invalid_export_preparation_request`. No client ETag is required. If
+ `If-Match` is supplied, a stale or non-exact ETag returns
+@@ -206,8 +213,16 @@
+ usage. Preparation does not update the recipe or its confirmed `exportView`;
+ saving still requires the separate explicit confirmation flow.
+ The export trace is validated against the persisted recipe's ordered `steps`,
+-not the Recipe Analyze response's re-extracted `steps`; the latter is not the
+-source of truth for an existing recipe.
++not the model-returned `steps`; the latter is not the source of truth for an
++existing recipe. Missing, duplicate, unknown, or reordered source references,
++empty text, and limit violations return `422`. This is not a general content
++validator: complete IDs and valid lengths do not prove that all actions or
++details survive in the text. The v2 grouping instructions are prompt intent,
++not a demonstrated content guarantee. Current live evidence is FAIL, with the
++remaining serial runs UNVERIFIED; see the
++[B-16 handoff](../../User%20Stories/Reciepe/B-16_Recipe-Preparation-v2_Handoff_2026-10-09.md).
++Preparation uses the current saved recipe, not a historical replay; the private
++original recipe and deployed revision are unavailable for historical validation.
+ 
+ ### Sharing a Confirmed Export View or Request Draft
+ 
+diff --git a/docs/kb/domain/07-ai-features.md b/docs/kb/domain/07-ai-features.md
+--- a/docs/kb/domain/07-ai-features.md
++++ b/docs/kb/domain/07-ai-features.md
+@@ -102,7 +102,8 @@
+ 
+ ## 5. Recipe Analyzer
+ 
+-**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v13'`
++**Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v15'`;
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v2'`.
+ 
+ **Endpoint:** `POST /api/ai/recipe-analyze`
+ 
+@@ -165,6 +166,10 @@
+ This allows the review screen (`RecipeWizardScreen`) to render seasoning items differently from food items.
+ 
+ ### v13 analyzer and export suggestion contract
++
++The following v13 rules are retained in the current import v15 prompt; they
++describe the requested output, not a current live content PASS. Preparation
++v2 uses its own exclusive prompt and validation boundary described below.
+ 
+ For v13, explicitly numbered input instructions remain one-to-one in the complete ordered source `steps` array; the five-export-step limit never applies to that array. `exportSuggestion.steps` has exactly `min(source step count, 5)` entries. With at most five source steps, each export step references only its corresponding source order; above five, export steps partition the source sequence into exactly five contiguous groups. The prompt assigns groups using the next unassigned source order, so the flattened trace must equal `1..N` exactly once. The existing server validator remains fail-closed and invalid traces retain the HTTP `422` contract.
+ 
+@@ -193,7 +198,13 @@
+ The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. A structurally or semantically invalid AI result returns `422` and is rejected before usage is tracked. Usage is tracked only after the AI result passes server validation. The analysis response, including `exportSuggestion`, is transient at this endpoint: it is not persisted automatically, and no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Food items with an indeterminate amount remain visible with `needsReview: true`; seasoning items bypass catalog search and are also shown for user review in the wizard.
+ 
+ `POST /api/recipes/{id}/export-view/prepare` reuses the same analyzer call,
+-server validation, and `recipe-analyze` quota. It accepts only
++but selects only the exclusive preparation v2 system prompt, not the import
++v15 body or an appended addendum. The existing client sends `recipeContext`
++and unchanged stored `steps` as JSON in the user-data message. Import v15 is
++unchanged. The full Strict `AiRecipeRaw` provider contract, model selection,
++temperature 0.2, 2048-token budget, and single provider call are unchanged.
++Preparation validates against saved `recipe.steps`, not model-returned source
++steps, and uses the same `recipe-analyze` quota. It accepts only
+ `{ "contractVersion": 2 }`. A client ETag is not required; if `If-Match` is
+ supplied, a stale or non-exact value returns `412 recipe_revision_conflict`
+ before quota or provider work. The transient response contains only the
+@@ -204,6 +215,16 @@
+ persist the suggestion, and tracks usage once only after a valid AI result.
+ The analyzer's `includedIngredientKeys` remain part of the separate
+ new-recipe analysis contract.
++
++Preparation V2 is text-only: unused AI ingredient fields and ingredient-key
++references do not block it; import still uses full analyzer validation.
++The preparation validator rejects invalid source traces, empty texts, and
++limit violations, but is not a general content validator. The v2 prompt asks
++for content-driven adjacent grouping preserving every action and detail;
++that intent is not a working content guarantee. The synthetic live evidence
++is FAIL and the stopped serial runs remain UNVERIFIED, not PASS. Preparation
++is not a history replay. See the
++[current evidence and open gates](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
+ 
+ ### Share-Triggered Recipe Export Review
+ 
+diff --git a/docs/kb/tech/02-backend.md b/docs/kb/tech/02-backend.md
+--- a/docs/kb/tech/02-backend.md
++++ b/docs/kb/tech/02-backend.md
+@@ -264,12 +264,15 @@
+ sanitized provider code/status/request ID, and duration. Server-validation
+ failures record up to eight phase/code/field-path diagnostics plus a truncation
+ flag; validation messages are not logged. For `source_step_coverage_mismatch`
+-only, additional correlated failure events include the exact recipe text sent
+-as the AI user input and the generated source/export steps, each capped at
+-16,000 characters with original length and truncation status. This diagnostic
+-content is retained in Application Insights for 30 days; successful requests
+-do not log recipe or generated text. The completion event records source/export
+-step counts.
++only, the validation failure event also records expected saved source orders
++and actual flattened export source orders, each bounded to 32 values with
++truncation flags, plus the first mismatch position and expected/actual order.
++Preparation logs do not include recipe/context text, generated source/export
++text, raw provider payloads, or ingredient values on success or failure.
++The completion event records source/export step counts. These diagnostics
++describe trace failures against saved `recipe.steps`, not general content
++validation or historical replay. See
++[Preparation V2 evidence boundary](06-ai-integrations.md#preparation-v2-evidence-boundary).
+ Strict request-body failures across preparation and rendering record bounded
+ Zod issue codes, sanitized schema paths, and up to eight identifier-shaped
+ unknown field names, with issue/key truncation indicated; request values are
+diff --git a/docs/kb/tech/06-ai-integrations.md b/docs/kb/tech/06-ai-integrations.md
+--- a/docs/kb/tech/06-ai-integrations.md
++++ b/docs/kb/tech/06-ai-integrations.md
+@@ -63,7 +63,12 @@
+ 
+ ### 6. Recipe Analyzer (`POST /api/ai/recipe-analyze`)
+ 
+-**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v13'`.
++**Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v15'`;
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v2'`.
++
++The v13 rules below describe the inherited import contract/prompt intent,
++retained in v15, not a current live content PASS. Preparation v2 is separate;
++see [its evidence boundary](#preparation-v2-evidence-boundary).
+ 
+ For explicitly numbered input, v13 first emits exactly one ordered source `steps` entry per input instruction; the five-step cap applies only to `exportSuggestion.steps`. The export contains exactly `min(N, 5)` steps: a one-to-one source mapping for up to five steps, or five groups of adjacent steps above five. The prompt assigns groups using the next unassigned source order and requires the flattened trace to equal `1..N` exactly once; the server validator and its HTTP `422` failure behavior remain unchanged.
+ 
+@@ -94,6 +99,53 @@
+ Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: true`, `additionalProperties: false`). The handler enforces the `recipe-analyze` quota before the provider call and tracks usage only after the parsed result passes structural and semantic validation. Quota exhaustion returns `429`; provider, empty-response, or JSON-parse failures return `502`; invalid structured or plausibility output returns `422`. The response is a transient review preview. No AI result is persisted by this endpoint and no usage is tracked for a rejected result; only a later explicit user-confirmed recipe write can persist accepted export data.
+ 
+ **Used by:** `RecipeWizardScreen` on mobile.
++
++#### Preparation V2 Evidence Boundary
++
++`POST /api/recipes/{id}/export-view/prepare` calls the existing
++`analyzeRecipeText('', preparationContext)` once. With context, its system
++message is exclusively `RECIPE_PREPARATION_SYSTEM_PROMPT` v2; without context,
++free-text import keeps the unchanged v15 prompt. JSON is sent only in the user
++message: `recipeContext` projects saved metadata and ingredient values without
++stored ingredient IDs, while `steps` preserves stored array order and
++`order`/`title`/`description`. The prompt requests unchanged model source steps
++(missing title becomes `null`), not fresh source extraction.
++
++The full `AiRecipeRaw` output remains required by the unchanged
++`recipe_analyze` Strict schema, including ingredients and ingredient keys.
++Model selection, temperature 0.2, max_tokens 2048, and one provider call remain
++unchanged; no new client operation, retry, fallback, or intermediate output.
++The v2 prompt requests content-driven adjacent grouping only after accounting
++for every saved action/detail, under the existing five-step/90-character limits.
++This is prompt intent, not proof of content preservation or model causality.
++
++The handler replaces model-returned source steps with saved `recipe.steps`
++for `validateRecipeExportPreparationOutput()`. Invalid traces (missing,
++duplicate, unknown, or reordered references), empty text, nullable-metadata
++violations, and limits fail with `422`. The V2 response projects only export
++text; unused ingredient fields/key references do not block preparation, while
++import retains full validation. There is no general runtime content validator:
++valid IDs/counts/lengths can still accompany missing actions or details.
++Auth, optional ETag before quota, `429`/`502`, usage only after valid success,
++privacy-safe bounded order diagnostics, and transience are unchanged.
++
++[Partial] The [B-16 handoff](../../User%20Stories/Reciepe/B-16_Recipe-Preparation-v2_Handoff_2026-10-09.md)
++records passing request isolation and offline gates (294 focused / 1407 full
++unit tests, typecheck, build), not a live content PASS. Serial run 1 is FAIL:
++export IDs cover 1..7 instead of 1..8; serving, medium heat, and covered resting
++are missing. The real handler returns `422`, usage is 0, provider calls 1.
++Runs 2/3 stopped and remain UNVERIFIED. The separate Recipe eval has eight
++import failures plus preparation FAIL; the overall eval is 12 FAIL / 27 PASS,
++including unrelated Daily Insight failures. Partly unavailable overall raw
++evidence and unreached success assertions remain UNVERIFIED. Live FAIL blocks
++completion/release; QA and open gates are not closed by this documentation.
++
++Source binding already worked in v15 despite missing export text. No proven
++model cause, prompt dominance, or token shortage follows; both fully captured
++responses finished with `stop`, not `length`. The private original recipe and
++deployed revision are missing: MANUAL VALIDATION REQUIRED, no history replay.
++[Open] PO-1 exact-count rule remains unresolved and unchanged; B-1 reversions
++and the three unattributed import hunks are not resolved by B-16 or this update.
+ 
+ The backend resolves the analyzer's normalized food names directly against the catalog. It does not re-run the general meal parser, so the analyzer's kitchen-unit conversions remain attached to the matching food.
+ 
+diff --git a/docs/kb/tech/09-api-reference.md b/docs/kb/tech/09-api-reference.md
+--- a/docs/kb/tech/09-api-reference.md
++++ b/docs/kb/tech/09-api-reference.md
+@@ -401,9 +401,15 @@
+ 
+ The route loads a versioned recipe from the JWT user's partition and invokes
+ the existing Recipe Analyze operation with the shared `recipe-analyze` quota.
+-It does not change the prompt, make an extra AI call, or write to Cosmos. The
+-AI output is validated before exactly one usage is tracked. Provider, quota,
+-and validation failures do not track usage.
++In the existing `analyzeRecipeText()` client, preparation selects only
++`RECIPE_PREPARATION_SYSTEM_PROMPT` v2, without the import v15 body. The user
++message is JSON with saved `recipeContext` and unchanged ordered `steps`
++(`order`, optional `title`, `description`); missing title is requested as
++`null` in the model output. Import v15, the full Strict `AiRecipeRaw` provider
++contract, model selection, temperature 0.2, and max_tokens 2048 are unchanged.
++There is one provider call, no extra call, retry, fallback, or Cosmos write.
++The AI output is validated before exactly one usage is tracked. Provider,
++quota, and validation failures do not track usage.
+ 
+ **Request:** exactly `{ "contractVersion": 2 }`. Missing or invalid JSON,
+ `{}`, unknown fields, and unsupported versions return
+@@ -419,6 +425,15 @@
+ `null`. Preparation is transient: it does not update the recipe or its
+ confirmed `exportView`; saving still uses the separate explicit confirmation
+ flow above.
++
++Validation uses the loaded recipe's `steps`, not model-returned source steps.
++Missing, duplicate, unknown, or reordered source references, empty text, and
++export limits fail with `422`; unused AI ingredient fields/key references do
++not block this text-only V2 projection. Full import validation remains separate.
++Valid references and lengths are not a general content guarantee. Current
++live content evidence is FAIL, stopped serial runs are UNVERIFIED, and this
++route does not replay history; see
++[Preparation V2 evidence boundary](06-ai-integrations.md#preparation-v2-evidence-boundary).
+ 
+ ```json
+ {

@@ -1,0 +1,37 @@
+{
+  "command": [
+    "npm",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "src/functions/recipes.test.ts",
+    "src/functions/ai.test.ts",
+    "src/lib/openai.recipeAnalyze.test.ts",
+    "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+    "src/lib/recipePreparation.test.ts",
+    "--reporter=dot",
+    "--reporter=json",
+    "--silent",
+    "--outputFile=docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Focused-Report.json"
+  ],
+  "start": "2026-10-09T17:24:11.805Z",
+  "end": "2026-10-09T17:25:24.231Z",
+  "exit": 0,
+  "signal": null,
+  "candidateHash": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "output": "docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Focused-Output.txt",
+  "outputSha256": "305642d294fe52c293e9837d96a0a95b08f5df2bb81ad3e72996a79feb1a6af5",
+  "report": "docs/qa/reports/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09-ROUND1-Focused-Report.json",
+  "reportSha256": "23263bbeb08676dcf6fbbea83e511c595e1e0ac8483d928bba082eba82dc2d60",
+  "counts": {
+    "executed": 519,
+    "passed": 519,
+    "failed": 0,
+    "skipped": 0
+  },
+  "liveCalls": 0,
+  "buildRuns": 0
+}

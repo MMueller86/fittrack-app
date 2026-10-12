@@ -1,0 +1,86 @@
+diff --git a/backend/src/lib/recipePreparation.test.ts b/backend/src/lib/recipePreparation.test.ts
+index f9b831c..4d72150 100644
+--- a/backend/src/lib/recipePreparation.test.ts
++++ b/backend/src/lib/recipePreparation.test.ts
+@@ -16,6 +16,28 @@ function draft(description = 'Mische den Teig.', count = 4): RecipeExportPrepara
+ }
+ 
+ describe('B-2 bounded Preparation loop', () => {
++
++  it.each([4, 5])('QA-R1 uses production step and teaser font metadata for %i steps', async (count) => {
++    const output = draft('Mische den Teig.', count);
++    output.steps[0]!.description = 'W'.repeat(90);
++    output.teaser = 'W'.repeat(96);
++    const generate = vi.fn().mockResolvedValue(output);
++    const result = await prepareValidatedRecipeExport(source, { generate });
++    expect(result.status).toBe('exhausted');
++    if (result.status !== 'exhausted') throw new Error('Expected measured exhaustion');
++    for (const errors of [result.diagnostics, ...generate.mock.calls.slice(1).map((call) => call[1].correction.validationErrors)]) {
++      expect(errors).toContainEqual(expect.objectContaining({ path: 'steps[0].description',
++        layout: count === 5 ? 'compact' : 'large', stepCount: count,
++        font: { family: 'Inter', size: count === 5 ? 18 : 22, weight: 500, style: 'normal', lineHeight: count === 5 ? 1.17 : 1.25 } }));
++      expect(errors).toContainEqual(expect.objectContaining({ path: 'teaser',
++        font: { family: 'Inter', size: 18, weight: 500, style: 'italic', lineHeight: 1.25 } }));
++    }
++    const fields = recipePreparationAffectedFields(result.latestDraft, result.diagnostics);
++    expect(fields).toHaveLength(2);
++    expect(fields.find((field) => field.path === 'steps[0].description')!.diagnoses[0]!.font!.lineHeight).toBe(count === 5 ? 1.17 : 1.25);
++    expect(generate).toHaveBeenCalledTimes(3);
++  });
++
+   it('extracts only exact known affected text for element-level schema references', () => {
+     const output = draft();
+     output.steps[0]!.description = 'Exact "text"\n\\untrimmed ';
+diff --git a/backend/src/lib/recipePreparation.ts b/backend/src/lib/recipePreparation.ts
+index 955a879..8c91e18 100644
+--- a/backend/src/lib/recipePreparation.ts
++++ b/backend/src/lib/recipePreparation.ts
+@@ -2,6 +2,7 @@ import { performance } from 'node:perf_hooks';
+ import { prepareRecipeExport, type RecipePreparationContext, type RecipeExportPreparationOutput } from './openai';
+ import { validateRecipeExportPreparationOutput, validateRecipePreparationSource, type RecipeExportPreparationDiagnostic } from './recipeAnalyzeValidation';
+ import { probeInstagramRecipeDetailsGeneratedText, type RecipeDetailsGeneratedTextProbeResult } from './instagramRenderer';
++import { getRecipeDetailsTextLayoutFields } from './instagramRenderer/recipeDetailsTemplateV3';
+ 
+ export const RECIPE_PREPARATION_DEADLINE_MS = 75_000;
+ export const RECIPE_PREPARATION_REQUEST_MS = 20_000;
+@@ -39,7 +40,7 @@ function probeInput(raw: unknown, savedTitle: string) {
+   return { savedTitle, teaser: draft['teaser'], steps };
+ }
+ 
+-function templateDiagnostics(result: RecipeDetailsGeneratedTextProbeResult, draft: unknown): RecipeExportPreparationDiagnostic[] {
++function templateDiagnostics(result: RecipeDetailsGeneratedTextProbeResult, draft: unknown, savedTitle: string): RecipeExportPreparationDiagnostic[] {
+   const candidate = draft as RecipeExportPreparationOutput;
+   return result.diagnostics.flatMap((diagnostic): RecipeExportPreparationDiagnostic[] => {
+     if (diagnostic.field === 'title' || diagnostic.status === 'fits' || diagnostic.status === 'technical-failure') return [];
+@@ -54,9 +55,12 @@ function templateDiagnostics(result: RecipeDetailsGeneratedTextProbeResult, draf
+         explanation: 'Text must satisfy the existing template input rules.' }];
+     }
+     const measured = diagnostic.measured;
++    const { style } = getRecipeDetailsTextLayoutFields({ title: savedTitle, description: candidate.teaser,
++      steps: candidate.steps.map((step) => step.description) }, diagnostic.fontSize)
++      .find((field) => diagnostic.field === 'teaser' ? field.field === 'description' : field.field === 'steps' && field.itemIndex === stepIndex)!;
+     return [{ ...common, code: 'TEMPLATE_FIELD_OVERFLOW', constraint: 'measured_text_bounds',
+-      font: { family: 'Inter', size: diagnostic.fontSize, weight: 500,
+-        style: diagnostic.field === 'teaser' ? 'italic' : 'normal', lineHeight: 1.25 },
++      font: { family: style.fontFamily, size: style.fontSize, weight: style.fontWeight,
++        style: style.fontStyle ?? 'normal', lineHeight: style.lineHeight },
+       actual: { width: measured.width, ...('height' in measured ? { height: measured.height } : {}) },
+       bounds: { width: measured.maxWidth, ...('maxHeight' in measured ? { height: measured.maxHeight } : {}), tolerance: 0.5 },
+       explanation: 'Reword the affected text to fit these measured production bounds without changing source-backed meaning.' }];
+@@ -133,7 +137,7 @@ export async function prepareValidatedRecipeExport(original: RecipePreparationCo
+           })) {
+           return { status: 'terminal', kind: 'technical', code: 'MISSING_OR_NON_FINITE_MEASUREMENT', ...metadata() };
+         }
+-        diagnostics = [...diagnostics, ...templateDiagnostics(probe, latestDraft)];
++        diagnostics = [...diagnostics, ...templateDiagnostics(probe, latestDraft, preparation.recipeContext.name)];
+         if (!probe.ok && diagnostics.length === 0) {
+           return { status: 'terminal', kind: 'technical', code: 'MISSING_MEASUREMENT', ...metadata() };
+         }
+@@ -158,6 +162,7 @@ export function recipePreparationAffectedFields(latestDraft: unknown, diagnostic
+   const draft = latestDraft && typeof latestDraft === 'object' ? latestDraft as Record<string, unknown> : undefined;
+   const records = new Map<string, { path: string; stepIndex?: number; stepOrder?: number; text: string; textLength: number; diagnoses: RecipeExportPreparationDiagnostic[] }>();
+   for (const diagnostic of diagnostics) {
++    if (diagnostic.code === 'unrecognized_keys') continue;
+     let path = diagnostic.path;
+     let text: unknown;
+     let stepOrder: unknown;

@@ -1,0 +1,12 @@
+{
+  "checkedAt": "2026-10-09T23:18:36.532Z",
+  "checkedFiles": 1010,
+  "changed": [
+    {
+      "path": "docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md",
+      "sha256": "0b19f849298bc1067a9ccc4862186c304d45081438aca3cb1b37aec6854fa0c6"
+    }
+  ],
+  "unexpected": [],
+  "candidateUnchanged": true
+}

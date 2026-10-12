@@ -1,0 +1,38 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "../node_modules/vitest/vitest.mjs",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "src/lib/recipePreparation.test.ts",
+    "src/lib/openai.recipeAnalyze.test.ts",
+    "src/lib/openai.daily.test.ts",
+    "src/functions/recipes.test.ts",
+    "src/functions/ai.test.ts",
+    "src/functions/instagramRecipe.test.ts",
+    "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+    "src/test-utils/weeklyInsightEvalSemantics.test.ts",
+    "src/lib/prompts/dailyInsightPrompt.test.ts",
+    "src/lib/prompts/dailyInsightPromptManifest.test.ts",
+    "src/lib/dailyInsightValidation.test.ts",
+    "src/functions/dailyInsight.test.ts",
+    "src/lib/repositories/insightRepository.test.ts",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2-Report.json"
+  ],
+  "cwd": "backend",
+  "started": "2026-10-10T00:12:54.705Z",
+  "finished": "2026-10-10T00:13:40.909Z",
+  "exit": 0,
+  "counts": {
+    "total": 788,
+    "passed": 788,
+    "failed": 0,
+    "skipped": 0
+  },
+  "outputPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2-Output.txt",
+  "outputSha256": "1e4fc94a514b7a9787357b8d06a0a7838b1ad05ff6a92c0d15cff3890c77a57a",
+  "reportPath": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-focus2-Report.json",
+  "reportSha256": "a471a7afee2482125ee9e46c8e44fab068dc6d8b7c462527af173339d60ef515"
+}

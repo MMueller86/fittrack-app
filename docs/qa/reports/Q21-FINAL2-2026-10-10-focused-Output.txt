@@ -1,0 +1,63 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [32m✓[39m src/lib/dailyInsightValidation.test.ts [2m([22m[2m36 tests[22m[2m)[22m[90m 34[2mms[22m[39m
+ [32m✓[39m src/lib/prompts/dailyInsightPrompt.test.ts [2m([22m[2m40 tests[22m[2m)[22m[90m 16[2mms[22m[39m
+ [32m✓[39m src/lib/prompts/dailyInsightPromptManifest.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/test-utils/weeklyInsightEvalSemantics.test.ts [2m([22m[2m14 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/lib/recipeAnalyzeValidation.test.ts [2m([22m[2m177 tests[22m[2m)[22m[90m 132[2mms[22m[39m
+ [32m✓[39m src/lib/openai.daily.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 17[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/insightRepository.test.ts [2m([22m[2m75 tests[22m[2m)[22m[90m 28[2mms[22m[39m
+ [32m✓[39m src/lib/openai.recipeAnalyze.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 331[2mms[22m[39m
+ [32m✓[39m src/functions/dailyInsight.test.ts [2m([22m[2m37 tests[22m[2m)[22m[90m 173[2mms[22m[39m
+ [32m✓[39m src/functions/ai.test.ts [2m([22m[2m78 tests[22m[2m)[22m[90m 180[2mms[22m[39m
+ [32m✓[39m src/functions/instagramRecipe.test.ts [2m([22m[2m31 tests[22m[2m)[22m[90m 248[2mms[22m[39m
+ [32m✓[39m src/functions/recipes.test.ts [2m([22m[2m122 tests[22m[2m)[22m[33m 871[2mms[22m[39m
+ [32m✓[39m src/lib/recipePreparation.test.ts [2m([22m[2m57 tests[22m[2m)[22m[33m 1475[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts [2m([22m[2m83 tests[22m[2m)[22m[33m 44858[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 1 steps / 'Brötchen' [33m982[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen' [33m727[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1113[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 2 steps / 'Brötchen' [33m703[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen' [33m716[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1141[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 3 steps / 'Brötchen' [33m731[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen' [33m725[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1242[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 4 steps / 'Brötchen' [33m791[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen' [33m737[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1213[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 5 steps / 'Brötchen' [33m707[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen' [33m681[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1183[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mshares the 0.5px 'width' boundary with full rendering: 0.5 [33m698[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mshares the 0.5px 'height' boundary with full rendering: 0.5 [33m671[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 22px [33m694[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 21px [33m836[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 20px [33m1015[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 19px [33m1197[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 18px [33m1287[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches title-dependent teaser overflow and legal German breaks with the full renderer [33m3202[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mpreserves B-1 Alpha geometry and pre-extraction PNG fingerprints [33m2981[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mkeeps short teasers at 22px and shrinks only overflowing teasers to the largest fitting size [33m2207[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the Quarkbroetchen approval fixture as an Instagram PNG [33m690[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders selective cooking summaries at 1..5 steps including 90 characters [33m3565[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the Alpha Gefluegelfrikadellen recipe with an offline reference photo as an Instagram PNG [33m712[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders seven ingredients with the full serving label at index 6 as an Instagram PNG [33m700[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the nine-ingredient two-column boundary as an Instagram PNG [33m715[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mkeeps eight ingredients in the larger one-column layout [33m730[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the fourteen-ingredient compact range as an Instagram PNG [33m734[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the 20-ingredient layout prototype as an Instagram PNG [33m1375[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mkeeps fifteen ingredients in the compact layout without the motif overflow [33m1348[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders a longer recipe name without changing the fixed Instagram canvas [33m710[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders a long German teaser compound after a measured legal break [33m760[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22momits difficulty from the detail image without affecting the other metadata [33m2895[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22momits a null time chip while retaining portions and ingredient count [33m677[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m14 passed[39m[22m[90m (14)[39m
+[2m      Tests [22m [1m[32m788 passed[39m[22m[90m (788)[39m
+[2m   Start at [22m 02:20:24
+[2m   Duration [22m 45.97s[2m (transform 2.97s, setup 0ms, collect 9.29s, tests 48.38s, environment 3ms, prepare 2.04s)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/qa/reports/Q21-FINAL2-2026-10-10-focused-Report.json
+

@@ -1,0 +1,16 @@
+{
+  "label": "full-run01",
+  "exit": 0,
+  "started": "2026-10-11T10:33:06.123Z",
+  "finished": "2026-10-11T10:35:00.186Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 21,
+    "failed": 0,
+    "pending": 0
+  },
+  "failures": [],
+  "outputSha256": "02b132af81d5e5f8e1fed4dbd58fa6a0a2420ff57e9fd8299df296d7f006b485",
+  "reportSha256": "47e285377963f54e878fba4cd6b5344ba2ac59dec5633752b2e1468296162e73"
+}

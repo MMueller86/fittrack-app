@@ -1,0 +1,5 @@
+
+> @fittrack/backend@1.0.0 test
+> vitest run --silent --reporter=json --outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Report.json
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-units-Report.json

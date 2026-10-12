@@ -106,14 +106,15 @@ represents the `missing` state to consumers.
 
 Shared defines these structures and limits but does not parse or validate HTTP
 requests or perform HTTP work. Existing-recipe preparation has one shared API
-contract: V2 sends `{ contractVersion: 2 }` with the loaded ETag in `If-Match`,
-then checks that the response's `sourceEtag` matches. Its suggestion contains
+contract: V2 sends `{ contractVersion: 2 }`; an ETag in `If-Match` is optional
+(a supplied header is checked by the backend) and the response's `sourceEtag` is
+compatibility metadata that clients need not compare. Its suggestion contains
 only export text and plain steps; it has no ingredient keys, IDs, or resolution
 types. This does not change `RecipeExportSuggestion`, whose analysis-local
 `includedIngredientKeys` are used by the separate new-recipe analyzer flow.
-Confirmation also sends the loaded ETag in `If-Match`, separately from the
+Confirmation may also send the loaded ETag in `If-Match` as an optional precondition, separately from the
 request body. The backend enforces strict V2 request parsing, the confirmation
-pair and ETag precondition, and computes the persisted fingerprint.
+pair and any supplied ETag precondition, and computes the persisted fingerprint.
 
 ### `recipeScale.ts`
 - `RECIPE_PORTION_MIN` / `RECIPE_PORTION_MAX` — shared target portion bounds (`1`–`50`)

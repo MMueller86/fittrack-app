@@ -1,0 +1,23 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "../node_modules/vitest/vitest.mjs",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "--testNamePattern",
+    "CORR2",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-rice-Report.json"
+  ],
+  "cwd": "backend",
+  "started": "2026-10-10T00:09:50.382Z",
+  "finished": "2026-10-10T00:09:51.217Z",
+  "exit": 0,
+  "counts": {
+    "total": 177,
+    "passed": 1,
+    "failed": 0,
+    "skipped": 176
+  }
+}

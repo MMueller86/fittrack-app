@@ -1,0 +1,8 @@
+{
+  "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+  "exit": null,
+  "executed": 0,
+  "providerCalls": 0,
+  "semanticPass": false,
+  "reason": "Required F failed: R was not run; no permitted retry or candidate change."
+}

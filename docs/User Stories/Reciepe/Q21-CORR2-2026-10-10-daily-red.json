@@ -1,0 +1,24 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "../node_modules/vitest/vitest.mjs",
+    "run",
+    "src/lib/prompts/dailyInsightPrompt.test.ts",
+    "src/lib/dailyInsightValidation.test.ts",
+    "--testNamePattern",
+    "CORR2",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-red-Report.json"
+  ],
+  "cwd": "backend",
+  "started": "2026-10-10T00:08:16.405Z",
+  "finished": "2026-10-10T00:08:17.267Z",
+  "exit": 1,
+  "counts": {
+    "total": 76,
+    "passed": 5,
+    "failed": 1,
+    "skipped": 70
+  }
+}

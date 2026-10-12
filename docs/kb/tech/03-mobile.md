@@ -248,13 +248,30 @@ render starts as soon as a draft is available; it uses request-only data and
 does not require prior text confirmation or write the recipe. When both images
 are ready, show this review hint below the pair:
 
-> Check beide Bilder kurz durch. Die Texte kannst du jederzeit noch anpassen.
+> Check beide Bilder kurz durch. Texte, Ausschnitt und Tags kannst du jederzeit anpassen.
+
+The dialog is titled `Rezept teilen` in the paired view and `Bilder anpassen`
+in the editor. The paired view shows both images on one shared card with
+captions; its actions are the secondary `Optionen & Texte bearbeiten` and the
+primary `Speichern & teilen`. `Ausschnitt anpassen` is not a paired-view
+action; it exists only in the editor under `Titelbild`.
 
 One `Optionen & Texte bearbeiten` action opens a unified editor in that same
-preview. `Titelbild` contains `Ausschnitt anpassen`, preparation
+dialog. A compact `Titelbild` / `Detailbild` selector shows only the selected
+PNG (centered on a stage card) and only its fields; both images stay mounted
+and the unselected one is hidden, so the detail image renders reliably after a
+refresh. `Titelbild` contains `Ausschnitt anpassen`, preparation
 time, difficulty, tags, and highlight; `Detailbild` contains the teaser,
-optional ingredient selection, and export steps. There is no separate options
-sheet or pre-render text-confirmation action. A transient analyzer/preparation
+optional ingredient selection, and export steps. Teaser and export steps show
+remaining characters against their 96 and 90 character limits. There is no
+separate options sheet or pre-render text-confirmation action. The editor has a
+single action, `Vorschau aktualisieren`: when export fields are new or changed
+and valid for saving, it first saves them and then renders again; otherwise it
+only renders. On success the dialog returns to the paired view; if saving
+fails the editor stays open. Leaving the editor with the back arrow without
+refreshing marks the preview as outdated after text, tag, or highlight
+changes: the paired view shows a hint and `Speichern & teilen` stays disabled
+until the next refresh. A transient analyzer/preparation
 draft is sent only as request data for each bundle render that uses it. The optional
 top-level `exportViewDraft` property uses the shared
 `RecipeShareBundleExportDraft` type; it does not persist recipe data, invoke AI
@@ -264,10 +281,10 @@ is `current` or `stale`. The ingredient chooser appears only when the recipe
 has more than 20 ingredients; at 20 or fewer, current included IDs remain
 unchanged without switches. Nullable preparation metadata stays blank and is
 renderable as `null`; the existing `exportViewAction: 'confirm'` plus
-`exportView` PUT pair requires valid non-null metadata and is sent only after
-the user presses `Speichern` and export fields are new or changed. A stale
+`exportView` PUT pair requires valid non-null metadata and is sent only when
+`Vorschau aktualisieren` runs and export fields are new or changed. A stale
 status alone does not cause a PUT: if the export fields are unchanged,
-`Speichern` sends no PUT. A successful save triggers a fresh paired render.
+refreshing sends no PUT. A successful save triggers a fresh paired render.
 Presentation-only changes and transient preview/share never write recipe data.
 The server-owned fingerprint is never sent by Mobile, and
 export text never replaces the ordinary recipe description or steps. A

@@ -910,6 +910,50 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     }
   });
 
+  it.each([1, 5])('logs the affected step and layout diagnostics with %i steps', async (stepCount) => {
+    const { recipe } = await createCurrentBundleRecipe();
+    const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+    renderInstagramRecipeDetailsTemplateMock.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: 'TEMPLATE_FIELD_OVERFLOW',
+        message: 'Step 1 exceeds its measured detail-template row.',
+        field: 'steps',
+        itemIndex: 0,
+        itemField: 'text',
+        measured: { width: 300, height: 112, maxWidth: 302, maxHeight: 105 },
+      },
+    });
+    try {
+      const body = stepCount === 5 ? {
+        exportViewDraft: {
+          ...shareBundleExportDraft,
+          steps: Array.from({ length: stepCount }, (_, index) => ({
+            order: index + 1,
+            description: index === 0 ? 'Rühre "gründlich" um.\r\nGare danach fertig.' : 'Serviere das Gericht.',
+          })),
+        },
+      } : {};
+      const response = await shareBundleHandler(
+        await makeAuthRequest({ params: { id: recipe.id }, body }), ctx,
+      );
+      expect(response.status).toBe(422);
+      const input = renderInstagramRecipeDetailsTemplateMock.mock.calls[0]![0];
+      const text = input.steps[0]!;
+      const logs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(logs).toContain(`"step_text":${JSON.stringify(text)}`);
+      expect(logs).toContain(`"step_count":${input.steps.length}`);
+      expect(logs).toContain(`"step_text_length":${text.length}`);
+      expect(logs).toContain(`"step_longest_word_length":${Math.max(0, ...text.split(/\s+/u).map((word) => word.length))}`);
+      expect(logs).toContain(`"step_explicit_line_breaks":${stepCount === 5 ? 1 : 0}`);
+      expect(logs).toContain(`"step_layout":"${stepCount === 5 ? 'compact' : 'large'}"`);
+      expect(logs).not.toContain('Serviere das Gericht.');
+      expect(JSON.stringify(response.jsonBody)).not.toContain(text);
+    } finally {
+      warningLogs.mockRestore();
+    }
+  });
+
   it('logs the detail field and item index without logging the raw item value', async () => {
     const { recipe } = await createCurrentBundleRecipe();
     const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});

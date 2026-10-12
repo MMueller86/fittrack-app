@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import type { AiRecipeRaw, AiRecipeScaleRaw } from '../lib/openai';
+import type { AiRecipeRaw, AiRecipeScaleRaw, RecipeExportPreparationOutput } from '../lib/openai';
 
 vi.mock('../lib/quota', () => ({
   enforceQuota: vi.fn().mockResolvedValue(null),
@@ -15,7 +15,7 @@ import {
   recipeScalePreviewHandler,
 } from './ai';
 import type { AiParsedItem } from '../lib/openai';
-import { analyzeRecipeText, __setOpenAiClientForTests } from '../lib/openai';
+import { analyzeRecipeText, prepareRecipeExport, __setOpenAiClientForTests } from '../lib/openai';
 import { enforceQuota, trackUsage } from '../lib/quota';
 import { _setFoodProductRepository, _resetFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { _setReusableItemsRepository, __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
@@ -24,6 +24,7 @@ import type { ReusableItemsRepository } from '../lib/repositories/reusableItemsR
 import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
 import {
   makeContext,
+  makeRequest,
   makeAuthRequest,
   setupTestAuth,
   teardownTestAuth,
@@ -597,11 +598,11 @@ describe('POST /api/ai/meal-estimate/preview', () => {
 // recipeAnalyzeHandler — unit tests
 // ---------------------------------------------------------------------------
 
-function mockRecipeAnalyzeClient(recipe: AiRecipeRaw) {
-  // recipeAnalyzeHandler makes one OpenAI call: analyzeRecipeText returns the
-  // recipe structure and the already converted food ingredient amounts.
+function mockRecipeAnalyzeClient(recipe: AiRecipeRaw | RecipeExportPreparationOutput) {
+  // recipeAnalyzeHandler makes one OpenAI call per attempt; a contract violation triggers up to two corrections,
+  // so the same payload is returned for every attempt.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const create = vi.fn().mockResolvedValueOnce({
+  const create = vi.fn().mockResolvedValue({
     choices: [{ message: { content: JSON.stringify(recipe) } }],
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -665,6 +666,76 @@ const VALID_RECIPE_RAW_WITH_EXPORT_KEYS: AiRecipeRaw = {
 };
 
 describe('analyzeRecipeText normalization', () => {
+  it('sends preparation JSON separately from its system instructions with unchanged source identities', async () => {
+    const small: RecipeExportPreparationOutput = {
+      version: 1, teaser: 'Saved recipe', totalTimeMinutes: null, difficulty: null,
+      steps: [{ order: 1, description: 'Cook.', sourceStepOrders: [5] }],
+    };
+    const create = mockRecipeAnalyzeClient(small);
+    const preparation = {
+      recipeContext: { name: 'SYNTHETIC_PRIVATE_NAME', portions: 2, tags: [], ingredients: [] },
+      steps: [
+        { order: 8, title: 'SYNTHETIC_PRIVATE_TITLE', description: 'Original serving action.' },
+        { order: 5, description: 'Original rice cooking action.' },
+      ],
+    };
+    const before = structuredClone(preparation);
+    expect(await prepareRecipeExport(preparation)).toEqual(small);
+    expect(create).toHaveBeenCalledTimes(1);
+    const request = create.mock.calls[0]![0];
+    expect(JSON.parse(request.messages[1].content)).toEqual(preparation);
+    const prompts = await import('../lib/prompts/recipeAnalyze');
+    expect(request.messages).toHaveLength(2);
+    expect(request.messages[0].role).toBe('system');
+    expect(request.messages[1].role).toBe('user');
+    expect(request.messages[0].content).not.toContain(prompts.RECIPE_ANALYZE_SYSTEM_PROMPT);
+    expect(request.messages[0].content).toContain('Preparation v12');
+    expect(request.messages[0].content).toBe(prompts.RECIPE_PREPARATION_SYSTEM_PROMPT);
+    expect(request.messages[0].content).not.toContain(preparation.recipeContext.name);
+    expect(request.messages[0].content).not.toContain(preparation.steps[0]!.title);
+    expect(request).toMatchObject({
+      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
+      temperature: 0.2,
+      max_tokens: 2048,
+      response_format: { type: 'json_schema', json_schema: { name: 'recipe_export_preparation', strict: true } },
+    });
+    const schema = request.response_format.json_schema.schema;
+    expect(Object.keys(schema.properties)).toEqual(['version', 'teaser', 'totalTimeMinutes', 'difficulty', 'steps']);
+    expect(schema.required).toEqual(Object.keys(schema.properties));
+    expect(schema.additionalProperties).toBe(false);
+    expect(schema.properties.steps.items.additionalProperties).toBe(false);
+    expect(schema.properties.steps.items.required).toEqual(['order', 'description', 'sourceStepOrders']);
+    expect(schema.properties.steps).toMatchObject({ minItems: 1, maxItems: 5 });
+    expect(schema.properties.steps.items.properties.description).toMatchObject({ minLength: 1, maxLength: 90 });
+    expect(schema.properties.teaser).toMatchObject({ maxLength: 96 });
+    expect(schema.properties.totalTimeMinutes).toMatchObject({ maximum: 10080 });
+    expect(preparation).toEqual(before);
+  });
+
+  it('keeps import requests on the unextended system prompt and original input', async () => {
+    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    const { RECIPE_ANALYZE_SYSTEM_PROMPT } = await import('../lib/prompts/recipeAnalyze');
+    await analyzeRecipeText('Original synthetic import text');
+    expect(create.mock.calls[0]![0].messages).toEqual([
+      { role: 'system', content: RECIPE_ANALYZE_SYSTEM_PROMPT },
+      { role: 'user', content: 'Original synthetic import text' },
+    ]);
+  });
+
+  it('turns a tiny placeholder amount for unmeasurable food into null but keeps real small amounts', async () => {
+    mockRecipeAnalyzeClient({
+      ...VALID_RECIPE_RAW,
+      ingredients: [
+        { ...VALID_RECIPE_RAW.ingredients[0]!, displayName: 'Sprühöl', amountGrams: 0.01 },
+        { ...VALID_RECIPE_RAW.ingredients[1]!, displayName: 'Safran-Öl', amountGrams: 2 },
+      ],
+    });
+
+    const result = await analyzeRecipeText('Sprühöl zum Anbraten, 2 g Safran-Öl');
+
+    expect(result.ingredients.map((ingredient) => ingredient.amountGrams)).toEqual([null, 2]);
+  });
+
   it('clears kitchenAmountText when Azure returns it for a food ingredient', async () => {
     mockRecipeAnalyzeClient({
       ...VALID_RECIPE_RAW,
@@ -682,6 +753,62 @@ describe('analyzeRecipeText normalization', () => {
 });
 
 describe('POST /api/ai/recipe-analyze', () => {
+  it('authenticates before quota, provider and usage tracking', async () => {
+    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    const response = await recipeAnalyzeHandler(
+      makeRequest({ body: { text: 'Synthetischer Import ohne Anmeldung' } }),
+      makeContext(),
+    );
+    expect(response.status).toBe(401);
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 before provider work and does not track usage', async () => {
+    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    const quotaResponse = { status: 429, jsonBody: { error: 'quota_exceeded', feature: 'recipe-analyze' } };
+    vi.mocked(enforceQuota).mockResolvedValueOnce(quotaResponse);
+    const response = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Synthetischer Import mit Quotalimit' } }),
+      makeContext(),
+    );
+    expect(response).toEqual(quotaResponse);
+    expect(create).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it.each(['', 'not-json'])('returns 502 for invalid provider content %j without tracking', async (content) => {
+    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
+    create.mockReset().mockResolvedValueOnce({ choices: [{ message: { content } }] });
+    const response = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Synthetischer Import mit Providerfehler' } }),
+      makeContext(),
+    );
+    expect(response.status).toBe(502);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('does not persist a valid import preview and tracks its one AI call once', async () => {
+    const repository = getRecipesRepository();
+    const createRecipe = vi.spyOn(repository, 'create');
+    const updateRecipe = vi.spyOn(repository, 'update');
+    const before = await repository.list(TEST_USER_ID);
+    const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW_WITH_EXPORT_KEYS);
+    mockFoodRepo([]);
+    const response = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Synthetischer Import ohne Persistenz' } }),
+      makeContext(),
+    );
+    expect(response.status).toBe(200);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+    expect(createRecipe).not.toHaveBeenCalled();
+    expect(updateRecipe).not.toHaveBeenCalled();
+    expect(await repository.list(TEST_USER_ID)).toEqual(before);
+  });
+
   it('returns 400 when text is missing', async () => {
     mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
     mockFoodRepo([]);
@@ -725,7 +852,11 @@ describe('POST /api/ai/recipe-analyze', () => {
       includedIngredientKeys: ['ingredient-chicken', 'ingredient-onion'],
     });
 
+    expect(create).toHaveBeenCalledTimes(1);
     const request = create.mock.calls[0]?.[0] as {
+      temperature: number;
+      max_tokens: number;
+      model: string;
       response_format: {
         type: string;
         json_schema: {
@@ -738,6 +869,11 @@ describe('POST /api/ai/recipe-analyze', () => {
         };
       };
     };
+    expect(request).toMatchObject({
+      temperature: 0.2,
+      max_tokens: 2048,
+      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
+    });
     expect(request.response_format).toMatchObject({
       type: 'json_schema',
       json_schema: { name: 'recipe_analyze', strict: true },
@@ -788,7 +924,21 @@ describe('POST /api/ai/recipe-analyze', () => {
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
-  it('rejects export steps that do not trace every source step', async () => {
+  it('returns 422 without usage when numbered steps stay merged after the allowed corrections', async () => {
+    const create = mockRecipeAnalyzeClient({ ...VALID_RECIPE_RAW });
+
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: 'Rezept\nZubereitung:\n1. Eins.\n2. Zwei.\n3. Drei.' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(422);
+    expect((res.jsonBody as { details: string[] }).details.join(' ')).toContain('3 nummerierte Anweisungen');
+    expect(create).toHaveBeenCalledTimes(3);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('accepts a selective export without requiring every source step', async () => {
     mockRecipeAnalyzeClient({
       ...VALID_RECIPE_RAW_WITH_EXPORT_KEYS,
       exportSuggestion: {
@@ -806,9 +956,8 @@ describe('POST /api/ai/recipe-analyze', () => {
       makeContext(),
     );
 
-    expect(res.status).toBe(422);
-    expect((res.jsonBody as { details: string[] }).details.join(' ')).toContain('trace');
-    expect(trackUsage).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
   });
 
   it('rejects more than the maximum number of export steps before tracking usage', async () => {

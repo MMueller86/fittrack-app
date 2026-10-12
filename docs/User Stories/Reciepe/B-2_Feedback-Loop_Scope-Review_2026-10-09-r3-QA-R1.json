@@ -1,0 +1,84 @@
+{
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "sourceAndImportAstChecks": [
+    "RECIPE_ANALYZE_SYSTEM_PROMPT",
+    "RECIPE_ANALYZE_PROMPT_VERSION",
+    "RECIPE_PREPARATION_EVAL_FIXTURE.preparation",
+    "RECIPE_PREPARATION_FORCED_DOUGH_FIXTURE.preparation",
+    "forcedInitial",
+    "savedSource1",
+    "savedSource2",
+    "allImportFixtures"
+  ],
+  "untouchedContractFiles": [
+    "backend/src/lib/openai.ts",
+    "backend/src/functions/recipes.ts",
+    "backend/src/lib/recipeAnalyzeValidation.ts",
+    "backend/src/lib/quota.ts",
+    "backend/src/lib/quotaConfig.ts",
+    "backend/src/lib/http.ts",
+    "shared/types/recipes.ts",
+    "shared/types/recipeExport.ts",
+    "mobile/src/shared/api/recipeApi.ts",
+    "mobile/src/shared/api/client.ts",
+    "backend/scripts/run-eval.mjs",
+    "backend/vitest.eval.config.mts",
+    "backend/package.json"
+  ],
+  "ownedFiles": 8,
+  "reviewedFindings": [
+    {
+      "finding": "Q1-01",
+      "stableKey": "FT-QA-2026-081",
+      "sha256": "da256fd5e32777c0f211d7d34a8176327f0d07e4cf0a0fc53e423f1bca606e8f",
+      "files": [
+        "backend/src/lib/recipePreparation.test.ts",
+        "backend/src/functions/recipes.test.ts"
+      ]
+    },
+    {
+      "finding": "Q1-02",
+      "stableKey": "FT-QA-2026-082",
+      "sha256": "5ab47847067c21f389955fe1d7d5850fb0753eddddc58d493b489422ff1a3b08",
+      "files": [
+        "backend/src/lib/recipePreparation.test.ts",
+        "backend/src/lib/recipePreparation.ts"
+      ]
+    },
+    {
+      "finding": "Q1-03",
+      "stableKey": "FT-QA-2026-083",
+      "sha256": "1c0502077f1d774899253788bb1599c0b71da9a24a4a48d2aed68bf7d54bea1c",
+      "files": [
+        "backend/src/lib/recipePreparation.test.ts",
+        "backend/src/functions/recipes.test.ts",
+        "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+        "backend/src/lib/prompts/recipeAnalyze.ts",
+        "backend/src/functions/ai.test.ts"
+      ]
+    },
+    {
+      "finding": "Q1-04",
+      "stableKey": "FT-QA-2026-084",
+      "sha256": "10cd4f6c19e3365d3114af0a84a7be72b9656b74d58a359085e5086de5549b5c",
+      "files": [
+        "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+        "backend/src/lib/recipeAnalyzeValidation.test.ts"
+      ]
+    },
+    {
+      "finding": "Q1-05",
+      "stableKey": "FT-QA-2026-085",
+      "sha256": "7d0b39d8498f69ba518e08926b68e56341097a26e8d0b1f72323f1e658c8eed9",
+      "files": [
+        "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+        "backend/src/lib/recipeAnalyzeValidation.test.ts"
+      ]
+    }
+  ],
+  "scopedSecretPatternMatches": 0,
+  "scope": "Only owned added lines, no private settings or complete secret-absence claim",
+  "loopNoLoggingOrRepositories": true,
+  "allInheritedHunksRetained": true,
+  "qaClosureClaim": false
+}

@@ -1,0 +1,57 @@
+﻿{
+    "series":  "full",
+    "file":  "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "filter":  "",
+    "count":  8,
+    "candidateStable":  true,
+    "runs":  [
+                 {
+                     "run":  1,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  92
+                 },
+                 {
+                     "run":  2,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  95
+                 },
+                 {
+                     "run":  3,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  90
+                 },
+                 {
+                     "run":  4,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  98
+                 },
+                 {
+                     "run":  5,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  90
+                 },
+                 {
+                     "run":  6,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  114
+                 },
+                 {
+                     "run":  7,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  131
+                 },
+                 {
+                     "run":  8,
+                     "exit":  0,
+                     "tests":  " 21 passed (21)",
+                     "seconds":  102
+                 }
+             ]
+}

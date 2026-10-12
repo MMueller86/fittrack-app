@@ -1,0 +1,30 @@
+{
+  "format": "fittrack-q21-final2-document-history-v1",
+  "exit": 0,
+  "checkedAt": "2026-10-10T00:31:12.756Z",
+  "path": "docs/kb/tech/06-ai-integrations.md",
+  "historical": [
+    {
+      "heading": "Historical Preparation v9 Evidence (2026-10-09)",
+      "sha256": "fc87f6f120a72e8a517b0deb6d72ffa34513e54416aa5d265268056390a619e8",
+      "byteEquivalent": true
+    },
+    {
+      "heading": "Preparation v8: Simplified Grouping and Order Guidance",
+      "sha256": "2fcd47e1d3a5d7a3fc1bde903c270a3154861d039ea9e7c1290ad3d49ddab491",
+      "byteEquivalent": true
+    },
+    {
+      "heading": "Preparation v7: Text-Only Overflow Correction",
+      "sha256": "aead62fd610c540d550789657e78fa4b63ddbda26191550221ff769d426ee09b",
+      "byteEquivalent": true
+    },
+    {
+      "heading": "Preparation Feedback Loop: Recorded r3 QA-R1",
+      "sha256": "27778b5bc7263538966b033dbd15326076406d4ac7ca8a9eaab3fd265c501249",
+      "byteEquivalent": true
+    }
+  ],
+  "scope": "Four selected historical heading blocks; not universal authorship attribution",
+  "liveCalls": 0
+}

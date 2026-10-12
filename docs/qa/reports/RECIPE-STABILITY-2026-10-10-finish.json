@@ -1,0 +1,33 @@
+{
+  "stage": "finish",
+  "exit": 0,
+  "checkedAt": "2026-10-10T13:24:31.836Z",
+  "verdict": "FAIL",
+  "candidateHashStable": true,
+  "candidateSha256": "01cd0cd18d4f5a3e443dafd9deb5ff7915dd97f1ab5ddc8387907a710f16acd3",
+  "preservationChanges": [],
+  "newForeignFiles": [],
+  "filesVerified": 1221,
+  "artifactsChecked": 43,
+  "secretExposure": "NONE",
+  "utf8": "VALID",
+  "criteria": [
+    "AC-1",
+    "AC-2",
+    "AC-3",
+    "AC-4",
+    "AC-5",
+    "AC-6",
+    "AC-7",
+    "AC-8",
+    "AC-9",
+    "AC-10",
+    "US-10 AC-15",
+    "US-10 AC-16"
+  ],
+  "reportSha256": "f32bd75866fca389d308ee41e1cefbceef7c50bbaab33e3d64de32b7daeeb15c",
+  "sevenGateRuns": 7,
+  "replacements": 0,
+  "allIntendedTestsExecuted": true,
+  "liveCalls": 0
+}

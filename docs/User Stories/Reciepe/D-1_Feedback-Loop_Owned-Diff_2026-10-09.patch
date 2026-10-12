@@ -1,0 +1,743 @@
+diff --git a/docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md b/docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md
+new file mode 100644
+index 0000000..e2354ed
+--- /dev/null
++++ b/docs/User Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md	
+@@ -0,0 +1,142 @@
++# D-1 Preparation Feedback Loop: Documentation Handoff
++
++Scope: ONLY approved D-1 task package; user approval 2026-10-09; Backend agent.
++Documentation completion only. Feature status: [Partial], implemented NOT ACCEPTED,
++`IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED`. B-1 implemented with
++passing recorded evidence; B-2 r2 implementation and complete handoff evidence
++satisfy D-1's dependency only. Required F failed; R/G NOT_RUN. No feature PASS,
++final QA, acceptance, merge or release approval is claimed or implied.
++
++No code, tests, prompts, instructions, plan status, handoff requirements, old
++stories, QA reports, release records or historical evidence were changed.
++No gate, live/provider call, deployment, delegation, commit or full-plan read.
++Only the D-1 section of the approved plan was read; the task package controls
++scope. Required skills: none. No new domain assumption or architecture decision.
++
++## Exact Document Edits
++
++| Edited document | D-1-owned change |
++| --- | --- |
++| [docs/kb/domain/06-recipes.md](../../kb/domain/06-recipes.md) | Current transient Preparation is v5 initial plus two corrections; full validation/probe and geometry-only scope; existing limits/V2/transience retained; current r2 partial/F-failed evidence before historical B-19. |
++| [docs/kb/domain/07-ai-features.md](../../kb/domain/07-ai-features.md) | V5 Preparation versus separate unchanged v16 Import; whole-draft corrections, geometry versus semantic/user review, deadline/once-only usage and narrow exhaustion-text exception; r2 partial evidence. |
++| [docs/kb/tech/02-backend.md](../../kb/tech/02-backend.md) | Owning loop/provider/probe integration; immutable source/latest whole draft, measurement technical precedence, monotonic deadline/cancellation/booking, generic error contracts and exact latest affected known-text logging; current r2 evidence, unchanged confirmation/ETag. |
++| [docs/kb/tech/06-ai-integrations.md](../../kb/tech/06-ai-integrations.md#preparation-feedback-loop-current-r2) | Current v5 contract and dedicated r2 subsection: correction JSON, geometry scope, deadlines/options, HTTP/log privacy, fixture failures, hash/execution boundaries; old evidence remains historical. |
++| [docs/kb/tech/09-api-reference.md](../../kb/tech/09-api-reference.md#post-apirecipesidexport-viewprepare) | Internal loop does not change public V2/ETag; full probe, deadline/usage boundaries, existing 422 exhaustion plus terminal generic 502/500; partial r2 status. |
++| [docs/kb/tech/08-testing.md](../../kb/tech/08-testing.md#recipe-preparation-feedback-loop-evidence) | Owning offline coverage versus live semantic assertions; recorded commands/counts, F failure and R/G non-execution, freeze boundaries and documentation-only verification. |
++| [SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md](SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md) | Short superseded-by-approved-plan pointer only; historical body unchanged. Single call, omission strategy, universal budgets and three-line proposal are not the current product contract. |
++
++Machine-generated baseline, owned patch and this new handoff/manifest are D-1
++reporting artifacts, not production candidate changes. The
++[manifest](D-1_Feedback-Loop_Manifest_2026-10-09.json) inventories exact files,
++before/after hashes, own hunk headers and executed validation commands/results.
++The [baseline](D-1_Feedback-Loop_Baseline_2026-10-09.json) retains starting status,
++seven original document byte snapshots and hashes of 929 existing regular files.
++The [owned patch](D-1_Feedback-Loop_Owned-Diff_2026-10-09.patch) is against those
++STARTING WORKTREE bytes, not HEAD; no inherited dirty hunk is claimed as D-1 work.
++Generated JSON evidence is inventoried by hash, not embedded in the prose patch.
++
++## Implemented Boundaries
++
++AC-1: Fixed production template/fonts/layout, existing 1..5 steps, step90,
++teaser96, nullable time10080 and reference rules remain. No ingredient-omission
++strategy, universal 23-character/11-character-word cap, three-line product rule,
++truncation or new font/layout fallback. Existing teaser 22/21/20/19/18 selection
++is retained. Complete measurable teaser/steps are reprobed after every draft,
++including changed counts; technical geometry failures are not corrections.
++Only generated-text fit in saved-title context is established, not full-image
++or Share success, semantic preservation or ingredient fidelity.
++
++AC-6/7/8/9: Initial plus at most two corrections; immutable original ID-free
++context, exact latest whole draft/current errors; whole-output revalidation.
++Monotonic 75000 ms generation/validation/probe deadline, at most 20000 ms per
++provider call, SDK maxRetries0, AbortSignal, bounded awaits/timer cleanup and
++discarded late results. Timeout/provider failures terminate as generic 502;
++technical probe/lookup/quota-backend/booking failures generic 500; three completed
++invalid parsed drafts exhaust into the existing 422 validation envelope.
++No private Error.message/raw text/bounds HTTP echo. Quota enforced once;
++usage booked once only after full valid success and final deadline check.
++Booking is awaited, never raced/retried; timeout cannot start late booking.
++No autosave or recipe/export/image/diary writes. V2, optional client ETag,
++sourceEtag, confirmation and internal compare-and-replace stay unchanged.
++
++AC-10: Only `recipes.prepareExportView.correctionsExhausted` after two completed
++corrections logs exact latest affected known step/teaser/difficulty text and
++safe structured diagnostics/bounds. JSON escaping preserves exact text;
++summary and per-field diagnoses are bounded to eight with truncation flags.
++Exact text is not truncated; no arbitrary provider-size bound is claimed.
++No source/context, old/unaffected text, arbitrary objects/provider payloads,
++images/base64 or secrets; no broader success, terminal-failure, other-flow or
++HTTP logging exception. Existing targeted Share overflow logging is unchanged.
++
++AC-11/12: Preparation v5 remains separate from unchanged Import v16. Geometry,
++structure/references, independent fixture semantics and explicit user review
++are distinct. Documentation correctness cannot convert F failure into feature
++acceptance, close Q-19, waive R/G or authorize release.
++
++## Recorded Evidence, Not D-1 Gate Runs
++
++Exact original executable/argument arrays, output/report hashes and timestamps
++are retained in the immutable r2 records and repeated as references in the D-1
++manifest. Command families below omit only machine-specific paths/reporters.
++
++| Recorded check | Command family | Exit | Executed / Passed / Failed / Skipped |
++| --- | --- | --- | --- |
++| Focused | `npm exec --workspace=backend -- vitest run` on validator, recipes, ai, SDK, renderer and loop test files | 0 | 495 / 495 / 0 / 0 |
++| Units | `npm run test --workspace=backend -- --reporter=default --reporter=json --outputFile=<recorded report>` | 0 | 1576 / 1576 / 0 / 0 |
++| Typecheck | `npm run typecheck --workspace=backend` | 0 | non-test |
++| Build | `npm run build:verify --workspace=backend` | 0 | non-test |
++| F | `node backend/scripts/run-eval.mjs src/lib/prompts/recipeAnalyze.eval.test.ts --testNamePattern "preparation prompt version matches fixture expectations\|recipePreparation"` plus recorded reporters | 1 | 5 / 2 / 3 / 9 |
++| R/G | NOT_RUN after required F failure; no command dispatched | null | 0 executed, 0 provider calls |
++
++F: one version guard plus four fixtures; 8 logical calls including one forced
++initial draft, 7 SDK calls. Rice fits and passes only that fixture's fidelity.
++Oven repeats step[1] 300x112 versus 302x105 through all three drafts, final
++422/usage0; later success/independent semantic assertions NOT REACHED. Pasta
++fits, returns 200/usage1, but fails source-5 contradiction. Forced dough fits
++after one real correction (2 logical/1 SDK), returns 200/usage1, but fails
++source-1 ingredient-explicit fidelity. Fit and 200 are not semantic PASS.
++Recorded sources unchanged, write counts zero. No rerun or rubric repair.
++
++[B-2 final r2 candidate](B-2_Feedback-Loop_Candidate_2026-10-09-r2.json) SHA-256:
++`80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171`.
++Its 846 frozen files are historical release-candidate identity, not a claim
++that D-1's later KB/SPEC bytes belong to that snapshot. Offline records predate
++final freeze and have candidateSha256 null: no offline hash-guard execution is
++claimed. The [completion manifest](B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json)
++and all 83 entries in the [artifact manifest](B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json)
++remain immutable. The D-1 manifest distinguishes authorized post-freeze document
++deltas from unmodified owning code/test/prompt/assets/dependency bytes.
++
++## Preservation And Documentation Verification
++
++All 922 baseline files outside the seven edited documents retain exact hashes,
++including old handoffs/plans/stories/evidence, Q-19/report/findings, release
++record, instructions and all implementation/test/prompt files. Original owned
++document bytes remain in the baseline; SPEC differs only by its pointer. No
++historical evidence status or requirement is rewritten. Baseline excludes
++private settings/env and ignored output/dependencies: no universal filesystem
++or secret-absence claim. Focused secret-pattern review covers only new prose.
++
++D-1 verification is documentation-only: focused assertions of current versions,
++counts/status/timeout/error/logging boundaries; changed-link/anchor integrity;
++strict UTF-8/mojibake checks on owned docs; editor errors; owned patch whitespace
++and read-only reverse applicability; preservation and immutable artifact hashes.
++Results and exact command are in the manifest, not substituted for feature
++gates. The repository encoding script scans code, not docs, so it was inspected
++but not used as document evidence. `rg` was unavailable; that read-only search
++failure was followed by workspace search, not by an implementation gate.
++
++The old [Q-19 FAIL](../../qa/reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md),
++accepted-rice fidelity loss, historical missing rice/oven success, foreign
++Import/Daily failures, old all-skipped UNVERIFIED and private/Alpha replay
++limits remain unresolved. The [14:12 release record](../../../infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md)
++deployed only targeted overflow logging; the feedback loop is NOT deployed to
++Alpha. The original [requirements handoff](HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md)
++and [B-1](B-1_Feedback-Loop_Handoff_2026-10-09.md)/[B-2](B-2_Feedback-Loop_Handoff_2026-10-09.md)
++handoffs are preserved as evidence of their own chronology. Stale current KB
++v4/single-call/no-text-exception statements were corrected locally, not silently
++treated as implementation truth. No scope deviation or new product rule.
++
++Next owner: Orchestrator/QA receives this durable documentation handoff.
++Required F failures need scoped disposition/authorization; R/G, independent QA
++and release requirements remain unwaived. D-1 does not execute or delegate them.
+\ No newline at end of file
+diff --git a/docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md b/docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md
+index acad0c9..b39c921 100644
+--- a/docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md	
++++ b/docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md	
+@@ -3,6 +3,14 @@
+ Status: [Planned] Spezifikationsentwurf zur Freigabe, keine Implementierung oder Feature-Abnahme.
+ Datum: 2026-10-09
+ 
++> [Deprecated] Historischer Entwurf, fuer die aktuelle Preparation durch den
++> [am 2026-10-09 nutzerfreigegebenen Feedback-Loop-Plan](PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md)
++> ersetzt. Ein-Aufruf-Vorgabe, Zutaten-Auslassungsstrategie, neue Pauschalbudgets
++> und Drei-Zeilen-Produktregel unten sind kein aktueller Implementierungsvertrag.
++> Siehe [aktuellen KB-Vertrag](../../kb/tech/06-ai-integrations.md#preparation-feedback-loop-current-r2):
++> [Partial] implementiert, nicht abgenommen, F FAIL / R/G NOT_RUN, kein Loop-Alpha-Release.
++> Der historische Entwurf bleibt unveraendert dokumentiert.
++
+ ## Ziel und feste Randbedingungen
+ 
+ Die Vorbereitung liefert nur einen transienten KI-Entwurf, dessen generierte Exporttexte in das unveraenderte Instagram-Detailtemplate passen. Es bleibt bei einem KI-Aufruf pro Vorbereitung, einem festen Bildformat und der bestehenden Nutzerpruefung. Kein Font-Fallback, kein anderes Template, keine weiteren Bilder, kein Abschneiden, kein automatischer KI-Korrekturaufruf und keine Speicherung ohne Bestaetigung.
+diff --git a/docs/kb/domain/06-recipes.md b/docs/kb/domain/06-recipes.md
+index a986517..abe5ab9 100644
+--- a/docs/kb/domain/06-recipes.md
++++ b/docs/kb/domain/06-recipes.md
+@@ -182,7 +182,8 @@ duplicate, or seasoning IDs return `400` with
+ ### Transient Export-View Preparation
+ 
+ `POST /api/recipes/{id}/export-view/prepare` calls separate backend-only
+-`prepareRecipeExport(context)` with `RECIPE_PREPARATION_SYSTEM_PROMPT` v4 and
++`prepareValidatedRecipeExport(context)` using `prepareRecipeExport(context, options)`
++with `RECIPE_PREPARATION_SYSTEM_PROMPT` v5 and
+ the shared `recipe-analyze` quota. `analyzeRecipeText(text)` is import-only,
+ retaining v16, full `AiRecipeRaw`, normalization and validation.
+ Preparation sends the complete ID-free `recipeContext` projection (name,
+@@ -195,7 +196,9 @@ data. The Strict `recipe_export_preparation` provider schema returns only
+ object rejects additional properties. No recipe name, portions, tags,
+ ingredients, keys, or source steps are returned. The same lazy client,
+ deployment/API version, temperature 0.2, and 2048-token budget remain:
+-one call, no retry, fallback, extra call, full-recipe wrapper or renderer payload.
++one initial draft plus at most two corrections, with no SDK retries, fallback,
++full-recipe wrapper or renderer payload. Each correction receives the immutable
++original context, exact latest whole draft and current structured diagnostics.
+ The route does not persist recipe data and accepts only the strict
+ `{ "contractVersion": 2 }` request; `{}`, missing or
+ invalid JSON, unknown fields, and unsupported versions return
+@@ -228,19 +231,34 @@ saving still requires the separate explicit confirmation flow.
+ `validateRecipeExportPreparationOutput(output, recipe.steps)` validates against
+ the separate saved source; the provider returns no replacement source steps.
+ Duplicate/unknown references, local or first-reference group reversals, invalid
+-source orders, empty text and limit violations return 422; omissions alone do
++source orders, empty text and limit violations are rejected; final correction
++exhaustion returns 422. Omissions alone do
+ not. Empty saved steps or exclusively blank source descriptions returns 422
+ before quota/provider work. No sorting, renumbering, padding, truncation,
+-repair or invented fallback is performed. Runtime checks structure/references,
+-not general cooking-core preservation, component fit or metadata derivation.
+-The v4 prompt requests a complete understandable compact detail-image workflow
++identity repair or invented fallback is performed. Each whole draft is validated
++and its complete teaser/step array is measured with the production text-only
++probe, including after step-count changes. This establishes generated-text fit
++in the saved-title context, not whole-image/Share success or general cooking-core
++preservation, component fidelity or metadata derivation. Existing 1..5/90/96
++limits and fonts/layout remain; no universal 23-character/11-character-word cap,
++three-line product rule, truncation or new font/layout fallback is introduced.
++The v5 prompt requests a complete understandable compact detail-image workflow
+ by grouping related actions after reading the entire recipe, not selecting
+ five original steps. Central preparation/full cooking, essential separate sides
+ or sauces and necessary transitions are prompt requirements. Optional details
+ may be omitted; retained claims/metadata must be source-backed without invention
+ or contradiction. Fixture rubrics and user review remain separate from runtime.
+ 
+-[Partial] B-19 v4/v16 (2026-10-09) is implemented, not accepted: upstream offline
++[Partial] Current B-2 r2 is implemented, NOT ACCEPTED and release blocked:
++495 focused and 1576 backend units passed; typecheck/build exited 0. Required
++F exited 1 (5 executed / 2 passed / 3 failed / 9 skipped); R/G were NOT_RUN.
++Oven exhausts three overflowing drafts, pasta contradicts source 5, and dough
++loses source-1 ingredient fidelity despite fitting. The loop is NOT deployed
++to Alpha; the historical 14:12 release deployed only step-overflow logging.
++See [current evidence and error/logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r2)
++and the [D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++
++[Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted: upstream offline
+ gates passed (1437 units, typecheck/build), but all executed F/R/G live gates
+ exited 1. All three Preparation fixtures ran in each: saved8 rice and oven
+ FAIL, pasta PASS. Rice groups start 6 before 5; oven repeats reference 3.
+diff --git a/docs/kb/domain/07-ai-features.md b/docs/kb/domain/07-ai-features.md
+index f317fa7..0f66a53 100644
+--- a/docs/kb/domain/07-ai-features.md
++++ b/docs/kb/domain/07-ai-features.md
+@@ -103,7 +103,7 @@ All AI features are **guided workflows** — the AI assists, the user confirms.
+ ## 5. Recipe Analyzer
+ 
+ **Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v16'`;
+-saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v4'`.
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v5'`.
+ 
+ **Endpoint:** `POST /api/ai/recipe-analyze`
+ 
+@@ -168,7 +168,7 @@ This allows the review screen (`RecipeWizardScreen`) to render seasoning items d
+ ### Current Analyzer and Export Suggestion Contract
+ 
+ Import v16 keeps full source extraction and its export suggestion in one
+-`analyzeRecipeText(text)` call. Saved-recipe Preparation v4 uses the separate
++`analyzeRecipeText(text)` call. Saved-recipe Preparation v5 uses the separate
+ small-output `prepareRecipeExport(context)` path below, without source
+ re-extraction. Prompt intent, runtime validation, fixture quality, and user
+ review are distinct; none is a general cooking/safety guarantee.
+@@ -200,7 +200,7 @@ The prompt requests the recipe-specific cooking core: central preparation and co
+ The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. An AI result failing server shape/reference/ingredient validation returns `422` before usage is tracked; this does not test general cooking semantics. Usage is tracked only after server validation. The response, including `exportSuggestion`, is transient: no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Indeterminate food amounts remain visible with `needsReview: true`; seasonings bypass catalog search and remain visible for review.
+ 
+ `POST /api/recipes/{id}/export-view/prepare` calls backend-only
+-`prepareRecipeExport(context)` once with the exclusive v4 system prompt, not
++`prepareValidatedRecipeExport(context)` with the exclusive v5 system prompt, not
+ import v16. `analyzeRecipeText(text)` is import-only and retains its full
+ contract, normalization and globally monotone trace validation. Preparation
+ sends the complete ID-free saved metadata/ingredient projection in
+@@ -210,7 +210,10 @@ The Strict `recipe_export_preparation` output is only
+ `{ order, description, sourceStepOrders }`. Every field is required and every
+ object has `additionalProperties: false`; no name, portions, tags, ingredients,
+ keys or source steps are returned. The lazy client, deployment/API version,
+-temperature 0.2, 2048-token budget and one SDK call are unchanged. Preparation
++temperature 0.2 and 2048-token budget are unchanged. The loop permits an initial
++draft and at most two corrections through `prepareRecipeExport(context, options)`;
++each receives immutable original context, the exact latest whole draft and
++current diagnostics. Preparation-only SDK retries are disabled. Preparation
+ validates against separately supplied saved `recipe.steps` and uses the same
+ `recipe-analyze` quota. It accepts only
+ `{ "contractVersion": 2 }`. A client ETag is not required; if `If-Match` is
+@@ -219,7 +222,7 @@ before quota or provider work. The transient response contains only the
+ teaser, nullable time and difficulty, and plain ordered export steps.
+ `sourceEtag` is compatibility metadata, not a client acceptance prerequisite.
+ The endpoint does not map analyzer ingredient keys to saved recipe ingredient
+-IDs or expose resolution states. It performs no second AI call, does not
++IDs or expose resolution states. It does not run the import analyzer or
+ persist the suggestion, and tracks usage once only after a valid AI result.
+ The analyzer's `includedIngredientKeys` remain part of the separate
+ new-recipe analysis contract.
+@@ -233,14 +236,33 @@ known, locally ascending and globally unique, ordered by their FIRST reference.
+ `[1,4,6],[5]` is valid only for Preparation; `[5],[1,4,6]` fails. Gaps and
+ non-contiguous saved source orders are allowed; full coverage is not required.
+ Empty saved steps or exclusively blank source descriptions returns 422 before
+-quota/provider work. There is no sorting, padding, truncation, fallback, repair
+-or full-recipe wrapper. The v4 prompt requests a complete understandable compact
++quota/provider work. There is no sorting, padding, truncation, fallback, identity
++repair or full-recipe wrapper. The v5 prompt requests a complete understandable compact
+ detail-image workflow by grouping actions, not selecting five original steps;
+ retained claims/metadata must be source-backed. Runtime does not independently
+ prove cooking-core preservation, component fit or metadata derivation; test-only
+ fixture rubrics and explicit user review remain separate.
+ 
+-[Partial] B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
++Every measurable whole draft is probed for teaser and all step geometry using
++the production fonts/layout, including count changes. Technical measurement
++failures terminate, rather than request a correction. Fit is not semantic
++preservation or whole-image/Share approval. No ingredient-omission strategy,
++23/11 universal cap, three-line product rule or new font fallback is introduced.
++The 75000 ms aggregate deadline and 20000 ms per-call ceiling are terminal;
++quota is enforced once and usage booked once only after validated success.
++Nothing is automatically saved. Only exhausted two completed corrections may
++log exact latest affected known text; see the
++[current loop, error and logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r2).
++
++[Partial] Current B-2 r2 is implemented, NOT ACCEPTED / release blocked. Recorded
++focused495/full1576 pass, typecheck/build exit0; F exit1 (5 executed / 2 passed /
++3 failed / 9 skipped), R/G NOT_RUN. Oven still overflows; fitting pasta/dough
++fail independent contradiction/ingredient-fidelity assertions. Q-19 FAIL and
++older failures remain unresolved. Alpha has only the historical 14:12 logging
++release, not this loop. See the
++[D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++
++[Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+ gates passed (1437 units, typecheck/build); F/R/G all exited 1 with all three
+ Preparation fixtures executed each time. Rice group starts 6 before 5 and oven
+ duplicate reference 3 fail with 422/usage0/writes0/unchanged=true; pasta passes
+diff --git a/docs/kb/tech/02-backend.md b/docs/kb/tech/02-backend.md
+index e75f4a3..970ab50 100644
+--- a/docs/kb/tech/02-backend.md
++++ b/docs/kb/tech/02-backend.md
+@@ -260,8 +260,8 @@ saved-title context are technical failures, not AI-correctable failures.
+ Success establishes only generated teaser/step fit in that title context; it
+ does not certify the saved title, ingredients, chips, images or share bundle.
+ The full renderer retains its existing first-failure public contract, including
+-the legacy height value on German width-break errors. No preparation retry loop
+-or provider/handler integration is implemented by this extraction.
++the legacy height value on German width-break errors. B-1 supplied the probe;
++B-2 now integrates it into the Preparation loop described below.
+ 
+ ### Recipe export preparation and confirmation concurrency
+ 
+@@ -273,7 +273,8 @@ The response keeps `sourceEtag` for compatibility, but it is not a client-side
+ acceptance prerequisite. Preparation is transient and does not change the
+ recipe, confirmed export view, ingredient IDs, or ingredient values.
+ 
+-The handler calls only `prepareRecipeExport(context)` with Preparation v4;
++The handler calls `prepareValidatedRecipeExport(context)` from `recipePreparation.ts`,
++which uses `prepareRecipeExport(context, options)` with Preparation v5;
+ `analyzeRecipeText(text)` is import-only (v16, full `AiRecipeRaw`, unchanged
+ normalization and globally ascending flattened references). Preparation sends
+ the complete ID-free saved metadata/ingredient projection and all original
+@@ -284,7 +285,24 @@ difficulty, steps }`, where steps contain only `{ order, description,
+ sourceStepOrders }`. Every field is required and every object is closed; no
+ ingredients, keys or model-returned source steps are accepted. The same lazy
+ client, deployment/API version, temperature 0.2 and max_tokens 2048 are used for
+-one SDK call, with no retry, fallback, wrapper, truncation, padding, sorting or repair.
++each of at most three logical calls (initial plus two corrections). SDK
++`maxRetries: 0`, AbortSignal and at most 20000 ms per call apply only to
++Preparation. The monotonic 75000 ms generation/validation/probe deadline is
++not reset by corrections. Provider/probe awaits are bounded, timers cleaned
++up, pending provider work aborted and late results discarded. A deadline check
++precedes usage booking; booking itself is awaited once, never raced or retried.
++No fallback, wrapper, truncation, padding, sorting or identity repair is added.
++
++Corrections receive immutable original ID-free context, exact latest whole
++draft and structured validation/probe diagnostics. The whole new output and
++complete teaser/step array are revalidated/reprobed, including after count
++changes; technical failures take precedence over content failures. Geometry
++uses the unchanged production fonts, large/compact bounds and 0.5 px tolerance,
++with width-only diagnostics never inventing height. Missing, duplicate or
++non-finite measurements are terminal. Generated-text fit in saved-title context
++does not certify ingredients, title, chips, image or Share. Existing teaser
++22..18 selection remains; no new font/layout fallback, 23/11 cap, three-line
++product rule or ingredient-omission strategy is introduced.
+ 
+ `validateRecipeExportPreparationOutput(output, recipe.steps)` receives the saved
+ source separately and checks positive unique ascending source orders, export
+@@ -294,15 +312,25 @@ locally ascending, globally unique, and ordered by FIRST reference, not by the
+ flattened trace: `[1,4,6],[5]` is allowed only here; `[5],[1,4,6]` is rejected.
+ Gaps and non-contiguous source orders are valid. Empty saved steps or exclusively
+ blank source descriptions returns 422 before quota/provider work; other
+-shape/reference/limit failures return 422 without usage. Auth, owner lookup
++shape/reference/limit failures can request correction and exhausted invalid
++drafts return 422 without usage. Auth, owner lookup
+ and optional ETag remain before quota; valid success alone tracks
+ `recipe-analyze` exactly once. Internal references are stripped from the
+ unchanged plain V2 App response. Cooking-core preservation, component fit and
+ metadata derivation are prompt/fixture/review concerns, not a general runtime
+-semantic check. The v4 prompt requests a complete compact detail-image workflow
++semantic check. The v5 prompt requests a complete compact detail-image workflow
+ by grouping actions after reading the full recipe.
+ 
+-[Partial] B-19 v4/v16 is implemented, not accepted: upstream offline gates passed
++[Partial] B-2 r2 is implemented, NOT ACCEPTED / release blocked: focused495 and
++full1576 passed, typecheck/build exit0; required F exit1 (5 executed / 2 passed /
++3 failed / 9 skipped); R/G NOT_RUN. F oven repeats 300x112 versus 302x105 through
++all three drafts (422/usage0); fitting pasta/dough fail source-5 contradiction /
++source-1 ingredient fidelity. No loop Alpha deployment or QA acceptance is
++established; the historical 14:12 Alpha release is logging-only. See
++[current r2 evidence](06-ai-integrations.md#preparation-feedback-loop-current-r2)
++and the [D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++
++[Partial] Historical B-19 v4/v16 is implemented, not accepted: upstream offline gates passed
+ (1437 units, typecheck/build); all F/R/G live gates exited 1. All three Preparation
+ fixtures executed in each; rice/oven were rejected with 422/usage0/writes0/
+ unchanged=true, pasta completed success assertions. Complete all-three
+@@ -329,8 +357,24 @@ coverage-only payload/helpers are removed: no `sourceStepTrace`, expected/actual
+ order lists, or first-mismatch fields. Genuine unknown, duplicate, or reordered
+ references still produce bounded phase/code/path diagnostics; generic request
+ and provider diagnostics remain.
+-Preparation logs do not include recipe/context text, generated source/export
+-text, raw provider payloads, or ingredient values on success or failure.
++Preparation logs otherwise exclude recipe/context text, generated source/export
++text, raw provider payloads and ingredient values. The sole new exception is
++`recipes.prepareExportView.correctionsExhausted`, only after the initial draft
++and two completed parsed corrections remain invalid. It records exact latest
++affected known step descriptions, teaser or difficulty, not old/intermediate
++drafts, source/context, arbitrary fields or unaffected text. `affected_fields`
++is JSON escaped; each field includes path/index/order when available, exact
++text/length and up to eight safe diagnoses with a truncation flag. The summary
++is bounded to eight phase/code/path entries; structured diagnoses retain
++constraints, reference values and available measured bounds/font/layout.
++Exact affected text is not truncated; diagnostic limits do not imply a blanket
++provider-payload size bound. This exception does not extend to terminal provider,
++technical, timeout or booking failures, success logs, other flows or HTTP.
++Provider/timeout errors return generic 502, technical probe/lookup/quota-backend/
++booking errors generic 500, and exhausted invalid drafts the existing 422
++validation envelope with bounded phase/code/path details, never raw text,
++measurements or private Error.message. Booking is once after validation and
++deadline check, with no automatic save or late-timeout booking.
+ The completion event records source/export step counts. These diagnostics
+ describe structural/reference failures against saved `recipe.steps`, not
+ general cooking quality, guaranteed preservation, or historical replay. Privacy
+diff --git a/docs/kb/tech/06-ai-integrations.md b/docs/kb/tech/06-ai-integrations.md
+index 3ef6e0b..471ec76 100644
+--- a/docs/kb/tech/06-ai-integrations.md
++++ b/docs/kb/tech/06-ai-integrations.md
+@@ -64,7 +64,7 @@ Mobile shows `MealEstimateReviewScreen`.
+ ### 6. Recipe Analyzer (`POST /api/ai/recipe-analyze`)
+ 
+ **Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v16'`;
+-saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v4'`.
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v5'`.
+ 
+ The import contract keeps complete source extraction and a selective export
+ summary in `analyzeRecipeText(text)`. Preparation uses a separate small-output
+@@ -106,7 +106,8 @@ Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: t
+ #### Preparation V2 Evidence Boundary
+ 
+ `POST /api/recipes/{id}/export-view/prepare` calls backend-only
+-`prepareRecipeExport(context)` once with `RECIPE_PREPARATION_SYSTEM_PROMPT` v4.
++`prepareValidatedRecipeExport(context)` using `prepareRecipeExport(context, options)`
++with `RECIPE_PREPARATION_SYSTEM_PROMPT` v5.
+ `analyzeRecipeText(text)` is import-only: v16 prompt body, full `AiRecipeRaw`
+ Strict schema, ingredient normalization/validation and globally ascending
+ flattened trace are unchanged. Preparation does not append to the import prompt.
+@@ -133,8 +134,10 @@ The dedicated Strict `recipe_export_preparation` schema returns only backend-onl
+ Every field is required and every object has `additionalProperties: false`.
+ There is no name, portions, tags, ingredients, ingredient key, source-step list,
+ full-recipe wrapper, renderer payload or intermediate output. The same lazy
+-client, deployment/API version, temperature 0.2, max_tokens 2048 and one SDK call
+-remain; no retry, fallback, second call, sorting, padding, truncation or repair.
++client, deployment/API version, temperature 0.2 and max_tokens 2048 remain.
++Initial generation plus at most two corrections replaces the former single-call
++behavior; no hidden SDK retry, fallback, sorting, padding, truncation or identity
++repair is added. See [the current loop contract](#preparation-feedback-loop-current-r2).
+ Shared min1/max5/text90/teaser96/time10080 constants drive the prompt/schema and
+ server checks. Time is nullable or a positive integer; difficulty is nullable
+ or trimmed non-empty single-line text.
+@@ -148,11 +151,12 @@ need not ascend: `[1,4,6],[5]` is valid for Preparation, `[5],[1,4,6]` is not;
+ the former still fails import's unchanged global-monotone rule. Gaps are valid;
+ full coverage and adjacent-only grouping are not required. Unknown/duplicate
+ references, local/group-start reversals, invalid source orders, empty text,
+-metadata/limit violations and extra fields return 422 without usage. Empty saved
++metadata/limit violations and extra fields are rejected; exhaustion returns
++422 without usage. Empty saved
+ steps or exclusively blank source descriptions returns 422 before quota/provider
+ work; no invented reference-based fallback is allowed.
+ 
+-The v4 prompt asks for a complete understandable compact detail-image workflow:
++The v5 prompt asks for a complete understandable compact detail-image workflow:
+ read the full recipe and group related actions instead of selecting five original
+ steps. Central preparation, full cooking of the main component, essential
+ separate sides/sauces and necessary transitions must remain; optional details/
+@@ -167,13 +171,96 @@ response with `sourceEtag`, teaser, nullable metadata and `{ order, description
+ steps; references stay internal. No ingredient IDs/keys/resolution states are
+ returned. Preparation does not persist suggestions or change saved ingredients,
+ export confirmation, fingerprints, Save/Share, Shared, Mobile, Cosmos,
+-infrastructure, SDK or dependencies.
++infrastructure or dependency versions.
+ Auth, optional ETag before quota, `429`/`502`, usage only after valid success,
+ privacy-safe bounded phase/code/path diagnostics, and transience are retained.
+-Coverage-only payload/order-list/mismatch helpers are removed; no private
+-recipe/context/generated/provider/error text is added to logs.
+-
+-[Partial] Current B-19 evidence (2026-10-09) from the complete
++Coverage-only payload/order-list/mismatch helpers remain removed. Only terminal
++correction exhaustion permits exact latest affected known generated text in
++server logs, as specified below; private context/provider/error payloads remain excluded.
++
++##### Preparation Feedback Loop: Current r2
++
++[Partial] B-1 probe and B-2 r2 loop are implemented, NOT ACCEPTED; B-2 status is
++`IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED`. Completed handoff
++evidence satisfies D-1's implementation/evidence dependency only, not failed
++gates, semantic acceptance, independent QA or release. The loop is NOT deployed
++to Alpha. The [14:12 Alpha release](../../../infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md)
++deployed targeted Share step-overflow logging only, not this later loop.
++
++`recipePreparation.ts` owns initial plus at most two corrections. Initial JSON
++keys are `recipeContext` and `steps`; correction keys are `originalPreparation`,
++`latestDraft` and `validationErrors`. Each correction has the unchanged complete
++ID-free saved context, exact latest whole draft and current safe structured
++diagnostics (path/index/order/count/layout, constraints, numeric references,
++font and measured/allowed bounds with 0.5 px tolerance when available). Original,
++draft and error values are untrusted data. The whole corrected output is
++validated and all measurable teaser/steps reprobed with production fonts and
++layout, including changed counts and previously fitting fields. Unmeasurable
++shapes are rejected, never certified as fitting. Technical probe/context/font
++failures, duplicate/absent/non-finite measurements terminate before correction.
++
++Existing 1..5 steps, step90/teaser96/time10080 and template rules remain. Large
++1..4-step geometry is 302x105 at 22 px; compact five-step geometry is 318x84 at
++18 px. Existing title-dependent teaser selection 22/21/20/19/18 remains, not a
++new fallback. No universal 23-character/11-character-word cap, three-line
++product rule, truncation, layout fallback or ingredient-omission strategy is
++introduced. Probe success covers only generated teaser/steps in saved-title
++context, not ingredients/title/chips/photo/full render or Share. Cooking-core,
++ingredient fidelity and contradiction checks remain independent fixture rubrics
++and explicit user review, not a runtime semantic guarantee. Import v16 and its
++single-call schema/normalization/reference policy are unchanged.
++
++The monotonic aggregate generation/validation/probe deadline is 75000 ms; each
++provider call uses at most `min(20000, remainingMs)`, SDK `maxRetries: 0` and
++AbortSignal. Bounded provider/probe awaits clean up timers, abort pending work
++and discard late results. Provider refusal/incomplete finish, empty/invalid
++response and timeout are terminal generic 502, never content-correction signals.
++Technical probe, lookup/quota-backend and booking failures are generic 500.
++Three completed parsed invalid drafts exhaust into the existing 422 envelope
++with at most eight deduplicated phase/code/path details; no raw text, measurement
++payload or private Error.message is echoed over HTTP. Auth, strict V2, owner
++read, optional ETag and saved-source validation precede quota/provider work.
++Quota is enforced once; usage is booked once only after full valid success and
++the final deadline check. Booking is awaited, never raced/retried; a late result
++cannot start booking. No recipe/export/image/diary writes or automatic saves
++are added; V2, sourceEtag, confirmation, fingerprint and ETag contracts remain.
++
++Only `recipes.prepareExportView.correctionsExhausted` after two completed
++corrections logs exact latest affected known step descriptions, teaser or
++difficulty plus safe structured errors/bounds. JSON escapes exact text; the
++summary and per-field diagnoses are limited to eight, with truncation flags.
++Text itself is exact, not truncated; no blanket payload-size bound is claimed.
++No source/context, old/unaffected text, arbitrary object/provider payload,
++image/base64 or secret is permitted. Success and other terminal failures keep
++metadata-only logs; the exception does not broaden Import, other flows or HTTP.
++
++Recorded r2 evidence, not D-1 reruns: focused 495/495, full units 1576/1576,
++typecheck/build exit0. Required F exit1: 5 executed / 2 passed / 3 failed /
++9 skipped. R/G are NOT_RUN, not passing. F has four fixtures plus a version
++guard, 8 logical calls including one forced draft, and 7 actual SDK calls:
++
++- Rice: 1 SDK call, fit and this fixture's fidelity pass, 200/usage1.
++- Oven: 3 SDK calls, all drafts repeat step[1] 300x112 versus 302x105;
++	final 422/usage0, independent semantic assertion NOT REACHED.
++- Pasta: 2 SDK calls, final fit/200/usage1, source-5 contradiction FAIL.
++- Forced dough: 2 logical / 1 SDK call, final fit/200/usage1, source-1
++	ingredient-explicit fidelity FAIL; generic all-ingredients wording is no pass.
++
++All recorded sources stayed unchanged and write counts were zero. Q-19 FAIL,
++earlier accepted-rice fidelity loss, foreign Import/Daily failures and private/
++Alpha replay limits remain open; one synthetic rice pass closes none of them.
++The [B-2 handoff](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09.md),
++[completion manifest](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json)
++and [artifact manifest](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json)
++bind recorded commands/output/report hashes. Candidate SHA-256 is
++`80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171`.
++Offline records predate final freeze and have no candidate-hash execution guard;
++D-1 documentation is outside the frozen candidate. See
++[testing boundaries](08-testing.md#recipe-preparation-feedback-loop-evidence)
++and the [D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++Historical evidence below is unchanged in meaning, not reclassified as PASS.
++
++[Partial] Historical B-19 evidence (2026-10-09) from the complete
+ [handoff](../../User%20Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md),
+ [manifest](../../User%20Stories/Reciepe/B-19_Recipe-Preparation_Manifest_2026-10-09.json)
+ and linked offline/live records: Preparation v4 / Import v16 is implemented,
+@@ -208,7 +295,7 @@ fixtures remains unmet; metadata derivation is not independently proven by the
+ structural/core checks. R also fails the separate import trace `[4,3]` (7/8
+ imports pass); G passes 8/8 imports but fails four unrelated Daily cases.
+ No Import/Daily repair, historical finding closure, overall PASS, repair retry,
+-second candidate, v5 or deployment is established.
++second candidate, v5 or deployment was established by that B-19 evidence.
+ 
+ [Partial] The [B-16 handoff](../../User%20Stories/Reciepe/B-16_Recipe-Preparation-v2_Handoff_2026-10-09.md)
+ records passing request isolation and offline gates (294 focused / 1407 full
+@@ -276,8 +363,9 @@ The B-18 focused all-skipped UNVERIFIED remains historical, not overwritten
+ by the executed B-18C focus. B-18C records 85/85 protected paths unchanged;
+ no correction or closure of Findings001/003/004/005 is established.
+ 
+-[Open] Independent QA of B-19 and final package/merge/release gates remain
+-open/blocked; historical Q-18A and v18 follow-up reports are not rewritten or
++[Partial] Independent Q-19 review returned FAIL and remains unresolved;
++feedback-loop QA and final package/merge/release gates remain unverified/blocked.
++Historical Q-18A and v18 follow-up reports are not rewritten or
+ superseded as acceptance evidence by D-19. Further provider/prompt/policy work
+ requires a new authorized package; STOP FOR DECISION, no rerun-until-green.
+ The Orchestrator owns further bounded work and the
+diff --git a/docs/kb/tech/08-testing.md b/docs/kb/tech/08-testing.md
+index 1109600..120109f 100644
+--- a/docs/kb/tech/08-testing.md
++++ b/docs/kb/tech/08-testing.md
+@@ -107,6 +107,52 @@ Sharp/Resvg imports and non-font reads and check missing/corrupt fonts and
+ Satori failures. No live AI, authenticated photo or confirmed export view is
+ required by these offline probe tests.
+ 
++### Recipe Preparation Feedback Loop Evidence
++
++[Partial] B-1 probe is implemented with passing recorded offline evidence;
++B-2 r2 loop is implemented, NOT ACCEPTED / release blocked. Dedicated colocated
++`recipePreparation.test.ts`, handler/source-validator/SDK tests and the existing
++renderer tests cover initial/correction1/correction2 success and three-draft
++exhaustion, immutable original context/latest draft, complete rechecks/count
++changes, real-font Alpha overflow, technical precedence, missing/non-finite
++measurements, provider/refusal/timeout/late results, once-only quota/booking,
++no writes, generic HTTP and exact latest affected-text exhaustion privacy.
++Injected SDK/time/measurement tests are offline coverage, not evidence that
++every failure mode executed live. V5 Preparation guards are separate from
++unchanged v16 Import; geometry is separate from independent cooking-core,
++ingredient-fidelity and contradiction rubrics and explicit user review.
++
++Recorded r2 commands/results, NOT rerun by documentation-only D-1:
++
++| Check | Recorded command family (exact arguments/hashes in linked records) | Exit | Executed / Passed / Failed / Skipped |
++| --- | --- | --- | --- |
++| Focused | `npm exec --workspace=backend -- vitest run` on the six owning test files | 0 | 495 / 495 / 0 / 0 |
++| Units | `npm run test --workspace=backend -- --reporter=default --reporter=json --outputFile=<recorded report>` | 0 | 1576 / 1576 / 0 / 0 |
++| Typecheck | `npm run typecheck --workspace=backend` | 0 | non-test |
++| Build | `npm run build:verify --workspace=backend` | 0 | non-test |
++| F | `node backend/scripts/run-eval.mjs src/lib/prompts/recipeAnalyze.eval.test.ts --testNamePattern "preparation prompt version matches fixture expectations\|recipePreparation"` plus recorded reporters | 1 | 5 / 2 / 3 / 9 |
++| R/G | NOT_RUN after required F failure; no command dispatched | null | 0 executed; 0 provider calls |
++
++F's version guard plus four fixtures include 8 logical calls (one forced initial
++draft) and 7 SDK calls. Rice passes its fit/fidelity checks; oven repeats
++300x112 versus 302x105 through all three drafts, 422/usage0 and independent
++semantic assertions NOT REACHED. Pasta fits but fails source-5 contradiction;
++forced dough fits but fails source-1 ingredient-explicit fidelity. 200/usage1
++and measured fit on those latter cases are not semantic PASS. Offline records
++predate candidate freeze (`candidateSha256: null`), not hash-guarded gate runs.
++
++See [B-2 recorded commands and hashes](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Recovery-Manifest_2026-10-09-r2-completion.json),
++[artifact inventory](../../User%20Stories/Reciepe/B-2_Feedback-Loop_Artifact-Manifest_2026-10-09-r2-completion.json)
++and [current evidence boundary](06-ai-integrations.md#preparation-feedback-loop-current-r2).
++Q-19 FAIL, old B-16/B-18/B-18C/B-19 FAIL/UNVERIFIED and foreign Import/Daily
++failures remain preserved; R/G NOT_RUN cannot close them. No independent QA,
++release or authenticated private/Alpha replay is claimed. The historical
++14:12 Alpha release deployed only logging, not the loop. D-1 performs only
++focused documentation assertions, links/encoding/errors and owned-diff/hash
++preservation checks, not units/typecheck/build/live gates. Its
++[handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md)
++records those separate results; documentation PASS cannot waive feature gates.
++
+ ### Daily Insight Prompt and Cache Checks
+ 
+ The active Daily prompt is tested through
+diff --git a/docs/kb/tech/09-api-reference.md b/docs/kb/tech/09-api-reference.md
+index 32e213f..65428b6 100644
+--- a/docs/kb/tech/09-api-reference.md
++++ b/docs/kb/tech/09-api-reference.md
+@@ -400,8 +400,8 @@ the revision it read, independently of the client header.
+ ### POST /api/recipes/{id}/export-view/prepare
+ 
+ The route loads a versioned recipe from the JWT user's partition and invokes
+-the separate backend-only `prepareRecipeExport(context)` operation with the
+-shared `recipe-analyze` quota and exclusive Preparation v4 system prompt.
++the backend-only `prepareValidatedRecipeExport(context)` loop with the
++shared `recipe-analyze` quota and exclusive Preparation v5 system prompt.
+ `analyzeRecipeText(text)` is import-only, retaining v16, full `AiRecipeRaw`,
+ normalization and globally monotone reference validation. The user message
+ contains the complete ID-free saved `recipeContext` projection and all unchanged
+@@ -412,7 +412,14 @@ The Strict `recipe_export_preparation` output contains only
+ object rejects extras; there are no ingredients, keys or returned source steps.
+ This internal provider change does not change the App API below. The same lazy
+ client, deployment/API version, temperature 0.2 and max_tokens 2048 are retained.
+-There is one provider call, no extra call, retry, fallback, or Cosmos write.
++There is an initial provider call and at most two content corrections via
++`prepareRecipeExport(context, options)`, with no hidden SDK retry, fallback or
++Cosmos write. Each correction uses immutable original context, exact latest
++whole draft and diagnostics; full output and all measurable teaser/steps are
++revalidated/reprobed, including after count changes. The 75000 ms monotonic
++aggregate generation/validation/probe deadline and at most 20000 ms per provider
++call use AbortSignal and SDK maxRetries0. Late results cannot book usage;
++booking is awaited once after the final deadline check, not raced or retried.
+ The AI output is validated before exactly one usage is tracked. Provider,
+ quota, and validation failures do not track usage.
+ 
+@@ -441,17 +448,32 @@ order; references are globally unique and groups ascend by FIRST reference.
+ The flattened list need not ascend: `[1,4,6],[5]` is allowed for Preparation,
+ `[5],[1,4,6]` is not. Gaps are allowed; no exact-min count or full partition is
+ required. Duplicate/unknown references, local/group-start reversals, invalid
+-source orders, empty text, metadata/limit violations and extra fields fail with
+-422; omission alone does not. Empty saved steps or exclusively blank source
++source orders, empty text, metadata/limit violations and extra fields are rejected;
++exhausted invalid drafts return 422. Omission alone does not. Empty saved steps or exclusively blank source
+ descriptions returns 422 before quota/provider work. There is no sorting,
+-padding, truncation, repair, full-recipe wrapper or invented fallback.
++padding, truncation, identity repair, full-recipe wrapper or invented fallback.
+ References remain internal and are removed from the unchanged plain V2 response.
+-The v4 prompt requests a complete understandable compact workflow by grouping
++The v5 prompt requests a complete understandable compact workflow by grouping
+ actions, not selecting five original steps; retained claims/metadata must be
+ source-backed. Runtime does not independently prove cooking-core preservation,
+ component fit or metadata derivation; fixture checks/user review are separate.
+ 
+-[Partial] B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
++Production geometry certifies only generated teaser/steps in saved-title
++context, not full image or Share success. Existing fonts/layout, 1..5/90/96
++limits and teaser sizing remain; no new font fallback, universal 23/11 cap,
++three-line product rule or ingredient-omission strategy is added. Only terminal
++correction exhaustion logs exact latest affected known text on the server;
++responses never contain raw draft/provider/error text or measurement payloads.
++See [current loop and logging boundaries](06-ai-integrations.md#preparation-feedback-loop-current-r2).
++
++[Partial] Current B-2 r2 is implemented, NOT ACCEPTED / release blocked:
++focused495/full1576 pass, typecheck/build exit0; F exit1 (5 executed / 2 passed /
++3 failed / 9 skipped); R/G NOT_RUN. Oven overflows all three drafts; fitting
++pasta/dough fail independent semantic checks. Alpha has only the historical
++14:12 logging release, not this loop. Q-19 FAIL remains unresolved. See the
++[D-1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09.md).
++
++[Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+ gates passed (1437 units, typecheck/build); all executed F/R/G live gates exit 1.
+ All three Preparation cases ran in each: rice group starts 6 before 5 and oven
+ duplicate reference 3 return 422/usage0/writes0/unchanged=true; pasta returns
+@@ -494,10 +516,10 @@ open. This is no private/Alpha replay or Share-success claim. See
+ - `401` — missing or invalid Bearer token
+ - `404` — recipe not found for the authenticated user
+ - `412` — a supplied `If-Match` does not exactly match the loaded recipe revision; rejected before quota/provider work
+-- `422` — missing saved cooking source (before quota/provider), or AI output fails server-side recipe/export validation; response includes `details`
++- `422` — invalid/missing saved cooking source before quota/provider, or three completed parsed drafts exhaust content corrections; existing validation envelope with bounded `details`, no raw text/bounds
+ - `429` — existing `QuotaExceededResponse` for `recipe-analyze`
+-- `502` — provider or empty/invalid AI response
+-- `500` — unexpected backend failure
++- `502` — terminal provider/refusal/incomplete/empty/invalid response or timeout; generic `AI recipe analysis failed`, no further correction or usage
++- `500` — technical probe/font/measurement, lookup/quota-backend or usage-booking failure; generic `Internal server error`, no private Error.message echo
+ 
+ ### Recipe steps
+ 

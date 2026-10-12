@@ -109,3 +109,52 @@ export type RecipeDetailsTemplateRenderError =
 export type RecipeDetailsTemplateRenderResult =
   | RenderOk
   | { ok: false; error: RecipeDetailsTemplateRenderError };
+
+export type RecipeDetailsGeneratedTextProbeInput = {
+  savedTitle: string;
+  teaser: string;
+  steps: string[];
+};
+
+export type RecipeDetailsGeneratedTextProbeField = "title" | "teaser" | "steps";
+
+export type RecipeDetailsGeneratedTextProbeTechnicalCode =
+  | "INVALID_CONTEXT"
+  | "MISSING_ASSET"
+  | "FONT_OR_SATORI_FAILED"
+  | "MISSING_MEASUREMENT"
+  | "NON_FINITE_MEASUREMENT"
+  | "TITLE_LAYOUT_FAILED"
+  | "PROBE_FAILED";
+
+export type RecipeDetailsGeneratedTextProbeDiagnostic = {
+  field: RecipeDetailsGeneratedTextProbeField;
+  itemIndex?: number;
+} & (
+  | {
+      status: "fits" | "overflow";
+      measured: { width: number; height: number; maxWidth: number; maxHeight: number };
+      fontSize: number;
+      displayText: string;
+    }
+  | {
+      status: "width-overflow";
+      measured: { width: number; maxWidth: number };
+      fontSize: number;
+    }
+  | { status: "invalid-text"; code: "INVALID_TEXT" | "INVALID_STEP_COUNT" }
+  | { status: "technical-failure"; code: RecipeDetailsGeneratedTextProbeTechnicalCode }
+);
+
+export type RecipeDetailsGeneratedTextProbeResult = {
+  diagnostics: RecipeDetailsGeneratedTextProbeDiagnostic[];
+  teaserFontSize?: number;
+} & (
+  | { ok: true; status: "success" }
+  | { ok: false; status: "generated-text-failure" }
+  | {
+      ok: false;
+      status: "technical-failure";
+      error: { code: RecipeDetailsGeneratedTextProbeTechnicalCode; message: string; asset?: string };
+    }
+);

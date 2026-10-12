@@ -1,0 +1,31 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/functions/recipes.test.ts",
+    "--testNamePattern",
+    "returns a transient, server-generated|logs only the latest affected|does not track usage for a V2 provider failure|rejects empty saved cooking",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Handler-Green-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:48:34.244Z",
+  "endedAt": "2026-10-09T15:48:40.717Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "844fea3bd6be7860ec865ab6c4e02bbae4c2f80437996a404ae81508a53a6ce3",
+  "reportSha256": "71f0bbec8d9ce55c374f2a5200b10cd64819e7ea44489a4a290550d283aaa069",
+  "counts": {
+    "executed": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 101
+  },
+  "failures": []
+}

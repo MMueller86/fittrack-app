@@ -1,0 +1,48 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "backend/scripts/run-eval.mjs",
+    "src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "--testNamePattern",
+    "preparation prompt version matches fixture expectations|recipePreparation",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_F-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T16:02:27.683Z",
+  "endedAt": "2026-10-09T16:02:46.279Z",
+  "exit": 1,
+  "signal": null,
+  "candidateSha256": "80aac40c4d980e1b6af8ed76bc7fbe36bac16dee87e14db7977ef4c681de7171",
+  "outputSha256": "220fd741cbe6f1cc9010c508a0ea2e10b15f1487f666a7f58b852f68c0de0c0c",
+  "reportSha256": "7cf9cb2e1c9cd527bbb586667966c1d1025aa41c536d1581aef942a23302fec0",
+  "counts": {
+    "executed": 5,
+    "passed": 2,
+    "failed": 3,
+    "skipped": 9
+  },
+  "failures": [
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+      "messages": [
+        "AssertionError: expected { …(4) } to match object { ok: true, status: 'success' }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:425:29\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+      "messages": [
+        "AssertionError: Contradiction at export source 5: expected 'Koche die Pasta in Salzwasser 10 Minu…' not to match /pasta(?:(?!\\bund\\b)[^;,.])*(?:in|mi…/iu\n    at assertRecipeStepSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:91:100)\n    at Module.assertRecipePreparationSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:320:3)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:459:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-dough-forced-initial-overfl…'] preserves saved source and selective cooking core",
+      "messages": [
+        "AssertionError: Export source 1: mix all original dough ingredients without omission: expected 'Vermische alle Zutaten zu einem Teig …' to match /mehl/iu\n    at assertRecipeStepSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:88:105)\n    at Module.assertRecipePreparationSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:320:3)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:459:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ]
+    }
+  ]
+}

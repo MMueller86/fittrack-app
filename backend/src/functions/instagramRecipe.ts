@@ -1,6 +1,7 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { z } from 'zod';
 import type { RecipeImage } from '@fittrack/shared';
+import { RECIPE_EXPORT_MAX_STEPS } from '../../../shared/types/recipeExport';
 
 import { requireUser } from '../lib/auth';
 import { withHandler, parseBody } from '../lib/http';
@@ -465,23 +466,39 @@ export const shareBundleHandler = withHandler(
       );
     }
 
-    const detailRender = await renderInstagramRecipeDetailsTemplate(
-      adaptRecipeToDetailsTemplateInput(recipe, imageBuffer, {
-        presentation: parsed.data.presentation,
-        storedHeroCrop: image.heroCrop,
-        exportViewDraft,
-        recipeMeta,
-        highlight: parsed.data.nutritionHighlight ?? undefined,
-      }),
-    );
+    const detailInput = adaptRecipeToDetailsTemplateInput(recipe, imageBuffer, {
+      presentation: parsed.data.presentation,
+      storedHeroCrop: image.heroCrop,
+      exportViewDraft,
+      recipeMeta,
+      highlight: parsed.data.nutritionHighlight ?? undefined,
+    });
+    const detailRender = await renderInstagramRecipeDetailsTemplate(detailInput);
     if (!detailRender.ok) {
       if (UNRENDERABLE_DETAIL_ERROR_CODES.has(detailRender.error.code as string)) {
+        const stepDiagnostics: LogFields = {};
+        if (detailRender.error.code === 'TEMPLATE_FIELD_OVERFLOW' &&
+            detailRender.error.field === 'steps' && detailRender.error.itemIndex !== undefined) {
+          const text = detailInput.steps[detailRender.error.itemIndex];
+          if (text !== undefined) {
+            stepDiagnostics['step_text'] = text;
+            stepDiagnostics['step_count'] = detailInput.steps.length;
+            stepDiagnostics['step_layout'] = detailInput.steps.length === RECIPE_EXPORT_MAX_STEPS
+              ? 'compact' : 'large';
+            stepDiagnostics['step_text_length'] = text.length;
+            stepDiagnostics['step_longest_word_length'] = Math.max(
+              0, ...text.split(/\s+/u).map((word) => word.length),
+            );
+            stepDiagnostics['step_explicit_line_breaks'] = (text.match(/\r\n|[\r\n\u2028\u2029]/gu) ?? []).length;
+          }
+        }
         logEvent(ctx, 'warn', 'recipes.shareBundle.unrenderableDetail', {
           userId,
           recipeId,
           image_id: image.id,
           failure_stage: 'detail_render',
           export_view_source: exportViewDraft ? 'request_draft' : 'stored_confirmed',
+          ...stepDiagnostics,
           ...rendererErrorLogFields(detailRender.error),
         });
         return {

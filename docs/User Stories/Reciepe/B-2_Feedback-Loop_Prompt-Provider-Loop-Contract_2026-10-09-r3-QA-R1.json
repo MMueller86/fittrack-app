@@ -1,0 +1,234 @@
+{
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "promptVersion": "v6",
+  "importVersion": "v16",
+  "promptSourceSha256": "ad57db8d728b39e67f16845afbc72d8132693cb4f51eb9a2a7fa2882d03ce220",
+  "providerVisiblePromptSha256": "61b6e6d2d37028f43b7974ec71dc1f04754fd8ca750116d5297c4bad1160d3ec",
+  "schema": {
+    "type": "json_schema",
+    "json_schema": {
+      "name": "recipe_export_preparation",
+      "strict": true,
+      "schema": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "teaser": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96
+          },
+          "totalTimeMinutes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 10080
+          },
+          "difficulty": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "properties": {
+                "order": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 90
+                },
+                "sourceStepOrders": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "required": [
+                "order",
+                "description",
+                "sourceStepOrders"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "version",
+          "teaser",
+          "totalTimeMinutes",
+          "difficulty",
+          "steps"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "schemaUnchangedAgainstR2": true,
+  "previousEvidence": {
+    "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Recorded-Provider-Evidence_2026-10-09-r2-completion.json",
+    "sha256": "c0a3c7a49ba4ca1b56252b4431bbba559a62603fa4fe61f98671623d55a11c7a"
+  },
+  "providerInput": {
+    "initial": [
+      "recipeContext",
+      "steps"
+    ],
+    "correction": [
+      "originalPreparation",
+      "latestDraft",
+      "validationErrors"
+    ],
+    "originalAndLatestPayloadsVerifiedBy": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Reconciliation_2026-10-09-r3-QA-R1.json",
+    "allValuesUntrusted": true
+  },
+  "temperature": 0.2,
+  "maxTokens": 2048,
+  "maxLogicalCalls": 3,
+  "maxCorrections": 2,
+  "aggregateDeadlineMs": 75000,
+  "maxRequestMs": 20000,
+  "requestPolicy": "min(20000,remainingMs), maxRetries0, AbortSignal; terminal deadline before booking; late provider/probe discarded",
+  "actualFOptions": [
+    {
+      "fixture": "synthetic-saved-eight-steps-rice-serving",
+      "sdkCall": 1,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-saved-eight-steps-rice-serving",
+      "sdkCall": 2,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-saved-eight-steps-rice-serving",
+      "sdkCall": 3,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-saved-oven-seven-steps",
+      "sdkCall": 1,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-saved-oven-seven-steps",
+      "sdkCall": 2,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-saved-oven-seven-steps",
+      "sdkCall": 3,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-saved-pasta-essential-sauce",
+      "sdkCall": 1,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+      "sdkCall": 1,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    },
+    {
+      "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+      "sdkCall": 2,
+      "options": {
+        "maxRetries": 0,
+        "timeout": 20000,
+        "signalPresent": true
+      },
+      "finishReason": "stop"
+    }
+  ],
+  "ownership": "recipePreparation lib generation/validation/probe only; unchanged handler authentication/quota/booking/logging/HTTP",
+  "sourceAuthority": "Whole generated candidate validated against unchanged saved source; FIRST groups, gaps, no server repair",
+  "terminalStatuses": [
+    400,
+    401,
+    404,
+    412,
+    429,
+    422,
+    502,
+    500
+  ],
+  "publicContract": "Unchanged V2, stripped internal refs, optional ETag, sourceEtag, mobile90s, no timeout/5xx POST retry",
+  "persistence": "No recipe/export/image/diary writes, quota once, final success usage once",
+  "logging": "Only completed parsed three-draft exhaustion; exact latest affected known strings; unknown keys and nonstrings metadata-only; no source/provider/arbitrary/unaffected content",
+  "productionFonts": "Unchanged B1; diagnostics now derive Inter font metadata from getRecipeDetailsTextLayoutFields, large1.25 compact1.17 teaser1.25",
+  "semanticBoundary": "Finite independent source-derived rubrics and explicit user review; fit200 refs are not semantic success",
+  "gates": {
+    "F": {
+      "exit": 1,
+      "counts": {
+        "executed": 5,
+        "passed": 2,
+        "failed": 3,
+        "skipped": 9
+      }
+    },
+    "R": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+    "G": "NOT_RUN_REQUIRED_LIVE_FAILURE"
+  },
+  "releaseEligible": false
+}

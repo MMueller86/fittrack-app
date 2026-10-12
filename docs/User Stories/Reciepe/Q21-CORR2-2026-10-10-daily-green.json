@@ -1,0 +1,24 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "../node_modules/vitest/vitest.mjs",
+    "run",
+    "src/lib/prompts/dailyInsightPrompt.test.ts",
+    "src/lib/dailyInsightValidation.test.ts",
+    "src/functions/dailyInsight.test.ts",
+    "src/lib/repositories/insightRepository.test.ts",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-daily-green-Report.json"
+  ],
+  "cwd": "backend",
+  "started": "2026-10-10T00:08:50.271Z",
+  "finished": "2026-10-10T00:08:51.674Z",
+  "exit": 0,
+  "counts": {
+    "total": 188,
+    "passed": 188,
+    "failed": 0,
+    "skipped": 0
+  }
+}

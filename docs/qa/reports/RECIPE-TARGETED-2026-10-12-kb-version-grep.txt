@@ -1,0 +1,207 @@
+﻿07-ai-features.md:105: **Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v17'`;
+07-ai-features.md:106: saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v12'`.
+07-ai-features.md:170: Import v17 keeps full source extraction and its export suggestion in one
+07-ai-features.md:171: `analyzeRecipeText(text)` analysis (re-sent for at most two directed corrections). Saved-recipe Preparation v12 uses the separate
+07-ai-features.md:178: `exportSuggestion` is generated in the same AI analysis and is only a user-review proposal. Since v17 the provider schema carries an internal per-source-step `cookingEssential` planning flag
+07-ai-features.md:203: `prepareValidatedRecipeExport(context)` with the exclusive v12 system prompt, not
+07-ai-features.md:204: import v17. `analyzeRecipeText(text)` is import-only and retains its full
+07-ai-features.md:219: `{ "contractVersion": 2 }`. A client ETag is not required; if `If-Match` is
+07-ai-features.md:223: `sourceEtag` is compatibility metadata, not a client acceptance prerequisite.
+07-ai-features.md:230: Preparation V2 remains text-only at the App API boundary; the small provider
+07-ai-features.md:240: repair or full-recipe wrapper. The v11 prompt requests a complete understandable compact
+07-ai-features.md:246: Initial and full-draft correction have separate v11 system prompts; pure
+07-ai-features.md:253: Q-21 correction attempt 1 (v10) failed independent F/R/G. The second and final
+07-ai-features.md:254: candidate v11 decides time before compression from the complete source and
+07-ai-features.md:284: [Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+07-ai-features.md:288: with 200/usage1/writes0/unchanged=true. Later V2-success-body/usage-order/final
+07-ai-features.md:293: Historical v2 FAIL/stopped-run UNVERIFIED
+07-ai-features.md:294: remain historical. B-18 evidence from 2026-10-09 for v16/v3 has a fully skipped focused
+07-ai-features.md:297: Later V2-body/usage-order assertions were not reached. The subsequent B-18C
+07-ai-features.md:303: [current evidence and open gates](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
+07-ai-features.md:317: analysis or an earlier V2 preparation while the detail screen remains mounted.
+07-ai-features.md:332: **Prompt version:** `RECIPE_SCALE_PROMPT_VERSION = 'v1'`
+07-ai-features.md:406: ### v17 prompt, output, and failure contract
+07-ai-features.md:408: `DAILY_INSIGHT_PROMPT_VERSION = 'v17'`. The selected focused module is combined
+07-ai-features.md:418: v14 fingerprint `sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`
+07-ai-features.md:419: and the historical v15 fingerprint
+07-ai-features.md:421: The historical v16 fingerprint remains
+07-ai-features.md:423: The appended active v17 fingerprint is
+07-ai-features.md:425: with assembly version `v2`. Historical release records are unchanged.
+07-ai-features.md:433: passes but unknown-activity fails. V17 removes the shared-tone permission to
+07-ai-features.md:474: The stale-weight safety contract introduced in v15 remains global because the shared tone guard is
+07-ai-features.md:483: `promptNutrition`; the fix introduced in v11 remains active in v17 and applies the shared guard to that path and all other
+07-ai-features.md:491: For v17, a positive `remainingCalories` value is an unfinished target budget,
+07-ai-features.md:529: interval, daily limit, or admin status. A complete, unexpired v14 same-date
+07-ai-features.md:530: Daily remains cached and is returned unchanged until its existing expiry; v17,
+07-ai-features.md:531: like v15/v16, does not overwrite it early. After expiry, the date key may receive a new v17
+07-ai-features.md:532: document. A v14 entry without complete provenance does not qualify for
+07-ai-features.md:636: are excluded. The prompt is versioned (`WEEKLY_INSIGHT_PROMPT_VERSION = 'v3'`)
+07-ai-features.md:653: including the v2-to-v3 prompt bump.
+07-ai-features.md:674: Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v15'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily 
+06-recipes.md:165: exact `If-Match` from the recipe GET response is checked when supplied. The
+06-recipes.md:186: with `RECIPE_PREPARATION_SYSTEM_PROMPT` v12 and
+06-recipes.md:188: retaining v16, full `AiRecipeRaw`, normalization and validation.
+06-recipes.md:207: `RECIPE_PREPARATION_CORRECTION_SYSTEM_PROMPT` v12 and the existing full-draft
+06-recipes.md:209: Preparation v12 starts total time at `null` and requires an explicit source total
+06-recipes.md:224: `If-Match` is supplied, a stale or non-exact ETag returns
+06-recipes.md:228: On success, the response retains `sourceEtag` as compatibility metadata and
+06-recipes.md:230: `RecipeExportStep` values. `sourceEtag` is not a client acceptance prerequisite.
+06-recipes.md:263: The v11 creation prompt requests a complete understandable compact detail-image workflow
+06-recipes.md:277: Preparation v12 explicitly preserves source cooking endpoints, not just cooking
+06-recipes.md:286: [Partial] Q-21 correction attempt 1 (v10, 2026-10-10) failed independent F/R/G.
+06-recipes.md:287: The second and final local candidate is v11. It decides aggregate time from
+06-recipes.md:308: [Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted: upstream offline
+06-recipes.md:316: and [current evidence boundary](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
+06-recipes.md:318: Historical v2 live evidence remains FAIL, with stopped serial runs UNVERIFIED; see the
+06-recipes.md:320: The B-18 evidence from 2026-10-09 for v16/v3 is not a quality PASS: the focused gate
+06-recipes.md:323: writes/unchanged source. Later V2-body/usage-order assertions were not reached.
+06-recipes.md:327: See [the current evidence boundary](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
+06-recipes.md:420: local draft from new-recipe analysis or V2 preparation while the detail screen
+06-recipes.md:421: remains mounted; only when neither source is available does it call the V2
+06-recipes.md:459: [Rule] `id`, `blobName`, `order`, and the optional `heroCrop` are stored in Cosmos metadata. Binary image data goes to Blob Storage; SAS URLs are generated per request. Legacy images without
+06-recipes.md:461: `heroCrop` is a closed, versioned contract: `version: 1`, `frame: 'instagram-recipe-v1'`, finite normalized `focusX` and `focusY` values in `0..1`, and finite `zoom >= 1`. The focus coordina
+06-recipes.md:463: The `instagram-recipe-v1` frame uses a `1080 x 1015` photo/hero area. This intentionally differs from the older `1080 x 880` reference: `1080 x 880` ends before the renderer's tag zone and i
+02-backend.md:137: deterministic effective default `{ version: 1, frame: 'instagram-recipe-v1',
+02-backend.md:173: The versioned `instagram-recipe-v1` frame is the renderer's `1080 x 1015`
+02-backend.md:268: `POST /api/recipes/{id}/export-view/prepare` accepts only the strict V2 body
+02-backend.md:269: `{ "contractVersion": 2 }`; it has no empty-body or V1 fallback. It does not
+02-backend.md:270: require client `If-Match`. A supplied header is checked against the
+02-backend.md:272: The response keeps `sourceEtag` for compatibility, but it is not a client-side
+02-backend.md:277: which uses `prepareRecipeExport(context, options)` with Preparation v12;
+02-backend.md:278: `analyzeRecipeText(text)` is import-only (v17, full `AiRecipeRaw`, unchanged
+02-backend.md:319: unchanged plain V2 App response. Cooking-core preservation, component fit and
+02-backend.md:321: semantic check. The v11 prompt requests a complete compact detail-image workflow
+02-backend.md:324: Initial creation and full-draft correction use separate v11 prompts; pure
+02-backend.md:329: no new semantic validation. V11 decides time before compression from the full
+02-backend.md:354: [Partial] Historical B-19 v4/v16 is implemented, not accepted: upstream offline gates passed
+02-backend.md:363: client `If-Match`; a supplied header remains an optional precondition. The
+02-backend.md:403: [Preparation V2 evidence boundary](06-ai-integrations.md#preparation-v2-evidence-boundary).
+04-shared-library.md:49: - `elevationLossM?` — descent in metres (V3; defaults to 0 when absent)
+04-shared-library.md:60: - `metBase?`, `metLocomotion?`, `terrainFactor?`, `deltaPack?` — hiking V3 intermediates (optional)
+04-shared-library.md:61: - `speedMet?`, `uphillBonusMet?`, `terrainBonusMet?`, `effectiveSupport?` — cycling V1.1 intermediates (optional)
+04-shared-library.md:87: - `PrepareRecipeExportViewResponseV2` — ETag-bound preparation response with `recipeId`, `sourceEtag`, and a text-only suggestion
+04-shared-library.md:101: the opaque server ETag in the HTTP `If-Match` header, never in the body.
+04-shared-library.md:109: contract: V2 sends `{ contractVersion: 2 }`; an ETag in `If-Match` is optional
+04-shared-library.md:110: (a supplied header is checked by the backend) and the response's `sourceEtag` is
+04-shared-library.md:115: Confirmation may also send the loaded ETag in `If-Match` as an optional precondition, separately from the
+04-shared-library.md:116: request body. The backend enforces strict V2 request parsing, the confirmation
+04-shared-library.md:182: | `activityBonusCalculator.ts` | `calculateActivityBonus(inputs, weightKg, dailyCalorieTarget)` | V3 piecewise-linear MET model for hiking; returns `ActivityBonusResult` including V3 interme
+04-shared-library.md:199: ### `activityBonusCalculator.ts` — V3 Algorithm (Hiking)
+04-shared-library.md:216: ### `cyclingBonusCalculator.ts` — V1.1 Algorithm (Cycling)
+06-ai-integrations.md:66: **Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v17'`;
+06-ai-integrations.md:67: saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v12'`.
+06-ai-integrations.md:74: [the historical and current evidence boundary](#preparation-v2-evidence-boundary).
+06-ai-integrations.md:76: For explicitly numbered input, import v17 requests exactly one complete ordered source `steps` entry per instruction; the five-step cap applies only to `exportSuggestion.steps`. Export has 1
+06-ai-integrations.md:108: #### Preparation V2 Evidence Boundary
+06-ai-integrations.md:112: with `RECIPE_PREPARATION_SYSTEM_PROMPT` v12.
+06-ai-integrations.md:113: `analyzeRecipeText(text)` is import-only: v17 prompt body, full `AiRecipeRaw`
+06-ai-integrations.md:161: The v12 prompt asks for a complete understandable compact detail-image workflow:
+06-ai-integrations.md:171: The App API remains the strict `{ "contractVersion": 2 }` request and plain V2
+06-ai-integrations.md:172: response with `sourceEtag`, teaser, nullable metadata and `{ order, description }`
+06-ai-integrations.md:188: ##### Preparation v12: Total-Time Provenance Fix
+06-ai-integrations.md:190: QA's oven40/pasta25 findings were reproduced against v11 with direct live
+06-ai-integrations.md:191: Preparation calls. v12 keeps the same API/schema, quota and bounded correction
+06-ai-integrations.md:203: ##### Historical Preparation v11: Final Q-21 Correction
+06-ai-integrations.md:206: an existing export draft. `RECIPE_PREPARATION_SYSTEM_PROMPT` v11 contains creation
+06-ai-integrations.md:208: `RECIPE_PREPARATION_CORRECTION_SYSTEM_PROMPT` v11 with the existing
+06-ai-integrations.md:217: Import v17 remains one analysis including the export suggestion: separating
+06-ai-integrations.md:220: Preparation v11 retains explicit source cooking-endpoint preservation in all three
+06-ai-integrations.md:229: [Partial] CORR1 v10 (2026-10-10) failed independent F2/5, R11/14, G38/42.
+06-ai-integrations.md:230: The second and final candidate v11 decides total time before compression from
+06-ai-integrations.md:239: All dated v9/v8/v7/v6 evidence below remains historical, not proof for v11.
+06-ai-integrations.md:241: ##### Historical Preparation v9 Evidence (2026-10-09)
+06-ai-integrations.md:244: in `backend/output/recipe-preparation-v9-separated-prompts-eval-2026-10-09.json`.
+06-ai-integrations.md:260: ##### Preparation v8: Simplified Grouping and Order Guidance
+06-ai-integrations.md:262: Preparation v8 keeps the v7 text-only shortening path and simplifies
+06-ai-integrations.md:268: fonts, templates, schema, budgets, Import v16 and public contracts are unchanged.
+06-ai-integrations.md:271: in `backend/output/recipe-preparation-v8-order-eval-2026-10-09.json`. Rice and oven
+06-ai-integrations.md:275: v16 (`explicit-quantities-with-unit-conversion`) and Daily Insight (`stale-weight`).
+06-ai-integrations.md:278: build:verify passed. Recorded v6/v7 results remain historical evidence.
+06-ai-integrations.md:280: ##### Preparation v7: Text-Only Overflow Correction
+06-ai-integrations.md:282: The v7 implementation adds a user-requested narrow correction path. When all
+06-ai-integrations.md:295: partial edits. Import v16, public contracts, template and fonts are unchanged.
+06-ai-integrations.md:297: overflow only. Historical v6 results below are not reclassified and do not
+06-ai-integrations.md:298: certify v7 or authorize a deployment.
+06-ai-integrations.md:311: Results: [v7 live eval report](../../../backend/output/recipe-text-correction-v7-eval-2026-10-09.json).
+06-ai-integrations.md:319: Results: [dough rubric live rerun](../../../backend/output/recipe-text-correction-v7-dough-rubric-eval-2026-10-09.json).
+06-ai-integrations.md:330: The recorded v6 `recipePreparation.ts` owns initial plus at most two corrections. Initial JSON
+06-ai-integrations.md:342: Preparation v6 changes only correction guidance: zero-based path/index versus
+06-ai-integrations.md:356: and explicit user review, not a runtime semantic guarantee. Import v16 and its
+06-ai-integrations.md:371: payload or private Error.message is echoed over HTTP. Auth, strict V2, owner
+06-ai-integrations.md:376: are added; V2, sourceEtag, confirmation, fingerprint and ETag contracts remain.
+06-ai-integrations.md:403: F has four fixtures plus the passing v6 version guard, 10 logical calls
+06-ai-integrations.md:439: and linked offline/live records: Preparation v4 / Import v16 is implemented,
+06-ai-integrations.md:459: Core/contradiction and V2-body/quota-order/usage-order/no-private-ID/no-write
+06-ai-integrations.md:463: then validation-success fails. Later V2-success-body/usage-order and final
+06-ai-integrations.md:471: second candidate, v5 or deployment was established by that B-19 evidence.
+06-ai-integrations.md:484: Source binding already worked in v15 despite missing export text. No proven
+06-ai-integrations.md:488: At D-16, PO-1 exact-count remained unresolved. The explicitly approved v18
+06-ai-integrations.md:496: and its repository-backed offline/live evidence record implemented v16/v3.
+06-ai-integrations.md:508: do not constitute a quality PASS. Later text-only-V2-body/usage-order assertions
+06-ai-integrations.md:514: [Q-18A](../../qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md)
+06-ai-integrations.md:523: universal parser. Production import v16/preparation v3 and all runtime
+06-ai-integrations.md:534: writes/unchanged source; later V2-body/usage-order assertions were not reached.
+06-ai-integrations.md:541: Historical Q-18A and v18 follow-up reports are not rewritten or
+06-ai-integrations.md:618: **v17 prompt and validation contract:**
+06-ai-integrations.md:619: - `DAILY_INSIGHT_PROMPT_VERSION` is `'v17'`. The selected intent module is
+06-ai-integrations.md:625: The append-only manifest preserves v14 fingerprint
+06-ai-integrations.md:627: and historical v15 fingerprint
+06-ai-integrations.md:629: unchanged. The historical v16 fingerprint remains
+06-ai-integrations.md:631: and the appended active v17 fingerprint is
+06-ai-integrations.md:633: with assembly version `v2`.
+06-ai-integrations.md:650: - The stale-weight contract introduced in v15 remains global: the shared tone guard is included
+06-ai-integrations.md:659: - The runtime root cause was corrected in v11 and remains active in v17: stale-weight rules had been
+06-ai-integrations.md:679: - Q-21's separate Daily v16 fix removes the shared-tone instruction to use
+06-ai-integrations.md:685: validator. Final correction v17 removes shared-tone rest-budget wording for
+06-ai-integrations.md:719: - A complete, unexpired v14 same-date Daily is returned unchanged until its
+06-ai-integrations.md:720: existing expiry and is not overwritten by v17 early, retaining the v15/v16 rule.
+06-ai-integrations.md:721: After expiry, that key can receive a new v17 document. A v14 document without complete provenance
+06-ai-integrations.md:758: partition/id, `_docType: 'insightFeedback'`, `promptVersion: 'v14'`, and stored
+06-ai-integrations.md:794: The weekly prompt is `WEEKLY_INSIGHT_PROMPT_VERSION = 'v2'` in
+06-ai-integrations.md:834: - `dailyInsightPrompt.ts` (active v17 composition root), `dailyInsightPromptManifest.ts` (preserved v14/v15/v16 and active v17 release locks), and `../dailyInsightSchema.ts` (shared Strict S
+06-ai-integrations.md:838: [Rule] Prompt files are versioned. When a prompt changes in ways that would alter output format or interpretation, increment the version (e.g., `V6` → `V7`). Store the version constant along
+08-testing.md:133: every failure mode executed live. V12 Preparation guards are separate from
+08-testing.md:134: unchanged v17 Import; geometry is separate from independent cooking-core,
+08-testing.md:166: F's passing v6 version guard plus four fixtures include 10 logical calls (one
+08-testing.md:176: The initial focused run (519/518/1/0, stale v5 companion guard) and all Red
+08-testing.md:200: canonical-bundle fingerprinting, the append-only manifest with retained v14/v15
+08-testing.md:201: v16 and active v17 entries, and the context-dependent system-prompt hashes. The
+08-testing.md:227: also prove that a complete unexpired same-date v14 cache entry is returned
+09-api-reference.md:190: | `metBase` | *(hiking only)* Flat-terrain walking MET (V3 intermediate) |
+09-api-reference.md:191: | `metLocomotion` | *(hiking only)* MET after elevation adjustments (V3 intermediate) |
+09-api-reference.md:192: | `terrainFactor` | *(hiking only)* Multiplicative terrain factor applied (V3 intermediate) |
+09-api-reference.md:193: | `deltaPack` | *(hiking only)* Additive pack bonus applied (V3 intermediate) |
+09-api-reference.md:269: The route returns the updated owner `Recipe` and ETag. `If-Match` is optional;
+09-api-reference.md:377: create that includes one requires the marker and has no `If-Match`
+09-api-reference.md:380: `If-Match` nor a client-computed `sourceFingerprint` is a JSON field. The server
+09-api-reference.md:386: send the exact ETag from the recipe GET response in the HTTP `If-Match` header
+09-api-reference.md:404: shared `recipe-analyze` quota and exclusive Preparation v12 system prompt.
+09-api-reference.md:405: `analyzeRecipeText(text)` is import-only, retaining v17, full `AiRecipeRaw`,
+09-api-reference.md:428: `400 { "error": "invalid_export_preparation_request" }`. No client `If-Match`
+09-api-reference.md:433: plain steps. `sourceEtag` identifies the loaded revision for compatibility;
+09-api-reference.md:455: References remain internal and are removed from the unchanged plain V2 response.
+09-api-reference.md:456: The v11 prompt requests a complete understandable compact workflow by grouping
+09-api-reference.md:465: Public V2 and provider schemas are unchanged. V11 decides time from the full
+09-api-reference.md:494: [Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+09-api-reference.md:499: later V2-success-body/usage-order/final semantic assertions are not reached.
+09-api-reference.md:504: Historical v2 FAILs remain;
+09-api-reference.md:505: B-18 evidence from 2026-10-09 for v16/v3 has an all-skipped focused gate (UNVERIFIED) and
+09-api-reference.md:507: 200/SDK1/analyze1/usage1/writes0/unchanged=true. Later V2-body/usage-order
+09-api-reference.md:512: [Preparation V2 evidence boundary](06-ai-integrations.md#preparation-v2-evidence-boundary).
+09-api-reference.md:518: "sourceEtag": "\"recipe-revision\"",
+09-api-reference.md:536: - `412` — a supplied `If-Match` does not exactly match the loaded recipe revision; rejected before quota/provider work
+09-api-reference.md:550: `heroCrop` has the closed shape `{ version: 1, frame: "instagram-recipe-v1", focusX, focusY, zoom }`. `focusX` and `focusY` are finite normalized coordinates in `0..1` on the visually orient
+09-api-reference.md:552: The `instagram-recipe-v1` frame is `1080 x 1015`, matching the current
+09-api-reference.md:570: "frame": "instagram-recipe-v1",
+09-api-reference.md:897: "promptVersion": "v17",
+09-api-reference.md:914: `aiInsights` container with `id = ${userId}:${date}`. The selected v17 intent,
+09-api-reference.md:919: The active v17 prompt and server validator apply the stale-weight guard to all
+09-api-reference.md:926: Daily v17 retains v16's removal of contradictory below-target guidance and
+09-api-reference.md:930: The append-only release manifest retains v14/v15/v16; the existing complete,
+09-api-reference.md:931: unexpired same-date v14 cache exception remains effective under v17.
+09-api-reference.md:1002: | `promptVersion` | Stored Daily prompt version, currently `v17` for new generations |
+03-mobile.md:214: held locally from new-recipe analysis or an earlier V2 preparation while the
+03-mobile.md:221: `If-Match` header or require/compare `sourceEtag`; the response is transient
+03-mobile.md:307: frame: 'instagram-recipe-v1';
+03-mobile.md:316: `instagram-recipe-v1` frame describes the `1080 x 1015` photo/hero area of the
+03-mobile.md:327: frame: 'instagram-recipe-v1',

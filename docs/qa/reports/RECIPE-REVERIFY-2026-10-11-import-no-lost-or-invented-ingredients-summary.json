@@ -1,0 +1,119 @@
+{
+  "series": "import-no-lost-or-invented-ingredients",
+  "runs": [
+    {
+      "label": "import-no-lost-or-invented-ingredients-run01",
+      "exit": 0,
+      "started": "2026-10-11T10:54:21.311Z",
+      "finished": "2026-10-11T10:54:32.212Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-no-lost-or-invented-ingredients-run02",
+      "exit": 0,
+      "started": "2026-10-11T10:54:32.981Z",
+      "finished": "2026-10-11T10:54:40.201Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-no-lost-or-invented-ingredients-run03",
+      "exit": 0,
+      "started": "2026-10-11T10:54:40.872Z",
+      "finished": "2026-10-11T10:54:47.889Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-no-lost-or-invented-ingredients-run04",
+      "exit": 0,
+      "started": "2026-10-11T10:54:48.561Z",
+      "finished": "2026-10-11T10:54:56.760Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-no-lost-or-invented-ingredients-run05",
+      "exit": 0,
+      "started": "2026-10-11T10:54:57.412Z",
+      "finished": "2026-10-11T10:55:06.632Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-no-lost-or-invented-ingredients-run06",
+      "exit": 0,
+      "started": "2026-10-11T10:55:07.327Z",
+      "finished": "2026-10-11T10:55:14.695Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-no-lost-or-invented-ingredients-run07",
+      "exit": 0,
+      "started": "2026-10-11T10:55:15.354Z",
+      "finished": "2026-10-11T10:55:25.518Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-no-lost-or-invented-ingredients-run08",
+      "exit": 0,
+      "started": "2026-10-11T10:55:26.290Z",
+      "finished": "2026-10-11T10:55:47.033Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    }
+  ],
+  "passedRuns": 8,
+  "totalRuns": 8
+}

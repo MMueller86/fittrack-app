@@ -1,0 +1,250 @@
+diff --git a/docs/kb/domain/06-recipes.md b/docs/kb/domain/06-recipes.md
+--- a/docs/kb/domain/06-recipes.md
++++ b/docs/kb/domain/06-recipes.md
+@@ -94 +94 @@
+-[Rule] Recipe analysis preserves preparation order with contiguous 1-based source-step orders. When input instructions are explicitly numbered, each instruction remains one analysis source step in that order. Only export suggestions may compress steps; export grouping may combine only adjacent source steps, and the flattened source-step trace must include every source step exactly once in order.
++[Rule] Recipe analysis preserves the complete source with contiguous 1-based source-step orders. When input instructions are explicitly numbered, each instruction remains one analysis source step in that order; the export limit never applies to this list. Only export suggestions may compress selectively. Their non-empty `sourceStepOrders` lists reference contained actions, not every detail read; flattened references must be positive, present, globally unique, and strictly ascending. Gaps within and between groups are allowed; full coverage and adjacent-only partitions are not required.
+@@ -186,2 +186,2 @@
+-`analyzeRecipeText()` selects only `RECIPE_PREPARATION_SYSTEM_PROMPT` v2, without
+-the import prompt body; free-text import still uses the unchanged v15 prompt.
++`analyzeRecipeText()` selects only `RECIPE_PREPARATION_SYSTEM_PROMPT` v3, without
++the import prompt body; free-text import uses the separate v16 prompt.
+@@ -208,2 +208,3 @@
+-export text limits, nullable metadata, contiguous export-step order, and complete
+-ordered source-step coverage. Unused AI ingredient fields and ingredient-key
++export text limits (1..5 non-empty descriptions, at most 90 characters each),
++nullable metadata, contiguous export-step order 1..K, and a globally unique,
++strictly ascending subset of existing source orders. Unused AI ingredient fields and ingredient-key
+@@ -217,6 +218,8 @@
+-existing recipe. Missing, duplicate, unknown, or reordered source references,
+-empty text, and limit violations return `422`. This is not a general content
+-validator: complete IDs and valid lengths do not prove that all actions or
+-details survive in the text. The v2 grouping instructions are prompt intent,
+-not a demonstrated content guarantee. Current live evidence is FAIL, with the
+-remaining serial runs UNVERIFIED; see the
++existing recipe. Duplicate, unknown, or reordered references, invalid source
++orders, empty text, and limit violations return `422`; omitted references alone
++do not. No cooking source permits no invented fallback. This is not a general
++content validator: valid IDs and lengths do not prove a preserved cooking core.
++The v3 prompt requests central preparation/cooking, essential separate sides
++or sauces, and necessary transitions. Details may be omitted; retained claims
++must fit their source and component without invention or contradiction.
++Historical v2 live evidence remains FAIL, with stopped serial runs UNVERIFIED; see the
+@@ -223,0 +227,5 @@
++The new 2026-10-09 v16/v3 evidence is also not a quality PASS: the focused gate
++skipped every test (UNVERIFIED); separate Recipe and overall gates failed on
++missing preparation finish-cooking, despite observed 200/one call/one usage/no
++writes/unchanged source. Later V2-body/usage-order assertions were not reached.
++See [the current evidence boundary](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
+@@ -324 +332 @@
+-[Rule] Recipe analysis keeps explicitly numbered input instructions one-to-one in ordered source steps. Export suggestions contain exactly `min(source step count, 5)` steps: source steps map one-to-one when there are at most five; above five, only adjacent source steps may be grouped. The flattened source-step trace must include every source step exactly once and in order.
++[Rule] Recipe analysis keeps explicitly numbered input instructions one-to-one in complete ordered source steps. Export suggestions contain 1..5 non-empty German descriptions of at most 90 characters each, with orders 1..K. They preserve the recipe-specific cooking core, not every source detail. Compression is allowed even for at most five source steps; no exact-min count, padding, first-five truncation, or full-preservation packing is required. References follow the ordered unique subset rule above. Runtime validates structure/references, not general cooking semantics; fixture quality checks and explicit user review remain separate.
+diff --git a/docs/kb/domain/07-ai-features.md b/docs/kb/domain/07-ai-features.md
+--- a/docs/kb/domain/07-ai-features.md
++++ b/docs/kb/domain/07-ai-features.md
+@@ -105,2 +105,2 @@
+-**Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v15'`;
+-saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v2'`.
++**Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v16'`;
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v3'`.
+@@ -168 +168 @@
+-### v13 analyzer and export suggestion contract
++### Current Analyzer and Export Suggestion Contract
+@@ -170,3 +170,3 @@
+-The following v13 rules are retained in the current import v15 prompt; they
+-describe the requested output, not a current live content PASS. Preparation
+-v2 uses its own exclusive prompt and validation boundary described below.
++Import v16 and preparation v3 separate full source preservation from a
++selective cooking summary. Prompt intent, runtime validation, fixture quality,
++and user review are distinct; none is a general cooking/safety guarantee.
+@@ -174 +174 @@
+-For v13, explicitly numbered input instructions remain one-to-one in the complete ordered source `steps` array; the five-export-step limit never applies to that array. `exportSuggestion.steps` has exactly `min(source step count, 5)` entries. With at most five source steps, each export step references only its corresponding source order; above five, export steps partition the source sequence into exactly five contiguous groups. The prompt assigns groups using the next unassigned source order, so the flattened trace must equal `1..N` exactly once. The existing server validator remains fail-closed and invalid traces retain the HTTP `422` contract.
++Explicitly numbered input instructions remain one-to-one in the complete ordered source `steps` array; the five-export-step limit never applies to it. `exportSuggestion.steps` contains 1..5 non-empty German texts of at most 90 characters, with orders 1..K. Compression is allowed even when the source has at most five steps. There is no exact-min count, padding, first-five truncation, full partition, or full-detail packing requirement. Each non-empty reference list names actions contained in the export text. Flattened references must be positive, present in the source, globally unique, and strictly ascending; gaps within and between groups are allowed. Genuine structural/reference failures remain HTTP `422`, but omission alone is not a failure.
+@@ -187 +187 @@
+-    sourceStepOrders: number[];    // ascending source-step orders
++    sourceStepOrders: number[];    // non-empty ordered subset of source actions
+@@ -189 +189 @@
+-  }>;                              // at most 5 entries
++  }>;                              // 1..5 entries
+@@ -194 +194 @@
+-`totalTimeMinutes` and `difficulty` use the same time and difficulty field names as the persisted recipe export view. During AI analysis both are nullable because no default may be invented; the later persisted export view has its own required-field validation. `includedIngredientKeys` excludes `seasoning` ingredients. The backend requires unique, ascending source `steps.order` values, contiguous export orders, valid ingredient references, and a complete `sourceStepOrders` trace: every source step must occur exactly once and in the original order. When recipe input has explicitly numbered instructions, v13 keeps one analysis source step per instruction in the same order; the five-step cap applies only to `exportSuggestion.steps`. If more than five source steps exist, the prompt requires semantic grouping rather than mechanical truncation, preserving actions, ingredient references, temperatures, times, and turning points. Descriptions above 90 characters or more than five export steps are rejected with HTTP `422`.
++`totalTimeMinutes` and `difficulty` use the same field names as the persisted export view. During analysis both are nullable because no default may be invented; persistence has its own required-field validation. `includedIngredientKeys` excludes `seasoning`. The backend requires positive, unique, ascending source orders, contiguous export orders, valid ingredient references, and the ordered unique subset trace above. It rejects empty exports, blank descriptions, more than five steps, descriptions above 90 characters, and unknown/duplicate/reordered references with `422`; it does not sort, renumber, or repair identities.
+@@ -196 +196 @@
+-For more than five source steps, v13 makes semantic preservation operational: before grouping, the prompt accounts for each step's action, ingredients, temperature, duration, turning point, and any side-dish, sauce, or serving relationship. It groups only adjacent steps. An explicit side-dish role and plating/serving action must remain readable in the export text; ingredient names or a complete `sourceStepOrders` trace alone are not sufficient. The live eval uses eight explicitly numbered instructions and checks that all eight survive source extraction, that the flattened export trace is complete and ordered, and that the numbered potato-cooking action and final serving action survive in both source-step and export descriptions. It also checks the existing five-export-step and 90-character limits without requiring exact export grouping or generated wording.
++The prompt requests the recipe-specific cooking core: central preparation and cooking, essential separate sides or sauces, and necessary transitions. Merely naming a side does not replace cooking it. Details and serving may be omitted when the core remains understandable; retained statements must fit their source/component without invention or contradiction. Full source-extraction checks remain separate from small, fixture-specific export-core rubrics. The chicken/rice preparation fixture requires chicken preparation, frying, independent rice cooking, and finish-cooking, not every seasoning/heat/resting/serving detail. These test-only checks are not a universal runtime semantic validator or a fixed wording/grouping requirement.
+@@ -198 +198 @@
+-The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. A structurally or semantically invalid AI result returns `422` and is rejected before usage is tracked. Usage is tracked only after the AI result passes server validation. The analysis response, including `exportSuggestion`, is transient at this endpoint: it is not persisted automatically, and no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Food items with an indeterminate amount remain visible with `needsReview: true`; seasoning items bypass catalog search and are also shown for user review in the wizard.
++The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. An AI result failing server shape/reference/ingredient validation returns `422` before usage is tracked; this does not test general cooking semantics. Usage is tracked only after server validation. The response, including `exportSuggestion`, is transient: no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Indeterminate food amounts remain visible with `needsReview: true`; seasonings bypass catalog search and remain visible for review.
+@@ -201,4 +201,4 @@
+-but selects only the exclusive preparation v2 system prompt, not the import
+-v15 body or an appended addendum. The existing client sends `recipeContext`
+-and unchanged stored `steps` as JSON in the user-data message. Import v15 is
+-unchanged. The full Strict `AiRecipeRaw` provider contract, model selection,
++but selects only the exclusive preparation v3 system prompt, not the import
++v16 body or an appended addendum. The existing client sends `recipeContext`
++and unchanged stored `steps` as JSON in the user-data message. The full Strict
++`AiRecipeRaw` provider contract, model selection,
+@@ -221,6 +221,9 @@
+-The preparation validator rejects invalid source traces, empty texts, and
+-limit violations, but is not a general content validator. The v2 prompt asks
+-for content-driven adjacent grouping preserving every action and detail;
+-that intent is not a working content guarantee. The synthetic live evidence
+-is FAIL and the stopped serial runs remain UNVERIFIED, not PASS. Preparation
+-is not a history replay. See the
++The preparation validator checks the ordered unique subset against saved
++steps, rejects genuine reference/shape/limit failures, and accepts gaps. Without
++a cooking source it cannot accept invented reference-based fallback steps.
++It is not a general content validator. Historical v2 FAIL/stopped-run UNVERIFIED
++remain historical. New 2026-10-09 v16/v3 evidence has a fully skipped focused
++gate (UNVERIFIED) and Preparation FAIL in both Recipe and overall gates: missing
++finish-cooking despite observed 200/one call/usage1/no writes/unchanged source.
++Later V2-body/usage-order assertions were not reached. Preparation is not a
++private/Alpha replay or Share-success proof. See the
+diff --git a/docs/kb/tech/02-backend.md b/docs/kb/tech/02-backend.md
+--- a/docs/kb/tech/02-backend.md
++++ b/docs/kb/tech/02-backend.md
+@@ -266,4 +266,5 @@
+-flag; validation messages are not logged. For `source_step_coverage_mismatch`
+-only, the validation failure event also records expected saved source orders
+-and actual flattened export source orders, each bounded to 32 values with
+-truncation flags, plus the first mismatch position and expected/actual order.
++flag; validation messages are not logged. With ordered partial traces, the
++coverage-only payload/helpers are removed: no `sourceStepTrace`, expected/actual
++order lists, or first-mismatch fields. Genuine unknown, duplicate, or reordered
++references still produce bounded phase/code/path diagnostics; generic request
++and provider diagnostics remain.
+@@ -273,2 +274,3 @@
+-describe trace failures against saved `recipe.steps`, not general content
+-validation or historical replay. See
++describe structural/reference failures against saved `recipe.steps`, not
++general cooking quality, guaranteed preservation, or historical replay. Privacy
++checks cover every log/warn/error argument, including nested values. See
+diff --git a/docs/kb/tech/06-ai-integrations.md b/docs/kb/tech/06-ai-integrations.md
+--- a/docs/kb/tech/06-ai-integrations.md
++++ b/docs/kb/tech/06-ai-integrations.md
+@@ -66,2 +66,2 @@
+-**Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v15'`;
+-saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v2'`.
++**Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v16'`;
++saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v3'`.
+@@ -69,3 +69,3 @@
+-The v13 rules below describe the inherited import contract/prompt intent,
+-retained in v15, not a current live content PASS. Preparation v2 is separate;
+-see [its evidence boundary](#preparation-v2-evidence-boundary).
++The current contract separates complete source extraction from a selective
++export cooking summary. Preparation uses its own exclusive prompt; see
++[the historical and current evidence boundary](#preparation-v2-evidence-boundary).
+@@ -73 +73 @@
+-For explicitly numbered input, v13 first emits exactly one ordered source `steps` entry per input instruction; the five-step cap applies only to `exportSuggestion.steps`. The export contains exactly `min(N, 5)` steps: a one-to-one source mapping for up to five steps, or five groups of adjacent steps above five. The prompt assigns groups using the next unassigned source order and requires the flattened trace to equal `1..N` exactly once; the server validator and its HTTP `422` failure behavior remain unchanged.
++For explicitly numbered input, import v16 requests exactly one complete ordered source `steps` entry per instruction; the five-step cap applies only to `exportSuggestion.steps`. Export has 1..5 non-empty German texts, at most 90 characters each, orders 1..K. Compression is allowed even for N <= 5. No exact-min count, padding, first-five truncation, full partition, or full-detail packing is required. Non-empty `sourceStepOrders` reference contained actions, not every detail read. Flattened references must be positive, present, globally unique, and strictly ascending; gaps within and between groups are allowed. Unknown, duplicate, or reordered references remain `422`; omission alone does not.
+@@ -77 +77 @@
+-The strict `AiRecipeRaw` contract includes `suggestedName`, `description`, positive `suggestedPortions`, `tags`, `steps`, `ingredients`, and `exportSuggestion`. Each ingredient has a unique `analysisKey`, the original `line`, a normalized `displayName`, `category: 'food' | 'seasoning'`, `amountGrams`, and `kitchenAmountText`. Every determinable food quantity is converted to positive grams, including `2 EL` → approximately `30 g`; a genuinely indeterminate food amount such as unmeasured spray oil must be `amountGrams: null`, never a tiny positive placeholder, and is routed to manual review. Seasoning amounts may also be null only when genuinely indeterminate. Food and seasoning routing is performed by the backend without re-running the general meal parser, preserving the analyzer's kitchen-unit conversions. Explicitly numbered input instructions remain one source step each in the same order; export steps alone may group adjacent source steps, and their flattened `sourceStepOrders` must trace every source step exactly once in order.
++The strict `AiRecipeRaw` contract includes `suggestedName`, `description`, positive `suggestedPortions`, `tags`, `steps`, `ingredients`, and `exportSuggestion`. Each ingredient has a unique `analysisKey`, the original `line`, a normalized `displayName`, `category: 'food' | 'seasoning'`, `amountGrams`, and `kitchenAmountText`. Every determinable food quantity is converted to positive grams, including `2 EL` → approximately `30 g`; a genuinely indeterminate food amount such as unmeasured spray oil must be `amountGrams: null`, never a tiny positive placeholder, and is routed to manual review. Seasoning amounts may also be null only when genuinely indeterminate. Food and seasoning routing is performed by the backend without re-running the general meal parser, preserving the analyzer's kitchen-unit conversions. Complete source extraction remains separate from selective export references.
+@@ -79 +79 @@
+-The v13 `exportSuggestion` contract retains the v10 shape:
++The current `exportSuggestion` contract retains the existing shape:
+@@ -92 +92 @@
+-	}>;                               // at most 5 entries
++	}>;                               // 1..5 entries
+@@ -97 +97 @@
+-`totalTimeMinutes` and `difficulty` are the shared time and difficulty fields used by the recipe export contract. They remain nullable during analysis when the recipe does not support a reliable value; the AI must not substitute a default. `sourceStepOrders` must be ascending and must trace every source `steps.order` exactly once and in order. Export orders are contiguous from 1, `ingredientKeys` reference existing `analysisKey` values, and `includedIngredientKeys` cannot reference seasonings. For more than five source steps, the v13 prompt uses a per-step preservation checklist for actions, ingredient references, temperatures, durations, turning points, and serving relationships; it groups only adjacent steps and explicitly preserves side-dish roles and plating/serving actions. A name in the ingredient list or a complete trace does not by itself prove semantic preservation. The live eval's synthetic `side-dish-and-serving-actions` fixture contains eight explicitly numbered source instructions; it requires all eight in source extraction, complete flattened trace order, no more than five export steps, and descriptions no longer than 90 characters. It checks the potato-cooking action and final serving action in both source extraction and export descriptions without requiring exact wording or grouping. The provider schema carries `maxItems: 5` and `maxLength: 90`; the server repeats these limits and rejects violations with `422`.
++`totalTimeMinutes` and `difficulty` remain nullable when no reliable value can be derived; no default may be invented. Export orders are contiguous from 1, `ingredientKeys` reference existing `analysisKey` values, and `includedIngredientKeys` cannot reference seasonings. Runtime checks positive unique ascending source orders and the ordered unique subset trace, not general cooking semantics. It enforces min1/max5, non-blank descriptions and max90; the unchanged provider schema carries max5/max90. Neither path sorts, renumbers, or repairs IDs.
+@@ -99 +99,3 @@
+-Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: true`, `additionalProperties: false`). The handler enforces the `recipe-analyze` quota before the provider call and tracks usage only after the parsed result passes structural and semantic validation. Quota exhaustion returns `429`; provider, empty-response, or JSON-parse failures return `502`; invalid structured or plausibility output returns `422`. The response is a transient review preview. No AI result is persisted by this endpoint and no usage is tracked for a rejected result; only a later explicit user-confirmed recipe write can persist accepted export data.
++Both prompts request the recipe-specific cooking core: central preparation/cooking, essential separate sides or sauces, and necessary transitions. Details may be omitted; retained claims must fit the source/component without invention or contradiction. No general serving/detail duty or safety guarantee follows. Full source-extraction tests remain separate from small fixture-specific export-core rubrics. The chicken/rice fixture requires chicken preparation, frying, independent rice cooking, and finish-cooking. Valid IDs and text lengths do not prove these actions; explicit user review remains required.
++
++Azure OpenAI is called with Strict Structured Outputs (`json_schema`, `strict: true`, `additionalProperties: false`). The handler enforces the `recipe-analyze` quota before the provider call and tracks usage only after shape/reference/ingredient validation, not after a general cooking-quality check. Quota exhaustion returns `429`; provider, empty-response, or JSON-parse failures return `502`; rejected server-validation results return `422` without usage. The response is transient; only a later explicit user-confirmed write can persist accepted export data.
+@@ -107,2 +109,2 @@
+-message is exclusively `RECIPE_PREPARATION_SYSTEM_PROMPT` v2; without context,
+-free-text import keeps the unchanged v15 prompt. JSON is sent only in the user
++message is exclusively `RECIPE_PREPARATION_SYSTEM_PROMPT` v3; without context,
++free-text import uses v16. JSON is sent only in the user
+@@ -118,3 +120,3 @@
+-The v2 prompt requests content-driven adjacent grouping only after accounting
+-for every saved action/detail, under the existing five-step/90-character limits.
+-This is prompt intent, not proof of content preservation or model causality.
++The v3 prompt requests a selective cooking-core summary under min1/max5/max90
++and the ordered partial trace, not full-detail packing. This is prompt intent,
++not proof of content preservation or model causality.
+@@ -123,2 +125,2 @@
+-for `validateRecipeExportPreparationOutput()`. Invalid traces (missing,
+-duplicate, unknown, or reordered references), empty text, nullable-metadata
++for `validateRecipeExportPreparationOutput()`. Invalid traces (duplicate,
++unknown, or reordered references), invalid source orders, empty text, nullable-metadata
+@@ -128 +130,2 @@
+-valid IDs/counts/lengths can still accompany missing actions or details.
++valid IDs/counts/lengths can still accompany missing core actions. Gaps alone
++are valid; without cooking source, invented reference-based fallback fails.
+@@ -130 +133,3 @@
+-privacy-safe bounded order diagnostics, and transience are unchanged.
++privacy-safe bounded phase/code/path diagnostics, and transience are retained.
++Coverage-only payload/order-list/mismatch helpers are removed; no private
++recipe/context/generated/provider/error text is added to logs.
+@@ -147,2 +152,32 @@
+-[Open] PO-1 exact-count rule remains unresolved and unchanged; B-1 reversions
+-and the three unattributed import hunks are not resolved by B-16 or this update.
++At D-16, PO-1 exact-count remained unresolved. The explicitly approved v18
++contract now replaces exact-min/full coverage with min1/max5/partial trace;
++this does not reinterpret historical FAILs. B-1 reversions and the three
++unattributed import hunks PR-07/08/10 remain preserved, with origin unresolved;
++no historical restoration is claimed.
++
++[Partial] New evidence on 2026-10-09, separately from B-16: the
++[B-18 handoff](../../User%20Stories/Reciepe/B-18_Recipe-Kurzfassung-Review_Handoff_2026-10-09.md)
++and its repository-backed offline/live evidence record implemented v16/v3.
++Recovery offline gates passed (102 validator, 288 focus, 34 renderer, 1397
++normal units, version guards, typecheck/build/diff); these are B-18 results,
++not D-18 runs or independent QA. The reconstructed Red/Green comparison is
++explicitly a replay; original Red/live chronology remains UNVERIFIED.
++
++The three newly authorized frozen-candidate live calls had exits 0/1/1:
++focused Preparation skipped ALL tests (UNVERIFIED, not PASS); separate Recipe
++passed 8/8 imports and 2/2 guards but failed Preparation; overall failed the
++same Preparation plus two unrelated Daily checks. In both Preparation outputs,
++Source1..8 passed, export references were only 1..5, and core6/finish-cooking
++was absent. Observed status200, SDK1/analyze1/usage1, writes0 and unchanged=true
++do not constitute a quality PASS. Later text-only-V2-body/usage-order assertions
++were not reached. Unreported raw data/call counts are not reconstructed.
++All 641 protected paths stayed unchanged during those calls; D-18 updates KB
++after that evidence, without changing the candidate.
++
++[Open] Independent Q-18A, final inventory disposition and package/merge/release
++gates remain open/blocked. The Orchestrator owns further bounded work and the
++existing FT070 registry discrepancy; no registry closure or all-clean claim.
++Q-18R's additional simplification disposition remains No-op beyond K-1..K-8.
++No private-original replay, Alpha, deployed revision, or Save/Share environment
++success is established. Documentation of implemented code despite FAIL does
++not waive quality gates or guarantee safe cooking.
+diff --git a/docs/kb/tech/09-api-reference.md b/docs/kb/tech/09-api-reference.md
+--- a/docs/kb/tech/09-api-reference.md
++++ b/docs/kb/tech/09-api-reference.md
+@@ -405 +405 @@
+-`RECIPE_PREPARATION_SYSTEM_PROMPT` v2, without the import v15 body. The user
++`RECIPE_PREPARATION_SYSTEM_PROMPT` v3, without the import v16 body. The user
+@@ -408 +408 @@
+-`null` in the model output. Import v15, the full Strict `AiRecipeRaw` provider
++`null` in the model output. Import uses v16; the full Strict `AiRecipeRaw` provider
+@@ -430,2 +430,9 @@
+-Missing, duplicate, unknown, or reordered source references, empty text, and
+-export limits fail with `422`; unused AI ingredient fields/key references do
++Export requires 1..5 non-empty descriptions of at most 90 characters and orders
++1..K. Each non-empty `sourceStepOrders` list references contained actions;
++flattened references must be positive, present, globally unique and strictly
++ascending. Gaps within and between groups are allowed, even with at most five
++source steps; no exact-min count or full partition is required. Duplicate,
++unknown, or reordered references, invalid source orders, empty text, nullable
++metadata violations and limits fail with `422`; omission alone does not.
++Without cooking source, invented reference-based fallback cannot pass.
++Unused AI ingredient fields/key references do
+@@ -433,3 +440,8 @@
+-Valid references and lengths are not a general content guarantee. Current
+-live content evidence is FAIL, stopped serial runs are UNVERIFIED, and this
+-route does not replay history; see
++The v3 prompt requests the cooking core, not every detail; retained claims
++must fit their source/component without invention or contradiction. Runtime
++does not verify general cooking semantics. Historical v2 FAILs remain; new
++2026-10-09 v16/v3 evidence has an all-skipped focused gate (UNVERIFIED) and
++Recipe/overall Preparation FAIL for missing finish-cooking despite observed
++200/SDK1/analyze1/usage1/writes0/unchanged=true. Later V2-body/usage-order
++assertions were not reached. This is no private/Alpha replay or Share-success
++claim; independent QA and final gates remain open. See

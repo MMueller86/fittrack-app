@@ -400,10 +400,28 @@ the revision it read, independently of the client header.
 ### POST /api/recipes/{id}/export-view/prepare
 
 The route loads a versioned recipe from the JWT user's partition and invokes
-the existing Recipe Analyze operation with the shared `recipe-analyze` quota.
-It does not change the prompt, make an extra AI call, or write to Cosmos. The
-AI output is validated before exactly one usage is tracked. Provider, quota,
-and validation failures do not track usage.
+the backend-only `prepareValidatedRecipeExport(context)` loop with the
+shared `recipe-analyze` quota and exclusive Preparation v12 system prompt.
+`analyzeRecipeText(text)` is import-only, retaining v17, full `AiRecipeRaw`,
+normalization and globally monotone reference validation. The user message
+contains the complete ID-free saved `recipeContext` projection and all unchanged
+ordered `steps` (`order`, optional `title`, `description`) as untrusted JSON data.
+The Strict `recipe_export_preparation` output contains only
+`{ version: 1, teaser, totalTimeMinutes, difficulty, steps }`, with step fields
+`{ order, description, sourceStepOrders }`. Every field is required and every
+object rejects extras; there are no ingredients, keys or returned source steps.
+This internal provider change does not change the App API below. The same lazy
+client, deployment/API version, temperature 0.2 and max_tokens 2048 are retained.
+There is an initial provider call and at most two content corrections via
+`prepareRecipeExport(context, options)`, with no hidden SDK retry, fallback or
+Cosmos write. Each correction uses immutable original context, exact latest
+whole draft and diagnostics; full output and all measurable teaser/steps are
+revalidated/reprobed, including after count changes. The 75000 ms monotonic
+aggregate generation/validation/probe deadline and at most 20000 ms per provider
+call use AbortSignal and SDK maxRetries0. Late results cannot book usage;
+booking is awaited once after the final deadline check, not raced or retried.
+The AI output is validated before exactly one usage is tracked. Provider,
+quota, and validation failures do not track usage.
 
 **Request:** exactly `{ "contractVersion": 2 }`. Missing or invalid JSON,
 `{}`, unknown fields, and unsupported versions return
@@ -419,6 +437,79 @@ ingredient-resolution results. `totalTimeMinutes` and `difficulty` may be
 `null`. Preparation is transient: it does not update the recipe or its
 confirmed `exportView`; saving still uses the separate explicit confirmation
 flow above.
+
+`validateRecipeExportPreparationOutput(output, recipe.steps)` uses the separate
+loaded source: positive, unique, ascending orders, not necessarily contiguous.
+Export requires 1..5 non-empty descriptions of at most 90 characters, orders
+1..K, a non-blank teaser up to 96 characters, nullable positive integer time up
+to 10080 and nullable trimmed non-empty single-line difficulty. Each non-empty
+`sourceStepOrders` group must reference known source orders in locally ascending
+order; references are globally unique and groups ascend by FIRST reference.
+The flattened list need not ascend: `[1,4,6],[5]` is allowed for Preparation,
+`[5],[1,4,6]` is not. Gaps are allowed; no exact-min count or full partition is
+required. Duplicate/unknown references, local/group-start reversals, invalid
+source orders, empty text, metadata/limit violations and extra fields are rejected;
+exhausted invalid drafts return 422. Omission alone does not. Empty saved steps or exclusively blank source
+descriptions returns 422 before quota/provider work. There is no sorting,
+padding, truncation, identity repair, full-recipe wrapper or invented fallback.
+References remain internal and are removed from the unchanged plain V2 response.
+The v11 prompt requests a complete understandable compact workflow by grouping
+actions, not selecting five original steps; retained claims/metadata must be
+source-backed. Runtime does not independently prove cooking-core preservation,
+component fit or metadata derivation; fixture checks/user review are separate.
+
+Initial/full-draft/text-only prompts explicitly retain source cooking endpoints.
+Time requires an explicit total or an entirely timed, explicitly sequential
+source workflow; untimed work or unclear overlap requires `null`. Overflow-only
+correction keeps its small strict text response, not a full-context payload.
+Public V2 and provider schemas are unchanged. V11 decides time from the full
+source before compression and prioritizes essential cooking/endpoints over
+optional details, without changing free grouping or reference validation.
+The second and final local Q-21 candidate still
+requires independent F/R/G and manual oven review; no deployment is authorized.
+The dated evidence below is historical, not current-candidate acceptance.
+
+Production geometry certifies only generated teaser/steps in saved-title
+context, not full image or Share success. Existing fonts/layout, 1..5/90/96
+limits and teaser sizing remain; no new font fallback, universal 23/11 cap,
+three-line product rule or ingredient-omission strategy is added. Only terminal
+correction exhaustion logs exact latest affected known text on the server;
+responses never contain raw draft/provider/error text or measurement payloads.
+Unknown-key-only diagnoses and nonstring affected values remain metadata-only;
+production-derived font metadata retains compact lineHeight1.17. These tested
+local QA-R1 corrections are pending independent QA, not a public API change.
+See [current loop and logging boundaries](06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1).
+
+[Partial] Current B-2 r3 / QA-R1 is implemented, NOT ACCEPTED / release CLOSED:
+focused519/full1600 pass, typecheck/build exit0; F exit1 (5 executed / 2 passed /
+3 failed / 9 skipped); R/G NOT_RUN_REQUIRED_LIVE_FAILURE. Version guard/pasta
+pass. Rice returns 422 (FIRST 6 before 5 plus overflows); oven fits/200 but
+source-3 cream action is in the source-4 group, semantic FAIL. Forced dough
+repeats the overflow/422, semantics NOT_REACHED. Historical r2 pasta/dough
+lexical failures were not demonstrated cooking loss; narrow test-only repairs
+do not reclassify old FAIL or close findings. Alpha has only the historical
+14:12 logging release, not this loop. Q-19 FAIL remains unresolved. See the
+[D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+
+[Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+gates passed (1437 units, typecheck/build); all executed F/R/G live gates exit 1.
+All three Preparation cases ran in each: rice group starts 6 before 5 and oven
+duplicate reference 3 return 422/usage0/writes0/unchanged=true; pasta returns
+200/usage1/writes0/unchanged=true with complete success assertions. Rice/oven's
+later V2-success-body/usage-order/final semantic assertions are not reached.
+Complete all-three cooking-core/success-path proof and independent QA remain
+open; this is no release, Alpha/private replay or Save/Share-success claim. See
+the [B-19 handoff](../../User%20Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md).
+
+Historical v2 FAILs remain;
+B-18 evidence from 2026-10-09 for v16/v3 has an all-skipped focused gate (UNVERIFIED) and
+Recipe/overall Preparation FAIL for missing finish-cooking despite observed
+200/SDK1/analyze1/usage1/writes0/unchanged=true. Later V2-body/usage-order
+assertions were not reached. The subsequent B-18C test-only rubric correction
+leaves this API and prompt versions unchanged; its executed F/R/G gates still
+FAIL. Q-18A returned FAIL; independent review after B-18C and final gates remain
+open. This is no private/Alpha replay or Share-success claim. See
+[Preparation V2 evidence boundary](06-ai-integrations.md#preparation-v2-evidence-boundary).
 
 ```json
 {
@@ -443,10 +534,10 @@ flow above.
 - `401` — missing or invalid Bearer token
 - `404` — recipe not found for the authenticated user
 - `412` — a supplied `If-Match` does not exactly match the loaded recipe revision; rejected before quota/provider work
-- `422` — AI output fails server-side recipe/export validation; response includes `details`
+- `422` — invalid/missing saved cooking source before quota/provider, or three completed parsed drafts exhaust content corrections; existing validation envelope with bounded `details`, no raw text/bounds
 - `429` — existing `QuotaExceededResponse` for `recipe-analyze`
-- `502` — provider or empty/invalid AI response
-- `500` — unexpected backend failure
+- `502` — terminal provider/refusal/incomplete/empty/invalid response or timeout; generic `AI recipe analysis failed`, no further correction or usage
+- `500` — technical probe/font/measurement, lookup/quota-backend or usage-booking failure; generic `Internal server error`, no private Error.message echo
 
 ### Recipe steps
 
@@ -787,7 +878,7 @@ Cosmos `ttl` is the ceiling of the remaining seconds. The normalized offset is
 included in the input hash, so a changed normalized offset follows the normal
 cache regeneration rules.
 
-This request-boundary validation does not change the Daily v15 prompt, the
+This request-boundary validation does not change the current Daily prompt, the
 Structured Output or public AI response contract, or the existing quota and
 failure semantics. For valid requests, quota is still checked before Azure
 OpenAI, successful usage is tracked only after persistence, and context/provider
@@ -803,7 +894,7 @@ failures plus quota exhaustion remain friendly HTTP `200` responses.
 	"cta": "Ernährung öffnen",
 	"ctaTarget": "Nutrition",
 	"generatedAt": "2026-08-20T08:30:00.000Z",
-	"promptVersion": "v15",
+	"promptVersion": "v17",
 	"status": "fresh",
 	"feedbackAvailable": true
 }
@@ -820,17 +911,24 @@ The POST guard remains authoritative and rejects incomplete provenance with
 `feedback_snapshot_unavailable`.
 
 Daily documents are stored as `_docType: "dailyInsight"` under the existing
-`aiInsights` container with `id = ${userId}:${date}`. The selected v15 intent,
+`aiInsights` container with `id = ${userId}:${date}`. The selected v17 intent,
 input context, input hash, exact system/user prompt snapshot, model, token
 usage, and intelligence version are server-owned persistence fields. Daily
 quota is checked before Azure OpenAI and tracked only after a valid response;
 quota exhaustion remains a friendly HTTP `200` response and is not tracked.
-The active v15 prompt and server validator apply the stale-weight guard to all
+The active v17 prompt and server validator apply the stale-weight guard to all
 intents: day 14 remains current, day 15 is stale, stale-as-current wording is
 rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
 accepted. Context, provider, truncation/content-filter, or validation failures
 return HTTP `200` with `status: "unavailable"`; the failed result is not
 persisted and does not consume or track Daily quota.
+
+Daily v17 retains v16's removal of contradictory below-target guidance and
+adds the existing activity open-day rule as a final context guard independently
+of protein gap/local hour; unknown completion and fueling stay conditional.
+the strict open-day rule, public fields and failure contract remain unchanged.
+The append-only release manifest retains v14/v15/v16; the existing complete,
+unexpired same-date v14 cache exception remains effective under v17.
 
 The server-owned `inputContext.weight.weeklyTrend30d` is not exposed in the
 public response. It is the `gaining | losing | stable | null` direction
@@ -901,7 +999,7 @@ TTL/expiry.
 | `response` | Complete server-generated/displayed Daily response |
 | `promptSnapshot.system` | Exact system prompt stored for this Daily instance and sent to Azure OpenAI |
 | `promptSnapshot.user` | Exact serialized user message sent to Azure OpenAI |
-| `promptVersion` | Stored Daily prompt version, currently `v15` for new generations |
+| `promptVersion` | Stored Daily prompt version, currently `v17` for new generations |
 | `intent` | Deterministic server-selected `InsightIntent` |
 | `inputContext` | Complete server-built `InsightInputContext` used for generation |
 | `inputHash` | Server-computed hash for the Daily input and active prompt |

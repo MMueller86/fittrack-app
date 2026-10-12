@@ -1,0 +1,16 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [32m✓[39m src/lib/recipeAnalyzeValidation.test.ts [2m([22m[2m177 tests[22m[2m)[22m[90m 67[2mms[22m[39m
+ [32m✓[39m src/lib/openai.recipeAnalyze.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 2444[2mms[22m[39m
+   [33m[2m✓[22m[39m B-2 Preparation SDK contract[2m > [22mbinds all three real SDK operations to unchanged original and the latest whole parsed draft and diagnostics [33m2328[2mms[22m[39m
+ [32m✓[39m src/lib/recipePreparation.test.ts [2m([22m[2m59 tests[22m[2m)[22m[33m 3444[2mms[22m[39m
+   [33m[2m✓[22m[39m B-2 bounded Preparation loop[2m > [22mQA-R1 reproduces the recorded oven field and preserves cooking core in a complete corrected draft [33m2388[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m3 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[32m262 passed[39m[22m[90m (262)[39m
+[2m   Start at [22m 15:13:09
+[2m   Duration [22m 6.65s[2m (transform 386ms, setup 0ms, collect 3.16s, tests 5.96s, environment 0ms, prepare 3.89s)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/qa/reports/RECIPE-STABILITY-2026-10-10-focused-Report.json
+

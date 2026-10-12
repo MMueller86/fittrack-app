@@ -1,0 +1,297 @@
+{
+  "candidateHash": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "archiveHash": "0706f39479ab6f53eaf918b27b1ea5440b7cff43d704dcddf5977c20b47bca32",
+  "currentArtifacts": 53,
+  "historicalArtifacts": 83,
+  "documentationArtifacts": 11,
+  "candidateFiles": 935,
+  "authorizedPublicationDeltas": [
+    "docs/kb/domain/06-recipes.md",
+    "docs/kb/domain/07-ai-features.md",
+    "docs/kb/tech/02-backend.md",
+    "docs/kb/tech/06-ai-integrations.md",
+    "docs/kb/tech/08-testing.md",
+    "docs/kb/tech/09-api-reference.md"
+  ],
+  "runtimeFiles": 338,
+  "dependencyIdentities": 7,
+  "roundForeignFiles": 926,
+  "d1ForeignFiles": 982,
+  "recordedOfflineCountsVerified": true,
+  "rawFHash": "36f4ffdc97fdd9945ca3d6e1e753df2c052f8f48fa0e12f34a8d3f94724546c7",
+  "recordedLogicalCalls": 10,
+  "recordedSdkCalls": 9,
+  "offlineRealFontReplayProbes": 10,
+  "newProviderCalls": 0,
+  "unknownKeyOnlyMetadataCheck": "PASS",
+  "fixtures": [
+    {
+      "fixture": "synthetic-saved-eight-steps-rice-serving",
+      "logical": 3,
+      "sdk": 3,
+      "http": 422,
+      "usage": 0,
+      "fit": false,
+      "structural": false,
+      "semanticsReached": false,
+      "semanticsPassed": false,
+      "nativeStatus": "failed",
+      "failures": [
+        "AssertionError: expected { ok: false, errors: [ …(2) ], …(1) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:424:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+      ],
+      "structuralErrors": [
+        {
+          "phase": "semantic",
+          "code": "export_source_trace_not_ascending",
+          "path": "steps[2].sourceStepOrders",
+          "stepIndex": 2,
+          "stepOrder": 3,
+          "constraint": "export_source_trace_not_ascending",
+          "explanation": "groups must be ascending by first reference",
+          "offendingReferences": [
+            6
+          ]
+        },
+        {
+          "phase": "semantic",
+          "code": "export_source_trace_not_ascending",
+          "path": "steps[3].sourceStepOrders",
+          "stepIndex": 3,
+          "stepOrder": 4,
+          "constraint": "export_source_trace_not_ascending",
+          "explanation": "groups must be ascending by first reference",
+          "offendingReferences": [
+            5
+          ]
+        }
+      ],
+      "overflows": [
+        {
+          "itemIndex": 1,
+          "measured": {
+            "width": 300,
+            "height": 112,
+            "maxWidth": 302,
+            "maxHeight": 105
+          }
+        },
+        {
+          "itemIndex": 2,
+          "measured": {
+            "width": 300,
+            "height": 112,
+            "maxWidth": 302,
+            "maxHeight": 105
+          }
+        }
+      ],
+      "final": {
+        "version": 1,
+        "teaser": "Ein schnelles und einfaches Rezept für eine Hähnchenpfanne mit Reis.",
+        "totalTimeMinutes": 30,
+        "difficulty": "einfach",
+        "steps": [
+          {
+            "order": 1,
+            "description": "Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.",
+            "sourceStepOrders": [
+              1,
+              2
+            ]
+          },
+          {
+            "order": 2,
+            "description": "Erhitze Olivenöl in der Pfanne und brate das Hähnchen 4 Minuten pro Seite.",
+            "sourceStepOrders": [
+              3,
+              4
+            ]
+          },
+          {
+            "order": 3,
+            "description": "Gare das Hähnchen bei niedriger Hitze 6 Minuten und lasse es 3 Minuten ruhen.",
+            "sourceStepOrders": [
+              6,
+              7
+            ]
+          },
+          {
+            "order": 4,
+            "description": "Koche den Reis 12 Minuten in Salzwasser und serviere ihn mit dem Hähnchen.",
+            "sourceStepOrders": [
+              5,
+              8
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "synthetic-saved-oven-seven-steps",
+      "logical": 3,
+      "sdk": 3,
+      "http": 200,
+      "usage": 1,
+      "fit": true,
+      "structural": true,
+      "semanticsReached": true,
+      "semanticsPassed": false,
+      "nativeStatus": "failed",
+      "failures": [
+        "AssertionError: Export source 3: assemble potatoes with cream: expected 'Schneide die Kartoffeln in dünne Sche…' to match /sahne/iu\n    at assertRecipeStepSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:96:105)\n    at Module.assertRecipePreparationSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.fixtures.ts:328:3)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:459:7\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)"
+      ],
+      "structuralErrors": [],
+      "overflows": [],
+      "final": {
+        "version": 1,
+        "teaser": "Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.",
+        "totalTimeMinutes": 50,
+        "difficulty": "einfach",
+        "steps": [
+          {
+            "order": 1,
+            "description": "Schneide die Kartoffeln in dünne Scheiben und lege sie in die gefettete Form.",
+            "sourceStepOrders": [
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "order": 2,
+            "description": "Gieße die Sahne über die Kartoffeln und streue den Käse darüber.",
+            "sourceStepOrders": [
+              4
+            ]
+          },
+          {
+            "order": 3,
+            "description": "Heize den Ofen auf 180°C vor und backe den Auflauf 40 Minuten.",
+            "sourceStepOrders": [
+              5,
+              6
+            ]
+          },
+          {
+            "order": 4,
+            "description": "Lasse den Auflauf kurz ruhen und serviere ihn.",
+            "sourceStepOrders": [
+              7
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "synthetic-saved-pasta-essential-sauce",
+      "logical": 1,
+      "sdk": 1,
+      "http": 200,
+      "usage": 1,
+      "fit": true,
+      "structural": true,
+      "semanticsReached": true,
+      "semanticsPassed": true,
+      "nativeStatus": "passed",
+      "failures": [],
+      "structuralErrors": [],
+      "overflows": [],
+      "final": {
+        "version": 1,
+        "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+        "totalTimeMinutes": 35,
+        "difficulty": "einfach",
+        "steps": [
+          {
+            "order": 1,
+            "description": "Schneide die Zwiebel klein und brate sie in Olivenöl an.",
+            "sourceStepOrders": [
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "order": 2,
+            "description": "Gib die Tomaten hinzu und lasse die Sauce 15 Minuten köcheln.",
+            "sourceStepOrders": [
+              4
+            ]
+          },
+          {
+            "order": 3,
+            "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+            "sourceStepOrders": [
+              5,
+              6
+            ]
+          },
+          {
+            "order": 4,
+            "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+            "sourceStepOrders": [
+              7
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "fixture": "synthetic-dough-forced-initial-overflow-real-correction",
+      "logical": 3,
+      "sdk": 2,
+      "http": 422,
+      "usage": 0,
+      "fit": false,
+      "structural": true,
+      "semanticsReached": false,
+      "semanticsPassed": false,
+      "nativeStatus": "failed",
+      "failures": [
+        "AssertionError: expected { …(4) } to match object { ok: true, status: 'success' }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:425:29\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+      ],
+      "structuralErrors": [],
+      "overflows": [
+        {
+          "itemIndex": 0,
+          "measured": {
+            "width": 300,
+            "height": 112,
+            "maxWidth": 302,
+            "maxHeight": 105
+          }
+        }
+      ],
+      "final": {
+        "version": 1,
+        "teaser": "Goldbraune Broetchen",
+        "totalTimeMinutes": 30,
+        "difficulty": "einfach",
+        "steps": [
+          {
+            "order": 1,
+            "description": "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.",
+            "sourceStepOrders": [
+              1
+            ]
+          },
+          {
+            "order": 2,
+            "description": "Forme den Teig zu Broetchen und backe sie 20 Minuten bei 180°C.",
+            "sourceStepOrders": [
+              2,
+              3
+            ]
+          },
+          {
+            "order": 3,
+            "description": "Lasse die Broetchen abkühlen.",
+            "sourceStepOrders": [
+              4
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,2949 @@
+{
+  "date": "2026-10-09",
+  "candidate": [
+    {
+      "path": "backend/src/lib/openai.ts",
+      "sha256": "3fab86522a4e0c8db17e85aad28e52c2415d308b28d48cb209fbc0ba28b656bd"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "sha256": "1de736e90f34df92a60f8b09f3bbe316090a87095ccfd9d8e9bd04f1b20e49a2"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.ts",
+      "sha256": "5216fd9f27b2e1197f50b1d64eb15f5e131a1da4519df7d818e04632ca97352c"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "sha256": "89ab89897d0e73eea6fe11dc9c7f05053e4a77a24dffbced2d6aa7fb00346e78"
+    },
+    {
+      "path": "backend/src/functions/recipes.ts",
+      "sha256": "3a94e45299640f98047fdde23cd34ed4310a64a195949ffba1385c4924cffd1e"
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "sha256": "70a9f734e742345969c9a0ef158fb01653634f30c0dffb86dcff3f5ad5eae85f"
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "sha256": "0ea4adb4cfe48e4c4a96cd16c71b352cf55ce332655627c0afd90271121fbd73"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "sha256": "1781b3e81589d603f63ecf059a2c63c48011bfa79241af3dc779f89278e5938d"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+      "sha256": "6ff92ce93ef097e88af20afe1341935fb6c069652da49aafe2b70b075112fc50"
+    }
+  ],
+  "officialRunner": true,
+  "gates": [
+    {
+      "id": "F",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "backend/scripts/run-eval.mjs",
+        "src/lib/prompts/recipeAnalyze.eval.test.ts",
+        "--testNamePattern",
+        "preparation prompt version matches fixture expectations|recipePreparation",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-19_Recipe-Preparation_Live-F-Report_2026-10-09.json"
+      ],
+      "started": "2026-10-09T12:54:13.700Z",
+      "finished": "2026-10-09T12:54:23.636Z",
+      "exit": 1,
+      "signal": null,
+      "status": "FAIL",
+      "executed": 4,
+      "pass": 2,
+      "fail": 2,
+      "skip": 9,
+      "failures": [
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "messages": [
+            "AssertionError: expected { ok: false, …(2) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:367:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+          ]
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "messages": [
+            "AssertionError: expected { ok: false, …(2) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:367:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+          ]
+        }
+      ],
+      "preparedExecuted": 3,
+      "preparation": [
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "status": "failed"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "status": "failed"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+          "status": "passed"
+        }
+      ],
+      "records": [
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              73,
+              56,
+              65,
+              47
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              81,
+              64,
+              66,
+              46
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "fry onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 4,
+                "core": "cook the essential tomato sauce",
+                "group": [
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook pasta independently",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              58,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation executed protection assertions",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "v2Body": true,
+            "quotaOrder": true,
+            "usageOrder": true,
+            "noWrites": true,
+            "savedSourceUnchanged": true,
+            "compactSchema": true,
+            "sdkCalls": 1,
+            "usageCalls": 1
+          }
+        }
+      ],
+      "reconciledRecords": [
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "title": "Schneiden",
+                "description": "Schneide das Hähnchen in Würfel."
+              },
+              {
+                "order": 2,
+                "description": "Würze das Hähnchen mit Salz und Pfeffer."
+              },
+              {
+                "order": 3,
+                "description": "Erhitze Olivenöl in der Pfanne."
+              },
+              {
+                "order": 4,
+                "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+              },
+              {
+                "order": 5,
+                "title": "Separate Beilage",
+                "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+              },
+              {
+                "order": 6,
+                "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+              },
+              {
+                "order": 7,
+                "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+              },
+              {
+                "order": 8,
+                "title": "Servieren",
+                "description": "Serviere Hähnchen mit Reis als Beilage."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für eine leckere Hähnchenpfanne mit Reis.",
+              "totalTimeMinutes": 25,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.",
+                  "sourceStepOrders": [
+                    1,
+                    2
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Erhitze Olivenöl in der Pfanne und brate das Hähnchen 4 Minuten je Seite.",
+                  "sourceStepOrders": [
+                    3,
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Senke die Hitze und gare das Hähnchen weitere 6 Minuten.",
+                  "sourceStepOrders": [
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Koche den Reis separat 12 Minuten in Salzwasser und gieße ihn ab.",
+                  "sourceStepOrders": [
+                    5
+                  ]
+                },
+                {
+                  "order": 5,
+                  "description": "Serviere das Hähnchen mit dem Reis als Beilage.",
+                  "sourceStepOrders": [
+                    8
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [
+              {
+                "order": 1,
+                "detail": "cut chicken into cubes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 2,
+                "detail": "season chicken with salt and pepper",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 3,
+                "detail": "heat olive oil in the pan",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 4,
+                "detail": "fry chicken at medium heat 4 minutes per side",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 5,
+                "detail": "cook rice separately 12 minutes in salted water and drain",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 6,
+                "detail": "lower heat and cook chicken another 6 minutes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 7,
+                "detail": "remove chicken from pan and rest covered 3 minutes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 8,
+                "detail": "serve chicken with rice as a side dish",
+                "sourcePatterns": [
+                  true,
+                  true
+                ]
+              }
+            ],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "prepare chicken by cutting",
+                "group": [
+                  1,
+                  2
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 4,
+                "core": "fry chicken",
+                "group": [
+                  3,
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook rice independently, not just mention it",
+                "group": [
+                  5
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              },
+              {
+                "order": 6,
+                "core": "finish cooking chicken after frying",
+                "group": [
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              73,
+              56,
+              65,
+              47
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben."
+              },
+              {
+                "order": 2,
+                "description": "Fette die Auflaufform ein."
+              },
+              {
+                "order": 3,
+                "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+              },
+              {
+                "order": 4,
+                "description": "Streue Käse über die Kartoffeln."
+              },
+              {
+                "order": 5,
+                "description": "Heize den Ofen auf 180°C vor."
+              },
+              {
+                "order": 6,
+                "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+              },
+              {
+                "order": 7,
+                "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.",
+              "totalTimeMinutes": 50,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Kartoffeln in dünne Scheiben und schichte sie in die gefettete Form.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gieße die Sahne über die Kartoffeln und streue den Käse darüber.",
+                  "sourceStepOrders": [
+                    3,
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Heize den Ofen auf 180°C vor und backe den Auflauf für 40 Minuten.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Lasse den Auflauf kurz ruhen und serviere ihn.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut potatoes",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "assemble potatoes with cream",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true,
+                  false
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 6,
+                "core": "bake potato casserole to completion in the oven",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              81,
+              64,
+              66,
+              46
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "fry onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 4,
+                "core": "cook the essential tomato sauce",
+                "group": [
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook pasta independently",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              58,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation executed protection assertions",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "v2Body": true,
+            "quotaOrder": true,
+            "usageOrder": true,
+            "noWrites": true,
+            "savedSourceUnchanged": true,
+            "compactSchema": true,
+            "sdkCalls": 1,
+            "usageCalls": 1
+          }
+        }
+      ],
+      "postCaptureValidation": [
+        {
+          "fixture": "synthetic-saved-eight-steps-rice-serving",
+          "result": {
+            "ok": false,
+            "errors": [
+              "groups must be ascending by first reference"
+            ],
+            "diagnostics": [
+              {
+                "phase": "semantic",
+                "code": "export_source_trace_not_ascending",
+                "path": "steps"
+              }
+            ]
+          }
+        },
+        {
+          "fixture": "synthetic-saved-oven-seven-steps",
+          "result": {
+            "ok": false,
+            "errors": [
+              "sourceStepOrders must be globally unique"
+            ],
+            "diagnostics": [
+              {
+                "phase": "semantic",
+                "code": "duplicate_export_source_reference",
+                "path": "steps"
+              }
+            ]
+          }
+        },
+        {
+          "fixture": "synthetic-saved-pasta-essential-sauce",
+          "result": {
+            "ok": true,
+            "data": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "R",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "backend/scripts/run-eval.mjs",
+        "src/lib/prompts/recipeAnalyze.eval.test.ts",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-19_Recipe-Preparation_Live-R-Report_2026-10-09.json"
+      ],
+      "started": "2026-10-09T12:54:23.644Z",
+      "finished": "2026-10-09T12:55:46.474Z",
+      "exit": 1,
+      "signal": null,
+      "status": "FAIL",
+      "executed": 13,
+      "pass": 10,
+      "fail": 3,
+      "skip": 0,
+      "failures": [
+        {
+          "name": "recipeAnalyze: live prompt evaluation ['no-lost-or-invented-ingredients'] 'All 6 named ingredients appear in out…'",
+          "messages": [
+            "AssertionError: export step trace: 1 [1]: Koche die Spaghetti in Salzwasser al dente. | 2 [2]: Brate den Speck knusprig und stelle ihn beiseite. | 3 [4,3]: Vermische die Spaghetti mit Speck und der Eier-Parmesan-Mischung.: expected false to be true // Object.is equality\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:226:100\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11\n    at withEnv (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)"
+          ]
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "messages": [
+            "AssertionError: expected { ok: false, …(2) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:367:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+          ]
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "messages": [
+            "AssertionError: expected { ok: false, …(2) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:367:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+          ]
+        }
+      ],
+      "preparedExecuted": 3,
+      "preparation": [
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "status": "failed"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "status": "failed"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+          "status": "passed"
+        }
+      ],
+      "records": [
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              73,
+              56,
+              65,
+              47
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              81,
+              64,
+              66,
+              46
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "fry onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 4,
+                "core": "cook the essential tomato sauce",
+                "group": [
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook pasta independently",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              58,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation executed protection assertions",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "v2Body": true,
+            "quotaOrder": true,
+            "usageOrder": true,
+            "noWrites": true,
+            "savedSourceUnchanged": true,
+            "compactSchema": true,
+            "sdkCalls": 1,
+            "usageCalls": 1
+          }
+        }
+      ],
+      "reconciledRecords": [
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "title": "Schneiden",
+                "description": "Schneide das Hähnchen in Würfel."
+              },
+              {
+                "order": 2,
+                "description": "Würze das Hähnchen mit Salz und Pfeffer."
+              },
+              {
+                "order": 3,
+                "description": "Erhitze Olivenöl in der Pfanne."
+              },
+              {
+                "order": 4,
+                "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+              },
+              {
+                "order": 5,
+                "title": "Separate Beilage",
+                "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+              },
+              {
+                "order": 6,
+                "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+              },
+              {
+                "order": 7,
+                "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+              },
+              {
+                "order": 8,
+                "title": "Servieren",
+                "description": "Serviere Hähnchen mit Reis als Beilage."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für eine leckere Hähnchenpfanne mit Reis.",
+              "totalTimeMinutes": 30,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.",
+                  "sourceStepOrders": [
+                    1,
+                    2
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Erhitze Olivenöl in der Pfanne und brate das Hähnchen 4 Minuten je Seite.",
+                  "sourceStepOrders": [
+                    3,
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Senke die Hitze und gare das Hähnchen weitere 6 Minuten.",
+                  "sourceStepOrders": [
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Koche den Reis separat 12 Minuten in Salzwasser und gieße ihn ab.",
+                  "sourceStepOrders": [
+                    5
+                  ]
+                },
+                {
+                  "order": 5,
+                  "description": "Serviere das Hähnchen mit dem Reis als Beilage.",
+                  "sourceStepOrders": [
+                    8
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [
+              {
+                "order": 1,
+                "detail": "cut chicken into cubes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 2,
+                "detail": "season chicken with salt and pepper",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 3,
+                "detail": "heat olive oil in the pan",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 4,
+                "detail": "fry chicken at medium heat 4 minutes per side",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 5,
+                "detail": "cook rice separately 12 minutes in salted water and drain",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 6,
+                "detail": "lower heat and cook chicken another 6 minutes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 7,
+                "detail": "remove chicken from pan and rest covered 3 minutes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 8,
+                "detail": "serve chicken with rice as a side dish",
+                "sourcePatterns": [
+                  true,
+                  true
+                ]
+              }
+            ],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "prepare chicken by cutting",
+                "group": [
+                  1,
+                  2
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 4,
+                "core": "fry chicken",
+                "group": [
+                  3,
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook rice independently, not just mention it",
+                "group": [
+                  5
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              },
+              {
+                "order": 6,
+                "core": "finish cooking chicken after frying",
+                "group": [
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              73,
+              56,
+              65,
+              47
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben."
+              },
+              {
+                "order": 2,
+                "description": "Fette die Auflaufform ein."
+              },
+              {
+                "order": 3,
+                "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+              },
+              {
+                "order": 4,
+                "description": "Streue Käse über die Kartoffeln."
+              },
+              {
+                "order": 5,
+                "description": "Heize den Ofen auf 180°C vor."
+              },
+              {
+                "order": 6,
+                "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+              },
+              {
+                "order": 7,
+                "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.",
+              "totalTimeMinutes": 40,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Kartoffeln in dünne Scheiben und schichte sie in die gefettete Form.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gieße die Sahne über die Kartoffeln und streue den Käse darüber.",
+                  "sourceStepOrders": [
+                    3,
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Heize den Ofen auf 180°C vor und backe den Auflauf für 40 Minuten.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Lasse den Auflauf kurz ruhen und serviere ihn.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut potatoes",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "assemble potatoes with cream",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true,
+                  false
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 6,
+                "core": "bake potato casserole to completion in the oven",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              81,
+              64,
+              66,
+              46
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "fry onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 4,
+                "core": "cook the essential tomato sauce",
+                "group": [
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook pasta independently",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              58,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation executed protection assertions",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "v2Body": true,
+            "quotaOrder": true,
+            "usageOrder": true,
+            "noWrites": true,
+            "savedSourceUnchanged": true,
+            "compactSchema": true,
+            "sdkCalls": 1,
+            "usageCalls": 1
+          }
+        }
+      ],
+      "postCaptureValidation": [
+        {
+          "fixture": "synthetic-saved-eight-steps-rice-serving",
+          "result": {
+            "ok": false,
+            "errors": [
+              "groups must be ascending by first reference"
+            ],
+            "diagnostics": [
+              {
+                "phase": "semantic",
+                "code": "export_source_trace_not_ascending",
+                "path": "steps"
+              }
+            ]
+          }
+        },
+        {
+          "fixture": "synthetic-saved-oven-seven-steps",
+          "result": {
+            "ok": false,
+            "errors": [
+              "sourceStepOrders must be globally unique"
+            ],
+            "diagnostics": [
+              {
+                "phase": "semantic",
+                "code": "duplicate_export_source_reference",
+                "path": "steps"
+              }
+            ]
+          }
+        },
+        {
+          "fixture": "synthetic-saved-pasta-essential-sauce",
+          "result": {
+            "ok": true,
+            "data": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser 10 Minuten und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "G",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "test:eval",
+        "--workspace=backend",
+        "--",
+        "--reporter=default",
+        "--reporter=json",
+        "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-19_Recipe-Preparation_Live-G-Report_2026-10-09.json"
+      ],
+      "started": "2026-10-09T12:55:46.477Z",
+      "finished": "2026-10-09T12:58:07.494Z",
+      "exit": 1,
+      "signal": null,
+      "status": "FAIL",
+      "executed": 41,
+      "pass": 35,
+      "fail": 6,
+      "skip": 0,
+      "failures": [
+        {
+          "name": "dailyInsight: live prompt evaluation [VERIFIED] ['phase-progress-open-day'] 'An open target budget is not presente…'",
+          "messages": [
+            "DailyInsightValidationError: Daily insight judges an open day as completed\n    at validateBudgetSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:230:11)\n    at validateDailyInsightSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:382:3)\n    at Module.validateDailyInsightResponse (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:399:3)\n    at Module.generateDailyInsight (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\openai.ts:910:21)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\dailyInsight.eval.test.ts:23:16\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)"
+          ]
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation [VERIFIED] ['protein-nearly-complete'] 'A nearly complete protein target is n…'",
+          "messages": [
+            "DailyInsightValidationError: Daily insight treats a target-relative calorie difference as an achieved energy balance\n    at validateTargetRelativeEnergyBalanceSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:288:11)\n    at validateDailyInsightSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:380:3)\n    at Module.validateDailyInsightResponse (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:399:3)\n    at Module.generateDailyInsight (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\openai.ts:910:21)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\dailyInsight.eval.test.ts:23:16\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)"
+          ]
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation [VERIFIED] ['midday-empty-day-not-morning'] 'At local hour 12, an empty current di…'",
+          "messages": [
+            "AssertionError: required concept group 1 missing; expected one of: heute, dein tag, für den rest; output: stabiler gewichtstrend dein aktuelles gewicht liegt bei 80 kg, was im vergleich zur letzten messung stabil ist. der trend zeigt, dass du in den letzten wochen kontinuierlich gewicht verlierst. dies ist ein positiver hinweis auf deinen fortschritt in richtung deines ziels, 78 kg zu erreichen. du hast deine kalorienaufnahme in den letzten tagen gut im griff, was dir helfen sollte, dein ziel weiter zu verfolgen. halte deine ernährung weiterhin im blick und achte auf eine ausgewogene nährstoffaufnahme. ernährung prüfen: expected false to be true // Object.is equality\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\dailyInsight.eval.test.ts:74:9\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11\n    at withEnv (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)"
+          ]
+        },
+        {
+          "name": "dailyInsight: live prompt evaluation [VERIFIED] ['stale-weight'] 'Stale weight data is not presented as…'",
+          "messages": [
+            "DailyInsightValidationError: Daily insight judges an open day as completed\n    at validateBudgetSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:230:11)\n    at validateDailyInsightSemantics (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:382:3)\n    at Module.validateDailyInsightResponse (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\dailyInsightValidation.ts:399:3)\n    at Module.generateDailyInsight (C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\openai.ts:910:21)\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\dailyInsight.eval.test.ts:23:16\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)"
+          ]
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "messages": [
+            "AssertionError: expected { ok: false, …(2) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:367:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+          ]
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "messages": [
+            "AssertionError: expected { ok: false, …(2) } to match object { ok: true }\n(2 matching properties omitted from actual)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:1134:13)\n    at Proxy.<anonymous> (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/expect/dist/index.js:972:17)\n    at Proxy.methodWrapper (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/chai/index.js:1686:25)\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\lib\\prompts\\recipeAnalyze.eval.test.ts:367:88\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)"
+          ]
+        }
+      ],
+      "preparedExecuted": 3,
+      "preparation": [
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-eight-steps-rice-serv…'] preserves saved source and selective cooking core",
+          "status": "failed"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-oven-seven-steps'] preserves saved source and selective cooking core",
+          "status": "failed"
+        },
+        {
+          "name": "recipePreparation: synthetic saved-source live evaluation ['synthetic-saved-pasta-essential-sauce'] preserves saved source and selective cooking core",
+          "status": "passed"
+        }
+      ],
+      "records": [
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              73,
+              56,
+              65,
+              47
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              81,
+              64,
+              66,
+              46
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "fry onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 4,
+                "core": "cook the essential tomato sauce",
+                "group": [
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook pasta independently",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              47,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation executed protection assertions",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "v2Body": true,
+            "quotaOrder": true,
+            "usageOrder": true,
+            "noWrites": true,
+            "savedSourceUnchanged": true,
+            "compactSchema": true,
+            "sdkCalls": 1,
+            "usageCalls": 1
+          }
+        }
+      ],
+      "reconciledRecords": [
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "title": "Schneiden",
+                "description": "Schneide das Hähnchen in Würfel."
+              },
+              {
+                "order": 2,
+                "description": "Würze das Hähnchen mit Salz und Pfeffer."
+              },
+              {
+                "order": 3,
+                "description": "Erhitze Olivenöl in der Pfanne."
+              },
+              {
+                "order": 4,
+                "description": "Brate Hähnchen bei mittlerer Hitze 4 Minuten je Seite."
+              },
+              {
+                "order": 5,
+                "title": "Separate Beilage",
+                "description": "Koche Reis separat 12 Minuten in Salzwasser und gieße ihn ab."
+              },
+              {
+                "order": 6,
+                "description": "Senke die Hitze und gare Hähnchen weitere 6 Minuten."
+              },
+              {
+                "order": 7,
+                "description": "Nimm Hähnchen aus der Pfanne und lasse es zugedeckt 3 Minuten ruhen."
+              },
+              {
+                "order": 8,
+                "title": "Servieren",
+                "description": "Serviere Hähnchen mit Reis als Beilage."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein schnelles und einfaches Rezept für eine Hähnchenpfanne mit Reis.",
+              "totalTimeMinutes": 30,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide das Hähnchen in Würfel und würze es mit Salz und Pfeffer.",
+                  "sourceStepOrders": [
+                    1,
+                    2
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Erhitze Olivenöl in der Pfanne und brate das Hähnchen 4 Minuten je Seite.",
+                  "sourceStepOrders": [
+                    3,
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Senke die Hitze und gare das Hähnchen weitere 6 Minuten.",
+                  "sourceStepOrders": [
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Koche den Reis separat 12 Minuten in Salzwasser und gieße ihn ab.",
+                  "sourceStepOrders": [
+                    5
+                  ]
+                },
+                {
+                  "order": 5,
+                  "description": "Serviere das Hähnchen mit dem Reis als Beilage.",
+                  "sourceStepOrders": [
+                    8
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [
+              {
+                "order": 1,
+                "detail": "cut chicken into cubes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 2,
+                "detail": "season chicken with salt and pepper",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 3,
+                "detail": "heat olive oil in the pan",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 4,
+                "detail": "fry chicken at medium heat 4 minutes per side",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 5,
+                "detail": "cook rice separately 12 minutes in salted water and drain",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 6,
+                "detail": "lower heat and cook chicken another 6 minutes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 7,
+                "detail": "remove chicken from pan and rest covered 3 minutes",
+                "sourcePatterns": [
+                  true,
+                  true,
+                  true,
+                  true
+                ]
+              },
+              {
+                "order": 8,
+                "detail": "serve chicken with rice as a side dish",
+                "sourcePatterns": [
+                  true,
+                  true
+                ]
+              }
+            ],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "prepare chicken by cutting",
+                "group": [
+                  1,
+                  2
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 4,
+                "core": "fry chicken",
+                "group": [
+                  3,
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook rice independently, not just mention it",
+                "group": [
+                  5
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              },
+              {
+                "order": 6,
+                "core": "finish cooking chicken after frying",
+                "group": [
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-eight-steps-rice-serving",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 8,
+            "exportCount": 5,
+            "lengths": [
+              66,
+              73,
+              56,
+              65,
+              47
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide Kartoffeln in dünne Scheiben."
+              },
+              {
+                "order": 2,
+                "description": "Fette die Auflaufform ein."
+              },
+              {
+                "order": 3,
+                "description": "Schichte Kartoffeln in die Form und gieße Sahne darüber."
+              },
+              {
+                "order": 4,
+                "description": "Streue Käse über die Kartoffeln."
+              },
+              {
+                "order": 5,
+                "description": "Heize den Ofen auf 180°C vor."
+              },
+              {
+                "order": 6,
+                "description": "Backe den Kartoffelauflauf im Ofen bei 180°C für 40 Minuten, bis die Kartoffeln gar sind."
+              },
+              {
+                "order": 7,
+                "description": "Lasse den Auflauf kurz ruhen und serviere ihn."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfacher und leckerer Kartoffelauflauf für jeden Anlass.",
+              "totalTimeMinutes": 40,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Kartoffeln in dünne Scheiben und schichte sie in die gefettete Form.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gieße die Sahne über die Kartoffeln und streue den Käse darüber.",
+                  "sourceStepOrders": [
+                    3,
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Heize den Ofen auf 180°C vor und backe den Auflauf für 40 Minuten.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Lasse den Auflauf kurz ruhen und serviere ihn.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut potatoes",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "assemble potatoes with cream",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true,
+                  false
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 6,
+                "core": "bake potato casserole to completion in the oven",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-oven-seven-steps",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              81,
+              64,
+              66,
+              46
+            ],
+            "status": 422,
+            "usageCalls": 0,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation semantic evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "promptVersion": "v4",
+            "savedSource": [
+              {
+                "order": 1,
+                "description": "Schneide die Zwiebel klein."
+              },
+              {
+                "order": 2,
+                "description": "Erhitze Olivenöl in einer Pfanne."
+              },
+              {
+                "order": 3,
+                "description": "Brate die Zwiebel in der Pfanne an."
+              },
+              {
+                "order": 4,
+                "description": "Gib Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln."
+              },
+              {
+                "order": 5,
+                "description": "Koche Pasta separat in einem Topf mit Salzwasser 10 Minuten."
+              },
+              {
+                "order": 6,
+                "description": "Gieße die Pasta ab."
+              },
+              {
+                "order": 7,
+                "description": "Mische Pasta mit der Tomatensauce und serviere sie."
+              }
+            ],
+            "raw": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            },
+            "sourceMatrix": [],
+            "exportCoreMatrix": [
+              {
+                "order": 1,
+                "core": "cut onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": []
+              },
+              {
+                "order": 3,
+                "core": "fry onion",
+                "group": [
+                  1,
+                  2,
+                  3
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 4,
+                "core": "cook the essential tomato sauce",
+                "group": [
+                  4
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false
+                ]
+              },
+              {
+                "order": 5,
+                "core": "cook pasta independently",
+                "group": [
+                  5,
+                  6
+                ],
+                "exportPatterns": [
+                  true
+                ],
+                "contradictions": [
+                  false,
+                  false
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "label": "Synthetic preparation counts and handler evidence",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "sdkCalls": 1,
+            "preparationCalls": 1,
+            "model": "gpt-4o-mini",
+            "apiVersion": "2024-08-01-preview",
+            "temperature": 0.2,
+            "maxTokens": 2048,
+            "finishReason": "stop",
+            "sourceCount": 7,
+            "exportCount": 4,
+            "lengths": [
+              66,
+              67,
+              47,
+              55
+            ],
+            "status": 200,
+            "usageCalls": 1,
+            "writes": {
+              "update": 0,
+              "replace": 0,
+              "create": 0
+            },
+            "unchanged": true
+          }
+        },
+        {
+          "label": "Synthetic preparation executed protection assertions",
+          "data": {
+            "fixture": "synthetic-saved-pasta-essential-sauce",
+            "v2Body": true,
+            "quotaOrder": true,
+            "usageOrder": true,
+            "noWrites": true,
+            "savedSourceUnchanged": true,
+            "compactSchema": true,
+            "sdkCalls": 1,
+            "usageCalls": 1
+          }
+        }
+      ],
+      "postCaptureValidation": [
+        {
+          "fixture": "synthetic-saved-eight-steps-rice-serving",
+          "result": {
+            "ok": false,
+            "errors": [
+              "groups must be ascending by first reference"
+            ],
+            "diagnostics": [
+              {
+                "phase": "semantic",
+                "code": "export_source_trace_not_ascending",
+                "path": "steps"
+              }
+            ]
+          }
+        },
+        {
+          "fixture": "synthetic-saved-oven-seven-steps",
+          "result": {
+            "ok": false,
+            "errors": [
+              "sourceStepOrders must be globally unique"
+            ],
+            "diagnostics": [
+              {
+                "phase": "semantic",
+                "code": "duplicate_export_source_reference",
+                "path": "steps"
+              }
+            ]
+          }
+        },
+        {
+          "fixture": "synthetic-saved-pasta-essential-sauce",
+          "result": {
+            "ok": true,
+            "data": {
+              "version": 1,
+              "teaser": "Ein einfaches Rezept für Pasta mit frischer Tomatensauce.",
+              "totalTimeMinutes": 35,
+              "difficulty": "einfach",
+              "steps": [
+                {
+                  "order": 1,
+                  "description": "Schneide die Zwiebel klein und brate sie in erhitztem Olivenöl an.",
+                  "sourceStepOrders": [
+                    1,
+                    2,
+                    3
+                  ]
+                },
+                {
+                  "order": 2,
+                  "description": "Gib die Tomaten zur Zwiebel und lasse die Sauce 15 Minuten köcheln.",
+                  "sourceStepOrders": [
+                    4
+                  ]
+                },
+                {
+                  "order": 3,
+                  "description": "Koche die Pasta in Salzwasser und gieße sie ab.",
+                  "sourceStepOrders": [
+                    5,
+                    6
+                  ]
+                },
+                {
+                  "order": 4,
+                  "description": "Mische die Pasta mit der Tomatensauce und serviere sie.",
+                  "sourceStepOrders": [
+                    7
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "candidateUnchanged": true,
+  "captureNote": "Post-run ANSI stripping recovers all existing raw transcript records. No provider call or candidate edit; these are post-capture validations, not formerly unreached live assertions."
+}

@@ -1,0 +1,46 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/functions/recipes.test.ts",
+    "--testNamePattern",
+    "B-2 rejects malformed|B-2 terminates",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Backend-Privacy-Red-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:57:00.053Z",
+  "endedAt": "2026-10-09T15:57:06.089Z",
+  "exit": 1,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "6b39adaaa97ab65bbf618bb2d8be7222cfa2db3a1722e11c3c6080c1206af611",
+  "reportSha256": "699681d977fe1ac5db66aba0ea4d3ab50ef775e810361ce527e2f2d9a4dc9bbb",
+  "counts": {
+    "executed": 6,
+    "passed": 4,
+    "failed": 2,
+    "skipped": 115
+  },
+  "failures": [
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/functions/recipes.test.ts",
+      "name": "POST /recipes/{id}/export-view/prepare B-2 terminates lookup backend failure without private error logs or usage",
+      "messages": [
+        "AssertionError: expected '[[[\"{\\\"ts\\\":\\\"2026-10-09T15:57:05.772…' not to contain 'PRIVATE_BACKEND_DETAIL_SENTINEL'\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\functions\\recipes.test.ts:272:69\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11\n    at withEnv (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)\n    at run (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:112:3)"
+      ]
+    },
+    {
+      "file": "C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend/src/functions/recipes.test.ts",
+      "name": "POST /recipes/{id}/export-view/prepare B-2 terminates quota backend failure without private error logs or usage",
+      "messages": [
+        "AssertionError: expected '[[[\"{\\\"ts\\\":\\\"2026-10-09T15:57:05.806…' not to contain 'PRIVATE_BACKEND_DETAIL_SENTINEL'\n    at C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\backend\\src\\functions\\recipes.test.ts:272:69\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:533:5\n    at runTest (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1056:11)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runSuite (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1205:15)\n    at runFiles (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1262:5)\n    at startTests (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/@vitest/runner/dist/index.js:1271:3)\n    at file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:126:11\n    at withEnv (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:90:5)\n    at run (file:///C:/Users/mmueller/OneDrive%20-%20PRODYNA%20SE/fittrack-app/node_modules/vitest/dist/chunks/runBaseTests.3qpJUEJM.js:112:3)"
+      ]
+    }
+  ]
+}

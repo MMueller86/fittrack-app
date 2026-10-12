@@ -8,7 +8,7 @@ vi.mock('../lib/storage', () => ({
 }));
 
 vi.mock('../lib/openai', () => ({
-  analyzeRecipeText: vi.fn(),
+  prepareRecipeExport: vi.fn(),
 }));
 
 vi.mock('../lib/quota', () => ({
@@ -16,7 +16,8 @@ vi.mock('../lib/quota', () => ({
   trackUsage: vi.fn(),
 }));
 
-vi.mock('../lib/recipeAnalyzeValidation', () => ({
+vi.mock('../lib/recipeAnalyzeValidation', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/recipeAnalyzeValidation')>(),
   validateRecipeExportPreparationOutput: vi.fn(),
 }));
 
@@ -34,7 +35,10 @@ import {
   setRecipeVisibilityHandler,
   prepareRecipeExportViewHandler,
 } from './recipes';
-import { analyzeRecipeText } from '../lib/openai';
+import { prepareRecipeExport } from '../lib/openai';
+import * as preparationLoop from '../lib/recipePreparation';
+import * as renderer from '../lib/instagramRenderer';
+import { performance } from 'node:perf_hooks';
 import { enforceQuota, trackUsage } from '../lib/quota';
 import { validateRecipeExportPreparationOutput } from '../lib/recipeAnalyzeValidation';
 import { __resetRecipesRepositoryForTests, getRecipesRepository } from '../lib/repositories/recipesRepository';
@@ -63,7 +67,7 @@ beforeEach(() => {
   __resetRecipesRepositoryForTests();
   __resetDiaryRepositoryForTests();
   __resetUserFoodRelationRepositoryForTests();
-  vi.mocked(analyzeRecipeText).mockReset();
+  vi.mocked(prepareRecipeExport).mockReset();
   vi.mocked(enforceQuota).mockReset().mockResolvedValue(null);
   vi.mocked(trackUsage).mockReset().mockResolvedValue(undefined);
   vi.mocked(validateRecipeExportPreparationOutput).mockReset();
@@ -168,25 +172,9 @@ async function createTestRecipeWithExportView(description?: string) {
   return res.jsonBody as Record<string, unknown>;
 }
 
-function setValidPreparationAnalysis(
-  ingredients: Array<{ analysisKey: string; displayName: string; category?: 'food' | 'seasoning' }>,
-  includedKeys: string[],
-) {
+function setValidPreparationAnalysis() {
   const analysis = {
-    suggestedName: 'Sauerteigbrot',
-    description: 'Einfaches Brot',
-    suggestedPortions: 4,
-    tags: ['Brot'],
-    ingredients: ingredients.map((ingredient) => ({
-      ...ingredient,
-      line: ingredient.displayName,
-      category: ingredient.category ?? 'food',
-      amountGrams: ingredient.category === 'seasoning' ? null : 500,
-      kitchenAmountText: ingredient.category === 'seasoning' ? 'nach Geschmack' : null,
-    })),
-    steps: [{ order: 1, title: null, description: 'Mischen.' }],
-    exportSuggestion: {
-      version: 1,
+      version: 1 as const,
       teaser: 'Goldbraunes Brot',
       totalTimeMinutes: 90,
       difficulty: 'Einfach',
@@ -194,12 +182,9 @@ function setValidPreparationAnalysis(
         order: 1,
         description: 'Mischen.',
         sourceStepOrders: [1],
-        ingredientKeys: includedKeys,
       }],
-      includedIngredientKeys: includedKeys,
-    },
   };
-  vi.mocked(analyzeRecipeText).mockResolvedValue(analysis as any);
+  vi.mocked(prepareRecipeExport).mockResolvedValue(analysis as any);
   vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: true, data: analysis as any });
   return analysis;
 }
@@ -214,7 +199,9 @@ async function getRecipeEtag(recipeId: string): Promise<string> {
 }
 
 async function requestV2Preparation(recipeId: string, ifMatch?: string) {
-  return prepareRecipeExportViewHandler(
+  const repo = getRecipesRepository();
+  const before = structuredClone(await repo.getVersioned(TEST_USER_ID, recipeId));
+  const response = await prepareRecipeExportViewHandler(
     await makeAuthRequest({
       params: { id: recipeId },
       ...(ifMatch !== undefined ? { headers: { 'if-match': ifMatch } } : {}),
@@ -222,6 +209,8 @@ async function requestV2Preparation(recipeId: string, ifMatch?: string) {
     }),
     ctx,
   );
+  expect(await repo.getVersioned(TEST_USER_ID, recipeId)).toEqual(before);
+  return response;
 }
 
 function expectTextOnlyPreparation(
@@ -253,36 +242,268 @@ function expectTextOnlyPreparation(
 // ---------------------------------------------------------------------------
 
 describe('POST /recipes/{id}/export-view/prepare', () => {
+  it('QA-R1 logs metadata only for nested unknown-key-only exhaustion', async () => {
+    const recipe = await createTestRecipe();
+    const actual = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actual.validateRecipeExportPreparationOutput);
+    const output = { version: 1 as const, teaser: 'Goldbraunes Brot', totalTimeMinutes: null, difficulty: null,
+      steps: [{ order: 1, description: 'Mische den Teig.', sourceStepOrders: [1], extra: 'UNKNOWN_OBJECT_SENTINEL' }] };
+    vi.mocked(prepareRecipeExport).mockResolvedValue(output);
+    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
+    try {
+      const result = await requestV2Preparation(String(recipe['id']));
+      expect(result).toMatchObject({ status: 422, jsonBody: { details: ['schema:unrecognized_keys@steps[0]'] } });
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(3);
+      expect(enforceQuota).toHaveBeenCalledTimes(1);
+      expect(trackUsage).not.toHaveBeenCalled();
+      const events = logs.flatMap((log) => log.mock.calls.flatMap((args) => args.map((value) => JSON.parse(String(value)))));
+      const exhausted = events.filter((event) => event.event === 'recipes.prepareExportView.correctionsExhausted');
+      expect(exhausted).toHaveLength(1);
+      expect(exhausted[0]).toMatchObject({ affected_field_count: 0, affected_fields: '[]', corrections: 2, logical_calls: 3 });
+      const captured = JSON.stringify(logs.map((log) => log.mock.calls));
+      for (const text of ['Mische den Teig.', 'Goldbraunes Brot', 'UNKNOWN_OBJECT_SENTINEL', 'Zutaten mischen.']) expect(captured).not.toContain(text);
+    } finally { logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it.each([
+    [{ order: 2, description: 'Saved.' }, { order: 1, description: 'Saved.' }],
+    [{ order: 1, description: 'Saved.' }, { order: 1, description: 'Saved again.' }],
+    [{ order: 0, description: 'Saved.' }], [{ order: 1, description: ' ' }],
+  ].map((steps) => ({ steps })))('B-2 rejects malformed whole saved source before quota: $steps', async ({ steps }) => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const repo = getRecipesRepository();
+    await repo.update(TEST_USER_ID, recipeId, { steps });
+    expect((await requestV2Preparation(recipeId)).status).toBe(422);
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it.each(['lookup', 'quota'] as const)('B-2 terminates %s backend failure without private error logs or usage', async (stage) => {
+    const recipe = await createTestRecipe();
+    const repo = getRecipesRepository();
+    const lookup = vi.spyOn(repo, 'getVersioned');
+    if (stage === 'lookup') lookup.mockRejectedValue(new Error('PRIVATE_BACKEND_DETAIL_SENTINEL'));
+    else vi.mocked(enforceQuota).mockRejectedValue(new Error('PRIVATE_BACKEND_DETAIL_SENTINEL'));
+    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
+    try {
+      const result = await prepareRecipeExportViewHandler(await makeAuthRequest({ params: { id: String(recipe['id']) }, body: { contractVersion: 2 } }), ctx);
+      expect(result).toMatchObject({ status: 500, jsonBody: { error: 'Internal server error' } });
+      expect(prepareRecipeExport).not.toHaveBeenCalled();
+      expect(trackUsage).not.toHaveBeenCalled();
+      expect(JSON.stringify(logs.map((log) => log.mock.calls))).not.toContain('PRIVATE_BACKEND_DETAIL_SENTINEL');
+    } finally { lookup.mockRestore(); logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it.each([0, 1, 2])('B-2 books exactly once after %i corrections with no source writes or text logs', async (corrections) => {
+    const recipe = await createTestRecipeWithExportView();
+    const recipeId = String(recipe['id']);
+    const repo = getRecipesRepository();
+    const writes = [vi.spyOn(repo, 'update'), vi.spyOn(repo, 'compareAndReplace'), vi.spyOn(repo, 'create'), vi.spyOn(repo, 'createVersioned')];
+    const actual = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actual.validateRecipeExportPreparationOutput);
+    const final = { version: 1 as const, teaser: 'Goldbraunes Brot', totalTimeMinutes: null, difficulty: null,
+      steps: [{ order: 1, description: 'Mische den Teig.', sourceStepOrders: [1] }] };
+    vi.mocked(prepareRecipeExport).mockImplementation(async () => vi.mocked(prepareRecipeExport).mock.calls.length <= corrections
+      ? { ...final, totalTimeMinutes: -1 } : final);
+    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
+    try {
+      const result = await requestV2Preparation(recipeId);
+      expect(result.status).toBe(200);
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(corrections + 1);
+      expect(enforceQuota).toHaveBeenCalledTimes(1);
+      expect(trackUsage).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(trackUsage).mock.invocationCallOrder[0]).toBeGreaterThan(vi.mocked(validateRecipeExportPreparationOutput).mock.invocationCallOrder.at(-1)!);
+      writes.forEach((write) => expect(write).not.toHaveBeenCalled());
+      const captured = JSON.stringify(logs.map((log) => log.mock.calls));
+      expect(captured).not.toContain('Mische den Teig.');
+      expect(captured).not.toContain('Goldbraunes Brot');
+      expect(captured).not.toContain('correctionsExhausted');
+      expect((result.jsonBody as { suggestion: unknown }).suggestion).toEqual({ ...final, steps: [{ order: 1, description: 'Mische den Teig.' }] });
+    } finally { logs.forEach((log) => log.mockRestore()); writes.forEach((write) => write.mockRestore()); }
+  });
+
+  it('B-2 logs exact latest affected step, teaser and difficulty only after two completed corrections', async () => {
+    const recipe = await createTestRecipe();
+    const actual = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actual.validateRecipeExportPreparationOutput);
+    const values = [1, 2, 3].map((index) => ({ version: 1 as const, teaser: `LATEST_TEASER_${index}\n"quoted"`,
+      totalTimeMinutes: null, difficulty: `LATEST_DIFFICULTY_${index}\nsecond`,
+      steps: [{ order: 1, description: `LATEST_STEP_${index}\n"quoted"\\raw`, sourceStepOrders: [99] }],
+      unknown: { secret: 'UNKNOWN_OBJECT_SENTINEL' },
+    }));
+    vi.mocked(prepareRecipeExport).mockImplementation(async () => values[vi.mocked(prepareRecipeExport).mock.calls.length - 1]!);
+    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
+    try {
+      const result = await requestV2Preparation(String(recipe['id']));
+      expect(result.status).toBe(422);
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(3);
+      expect(trackUsage).not.toHaveBeenCalled();
+      const events = logs.flatMap((log) => log.mock.calls.flatMap((args) => args.map((value) => JSON.parse(String(value)))));
+      const exhausted = events.filter((event) => event.event === 'recipes.prepareExportView.correctionsExhausted');
+      expect(exhausted).toHaveLength(1);
+      expect(exhausted[0]).toMatchObject({ prompt_version: 'v12', corrections: 2, logical_calls: 3, export_step_count: 1, source_step_count: 1 });
+      const fields = JSON.parse(exhausted[0].affected_fields);
+      expect(fields.map((field: { text: string }) => field.text).sort()).toEqual([values[2]!.teaser, values[2]!.difficulty, values[2]!.steps[0]!.description].sort());
+      const captured = JSON.stringify(logs.map((log) => log.mock.calls));
+      for (const sentinel of ['LATEST_STEP_1', 'LATEST_STEP_2', 'LATEST_TEASER_1', 'LATEST_TEASER_2', 'UNKNOWN_OBJECT_SENTINEL', 'Zutaten mischen.']) expect(captured).not.toContain(sentinel);
+      expect(JSON.stringify(result)).not.toContain('LATEST_');
+      expect(captured).toContain('\\\\n');
+    } finally { logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it.each([1, 2])('B-2 does not log exhausted text or book on provider failure after %i completed draft(s)', async (completed) => {
+    const recipe = await createTestRecipe();
+    const actual = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actual.validateRecipeExportPreparationOutput);
+    vi.mocked(prepareRecipeExport).mockImplementation(async () => {
+      if (vi.mocked(prepareRecipeExport).mock.calls.length > completed) throw new Error('PRIVATE_PROVIDER_MESSAGE_SENTINEL');
+      return { version: 1, teaser: 'PRIVATE_GENERATED_TEASER', totalTimeMinutes: -1, difficulty: null,
+        steps: [{ order: 1, description: 'PRIVATE_GENERATED_STEP', sourceStepOrders: [1] }] };
+    });
+    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
+    try {
+      const result = await requestV2Preparation(String(recipe['id']));
+      expect(result).toMatchObject({ status: 502, jsonBody: { error: 'AI recipe analysis failed' } });
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(completed + 1);
+      expect(trackUsage).not.toHaveBeenCalled();
+      const captured = JSON.stringify(logs.map((log) => log.mock.calls));
+      expect(captured).not.toContain('PRIVATE_');
+      expect(captured).not.toContain('correctionsExhausted');
+    } finally { logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it('B-2 gives technical font/probe failure precedence and generic HTTP with no text logs or booking', async () => {
+    const recipe = await createTestRecipe();
+    setValidPreparationAnalysis();
+    const probe = vi.spyOn(renderer, 'probeInstagramRecipeDetailsGeneratedText').mockResolvedValue({
+      ok: false, status: 'technical-failure', diagnostics: [], teaserFontSize: 22,
+      error: { code: 'FONT_OR_SATORI_FAILED', message: 'PRIVATE_FONT_PAYLOAD' },
+    });
+    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
+    try {
+      expect(await requestV2Preparation(String(recipe['id']))).toMatchObject({ status: 500, jsonBody: { error: 'Internal server error' } });
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(1);
+      expect(trackUsage).not.toHaveBeenCalled();
+      const captured = JSON.stringify(logs.map((log) => log.mock.calls));
+      expect(captured).not.toContain('PRIVATE_FONT_PAYLOAD');
+      expect(captured).not.toContain('correctionsExhausted');
+    } finally { probe.mockRestore(); logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it('B-2 checks final deadline immediately before booking without starting it', async () => {
+    const recipe = await createTestRecipe();
+    const output = setValidPreparationAnalysis();
+    const loop = vi.spyOn(preparationLoop, 'prepareValidatedRecipeExport').mockResolvedValue({
+      status: 'success', data: output, deadlineAt: 0, logicalCalls: 1, corrections: 0, elapsedMs: 75_000,
+    });
+    try {
+      expect(await requestV2Preparation(String(recipe['id']))).toMatchObject({ status: 502 });
+      expect(trackUsage).not.toHaveBeenCalled();
+    } finally { loop.mockRestore(); }
+  });
+
+  it.each([false, true])('B-2 awaits booking once without race/retry, failing=%s', async (failing) => {
+    const recipe = await createTestRecipe();
+    setValidPreparationAnalysis();
+    let clock = 0;
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    vi.mocked(trackUsage).mockImplementation(async () => {
+      await Promise.resolve();
+      clock = 100_000;
+      if (failing) throw new Error('PRIVATE_BOOKING_PAYLOAD');
+    });
+    const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
+    try {
+      const result = await requestV2Preparation(String(recipe['id']));
+      expect(result.status).toBe(failing ? 500 : 200);
+      expect(trackUsage).toHaveBeenCalledTimes(1);
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(1);
+      expect(JSON.stringify(result)).not.toContain('PRIVATE_BOOKING_PAYLOAD');
+      expect(JSON.stringify(logs.map((log) => log.mock.calls))).not.toContain('PRIVATE_BOOKING_PAYLOAD');
+    } finally { now.mockRestore(); logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it('rejects empty saved cooking source before quota, provider and usage without writes', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const repo = getRecipesRepository();
+    await repo.update(TEST_USER_ID, recipeId, { steps: [] });
+    const update = vi.spyOn(repo, 'update');
+    const replace = vi.spyOn(repo, 'compareAndReplace');
+    const response = await requestV2Preparation(recipeId);
+    expect(response.status).toBe(422);
+    expect(enforceQuota).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
+    expect(trackUsage).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('sends every ingredient and original saved step beyond five without private identifiers', async () => {
+    const ingredients = Array.from({ length: 8 }, (_, index) => ({
+      ...baseIngredient, id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, '0')}`,
+      displayName: `Saved ingredient ${index + 1}`, linkedProductId: `private-product-${index + 1}`,
+    }));
+    const recipe = await createTestRecipe(ingredients, 'Saved metadata');
+    const recipeId = String(recipe['id']);
+    const repo = getRecipesRepository();
+    const steps = Array.from({ length: 8 }, (_, index) => ({
+      order: index + 1, title: `Original ${index + 1}`, description: `Original action ${index + 1}.`,
+    }));
+    await repo.update(TEST_USER_ID, recipeId, { steps });
+    setValidPreparationAnalysis();
+    const response = await requestV2Preparation(recipeId);
+    expect(response.status).toBe(200);
+    const input = vi.mocked(prepareRecipeExport).mock.calls[0]![0];
+    expect(input.steps).toEqual(steps);
+    expect(input.recipeContext.ingredients).toEqual(ingredients.map(({ displayName, amountGrams, inputAmount, unit }) => ({
+      displayName, amountGrams, inputAmount, unit,
+    })));
+    expect(input.recipeContext).toMatchObject({ name: 'Sauerteigbrot', description: 'Saved metadata', portions: 4, tags: ['Brot'] });
+    for (const ingredient of ingredients) {
+      expect(JSON.stringify(input)).not.toContain(ingredient.id);
+      expect(JSON.stringify(input)).not.toContain(ingredient.linkedProductId);
+    }
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('binds preparation to unchanged stored JSON source steps and recipe context', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const repo = getRecipesRepository();
+    const stored = (await repo.get(TEST_USER_ID, recipeId))!;
+    stored.steps = [
+      { order: 3, title: 'Original title', description: 'Original description.' },
+      { order: 7, description: 'Do not sort or renumber.' },
+    ];
+    await repo.update(TEST_USER_ID, recipeId, { steps: stored.steps });
+    setValidPreparationAnalysis();
+
+    await requestV2Preparation(recipeId);
+
+    expect(prepareRecipeExport).toHaveBeenCalledTimes(1);
+    expect(prepareRecipeExport).toHaveBeenCalledWith({
+      recipeContext: {
+        name: stored.name,
+        description: stored.description,
+        portions: stored.portions,
+        tags: stored.tags,
+        ingredients: stored.ingredients.map(({ displayName, amountGrams, inputAmount, unit }) => ({
+          displayName, amountGrams, inputAmount, unit,
+        })),
+      },
+      steps: stored.steps,
+    }, expect.objectContaining({ signal: expect.any(AbortSignal), timeout: expect.any(Number) }));
+  });
+
   it('returns a transient, server-generated export suggestion without persisting it', async () => {
     const recipe = await createTestRecipe([baseIngredient], 'Canonical recipe description');
-    const createText = vi.mocked(analyzeRecipeText);
+    const createText = vi.mocked(prepareRecipeExport);
     const createAnalysis = vi.mocked(validateRecipeExportPreparationOutput);
     const calls: string[] = [];
-    const recipeAnalysis = {
-      suggestedName: 'Sauerteigbrot',
-      description: 'Einfaches Brot',
-      suggestedPortions: 4,
-      tags: ['Brot'],
-      ingredients: [
-        {
-          analysisKey: 'ingredient-1',
-          line: '500g Mehl',
-          displayName: 'Mehl',
-          category: 'food',
-          amountGrams: 500,
-          kitchenAmountText: null,
-        },
-      ],
-      steps: [{ order: 1, title: null, description: 'Mischen.' }],
-      exportSuggestion: {
-        version: 1,
-        teaser: 'Goldbraunes Brot',
-        totalTimeMinutes: 90,
-        difficulty: 'Einfach',
-        steps: [{ order: 1, description: 'Mischen.', sourceStepOrders: [1], ingredientKeys: ['ingredient-1'] }],
-        includedIngredientKeys: ['ingredient-1'],
-      },
-    } as const;
+    const recipeAnalysis = setValidPreparationAnalysis();
 
     vi.mocked(enforceQuota).mockImplementation(async () => {
       calls.push('quota');
@@ -335,7 +556,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(response.status).toBe(400);
     expect(response.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
     expect(enforceQuota).not.toHaveBeenCalled();
-    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
@@ -345,35 +566,8 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
       id: '00000000-0000-0000-0000-000000000003',
     };
     const recipe = await createTestRecipe([baseIngredient, duplicateIngredient]);
-    const validAnalysis = {
-      suggestedName: 'Sauerteigbrot',
-      description: 'Einfaches Brot',
-      suggestedPortions: 4,
-      tags: ['Brot'],
-      ingredients: [{
-        analysisKey: 'ingredient-1',
-        line: '500g Mehl',
-        displayName: 'Mehl',
-        category: 'food',
-        amountGrams: 500,
-        kitchenAmountText: null,
-      }],
-      steps: [{ order: 1, title: null, description: 'Mischen.' }],
-      exportSuggestion: {
-        version: 1,
-        teaser: 'Goldbraunes Brot',
-        totalTimeMinutes: 90,
-        difficulty: 'Einfach',
-        steps: [{
-          order: 1,
-          description: 'Mischen.',
-          sourceStepOrders: [1],
-          ingredientKeys: ['ingredient-1'],
-        }],
-        includedIngredientKeys: ['ingredient-1'],
-      },
-    };
-    vi.mocked(analyzeRecipeText).mockResolvedValue(validAnalysis as any);
+    const validAnalysis = setValidPreparationAnalysis();
+    vi.mocked(prepareRecipeExport).mockResolvedValue(validAnalysis as any);
     vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({ ok: true, data: validAnalysis as any });
 
     const recipeId = String(recipe['id']);
@@ -386,9 +580,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 
   it('does not return a resolution for unmatched AI ingredient names', async () => {
     const recipe = await createTestRecipe();
-    setValidPreparationAnalysis([{ analysisKey: 'ingredient-unknown', displayName: 'Kichererbsen' }], [
-      'ingredient-unknown',
-    ]);
+    setValidPreparationAnalysis();
 
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
@@ -400,10 +592,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 
   it('does not resolve separate AI ingredient keys to the same saved ingredient', async () => {
     const recipe = await createTestRecipe();
-    setValidPreparationAnalysis([
-      { analysisKey: 'flour-a', displayName: 'Mehl' },
-      { analysisKey: 'flour-b', displayName: 'Mehl' },
-    ], ['flour-a', 'flour-b']);
+    setValidPreparationAnalysis();
 
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
@@ -448,7 +637,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(extraField.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
     expect(invalidVersion.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
     expect(extraV2Field.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
-    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(enforceQuota).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
@@ -489,7 +678,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(response.status).toBe(412);
     expect(response.jsonBody).toEqual({ error: 'recipe_revision_conflict' });
     expect(enforceQuota).not.toHaveBeenCalled();
-    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
@@ -502,13 +691,13 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const recipe = await createTestRecipe([baseIngredient, fuzzyIngredient]);
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
-    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+    setValidPreparationAnalysis();
 
     const response = await requestV2Preparation(recipeId, etag);
 
     expectTextOnlyPreparation(response, recipeId, etag);
     expect(trackUsage).toHaveBeenCalledTimes(1);
-    expect(analyzeRecipeText).toHaveBeenCalledTimes(1);
+    expect(prepareRecipeExport).toHaveBeenCalledTimes(1);
 
     const storedRecipe = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
     expect(responseEtag(storedRecipe)).toBe(etag);
@@ -524,7 +713,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const recipe = await createTestRecipe([fuzzyIngredient]);
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
-    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+    setValidPreparationAnalysis();
 
     const response = await requestV2Preparation(recipeId, etag);
 
@@ -539,7 +728,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const recipe = await createTestRecipe([baseIngredient, duplicateIngredient]);
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
-    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+    setValidPreparationAnalysis();
 
     const response = await requestV2Preparation(recipeId, etag);
 
@@ -560,7 +749,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const recipe = await createTestRecipe([dinkelmehl, weizenmehl]);
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
-    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+    setValidPreparationAnalysis();
 
     const response = await requestV2Preparation(recipeId, etag);
 
@@ -571,10 +760,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const recipe = await createTestRecipe();
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
-    setValidPreparationAnalysis([
-      { analysisKey: 'flour', displayName: 'Mehl' },
-      { analysisKey: 'chickpeas', displayName: 'Kichererbsen' },
-    ], ['flour', 'chickpeas']);
+    setValidPreparationAnalysis();
 
     const response = await requestV2Preparation(recipeId, etag);
 
@@ -585,7 +771,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const recipe = await createTestRecipe([seasoningIngredient]);
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
-    setValidPreparationAnalysis([{ analysisKey: 'salt', displayName: 'Salz' }], ['salt']);
+    setValidPreparationAnalysis();
 
     const response = await requestV2Preparation(recipeId, etag);
 
@@ -601,7 +787,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     }]);
     const recipeId = String(currentRecipe['id']);
     const etag = await getRecipeEtag(recipeId);
-    setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+    setValidPreparationAnalysis();
 
     const response = await requestV2Preparation(recipeId, etag);
 
@@ -622,7 +808,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 
     expect(response).toEqual(quotaResponse);
     expect(enforceQuota).toHaveBeenCalledWith(expect.objectContaining({ userId: TEST_USER_ID }), 'recipe-analyze');
-    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
@@ -635,7 +821,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
       type: 'requests',
       request_id: 'req-12345678',
     });
-    vi.mocked(analyzeRecipeText).mockRejectedValue(providerError);
+    vi.mocked(prepareRecipeExport).mockRejectedValue(providerError);
     const errorSpy = vi.spyOn(ctx, 'error').mockImplementation(() => {});
 
     try {
@@ -659,11 +845,11 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
   it('does not track usage for an invalid V2 AI result', async () => {
     const recipe = await createTestRecipe();
     const etag = await getRecipeEtag(String(recipe['id']));
-    vi.mocked(analyzeRecipeText).mockResolvedValue({} as any);
+    vi.mocked(prepareRecipeExport).mockResolvedValue({} as any);
     vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({
       ok: false,
       errors: ['private generated text was invalid'],
-      diagnostics: [{ phase: 'semantic', code: 'source_step_coverage_mismatch', path: 'exportSuggestion.steps' }],
+      diagnostics: [{ phase: 'semantic', code: 'unknown_source_step_reference', path: 'exportSuggestion.steps[0].sourceStepOrders' }],
     });
     const warningSpy = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
 
@@ -673,13 +859,188 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
       expect(response.status).toBe(422);
       expect(trackUsage).not.toHaveBeenCalled();
       const lines = warningSpy.mock.calls.map(([line]) => String(line));
-      const validationFailure = lines.find((line) => line.includes('"event":"recipes.prepareExportView.validationFailed"'));
+      const validationFailure = lines.find((line) => line.includes('"event":"recipes.prepareExportView.correctionsExhausted"'));
       expect(validationFailure).toContain('"failure_stage":"analysis_output_validation"');
-      expect(validationFailure).toContain('semantic:source_step_coverage_mismatch@exportSuggestion.steps');
+      expect(validationFailure).toContain('semantic:unknown_source_step_reference@exportSuggestion.steps[0].sourceStepOrders');
       expect(validationFailure).not.toContain('private generated text was invalid');
     } finally {
       warningSpy.mockRestore();
     }
+  });
+
+  it('logs only the latest affected synthetic cooking text on reference exhaustion with no HTTP echo', async () => {
+    const privateMarkers = {
+      name: 'PRIVATE_RECIPE_NAME',
+      description: 'PRIVATE_RECIPE_DESCRIPTION',
+      tag: 'PRIVATE_RECIPE_TAG',
+      ingredient: 'PRIVATE_INGREDIENT_NAME',
+      unit: 'PRIVATE_INGREDIENT_UNIT',
+      storedTitle: 'PRIVATE_STORED_STEP_TITLE',
+      storedFirstStep: 'PRIVATE_STORED_FIRST_STEP',
+      storedSecondStep: 'PRIVATE_STORED_SECOND_STEP',
+      analysisName: 'PRIVATE_ANALYSIS_NAME',
+      analysisDescription: 'PRIVATE_ANALYSIS_DESCRIPTION',
+      analysisIngredient: 'PRIVATE_ANALYSIS_INGREDIENT',
+      analysisTitle: 'PRIVATE_ANALYSIS_STEP_TITLE',
+      analysisStep: 'PRIVATE_REEXTRACTED_STEP',
+      exportTeaser: 'PRIVATE_EXPORT_TEASER',
+      exportDifficulty: 'PRIVATE_EXPORT_DIFFICULTY',
+      exportStep: 'Mische den Teig "vorsichtig".\nBacke ihn.',
+      error: 'PRIVATE_VALIDATION_ERROR',
+    };
+    const createResponse = await createRecipeHandler(await makeAuthRequest({
+      body: {
+        name: privateMarkers.name,
+        description: privateMarkers.description,
+        portions: 4,
+        ingredients: [{ ...baseIngredient, displayName: privateMarkers.ingredient, unit: privateMarkers.unit }],
+        steps: [
+          { order: 1, title: privateMarkers.storedTitle, description: privateMarkers.storedFirstStep },
+          { order: 2, description: privateMarkers.storedSecondStep },
+        ],
+        tags: [privateMarkers.tag],
+      },
+    }), ctx);
+    expect(createResponse.status).toBe(201);
+    const recipeId = String((createResponse.jsonBody as Record<string, unknown>)['id']);
+    const storedBefore = await getRecipesRepository().getVersioned(TEST_USER_ID, recipeId);
+    const analysis = setValidPreparationAnalysis();
+    analysis.teaser = privateMarkers.exportTeaser;
+    analysis.difficulty = privateMarkers.exportDifficulty;
+    analysis.steps[0]!.description = privateMarkers.exportStep;
+    analysis.steps[0]!.sourceStepOrders = [99];
+    const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation((raw, savedSource) => {
+      const validation = actualValidation.validateRecipeExportPreparationOutput(raw, savedSource);
+      expect(validation.ok).toBe(false);
+      return validation.ok ? validation : { ...validation, errors: [privateMarkers.error] };
+    });
+    const logSpies = ['log', 'warn', 'error'].map((method) =>
+      vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}),
+    );
+
+    try {
+      const response = await requestV2Preparation(recipeId);
+
+      expect(response.status).toBe(422);
+      expect(response.jsonBody).toEqual({
+        error: 'Recipe export preparation failed server-side validation',
+        details: ['semantic:unknown_source_step_reference@steps[0].sourceStepOrders',
+          'template:INVALID_TEXT@steps[0].description'],
+      });
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(3);
+      expect(enforceQuota).toHaveBeenCalledTimes(1);
+      expect(trackUsage).not.toHaveBeenCalled();
+      expect(validateRecipeExportPreparationOutput).toHaveBeenCalledWith(analysis, [
+          { order: 1, title: privateMarkers.storedTitle, description: privateMarkers.storedFirstStep },
+          { order: 2, description: privateMarkers.storedSecondStep },
+      ]);
+      expect(await getRecipesRepository().getVersioned(TEST_USER_ID, recipeId)).toEqual(storedBefore);
+      const lines = logSpies.flatMap((spy) => spy.mock.calls.flatMap((args) => args.map(String)));
+      const failureLine = lines.find((value) => value.includes('"event":"recipes.prepareExportView.correctionsExhausted"'));
+      expect(failureLine).toBeDefined();
+      const failureEvent = JSON.parse(String(failureLine)) as Record<string, unknown>;
+      expect(failureEvent).toMatchObject({
+        failure_stage: 'analysis_output_validation',
+        logical_calls: 3,
+        corrections: 2,
+        validation_diagnostics_truncated: false,
+      });
+      expect(failureEvent).not.toHaveProperty('expected_source_orders');
+      expect(failureEvent).not.toHaveProperty('actual_export_source_orders');
+      expect(lines.some((line) => line.includes('"event":"handler.response.failure"') && line.includes('"status":422'))).toBe(true);
+      const capturedLogs = JSON.stringify(logSpies.map((spy) => spy.mock.calls));
+      const affected = JSON.parse(String(failureEvent['affected_fields']));
+      expect(affected[0].text).toBe(privateMarkers.exportStep);
+      for (const marker of Object.values(privateMarkers).filter((marker) => marker !== privateMarkers.exportStep)) {
+        expect(capturedLogs).not.toContain(marker);
+      }
+      expect(capturedLogs).not.toContain('recipes.prepareExportView.validationContext');
+      expect(capturedLogs).not.toContain('recipes.prepareExportView.validationOutput');
+    } finally {
+      logSpies.forEach((spy) => spy.mockRestore());
+    }
+  });
+
+  it('validates export source references against the stored recipe steps', async () => {
+    const recipe = await createTestRecipe();
+    const analysis = setValidPreparationAnalysis();
+    const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>(
+      '../lib/recipeAnalyzeValidation',
+    );
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(
+      actualValidation.validateRecipeExportPreparationOutput,
+    );
+
+    const response = await requestV2Preparation(String(recipe['id']));
+
+    expect(response.status).toBe(200);
+    expectTextOnlyPreparation(response, String(recipe['id']), await getRecipeEtag(String(recipe['id'])));
+    expect(validateRecipeExportPreparationOutput).toHaveBeenCalledWith(analysis, [
+      { order: 1, description: 'Zutaten mischen.' },
+    ]);
+  });
+
+  it('accepts the ordered partial trace against saved 1..8 with one usage and no writes', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const repo = getRecipesRepository();
+    const savedSteps = Array.from({ length: 8 }, (_, index) => ({
+      order: index + 1, description: `Synthetische gespeicherte Handlung ${index + 1}.`,
+    }));
+    await repo.update(TEST_USER_ID, recipeId, { steps: savedSteps });
+    const before = await repo.getVersioned(TEST_USER_ID, recipeId);
+    const analysis = setValidPreparationAnalysis();
+    analysis.steps = [[1, 4, 6], [5]].map((sourceStepOrders, index) => ({
+      order: index + 1, description: 'Synthetic export.', sourceStepOrders,
+    }));
+    const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
+    expect(actualValidation.validateRecipeExportPreparationOutput(analysis, savedSteps).ok).toBe(true);
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actualValidation.validateRecipeExportPreparationOutput);
+    const update = vi.spyOn(repo, 'update');
+    const compareAndReplace = vi.spyOn(repo, 'compareAndReplace');
+    const warning = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+    try {
+      const response = await requestV2Preparation(recipeId);
+      expect(response.status).toBe(200);
+      expect(prepareRecipeExport).toHaveBeenCalledTimes(1);
+      expect(trackUsage).toHaveBeenCalledTimes(1);
+      expect(update).not.toHaveBeenCalled();
+      expect(compareAndReplace).not.toHaveBeenCalled();
+      expect(await repo.getVersioned(TEST_USER_ID, recipeId)).toEqual(before);
+      const events = warning.mock.calls.flatMap((args) => args.map(String)).map((line) => JSON.parse(line));
+      expect(events).toEqual([]);
+      expect(response.jsonBody).toMatchObject({
+        contractVersion: 2,
+        suggestion: { steps: analysis.steps.map(({ order, description }) => ({ order, description })) },
+      });
+      expect(analysis.steps.flatMap((step) => step.sourceStepOrders)).toEqual([1, 4, 6, 5]);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
+  it('rejects an AI-only source order against saved authority without usage or writes', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const repo = getRecipesRepository();
+    const before = await repo.getVersioned(TEST_USER_ID, recipeId);
+    const analysis = setValidPreparationAnalysis();
+    analysis.steps[0]!.sourceStepOrders = [2];
+    const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>('../lib/recipeAnalyzeValidation');
+    expect(actualValidation.validateRecipeExportPreparationOutput(analysis, before!.recipe.steps).ok).toBe(false);
+    vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actualValidation.validateRecipeExportPreparationOutput);
+    const update = vi.spyOn(repo, 'update');
+    const replace = vi.spyOn(repo, 'compareAndReplace');
+    const create = vi.spyOn(repo, 'create');
+    const response = await requestV2Preparation(recipeId);
+    expect(response.status).toBe(422);
+    expect(prepareRecipeExport).toHaveBeenCalledTimes(3);
+    expect(trackUsage).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+    expect(await repo.getVersioned(TEST_USER_ID, recipeId)).toEqual(before);
   });
 
   it('returns the recipe-analyze quota response without calling the provider or tracking usage', async () => {
@@ -701,13 +1062,13 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 
     expect(response).toEqual(quotaResponse);
     expect(enforceQuota).toHaveBeenCalledTimes(1);
-    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
   it('does not track usage when the provider fails', async () => {
     const recipe = await createTestRecipe();
-    vi.mocked(analyzeRecipeText).mockRejectedValue(new Error('provider failed'));
+    vi.mocked(prepareRecipeExport).mockRejectedValue(new Error('provider failed'));
 
     const etag = await getRecipeEtag(String(recipe['id']));
     const response = await requestV2Preparation(String(recipe['id']), etag);
@@ -719,7 +1080,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 
   it('does not track usage when server validation rejects the provider result', async () => {
     const recipe = await createTestRecipe();
-    vi.mocked(analyzeRecipeText).mockResolvedValue({} as any);
+    vi.mocked(prepareRecipeExport).mockResolvedValue({} as any);
     vi.mocked(validateRecipeExportPreparationOutput).mockReturnValue({
       ok: false,
       errors: ['invalid output'],
@@ -733,22 +1094,21 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
-  it('prepares valid export texts even when unused AI ingredient references are invalid', async () => {
+  it('rejects obsolete model ingredient fields instead of silently stripping them', async () => {
     const recipe = await createTestRecipe();
-    const analysis = setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['unknown']);
+    const analysis = setValidPreparationAnalysis();
     const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>(
       '../lib/recipeAnalyzeValidation',
     );
-    expect(actualValidation.validateRecipeAnalyzeOutput(analysis).ok).toBe(false);
+    Object.assign(analysis, { ingredients: [] });
     vi.mocked(validateRecipeExportPreparationOutput).mockImplementation(actualValidation.validateRecipeExportPreparationOutput);
 
     const recipeId = String(recipe['id']);
     const etag = await getRecipeEtag(recipeId);
     const response = await requestV2Preparation(recipeId, etag);
 
-    expect(response.status).toBe(200);
-    expectTextOnlyPreparation(response, recipeId, etag);
-    expect(trackUsage).toHaveBeenCalledTimes(1);
+    expect(response.status).toBe(422);
+    expect(trackUsage).not.toHaveBeenCalled();
     const storedRecipe = await getRecipeHandler(await makeAuthRequest({ params: { id: recipeId } }), ctx);
     expect(responseEtag(storedRecipe)).toBe(etag);
     expect(storedRecipe.jsonBody).not.toHaveProperty('exportView');
@@ -756,32 +1116,32 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 
   it.each([
     ['teaser length', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.teaser = 'x'.repeat(97);
+      analysis.teaser = 'x'.repeat(97);
     }],
     ['step length', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.steps[0]!.description = 'x'.repeat(91);
+      analysis.steps[0]!.description = 'x'.repeat(91);
     }],
     ['time', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.totalTimeMinutes = 0;
+      analysis.totalTimeMinutes = 0;
     }],
     ['difficulty', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.difficulty = 'Einfach\nSchwer';
+      analysis.difficulty = 'Einfach\nSchwer';
     }],
     ['unknown source step', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.steps[0]!.sourceStepOrders = [2];
+      analysis.steps[0]!.sourceStepOrders = [2];
     }],
     ['duplicate source step', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.steps[0]!.sourceStepOrders = [1, 1];
+      analysis.steps[0]!.sourceStepOrders = [1, 1];
     }],
     ['missing source step', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.steps = [];
+      analysis.steps = [];
     }],
     ['export order', (analysis: ReturnType<typeof setValidPreparationAnalysis>) => {
-      analysis.exportSuggestion.steps[0]!.order = 2;
+      analysis.steps[0]!.order = 2;
     }],
   ] as const)('still rejects invalid %s without consuming quota', async (_case, invalidate) => {
     const recipe = await createTestRecipe();
-    const analysis = setValidPreparationAnalysis([{ analysisKey: 'flour', displayName: 'Mehl' }], ['flour']);
+    const analysis = setValidPreparationAnalysis();
     invalidate(analysis);
     const actualValidation = await vi.importActual<typeof import('../lib/recipeAnalyzeValidation')>(
       '../lib/recipeAnalyzeValidation',
@@ -817,7 +1177,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(response.status).toBe(401);
     expect(v2Response.status).toBe(401);
     expect(enforceQuota).not.toHaveBeenCalled();
-    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
@@ -843,7 +1203,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 
     expect(response.status).toBe(404);
     expect(enforceQuota).not.toHaveBeenCalled();
-    expect(analyzeRecipeText).not.toHaveBeenCalled();
+    expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
 });

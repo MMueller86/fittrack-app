@@ -1,0 +1,177 @@
+{
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "baselineSha256": "e3c2c60be13733552a92e9becf96bb512b16c6f133043a86270a11eff12ebafb",
+  "extensionSha256": "666030e2ddbe0f153f9b05f537028daee97a5a3b4adbe374f382b8cb71585da9",
+  "aggregate": {
+    "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Owned-Diff_2026-10-09-r3-QA-R1.patch",
+    "sha256": "1d7c9c893471325e94285c3b343915c768507dba10fda85fb47e75350c912750"
+  },
+  "findings": [
+    {
+      "finding": "Q1-01",
+      "stableKey": "FT-QA-2026-081",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-01-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "da256fd5e32777c0f211d7d34a8176327f0d07e4cf0a0fc53e423f1bca606e8f",
+      "base": "Immutable round starting worktree, not HEAD; independent finding projection, companion tests split by TypeScript AST",
+      "files": [
+        {
+          "path": "backend/src/lib/recipePreparation.test.ts",
+          "beforeSha256": "cf181e19f465294087573cdbb6d009d609b32af735767ea6811f9a13a9cb1574",
+          "findingSnapshotSha256": "9485342ddcf72c1a8071240cb0e24a2210b46ffde8b95927205f23e3b090896e",
+          "finalSha256": "365a5932e153d3919fe3506d3c792904e77bb3daad4d44457c260f069475f9d0"
+        },
+        {
+          "path": "backend/src/functions/recipes.test.ts",
+          "beforeSha256": "dddd1f3c2300325173987371c8dbacbaf8214ea3cf6f238cd31bd07e31668a04",
+          "findingSnapshotSha256": "5ea5ad3448bfa09cd2d13cb62271eb7ede1a72b86e6c805120b259e34bc9bc22",
+          "finalSha256": "f9991e52fd692fd3a60c4fc1ddedc70fefa3dec1d14b445dd138d33852b2d6bb"
+        }
+      ]
+    },
+    {
+      "finding": "Q1-02",
+      "stableKey": "FT-QA-2026-082",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-02-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "5ab47847067c21f389955fe1d7d5850fb0753eddddc58d493b489422ff1a3b08",
+      "base": "Immutable round starting worktree, not HEAD; independent finding projection, companion tests split by TypeScript AST",
+      "files": [
+        {
+          "path": "backend/src/lib/recipePreparation.test.ts",
+          "beforeSha256": "cf181e19f465294087573cdbb6d009d609b32af735767ea6811f9a13a9cb1574",
+          "findingSnapshotSha256": "a29695d19de543c58113445e3a0c6a4157b5c7e0fac37054220b8dcc03ceab6d",
+          "finalSha256": "365a5932e153d3919fe3506d3c792904e77bb3daad4d44457c260f069475f9d0"
+        },
+        {
+          "path": "backend/src/lib/recipePreparation.ts",
+          "beforeSha256": "e813202160536a47acb9b362f4fb418bff1e4cf8c4af3962d07871f92e0e1549",
+          "findingSnapshotSha256": "e46aac7f12555f2ff6d6e4f09a8d98db8e7be5d4880015a0e8222be180b098eb",
+          "finalSha256": "e46aac7f12555f2ff6d6e4f09a8d98db8e7be5d4880015a0e8222be180b098eb"
+        }
+      ]
+    },
+    {
+      "finding": "Q1-03",
+      "stableKey": "FT-QA-2026-083",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-03-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "1c0502077f1d774899253788bb1599c0b71da9a24a4a48d2aed68bf7d54bea1c",
+      "base": "Immutable round starting worktree, not HEAD; independent finding projection, companion tests split by TypeScript AST",
+      "files": [
+        {
+          "path": "backend/src/lib/recipePreparation.test.ts",
+          "beforeSha256": "cf181e19f465294087573cdbb6d009d609b32af735767ea6811f9a13a9cb1574",
+          "findingSnapshotSha256": "c61b441fb9513380880f9a5553f914d9c063e901de8516eaddc42fd42c564cec",
+          "finalSha256": "365a5932e153d3919fe3506d3c792904e77bb3daad4d44457c260f069475f9d0"
+        },
+        {
+          "path": "backend/src/functions/recipes.test.ts",
+          "beforeSha256": "dddd1f3c2300325173987371c8dbacbaf8214ea3cf6f238cd31bd07e31668a04",
+          "findingSnapshotSha256": "48adbd71b109bf08ab47ea3f9c6741b3c119217706fbfc952de00c1a682945d4",
+          "finalSha256": "f9991e52fd692fd3a60c4fc1ddedc70fefa3dec1d14b445dd138d33852b2d6bb"
+        },
+        {
+          "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+          "beforeSha256": "c9082ef8063744e291aff224bcfc116ce43d214f81acebb8953510a6ce1b6b39",
+          "findingSnapshotSha256": "b5481bf921939ad4f187caee4d369fb09f4ef683e2e5b3e2484aa9f1c6ed3697",
+          "finalSha256": "b5481bf921939ad4f187caee4d369fb09f4ef683e2e5b3e2484aa9f1c6ed3697"
+        },
+        {
+          "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+          "beforeSha256": "90ce693b3864043cf0e6d07b3f56337f30562b488e92aad4d3c62a0dace9b804",
+          "findingSnapshotSha256": "ad57db8d728b39e67f16845afbc72d8132693cb4f51eb9a2a7fa2882d03ce220",
+          "finalSha256": "ad57db8d728b39e67f16845afbc72d8132693cb4f51eb9a2a7fa2882d03ce220"
+        },
+        {
+          "path": "backend/src/functions/ai.test.ts",
+          "beforeSha256": "5ed23c7a0d30dc9bcf0d784ff3ce3cd221568f1392cdd893968966cf490331ca",
+          "findingSnapshotSha256": "b08247fa69e0034976dd2158a8b571b9292eac3d363c4eb9133555e0e0e0c0d5",
+          "finalSha256": "b08247fa69e0034976dd2158a8b571b9292eac3d363c4eb9133555e0e0e0c0d5"
+        }
+      ]
+    },
+    {
+      "finding": "Q1-04",
+      "stableKey": "FT-QA-2026-084",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-04-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "10cd4f6c19e3365d3114af0a84a7be72b9656b74d58a359085e5086de5549b5c",
+      "base": "Immutable round starting worktree, not HEAD; independent finding projection, companion tests split by TypeScript AST",
+      "files": [
+        {
+          "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+          "beforeSha256": "e446f5805fff51912ec6d1836982c302fa9e008ac765373a4c77ee7b6f205f7f",
+          "findingSnapshotSha256": "a5777100d438b462718009251a5f83418a79cc2db849472d668a4126948f506f",
+          "finalSha256": "60d089e3fb5e37c986e2945e14e4e413f70ee847d753663884b5ee7612b247f3"
+        },
+        {
+          "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+          "beforeSha256": "8ffa33c626b2825d4796241514cd11d9b1a34b2a449147496de4b6262ff1c75f",
+          "findingSnapshotSha256": "9057be7fc29b8041e29d825d158b5e35f6d2536753fe392d5ebeb8f281c0be52",
+          "finalSha256": "6734e138c096197fc84fb3863a331d2c2582758ca6ad598a0fa44eec7535570a"
+        }
+      ]
+    },
+    {
+      "finding": "Q1-05",
+      "stableKey": "FT-QA-2026-085",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-05-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "7d0b39d8498f69ba518e08926b68e56341097a26e8d0b1f72323f1e658c8eed9",
+      "base": "Immutable round starting worktree, not HEAD; independent finding projection, companion tests split by TypeScript AST",
+      "files": [
+        {
+          "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+          "beforeSha256": "e446f5805fff51912ec6d1836982c302fa9e008ac765373a4c77ee7b6f205f7f",
+          "findingSnapshotSha256": "0bc33a408d3230fded2ea77ac0215227450ede4860f07fdcd5e3e9d327ee1f48",
+          "finalSha256": "60d089e3fb5e37c986e2945e14e4e413f70ee847d753663884b5ee7612b247f3"
+        },
+        {
+          "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+          "beforeSha256": "8ffa33c626b2825d4796241514cd11d9b1a34b2a449147496de4b6262ff1c75f",
+          "findingSnapshotSha256": "619fde2f5fe2b25cc0ac4b1b8060eae4c1ed6e3be419e9c9a2c6aa86a20deee9",
+          "finalSha256": "6734e138c096197fc84fb3863a331d2c2582758ca6ad598a0fa44eec7535570a"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "backend/src/lib/recipePreparation.test.ts",
+      "beforeSha256": "cf181e19f465294087573cdbb6d009d609b32af735767ea6811f9a13a9cb1574",
+      "afterSha256": "365a5932e153d3919fe3506d3c792904e77bb3daad4d44457c260f069475f9d0"
+    },
+    {
+      "path": "backend/src/lib/recipePreparation.ts",
+      "beforeSha256": "e813202160536a47acb9b362f4fb418bff1e4cf8c4af3962d07871f92e0e1549",
+      "afterSha256": "e46aac7f12555f2ff6d6e4f09a8d98db8e7be5d4880015a0e8222be180b098eb"
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "beforeSha256": "dddd1f3c2300325173987371c8dbacbaf8214ea3cf6f238cd31bd07e31668a04",
+      "afterSha256": "f9991e52fd692fd3a60c4fc1ddedc70fefa3dec1d14b445dd138d33852b2d6bb"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+      "beforeSha256": "e446f5805fff51912ec6d1836982c302fa9e008ac765373a4c77ee7b6f205f7f",
+      "afterSha256": "60d089e3fb5e37c986e2945e14e4e413f70ee847d753663884b5ee7612b247f3"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "beforeSha256": "c9082ef8063744e291aff224bcfc116ce43d214f81acebb8953510a6ce1b6b39",
+      "afterSha256": "b5481bf921939ad4f187caee4d369fb09f4ef683e2e5b3e2484aa9f1c6ed3697"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "beforeSha256": "90ce693b3864043cf0e6d07b3f56337f30562b488e92aad4d3c62a0dace9b804",
+      "afterSha256": "ad57db8d728b39e67f16845afbc72d8132693cb4f51eb9a2a7fa2882d03ce220"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "beforeSha256": "8ffa33c626b2825d4796241514cd11d9b1a34b2a449147496de4b6262ff1c75f",
+      "afterSha256": "6734e138c096197fc84fb3863a331d2c2582758ca6ad598a0fa44eec7535570a"
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "beforeSha256": "5ed23c7a0d30dc9bcf0d784ff3ce3cd221568f1392cdd893968966cf490331ca",
+      "afterSha256": "b08247fa69e0034976dd2158a8b571b9292eac3d363c4eb9133555e0e0e0c0d5"
+    }
+  ],
+  "inheritedDiff": "Retained verbatim in round Baseline.inheritedTrackedDiff; all original/resume/r2 patches remain unchanged"
+}

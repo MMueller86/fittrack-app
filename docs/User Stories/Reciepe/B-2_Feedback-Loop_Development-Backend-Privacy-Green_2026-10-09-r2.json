@@ -1,0 +1,31 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/functions/recipes.test.ts",
+    "--testNamePattern",
+    "B-2 rejects malformed|B-2 terminates",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-Backend-Privacy-Green-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:57:27.132Z",
+  "endedAt": "2026-10-09T15:57:33.119Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "1395d61f0fc48637736fef38c84325f84d8dd019606eafc732b70aa01a93b84d",
+  "reportSha256": "f6cccb98a991fa6f56ec88ee7d85508c92d16b9f5e5aa67d95c618cbc6da5ba8",
+  "counts": {
+    "executed": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 115
+  },
+  "failures": []
+}

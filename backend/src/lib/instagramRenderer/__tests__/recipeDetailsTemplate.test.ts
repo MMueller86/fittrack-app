@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -10,9 +11,11 @@ import { gefluegelfrikadellenDetailsFixture as alphaGefluegelfrikadellenDetailsF
 import { nineIngredientsDetailsFixture as alphaNineIngredientsDetailsFixture } from "../fixtures/nine-ingredients-details";
 import { quarkbroetchenDetailsFixture } from "../fixtures/quarkbroetchen-details";
 import { twentyIngredientsDetailsFixture as alphaTwentyIngredientsDetailsFixture } from "../fixtures/twenty-ingredients-details";
-import { renderInstagramRecipeDetailsTemplate } from "../index";
+import { probeInstagramRecipeDetailsGeneratedText, renderInstagramRecipeDetailsTemplate } from "../index";
+import type { RecipeDetailsTemplateInput } from "../types";
 import {
   composeRecipeDetailsTemplate,
+  composeRecipeDetailsGeneratedText,
   getRecipeDetailsTextLayoutFields,
   getRecipeDetailsTitleLayout,
 } from "../recipeDetailsTemplateV3";
@@ -117,7 +120,351 @@ function flattenTemplateElements(value: unknown): SatoriElement[] {
   return [value, ...flattenTemplateElements(value.props.children)];
 }
 
+async function captureProductionMeasurements<Result>(action: () => Promise<Result>) {
+  const actual = await vi.importActual<typeof import("satori")>("satori");
+  const measurements = new Map<string, { width: number; height: number }>();
+  const teaserSizes: number[] = [];
+  vi.mocked(satori).mockImplementation(async (root, options) => {
+    const teaser = flattenTemplateElements(root).find(
+      (node) => node.props["data-render-node"] === "recipe-details-description",
+    );
+    if (teaser) teaserSizes.push((teaser.props.style as Record<string, unknown>).fontSize as number);
+    return actual.default(root, {
+      ...options,
+      onNodeDetected: (node) => {
+        const marker = node.props["data-render-node"];
+        if (typeof marker === "string" && marker.startsWith("recipe-details-")) {
+          measurements.set(marker, { width: node.width, height: node.height });
+        }
+        options.onNodeDetected?.(node);
+      },
+    });
+  });
+  try {
+    return { result: await action(), measurements, teaserSizes };
+  } finally {
+    vi.mocked(satori).mockImplementation(actual.default);
+  }
+}
+
+const probeTitles = ["Brötchen", "Herzhafte Quarkbrötchen", "Herzhafte Quarkbrötchen mit Dinkel und Körnern"];
+const denseProbeTeaser = "Goldbraune Quarkbrötchen mit Dinkelmehl und knackigen Körnern für ein sättigendes Frühstück.";
+
+describe("B-1 generated detail text production probe", () => {
+  it.each([1, 2, 3, 4, 5].flatMap((count) => probeTitles.map((title) => ({ count, title }))))(
+    "matches full-render node geometry and teaser decisions for $count steps / $title",
+    async ({ count, title }) => {
+      const input: RecipeDetailsTemplateInput = {
+        ...quarkbroetchenDetailsFixture, title,
+        description: denseProbeTeaser,
+        steps: Array.from({ length: count }, () => "Mische die Zutaten und forme daraus Brötchen."),
+      };
+      const before = JSON.stringify(input);
+      const full = await captureProductionMeasurements(() => renderInstagramRecipeDetailsTemplate(input));
+      const probe = await captureProductionMeasurements(() => probeInstagramRecipeDetailsGeneratedText({
+        savedTitle: title, teaser: input.description!, steps: input.steps,
+      }));
+      expect(full.result.ok).toBe(true);
+      expect(probe.result).toMatchObject({ ok: true, status: "success" });
+      expect(probe.teaserSizes).toEqual(full.teaserSizes);
+      expect(probe.teaserSizes).toEqual(probe.teaserSizes.map((_size, index) => 22 - index));
+      expect(probe.result.teaserFontSize).toBe(full.teaserSizes.at(-1));
+      expect(probe.result.diagnostics).toHaveLength(count + 2);
+      for (const [marker, measurement] of probe.measurements) {
+        expect(measurement, marker).toEqual(full.measurements.get(marker));
+      }
+      expect(probe.result.diagnostics.filter((item) => item.field === "steps"))
+        .toEqual(Array.from({ length: count }, (_step, itemIndex) => expect.objectContaining({
+          itemIndex, status: "fits", fontSize: count === 5 ? 18 : 22,
+          measured: expect.objectContaining({ maxWidth: count === 5 ? 318 : 302, maxHeight: count === 5 ? 84 : 105 }),
+        })));
+      const teaser = probe.result.diagnostics.find((item) => item.field === "teaser");
+      expect(teaser).toMatchObject({ status: "fits", displayText: denseProbeTeaser.slice(0, -1) });
+      expect(JSON.stringify(input)).toBe(before);
+    }, 20000,
+  );
+
+  it("uses exactly the full-render subtrees and parent constraints without images or ingredients", () => {
+    const input = quarkbroetchenDetailsFixture;
+    const overrides = {
+      title: input.title, description: input.description!, descriptionFontSize: 21,
+      steps: input.steps, ingredients: input.ingredients.map((ingredient) => `${ingredient.amount} ${ingredient.name}`),
+    };
+    const full = composeRecipeDetailsTemplate(input, {
+      photo: { src: "data:image/png;base64,", width: 1080, height: 1350 },
+      wordmark: "", wordmarkMimeType: "image/svg+xml", nutritionHighlights: { "high-protein": "", "low-fat": "" },
+    }, overrides);
+    const probe = composeRecipeDetailsGeneratedText(input, overrides);
+    expect(probe.props.style).toEqual(full.props.style);
+    const fullChildren = full.props.children as SatoriElement[];
+    for (const subtree of probe.props.children as SatoriElement[]) {
+      expect(fullChildren).toContainEqual(subtree);
+    }
+    expect(flattenTemplateElements(probe).some((node) => node.type === "img")).toBe(false);
+    expect(JSON.stringify(probe)).not.toContain("recipe-details-ingredient-");
+  });
+
+  it("measures every step despite multiple overflow failures and reevaluates changed counts", async () => {
+    const text = "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.";
+    const candidate = { savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.", steps: Array.from({ length: 4 }, () => text) };
+    const four = await probeInstagramRecipeDetailsGeneratedText(candidate);
+    expect(four).toMatchObject({ status: "generated-text-failure" });
+    expect(four.diagnostics.filter((item) => item.field === "steps" && item.status === "overflow")).toHaveLength(4);
+    const five = await probeInstagramRecipeDetailsGeneratedText({ ...candidate, steps: [...candidate.steps, "Backe die Brötchen."] });
+    expect(five).toMatchObject({ ok: true, status: "success" });
+    expect(five.diagnostics.filter((item) => item.field === "steps")).toHaveLength(5);
+  });
+
+  it("reports width-only failures without inventing a multiline height and still measures other fields", async () => {
+    const result = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: "Quarkbrötchen", teaser: "W".repeat(96), steps: ["W".repeat(90), "Backe die Brötchen."],
+    });
+    expect(result).toMatchObject({ ok: false, status: "generated-text-failure", teaserFontSize: 18 });
+    const failures = result.diagnostics.filter((item) => item.status === "width-overflow");
+    expect(failures).toHaveLength(2);
+    for (const failure of failures) {
+      if (failure.status !== "width-overflow") continue;
+      expect(failure.measured.width).toBeGreaterThan(failure.measured.maxWidth);
+      expect(failure.measured).not.toHaveProperty("height");
+      expect(failure.measured).not.toHaveProperty("maxHeight");
+    }
+    expect(result.diagnostics).toContainEqual(expect.objectContaining({ field: "steps", itemIndex: 1, status: "fits" }));
+  });
+
+  it.each(["", " ", "Backe\nBrötchen", "Backe\rBrötchen", "Backe\u2028Brötchen", "Backe\u2029Brötchen", "x".repeat(97)])(
+    "rejects generated invalid text %j without normalization or claiming validation", async (text) => {
+      const candidate = { savedTitle: "Quarkbrötchen", teaser: text, steps: [text, "Backe die Brötchen."] };
+      const before = JSON.stringify(candidate);
+      const result = await probeInstagramRecipeDetailsGeneratedText(candidate);
+      expect(result).toMatchObject({ ok: false, status: "generated-text-failure" });
+      expect(result.diagnostics).toContainEqual({ field: "teaser", status: "invalid-text", code: "INVALID_TEXT" });
+      expect(result.diagnostics).toContainEqual({ field: "steps", itemIndex: 0, status: "invalid-text", code: "INVALID_TEXT" });
+      expect(result.diagnostics).toContainEqual(expect.objectContaining({ field: "steps", itemIndex: 1, status: "fits" }));
+      expect(JSON.stringify(candidate)).toBe(before);
+    },
+  );
+
+  it.each([0, 6])("rejects %i steps and does not claim the skipped steps fit", async (count) => {
+    const result = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.", steps: Array.from({ length: count }, () => "Backe Brötchen."),
+    });
+    expect(result).toMatchObject({ status: "generated-text-failure" });
+    expect(result.diagnostics.filter((item) => item.field === "steps" && item.status === "fits")).toHaveLength(0);
+    expect(result.diagnostics).toContainEqual({ field: "steps", status: "invalid-text", code: "INVALID_STEP_COUNT" });
+  });
+
+  it.each([
+    { dimension: "width" as const, extra: 0.5, ok: true },
+    { dimension: "width" as const, extra: 0.5001, ok: false },
+    { dimension: "height" as const, extra: 0.5, ok: true },
+    { dimension: "height" as const, extra: 0.5001, ok: false },
+  ])("shares the 0.5px $dimension boundary with full rendering: $extra", async ({ dimension, extra, ok }) => {
+    const actual = await vi.importActual<typeof import("satori")>("satori");
+    vi.mocked(satori).mockImplementation((root, options) => actual.default(root, {
+      ...options,
+      onNodeDetected: (node) => options.onNodeDetected?.(
+        node.props["data-render-node"] === "recipe-details-step-0"
+          ? { ...node, [dimension]: (dimension === "width" ? 302 : 105) + extra }
+          : node,
+      ),
+    }));
+    try {
+      const input = { ...quarkbroetchenDetailsFixture, steps: ["Backe Brötchen."] };
+      const full = await renderInstagramRecipeDetailsTemplate(input);
+      const probe = await probeInstagramRecipeDetailsGeneratedText({ savedTitle: input.title, teaser: input.description!, steps: input.steps });
+      expect(full.ok).toBe(ok);
+      expect(probe.ok).toBe(ok);
+      expect(probe.status).toBe(ok ? "success" : "generated-text-failure");
+    } finally {
+      vi.mocked(satori).mockImplementation(actual.default);
+    }
+  });
+
+  it.each(["missing", "nan-width", "infinite-height", "missing-word"]) (
+    "fails technically for %s production measurement, even with a correctable overflow", async (failure) => {
+      const actual = await vi.importActual<typeof import("satori")>("satori");
+      vi.mocked(satori).mockImplementation((root, options) => actual.default(root, {
+        ...options,
+        onNodeDetected: (node) => {
+          const marker = node.props["data-render-node"];
+          if (failure === "missing-word" && typeof marker === "string" && marker.startsWith("detail-text-measure-")) return;
+          if (marker === "recipe-details-step-1") {
+            if (failure === "missing") return;
+            if (failure === "nan-width") node = { ...node, width: NaN };
+            if (failure === "infinite-height") node = { ...node, height: Infinity };
+          }
+          options.onNodeDetected?.(node);
+        },
+      }));
+      try {
+        const result = await probeInstagramRecipeDetailsGeneratedText({
+          savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.",
+          steps: ["Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.", "Backe Brötchen."],
+        });
+        expect(result).toMatchObject({ ok: false, status: "technical-failure" });
+        expect(result.diagnostics.some((item) => item.status === "technical-failure")).toBe(true);
+      } finally {
+        vi.mocked(satori).mockImplementation(actual.default);
+      }
+    },
+  );
+
+  it.each(["", "Titel\nZeile", "W".repeat(60)])("never makes the saved title %j AI-correctable", async (savedTitle) => {
+    const result = await probeInstagramRecipeDetailsGeneratedText({ savedTitle, teaser: "Frisch gebacken.", steps: ["Backe Brötchen."] });
+    expect(result).toMatchObject({ ok: false, status: "technical-failure" });
+  });
+
+  it.each([22, 21, 20, 19, 18])("retains identical font-attempt selection through %ipx", async (selectedSize) => {
+    const actual = await vi.importActual<typeof import("satori")>("satori");
+    const attempts: number[] = [];
+    vi.mocked(satori).mockImplementation((root, options) => {
+      const teaser = flattenTemplateElements(root).find((node) => node.props["data-render-node"] === "recipe-details-description");
+      const fontSize = teaser ? (teaser.props.style as Record<string, unknown>).fontSize as number : undefined;
+      if (fontSize !== undefined) attempts.push(fontSize);
+      return actual.default(root, {
+        ...options,
+        onNodeDetected: (node) => options.onNodeDetected?.(
+          node.props["data-render-node"] === "recipe-details-description" && fontSize! > selectedSize
+            ? { ...node, height: 500 }
+            : node,
+        ),
+      });
+    });
+    try {
+      const input = quarkbroetchenDetailsFixture;
+      const full = await renderInstagramRecipeDetailsTemplate(input);
+      const fullAttempts = attempts.splice(0);
+      const probe = await probeInstagramRecipeDetailsGeneratedText({ savedTitle: input.title, teaser: input.description!, steps: input.steps });
+      expect(full.ok).toBe(true);
+      expect(probe).toMatchObject({ ok: true, teaserFontSize: selectedSize });
+      expect(attempts).toEqual(fullAttempts);
+      expect(attempts).toEqual(Array.from({ length: 23 - selectedSize }, (_size, index) => 22 - index));
+    } finally {
+      vi.mocked(satori).mockImplementation(actual.default);
+    }
+  });
+
+  it("matches title-dependent teaser overflow and legal German breaks with the full renderer", async () => {
+    for (const title of probeTitles) {
+      for (const description of ["W".repeat(96), "Grundstücksverkehrsgenehmigungszuständigkeitsübertragungsverordnung"]) {
+        const input = { ...quarkbroetchenDetailsFixture, title, description };
+        const full = await renderInstagramRecipeDetailsTemplate(input);
+        const probe = await probeInstagramRecipeDetailsGeneratedText({ savedTitle: title, teaser: description, steps: input.steps });
+        expect(probe.ok).toBe(full.ok);
+        if (!full.ok) {
+          expect(full.error).toMatchObject({ field: "description", code: "TEMPLATE_FIELD_OVERFLOW" });
+          expect(probe).toMatchObject({ status: "generated-text-failure", teaserFontSize: 18 });
+        } else {
+          const diagnostic = probe.diagnostics.find((item) => item.field === "teaser");
+          expect(diagnostic).toMatchObject({ status: "fits" });
+          if (diagnostic?.status === "fits") {
+            expect(diagnostic.displayText.replace(/-\n/g, "")).toBe(description);
+          }
+        }
+      }
+    }
+  }, 20000);
+
+  it.each(["font-only", "missing-font", "corrupt-font", "satori-failure"])(
+    "cold probe stays text-only and fails closed: %s", async (mode) => {
+      const actualFs = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
+      const actualSatori = await vi.importActual<typeof import("satori")>("satori");
+      const reads: string[] = [];
+      const nativeImport = vi.fn(() => { throw new Error("Native image dependencies must not be loaded by the probe."); });
+      vi.resetModules();
+      vi.doMock("sharp", nativeImport);
+      vi.doMock("@resvg/resvg-js", nativeImport);
+      vi.doMock("node:fs/promises", () => ({
+        ...actualFs,
+        readFile: async (...args: Parameters<typeof actualFs.readFile>) => {
+          const path = String(args[0]).replace(/\\/g, "/");
+          reads.push(path);
+          if (!path.includes("/assets/fonts/") || !path.endsWith(".ttf")) throw new Error("Probe attempted a non-font asset read.");
+          if (mode === "missing-font") throw new Error("Simulated unavailable font.");
+          if (mode === "corrupt-font") return Buffer.from("invalid-font");
+          return actualFs.readFile(...args);
+        },
+      }));
+      vi.doMock("satori", () => ({
+        ...actualSatori,
+        default: mode === "satori-failure" ? async () => { throw new Error("Simulated Satori failure."); } : actualSatori.default,
+      }));
+      try {
+        const { probeInstagramRecipeDetailsGeneratedText: freshProbe } = await import("../render");
+        const result = await freshProbe({ savedTitle: "Quarkbrötchen", teaser: "Frisch gebacken.", steps: ["Backe Brötchen."] });
+        if (mode === "font-only") {
+          expect(result).toMatchObject({ ok: true, status: "success" });
+        } else {
+          expect(result).toMatchObject({
+            ok: false, status: "technical-failure",
+            error: { code: mode === "missing-font" ? "MISSING_ASSET" : "FONT_OR_SATORI_FAILED" },
+          });
+          expect(result.diagnostics.every((item) => item.status === "technical-failure")).toBe(true);
+        }
+        expect(nativeImport).not.toHaveBeenCalled();
+        expect(reads).toHaveLength(4);
+      } finally {
+        vi.doUnmock("sharp");
+        vi.doUnmock("@resvg/resvg-js");
+        vi.doUnmock("node:fs/promises");
+        vi.doUnmock("satori");
+        vi.resetModules();
+      }
+    },
+  );
+});
+
 describe("Instagram recipe details template", () => {
+  it("preserves B-1 Alpha geometry and pre-extraction PNG fingerprints", async () => {
+    const steps = [
+      "Vermische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu einem Teig.",
+      "Forme den Teig zu Brötchen.",
+      "Backe die Brötchen im vorgeheizten Ofen.",
+      "Lasse die Brötchen abkühlen.",
+    ];
+    const input = { ...quarkbroetchenDetailsFixture, steps };
+    const overflow = await renderInstagramRecipeDetailsTemplate(input);
+    expect(overflow).toMatchObject({
+      ok: false,
+      error: {
+        code: "TEMPLATE_FIELD_OVERFLOW", field: "steps", itemIndex: 0,
+        measured: { width: 300, height: 112, maxWidth: 302, maxHeight: 105 },
+      },
+    });
+    const probe = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: input.title, teaser: input.description!, steps,
+    });
+    expect(probe).toMatchObject({ ok: false, status: "generated-text-failure", teaserFontSize: 22 });
+    expect(probe.diagnostics.find((item) => item.field === "steps" && item.itemIndex === 0)).toMatchObject({
+      status: "overflow", fontSize: 22,
+      measured: { width: 300, height: 112, maxWidth: 302, maxHeight: 105 },
+      displayText: steps[0],
+    });
+    expect(probe.diagnostics.filter((item) => item.field === "steps")).toHaveLength(4);
+    const shorter = {
+      ...input,
+      steps: ["Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig.", ...steps.slice(1)],
+    };
+    const hashes = [
+      "b81a0cc528c389cc3b21113ef7d65ea6d7cc37ba2023b4d9fa035e087573036a",
+      "bc9276a5158de0c1247a9da9b33a4fd5a072268f4fec4c7108b40ac94f460d74",
+      "e1737c8af626890d61ae1cc3decac0a31e6e6de7da8ca98fe2a88982e17b130b",
+    ];
+    for (const [index, candidate] of [quarkbroetchenDetailsFixture, shorter, twentyIngredientsDetailsFixture].entries()) {
+      const result = await renderInstagramRecipeDetailsTemplate(candidate);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(createHash("sha256").update(result.buffer).digest("hex")).toBe(hashes[index]);
+      }
+    }
+    const passing = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: shorter.title, teaser: shorter.description!, steps: shorter.steps,
+    });
+    expect(passing).toMatchObject({ ok: true, status: "success", teaserFontSize: 22 });
+    expect(passing.diagnostics.filter((item) => item.field === "steps"))
+      .toEqual(expect.arrayContaining([expect.objectContaining({ itemIndex: 0, status: "fits", fontSize: 22 })]));
+  }, 20000);
+
   it("omits difficulty and applies normal word wrapping to every visible text node", () => {
     const template = composeRecipeDetailsTemplate(
       { ...quarkbroetchenDetailsFixture, difficulty: "Einfach" },
@@ -327,6 +674,39 @@ describe("Instagram recipe details template", () => {
     expect(result.height).toBe(1350);
     expect(result.format).toBe("png");
     expect(Buffer.isBuffer(result.buffer)).toBe(true);
+  });
+
+  it("renders selective cooking summaries at 1..5 steps including 90 characters", async () => {
+    const rice = "Koche Reis separat in Salzwasser und gieße ihn ab, bevor du ihn zu dem Hähnchen servierst.";
+    expect(rice).toHaveLength(90);
+    const core = [
+      "Schneide Hähnchen.", "Brate Hähnchen an.", "Koche Reis separat.",
+      "Senke die Hitze und gare Hähnchen fertig.",
+    ];
+    for (const steps of [
+      ["Schneide Hähnchen, brate es an, koche Reis separat und gare Hähnchen fertig."],
+      ["Schneide Hähnchen und brate es an.", "Koche Reis separat und gare Hähnchen fertig."],
+      ["Schneide Hähnchen und brate es an.", "Koche Reis separat.", core[3]!],
+      core,
+      [core[0]!, core[1]!, rice, core[3]!, "Serviere Hähnchen mit Reis."],
+    ]) {
+      const result = await renderInstagramRecipeDetailsTemplate({
+        ...quarkbroetchenDetailsFixture,
+        title: "Hähnchen mit Reis",
+        description: "Hähnchenpfanne mit separat gekochtem Reis.",
+        ingredients: [
+          { amount: "350 g", name: "Hähnchen" },
+          { amount: "150 g", name: "Reis" },
+          { amount: "15 g", name: "Olivenöl" },
+        ],
+        steps,
+      });
+      expect(result, result.ok ? undefined : JSON.stringify(result.error))
+        .toMatchObject({ ok: true, width: 1080, height: 1350, format: "png" });
+      if (result.ok) {
+        expect(await sharp(result.buffer).metadata()).toMatchObject({ width: 1080, height: 1350, format: "png" });
+      }
+    }
   });
 
   it("renders the Alpha Gefluegelfrikadellen recipe with an offline reference photo as an Instagram PNG", async () => {

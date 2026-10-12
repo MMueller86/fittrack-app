@@ -1,0 +1,91 @@
+{
+  "series": "dough-overflow",
+  "runs": [
+    {
+      "label": "dough-overflow-run01",
+      "exit": 0,
+      "started": "2026-10-11T10:56:59.233Z",
+      "finished": "2026-10-11T10:57:01.072Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 0,
+        "failed": 0,
+        "pending": 21
+      },
+      "failures": []
+    },
+    {
+      "label": "dough-overflow-run02",
+      "exit": 0,
+      "started": "2026-10-11T10:57:01.973Z",
+      "finished": "2026-10-11T10:57:03.766Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 0,
+        "failed": 0,
+        "pending": 21
+      },
+      "failures": []
+    },
+    {
+      "label": "dough-overflow-run03",
+      "exit": 0,
+      "started": "2026-10-11T10:57:04.496Z",
+      "finished": "2026-10-11T10:57:06.315Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 0,
+        "failed": 0,
+        "pending": 21
+      },
+      "failures": []
+    },
+    {
+      "label": "dough-overflow-run04",
+      "exit": 0,
+      "started": "2026-10-11T10:57:07.073Z",
+      "finished": "2026-10-11T10:57:08.870Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 0,
+        "failed": 0,
+        "pending": 21
+      },
+      "failures": []
+    },
+    {
+      "label": "dough-overflow-run05",
+      "exit": 0,
+      "started": "2026-10-11T10:57:09.599Z",
+      "finished": "2026-10-11T10:57:11.438Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 0,
+        "failed": 0,
+        "pending": 21
+      },
+      "failures": []
+    },
+    {
+      "label": "dough-overflow-run06",
+      "exit": 0,
+      "started": "2026-10-11T10:57:12.326Z",
+      "finished": "2026-10-11T10:57:14.258Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 0,
+        "failed": 0,
+        "pending": 21
+      },
+      "failures": []
+    }
+  ],
+  "passedRuns": 6,
+  "totalRuns": 6
+}

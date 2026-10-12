@@ -1,0 +1,365 @@
+{
+  "status": "IMPLEMENTATION_PRESENT_REQUIRED_F_FAILED_RELEASE_BLOCKED",
+  "release": "CLOSED",
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "handoff": {
+    "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09-r3-QA-R1.md",
+    "sha256": "7daee3b42daf1f500a8f06eee05c4d04adb808f0e4c2ffe9ac8b45970ecfd8c3"
+  },
+  "preservation": {
+    "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Preservation_2026-10-09-r3-QA-R1.json",
+    "sha256": "20f8aba6599729c49b238edc8e8b642bc8edcf02edb860e3d043fe82e6a24a26",
+    "foreignFiles": 926,
+    "candidateFiles": 935,
+    "runtimeFiles": 338,
+    "historicalArtifacts": 83
+  },
+  "ownedPaths": [
+    "backend/src/lib/recipePreparation.test.ts",
+    "backend/src/lib/recipePreparation.ts",
+    "backend/src/functions/recipes.test.ts",
+    "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+    "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+    "backend/src/lib/prompts/recipeAnalyze.ts",
+    "backend/src/lib/recipeAnalyzeValidation.test.ts",
+    "backend/src/functions/ai.test.ts"
+  ],
+  "findings": [
+    {
+      "finding": "Q1-01",
+      "stableKey": "FT-QA-2026-081",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-01-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "da256fd5e32777c0f211d7d34a8176327f0d07e4cf0a0fc53e423f1bca606e8f",
+      "closure": "NOT_CLAIMED"
+    },
+    {
+      "finding": "Q1-02",
+      "stableKey": "FT-QA-2026-082",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-02-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "5ab47847067c21f389955fe1d7d5850fb0753eddddc58d493b489422ff1a3b08",
+      "closure": "NOT_CLAIMED"
+    },
+    {
+      "finding": "Q1-03",
+      "stableKey": "FT-QA-2026-083",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-03-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "1c0502077f1d774899253788bb1599c0b71da9a24a4a48d2aed68bf7d54bea1c",
+      "closure": "NOT_CLAIMED"
+    },
+    {
+      "finding": "Q1-04",
+      "stableKey": "FT-QA-2026-084",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-04-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "10cd4f6c19e3365d3114af0a84a7be72b9656b74d58a359085e5086de5549b5c",
+      "closure": "NOT_CLAIMED"
+    },
+    {
+      "finding": "Q1-05",
+      "stableKey": "FT-QA-2026-085",
+      "patch": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-05-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "7d0b39d8498f69ba518e08926b68e56341097a26e8d0b1f72323f1e658c8eed9",
+      "closure": "NOT_CLAIMED"
+    }
+  ],
+  "offlinePasses": [
+    "Focused-Final519",
+    "Units1600",
+    "Typecheck",
+    "Build"
+  ],
+  "live": {
+    "F": {
+      "exit": 1,
+      "counts": {
+        "executed": 5,
+        "passed": 2,
+        "failed": 3,
+        "skipped": 9
+      },
+      "logicalCalls": 10,
+      "sdkCalls": 9,
+      "outputSha256": "36f4ffdc97fdd9945ca3d6e1e753df2c052f8f48fa0e12f34a8d3f94724546c7",
+      "reportSha256": "4f6520e1069ab596b1c6b1b36ded2e88c83adecc38423c48e59fdcdd9bd6fbe2"
+    },
+    "R": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+    "G": "NOT_RUN_REQUIRED_LIVE_FAILURE"
+  },
+  "verification": {
+    "handoffLinks": 23,
+    "sourceAndImportAstChecks": 8,
+    "untouchedContracts": 13,
+    "ownedScopedSecretPatternMatches": 0,
+    "nativeCountsAndOutputHashes": true,
+    "downstreamStartedFilesAbsent": true,
+    "noQaOrD1OrRegisterOrDeployEdits": true
+  },
+  "artifacts": [
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Baseline_2026-10-09-r3-QA-R1.json",
+      "sha256": "e3c2c60be13733552a92e9becf96bb512b16c6f133043a86270a11eff12ebafb",
+      "bytes": 1015104
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "db74fdead4e458190f942dfda81f0e0876ff3e9104e2f140d84023ecc7189d37",
+      "bytes": 9773
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Build_2026-10-09-r3-QA-R1.json",
+      "sha256": "c46d72255690a09c4915bdab15fb928084aaec2f8cc96f04966408af61e35045",
+      "bytes": 587
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Candidate_2026-10-09-r3-QA-R1.json",
+      "sha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+      "bytes": 219773
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Green-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "203ffc11f7f6d92381d79ac7462eac86956f2ee68d8020c9186b06645300cdf8",
+      "bytes": 3189
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Green-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "eb2e76a481330100f3972afac21fcaafef29eb1544801703f6fd7842df9bf127",
+      "bytes": 51279
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Green_2026-10-09-r3-QA-R1.json",
+      "sha256": "526f845ecbe658bc5b8c8d9d326f1851c8814a0a608d1b2e091a25e1611b5662",
+      "bytes": 1254
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Red-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "57b73c3a3261eddabd772b473c871523c75d00be39cf359d335171596ed50aa5",
+      "bytes": 11062
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Red-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "70d107e2f07f937b72d3f399845ca3849b7940565aeb90eea4207e8eaca7a65d",
+      "bytes": 55537
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Red_2026-10-09-r3-QA-R1.json",
+      "sha256": "fab0bfbe12d0374a87ca4745815ed54f4a51a9f86f52a5d7346560d3c0c1a540",
+      "bytes": 1246
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Evidence_2026-10-09-r3-QA-R1.mjs",
+      "sha256": "96f90fa06e8a057ebd1da59c3b969af3b2020e0d15229b2b5f2b50c86e8f5262",
+      "bytes": 10220
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "36f4ffdc97fdd9945ca3d6e1e753df2c052f8f48fa0e12f34a8d3f94724546c7",
+      "bytes": 140358
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Reconciliation_2026-10-09-r3-QA-R1.json",
+      "sha256": "3347bb1dbed45d225350d6dee798ee390c72562cfc51e284c0c42f80e7d2412e",
+      "bytes": 203925
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "4f6520e1069ab596b1c6b1b36ded2e88c83adecc38423c48e59fdcdd9bd6fbe2",
+      "bytes": 9767
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F-Started_2026-10-09-r3-QA-R1.json",
+      "sha256": "e1ad6a6fb2294735e76239a8634eb8e1233d473822abd4fb1ab09be2b2426da2",
+      "bytes": 625
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_F_2026-10-09-r3-QA-R1.json",
+      "sha256": "67c847ff70ded5c8b012c9429a6872e5790f2e2495e1d27bf3a9f0eb631f20d7",
+      "bytes": 1122
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Final-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "c064698289e648fd6b93cd572199bc4d64a7782ae56996554066654ad01600ca",
+      "bytes": 209517
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Final-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "00417e2c2fbfb6578892b4190be7dd5189f6cb2e3d84c15162dd568e27b03950",
+      "bytes": 176165
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Final_2026-10-09-r3-QA-R1.json",
+      "sha256": "f4f7445487c0adc6a240c3dc63961727a82232f6b3414e78b1a0610ac3d95dd0",
+      "bytes": 1398
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "ee76d0536fc9bbca15792cbf36f86e0e8a2fa73eb000906c13518e762cc6bb7d",
+      "bytes": 215429
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "7c5f58ad506d97705f46c5a9a523183ef5de09e3a0371cc6e2f102958f9490f2",
+      "bytes": 177674
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Focused_2026-10-09-r3-QA-R1.json",
+      "sha256": "aeffb5d6e4248be2c29c28f081fe31b029f854685c4b9a14f5e65ddad442a8f6",
+      "bytes": 1374
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_G_2026-10-09-r3-QA-R1.json",
+      "sha256": "418cb9b109ad8153a22d8771fecae84fc32c51a9d2fda1e98f19bc62d02600c3",
+      "bytes": 359
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Gate-Summary_2026-10-09-r3-QA-R1.json",
+      "sha256": "ef99154dddd7a92bb4b6410ee8691e5c6c7e8145587ae1b868f7614ef3511316",
+      "bytes": 21879
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Handoff-Check_2026-10-09-r3-QA-R1.json",
+      "sha256": "17e3563922afb6cff3c6ee9d28e9707c697fe64a300121a0a1c8e7cd61ef378b",
+      "bytes": 324
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09-r3-QA-R1.md",
+      "sha256": "7daee3b42daf1f500a8f06eee05c4d04adb808f0e4c2ffe9ac8b45970ecfd8c3",
+      "bytes": 13840
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "1d7c9c893471325e94285c3b343915c768507dba10fda85fb47e75350c912750",
+      "bytes": 30158
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Ownership-Extension_2026-10-09-r3-QA-R1.json",
+      "sha256": "666030e2ddbe0f153f9b05f537028daee97a5a3b4adbe374f382b8cb71585da9",
+      "bytes": 95502
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Ownership_2026-10-09-r3-QA-R1.json",
+      "sha256": "022207352ea9051add6238addc2af1450fb7c32f7380f1e0fe011a1e01f55e77",
+      "bytes": 9630
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Patch-Audit_2026-10-09-r3-QA-R1.json",
+      "sha256": "c181e0fe3f80d1c6c271260dd5a6f3b7cd56c0c27eac190ee34342156a9dc578",
+      "bytes": 314
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Preservation_2026-10-09-r3-QA-R1.json",
+      "sha256": "20f8aba6599729c49b238edc8e8b642bc8edcf02edb860e3d043fe82e6a24a26",
+      "bytes": 11993
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Provider-Loop-Contract_2026-10-09-r3-QA-R1.json",
+      "sha256": "e1cb07762693ffbf388672705f0765511a49782c8eafc8bd8a3ae351303e8637",
+      "bytes": 6588
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Green-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "342baab1f19186287f46588113a7306fd75815b9b3f1e9e0bb53f03261b74f3b",
+      "bytes": 914
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Green-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "283f67b55c875d3aa843d38823375c414f9cc017928608f8a87499e216bf32f3",
+      "bytes": 70407
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Green_2026-10-09-r3-QA-R1.json",
+      "sha256": "0436e37292271e73d724b190ed12d2b1dc5f47438dc44c623860732ed2ccf8e8",
+      "bytes": 1274
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Red-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "5270e1b85867c6504ac13f13def38e58ecaaf0bec7ae137f264956815df62455",
+      "bytes": 9353
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Red-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "0532c063302dbc5a37d32e6ead8f9f1019e394a98a965189e4d1d477b3e82508",
+      "bytes": 77343
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Prompt-Rubric-Red_2026-10-09-r3-QA-R1.json",
+      "sha256": "9bb34511ca63b7c08e05ff5a7a0cb337302d2d1dc4787667fe2c157ed975a43e",
+      "bytes": 1266
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-01-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "da256fd5e32777c0f211d7d34a8176327f0d07e4cf0a0fc53e423f1bca606e8f",
+      "bytes": 4244
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-02-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "5ab47847067c21f389955fe1d7d5850fb0753eddddc58d493b489422ff1a3b08",
+      "bytes": 6175
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-03-Investigation_2026-10-09-r3-QA-R1.json",
+      "sha256": "f29be8b1e0546c24b2e6eb5e750c43c40764a4b3d0ecadb9cde1465758c031fc",
+      "bytes": 62724
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-03-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "1c0502077f1d774899253788bb1599c0b71da9a24a4a48d2aed68bf7d54bea1c",
+      "bytes": 11101
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-04-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "10cd4f6c19e3365d3114af0a84a7be72b9656b74d58a359085e5086de5549b5c",
+      "bytes": 3793
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Q1-05-Owned-Diff_2026-10-09-r3-QA-R1.patch",
+      "sha256": "7d0b39d8498f69ba518e08926b68e56341097a26e8d0b1f72323f1e658c8eed9",
+      "bytes": 7434
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_R_2026-10-09-r3-QA-R1.json",
+      "sha256": "61ffd2e433b25cb24d3f7b8a3c09ead9557f97fb1b474cdd4596f6a2c566d1d2",
+      "bytes": 359
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Reporting-Validation_2026-10-09-r3-QA-R1.json",
+      "sha256": "1c6cd740d376f4042211451f88d2964b86626eaab5eb928e9a18960f142e2bc4",
+      "bytes": 1399
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Reporting_2026-10-09-r3-QA-R1.mjs",
+      "sha256": "99715afd104d8ec230e723b7bb7ac2bf40503c8511c895a8501c6b20259ac39c",
+      "bytes": 14635
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Scope-Review_2026-10-09-r3-QA-R1.json",
+      "sha256": "7bbb099e5162f41a5a377f76f138c1833cc53c2390e1484e083af8c8eccebf2a",
+      "bytes": 2814
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Typecheck-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "23c9d65eeb8572d1fe4ec2ca0ea0a4cd5b67699a40d46b72d4a2dbfea253fba0",
+      "bytes": 53
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Typecheck_2026-10-09-r3-QA-R1.json",
+      "sha256": "15806e5588bb3609c72d3f27554f6b7926ad84acbb47580d75929b54d1cb1b8a",
+      "bytes": 592
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units-Output_2026-10-09-r3-QA-R1.txt",
+      "sha256": "5da66e44e583d43d2fc41217cccdadf7d70e84d43931ec4948c660a511aa2310",
+      "bytes": 626660
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units-Report_2026-10-09-r3-QA-R1.json",
+      "sha256": "e64bcecd63f110b997e118527f79cc146a16d36fe6078caf3189c0c931d6d759",
+      "bytes": 510218
+    },
+    {
+      "path": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Units_2026-10-09-r3-QA-R1.json",
+      "sha256": "d38096ded480c99d94eb9db973d99e497e6195f0c5a136c180ab5ee1168061c4",
+      "bytes": 1072
+    }
+  ],
+  "selfExcluded": true,
+  "notUniversalCookingOrHumanAlphaProof": true
+}

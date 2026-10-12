@@ -25,6 +25,20 @@ export const DAILY_INSIGHT_PROMPT_RELEASES = [
     promptFingerprint: 'sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264',
     providerInputCompatibility: 'changed',
   },
+  {
+    releaseId: 'v16',
+    promptVersion: 'v16',
+    assemblyVersion: 'v2',
+    promptFingerprint: 'sha256:3e68d4dd0b6e49003936a278f3e65d693645ebfb41ee5ced3ea7daa3efa70893',
+    providerInputCompatibility: 'changed',
+  },
+  {
+    releaseId: 'v17',
+    promptVersion: 'v17',
+    assemblyVersion: 'v2',
+    promptFingerprint: 'sha256:0373462c2f0e3b3050c51b4cfe468c6aca238ce3c0b15cf80c5be2b8847e4386',
+    providerInputCompatibility: 'changed',
+  },
 ] as const satisfies readonly DailyInsightPromptRelease[];
 
 export const DAILY_INSIGHT_PROMPT_MANIFEST = DAILY_INSIGHT_PROMPT_RELEASES;

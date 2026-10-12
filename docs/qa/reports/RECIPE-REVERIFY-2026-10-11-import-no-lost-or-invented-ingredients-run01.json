@@ -1,0 +1,16 @@
+{
+  "label": "import-no-lost-or-invented-ingredients-run01",
+  "exit": 0,
+  "started": "2026-10-11T10:54:21.311Z",
+  "finished": "2026-10-11T10:54:32.212Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 1,
+    "failed": 0,
+    "pending": 20
+  },
+  "failures": [],
+  "outputSha256": "c2d68cee83cc12d3b5cb477b5c2c0ab7341bb9e6414cf05c19bbcb0bc2e2c9a5",
+  "reportSha256": "9a7b458df1280eadb3740a42c7916ec5d6fd419235bbfaefd9320bc6ed01ba7f"
+}

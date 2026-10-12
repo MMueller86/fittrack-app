@@ -1,0 +1,30 @@
+{
+  "stage": "units",
+  "startedAt": "2026-10-09T23:49:16.759Z",
+  "finishedAt": "2026-10-09T23:50:20.103Z",
+  "args": [
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "test",
+    "--workspace=backend",
+    "--",
+    "--silent",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\qa\\reports\\Q21-CORR1-2026-10-10-units-Report.json"
+  ],
+  "cwd": ".",
+  "exit": 0,
+  "signal": null,
+  "counts": {
+    "total": 1629,
+    "passed": 1629,
+    "failed": 0,
+    "skipped": 0
+  },
+  "outputPath": "docs/qa/reports/Q21-CORR1-2026-10-10-units-Output.txt",
+  "outputSha256": "2e411d0079a197910e9089f68f44c7a31c7209d430493fda93781646d6822875",
+  "testReport": "docs/qa/reports/Q21-CORR1-2026-10-10-units-Report.json",
+  "reportSha256": "7e72f2be62a7682b1371358c459656e9c72e6e89352f27898d8d199d808ac489",
+  "synthetic": []
+}

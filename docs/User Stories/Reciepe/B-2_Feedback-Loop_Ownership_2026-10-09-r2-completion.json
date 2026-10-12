@@ -1,0 +1,150 @@
+{
+  "basis": "Aggregate original-to-frozen-r2; original-to-resume and resume-to-r2 are separate",
+  "owned": [
+    {
+      "path": "backend/src/functions/recipes.ts",
+      "originalSha256": "3a94e45299640f98047fdde23cd34ed4310a64a195949ffba1385c4924cffd1e",
+      "resumeSha256": "99a51914f3cce2cf9e651f4defa6a79343ff02d3a979d3423c530015fa0b4df8",
+      "finalSha256": "4b58b65d1f6dfe5a34fe41da5900d626714997f7b913580e13765fed7abc1237"
+    },
+    {
+      "path": "backend/src/functions/recipes.test.ts",
+      "originalSha256": "70a9f734e742345969c9a0ef158fb01653634f30c0dffb86dcff3f5ad5eae85f",
+      "resumeSha256": "6ce9d785f730dfaa6d6a7222e6a21e18716ae5cb42ffff9e29710c07be664bcf",
+      "finalSha256": "dddd1f3c2300325173987371c8dbacbaf8214ea3cf6f238cd31bd07e31668a04"
+    },
+    {
+      "path": "backend/src/functions/ai.test.ts",
+      "originalSha256": "0ea4adb4cfe48e4c4a96cd16c71b352cf55ce332655627c0afd90271121fbd73",
+      "resumeSha256": "5ed23c7a0d30dc9bcf0d784ff3ce3cd221568f1392cdd893968966cf490331ca",
+      "finalSha256": "5ed23c7a0d30dc9bcf0d784ff3ce3cd221568f1392cdd893968966cf490331ca"
+    },
+    {
+      "path": "backend/src/lib/openai.ts",
+      "originalSha256": "3fab86522a4e0c8db17e85aad28e52c2415d308b28d48cb209fbc0ba28b656bd",
+      "resumeSha256": "1a6b0e8dc12e0e5039c0de11a438fa9a3132fb363f642f830019d421965e0e73",
+      "finalSha256": "1a6b0e8dc12e0e5039c0de11a438fa9a3132fb363f642f830019d421965e0e73"
+    },
+    {
+      "path": "backend/src/lib/openai.recipeAnalyze.test.ts",
+      "originalSha256": "9d0a18ca93cbbaac82f9acf69837e3d1edda6a6f3f1a3adbe579cae80ad959a5",
+      "resumeSha256": "9d0a18ca93cbbaac82f9acf69837e3d1edda6a6f3f1a3adbe579cae80ad959a5",
+      "finalSha256": "36886f9151979f45946e7a832ef7500c00c9e4ad823656d1ed2f54e96d1e0156"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.ts",
+      "originalSha256": "5216fd9f27b2e1197f50b1d64eb15f5e131a1da4519df7d818e04632ca97352c",
+      "resumeSha256": "bc2d3b79eb62752cf99947bd882b79ea1e62f325664413e66f846f0fb44ba7e5",
+      "finalSha256": "3b4b116e12bf1374621b5e2d42df5f386510f274b225621c07c89e61ad2aad58"
+    },
+    {
+      "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+      "originalSha256": "89ab89897d0e73eea6fe11dc9c7f05053e4a77a24dffbced2d6aa7fb00346e78",
+      "resumeSha256": "3526ed4ddbca8a8ab974a265110bb7db03220d33e48422ac8406bd259eb70730",
+      "finalSha256": "8ffa33c626b2825d4796241514cd11d9b1a34b2a449147496de4b6262ff1c75f"
+    },
+    {
+      "path": "backend/src/lib/recipePreparation.ts",
+      "originalSha256": null,
+      "resumeSha256": "b8c5a61b93d1a66796090ce91fa0f9f4b6d80bc96137bca74bbe6c4e3cd77073",
+      "finalSha256": "e813202160536a47acb9b362f4fb418bff1e4cf8c4af3962d07871f92e0e1549"
+    },
+    {
+      "path": "backend/src/lib/recipePreparation.test.ts",
+      "originalSha256": null,
+      "resumeSha256": "5ebfbb18dc6974eb238e2bbfeb43352077e3556f9c124b221e483e3caa4bb8a2",
+      "finalSha256": "cf181e19f465294087573cdbb6d009d609b32af735767ea6811f9a13a9cb1574"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+      "originalSha256": "1de736e90f34df92a60f8b09f3bbe316090a87095ccfd9d8e9bd04f1b20e49a2",
+      "resumeSha256": "90ce693b3864043cf0e6d07b3f56337f30562b488e92aad4d3c62a0dace9b804",
+      "finalSha256": "90ce693b3864043cf0e6d07b3f56337f30562b488e92aad4d3c62a0dace9b804"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+      "originalSha256": "1781b3e81589d603f63ecf059a2c63c48011bfa79241af3dc779f89278e5938d",
+      "resumeSha256": "1781b3e81589d603f63ecf059a2c63c48011bfa79241af3dc779f89278e5938d",
+      "finalSha256": "c9082ef8063744e291aff224bcfc116ce43d214f81acebb8953510a6ce1b6b39"
+    },
+    {
+      "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+      "originalSha256": "6ff92ce93ef097e88af20afe1341935fb6c069652da49aafe2b70b075112fc50",
+      "resumeSha256": "6ff92ce93ef097e88af20afe1341935fb6c069652da49aafe2b70b075112fc50",
+      "finalSha256": "e446f5805fff51912ec6d1836982c302fa9e008ac765373a4c77ee7b6f205f7f"
+    }
+  ],
+  "inheritedB1VerifiedByOriginalBaseline": true,
+  "originalStatus": " M .github/instructions/backend.instructions.md\n M backend/src/functions/ai.test.ts\n M backend/src/functions/instagramRecipe.test.ts\n M backend/src/functions/instagramRecipe.ts\n M backend/src/functions/recipes.test.ts\n M backend/src/functions/recipes.ts\n M backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts\n M backend/src/lib/instagramRenderer/index.ts\n M backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts\n M backend/src/lib/instagramRenderer/render.ts\n M backend/src/lib/instagramRenderer/types.ts\n M backend/src/lib/openai.ts\n M backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts\n M backend/src/lib/prompts/recipeAnalyze.eval.test.ts\n M backend/src/lib/prompts/recipeAnalyze.ts\n M backend/src/lib/recipeAnalyzeValidation.test.ts\n M backend/src/lib/recipeAnalyzeValidation.ts\n M docs/kb/domain/06-recipes.md\n M docs/kb/domain/07-ai-features.md\n M docs/kb/tech/02-backend.md\n M docs/kb/tech/06-ai-integrations.md\n M docs/kb/tech/08-testing.md\n M docs/kb/tech/09-api-reference.md\n M docs/qa/findings.md\n?? \"docs/User Stories/Reciepe/B-16_Recipe-Preparation-v2_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-16_Recipe-Preparation-v2_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-18C_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung-Review_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Ausgangsdiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Enddiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_LiveCapture_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_LiveEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_OfflineEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Preservation_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Verification_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Output_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Report_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Output_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Report_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Output_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Report_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_LiveEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Manifest_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_OfflineEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Verification_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Alpha_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Baseline-Units_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Baseline_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Build_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Encoding_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Extraction_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Focused_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Owned-Diff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Typecheck_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Units_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ausgangsdiff_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Enddiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ruecknahme_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ruecknahmediff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Evidence_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-2_Recipe-Analyze-v14_Handoff_2026-10-08.md\"\n?? \"docs/User Stories/Reciepe/B-2_Recipe-Preparation-v15_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-16_Recipe-Preparation-v2_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/D-16_Recipe-Preparation-v2_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-18C_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/D-18_Recipe-Kurzfassung-Review_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-18_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/D-19_Recipe-Preparation_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-08-v14.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Gezielte-Korrektur_2026-10-09-v15.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung_2026-10-09-v17.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md\"\n?? \"docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/verify-template-text-budget.mjs\"\n?? docs/qa/reports/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07-v13.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Nachpruefung.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Vorreview.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md\n?? infra/release-records/Recipe-Preparation-v19_Alpha-Functions_2026-10-09.md\n?? infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md\n",
+  "resumeStatus": " M .github/instructions/backend.instructions.md\n M backend/src/functions/ai.test.ts\n M backend/src/functions/instagramRecipe.test.ts\n M backend/src/functions/instagramRecipe.ts\n M backend/src/functions/recipes.test.ts\n M backend/src/functions/recipes.ts\n M backend/src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts\n M backend/src/lib/instagramRenderer/index.ts\n M backend/src/lib/instagramRenderer/recipeDetailsTemplateV3.ts\n M backend/src/lib/instagramRenderer/render.ts\n M backend/src/lib/instagramRenderer/types.ts\n M backend/src/lib/openai.ts\n M backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts\n M backend/src/lib/prompts/recipeAnalyze.eval.test.ts\n M backend/src/lib/prompts/recipeAnalyze.ts\n M backend/src/lib/recipeAnalyzeValidation.test.ts\n M backend/src/lib/recipeAnalyzeValidation.ts\n M docs/kb/domain/06-recipes.md\n M docs/kb/domain/07-ai-features.md\n M docs/kb/tech/02-backend.md\n M docs/kb/tech/06-ai-integrations.md\n M docs/kb/tech/08-testing.md\n M docs/kb/tech/09-api-reference.md\n M docs/qa/findings.md\n?? backend/src/lib/recipePreparation.test.ts\n?? backend/src/lib/recipePreparation.ts\n?? \"docs/User Stories/Reciepe/B-16_Recipe-Preparation-v2_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-16_Recipe-Preparation-v2_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-18C_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung-Review_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Ausgangsdiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Enddiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_LiveCapture_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_LiveEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_OfflineEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Preservation_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-18_Recipe-Kurzfassung_Verification_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Output_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-F-Report_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Output_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-G-Report_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Output_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Live-R-Report_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_LiveEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Manifest_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_OfflineEvidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-19_Recipe-Preparation_Verification_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Alpha_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Baseline-Units_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Baseline_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Build_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Encoding_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Evidence_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Extraction_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Focused_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Owned-Diff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Typecheck_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Feedback-Loop_Units_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ausgangsdiff_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Enddiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ruecknahme_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-1_Recipe-Analyze-v15_Ruecknahmediff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Baseline_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Candidate_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Development-Handler-Output_2026-10-09.txt\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Evidence_2026-10-09-r2.mjs\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Evidence_2026-10-09.mjs\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_F_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_G_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Offline_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Owned-Diff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_Preservation_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-2_Feedback-Loop_R_2026-10-09.json\"\n?? \"docs/User Stories/Reciepe/B-2_Recipe-Analyze-v14_Handoff_2026-10-08.md\"\n?? \"docs/User Stories/Reciepe/B-2_Recipe-Preparation-v15_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-16_Recipe-Preparation-v2_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/D-16_Recipe-Preparation-v2_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-18C_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/D-18_Recipe-Kurzfassung-Review_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/D-18_Recipe-Kurzfassung_EigenerDiff_2026-10-09.patch\"\n?? \"docs/User Stories/Reciepe/D-19_Recipe-Preparation_Handoff_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/PLAN_HANDOFF_Recipe-Preparation_Feedback-Loop_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-08-v14.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Gezielte-Korrektur_2026-10-09-v15.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung_2026-10-09-v17.md\"\n?? \"docs/User Stories/Reciepe/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md\"\n?? \"docs/User Stories/Reciepe/SPEC_Recipe-Export_Template-Textvertrag_2026-10-09.md\"\n?? \"docs/User Stories/Reciepe/verify-template-text-budget.mjs\"\n?? docs/qa/reports/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07-v13.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Analyze-Schrittvollstaendigkeit_2026-10-07.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Inhaltserhaltung_2026-10-09-v16.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Nachpruefung.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18-Vorreview.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Kurzfassung-Technisches-Review_2026-10-09-v18.md\n?? docs/qa/reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v19.md\n?? infra/release-records/Recipe-Preparation-v19_Alpha-Functions_2026-10-09.md\n?? infra/release-records/Recipe-Step-Overflow-Logging_Alpha-Functions_2026-10-09.md\n",
+  "inheritedOriginalDiff": "B-2_Feedback-Loop_Inherited-Original-Diff_2026-10-09-r2-completion.patch",
+  "inheritedResumeDiff": "B-2_Feedback-Loop_Inherited-Resume-Diff_2026-10-09-r2-completion.patch",
+  "originalToResumeOwnedDiff": "B-2_Feedback-Loop_Original-To-Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+  "resumeOwnedDiff": "B-2_Feedback-Loop_Resume-Owned-Diff_2026-10-09-r2-completion.patch",
+  "isolatedReconstruction": {
+    "touchesWorktree": false,
+    "exit": 0,
+    "files": [
+      {
+        "path": "backend/src/functions/recipes.ts",
+        "originalSha256": "3a94e45299640f98047fdde23cd34ed4310a64a195949ffba1385c4924cffd1e",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/functions/recipes.test.ts",
+        "originalSha256": "70a9f734e742345969c9a0ef158fb01653634f30c0dffb86dcff3f5ad5eae85f",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/functions/ai.test.ts",
+        "originalSha256": "0ea4adb4cfe48e4c4a96cd16c71b352cf55ce332655627c0afd90271121fbd73",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/openai.ts",
+        "originalSha256": "3fab86522a4e0c8db17e85aad28e52c2415d308b28d48cb209fbc0ba28b656bd",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/openai.recipeAnalyze.test.ts",
+        "originalSha256": "9d0a18ca93cbbaac82f9acf69837e3d1edda6a6f3f1a3adbe579cae80ad959a5",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/recipeAnalyzeValidation.ts",
+        "originalSha256": "5216fd9f27b2e1197f50b1d64eb15f5e131a1da4519df7d818e04632ca97352c",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/recipeAnalyzeValidation.test.ts",
+        "originalSha256": "89ab89897d0e73eea6fe11dc9c7f05053e4a77a24dffbced2d6aa7fb00346e78",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/recipePreparation.ts",
+        "originalSha256": null,
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/recipePreparation.test.ts",
+        "originalSha256": null,
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/prompts/recipeAnalyze.ts",
+        "originalSha256": "1de736e90f34df92a60f8b09f3bbe316090a87095ccfd9d8e9bd04f1b20e49a2",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/prompts/recipeAnalyze.eval.test.ts",
+        "originalSha256": "1781b3e81589d603f63ecf059a2c63c48011bfa79241af3dc779f89278e5938d",
+        "reconstructedExactly": true
+      },
+      {
+        "path": "backend/src/lib/prompts/recipeAnalyze.eval.fixtures.ts",
+        "originalSha256": "6ff92ce93ef097e88af20afe1341935fb6c069652da49aafe2b70b075112fc50",
+        "reconstructedExactly": true
+      }
+    ]
+  }
+}

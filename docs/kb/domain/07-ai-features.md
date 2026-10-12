@@ -102,7 +102,8 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 ## 5. Recipe Analyzer
 
-**Prompt version:** `RECIPE_ANALYZE_PROMPT_VERSION = 'v11'`
+**Prompt versions:** import `RECIPE_ANALYZE_PROMPT_VERSION = 'v17'`;
+saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v12'`.
 
 **Endpoint:** `POST /api/ai/recipe-analyze`
 
@@ -164,9 +165,17 @@ category?: 'food' | 'seasoning';
 
 This allows the review screen (`RecipeWizardScreen`) to render seasoning items differently from food items.
 
-### v11 analyzer and export suggestion contract
+### Current Analyzer and Export Suggestion Contract
 
-`exportSuggestion` is generated in the same AI call and is only a user-review proposal. It has the following fields:
+Import v17 keeps full source extraction and its export suggestion in one
+`analyzeRecipeText(text)` analysis (re-sent for at most two directed corrections). Saved-recipe Preparation v12 uses the separate
+small-output `prepareRecipeExport(context)` path below, without source
+re-extraction. Prompt intent, runtime validation, fixture quality, and user
+review are distinct; none is a general cooking/safety guarantee.
+
+Explicitly numbered input instructions remain one-to-one in the complete ordered source `steps` array; the five-export-step limit never applies to it. `exportSuggestion.steps` contains 1..5 non-empty German texts of at most 90 characters, with orders 1..K. Compression is allowed even when the source has at most five steps. There is no exact-min count, padding, first-five truncation, full partition, or full-detail packing requirement. Each non-empty reference list names actions contained in the export text. Flattened references must be positive, present in the source, globally unique, and strictly ascending; gaps within and between groups are allowed. Genuine structural/reference failures remain HTTP `422`, but omission alone is not a failure.
+
+`exportSuggestion` is generated in the same AI analysis and is only a user-review proposal. Since v17 the provider schema carries an internal per-source-step `cookingEssential` planning flag that the server strips before returning `AiRecipeRaw`. If the response omits a flagged cooking step, merges numbered input steps (enforced only below a "Zubereitung"-style heading), names a temperature that the referenced source steps do not contain, or violates the server contract, `analyzeRecipeText` re-asks with a directed correction (at most two corrections; no extra usage is tracked). If violations remain after the last correction, an invalid reference trace is repaired by moving `sourceStepOrders` only (the references are server-side anchors, not part of any client contract; steps, texts and step count never change). Any other remaining violation fails in a controlled way with HTTP `422` and no usage; a missing `cookingEssential` reference only blocks when the input has numbered instructions. The server never drops or rewrites export steps to hide a violation. Export steps are always sorted by first source reference and food amounts below 0.1 g become `null` server-side. Preparation additionally nulls `totalTimeMinutes` unless the source states the total (including "1 Std. 30 Min."), the durations of all saved steps add up to it, or two or more durations stated in the recipe description add up to it. It has the following fields:
 
 ```ts
 {
@@ -177,29 +186,121 @@ This allows the review screen (`RecipeWizardScreen`) to render seasoning items d
   steps: Array<{
     order: number;                 // contiguous export order, starting at 1
     description: string;           // 1-90 characters
-    sourceStepOrders: number[];    // ascending source-step orders
+    sourceStepOrders: number[];    // non-empty ordered subset of source actions
     ingredientKeys: string[];      // existing analysisKey values only
-  }>;                              // at most 5 entries
+  }>;                              // 1..5 entries
   includedIngredientKeys: string[]; // unique, source order, at most 20
 }
 ```
 
-`totalTimeMinutes` and `difficulty` use the same time and difficulty field names as the persisted recipe export view. During AI analysis both are nullable because no default may be invented; the later persisted export view has its own required-field validation. `includedIngredientKeys` excludes `seasoning` ingredients. The backend requires unique, ascending source `steps.order` values, contiguous export orders, valid ingredient references, and a complete `sourceStepOrders` trace: every source step must occur exactly once and in the original order. If more than five source steps exist, the prompt requires semantic grouping rather than mechanical truncation, preserving actions, ingredient references, temperatures, times, and turning points. Descriptions above 90 characters or more than five export steps are rejected with HTTP `422`.
+`totalTimeMinutes` and `difficulty` use the same field names as the persisted export view. During analysis both are nullable because no default may be invented; persistence has its own required-field validation. `includedIngredientKeys` excludes `seasoning`. The backend requires positive, unique, ascending source orders, contiguous export orders, valid ingredient references, and the ordered unique subset trace above. It rejects empty exports, blank descriptions, more than five steps, descriptions above 90 characters, and unknown/duplicate/reordered references with `422`; it does not sort, renumber, or repair identities.
 
-The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. A structurally or semantically invalid AI result returns `422` and is rejected before usage is tracked. Usage is tracked only after the AI result passes server validation. The analysis response, including `exportSuggestion`, is transient at this endpoint: it is not persisted automatically, and no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Food items with an indeterminate amount remain visible with `needsReview: true`; seasoning items bypass catalog search and are also shown for user review in the wizard.
+The prompt requests the recipe-specific cooking core: central preparation and cooking, essential separate sides or sauces, and necessary transitions. Merely naming a side does not replace cooking it. Details and serving may be omitted when the core remains understandable; retained statements must fit their source/component without invention or contradiction. Full source-extraction checks remain separate from small, fixture-specific export-core rubrics. The chicken/rice preparation fixture requires chicken preparation, frying, independent rice cooking, and finish-cooking, not every seasoning/heat/resting/serving detail. These test-only checks are not a universal runtime semantic validator or a fixed wording/grouping requirement.
 
-`POST /api/recipes/{id}/export-view/prepare` reuses the same analyzer call,
-server validation, and `recipe-analyze` quota. It accepts only
+The analyzer is a review workflow. Quota `recipe-analyze` is enforced before the AI call; quota exhaustion returns `429`. Provider, empty-response, or JSON-parse failures return `502`. An AI result failing server shape/reference/ingredient validation returns `422` before usage is tracked; this does not test general cooking semantics. Usage is tracked only after server validation. The response, including `exportSuggestion`, is transient: no reusable food, diary entry, or recipe is saved without a later explicit user-confirmed write. Indeterminate food amounts remain visible with `needsReview: true`; seasonings bypass catalog search and remain visible for review.
+
+`POST /api/recipes/{id}/export-view/prepare` calls backend-only
+`prepareValidatedRecipeExport(context)` with the exclusive v12 system prompt, not
+import v17. `analyzeRecipeText(text)` is import-only and retains its full
+contract, normalization and globally monotone trace validation. Preparation
+sends the complete ID-free saved metadata/ingredient projection in
+`recipeContext` and all unchanged stored `steps` as untrusted JSON user data.
+The Strict `recipe_export_preparation` output is only
+`{ version: 1, teaser, totalTimeMinutes, difficulty, steps }`, with step fields
+`{ order, description, sourceStepOrders }`. Every field is required and every
+object has `additionalProperties: false`; no name, portions, tags, ingredients,
+keys or source steps are returned. The lazy client, deployment/API version,
+temperature 0.2 and 2048-token budget are unchanged. The loop permits an initial
+draft and at most two corrections through `prepareRecipeExport(context, options)`;
+each receives immutable original context, the exact latest whole draft and
+current diagnostics. Preparation-only SDK retries are disabled. Preparation
+validates against separately supplied saved `recipe.steps` and uses the same
+`recipe-analyze` quota. It accepts only
 `{ "contractVersion": 2 }`. A client ETag is not required; if `If-Match` is
 supplied, a stale or non-exact value returns `412 recipe_revision_conflict`
 before quota or provider work. The transient response contains only the
 teaser, nullable time and difficulty, and plain ordered export steps.
 `sourceEtag` is compatibility metadata, not a client acceptance prerequisite.
 The endpoint does not map analyzer ingredient keys to saved recipe ingredient
-IDs or expose resolution states. It performs no second AI call, does not
+IDs or expose resolution states. It does not run the import analyzer or
 persist the suggestion, and tracks usage once only after a valid AI result.
 The analyzer's `includedIngredientKeys` remain part of the separate
 new-recipe analysis contract.
+
+Preparation V2 remains text-only at the App API boundary; the small provider
+schema rejects extra fields rather than accepting unused ingredient data.
+Runtime enforces Shared min1/max5/text90/teaser96/time10080 limits and nullable,
+trimmed non-empty single-line difficulty. Saved source orders are positive,
+unique and ascending; export orders are 1..K. Reference groups are non-empty,
+known, locally ascending and globally unique, ordered by their FIRST reference.
+`[1,4,6],[5]` is valid only for Preparation; `[5],[1,4,6]` fails. Gaps and
+non-contiguous saved source orders are allowed; full coverage is not required.
+Empty saved steps or exclusively blank source descriptions returns 422 before
+quota/provider work. There is no sorting, padding, truncation, fallback, identity
+repair or full-recipe wrapper. The v11 prompt requests a complete understandable compact
+detail-image workflow by grouping actions, not selecting five original steps;
+retained claims/metadata must be source-backed. Runtime does not independently
+prove cooking-core preservation, component fit or metadata derivation; test-only
+fixture rubrics and explicit user review remain separate.
+
+Initial and full-draft correction have separate v11 system prompts; pure
+measured overflow keeps the strict text-only correction path. All three retain
+source cooking endpoints as well as durations. Aggregate time requires an
+explicit total or a fully timed, explicitly sequential source workflow;
+untimed work or unclear overlap requires `null`, without estimated additions.
+Independent metadata fixture assertions also run for the manually reviewed
+oven, but do not constitute an automated oven cooking-content assertion.
+Q-21 correction attempt 1 (v10) failed independent F/R/G. The second and final
+candidate v11 decides time before compression from the complete source and
+prioritizes essential separate cooking/endpoints over optional details.
+FIRST-reference checks remain unchanged, including free non-adjacent grouping.
+New F/R/G and human oven review remain pending. No deployment is authorized;
+dated evidence below is historical.
+
+Every measurable whole draft is probed for teaser and all step geometry using
+the production fonts/layout, including count changes. Technical measurement
+failures terminate, rather than request a correction. Fit is not semantic
+preservation or whole-image/Share approval. No ingredient-omission strategy,
+23/11 universal cap, three-line product rule or new font fallback is introduced.
+The 75000 ms aggregate deadline and 20000 ms per-call ceiling are terminal;
+quota is enforced once and usage booked once only after validated success.
+Nothing is automatically saved. Only exhausted two completed corrections may
+log exact latest affected known text; see the
+[current loop, error and logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1).
+
+[Partial] Current B-2 r3 / QA-R1 is implemented, NOT ACCEPTED / release CLOSED.
+Recorded focused519/full1600 pass, typecheck/build exit0; F exit1 (5 executed /
+2 passed / 3 failed / 9 skipped), only version guard and pasta pass.
+Rice returns 422 (FIRST 6 before 5 plus overflows); oven fits/200 but moves
+source-3 cream action into the source-4 group and fails independent semantics.
+Forced dough repeats the overflow/422; semantics are NOT_REACHED. R/G remain
+NOT_RUN_REQUIRED_LIVE_FAILURE. QA identified r2 pasta/dough lexical rubric
+defects, not demonstrated cooking loss; narrow source-backed test corrections
+are locally tested, pending independent QA, without historical PASS or register
+closure. Q-19 FAIL and older failures remain unresolved. Alpha has only the
+historical 14:12 logging release, not this loop. See the
+[D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+
+[Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted. Upstream offline
+gates passed (1437 units, typecheck/build); F/R/G all exited 1 with all three
+Preparation fixtures executed each time. Rice group starts 6 before 5 and oven
+duplicate reference 3 fail with 422/usage0/writes0/unchanged=true; pasta passes
+with 200/usage1/writes0/unchanged=true. Later V2-success-body/usage-order/final
+semantic assertions are not reached for rice/oven. Complete all-three
+success-path proof and independent QA remain open; no release or Share-success
+claim follows. See the [B-19 handoff](../../User%20Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md).
+
+Historical v2 FAIL/stopped-run UNVERIFIED
+remain historical. B-18 evidence from 2026-10-09 for v16/v3 has a fully skipped focused
+gate (UNVERIFIED) and Preparation FAIL in both Recipe and overall gates: missing
+finish-cooking despite observed 200/one call/usage1/no writes/unchanged source.
+Later V2-body/usage-order assertions were not reached. The subsequent B-18C
+test-only correction accepts finish-cooking combined with serving across
+references [6,8], with gap7; real core losses and contradictions remain negative.
+Its executed F/R/G gates still FAIL, without a production version change or
+general runtime semantic validation. Preparation is not a
+private/Alpha replay or Share-success proof. See the
+[current evidence and open gates](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
 
 ### Share-Triggered Recipe Export Review
 
@@ -302,9 +403,9 @@ unchanged for valid requests. Context/provider and server-validation failures
 remain friendly HTTP `200` `unavailable` responses, and quota exhaustion remains
 friendly HTTP `200` `quota_exceeded` without usage tracking.
 
-### v15 prompt, output, and failure contract
+### v17 prompt, output, and failure contract
 
-`DAILY_INSIGHT_PROMPT_VERSION = 'v15'`. The selected focused module is combined
+`DAILY_INSIGHT_PROMPT_VERSION = 'v17'`. The selected focused module is combined
 with the shared German tone/output contract. The backend stores the exact
 `promptSnapshot.system` and serialized `promptSnapshot.user` sent to Azure
 OpenAI. Strict Structured Outputs use `json_schema`, `strict: true`, required
@@ -315,11 +416,28 @@ The shared Strict Structured Output schema is defined in
 `backend/src/lib/dailyInsightSchema.ts`, and the append-only release manifest
 is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`. It preserves the
 v14 fingerprint `sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`
-and locks the active v15 fingerprint
-`sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`
-with assembly version `v2`. The v14 provider input remains byte-identical to
-its locked baseline; v15 is the single changed provider release locked by
-offline tests.
+and the historical v15 fingerprint
+`sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`.
+The historical v16 fingerprint remains
+`sha256:3e68d4dd0b6e49003936a278f3e65d693645ebfb41ee5ced3ea7daa3efa70893`.
+The appended active v17 fingerprint is
+`sha256:0373462c2f0e3b3050c51b4cfe468c6aca238ce3c0b15cf80c5be2b8847e4386`
+with assembly version `v2`. Historical release records are unchanged.
+
+The separate Q-21 Daily fix removes a shared-tone contradiction that asked for
+below-target wording despite the open-day prohibition. A positive remainder
+now permits only forward-looking open-room wording, subject to stricter intent
+rules; the four forbidden completed-day phrases remain prohibited. The actual
+`stale-weight` fixture selects `phase_progress` with 500 kcal still open.
+Its unchanged strict validator rejection is regression-tested; CORR1 stale-weight
+passes but unknown-activity fails. V17 removes the shared-tone permission to
+describe rest budget for activity_focus and appends that intent's existing
+open-day rule after the output contract, independently of protein gap/local
+hour. Unknown completion remains neutral; fueling/liquids/recovery stay
+conditional. Exact unknown-activity fixture and strict rejection regressions
+are offline, not invented raw provider output. G evidence contains no raw Daily
+text; exact causal wording and new live success remain unverified. This is not
+a Preparation/Import/Weekly-caused bug; Weekly does not consume sharedTone.
 
 The release identity is dual: `promptVersion` is the human-readable release
 identifier and `promptFingerprint` is the SHA-256 identity of the canonical
@@ -362,7 +480,7 @@ current and day 15 is stale. A stale-as-current sentence such as
 wording such as `Der Trend deines Gewichts ist nicht aktuell.` is accepted.
 The runtime root cause was that the stale rules had previously existed only in
 `promptWeight`, while deterministic `nutrition_guidance` selected
-`promptNutrition`; the fix introduced in v11 remains active in v15 and applies the shared guard to that path and all other
+`promptNutrition`; the fix introduced in v11 remains active in v17 and applies the shared guard to that path and all other
 intents. Server-side validation remains strict and was not weakened.
 
 Negative calorie budget is authoritative. A `remainingProteinG` value of
@@ -370,7 +488,7 @@ Negative calorie budget is authoritative. A `remainingProteinG` value of
 state creates an additional protein action, and a negative calorie budget
 blocks further same-day food recommendations.
 
-For v15, a positive `remainingCalories` value is an unfinished target budget,
+For v17, a positive `remainingCalories` value is an unfinished target budget,
 not evidence of an achieved energy deficit or a completed energy balance. This
 also applies to `phase_progress`: the open-day guard keeps the narrative based
 on weight signals, does not present the remainder as an eating budget or base
@@ -409,8 +527,8 @@ weight/progress signals, and the other prompt inputs. Missing or mismatched
 prompt version, `promptFingerprint`, `systemPromptHash`, `intent`, or
 `promptSnapshot` is a hard cache invalidation, independent of the regeneration
 interval, daily limit, or admin status. A complete, unexpired v14 same-date
-Daily remains cached and is returned unchanged until its existing expiry; v15
-does not overwrite it early. After expiry, the date key may receive a new v15
+Daily remains cached and is returned unchanged until its existing expiry; v17,
+like v15/v16, does not overwrite it early. After expiry, the date key may receive a new v17
 document. A v14 entry without complete provenance does not qualify for
 preservation and follows hard invalidation.
 

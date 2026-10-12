@@ -1,0 +1,27 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "run",
+    "test",
+    "--workspace=backend",
+    "--",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Units-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T16:00:05.001Z",
+  "endedAt": "2026-10-09T16:01:07.410Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "74cf089c90dbc2bf0e47cfe30dba63bdae939a4334aa247812011842062a0616",
+  "reportSha256": "15d6aa236dc7e7f0a442fb812d01b9e45f1544872e7319df666be24f3a31c09c",
+  "counts": {
+    "executed": 1576,
+    "passed": 1576,
+    "failed": 0,
+    "skipped": 0
+  },
+  "failures": []
+}

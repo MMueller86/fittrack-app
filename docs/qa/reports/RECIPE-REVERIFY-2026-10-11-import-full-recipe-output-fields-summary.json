@@ -1,0 +1,119 @@
+{
+  "series": "import-full-recipe-output-fields",
+  "runs": [
+    {
+      "label": "import-full-recipe-output-fields-run01",
+      "exit": 0,
+      "started": "2026-10-11T10:51:29.235Z",
+      "finished": "2026-10-11T10:51:44.984Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-full-recipe-output-fields-run02",
+      "exit": 0,
+      "started": "2026-10-11T10:51:45.733Z",
+      "finished": "2026-10-11T10:51:53.311Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-full-recipe-output-fields-run03",
+      "exit": 0,
+      "started": "2026-10-11T10:51:54.053Z",
+      "finished": "2026-10-11T10:52:01.859Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-full-recipe-output-fields-run04",
+      "exit": 0,
+      "started": "2026-10-11T10:52:02.611Z",
+      "finished": "2026-10-11T10:52:10.876Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-full-recipe-output-fields-run05",
+      "exit": 0,
+      "started": "2026-10-11T10:52:11.699Z",
+      "finished": "2026-10-11T10:52:27.044Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-full-recipe-output-fields-run06",
+      "exit": 0,
+      "started": "2026-10-11T10:52:27.840Z",
+      "finished": "2026-10-11T10:52:37.969Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-full-recipe-output-fields-run07",
+      "exit": 0,
+      "started": "2026-10-11T10:52:38.739Z",
+      "finished": "2026-10-11T10:52:51.798Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    },
+    {
+      "label": "import-full-recipe-output-fields-run08",
+      "exit": 0,
+      "started": "2026-10-11T10:52:52.547Z",
+      "finished": "2026-10-11T10:53:15.811Z",
+      "candidateStable": true,
+      "counts": {
+        "total": 21,
+        "passed": 1,
+        "failed": 0,
+        "pending": 20
+      },
+      "failures": []
+    }
+  ],
+  "passedRuns": 8,
+  "totalRuns": 8
+}

@@ -1,0 +1,142 @@
+
+> @fittrack/backend@1.0.0 test
+> vitest run --silent --reporter=default --reporter=json --outputFile=C:\Users\mmueller\OneDrive - PRODYNA SE\fittrack-app\docs\qa\reports\Q21-CORR1-2026-10-10-units-Report.json
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [32m✓[39m src/lib/favoritesScoring.test.ts [2m([22m[2m21 tests[22m[2m)[22m[90m 15[2mms[22m[39m
+ [32m✓[39m src/lib/hintEngine.test.ts [2m([22m[2m85 tests[22m[2m)[22m[90m 18[2mms[22m[39m
+ [32m✓[39m src/lib/progressIntelligence.test.ts [2m([22m[2m49 tests[22m[2m)[22m[90m 39[2mms[22m[39m
+ [32m✓[39m src/lib/dailyInsightValidation.test.ts [2m([22m[2m32 tests[22m[2m)[22m[90m 27[2mms[22m[39m
+ [32m✓[39m src/lib/prompts/dailyInsightPrompt.test.ts [2m([22m[2m38 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/lib/recipeAnalyzeValidation.test.ts [2m([22m[2m176 tests[22m[2m)[22m[90m 122[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/recipeAdapter.test.ts [2m([22m[2m15 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/lib/http.test.ts [2m([22m[2m15 tests[22m[2m)[22m[90m 22[2mms[22m[39m
+ [32m✓[39m src/lib/auth.test.ts [2m([22m[2m20 tests[22m[2m)[22m[90m 141[2mms[22m[39m
+ [32m✓[39m src/lib/openai.daily.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/test-utils/weeklyInsightEvalSemantics.test.ts [2m([22m[2m14 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/lib/openai.recipeAnalyze.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 1569[2mms[22m[39m
+   [33m[2m✓[22m[39m B-2 Preparation SDK contract[2m > [22mbinds all three real SDK operations to unchanged original and the latest whole parsed draft and diagnostics [33m1413[2mms[22m[39m
+ [32m✓[39m src/lib/nutritionValidator.test.ts [2m([22m[2m20 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/lib/recipePreparation.test.ts [2m([22m[2m54 tests[22m[2m)[22m[33m 3252[2mms[22m[39m
+   [33m[2m✓[22m[39m B-2 bounded Preparation loop[2m > [22mQA-R1 reproduces the recorded oven field and preserves cooking core in a complete corrected draft [33m1518[2mms[22m[39m
+ [32m✓[39m src/lib/openai.weekly.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 10[2mms[22m[39m
+ [32m✓[39m src/lib/nutritionCalculator.test.ts [2m([22m[2m19 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/photo.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 45[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/highlight.test.ts [2m([22m[2m3 tests[22m[2m)[22m[33m 5558[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer nutrition highlights[2m > [22mrenders exactly one high-protein badge without shifting the remaining layout [33m3039[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer nutrition highlights[2m > [22mrenders exactly one low-fat badge without shifting the remaining layout [33m2427[2mms[22m[39m
+ [32m✓[39m src/lib/searchRanking.test.ts [2m([22m[2m14 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/tags.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 10337[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer tags[2m > [22maccepts zero, one, and four tags with the expected chip count [33m5584[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer tags[2m > [22mkeeps the remaining layout fixed when the tag row is omitted [33m2484[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer tags[2m > [22muses the compact chip geometry and preserves the four-tag render bounds [33m1124[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer tags[2m > [22muses text-only fallback chips for unknown tags and Curry [33m1099[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/nutrition-layout.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 8521[2mms[22m[39m
+   [33m[2m✓[22m[39m shared recipe footer background[2m > [22mrenders a greener left footer and a darker right footer [33m1325[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer nutrition layout[2m > [22mkeeps the PRO PORTION label free of foreign horizontal pixels [33m2638[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer nutrition layout[2m > [22mrenders the complete symmetric barbell above the card and integrates PRO PORTION [33m2351[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer nutrition layout[2m > [22mkeeps the null-highlight smoke fixture renderable [33m2203[2mms[22m[39m
+ [32m✓[39m src/lib/dailyInsightIntent.test.ts [2m([22m[2m10 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+ [32m✓[39m src/lib/recipeValidation.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/weightsRepository.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/foodProductRepository.test.ts [2m([22m[2m21 tests[22m[2m)[22m[90m 12[2mms[22m[39m
+ [32m✓[39m src/lib/weeklyInsight.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 24[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/diaryRepository.test.ts [2m([22m[2m27 tests[22m[2m)[22m[90m 29[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/insightRepository.test.ts [2m([22m[2m75 tests[22m[2m)[22m[90m 40[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/userFoodRelationRepository.test.ts [2m([22m[2m31 tests[22m[2m)[22m[90m 15[2mms[22m[39m
+ [32m✓[39m src/functions/foodSearch.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 13[2mms[22m[39m
+ [32m✓[39m src/lib/dailyInsightContext.test.ts [2m([22m[2m19 tests[22m[2m)[22m[90m 17[2mms[22m[39m
+ [32m✓[39m src/lib/communityRecipes.test.ts [2m([22m[2m13 tests[22m[2m)[22m[90m 22[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/recipesRepository.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 27[2mms[22m[39m
+ [32m✓[39m src/lib/quota.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/lib/storage.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 11[2mms[22m[39m
+ [32m✓[39m src/functions/foodEstimate.test.ts [2m([22m[2m12 tests[22m[2m)[22m[90m 151[2mms[22m[39m
+ [32m✓[39m src/functions/dailyInsight.test.ts [2m([22m[2m37 tests[22m[2m)[22m[90m 252[2mms[22m[39m
+ [32m✓[39m src/functions/dailyInsightFeedback.test.ts [2m([22m[2m41 tests[22m[2m)[22m[90m 229[2mms[22m[39m
+ [32m✓[39m src/functions/weights.test.ts [2m([22m[2m25 tests[22m[2m)[22m[90m 196[2mms[22m[39m
+ [32m✓[39m src/functions/weeklyInsight.test.ts [2m([22m[2m16 tests[22m[2m)[22m[90m 225[2mms[22m[39m
+ [32m✓[39m src/functions/profile.test.ts [2m([22m[2m19 tests[22m[2m)[22m[90m 293[2mms[22m[39m
+ [32m✓[39m src/functions/favorites.test.ts [2m([22m[2m21 tests[22m[2m)[22m[90m 263[2mms[22m[39m
+ [32m✓[39m src/lib/openFoodFactsClient.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/functions/weeklyTargetSnapshot.test.ts [2m([22m[2m3 tests[22m[2m)[22m[90m 128[2mms[22m[39m
+ [32m✓[39m src/lib/prompts/dailyInsightPromptManifest.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 7[2mms[22m[39m
+ [32m✓[39m src/lib/quotaConfig.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/functions/communityRecipes.test.ts [2m([22m[2m6 tests[22m[2m)[22m[90m 131[2mms[22m[39m
+ [32m✓[39m src/functions/specialActivity.test.ts [2m([22m[2m28 tests[22m[2m)[22m[33m 436[2mms[22m[39m
+ [32m✓[39m src/lib/weeklyInsightValidation.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 4[2mms[22m[39m
+ [32m✓[39m src/lib/weeklyTargetSnapshot.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 5[2mms[22m[39m
+ [32m✓[39m src/lib/registrations.test.ts [2m([22m[2m21 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/cosmosRecipesRepository.test.ts [2m([22m[2m2 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/functions/reusableItems.test.ts [2m([22m[2m34 tests[22m[2m)[22m[90m 295[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/reusableItemsRepository.test.ts [2m([22m[2m8 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/aiUsageRepository.test.ts [2m([22m[2m9 tests[22m[2m)[22m[90m 9[2mms[22m[39m
+ [32m✓[39m src/lib/repositories/dayMetaRepository.test.ts [2m([22m[2m5 tests[22m[2m)[22m[90m 8[2mms[22m[39m
+ [32m✓[39m src/functions/ai.test.ts [2m([22m[2m78 tests[22m[2m)[22m[33m 678[2mms[22m[39m
+ [32m✓[39m src/functions/instagramRecipe.test.ts [2m([22m[2m31 tests[22m[2m)[22m[90m 269[2mms[22m[39m
+ [32m✓[39m src/functions/diary.test.ts [2m([22m[2m60 tests[22m[2m)[22m[33m 816[2mms[22m[39m
+ [32m✓[39m src/functions/labelScan.test.ts [2m([22m[2m7 tests[22m[2m)[22m[90m 78[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/errors.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 1007[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer validation[2m > [22mrejects a title that exceeds the fixed width [33m683[2mms[22m[39m
+ [32m✓[39m src/functions/recipeImageHeroCrop.test.ts [2m([22m[2m11 tests[22m[2m)[22m[90m 6[2mms[22m[39m
+ [32m✓[39m src/functions/recipes.test.ts [2m([22m[2m122 tests[22m[2m)[22m[33m 1652[2mms[22m[39m
+   [33m[2m✓[22m[39m POST /recipes/{id}/export-view/prepare[2m > [22mQA-R1 logs metadata only for nested unknown-key-only exhaustion [33m350[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/smoke.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1370[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer smoke fixture[2m > [22mrenders the alternate recipe without a golden comparison [33m1368[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/recipe-meta.test.ts [2m([22m[2m26 tests[22m[2m)[22m[33m 13219[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer meta line[2m > [22mrenders one complete centered meta row with three line icons [33m3098[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer meta line[2m > [22mkeeps every existing pixel outside the optional meta zone unchanged [33m2519[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer meta line[2m > [22mkeeps the complete meta row when the nutrition highlight is null [33m1149[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer meta line[2m > [22momits null time and difficulty chips while retaining portions [33m1228[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer meta line[2m > [22mkeeps highlight changes confined to the existing badge zone [33m2221[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer meta line[2m > [22mretains distinct footer zones after a 4:5 thumbnail downscale [33m2746[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/golden.test.ts [2m([22m[2m1 test[22m[2m)[22m[33m 1843[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe renderer golden output[2m > [22mkeeps the approved composition within the documented V1.7 diagnostic envelope [33m1842[2mms[22m[39m
+ [32m✓[39m src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts [2m([22m[2m83 tests[22m[2m)[22m[33m 47890[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 1 steps / 'Brötchen' [33m1158[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen' [33m1013[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 1 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1710[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 2 steps / 'Brötchen' [33m1006[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen' [33m1032[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 2 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1557[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 3 steps / 'Brötchen' [33m925[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen' [33m1256[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 3 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1845[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 4 steps / 'Brötchen' [33m739[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen' [33m729[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 4 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1242[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 5 steps / 'Brötchen' [33m733[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen' [33m723[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches full-render node geometry and teaser decisions for 5 steps / 'Herzhafte Quarkbrötchen mit Dinkel un…' [33m1196[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mshares the 0.5px 'width' boundary with full rendering: 0.5 [33m686[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mshares the 0.5px 'height' boundary with full rendering: 0.5 [33m697[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 22px [33m751[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 21px [33m855[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 20px [33m1010[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 19px [33m1150[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mretains identical font-attempt selection through 18px [33m1316[2mms[22m[39m
+   [33m[2m✓[22m[39m B-1 generated detail text production probe[2m > [22mmatches title-dependent teaser overflow and legal German breaks with the full renderer [33m3040[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mpreserves B-1 Alpha geometry and pre-extraction PNG fingerprints [33m2985[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mkeeps short teasers at 22px and shrinks only overflowing teasers to the largest fitting size [33m2107[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the Quarkbroetchen approval fixture as an Instagram PNG [33m717[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders selective cooking summaries at 1..5 steps including 90 characters [33m3447[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the Alpha Gefluegelfrikadellen recipe with an offline reference photo as an Instagram PNG [33m707[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders seven ingredients with the full serving label at index 6 as an Instagram PNG [33m689[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the nine-ingredient two-column boundary as an Instagram PNG [33m716[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mkeeps eight ingredients in the larger one-column layout [33m715[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the fourteen-ingredient compact range as an Instagram PNG [33m716[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders the 20-ingredient layout prototype as an Instagram PNG [33m1408[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mkeeps fifteen ingredients in the compact layout without the motif overflow [33m1358[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders a longer recipe name without changing the fixed Instagram canvas [33m689[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22mrenders a long German teaser compound after a measured legal break [33m777[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22momits difficulty from the detail image without affecting the other metadata [33m2800[2mms[22m[39m
+   [33m[2m✓[22m[39m Instagram recipe details template[2m > [22momits a null time chip while retaining portions and ingredient count [33m694[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m67 passed[39m[22m[90m (67)[39m
+[2m      Tests [22m [1m[32m1629 passed[39m[22m[90m (1629)[39m
+[2m   Start at [22m 01:49:26
+[2m   Duration [22m 53.24s[2m (transform 17.05s, setup 0ms, collect 340.31s, tests 101.45s, environment 13ms, prepare 46.29s)[22m
+
+JSON report written to C:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/docs/qa/reports/Q21-CORR1-2026-10-10-units-Report.json
+

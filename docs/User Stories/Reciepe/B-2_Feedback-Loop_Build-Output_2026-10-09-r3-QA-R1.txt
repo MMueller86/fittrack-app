@@ -1,0 +1,88 @@
+
+> @fittrack/backend@1.0.0 build:verify
+> npm run build && node scripts/verify-build.mjs
+
+
+> @fittrack/backend@1.0.0 build
+> tsc --project tsconfig.json && node scripts/copy-instagram-assets.mjs
+
+Copied 10 Instagram renderer assets to C:\Users\mmueller\OneDrive - PRODYNA SE\fittrack-app\backend\dist\backend\src\lib\instagramRenderer\assets
+Check 1: Module resolution (ERR_MODULE_NOT_FOUND)…
+Check 2: Duplicate Azure Function IDs…
+✅  All checks passed.
+WARNING: Failed to detect the Azure Functions runtime. Switching "@azure/functions" package to test mode - not all features are supported.
+WARNING: Skipping call to register function "ai-meal-parser-preview" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "ai-meal-estimate-preview" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "ai-analyze-meal-item" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipe-analyze" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "ai-recipe-scale-preview" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "community-recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "community-recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "community-recipes-get-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "daily-insight" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "daily-insight-feedback" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "daily-insight-feedback-status" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-day-type-set" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-meals-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-meals-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-meals-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-meals-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-items-add" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-items-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-items-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-items-bulk-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-items-bulk-move" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-items-bulk-copy" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "favorites-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "favorites-add" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "favorites-remove" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "favorites-grouped" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "food-relations-recent" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "food-relations-frequent" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "ai-food-estimate-preview" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "ai-food-estimate-batch" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "food-products-search" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "food-products-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "food-search" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-render-instagram" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-share-bundle" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "ai-label-scan" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "nutrition-targets-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "nutrition-targets-calculate" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "nutrition-targets-ai-validate" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "nutrition-targets-save" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "profile-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "profile-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "profile-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "profile-calculate-preview" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "profile-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-get" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-set-visibility" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-reorder-images" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-update-image-hero-crop" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-log" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "recipes-prepare-export-view" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-get-by-id" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-search" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-create" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-update" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-upload-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-get-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-delete-image" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-enrich" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "reusable-items-enrich-scheduler" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-special-activity-set" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "diary-special-activity-remove" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "weekly-insight" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "weights-list" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "weights-add" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "weights-delete" because the "@azure/functions" package is in test mode.
+WARNING: Skipping call to register function "health" because the "@azure/functions" package is in test mode.

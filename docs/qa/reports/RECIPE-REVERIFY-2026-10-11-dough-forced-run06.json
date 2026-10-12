@@ -1,0 +1,16 @@
+{
+  "label": "dough-forced-run06",
+  "exit": 0,
+  "started": "2026-10-11T10:58:42.754Z",
+  "finished": "2026-10-11T10:58:46.933Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 1,
+    "failed": 0,
+    "pending": 20
+  },
+  "failures": [],
+  "outputSha256": "26d458be157e76886f4c7d0af66669fcea49e748710a4b0c5b986aae0fe4a797",
+  "reportSha256": "461c0549a51d684f3756fc5ea94800762c44ab54e61a95af815599e5df5a3e15"
+}

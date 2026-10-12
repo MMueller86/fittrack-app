@@ -5,6 +5,7 @@ import {
   estimateMeal,
   type AiParsedItem,
   analyzeRecipeText,
+  RecipeAnalysisContractError,
   type AiRecipeRaw,
   type AiRecipeIngredientLine,
   scaleRecipeText,
@@ -538,6 +539,9 @@ export const recipeAnalyzeHandler = withHandler(
     try {
       recipeRaw = await analyzeRecipeText(text);
     } catch (e) {
+      if (e instanceof RecipeAnalysisContractError) {
+        return { status: 422, jsonBody: { error: e.message, details: e.details } };
+      }
       const msg = e instanceof Error ? e.message : String(e);
       return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${msg}` } };
     }

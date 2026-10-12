@@ -236,8 +236,19 @@ den bestehenden Editor; das Öffnen oder Blättern löst weder KI noch Render od
 Speichern aus.
 
 Die einzige Aktion `Optionen & Texte bearbeiten` öffnet Tags, Highlight und
-Exporttexte in einem einheitlichen Editor direkt in derselben Vorschau. Im
-Abschnitt `Titelbild` liegen `Ausschnitt anpassen`, Zeit,
+Exporttexte in einem einheitlichen Editor direkt in derselben Vorschau. Der
+Dialog heißt `Rezept teilen` (Paaransicht) beziehungsweise `Bilder anpassen`
+(Editor). Die Paaransicht zeigt beide Bilder auf einer gemeinsamen Karte mit
+Beschriftung; ihre Aktionen sind `Optionen & Texte bearbeiten` (sekundär) und
+`Speichern & teilen` (primär). `Ausschnitt anpassen` existiert nur im Editor
+unter `Titelbild`. Beide Bilder bleiben im Editor durchgehend gemountet; das
+nicht gewählte wird nur ausgeblendet, damit das Detailbild nach dem
+Aktualisieren zuverlässig rendert. Ein
+dauerhaft sichtbarer kompakter `Titelbild`-/`Detailbild`-Schalter zeigt im Editor
+nur das jeweils gewählte PNG (zentriert auf einer Karte mit Rahmen und Schatten, etwa zwei Drittel
+breit) und nur die dazugehörigen Felder;
+die normale Bildvorschau zeigt weiterhin beide Bilder zusammen. Im Tab
+`Titelbild` liegen `Ausschnitt anpassen`, Zeit,
 Schwierigkeit, Tags und Highlight; `Detailbild` enthält den Teaser, die
 optionale Zutatenwahl und die Exportschritte:
 
@@ -256,14 +267,29 @@ optionale Zutatenwahl und die Exportschritte:
     deaktiviert `nutritionHighlight: null`. Daraus wird keine automatische
     High-Protein-Klassifikation und keine Nutrition-Regel abgeleitet.
 
-    Teaser, Zeit, Schwierigkeit und Exportschritte bleiben lokal editierbar. Die
-    Vorschau kann mit `Vorschau aktualisieren` erneut gerendert werden, ohne das
-    Rezept zu schreiben. `Speichern` bestätigt neue oder geänderte Exportfelder
-    über das bestehende `PUT /api/recipes/{id}`-Paar
+    Teaser, Zeit, Schwierigkeit und Exportschritte bleiben lokal editierbar.
+    Teaser und Exportschritte zeigen die Restzeichen (`Noch n von 96/90
+    Zeichen frei`, Warnfarbe kurz vor dem Limit) innerhalb ihrer
+    bestehenden Grenzen von 96 beziehungsweise 90 Zeichen. Schwierigkeit ist
+    einzeilig und hat kein festes Zeichenlimit; die gerenderte Vorschau prüft,
+    ob sie ins Bild passt. Die Zubereitungszeit zeigt den gültigen Bereich von
+    1 bis 10.080 Minuten. Validierungsfehler stehen tab-unabhängig oberhalb der
+    Aktionen. Der Editor hat genau eine Aktion, `Vorschau aktualisieren`.
+    Sind Exporttexte geändert und für das Speichern gültig, speichert sie die
+    Aktion zuerst im Rezept und rendert danach neu; ein Hinweis unter dem
+    Button benennt das. Sind die Texte unverändert oder nur für die Vorschau
+    gültig (leere Zeit oder Schwierigkeit), rendert sie ohne Rezept-Write
+    neu. Nach dem Auslösen kehrt der Dialog zur Paaransicht mit beiden Bildern
+    zurück und zeigt dort den Renderfortschritt; schlägt das Speichern fehl,
+    bleibt der Editor offen. Der Zurück-Pfeil verlässt den Editor ohne
+    Render: Wurden Texte, Tags oder Highlight geändert, zeigt die Paaransicht
+    einen Hinweis, und `Speichern & teilen` bleibt bis zur nächsten
+    Aktualisierung gesperrt. Das Speichern verwendet das bestehende
+    `PUT /api/recipes/{id}`-Paar
     `exportViewAction: 'confirm'` plus `exportView`; ein unveränderter View mit
-    Status `stale` sendet beim `Speichern` keinen PUT, und der Status allein
+    Status `stale` sendet beim Aktualisieren keinen PUT, und der Status allein
     erzwingt kein Speichern. Nach erfolgreicher Bestätigung wird das Bildpaar
-    frisch gerendert. Nullable Zeit und Schwierigkeit müssen für dieses
+    frisch gerendert. Nullable Zeit und Schwierigkeit müssen für das
     Speichern gültig ergänzt werden. Tag-, Highlight- und Crop-Änderungen
     bleiben präsentationsbezogen und lösen keinen Rezept-Write aus. Ein
     erfolgreich vorbereiteter, unbestätigter Exportentwurf bleibt im

@@ -1,0 +1,17 @@
+{
+  "gate": "R",
+  "candidateSha256": "59c7d826f4b0188ed82ee675ba20e787e5aa30f8459ea7680c7f364a6bcbed44",
+  "status": "NOT_RUN_REQUIRED_LIVE_FAILURE",
+  "blockedBy": "F",
+  "exit": null,
+  "counts": {
+    "executed": 0,
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "logicalCalls": 0,
+  "sdkCalls": 0,
+  "verified": false,
+  "dispatched": false
+}

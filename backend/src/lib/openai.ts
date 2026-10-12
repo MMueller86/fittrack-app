@@ -3,11 +3,16 @@
 // Uses Structured Outputs (API version >= 2024-07-01, model >= gpt-4o-mini 2024-07-18).
 
 import { AzureOpenAI } from 'openai';
+import type { RecipeExportPreparationDiagnostic } from './recipeAnalyzeValidation';
+import { importContractViolations } from './recipeAnalyzeValidation';
+import { redistributeExportReferences, sortExportStepsBySourceOrder } from './recipePreparationOrder';
+import { enforceSourceBackedTotalTime } from './recipeTotalTimeGuard';
+import { blockingImportViolations, importCorrectionFeedback, importViolations, stripCookingEssential } from './recipeImportCookingCheck';
 import { z } from 'zod';
 import { MEAL_PARSER_SYSTEM_PROMPT } from './prompts/mealParser';
 import { FOOD_ESTIMATE_SYSTEM_PROMPT } from './prompts/foodEstimate';
 import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
-import { RECIPE_ANALYZE_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
+import { RECIPE_ANALYZE_SYSTEM_PROMPT, RECIPE_PREPARATION_SYSTEM_PROMPT, RECIPE_PREPARATION_CORRECTION_SYSTEM_PROMPT, RECIPE_TEXT_CORRECTION_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
 import { RECIPE_SCALE_SYSTEM_PROMPT } from './prompts/recipeScale';
 import {
   DAILY_INSIGHT_PROMPT_VERSION,
@@ -30,6 +35,9 @@ import { validateWeeklyInsightExceedanceClaims } from './weeklyInsightValidation
 import {
   RECIPE_EXPORT_MAX_STEP_LENGTH,
   RECIPE_EXPORT_MAX_STEPS,
+  RECIPE_EXPORT_MIN_STEPS,
+  RECIPE_EXPORT_MAX_TEASER_LENGTH,
+  RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES,
 } from '../../../shared/types/recipeExport';
 
 // ---------------------------------------------------------------------------
@@ -448,8 +456,9 @@ const RECIPE_ANALYZE_SCHEMA = {
           order: { type: 'number' as const },
           title: { type: ['string', 'null'] as const },
           description: { type: 'string' as const },
+          cookingEssential: { type: 'boolean' as const },
         },
-        required: ['order', 'title', 'description'],
+        required: ['order', 'title', 'description', 'cookingEssential'],
         additionalProperties: false,
       },
     },
@@ -503,32 +512,183 @@ const RECIPE_ANALYZE_SCHEMA = {
  * Analyze a free-text recipe description via Azure OpenAI.
  * Returns structured recipe metadata + raw ingredient lines for further catalog matching.
  */
+export interface RecipePreparationContext {
+  recipeContext: {
+    name: string;
+    description?: string;
+    portions: number;
+    tags: string[];
+    ingredients: Array<{
+      displayName: string;
+      amountGrams: number | null;
+      inputAmount: number | null;
+      unit: string;
+    }>;
+  };
+  steps: Array<{ order: number; title?: string; description: string }>;
+}
+
+export interface RecipeExportPreparationOutput {
+  version: 1;
+  teaser: string;
+  totalTimeMinutes: number | null;
+  difficulty: string | null;
+  steps: Array<{ order: number; description: string; sourceStepOrders: number[] }>;
+}
+
+const RECIPE_EXPORT_PREPARATION_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    version: { type: 'integer' as const, enum: [1] },
+    teaser: { type: 'string' as const, minLength: 1, maxLength: RECIPE_EXPORT_MAX_TEASER_LENGTH },
+    totalTimeMinutes: { type: ['integer', 'null'] as const, minimum: 1, maximum: RECIPE_EXPORT_MAX_TOTAL_TIME_MINUTES },
+    difficulty: { type: ['string', 'null'] as const, minLength: 1 },
+    steps: {
+      type: 'array' as const, minItems: RECIPE_EXPORT_MIN_STEPS, maxItems: RECIPE_EXPORT_MAX_STEPS,
+      items: {
+        type: 'object' as const,
+        properties: {
+          order: { type: 'integer' as const, minimum: 1 },
+          description: { type: 'string' as const, minLength: 1, maxLength: RECIPE_EXPORT_MAX_STEP_LENGTH },
+          sourceStepOrders: { type: 'array' as const, minItems: 1, items: { type: 'integer' as const, minimum: 1 } },
+        },
+        required: ['order', 'description', 'sourceStepOrders'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['version', 'teaser', 'totalTimeMinutes', 'difficulty', 'steps'],
+  additionalProperties: false,
+};
+
+export interface RecipePreparationProviderOptions {
+  correction?: { latestDraft: unknown; validationErrors: RecipeExportPreparationDiagnostic[] };
+  signal?: AbortSignal;
+  timeout?: number;
+}
+
+/** Character budget for a text that measured actual vs bounds; 25 % below the proportional fit so a rewrite cannot repeat the overflowing text. */
+export function textCorrectionLimit(text: string, actual: { width: number; height?: number }, bounds: { width: number; height?: number }): number {
+  const ratios = [bounds.width / actual.width, actual.height && bounds.height !== undefined ? bounds.height / actual.height : 1]
+    .filter((ratio) => Number.isFinite(ratio) && ratio > 0);
+  return Math.max(10, Math.floor(text.length * Math.min(1, ...ratios) * 0.75));
+}
+
+export async function prepareRecipeExport(preparation: RecipePreparationContext, options: RecipePreparationProviderOptions = {}): Promise<RecipeExportPreparationOutput> {
+  const client = getClient();
+  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const correction = options.correction;
+  const textOnly = correction && correction.validationErrors.length > 0 && correction.validationErrors.every((error) =>
+    error.phase === 'template' && error.code === 'TEMPLATE_FIELD_OVERFLOW');
+  const correctedDraft = textOnly ? structuredClone(correction.latestDraft) as RecipeExportPreparationOutput : undefined;
+  const fields = correctedDraft ? [...new Map(correction!.validationErrors.map((error) => [error.path, error])).values()].map((error) => {
+    const match = /^steps\[(\d+)\]\.description$/u.exec(error.path);
+    const stepIndex = match ? Number(match[1]) : undefined;
+    const text = error.path === 'teaser' ? correctedDraft.teaser : stepIndex !== undefined ? correctedDraft.steps[stepIndex]?.description : undefined;
+    if (typeof text !== 'string' || !error.actual || !error.bounds) throw new Error('Invalid text correction target');
+    return { stepIndex, text, actual: error.actual,
+      bounds: { width: error.bounds.width, ...(error.bounds.height !== undefined ? { height: error.bounds.height } : {}) } };
+  }) : undefined;
+  const response = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      { role: 'system', content: fields ? RECIPE_TEXT_CORRECTION_SYSTEM_PROMPT : correction ? RECIPE_PREPARATION_CORRECTION_SYSTEM_PROMPT : RECIPE_PREPARATION_SYSTEM_PROMPT },
+      { role: 'user', content: JSON.stringify(fields ? { texts: fields.map(({ text, actual, bounds }) => ({ text, actual, bounds, maxCharacters: textCorrectionLimit(text, actual, bounds) })) } : options.correction ? {
+        originalPreparation: preparation,
+        latestDraft: options.correction.latestDraft,
+        validationErrors: options.correction.validationErrors,
+      } : preparation) },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: fields ? { name: 'recipe_text_correction', strict: true, schema: {
+        type: 'object', properties: { texts: { type: 'array', minItems: fields.length, maxItems: fields.length,
+          items: { type: 'string', minLength: 1, maxLength: RECIPE_EXPORT_MAX_TEASER_LENGTH } } },
+        required: ['texts'], additionalProperties: false,
+      } } : { name: 'recipe_export_preparation', strict: true, schema: RECIPE_EXPORT_PREPARATION_SCHEMA },
+    },
+    temperature: 0.2,
+    max_tokens: 2048,
+  }, { maxRetries: 0, timeout: Math.min(20_000, options.timeout ?? 20_000), signal: options.signal });
+  const choice = response.choices[0];
+  if (choice?.message?.refusal || (choice?.finish_reason && choice.finish_reason !== 'stop')) {
+    throw new Error('Azure OpenAI preparation response was refused or incomplete');
+  }
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) throw new Error('Empty response from Azure OpenAI');
+  if (fields && correctedDraft) {
+    const parsed = z.object({ texts: z.array(z.string().trim().min(1).max(RECIPE_EXPORT_MAX_TEASER_LENGTH)).length(fields.length) }).strict().parse(JSON.parse(raw));
+    fields.forEach((field, index) => {
+      if (field.stepIndex === undefined) correctedDraft.teaser = parsed.texts[index]!;
+      else correctedDraft.steps[field.stepIndex]!.description = parsed.texts[index]!;
+    });
+    return correctedDraft;
+  }
+  return enforceSourceBackedTotalTime(sortExportStepsBySourceOrder(JSON.parse(raw) as RecipeExportPreparationOutput), preparation);
+}
+
+const IMPORT_CALL_TIMEOUT_MS = 30_000;
+// No further correction is started once this much time is spent, bounding the worst case of three calls.
+const IMPORT_CORRECTION_DEADLINE_MS = 45_000;
+
+/** Import analysis still violates the server contract after the allowed corrections; details contain no recipe text. */
+export class RecipeAnalysisContractError extends Error {
+  constructor(readonly details: string[]) {
+    super('AI recipe analysis failed server-side validation');
+  }
+}
+
 export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
   const client = getClient();
   const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
 
-  const response = await client.chat.completions.create({
-    model: deployment,
-    messages: [
-      { role: 'system', content: RECIPE_ANALYZE_SYSTEM_PROMPT },
-      { role: 'user', content: text },
-    ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'recipe_analyze',
-        strict: true,
-        schema: RECIPE_ANALYZE_SCHEMA,
+  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+    { role: 'system', content: RECIPE_ANALYZE_SYSTEM_PROMPT },
+    { role: 'user', content: text },
+  ];
+  let parsed!: AiRecipeRaw;
+  const startedAt = Date.now();
+  // Up to two directed corrections when the response breaks a deterministic import contract rule.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await client.chat.completions.create({
+      model: deployment,
+      messages: [...messages],
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'recipe_analyze',
+          strict: true,
+          schema: RECIPE_ANALYZE_SCHEMA,
+        },
       },
-    },
-    temperature: 0.2,
-    max_tokens: 2048,
-  });
+      temperature: 0.2,
+      max_tokens: 2048,
+    }, { timeout: IMPORT_CALL_TIMEOUT_MS, maxRetries: 1 });
 
-  const raw = response.choices[0]?.message?.content;
-  if (!raw) throw new Error('Empty response from Azure OpenAI');
+    const raw = response.choices[0]?.message?.content;
+    if (!raw) throw new Error('Empty response from Azure OpenAI');
 
-  const parsed = JSON.parse(raw) as AiRecipeRaw;
+    const candidate = JSON.parse(raw) as AiRecipeRaw;
+    parsed = stripCookingEssential(candidate);
+    if (candidate.exportSuggestion) parsed = { ...parsed, exportSuggestion: sortExportStepsBySourceOrder(parsed.exportSuggestion) };
+    const violations = importViolations(text, { ...candidate, exportSuggestion: parsed.exportSuggestion }, importContractViolations(parsed));
+    if (violations.length === 0) break;
+    if (attempt === 2 || Date.now() - startedAt > IMPORT_CORRECTION_DEADLINE_MS) {
+      // Corrections exhausted. Soft violations are served; an invalid reference trace is repaired by moving references only
+      // (steps and texts untouched); anything else fails in a controlled way (422, no usage).
+      let blocking = blockingImportViolations(text, violations);
+      if (blocking.length > 0 && blocking.every((violation) => violation.kind === 'trace') && parsed.exportSuggestion) {
+        const repaired = { ...parsed, exportSuggestion: redistributeExportReferences(parsed.exportSuggestion) };
+        if (importContractViolations(repaired).length === 0) {
+          parsed = repaired;
+          blocking = [];
+        }
+      }
+      if (blocking.length > 0) throw new RecipeAnalysisContractError(blocking.map((violation) => violation.message));
+      break;
+    }
+    messages.push({ role: 'assistant', content: raw }, { role: 'user', content: importCorrectionFeedback(violations) });
+  }
 
   // Structured Outputs cannot express the category-dependent null rule for this field.
   return {
@@ -540,6 +700,8 @@ export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
       return {
         ...ingredient,
         category,
+        // The schema forbids 0, so the model sometimes emits a tiny placeholder for unmeasurable food such as spray oil.
+        amountGrams: category === 'food' && typeof ingredient.amountGrams === 'number' && ingredient.amountGrams < 0.1 ? null : ingredient.amountGrams,
         kitchenAmountText: category === 'food' ? null : ingredient.kitchenAmountText ?? null,
       };
     }),

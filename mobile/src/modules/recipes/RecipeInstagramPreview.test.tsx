@@ -63,6 +63,16 @@ function getByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstan
   return matches[0]!;
 }
 
+function isColumnHidden(renderer: ReactTestRenderer, asset: 'instagram' | 'detail'): boolean {
+  const column = renderer.root.findAll((node) => (
+    node.type === 'View' && node.props.testID === `recipe-share-preview-column-${asset}`
+  ))[0];
+  if (!column) throw new Error(`Expected the ${asset} preview column`);
+  return (column.props.style as unknown[]).some((style) => (
+    typeof style === 'object' && style !== null && (style as { display?: string }).display === 'none'
+  ));
+}
+
 function makeDraft(overrides: Partial<WizardExportDraft> = {}): WizardExportDraft {
   return {
     version: 1,
@@ -152,16 +162,25 @@ describe('RecipeInstagramPreview', () => {
     expect(renderer.root.findAll((node) => node.type === 'Animated.Image')).toHaveLength(2);
     await act(async () => {
       (viewer.props.onMomentumScrollEnd as (event: { nativeEvent: { contentOffset: { x: number } } }) => void)(
-        { nativeEvent: { contentOffset: { x: 390 } } },
+        { nativeEvent: { contentOffset: { x: label === 'Detailbild' ? 390 : 0 } } },
       );
     });
-    expect(getByLabel(renderer, 'Nächstes Bild').props.disabled).toBe(true);
-    expect(getByLabel(renderer, 'Vorheriges Bild').props.disabled).toBe(false);
+    expect(getByLabel(renderer, 'Nächstes Bild').props.disabled).toBe(label === 'Detailbild');
+    expect(getByLabel(renderer, 'Vorheriges Bild').props.disabled).toBe(label === 'Titelbild');
     await act(async () => {
       (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
     });
     expect(renderer.root.findAll((node) => node.props.testID === 'recipe-share-image-viewer')).toHaveLength(0);
-    expect(renderer.root.findAll((node) => node.props.testID === 'recipe-share-editor-title-section')).toHaveLength(1);
+    expect(renderer.root.findAll((node) => (
+      node.props.testID === (label === 'Titelbild'
+        ? 'recipe-share-editor-title-section'
+        : 'recipe-share-editor-detail-section')
+    ))).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.props.testID === 'recipe-share-preview-selected')).toHaveLength(1);
+    expect(getByLabel(renderer, `${label} auswählen`).props.accessibilityState).toMatchObject({ selected: true });
+    expect(renderer.root.findAll((node) => node.type === 'Animated.Image')).toHaveLength(2);
+    expect(isColumnHidden(renderer, label === 'Titelbild' ? 'instagram' : 'detail')).toBe(false);
+    expect(isColumnHidden(renderer, label === 'Titelbild' ? 'detail' : 'instagram')).toBe(true);
     expect(props.onChangeExportDraft).not.toHaveBeenCalled();
     expect(props.onUpdatePreview).not.toHaveBeenCalled();
   });
@@ -262,8 +281,9 @@ describe('RecipeInstagramPreview', () => {
       flexDirection: 'row',
       justifyContent: 'space-between',
     });
-    expect(getByLabel(renderer, 'Ausschnitt anpassen').props.disabled).toBe(false);
     expect(getByLabel(renderer, 'Bilder speichern und teilen').props.disabled).toBe(false);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Ausschnitt anpassen'))
+      .toHaveLength(0);
 
     await act(async () => {
       (getByLabel(renderer, 'Bilder speichern und teilen').props.onPress as () => void)();
@@ -290,26 +310,149 @@ describe('RecipeInstagramPreview', () => {
     });
 
     expect(renderer.root.findAll((node) => node.type === 'Text' && node.props.children === 'Titelbild'))
-      .toHaveLength(2);
+      .toHaveLength(1);
     expect(renderer.root.findAll((node) => node.type === 'Text' && node.props.children === 'Detailbild'))
-      .toHaveLength(2);
-    const titleSection = renderer.root.findAll((node) => (
-      node.type === 'View' && node.props.testID === 'recipe-share-editor-title-section'
-    ))[0];
-    const detailSection = renderer.root.findAll((node) => (
-      node.type === 'View' && node.props.testID === 'recipe-share-editor-detail-section'
-    ))[0];
-    expect(titleSection?.findAll((node) => node.props.accessibilityLabel === 'Export-Teaser')).toHaveLength(0);
-    expect(detailSection?.findAll((node) => node.props.accessibilityLabel === 'Export-Teaser')).toHaveLength(1);
-    const cropAction = getByLabel(renderer, 'Ausschnitt anpassen');
-    expect(cropAction.props.accessibilityRole).toBe('button');
-    expect(cropAction.props.accessibilityState).toMatchObject({ disabled: false });
+      .toHaveLength(1);
+    const findSection = (testID: string) => renderer.root.findAll((node) => (
+      node.type === 'View' && node.props.testID === testID
+    ));
+    expect(findSection('recipe-share-editor-title-section')).toHaveLength(1);
+    expect(findSection('recipe-share-editor-detail-section')).toHaveLength(0);
+    const titleSection = findSection('recipe-share-editor-title-section')[0];
     expect(titleSection?.findAll((node) => node.props.accessibilityLabel === 'Ausschnitt anpassen')).toHaveLength(1);
+    expect(getByLabel(renderer, 'Ausschnitt anpassen').props.accessibilityState).toMatchObject({ disabled: false });
     expect(getByLabel(renderer, 'High-Protein-Symbol anzeigen')).toBeDefined();
+    expect(getByLabel(renderer, 'Zubereitungszeit in Minuten')).toBeDefined();
+    expect(getByLabel(renderer, 'Export-Schwierigkeit')).toBeDefined();
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Export-Teaser')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => (
+      typeof node.props.accessibilityLabel === 'string'
+      && node.props.accessibilityLabel.startsWith('Exportschritt')
+    ))).toHaveLength(0);
+    const timeRangeHint = renderer.root.findAll((node) => (
+      node.type === 'Text'
+      && Array.isArray(node.props.children)
+      && node.props.children[0] === '1 bis '
+    ))[0];
+    expect(timeRangeHint?.props.children).toEqual([
+      '1 bis ',
+      (10_080).toLocaleString('de-DE'),
+      ' Minuten',
+    ]);
+    expect(getByLabel(renderer, 'Titelbild auswählen').props.accessibilityState).toMatchObject({ selected: true });
+    expect(renderer.root.findAll((node) => node.type === 'Animated.Image')).toHaveLength(2);
+    expect(isColumnHidden(renderer, 'instagram')).toBe(false);
+    expect(isColumnHidden(renderer, 'detail')).toBe(true);
+
+    await act(async () => {
+      (getByLabel(renderer, 'Detailbild auswählen').props.onPress as () => void)();
+    });
+    expect(getByLabel(renderer, 'Detailbild auswählen').props.accessibilityState).toMatchObject({ selected: true });
+    expect(findSection('recipe-share-editor-title-section')).toHaveLength(0);
+    expect(findSection('recipe-share-editor-detail-section')).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Ausschnitt anpassen')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'High-Protein-Symbol anzeigen'))
+      .toHaveLength(0);
+    expect(getByLabel(renderer, 'Export-Teaser')).toBeDefined();
+    expect(getByLabel(renderer, 'Exportschritt 1')).toBeDefined();
+    expect(renderer.root.findAll((node) => node.type === 'Animated.Image')).toHaveLength(2);
+    expect(isColumnHidden(renderer, 'instagram')).toBe(true);
+    expect(isColumnHidden(renderer, 'detail')).toBe(false);
+
+    const teaserCount = renderer.root.findAll((node) => (
+      node.type === 'Text' && node.props.testID === 'recipe-share-teaser-character-count'
+    ))[0];
+    const stepCount = renderer.root.findAll((node) => (
+      node.type === 'Text' && node.props.testID === 'recipe-share-step-character-count-0'
+    ))[0];
+    expect(teaserCount?.props.children).toEqual(['Noch ', 78, ' von ', 96, ' Zeichen frei']);
+    expect(stepCount?.props.children).toEqual(['Noch ', 72, ' von ', 90, ' Zeichen frei']);
+  });
+
+  it('saves changed texts when refreshing and only re-renders when nothing needs saving', async () => {
+    const { renderer: unsaved, props: unsavedProps } = await renderPreview({ exportDraftNeedsSaving: true });
+    await act(async () => {
+      (getByLabel(unsaved, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    expect(unsaved.root.findAll((node) => node.props.accessibilityLabel === 'Exportansicht speichern'))
+      .toHaveLength(0);
+    expect(unsaved.root.findAll((node) => (
+      node.type === 'Text'
+      && node.props.children === 'Geänderte Texte werden beim Aktualisieren im Rezept gespeichert.'
+    ))).toHaveLength(1);
+    await act(async () => {
+      (getByLabel(unsaved, 'Vorschau aktualisieren').props.onPress as () => void)();
+    });
+    expect(unsavedProps.onSaveExportDraft).toHaveBeenCalledTimes(1);
+    expect(unsavedProps.onUpdatePreview).not.toHaveBeenCalled();
+    expect(unsaved.root.findAll((node) => node.props.testID === 'recipe-share-preview-pair')).toHaveLength(1);
+    expect(unsaved.root.findAll((node) => node.props.testID === 'recipe-share-preview-selected')).toHaveLength(0);
+
+    const { renderer: saved, props: savedProps } = await renderPreview({ exportDraftNeedsSaving: false });
+    await act(async () => {
+      (getByLabel(saved, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    expect(saved.root.findAll((node) => (
+      node.type === 'Text' && typeof node.props.children === 'string'
+      && node.props.children.includes('beim Aktualisieren im Rezept gespeichert')
+    ))).toHaveLength(0);
+    await act(async () => {
+      (getByLabel(saved, 'Vorschau aktualisieren').props.onPress as () => void)();
+    });
+    expect(savedProps.onUpdatePreview).toHaveBeenCalledTimes(1);
+    expect(savedProps.onSaveExportDraft).not.toHaveBeenCalled();
+    expect(saved.root.findAll((node) => node.props.testID === 'recipe-share-preview-pair')).toHaveLength(1);
+  });
+
+  it('keeps the editor open when saving the changed texts fails', async () => {
+    const { renderer, props } = await renderPreview({
+      exportDraftNeedsSaving: true,
+      onSaveExportDraft: vi.fn(async () => false),
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Vorschau aktualisieren').props.onPress as () => void)();
+    });
+    expect(props.onSaveExportDraft).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findAll((node) => node.props.testID === 'recipe-share-preview-selected')).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.props.testID === 'recipe-share-preview-pair')).toHaveLength(0);
+  });
+
+  it('blocks sharing and warns after editor changes until the preview is refreshed', async () => {
+    const { renderer } = await renderPreview();
+    const hintText = (node: ReactTestInstance) => node.type === 'Text'
+      && Array.isArray(node.props.children) === false
+      && typeof node.props.children === 'string'
+      && node.props.children.includes('noch nicht in den Bildern');
+    await act(async () => {
+      (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Detailbild auswählen').props.onPress as () => void)();
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Export-Teaser').props.onChangeText as (value: string) => void)('Neuer Teaser');
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Zurück zur Vorschau').props.onPress as () => void)();
+    });
+    expect(renderer.root.findAll(hintText)).toHaveLength(1);
+    expect(getByLabel(renderer, 'Bilder speichern und teilen').props.disabled).toBe(true);
+
+    await act(async () => {
+      (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Vorschau aktualisieren').props.onPress as () => void)();
+    });
+    expect(renderer.root.findAll(hintText)).toHaveLength(0);
+    expect(getByLabel(renderer, 'Bilder speichern und teilen').props.disabled).toBe(false);
   });
 
   it('shows the review hint only after both previews are ready', async () => {
-    const hint = 'Check beide Bilder kurz durch. Die Texte kannst du jederzeit noch anpassen.';
+    const hint = 'Check beide Bilder kurz durch. Texte, Ausschnitt und Tags kannst du jederzeit anpassen.';
     const { renderer: readyRenderer } = await renderPreview();
     expect(readyRenderer.root.findAll((node) => node.type === 'Text' && node.props.children === hint))
       .toHaveLength(1);
@@ -409,7 +552,7 @@ describe('RecipeInstagramPreview', () => {
     )[0];
     if (!closeButton) throw new Error('Expected the preview close button');
     expect(closeButton.props.disabled).toBe(true);
-    expect(getByLabel(renderer, 'Ausschnitt anpassen').props.disabled).toBe(true);
+    expect(getByLabel(renderer, 'Optionen & Texte bearbeiten').props.disabled).toBe(true);
     expect(getByLabel(renderer, 'Bilder speichern und teilen').props.disabled).toBe(true);
   });
 
@@ -422,8 +565,11 @@ describe('RecipeInstagramPreview', () => {
       { uri: 'file:///cache/instagram.png' },
       { uri: 'file:///cache/detail.png' },
     ]);
-    expect(getByLabel(renderer, 'Ausschnitt anpassen').props.disabled).toBe(true);
     expect(getByLabel(renderer, 'Bilder speichern und teilen').props.disabled).toBe(true);
+    await act(async () => {
+      (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    expect(getByLabel(renderer, 'Ausschnitt anpassen').props.disabled).toBe(true);
   });
 
   it('renders two fixed loading frames before the PNG pair exists', async () => {
@@ -456,18 +602,22 @@ describe('RecipeInstagramPreview', () => {
     expect(getByLabel(renderer, 'Zubereitungszeit in Minuten').props.value).toBe('');
     expect(getByLabel(renderer, 'Export-Schwierigkeit').props.value).toBe('');
     expect(getByLabel(renderer, 'Vorschau aktualisieren').props.disabled).toBe(false);
-    expect(getByLabel(renderer, 'Exportansicht speichern').props.disabled).toBe(true);
-    expect(renderer.root.findAll((node) => (
-      node.type === 'Text'
-      && node.props.children === 'Bitte gib eine Schwierigkeit in einer Zeile an.'
-    ))).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.type === 'Text' && node.props.children === 'Bitte gib eine Schwierigkeit in einer Zeile an.'))
+      .toHaveLength(1);
+    await act(async () => {
+      (getByLabel(renderer, 'Vorschau aktualisieren').props.onPress as () => void)();
+    });
+    expect(props.onUpdatePreview).toHaveBeenCalledTimes(1);
     expect(props.onSaveExportDraft).not.toHaveBeenCalled();
   });
 
-  it('updates draft fields directly in the editor and persists only after explicit Speichern', async () => {
+  it('updates draft fields directly in the editor and persists them through the single refresh action', async () => {
     const { renderer, props } = await renderPreview();
     await act(async () => {
       (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Detailbild auswählen').props.onPress as () => void)();
     });
 
     const teaserInput = getByLabel(renderer, 'Export-Teaser');
@@ -481,7 +631,7 @@ describe('RecipeInstagramPreview', () => {
     }));
 
     await act(async () => {
-      (getByLabel(renderer, 'Exportansicht speichern').props.onPress as () => void)();
+      (getByLabel(renderer, 'Vorschau aktualisieren').props.onPress as () => void)();
     });
     expect(props.onSaveExportDraft).toHaveBeenCalledTimes(1);
   });
@@ -493,9 +643,12 @@ describe('RecipeInstagramPreview', () => {
     await act(async () => {
       (getByLabel(fourRenderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
     });
+    await act(async () => {
+      (getByLabel(fourRenderer, 'Detailbild auswählen').props.onPress as () => void)();
+    });
     expect(fourRenderer.root.findAll((node) => node.type === 'Text' && node.props.children === 'Zutaten im Bild'))
       .toHaveLength(0);
-    expect(fourRenderer.root.findAll((node) => node.type === 'Switch')).toHaveLength(1);
+    expect(fourRenderer.root.findAll((node) => node.type === 'Switch')).toHaveLength(0);
 
     const { renderer: twentyOneRenderer } = await renderPreview({
       exportIngredients: Array.from({ length: 21 }, (_, index) => makeIngredient(index)),
@@ -503,9 +656,12 @@ describe('RecipeInstagramPreview', () => {
     await act(async () => {
       (getByLabel(twentyOneRenderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
     });
+    await act(async () => {
+      (getByLabel(twentyOneRenderer, 'Detailbild auswählen').props.onPress as () => void)();
+    });
     expect(twentyOneRenderer.root.findAll((node) => node.type === 'Text' && node.props.children === 'Zutaten im Bild'))
       .toHaveLength(1);
-    expect(twentyOneRenderer.root.findAll((node) => node.type === 'Switch')).toHaveLength(22);
+    expect(twentyOneRenderer.root.findAll((node) => node.type === 'Switch')).toHaveLength(21);
   });
 
   it('anchors each step removal control to the right side of its step header', async () => {
@@ -528,6 +684,9 @@ describe('RecipeInstagramPreview', () => {
     });
     await act(async () => {
       (getByLabel(renderer, 'Optionen & Texte bearbeiten').props.onPress as () => void)();
+    });
+    await act(async () => {
+      (getByLabel(renderer, 'Detailbild auswählen').props.onPress as () => void)();
     });
     const removeButton = getByLabel(renderer, 'Exportschritt 1 entfernen');
     const stepHeader = renderer.root.findAll((node) => (
@@ -558,12 +717,8 @@ describe('RecipeInstagramPreview', () => {
     const { renderer } = await renderPreview();
     const scroll = renderer.root.findAll((node) => node.type === 'ScrollView')[0];
     expect(scroll?.props.contentContainerStyle).toMatchObject({ gap: 16, paddingBottom: 16 });
-    expect(getByLabel(renderer, 'Optionen & Texte bearbeiten').props.style).toMatchObject({
-      minHeight: 48,
-      paddingHorizontal: 16,
-    });
-    const cropStyles = getByLabel(renderer, 'Ausschnitt anpassen').props.style as unknown[];
-    expect(cropStyles[0]).toMatchObject({ minHeight: 48 });
+    const editStyles = getByLabel(renderer, 'Optionen & Texte bearbeiten').props.style as unknown[];
+    expect(editStyles[0]).toMatchObject({ minHeight: 48, paddingHorizontal: 16 });
     const shareStyles = getByLabel(renderer, 'Bilder speichern und teilen').props.style as unknown[];
     expect(shareStyles[0]).toMatchObject({ minHeight: 48 });
     expect(renderer.root.findAll((node) => (

@@ -1,0 +1,30 @@
+
+> @fittrack/backend@1.0.0 verify:daily-insight-prompt
+> node --test scripts/verify-daily-insight-prompt.test.mjs && node scripts/verify-daily-insight-prompt.mjs
+
+✔ allows the initial release when the base has no manifest (1.1913ms)
+✔ requires a new release when provider input changes (0.2974ms)
+✔ requires the manifest to change with provider input (0.1044ms)
+✔ requires a new release when provider-visible validation constants change (0.1412ms)
+✔ does not classify non-provider changes as provider input (0.0844ms)
+✔ rejects edits to historical releases (0.1021ms)
+✔ accepts an appended release with an unchanged history (0.0741ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 61.5956
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90mC:/Users/mmueller/OneDrive - PRODYNA SE/fittrack-app/backend[39m
+
+ [32m✓[39m src/lib/prompts/dailyInsightPromptManifest.test.ts [2m([22m[2m4 tests[22m[2m)[22m[90m 3[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 02:15:11
+[2m   Duration [22m 493ms[2m (transform 85ms, setup 0ms, collect 119ms, tests 3ms, environment 0ms, prepare 104ms)[22m
+
+Daily Insight prompt release guard passed: v17 sha256:0373462c2f0e3b3050c51b4cfe468c6aca238ce3c0b15cf80c5be2b8847e4386; base releases 2; provider input changed: yes.

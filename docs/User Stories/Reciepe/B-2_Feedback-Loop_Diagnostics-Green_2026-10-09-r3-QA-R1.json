@@ -1,0 +1,34 @@
+{
+  "name": "Diagnostics-Green",
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/recipePreparation.test.ts",
+    "src/functions/recipes.test.ts",
+    "--testNamePattern",
+    "QA-R1",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Diagnostics-Green-Report_2026-10-09-r3-QA-R1.json"
+  ],
+  "start": "2026-10-09T16:53:49.839Z",
+  "end": "2026-10-09T16:53:52.061Z",
+  "exit": 0,
+  "signal": null,
+  "counts": {
+    "executed": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 166
+  },
+  "output": "docs/User Stories/Reciepe/B-2_Feedback-Loop_Diagnostics-Green-Output_2026-10-09-r3-QA-R1.txt",
+  "outputSha256": "203ffc11f7f6d92381d79ac7462eac86956f2ee68d8020c9186b06645300cdf8",
+  "report": "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Diagnostics-Green-Report_2026-10-09-r3-QA-R1.json",
+  "reportSha256": "eb2e76a481330100f3972afac21fcaafef29eb1544801703f6fd7842df9bf127",
+  "candidateSha256": null
+}

@@ -46,6 +46,30 @@ describe('weekly insight diagnostic semantic validator', () => {
     });
   });
 
+  it.each([
+    'dein effektives Tagesziel lag bei 3600 Kalorien, was bedeutet, dass du 83,3 % deines Ziels erreicht hast.',
+    'DEIN EFFEKTIVES TAGESZIEL LAG BEI 3600 KALORIEN, WAS BEDEUTET, DASS DU 83,3 % DEINES ZIELS ERREICHT HAST.',
+  ])('accepts unchanged evidence content with different capitalization: %s', (evidence) => {
+    const result = classifyWeeklyInsightJudgeOutput(
+      underFixture,
+      'Dein effektives Tagesziel lag bei 3600 Kalorien, was bedeutet, dass du 83,3 % deines Ziels erreicht hast.',
+      { basis: 'effective_target', relation: 'within_effective_target', evidence },
+    );
+    expect(result).toMatchObject({ status: 'CORRECT', evidence, reason: null });
+  });
+
+  it.each([
+    'dein effektives Tagesziel lag bei 3500 Kalorien, was bedeutet, dass du 83,3 % deines Ziels erreicht hast.',
+    'dein effektives Tagesziel lag bei 3600 Kalorien, was bedeutet, dass du 84,3 % deines Ziels erreicht hast.',
+  ])('rejects changed evidence content even with different capitalization: %s', (evidence) => {
+    const result = classifyWeeklyInsightJudgeOutput(
+      underFixture,
+      'Dein effektives Tagesziel lag bei 3600 Kalorien, was bedeutet, dass du 83,3 % deines Ziels erreicht hast.',
+      { basis: 'effective_target', relation: 'within_effective_target', evidence },
+    );
+    expect(result).toMatchObject({ status: 'UNVERIFIED', reason: 'missing_or_unproven_evidence' });
+  });
+
   it('accepts the exact-effective-target relation', () => {
     const result = classifyWeeklyInsightJudgeOutput(
       atFixture,

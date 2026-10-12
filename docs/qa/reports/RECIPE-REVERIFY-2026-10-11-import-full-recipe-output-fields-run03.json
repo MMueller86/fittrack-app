@@ -1,0 +1,16 @@
+{
+  "label": "import-full-recipe-output-fields-run03",
+  "exit": 0,
+  "started": "2026-10-11T10:51:54.053Z",
+  "finished": "2026-10-11T10:52:01.859Z",
+  "candidateStable": true,
+  "counts": {
+    "total": 21,
+    "passed": 1,
+    "failed": 0,
+    "pending": 20
+  },
+  "failures": [],
+  "outputSha256": "63cc6fa25290b8ab3afdb7cc833c5b851c87b24211f66e099ecffc91d705328d",
+  "reportSha256": "9d5be995b11343d3cc11969a6e1b313ee9a611fefdcb890381dd73a1e5a68c26"
+}

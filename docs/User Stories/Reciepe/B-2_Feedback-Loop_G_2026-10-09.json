@@ -1,0 +1,11 @@
+{
+  "status": "NOT_RUN_STOP_ON_FAILED_ASSERTION",
+  "exit": null,
+  "executed": 0,
+  "passed": 0,
+  "failed": 0,
+  "skipped": null,
+  "providerCalls": 0,
+  "semanticPass": false,
+  "reason": "Implementation stopped before required offline gates and candidate live evaluation."
+}

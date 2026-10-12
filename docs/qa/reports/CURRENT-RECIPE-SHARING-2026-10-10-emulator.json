@@ -1,0 +1,13 @@
+{
+  "stage": "emulator",
+  "startedAt": "2026-10-10T10:32:51.134Z",
+  "finishedAt": "2026-10-10T10:32:51.151Z",
+  "endpoint": "http://127.0.0.1:18081/",
+  "command": "Node fetch loopback Cosmos readiness, 3000ms abort limit",
+  "reachable": false,
+  "state": "UNVERIFIED_LOCAL_EMULATOR_UNAVAILABLE",
+  "reason": "ECONNREFUSED",
+  "contractTestsExecuted": 0,
+  "liveCalls": 0,
+  "candidateHashStable": true
+}

@@ -1,0 +1,21 @@
+{
+  "executable": "C:\\Program Files\\nodejs\\node.exe",
+  "nativeArgs": [
+    "../node_modules/vitest/vitest.mjs",
+    "run",
+    "src/lib/prompts/dailyInsightPromptManifest.test.ts",
+    "--silent",
+    "--reporter=json",
+    "--outputFile=../docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-manifest-Report.json"
+  ],
+  "cwd": "backend",
+  "started": "2026-10-10T00:09:19.103Z",
+  "finished": "2026-10-10T00:09:19.961Z",
+  "exit": 0,
+  "counts": {
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+  }
+}

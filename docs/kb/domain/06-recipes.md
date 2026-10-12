@@ -91,7 +91,7 @@ Nutrition for each ingredient is calculated from `amountGrams / 100 × nutrition
 
 [Rule] During recipe analysis, every `food` ingredient with a determinable quantity must have a positive finite `amountGrams` value. Kitchen units such as tablespoons, teaspoons, millilitres, and pieces are converted before catalog resolution. A genuinely indeterminate food amount, such as unmeasured spray oil, must retain `amountGrams: null`; a tiny positive placeholder is not a measurement. It is routed to manual review and must be resolved or removed before persistence.
 
-[Rule] Recipe analysis preserves preparation order with contiguous 1-based source-step orders. Export grouping may combine only adjacent source steps, and the flattened source-step trace must include every source step exactly once in order.
+[Rule] Recipe analysis preserves the complete source with contiguous 1-based source-step orders. When input instructions are explicitly numbered, each instruction remains one analysis source step in that order; the export limit never applies to this list. Only export suggestions may compress selectively. Their non-empty `sourceStepOrders` lists reference contained actions, not every detail read; flattened references must be positive, present, globally unique, and strictly ascending. Gaps within and between groups are allowed; full coverage and adjacent-only partitions are not required.
 
 ### Create / Update Compatibility
 
@@ -181,10 +181,44 @@ duplicate, or seasoning IDs return `400` with
 
 ### Transient Export-View Preparation
 
-`POST /api/recipes/{id}/export-view/prepare` uses the existing Recipe Analyze
-call and the shared `recipe-analyze` quota. It does not change the prompt,
-persist recipe data, or make an additional AI call. The legacy `{}` request
-accepts only the strict `{ "contractVersion": 2 }` request; `{}`, missing or
+`POST /api/recipes/{id}/export-view/prepare` calls separate backend-only
+`prepareValidatedRecipeExport(context)` using `prepareRecipeExport(context, options)`
+with `RECIPE_PREPARATION_SYSTEM_PROMPT` v12 and
+the shared `recipe-analyze` quota. `analyzeRecipeText(text)` is import-only,
+retaining v16, full `AiRecipeRaw`, normalization and validation.
+Preparation sends the complete ID-free `recipeContext` projection (name,
+optional description, portions, tags, and every ingredient's display name,
+gram/input amounts, and unit) and all saved `steps` in original array order
+with unchanged `order`, optional `title`, and `description` as untrusted JSON
+data. The Strict `recipe_export_preparation` provider schema returns only
+`{ version: 1, teaser, totalTimeMinutes, difficulty, steps }`, with step fields
+`{ order, description, sourceStepOrders }`. Every field is required and every
+object rejects additional properties. No recipe name, portions, tags,
+ingredients, keys, or source steps are returned. The same lazy client,
+deployment/API version, temperature 0.2, and 2048-token budget remain:
+one initial draft plus at most two corrections, with no SDK retries, fallback,
+full-recipe wrapper or renderer payload. For pure measured text overflow, the
+provider receives only the affected texts with actual and available pixel bounds
+and a short instruction to shorten without changing meaning. The strict
+`recipe_text_correction` response contains one string per target in matching
+order. The server replaces only those strings; metadata, references, step count
+and all other text stay unchanged. Multiple overflow fields share one call.
+Structural/reference or mixed errors use the separate
+`RECIPE_PREPARATION_CORRECTION_SYSTEM_PROMPT` v12 and the existing full-draft
+correction request. Initial generation has no correction instructions.
+Preparation v12 starts total time at `null` and requires an explicit source total
+or a completely timed, explicitly sequential full workflow before returning a
+number. Numbered steps and separate components do not prove sequence. Untimed
+preparation plus 40 minutes baking, or 15 minutes sauce plus 10 minutes pasta
+without complete timing and explicit sequence, requires `null`; the individual
+cooking times remain in the export steps. This is a prompt rule, not a semantic
+runtime guarantee; suggestions still require user review.
+Mixed errors share one correction call; they are not silently repaired by text
+shortening. All overflow-only targets still share one short text correction
+call. Prompt separation adds no calls or budget changes. Every merged draft
+is fully validated and measured again. The original recipe is never rewritten.
+The route does not persist recipe data and accepts only the strict
+`{ "contractVersion": 2 }` request; `{}`, missing or
 invalid JSON, unknown fields, and unsupported versions return
 `400 invalid_export_preparation_request`. No client ETag is required. If
 `If-Match` is supplied, a stale or non-exact ETag returns
@@ -198,15 +232,113 @@ Preparation reads the current recipe server-side and does not expose AI
 ingredient keys, map them to saved recipe ingredient IDs, or return
 ingredient-resolution states. Existing saved ingredients remain unchanged and
 their IDs are not part of this transient suggestion. Preparation validates the
-export text limits, nullable metadata, contiguous export-step order, and complete
-ordered source-step coverage. Unused AI ingredient fields and ingredient-key
-references do not block this text-only response; full Recipe Analyze validation
-continues to enforce them for recipe import. The validated AI result is
+Shared limits (1..5 non-empty descriptions, at most 90 characters each, teaser
+1..96, nullable positive integer time up to 10080, and nullable trimmed,
+non-empty single-line difficulty) and contiguous export-step orders 1..K.
+Saved source orders must be positive, unique, and ascending, not necessarily
+contiguous. Reference groups must be non-empty, known and locally ascending;
+references are globally unique and groups ascend by their FIRST reference.
+The flattened list need not ascend: `[1,4,6],[5]` is valid for Preparation,
+`[5],[1,4,6]` is not. Gaps are allowed; no full coverage or adjacent-only
+partition is required. Import retains its strictly ascending flattened trace
+and ingredient validation. Extra fields, including ingredients/keys, are
+rejected in the small Preparation output rather than ignored. The validated AI result is
 tracked exactly once; quota, provider, and validation failures do not track
 usage. Preparation does not update the recipe or its confirmed `exportView`;
 saving still requires the separate explicit confirmation flow.
+`validateRecipeExportPreparationOutput(output, recipe.steps)` validates against
+the separate saved source; the provider returns no replacement source steps.
+Duplicate/unknown references, local or first-reference group reversals, invalid
+source orders, empty text and limit violations are rejected; final correction
+exhaustion returns 422. Omissions alone do
+not. Empty saved steps or exclusively blank source descriptions returns 422
+before quota/provider work. No sorting, renumbering, padding, truncation,
+identity repair or invented fallback is performed. Each whole draft is validated
+and its complete teaser/step array is measured with the production text-only
+probe, including after step-count changes. This establishes generated-text fit
+in the saved-title context, not whole-image/Share success or general cooking-core
+preservation, component fidelity or metadata derivation. Existing 1..5/90/96
+limits and fonts/layout remain; no universal 23-character/11-character-word cap,
+three-line product rule, truncation or new font/layout fallback is introduced.
+The v11 creation prompt requests a complete understandable compact detail-image workflow
+by grouping related actions after reading the entire recipe, not selecting
+five original steps. Central preparation/full cooking, essential separate sides
+or sauces and necessary transitions are prompt requirements. Optional details
+may be omitted; retained claims/metadata must be source-backed without invention
+or contradiction. Fixture rubrics and user review remain separate from runtime.
+The AI chooses which actions to combine and may omit self-explanatory steps and
+secondary details when the result remains understandable and cookable. Retained
+actions must keep the original order, including within combined steps. There is
+no adjacent-only grouping requirement. For FIRST-reference order errors, the
+separate correction prompt directs moving whole export steps into ascending first-source order,
+preserving their text/references and renumbering export orders 1..K. Runtime
+reference validation is unchanged; other reported errors can still need edits.
+
+Preparation v12 explicitly preserves source cooking endpoints, not just cooking
+durations, in initial, full-draft and text-only correction prompts. Total time
+requires an explicit source total or a completely timed, explicitly sequential
+workflow. Untimed preparation/preheating/resting and unknown overlap require
+`null`, not guessed additions or component-time sums. These are prompt rules;
+runtime remains structural/reference/geometric. Independent fixture metadata
+assertions require `null` for the unchanged rice, oven, pasta and forced-dough
+sources. Oven content remains `MANUAL VALIDATION REQUIRED`.
+
+[Partial] Q-21 correction attempt 1 (v10, 2026-10-10) failed independent F/R/G.
+The second and final local candidate is v11. It decides aggregate time from
+the complete source before compression, prioritizes essential separate cooking
+and doneness over optional details, and checks FIRST-reference order in the
+prompt without changing runtime validation or free grouping. Final-candidate
+F/R/G belong to independent QA; oven human review is not performed. No
+deployment is authorized. Dated evidence does not certify this candidate.
+
+[Partial] Current B-2 r3 / QA-R1 is implemented, NOT ACCEPTED and release CLOSED:
+519 focused and 1600 backend units passed; typecheck/build exited 0. Required
+F exited 1 (5 executed / 2 passed / 3 failed / 9 skipped): version guard and
+pasta pass. Rice returns 422 (FIRST 6 before 5 and overflows); oven fits/200
+but fails source binding (source-3 cream action appears in the source-4 group);
+forced dough exhausts with the same overflow/422, independent semantics NOT_REACHED.
+The r2 pasta/dough lexical failures were not demonstrated cooking corruption.
+Their narrow test-only corrections are locally tested, pending independent QA;
+historical FAIL records and the QA register remain unchanged. R/G remain
+NOT_RUN_REQUIRED_LIVE_FAILURE. The loop is NOT deployed to Alpha; the historical
+14:12 release deployed only step-overflow logging. See
+[current evidence and error/logging boundaries](../tech/06-ai-integrations.md#preparation-feedback-loop-current-r3-qa-r1)
+and the [D-1-R1 handoff](../../User%20Stories/Reciepe/D-1_Feedback-Loop_Handoff_2026-10-09-r1.md).
+
+[Partial] Historical B-19 v4/v16 (2026-10-09) is implemented, not accepted: upstream offline
+gates passed (1437 units, typecheck/build), but all executed F/R/G live gates
+exited 1. All three Preparation fixtures ran in each: saved8 rice and oven
+FAIL, pasta PASS. Rice groups start 6 before 5; oven repeats reference 3.
+Both return 422/usage0/writes0/unchanged=true. Only pasta completes success
+assertions; the complete all-three cooking-core/success-path proof remains unmet.
+This documents actual code despite FAIL, not QA, merge, release or Share
+approval. See the [B-19 handoff](../../User%20Stories/Reciepe/B-19_Recipe-Preparation_Handoff_2026-10-09.md)
+and [current evidence boundary](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
+
+Historical v2 live evidence remains FAIL, with stopped serial runs UNVERIFIED; see the
+[B-16 handoff](../../User%20Stories/Reciepe/B-16_Recipe-Preparation-v2_Handoff_2026-10-09.md).
+The B-18 evidence from 2026-10-09 for v16/v3 is not a quality PASS: the focused gate
+skipped every test (UNVERIFIED); separate Recipe and overall gates failed on
+missing preparation finish-cooking, despite observed 200/one call/one usage/no
+writes/unchanged source. Later V2-body/usage-order assertions were not reached.
+The subsequent B-18C test-only correction accepts the allowed finish-cooking
+and serving combination; its executed F/R/G gates still FAIL. Production
+versions, source/export contract, and runtime quality boundary are unchanged.
+See [the current evidence boundary](../tech/06-ai-integrations.md#preparation-v2-evidence-boundary).
+Preparation uses the current saved recipe, not a historical replay; the private
+original recipe and deployed revision are unavailable for historical validation.
 
 ### Sharing a Confirmed Export View or Request Draft
+
+The user removed the oven fixture's automated regex content rubric and its
+static content tests. Its live eval retains provider, schema, reference,
+production text-fit, deadline, quota and no-write checks. On technical success
+it outputs the original recipe and generated answer with
+`MANUAL_VALIDATION_REQUIRED` instead of claiming semantic acceptance. Cooking
+content is reviewed from those actual live outputs. Other fixture rubrics and
+runtime reference validation are unchanged. This test-only change does not
+reclassify historical live FAIL records, prove a new live result, or open the
+release gate.
 
 `POST /api/recipes/{id}/share-bundle` accepts an optional top-level
 `exportViewDraft`. When supplied, this unconfirmed request-only value is used
@@ -302,6 +434,8 @@ the user back to the wizard.
 - `order: number` — step sequence
 - `title?: string` — optional step title
 - `description: string` — instruction text
+
+[Rule] Recipe analysis keeps explicitly numbered input instructions one-to-one in complete ordered source steps. Export suggestions contain 1..5 non-empty German descriptions of at most 90 characters each, with orders 1..K. They preserve the recipe-specific cooking core, not every source detail. Compression is allowed even for at most five source steps; no exact-min count, padding, first-five truncation, or full-preservation packing is required. Import references follow the ordered unique subset rule above; saved-recipe Preparation uses locally ascending, globally unique references with groups ascending by first reference. Runtime validates structure/references, not general cooking semantics; fixture quality checks and explicit user review remain separate.
 
 There is no top-level recipe notes field and no step-level notes field in the persistent recipe contract. Historical notes are stripped from API responses and cleaned lazily on the next recipe update. No global Cosmos migration is required.
 

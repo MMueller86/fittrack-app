@@ -1,0 +1,20 @@
+{
+  "exit": 0,
+  "baseline": "docs/User Stories/Reciepe/Q21-CORR2-2026-10-10-baseline.json",
+  "note": "Baseline captured after first regression-test edit, before all production edits; first test file is owned",
+  "foreignFilesPreserved": 1054,
+  "historyFilesPreserved": 382,
+  "candidateFilesStable": 20,
+  "protectedRuntimeUnchanged": [
+    "backend/src/lib/openai.ts",
+    "backend/src/lib/recipePreparation.ts",
+    "backend/src/lib/recipeAnalyzeValidation.ts",
+    "backend/src/lib/dailyInsightValidation.ts",
+    "backend/src/functions/recipes.ts",
+    "backend/src/lib/quota.ts",
+    "backend/src/lib/quotaConfig.ts"
+  ],
+  "registerUnchanged": true,
+  "round1HandoffManifestUnchanged": true,
+  "liveCalls": 0
+}

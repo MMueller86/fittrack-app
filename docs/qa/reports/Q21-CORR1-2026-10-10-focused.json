@@ -1,0 +1,39 @@
+{
+  "stage": "focused",
+  "startedAt": "2026-10-09T23:48:22.095Z",
+  "finishedAt": "2026-10-09T23:49:06.881Z",
+  "args": [
+    "C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\node_modules\\vitest\\vitest.mjs",
+    "run",
+    "src/lib/recipeAnalyzeValidation.test.ts",
+    "src/lib/recipePreparation.test.ts",
+    "src/lib/openai.test.ts",
+    "src/functions/recipes.test.ts",
+    "src/functions/ai.test.ts",
+    "src/functions/instagramRecipe.test.ts",
+    "src/lib/instagramRenderer/__tests__/recipeDetailsTemplate.test.ts",
+    "src/test-utils/weeklyInsightEvalSemantics.test.ts",
+    "src/lib/prompts/dailyInsightPrompt.test.ts",
+    "src/lib/prompts/dailyInsightPromptManifest.test.ts",
+    "src/lib/dailyInsightValidation.test.ts",
+    "src/functions/dailyInsight.test.ts",
+    "--silent",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\qa\\reports\\Q21-CORR1-2026-10-10-focused-Report.json"
+  ],
+  "cwd": "backend",
+  "exit": 0,
+  "signal": null,
+  "counts": {
+    "total": 669,
+    "passed": 669,
+    "failed": 0,
+    "skipped": 0
+  },
+  "outputPath": "docs/qa/reports/Q21-CORR1-2026-10-10-focused-Output.txt",
+  "outputSha256": "6ceca2b8f132bc134cb5f5e6471cf96f0c107e297f96c137c2dfeedf0322af8e",
+  "testReport": "docs/qa/reports/Q21-CORR1-2026-10-10-focused-Report.json",
+  "reportSha256": "c4a90089fc6d09dbed6e742cf74f66a92817e257b741305acd175e8d8109712a",
+  "synthetic": []
+}

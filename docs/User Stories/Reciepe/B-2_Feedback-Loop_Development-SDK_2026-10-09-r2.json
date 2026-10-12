@@ -1,0 +1,29 @@
+{
+  "command": [
+    "C:\\Program Files\\nodejs\\node.exe",
+    "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+    "exec",
+    "--workspace=backend",
+    "--",
+    "vitest",
+    "run",
+    "src/lib/openai.recipeAnalyze.test.ts",
+    "--reporter=default",
+    "--reporter=json",
+    "--outputFile=C:\\Users\\mmueller\\OneDrive - PRODYNA SE\\fittrack-app\\docs\\User Stories\\Reciepe\\B-2_Feedback-Loop_Development-SDK-Report_2026-10-09-r2.json"
+  ],
+  "startedAt": "2026-10-09T15:50:49.687Z",
+  "endedAt": "2026-10-09T15:50:52.848Z",
+  "exit": 0,
+  "signal": null,
+  "candidateSha256": null,
+  "outputSha256": "f9ecb63513d49e2d135c041cedc67d83e273da2ed4d2c0ca621b475a5080be5e",
+  "reportSha256": "42f565c1c73ca863c6bcff4b8a9e076b6f91b251e24b030fff6480556aa4cd47",
+  "counts": {
+    "executed": 18,
+    "passed": 18,
+    "failed": 0,
+    "skipped": 0
+  },
+  "failures": []
+}
