@@ -5,7 +5,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -28,6 +27,9 @@ import type {
 import { profileApi } from '../../shared/api/profileApi';
 import { listWeights } from '../../services/weightsService';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { InfoOverlay } from '../../shared/components/InfoOverlay';
+import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
+import { ProfileGroup, ProfileRow } from './ProfileGroup';
 import type { ProfileStackParamList } from '../../app/navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileEdit'>;
@@ -158,6 +160,9 @@ function ChipButton({ label, selected, onPress }: { label: string; selected: boo
       style={[styles.chip, selected && styles.chipSelected]}
       onPress={onPress}
       activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected }}
     >
       <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
     </TouchableOpacity>
@@ -205,6 +210,8 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
 
   const [form, setForm] = useState<FormState>(() => profileToForm(existing));
   const [loading, setLoading] = useState(false);
+  const [saveErrorVisible, setSaveErrorVisible] = useState(false);
+  const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
   // Pre-fill current weight from diary when creating a new profile
   useEffect(() => {
@@ -240,7 +247,7 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
     const stepsPerDay = form.stepsUnknown ? null : (form.stepsPreset ?? (form.stepsPerDay ? parseInt(form.stepsPerDay, 10) : null));
     const activityLevel = form.stepsUnknown ? form.activityLevel : null;
     if (stepsPerDay === null && activityLevel === null) {
-      Alert.alert('Fehler', 'Bitte Schritte oder Aktivitätslevel angeben.');
+      showSnackbar({ message: 'Bitte Schritte oder Aktivitätslevel angeben.' });
       return;
     }
     const input = {
@@ -267,35 +274,10 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
       }
       navigation.goBack();
     } catch {
-      Alert.alert('Fehler', 'Profil konnte nicht gespeichert werden. Bitte erneut versuchen.');
+      setSaveErrorVisible(true);
     } finally {
       setLoading(false);
     }
-  }
-
-  async function handleDelete() {
-    Alert.alert(
-      'Profil löschen',
-      'Möchtest du dein Profil wirklich löschen? Alle persönlichen Daten und Zielwerte werden entfernt. Beim nächsten App-Start wirst du erneut nach einem Profil gefragt.',
-      [
-        { text: 'Abbrechen', style: 'cancel' },
-        {
-          text: 'Löschen',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await profileApi.deleteProfile();
-              navigation.goBack();
-            } catch {
-              Alert.alert('Fehler', 'Profil konnte nicht gelöscht werden. Bitte erneut versuchen.');
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ],
-    );
   }
 
   // ---------------------------------------------------------------------------
@@ -307,14 +289,22 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.navHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <TouchableOpacity
+            style={styles.navAction}
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Abbrechen"
+          >
             <Text style={styles.cancelText}>Abbrechen</Text>
           </TouchableOpacity>
-          <Text style={styles.navTitle}>{isNew ? 'Profil anlegen' : 'Profil bearbeiten'}</Text>
+          <Text style={styles.navTitle} accessibilityRole="header">{isNew ? 'Profil anlegen' : 'Profil bearbeiten'}</Text>
           <TouchableOpacity
+            style={styles.navAction}
             onPress={handleSave}
             disabled={!isValid() || loading}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="Speichern"
+            accessibilityState={{ disabled: !isValid() || loading }}
           >
             {loading
               ? <ActivityIndicator color={colors.primary} size="small" />
@@ -492,6 +482,9 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
             onPress={handleSave}
             disabled={!isValid() || loading}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Speichern"
+            accessibilityState={{ disabled: !isValid() || loading }}
           >
             {loading
               ? <ActivityIndicator color={colors.background} />
@@ -499,20 +492,22 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
             }
           </TouchableOpacity>
 
-          {/* Danger zone — nur bei bestehendem Profil */}
+          {/* Konto — Platzhalter ohne Aktion; Löschfunktion folgt später */}
           {!isNew && (
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={handleDelete}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.deleteButtonText}>Profil löschen</Text>
-            </TouchableOpacity>
+            <ProfileGroup title="Konto">
+              <ProfileRow label="Konto löschen" detail="Wird später verfügbar" iconName="trash-2" disabled />
+            </ProfileGroup>
           )}
 
         </ScrollView>
       </KeyboardAvoidingView>
+      <InfoOverlay
+        visible={saveErrorVisible}
+        title="Speichern fehlgeschlagen"
+        body="Das Profil konnte nicht gespeichert werden. Bitte versuche es erneut."
+        onClose={() => setSaveErrorVisible(false)}
+      />
+      <Snackbar ref={snackbarRef} />
     </SafeAreaView>
   );
 }
@@ -528,12 +523,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  navTitle: { ...typography.h3, color: colors.text },
+  navAction: { minHeight: spacing.xxl, justifyContent: 'center' },
+  navTitle: { ...typography.h3, color: colors.text, flexShrink: 1, textAlign: 'center' },
   cancelText: { ...typography.body1, color: colors.textSecondary },
   saveText: { ...typography.button, color: colors.primary },
   saveTextDisabled: { color: colors.textDisabled },
@@ -553,16 +550,17 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
     marginTop: spacing.md,
     marginBottom: spacing.sm,
   },
 
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.sm },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
   chip: {
+    minHeight: spacing.xxl,
+    justifyContent: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: 20,
+    borderRadius: radius.full,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
@@ -581,7 +579,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
   },
-  textInput: { flex: 1, color: colors.text, fontSize: 16, paddingVertical: spacing.md },
+  textInput: { flex: 1, color: colors.text, fontSize: typography.body1.fontSize, paddingVertical: spacing.md },
   unitText: { ...typography.body2, color: colors.textMuted, marginLeft: spacing.sm },
 
   optionRow: {
@@ -605,28 +603,19 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   goalCardSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  goalTitle: { ...typography.body1, color: colors.text, fontWeight: '600', marginBottom: 2 },
+  goalTitle: { ...typography.body1, color: colors.text, fontWeight: '600' },
   goalTitleSelected: { color: colors.primaryBright },
   goalDesc: { ...typography.caption, color: colors.textMuted },
 
   saveButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.sm,
+    minHeight: spacing.xxl,
     paddingVertical: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: spacing.xl,
   },
   saveButtonDisabled: { opacity: 0.4 },
   saveButtonText: { ...typography.button, color: colors.background },
-
-  deleteButton: {
-    borderWidth: 1,
-    borderColor: colors.negative,
-    borderRadius: radius.sm,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  deleteButtonText: { ...typography.button, color: colors.negative },
 });

@@ -28,6 +28,7 @@ import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
+import { isRemoteImageUri } from '../../../shared/components/foodProductSummaryUtils';
 import { recipeApi } from '../../../shared/api/recipeApi';
 import { resolveRecipeQuickEntryPortions } from '../../recipes/recipeUtils';
 import {
@@ -309,7 +310,7 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
           foodRefType: product.source === 'openFoodFacts' ? 'catalog' : 'personal',
           displayName: product.name,
           displayBrand: product.brand,
-          imageUrl: product.imageUrl ?? null,
+          imageUrl: isRemoteImageUri(product.imageUrl) ? product.imageUrl : null,
           nutritionPer100g: product.nutritionPer100g,
           portion: product.portion ?? null,
         });
@@ -377,7 +378,7 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
         amountGrams: gramsValue,
         calculatedNutrition: calcNutrition,
         sourceType: product.source === 'library' ? 'reusableItem' : product.source,
-        imageUrl: product.imageUrl ?? null,
+        imageUrl: isRemoteImageUri(product.imageUrl) ? product.imageUrl : null,
       });
       const newItem = result.meal.items[result.meal.items.length - 1];
       onAdded(product.name, mealId, newItem?.id ?? '');

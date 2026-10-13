@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildDirectAddItemInput,
   canSelectFoodRelation,
   computeLastUsageText,
   computeMacroText,
   computeDirectAddLabel,
 } from './FoodEntryHub.utils';
-import { canToggleFavorite, isUnavailableRecipeRelation } from './RelationRow.utils';
+import { buildRelationFavoriteInput, canToggleFavorite, isUnavailableRecipeRelation } from './RelationRow.utils';
 import type { UserFoodRelation } from '@fittrack/shared';
 
 function makeItem(overrides: Partial<UserFoodRelation>): UserFoodRelation {
@@ -224,6 +225,58 @@ describe('computeDirectAddLabel', () => {
 
     expect(computeDirectAddLabel(unavailable, 'fuerDich')).toBeNull();
     expect(computeDirectAddLabel(gramsMode, 'fuerDich')).toBeNull();
+  });
+});
+
+describe('buildDirectAddItemInput imageUrl', () => {
+  const amounts = {
+    nutritionPer100g: { calories: 200, protein: 10, carbs: 20, fat: 5 },
+    inputAmount: 50,
+    amountGrams: 50,
+  };
+
+  it('keeps a remote image URL', () => {
+    const input = buildDirectAddItemInput(makeItem({ imageUrl: 'https://example.invalid/a.jpg' }), amounts);
+    expect(input.imageUrl).toBe('https://example.invalid/a.jpg');
+  });
+
+  it('never sends a blob path (backend validates imageUrl as URL)', () => {
+    const input = buildDirectAddItemInput(makeItem({ imageUrl: 'user-1/item-1.jpg' }), amounts);
+    expect(input.imageUrl).toBeNull();
+  });
+
+  it('sends null when the relation has no image', () => {
+    expect(buildDirectAddItemInput(makeItem({ imageUrl: undefined }), amounts).imageUrl).toBeNull();
+    expect(buildDirectAddItemInput(makeItem({ imageUrl: null }), amounts).imageUrl).toBeNull();
+  });
+
+  it('keeps the remaining payload unchanged', () => {
+    const input = buildDirectAddItemInput(makeItem({ foodRefType: 'catalog', preferredInputMode: 'portion' }), amounts);
+    expect(input).toMatchObject({
+      productId: 'ref1',
+      productName: 'Test',
+      inputMode: 'portion',
+      inputAmount: 50,
+      amountGrams: 50,
+      sourceType: 'openFoodFacts',
+      calculatedNutrition: { calories: 100, protein: 5, carbs: 10, fat: 2.5 },
+    });
+  });
+});
+
+describe('buildRelationFavoriteInput imageUrl', () => {
+  it('keeps a remote image URL', () => {
+    const input = buildRelationFavoriteInput(makeItem({ imageUrl: 'https://example.invalid/a.jpg' }));
+    expect(input.imageUrl).toBe('https://example.invalid/a.jpg');
+  });
+
+  it('never sends a blob path (backend validates imageUrl as URL)', () => {
+    const input = buildRelationFavoriteInput(makeItem({ imageUrl: 'user-1/item-1.jpg' }));
+    expect(input.imageUrl).toBeNull();
+  });
+
+  it('sends null when the relation has no image', () => {
+    expect(buildRelationFavoriteInput(makeItem({ imageUrl: undefined })).imageUrl).toBeNull();
   });
 });
 

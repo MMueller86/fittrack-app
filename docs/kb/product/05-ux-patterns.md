@@ -437,12 +437,39 @@ Das Tages-Overlay hält Kalorienvergleich und absolute Makrowerte als getrennte 
 
 **Aktueller Implementierungsstand (2026-08-19):** Links im Header steht `Letzte 7 Tage`; rechts oben steht einzeilig `Zielerreichung: <Wert>`. Darunter folgt rechtsbündig nur `<Gegessen> / <Ziel> kcal` ohne sichtbares Ziel-Label. Die beiden unteren Bilanzzeilen entfallen. Über jedem Balken stehen Prozentwert und Tages-kcal ohne wiederholte `kcal`-Einheit; die Einheit bleibt im Header und in den Accessibility-Beschreibungen erhalten. Diese Regel ersetzt die frühere Beschreibung von zwei Bilanzzeilen unter dem Diagramm.
 
+## Profil-Hub
+
+Tab und Hauptscreen heißen sichtbar `Profil` (Route-ID `Profile`, Screen `ProfileScreen`; Begründung des Labels in [02-navigation.md](02-navigation.md#tab-label-profil-entscheidung)). Der Hub zeigt den Titel `Profil`, genau eine Karte (`Basisdaten`) und darunter die Navigationsgruppen als `ProfileGroup` mit `ProfileRow`-Zeilen (`mobile/src/modules/profile/ProfileGroup.tsx`). Es gibt keine `Bearbeiten`-Aktion im Hub. `Alltag & Training`, `Ziel` und `Tagesziele` stehen im read-only Screen `ProfileDetails` (`Profil & Tagesziele`), dessen Header-Aktion `Bearbeiten` `ProfileEdit` öffnet. Karten und Zustandsansichten sind in `ProfileSummaryCards.tsx` und `ProfileStateViews.tsx` gekapselt; `useProfileData.ts` lädt `GET /api/profile` für beide Screens (Laden bei Fokus, Pull-to-Refresh). Gruppen und Einträge sind in `profileHubGroups.ts` definiert; die Reihenfolge ist fest:
+
+1. `Persönliche Daten` — `Profil & Tagesziele` (Detailzeile `Details ansehen und bearbeiten`) → `ProfileDetails`. Nur sichtbar, wenn ein Profil geladen ist (kein toter Link).
+2. `Bibliothek` — Eintrag zu `LibraryScreen` (ersetzt den früheren zweiten Tab `Meine Lebensmittel` und die Header-Aktion `Bibliothek`).
+3. `Integrationen` — `Health Connect`.
+4. `Gemeinsam` — [Planned] Freunde / gemeinsamer Haushalt (Arbeitsname). Einfügeposition 4; wird erst gerendert, sobald ein Eintrag in `PROFILE_HUB_ENTRIES.shared` existiert.
+5. `Rechtliches` — `Impressum` und `Datenschutzerklärung` als native, scrollbare In-App-Seiten (`mobile/src/modules/legal`, Routen `Imprint` / `PrivacyPolicy`). Fester Platz am Ende. Der Text steht an genau einer Stelle (`legalTexts.ts`) und ist wortgleich zu `docs/legal/*.md`; `legalTexts.test.ts` prüft die Gleichheit. Die Datenschutzerklärung ist zusätzlich über `LoginScreen` und `ProfileWizardScreen` (Willkommensschritt, Vorschau vor `Profil übernehmen`) erreichbar. Es gibt keine externen Legal-Links. Der Text ist ein pragmatischer Alpha-Text ohne juristische Prüfung (vor öffentlichem Release neu bewerten).
+
+[Rule] Leere Gruppen, tote Routen und scheinbar aktive Platzhalter werden nicht gerendert. Einzige Ausnahme ist der deaktivierte Eintrag `Konto löschen` / `Wird später verfügbar` in der Profilbearbeitung (`ProfileRow` mit `disabled`; ohne Aktion, ohne `DELETE /api/profile`, `accessibilityState.disabled`).
+
+**Hub-Zustände:** Titel und die Gruppen `Bibliothek`, `Integrationen`, `Rechtliches` werden in jedem Zustand gerendert. Der Kartenplatz zeigt je nach Zustand `Basisdaten`, einen `ActivityIndicator` (Laden), `Profil konnte nicht geladen werden` mit `Erneut versuchen` (Fehler) oder `Noch kein Profil` mit `Profil einrichten` (nur nach erfolgreichem Request ohne Profil); `Persönliche Daten` fehlt in allen Zuständen außer „Profil geladen“. Schlägt ein späterer Refresh fehl, bleiben bereits geladene Daten sichtbar und eine `Snackbar` meldet `Profil konnte nicht aktualisiert werden.`. `ProfileDetails` zeigt dieselben Lade-/Fehlerzustände zentriert; ohne Profil erscheint `Noch kein Profil` ohne `Bearbeiten` und ohne Einrichten-Button. Fehler beim Speichern in `ProfileEdit` erscheinen als `InfoOverlay`, Validierungshinweise als `Snackbar`; `Alert.alert` wird in diesen Screens nicht verwendet.
+
+Die Health-Connect-Aktivierung nennt vor jeder Aktivierung Datenkategorie (`Gewicht` bzw. `Ernährung`) und Ziel `Health Connect auf deinem Gerät`, ohne Bezug auf Google-Cloud oder Google-Konto (`healthConnectCopy.ts`).
+
 ## Favorite Heart Toggle
 
 - Shown on search result rows
 - Immediate visual feedback (toggle state)
 - Persisted via `POST /api/favorites` / `DELETE /api/favorites/{foodRef}`
-- [Current] Fully functional — favorite management UI is a separate future story
+- `ResultRow` sends `imageUrl` to `POST /api/favorites` only when it is a loadable remote URL (`isRemoteImageUri`); otherwise it sends `null`. The endpoint validates `imageUrl` as a URL, so a blob path would be rejected.
+
+### Favoriten in der Bibliothek
+
+`Profil > Bibliothek > Favoriten` (`FavoritesView`) verwaltet die Favoriten. Datenquelle bleibt `UserFoodRelation` (`GET /api/favorites`), kein zusätzlicher Request pro Zeile.
+
+- **Produktdarstellung:** Jede Zeile nutzt `FoodProductSummary` — dieselbe Darstellung wie die Zeilen des Search Hub (`SearchState.ResultRow`) und `Eigene Lebensmittel`: 52-pt-Thumbnail, Name, Marke, Herkunfts-Badge (`OFF` / `Eigen` / `Rezept`), Nährwertzeile und Portion. Das Mapping liegt in `favoriteFoodSummary.ts` (`favoriteSummaryProps`). Ohne gespeicherte `nutritionPer100g` entfällt die Nährwertzeile. Die Zeile `n× verwendet` gibt es nicht mehr.
+- **Container:** Favoriten und `Eigene Lebensmittel` teilen sich die Karte `LibraryFoodCard` (Hauptbereich plus rechter 48-pt-Aktionsbutton). Nur die Produktdarstellung ist mit dem Hub identisch, nicht der flache Trennlinien-Container des Bottom Sheets.
+- **Bild:** Eine ladbare Remote-URL zeigt das Bild. Ohne Bild, bei Ladefehler oder wenn `imageUrl` nur ein Blob-Pfad ist (z. B. Foto eines eigenen Lebensmittels, `<userId>/<itemId>.jpg`), erscheint der Buchstaben-Avatar als Fallback. [Open] PO-1: Blob-Pfad-Fotos eigener Lebensmittel bleiben bewusst Avatar (Option C, Parität mit dem Search Hub); eine Auflösung zu ladbaren URLs wäre eine separate Backend-Änderung und ist nicht geplant.
+- **Rezepte:** Ein Rezept ohne Zugriff erscheint als `Rezept nicht verfügbar` ohne Bild und Nährwerte; der Favorit kann trotzdem entfernt werden. Rezepte ohne Marke zeigen `Community-Rezept` bzw. `Eigenes Rezept`.
+- **Aktion:** Einzige Aktion ist das Entfernen über das Herz (rot) am Kartenrand. Es öffnet ein `ConfirmSheet` (`Aus Favoriten entfernen?` / `Entfernen`); bei Fehler erscheint eine `Snackbar` (`Favorit konnte nicht entfernt werden.`). Die Zeile selbst ist nicht tippbar.
+- **Marke:** Favoriten ohne Marke bleiben ohne Marke; erneutes Favorisieren im Hub heilt sie. Die Backend-Regel steht in [domain/03-food-catalog.md](../domain/03-food-catalog.md#favorites-and-quick-entry).
 
 ---
 

@@ -1,4 +1,6 @@
-import type { UserFoodRelation, MealType } from '@fittrack/shared';
+import type { NutritionValues, UserFoodRelation, MealType } from '@fittrack/shared';
+import type { AddItemProductInput } from '../../../shared/api/diaryApi';
+import { isRemoteImageUri } from '../../../shared/components/foodProductSummaryUtils';
 import { isUnavailableRecipeRelation } from './RelationRow.utils';
 
 export function canSelectFoodRelation(
@@ -81,6 +83,35 @@ export function computeDirectAddLabel(
     return `${count} ${unitLabel}`;
   }
   return `${Math.round(preferredInputAmount)} g`;
+}
+
+export interface DirectAddAmounts {
+  nutritionPer100g: NutritionValues;
+  inputAmount: number;
+  amountGrams: number;
+}
+
+export function buildDirectAddItemInput(
+  item: UserFoodRelation,
+  { nutritionPer100g, inputAmount, amountGrams }: DirectAddAmounts,
+): AddItemProductInput {
+  return {
+    productId: item.foodRef,
+    productName: item.displayName,
+    inputMode: item.preferredInputMode ?? 'grams',
+    inputAmount,
+    amountGrams,
+    // foodRefType → backend sourceType enum mapping
+    sourceType: item.foodRefType === 'catalog' ? 'openFoodFacts' : item.foodRefType === 'personal' ? 'reusableItem' : item.foodRefType,
+    // Blob-Pfade eigener Produkte sind keine URL; das Backend lehnt sie ab (z.string().url()).
+    imageUrl: isRemoteImageUri(item.imageUrl) ? item.imageUrl : null,
+    calculatedNutrition: {
+      calories: nutritionPer100g.calories * amountGrams / 100,
+      protein: nutritionPer100g.protein * amountGrams / 100,
+      carbs: nutritionPer100g.carbs * amountGrams / 100,
+      fat: nutritionPer100g.fat * amountGrams / 100,
+    },
+  };
 }
 
 export function computeMacroText(item: UserFoodRelation): string | null {

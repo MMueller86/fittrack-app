@@ -28,7 +28,13 @@ import { syncLogger, type SyncLogEntry } from '../../services/health/syncLogger'
 import type { UserProfile } from '@fittrack/shared';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
+import { Icon } from '../../shared/components/Icon';
 import { SyncStatusSheet } from './SyncStatusSheet';
+import {
+  HEALTH_CONNECT_TARGET,
+  NUTRITION_SYNC_NOTICE,
+  WEIGHT_SYNC_NOTICE,
+} from './healthConnectCopy';
 
 const IS_DEV = process.env.EXPO_PUBLIC_APP_VARIANT === 'development';
 const IS_DEBUG_BUILD =
@@ -50,8 +56,8 @@ function StatusChip({
 }) {
   const config: Record<string, { label: string; bg: string; text: string }> = {
     available: { label: 'Verfügbar', bg: colors.primarySoft, text: colors.primaryBright },
-    not_available: { label: 'Nicht unterstützt', bg: '#3D1A1A', text: '#E26B6B' },
-    update_required: { label: 'Update erforderlich', bg: '#3D2E0A', text: '#C8961F' },
+    not_available: { label: 'Nicht unterstützt', bg: colors.surfaceMuted, text: colors.negative },
+    update_required: { label: 'Update erforderlich', bg: colors.surfaceMuted, text: colors.warning },
     error: { label: 'Status unbekannt', bg: colors.surfaceMuted, text: colors.textSecondary },
     sync_active: { label: 'Gewichtssync aktiv', bg: colors.primarySoft, text: colors.primaryBright },
     nutrition_sync_active: { label: 'Ernährungssync aktiv', bg: colors.primarySoft, text: colors.primaryBright },
@@ -61,6 +67,26 @@ function StatusChip({
     <View style={[styles.chip, { backgroundColor: c.bg }]}>
       <Text style={[styles.chipText, { color: c.text }]}>{c.label}</Text>
     </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Pre-activation notice: Datenkategorie und Ziel
+// ---------------------------------------------------------------------------
+
+function SyncNotice({ category, body }: { category: string; body: string }) {
+  return (
+    <>
+      <View style={styles.statusRow}>
+        <Text style={styles.statusLabel}>Datenkategorie</Text>
+        <Text style={styles.noticeValue}>{category}</Text>
+      </View>
+      <View style={styles.statusRow}>
+        <Text style={styles.statusLabel}>Ziel</Text>
+        <Text style={styles.noticeValue}>{HEALTH_CONNECT_TARGET}</Text>
+      </View>
+      <Text style={styles.bodyText}>{body}</Text>
+    </>
   );
 }
 
@@ -421,9 +447,7 @@ export default function HealthConnectScreen({ navigation }: Props) {
                   </>
                 ) : (
                   <>
-                    <Text style={styles.bodyText}>
-                      Deine Gewichtseinträge werden zu Google Health Connect übertragen. Alle vorhandenen und zukünftigen Einträge werden synchronisiert. Änderungen und Löschungen werden übernommen.
-                    </Text>
+                    <SyncNotice category={WEIGHT_SYNC_NOTICE.category} body={WEIGHT_SYNC_NOTICE.body} />
                     <TouchableOpacity
                       style={[styles.primaryButton, activating && styles.buttonDisabled]}
                       onPress={() => void handleEnable()}
@@ -516,9 +540,7 @@ export default function HealthConnectScreen({ navigation }: Props) {
                   </>
                 ) : (
                   <>
-                    <Text style={styles.bodyText}>
-                      Deine Ernährungseinträge werden zu Google Health Connect übertragen. Alle vorhandenen Einträge werden übertragen. Zukünftige Änderungen und Löschungen werden automatisch synchronisiert.
-                    </Text>
+                    <SyncNotice category={NUTRITION_SYNC_NOTICE.category} body={NUTRITION_SYNC_NOTICE.body} />
                     <TouchableOpacity
                       style={[styles.primaryButton, activatingNutrition && styles.buttonDisabled]}
                       onPress={() => void handleEnableNutrition()}
@@ -572,7 +594,7 @@ export default function HealthConnectScreen({ navigation }: Props) {
                 activeOpacity={0.7}
               >
                 <Text style={styles.devLabel}>SYNC LOG ({syncLog.length} Einträge)</Text>
-                <Text style={styles.devLogToggle}>{logExpanded ? '▲' : '▼'}</Text>
+                <Icon lib="feather" name={logExpanded ? 'chevron-up' : 'chevron-down'} size="sm" color={colors.textSecondary} />
               </TouchableOpacity>
 
               {logExpanded && (
@@ -582,7 +604,7 @@ export default function HealthConnectScreen({ navigation }: Props) {
                       <Text style={styles.devButtonText}>Aktualisieren</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.devButton} onPress={() => void clearLog()} activeOpacity={0.7}>
-                      <Text style={[styles.devButtonText, { color: '#E26B6B' }]}>Log leeren</Text>
+                      <Text style={[styles.devButtonText, styles.devButtonTextDanger]}>Log leeren</Text>
                     </TouchableOpacity>
                   </View>
                   {syncLog.length === 0 ? (
@@ -634,10 +656,16 @@ export default function HealthConnectScreen({ navigation }: Props) {
 function renderHeader(onBack: () => void) {
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} activeOpacity={0.7}>
-        <Text style={styles.backIcon}>{'‹'}</Text>
+      <TouchableOpacity
+        onPress={onBack}
+        style={styles.backButton}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Zurück"
+      >
+        <Icon lib="feather" name="chevron-left" size="lg" color={colors.text} />
       </TouchableOpacity>
-      <Text style={styles.title}>Health Connect</Text>
+      <Text style={styles.title} accessibilityRole="header">Health Connect</Text>
       <View style={styles.backButton} />
     </View>
   );
@@ -656,12 +684,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  backButton: { width: 40, alignItems: 'flex-start' },
-  backIcon: { fontSize: 28, color: colors.text, lineHeight: 32 },
+  backButton: { width: spacing.xxl, minHeight: spacing.xxl, alignItems: 'flex-start', justifyContent: 'center' },
   title: { flex: 1, textAlign: 'center', ...typography.h3, color: colors.text },
 
   loader: { marginVertical: spacing.md },
@@ -675,8 +702,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   cardWarning: {
-    borderColor: '#C8961F',
-    backgroundColor: '#1E1A0E',
+    borderColor: colors.warning,
+    backgroundColor: colors.surface,
   },
   cardTitle: {
     ...typography.overline,
@@ -687,11 +714,14 @@ const styles = StyleSheet.create({
 
   statusRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: spacing.sm,
     marginBottom: spacing.sm,
   },
   statusLabel: { ...typography.body2, color: colors.textSecondary },
+  noticeValue: { ...typography.body2, color: colors.text, fontWeight: '600', flexShrink: 1 },
   metaText: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
 
   chip: {
@@ -704,7 +734,6 @@ const styles = StyleSheet.create({
   bodyText: {
     ...typography.body2,
     color: colors.textSecondary,
-    lineHeight: 20,
     marginBottom: spacing.md,
   },
 
@@ -714,47 +743,55 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
   },
-  bannerAmber: { backgroundColor: '#2A1E05', borderColor: '#5C3D0A' },
-  bannerText: { ...typography.body2, color: '#C8961F', lineHeight: 20 },
-  bannerButton: { marginTop: spacing.sm },
-  bannerButtonText: { ...typography.button, color: '#C8961F' },
+  bannerAmber: { backgroundColor: colors.surface, borderColor: colors.warning },
+  bannerText: { ...typography.body2, color: colors.warning },
+  bannerButton: { marginTop: spacing.sm, minHeight: spacing.xxl, justifyContent: 'center' },
+  bannerButtonText: { ...typography.button, color: colors.warning },
 
   primaryButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
-    paddingVertical: spacing.sm + 4,
+    minHeight: spacing.xxl,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: spacing.xs,
   },
-  primaryButtonText: { ...typography.button, color: colors.white },
+  primaryButtonText: { ...typography.button, color: colors.white, textAlign: 'center' },
 
   secondaryButton: {
     backgroundColor: colors.primarySoft,
     borderRadius: radius.md,
-    paddingVertical: spacing.sm + 4,
+    minHeight: spacing.xxl,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: spacing.xs,
   },
-  secondaryButtonText: { ...typography.button, color: colors.primaryBright },
+  secondaryButtonText: { ...typography.button, color: colors.primaryBright, textAlign: 'center' },
 
   destructiveButton: {
-    backgroundColor: '#2D1212',
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
-    paddingVertical: spacing.sm + 4,
+    minHeight: spacing.xxl,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: spacing.sm,
     borderWidth: 1,
-    borderColor: '#5C2020',
+    borderColor: colors.negative,
   },
-  destructiveButtonText: { ...typography.button, color: '#E26B6B' },
+  destructiveButtonText: { ...typography.button, color: colors.negative },
 
   ghostButton: {
-    paddingVertical: spacing.sm + 4,
+    minHeight: spacing.xxl,
+    paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: spacing.xs,
   },
   ghostButtonText: { ...typography.button, color: colors.textMuted },
@@ -762,41 +799,43 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonRow: { gap: spacing.xs },
 
-  warningTitle: { ...typography.body1, color: '#C8961F', fontWeight: '600', marginBottom: spacing.xs },
+  warningTitle: { ...typography.body1, color: colors.warning, fontWeight: '600', marginBottom: spacing.xs },
 
   placeholderTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm, textAlign: 'center' },
-  placeholderBody: { ...typography.body2, color: colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  placeholderBody: { ...typography.body2, color: colors.textSecondary, textAlign: 'center' },
 
   // Dev debug area
   devCard: {
-    backgroundColor: '#0D1A2E',
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: '#1A3A6E',
+    borderColor: colors.border,
     marginTop: spacing.md,
   },
-  devLabel: { ...typography.overline, color: '#4A8FD4', marginBottom: spacing.sm, textTransform: 'uppercase' },
+  devLabel: { ...typography.overline, color: colors.textSecondary, marginBottom: spacing.sm, textTransform: 'uppercase' },
   devButton: {
-    backgroundColor: '#1A2A3E',
+    backgroundColor: colors.surface,
     borderRadius: radius.sm,
+    minHeight: spacing.xxl,
+    justifyContent: 'center',
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderWidth: 1,
-    borderColor: '#2A4A6E',
+    borderColor: colors.border,
   },
-  devButtonActive: { borderColor: '#4A8FD4', backgroundColor: '#1A3A5E' },
-  devButtonText: { ...typography.caption, color: '#6AAAD4' },
+  devButtonActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  devButtonText: { ...typography.caption, color: colors.textSecondary },
+  devButtonTextDanger: { color: colors.negative },
 
-  logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  logActions: { flexDirection: 'row', gap: spacing.xs, marginBottom: spacing.sm },
-  logEntry: { marginBottom: spacing.xs, paddingBottom: spacing.xs, borderBottomWidth: 1, borderBottomColor: '#1A3A6E' },
-  logMeta: { ...typography.caption, color: '#4A8FD4', marginBottom: 2 },
-  logMessage: { ...typography.caption, color: '#A0BDD4', lineHeight: 16 },
-  logError: { color: '#E26B6B' },
-  logWarn: { color: '#C8961F' },
-  logDetail: { ...typography.caption, color: '#6A8A9A', lineHeight: 14, marginTop: 2 },
-  logEmpty: { ...typography.caption, color: '#4A6A7A', textAlign: 'center', paddingVertical: spacing.sm },
-  devLogToggle: { ...typography.caption, color: '#4A8FD4' },
+  logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: spacing.xxl },
+  logActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
+  logEntry: { marginBottom: spacing.xs, paddingBottom: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
+  logMeta: { ...typography.caption, color: colors.textMuted },
+  logMessage: { ...typography.caption, color: colors.textSecondary },
+  logError: { color: colors.negative },
+  logWarn: { color: colors.warning },
+  logDetail: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
+  logEmpty: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.sm },
 });

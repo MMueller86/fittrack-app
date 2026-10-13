@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { Icon } from '../../shared/components/Icon';
 import { healthSyncService } from '../../services/health/healthSyncService';
 import type { PendingOp } from '../../services/health/healthSyncService';
 
@@ -76,10 +77,12 @@ export function SyncStatusSheet({ visible, syncStatus, onClose }: Props) {
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              hitSlop={{ top: spacing.sm, bottom: spacing.sm, left: spacing.sm, right: spacing.sm }}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Schließen"
             >
-              <Text style={styles.closeButtonText}>✕</Text>
+              <Icon lib="feather" name="x" size="md" color={colors.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -160,7 +163,7 @@ export function SyncStatusSheet({ visible, syncStatus, onClose }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: colors.overlay,
   },
   sheetWrapper: {
     flex: 1,
@@ -186,7 +189,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...typography.h3, color: colors.text },
   closeButton: { padding: spacing.xs },
-  closeButtonText: { ...typography.h3, color: colors.textMuted },
 
   scroll: { flexShrink: 1 },
   scrollContent: { padding: spacing.md },
@@ -230,7 +232,7 @@ const styles = StyleSheet.create({
   stackScroll: { maxHeight: 200, marginTop: spacing.xs },
   stackText: {
     fontFamily: 'monospace',
-    fontSize: 11,
+    fontSize: typography.overline.fontSize,
     color: colors.textSecondary,
     lineHeight: 16,
   },

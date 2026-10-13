@@ -34,6 +34,7 @@ positive:        '#67B23E'   // = primary
 warning:         '#F59E0B'   // outside weekly target range
 negative:        '#E26B6B'   // Errors, active heart icon
 neutral:         '#A6B0A4'
+overlay:         'rgba(0,0,0,0.6)' // Scrim behind modal sheets (ConfirmSheet, SyncStatusSheet)
 ```
 
 [Rule] Never hardcode hex values in components. Always use `colors.*` tokens from the theme.

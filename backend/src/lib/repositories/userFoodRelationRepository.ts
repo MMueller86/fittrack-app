@@ -50,6 +50,28 @@ export function stripRecipeRelationCache(relation: UserFoodRelation): UserFoodRe
   return safeRelation;
 }
 
+/**
+ * Wendet geänderte Anzeigefelder auf eine bestehende Nicht-Rezept-Relation an.
+ * displayBrand nur bei nicht leerem String (Merge-Semantik); gibt null zurück,
+ * wenn nichts zu schreiben ist (Rezept oder keine Änderung).
+ */
+export function applyDisplayFields(
+  relation: UserFoodRelation,
+  fields: { displayName?: string; displayBrand?: string },
+): UserFoodRelation | null {
+  if (relation.foodRefType === 'recipe') return null;
+  const nextName = fields.displayName !== undefined && fields.displayName.length > 0 ? fields.displayName : undefined;
+  const nextBrand = typeof fields.displayBrand === 'string' && fields.displayBrand.length > 0 ? fields.displayBrand : undefined;
+  const nameChanged = nextName !== undefined && nextName !== relation.displayName;
+  const brandChanged = nextBrand !== undefined && nextBrand !== relation.displayBrand;
+  if (!nameChanged && !brandChanged) return null;
+  return {
+    ...relation,
+    ...(nameChanged ? { displayName: nextName } : {}),
+    ...(brandChanged ? { displayBrand: nextBrand } : {}),
+  };
+}
+
 export interface UserFoodRelationRepository {
   /**
    * Erstellt einen neuen Eintrag oder aktualisiert Anzeigeinformationen.
@@ -109,6 +131,16 @@ export interface UserFoodRelationRepository {
     nutritionPer100g: NutritionValues,
     portion: PortionInfo | null,
   ): Promise<void>;
+
+  /**
+   * Synchronisiert displayName/displayBrand in bestehenden Nicht-Rezept-Relationen für einen foodRef
+   * nach einer Produktbearbeitung. Legt nie neue Relationen an; leere Marke löscht nicht.
+   */
+  updateDisplayDenormalized(
+    userId: string,
+    foodRef: string,
+    fields: { displayName?: string; displayBrand?: string },
+  ): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +195,7 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
           isFavorite,
           displayName,
           ...(!isRecipe ? {
-            displayBrand,
+            ...(typeof displayBrand === 'string' && displayBrand.length > 0 ? { displayBrand } : {}),
             ...(imageUrl !== undefined ? { imageUrl } : {}),
             ...(nutritionPer100g !== undefined ? { nutritionPer100g } : {}),
             ...(portion !== undefined ? { portion } : {}),
@@ -233,7 +265,9 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
         lastUsedAt: now,
         usageCount: existing.usageCount + 1,
         displayName: input.displayName,
-        ...(input.foodRefType !== 'recipe' ? { displayBrand: input.displayBrand } : {}),
+        ...(input.foodRefType !== 'recipe' && typeof input.displayBrand === 'string' && input.displayBrand.length > 0
+          ? { displayBrand: input.displayBrand }
+          : {}),
         ...(input.foodRefType !== 'recipe' && input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
         ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
         ...(input.lastInputAmount !== undefined ? { lastInputAmount: input.lastInputAmount } : {}),
@@ -305,6 +339,16 @@ class InMemoryUserFoodRelationRepository implements UserFoodRelationRepository {
     if (existing) {
       this.store.set(this.key(userId, foodRef), { ...existing, nutritionPer100g, portion });
     }
+  }
+
+  async updateDisplayDenormalized(
+    userId: string,
+    foodRef: string,
+    fields: { displayName?: string; displayBrand?: string },
+  ): Promise<void> {
+    const existing = this.store.get(this.key(userId, foodRef));
+    const updated = existing ? applyDisplayFields(existing, fields) : null;
+    if (updated) this.store.set(this.key(userId, foodRef), updated);
   }
 }
 

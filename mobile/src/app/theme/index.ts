@@ -28,6 +28,7 @@ const palette = {
   specialActivityOutline: '#C4A1FF', // Lila Akzentfarbe fuer Sonderaktivitaetsmarker.
 
   white: '#FFFFFF',
+  overlay: 'rgba(0, 0, 0, 0.6)',
 } as const;
 
 export const colors = {
@@ -54,6 +55,7 @@ export const colors = {
 
   divider: palette.border,
   white: palette.white,
+  overlay: palette.overlay,
 
   chart: {
     line: palette.primaryBright,

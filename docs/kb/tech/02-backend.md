@@ -117,7 +117,25 @@ Available repositories:
 `UserFoodRelationRepository.recordUsage()` requires the explicit date-only date of
 the diary meal for `usageDates`; it never derives a user date from the server
 clock. `lastUsedAt` and `createdAt` remain UTC instants. Missing internal usage
-dates fail closed in both repository implementations.
+dates fail closed in both repository implementations. For existing non-recipe
+relations, `recordUsage()` and `setFavorite()` update `displayBrand` only when a
+non-empty string is supplied (merge semantics in both implementations), so the
+brand-less diary add path no longer erases a favorite's brand.
+
+`UserFoodRelationRepository.getByFoodRef()` returns `null` only for "not found"
+(Cosmos `code` 404 or no resource). Any other read error is rethrown so
+`setFavorite()` (reported to the client as an error) and the other read-modify-write
+paths never overwrite an existing relation based on a failed read; `recordUsage()`
+stays fire-and-forget and swallows the error without writing.
+The recipe guard in `POST /api/diary/meals/:id/items` (runs for every add with a
+`productId`) is fail-open: if `getByFoodRef()` throws, the handler logs the
+`diary.item.recipeGuardReadFailed` warning (error class only, no user data) and
+treats it as "no relation found", so ordinary foods can still be logged. The
+residual risk is limited to an own recipe id being logged as a free entry; a
+found recipe relation still returns 404.
+`updateDisplayDenormalized()` (called from `PATCH /api/reusable-items/:id` next to
+`updateNutritionDenormalized()`) syncs `displayName`/`displayBrand` into existing
+non-recipe relations only; it never creates relations and skips unchanged values.
 
 ### Daily Insight feedback status boundary
 

@@ -33,7 +33,7 @@ import {
 import { nutritionSyncService } from '../../../services/health/nutritionSyncService';
 import { getLocalIsoDate } from '../../../shared/date/localDate';
 import { colors, radius, spacing, typography } from '../../../app/theme';
-import { canSelectFoodRelation, computeLastUsageText, computeMacroText, computeDirectAddLabel, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
+import { buildDirectAddItemInput, canSelectFoodRelation, computeLastUsageText, computeMacroText, computeDirectAddLabel, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
 export { computeLastUsageText, computeMacroText };
 import { useFoodEntryHubStore } from './useFoodEntryHubStore';
 import { hubReducer, INITIAL_HUB_STATE } from './hubReducer';
@@ -793,22 +793,11 @@ export function FoodEntryHub() {
       const amountGrams = item.preferredInputMode === 'portion'
         ? item.preferredInputAmount * (item.portion?.weightGrams ?? 100)
         : item.preferredInputAmount;
-      const result = await diaryApi.addItem(mealId, {
-        productId: item.foodRef,
-        productName: item.displayName,
-        inputMode: item.preferredInputMode ?? 'grams',
+      const result = await diaryApi.addItem(mealId, buildDirectAddItemInput(item, {
+        nutritionPer100g: item.nutritionPer100g,
         inputAmount: item.preferredInputAmount,
         amountGrams,
-        // foodRefType → backend sourceType enum mapping
-        sourceType: item.foodRefType === 'catalog' ? 'openFoodFacts' : item.foodRefType === 'personal' ? 'reusableItem' : item.foodRefType,
-        imageUrl: item.imageUrl,
-        calculatedNutrition: {
-          calories: item.nutritionPer100g.calories * amountGrams / 100,
-          protein: item.nutritionPer100g.protein * amountGrams / 100,
-          carbs: item.nutritionPer100g.carbs * amountGrams / 100,
-          fat: item.nutritionPer100g.fat * amountGrams / 100,
-        },
-      });
+      }));
       const items = result.meal?.items ?? [];
       const itemId = items[items.length - 1]?.id ?? '';
       handleQuantityAdded(item.displayName, mealId, itemId);

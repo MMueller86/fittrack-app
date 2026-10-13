@@ -8,7 +8,8 @@ import type { UserFoodRelation } from '@fittrack/shared';
 import { Icon } from '../../../shared/components/Icon';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
-import { canToggleFavorite, isUnavailableRecipeRelation, thumbnailBorderWidth } from './RelationRow.utils';
+import { FOOD_THUMBNAIL_SIZE } from '../../../shared/components/foodProductSummaryUtils';
+import { buildRelationFavoriteInput, canToggleFavorite, isUnavailableRecipeRelation, thumbnailBorderWidth } from './RelationRow.utils';
 export { thumbnailBorderWidth };
 
 export interface RelationRowProps {
@@ -22,8 +23,6 @@ export interface RelationRowProps {
   directAddLabel?: string;
   directAddLoading?: boolean;
 }
-
-const THUMBNAIL_SIZE = 50;
 
 // ---------------------------------------------------------------------------
 // Thumbnail
@@ -89,15 +88,7 @@ export const RelationRow = React.memo(function RelationRow({
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       if (next) {
-        await favoritesApi.addFavorite({
-          foodRef: relation.foodRef,
-          foodRefType: relation.foodRefType,
-          displayName: relation.displayName,
-          displayBrand: relation.displayBrand,
-          imageUrl: relation.imageUrl,
-          nutritionPer100g: relation.nutritionPer100g,
-          portion: relation.portion,
-        });
+        await favoritesApi.addFavorite(buildRelationFavoriteInput(relation));
       } else {
         await favoritesApi.removeFavorite(relation.foodRef);
       }
@@ -191,8 +182,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
   },
   thumbnail: {
-    width: THUMBNAIL_SIZE,
-    height: THUMBNAIL_SIZE,
+    width: FOOD_THUMBNAIL_SIZE,
+    height: FOOD_THUMBNAIL_SIZE,
     borderRadius: radius.sm,
     flexShrink: 0,
   },

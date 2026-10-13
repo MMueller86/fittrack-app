@@ -2,12 +2,13 @@
 // Single "Sign in" button — Entra handles identity provider routing (Google).
 
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { colors, spacing, typography } from '../../app/theme';
 import { authConfig } from '../../services/authConfig';
 import { authService } from '../../services/authService';
+import { LegalDocumentView } from '../legal/LegalDocumentView';
 
 // Needed so the browser dismisses properly after auth redirect.
 WebBrowser.maybeCompleteAuthSession();
@@ -28,6 +29,7 @@ interface LoginScreenProps {
 export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -86,8 +88,12 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
     promptAsync();
   }
 
+  if (showPrivacy) {
+    return <LegalDocumentView documentId="privacy" onBack={() => setShowPrivacy(false)} interceptHardwareBack />;
+  }
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
       <Text style={styles.title}>FitTrack</Text>
       <Text style={styles.subtitle}>Track your nutrition, effortlessly.</Text>
 
@@ -104,13 +110,26 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       </Pressable>
 
       {error && <Text style={styles.error}>{error}</Text>}
-    </View>
+
+      <Pressable
+        style={styles.privacyLink}
+        onPress={() => setShowPrivacy(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Datenschutzerklärung lesen"
+      >
+        <Text style={styles.privacyLinkText}>Datenschutzerklärung</Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scroll: {
     flex: 1,
+    backgroundColor: colors.background,
+  },
+  container: {
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background,
@@ -147,5 +166,17 @@ const styles = StyleSheet.create({
     color: colors.negative,
     marginTop: spacing.md,
     textAlign: 'center',
+  },
+  privacyLink: {
+    minHeight: spacing.xxl,
+    justifyContent: 'center',
+    marginTop: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  privacyLinkText: {
+    ...typography.body2,
+    color: colors.primaryBright,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
 });

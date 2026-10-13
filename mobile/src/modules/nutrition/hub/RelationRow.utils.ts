@@ -1,5 +1,6 @@
-import type { MealType, UserFoodRelation } from '@fittrack/shared';
+import type { MealType, UpsertUserFoodRelationInput, UserFoodRelation } from '@fittrack/shared';
 import { addLocalDays, getLocalIsoDate } from '../../../shared/date/localDate';
+import { isRemoteImageUri } from '../../../shared/components/foodProductSummaryUtils';
 
 export function isUnavailableRecipeRelation(
   relation: Pick<UserFoodRelation, 'foodRefType' | 'recipeAccess'>,
@@ -14,6 +15,19 @@ export function canToggleFavorite(
   isFavorite: boolean,
 ): boolean {
   return !isUnavailableRecipeRelation(relation) || isFavorite;
+}
+
+export function buildRelationFavoriteInput(relation: UserFoodRelation): UpsertUserFoodRelationInput {
+  return {
+    foodRef: relation.foodRef,
+    foodRefType: relation.foodRefType,
+    displayName: relation.displayName,
+    displayBrand: relation.displayBrand,
+    // Blob-Pfade eigener Produkte sind keine URL; das Backend lehnt sie ab (z.string().url()).
+    imageUrl: isRemoteImageUri(relation.imageUrl) ? relation.imageUrl : null,
+    nutritionPer100g: relation.nutritionPer100g,
+    portion: relation.portion,
+  };
 }
 
 export function thumbnailBorderWidth(

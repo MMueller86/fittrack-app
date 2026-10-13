@@ -123,6 +123,28 @@ The internal `recordUsage` contract requires the explicit diary meal date for
 `usageDates`; a missing date fails closed instead of falling back to the server
 UTC date. Existing usage dates are not rewritten or migrated.
 
+`displayBrand` follows merge semantics for existing non-recipe relations:
+`recordUsage` and `setFavorite` overwrite it only with a non-empty string;
+`undefined`, `null`, a missing value, or `''` keep the stored brand, and an
+unfavorite (`DELETE /api/favorites/:foodRef`) keeps it too. Diary add
+(`POST /api/diary/meals/:id/items`) carries no brand — the request has no brand
+field and the handler does not invent one — so logging a favorited item
+preserves its brand, while a relation created by logging has none. Recipe
+relations never store `displayBrand`.
+
+When the brand or name of an own food (`reusableItems`, `foodRefType: 'personal'`)
+is changed via `PATCH /api/reusable-items/:id`, the backend synchronizes
+`displayBrand`/`displayName` into the existing relation (fire-and-forget, same
+pattern as the nutrition denormalization; failures never fail the product
+update). It never creates a relation, never touches recipe relations, writes
+only on an actual change, and applies the same merge rule: an empty or cleared
+brand (`null`/`''`) does not remove the relation's stored brand.
+
+Known limitation: favorites whose brand was already lost before this rule have
+no backfill or read-time lookup (no migration). They are healed by favoriting
+the item again from the Nutrition Hub, which sends `displayBrand`. Removing a
+brand from an own food is not propagated to its relations.
+
 Bulk diary Copy records one relation use per copied referenced item only after
 the Diary commit. It classifies catalog references from the `openFoodFacts:`
 `sourceId` prefix and other personal references from `sourceId`, independently
@@ -134,13 +156,13 @@ and source counters unchanged; see [domain/02-diary.md](02-diary.md#bulk-item-mu
 
 ### Quick Entry Relevance
 
-Favorites (Quick Entries) are sorted for display using `computeRelevanceOrder()` in `mobile/src/modules/nutrition/hub/quickEntryRelevance.ts` or the backend-ranked favorites endpoint. Backend ranking uses the local request reference date for the date-only `usageDates` window; `favoritedAt` and `lastUsedAt` remain elapsed-time UTC instants. Scoring factors: novelty bonus (favoritedAt within 7 days), contextual usage, global usage (usageCount), and recency (lastUsedAt).
+Favorites (Quick Entries) are ranked by the backend (`GET /api/favorites?context=…`, `sortByRelevance()` in `backend/src/lib/favoritesScoring.ts`); the mobile hub consumes this order and does not compute its own relevance score. The hub's meal-type filters additionally use `sortByMealTypeUsage()` in `mobile/src/modules/nutrition/hub/FoodEntryHub.utils.ts`. Backend ranking uses the local request reference date for the date-only `usageDates` window; `favoritedAt` and `lastUsedAt` remain elapsed-time UTC instants. Scoring factors: novelty bonus (favoritedAt within 7 days), contextual usage, global usage (usageCount), and recency (lastUsedAt).
 
 ### API
 
 - `GET /api/favorites` — all favorites, sorted by displayName; recipe references include current `recipeAccess` and no stale recipe caches
 - `GET /api/favorites?context=MealType&localDate=YYYY-MM-DD` — favorites ranked for a meal context; `localDate` is a required real local reference date
-- `GET /api/favorites/grouped` — favorites pre-grouped into `{ ungrouped, groups, all }` (used by legacy IdleState; flat `all` used by current hub)
+- `GET /api/favorites/grouped` — favorites pre-grouped into `{ ungrouped, groups, all }` (used by the former IdleState, which no longer exists; flat `all` used by current hub)
 - `POST /api/favorites` — upsert a favorite; food references store nutrition/portion caches, while a recipe reference must currently resolve as owner or community and stores no recipe caches
 - `DELETE /api/favorites/{foodRef}` — removes the user's favorite even when a recipe reference is unavailable
 - `GET /api/food-relations/recent` — top N items sorted by `lastUsedAt` DESC

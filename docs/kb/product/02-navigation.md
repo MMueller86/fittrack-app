@@ -22,18 +22,83 @@ RootNavigator (NavigationContainer)
 ├── Tab: Progress
 │   └── (ProgressStack)
 │       └── ProgressMain → ProgressScreen
-└── Tab: Profile
+└── Tab: Profil (route id `Profile`)
     └── ProfileStack
-        ├── ProfileMain → ProfileScreen
-        ├── ProfileEdit → ProfileEditScreen (param: profile)
-        ├── MyProducts → MyProductsScreen
-        ├── Library → LibraryScreen
-        └── HealthConnect → HealthConnectScreen
+        ├── ProfileMain → ProfileScreen (Profil-Hub: Titel, Karte `Basisdaten`, Linkgruppen)
+        ├── ProfileDetails → ProfileDetailsScreen (Alltag & Training, Ziel, Tagesziele; Header-Aktion `Bearbeiten`)
+        ├── ProfileEdit → ProfileEditScreen (param: profile; nur über ProfileDetails erreichbar)
+        ├── Library → LibraryScreen (Tabs `Favoriten` / `Eigene Lebensmittel`; einziger Bibliotheksweg)
+        ├── HealthConnect → HealthConnectScreen
+        ├── Imprint → ImprintScreen (modules/legal; In-App-Text, kein externer Link)
+        └── PrivacyPolicy → PrivacyPolicyScreen (modules/legal; In-App-Text, kein externer Link)
+
+In-App-Datenschutz außerhalb des Profil-Stacks: `LoginScreen` und `ProfileWizardScreen` (Willkommensschritt und Vorschau vor `Profil übernehmen`)
+ersetzen sich lokal per State durch `LegalDocumentView` (ohne Auth, ohne Navigator); Zurück-Button und Android-Zurück kehren zum Ausgangsscreen zurück, Wizard-Eingaben bleiben erhalten.
 
 Modals (overlaid on top):
 ├── ProfileWizardScreen — shown on first launch (no SKIP_WIZARD_KEY in AsyncStorage)
 └── FoodEntryHub — BottomSheetModal, open from any screen via useFoodEntryHubStore
 ```
+
+### Profil-Hub: Informationsarchitektur
+
+`ProfileMain` zeigt von oben nach unten den Titel `Profil`, genau eine Karte (`Basisdaten`: Geschlecht, Alter, Größe, Gewicht, Zielgewicht) und danach die Navigationsgruppen aus `mobile/src/modules/profile/profileHubGroups.ts` in fester Reihenfolge (leere Gruppen werden nicht gerendert). `Alltag & Training`, `Ziel` und `Tagesziele` liegen nicht im Hub, sondern in `ProfileDetails`.
+
+```
+Profil
+┌ Basisdaten ───────────────┐
+│ Geschlecht / Alter /      │
+│ Größe / Gewicht /         │
+│ Zielgewicht               │
+└───────────────────────────┘
+PERSÖNLICHE DATEN
+ › Profil & Tagesziele        (Details ansehen und bearbeiten)
+BIBLIOTHEK
+ › Favoriten & Eigene Lebensmittel
+INTEGRATIONEN
+ › Health Connect
+[GEMEINSAM — [Planned], wird nicht gerendert]
+RECHTLICHES
+ › Impressum
+ › Datenschutzerklärung
+```
+
+| # | Gruppe | Inhalt | Ziel-Route |
+|---|---|---|---|
+| 1 | `Persönliche Daten` | `Profil & Tagesziele` (Detailzeile `Details ansehen und bearbeiten`). Nur mit geladenem Profil. | `ProfileDetails` |
+| 2 | `Bibliothek` | `Favoriten & Eigene Lebensmittel` | `Library` |
+| 3 | `Integrationen` | `Health Connect` | `HealthConnect` |
+| 4 | `Gemeinsam` | [Planned] Freunde / gemeinsamer Haushalt (Arbeitsname). Noch kein Eintrag, Route oder Screen; die Gruppe wird erst gerendert, wenn die Funktion implementiert ist. | — |
+| 5 | `Rechtliches` | `Impressum`, `Datenschutzerklärung` (native In-App-Seiten) | `Imprint`, `PrivacyPolicy` |
+
+- `Rechtliches` steht fest am Ende des Hubs; `Gemeinsam` steht fest zwischen `Integrationen` und `Rechtliches`; `Persönliche Daten` steht fest an erster Stelle.
+- `ProfileDetails` (`ProfileDetailsScreen`, Param `undefined`) hat einen Header mit Zurück, zentriertem Titel `Profil & Tagesziele` und rechts `Bearbeiten`; der Inhalt besteht aus `Alltag & Training`, `Ziel` und `Tagesziele` (Ruhetag/Trainingstag). `Bearbeiten` öffnet `ProfileEdit` mit dem geladenen Profil und ist der einzige Einstieg dorthin (Profil bearbeiten braucht damit zwei Taps). Der Screen lädt bei Fokus neu, sodass nach `ProfileEdit` → Speichern → Zurück die aktuellen Werte erscheinen. Ohne Profil zeigt er `Noch kein Profil` ohne `Bearbeiten` und ohne Einrichten-Button; die Einrichtung startet nur im Hub.
+- `Favoriten` und `Eigene Lebensmittel` sind ausschließlich über `Profil > Bibliothek` (`LibraryScreen`, zwei Tabs) erreichbar. Es gibt keine eigene Route und keinen zweiten Einstieg für `Eigene Lebensmittel`. `Eigene Lebensmittel` listet nur selbst angelegte Einträge und schließt `sourceType: 'openFoodFacts'` aus.
+- Datenschutz ist erreichbar über `Profil > Rechtliches`, `LoginScreen` und `ProfileWizardScreen` (Willkommensschritt und Vorschau), also auch vor dem ersten Speichern des Profils.
+- Die Profilbearbeitung (`ProfileEdit`) enthält keine aktive Löschfunktion; `Konto löschen` ist ein deaktivierter Platzhalter (`Wird später verfügbar`) ohne API-Aufruf.
+
+#### Hub-Zustände
+
+Titel sowie die Gruppen `Bibliothek`, `Integrationen` und `Rechtliches` werden in jedem Zustand gerendert; `Impressum` und `Datenschutzerklärung` sind daher auch bei Lade- oder Profilfehler im Profil-Tab erreichbar. Nur der Platz der Karte `Basisdaten` und die Gruppe `Persönliche Daten` hängen vom Profilzustand ab:
+
+| Zustand | Kartenplatz | `Persönliche Daten` |
+|---|---|---|
+| Laden | `ActivityIndicator` (`Profil wird geladen`) | ausgeblendet |
+| Fehler | `Profil konnte nicht geladen werden` + `Erneut versuchen` | ausgeblendet |
+| Kein Profil (erfolgreicher Request ohne Profil) | `Noch kein Profil` + `Profil einrichten` (öffnet den Wizard) | ausgeblendet |
+| Profil geladen | `Basisdaten` | sichtbar |
+
+#### Tab-Label `Profil` (Entscheidung)
+
+Das sichtbare Label bleibt `Profil`, die Route-ID bleibt `Profile`. Die Werte stehen in `mobile/src/app/navigation/profileTab.ts` (`PROFILE_TAB_ROUTE`, `PROFILE_TAB_LABEL`) und werden von `RootNavigator` verwendet. Begründung:
+
+1. Die einzige Karte im Hub ist die persönliche Karte `Basisdaten`; der Hub bleibt ein Ort mit Nutzeridentität. Ein generisches `Mehr` würde diese Karte und `Favoriten & Eigene Lebensmittel` hinter einem Sammelbegriff verstecken.
+2. Das Problem, dass Einstellungen erst nach Scrollen sichtbar waren, löst die Hub-Struktur, nicht das Label.
+3. `Mehr` bräuchte ein neues Tab-Icon (`ProfileIcon` ist ein Personen-Symbol) und ordnet die künftige Gruppe `Gemeinsam` [Planned] schlechter ein.
+
+Neubewertung, falls der Hub mehrere nicht profilbezogene Bereiche aufnimmt, sodass die persönliche Karte nicht mehr der Kern ist.
+
+Siehe [05-ux-patterns.md](05-ux-patterns.md#profil-hub) für Komponenten und Verhaltensregeln.
 
 ## Navigation Theme
 
@@ -121,10 +186,12 @@ NutritionStackParamList = {
 
 ProfileStackParamList = {
   ProfileMain: undefined;
+  ProfileDetails: undefined;
   ProfileEdit: { profile: UserProfile | null };
-  MyProducts: undefined;
   Library: undefined;
   HealthConnect: undefined;
+  Imprint: undefined;
+  PrivacyPolicy: undefined;
 }
 
 RecipeStackParamList = {

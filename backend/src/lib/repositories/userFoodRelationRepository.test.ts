@@ -354,6 +354,113 @@ describe('recipe relation cache', () => {
   });
 });
 
+describe('displayBrand merge semantics (in-memory)', () => {
+  const nutrition = { calories: 250, protein: 15, carbs: 20, fat: 8, fiber: 4 };
+  const portion = { label: 'Portion', weightGrams: 30 };
+  const imageUrl = 'https://img.invalid/a.jpg';
+
+  async function favoriteWithBrand() {
+    const repo = getUserFoodRelationRepository();
+    await repo.setFavorite(USER_A, FOOD_REF, 'catalog', 'Test Food', 'Brand A', true, imageUrl, nutrition, portion);
+    return repo;
+  }
+
+  it('keeps displayBrand when recordUsage omits it and updates only usage fields', async () => {
+    const repo = await favoriteWithBrand();
+    const before = await repo.getByFoodRef(USER_A, FOOD_REF);
+
+    await repo.recordUsage(USER_A, baseInput({ mealType: 'lunch' }));
+
+    const after = await repo.getByFoodRef(USER_A, FOOD_REF);
+    expect(after?.displayBrand).toBe('Brand A');
+    expect(after?.usageCount).toBe(1);
+    expect(after?.lastUsedAt).not.toBeNull();
+    expect(after?.usageDates).toEqual([{ date: DEFAULT_USAGE_DATE, mealType: 'lunch' }]);
+    expect(after).toMatchObject({
+      isFavorite: true,
+      favoritedAt: before?.favoritedAt,
+      nutritionPer100g: nutrition,
+      portion,
+      imageUrl,
+    });
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['empty string', ''],
+  ])('keeps displayBrand when recordUsage receives %s', async (_label, value) => {
+    const repo = await favoriteWithBrand();
+    await repo.recordUsage(USER_A, baseInput({ displayBrand: value }));
+    expect((await repo.getByFoodRef(USER_A, FOOD_REF))?.displayBrand).toBe('Brand A');
+  });
+
+  it('overwrites displayBrand when recordUsage receives a non-empty value', async () => {
+    const repo = await favoriteWithBrand();
+    await repo.recordUsage(USER_A, baseInput({ displayBrand: 'Brand B' }));
+    expect((await repo.getByFoodRef(USER_A, FOOD_REF))?.displayBrand).toBe('Brand B');
+  });
+
+  it('still updates displayName and never overwrites imageUrl with an empty value', async () => {
+    const repo = await favoriteWithBrand();
+    await repo.recordUsage(USER_A, baseInput({ displayName: 'Renamed', imageUrl: undefined }));
+    const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
+    expect(rel?.displayName).toBe('Renamed');
+    expect(rel?.imageUrl).toBe(imageUrl);
+  });
+
+  it('does not create a brand when recordUsage creates a new relation without one', async () => {
+    const repo = getUserFoodRelationRepository();
+    await repo.recordUsage(USER_A, baseInput());
+    expect((await repo.getByFoodRef(USER_A, FOOD_REF))?.displayBrand).toBeUndefined();
+  });
+
+  it('keeps the brand on re-favoriting without a brand and updates it with a value', async () => {
+    const repo = await favoriteWithBrand();
+
+    const noBrand = await repo.setFavorite(USER_A, FOOD_REF, 'catalog', 'Test Food', undefined, true);
+    expect(noBrand.displayBrand).toBe('Brand A');
+    const emptyBrand = await repo.setFavorite(USER_A, FOOD_REF, 'catalog', 'Test Food', '', true);
+    expect(emptyBrand.displayBrand).toBe('Brand A');
+    const nullBrand = await repo.setFavorite(
+      USER_A, FOOD_REF, 'catalog', 'Test Food', null as unknown as undefined, true,
+    );
+    expect(nullBrand.displayBrand).toBe('Brand A');
+
+    const updated = await repo.setFavorite(USER_A, FOOD_REF, 'catalog', 'Test Food', 'Brand B', true);
+    expect(updated.displayBrand).toBe('Brand B');
+  });
+
+  it('keeps the brand through an unfavorite cycle', async () => {
+    const repo = await favoriteWithBrand();
+    const removed = await repo.setFavorite(USER_A, FOOD_REF, 'catalog', 'Test Food', undefined, false);
+    expect(removed).toMatchObject({ isFavorite: false, displayBrand: 'Brand A' });
+    const again = await repo.setFavorite(USER_A, FOOD_REF, 'catalog', 'Test Food', undefined, true);
+    expect(again).toMatchObject({ isFavorite: true, displayBrand: 'Brand A' });
+  });
+
+  it('keeps recipe relations free of brand and caches on recordUsage and setFavorite', async () => {
+    const repo = getUserFoodRelationRepository();
+    const ref = 'recipe-merge';
+    await repo.setFavorite(USER_A, ref, 'catalog', 'Legacy', 'Legacy brand', true, imageUrl, nutrition, portion);
+
+    await repo.recordUsage(USER_A, {
+      foodRef: ref, foodRefType: 'recipe', displayName: 'Recipe', displayBrand: 'Forged', imageUrl,
+      usageDate: DEFAULT_USAGE_DATE,
+    });
+    const favorited = await repo.setFavorite(
+      USER_A, ref, 'recipe', 'Recipe', 'Forged', true, imageUrl, nutrition, portion,
+    );
+
+    for (const rel of [await repo.getByFoodRef(USER_A, ref), favorited]) {
+      expect(rel).not.toHaveProperty('displayBrand');
+      expect(rel).not.toHaveProperty('imageUrl');
+      expect(rel).not.toHaveProperty('nutritionPer100g');
+      expect(rel).not.toHaveProperty('portion');
+    }
+  });
+});
+
 describe('updateNutritionDenormalized', () => {
   it('updates nutritionPer100g and portion on an existing relation', async () => {
     const repo = getUserFoodRelationRepository();
@@ -374,5 +481,44 @@ describe('updateNutritionDenormalized', () => {
     await expect(
       repo.updateNutritionDenormalized(USER_A, 'nonexistent-ref', { calories: 100, protein: 5, carbs: 15, fat: 2 }, null),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('updateDisplayDenormalized (in-memory)', () => {
+  async function seeded(foodRefType: 'personal' | 'recipe' = 'personal') {
+    const repo = getUserFoodRelationRepository();
+    await repo.setFavorite(USER_A, FOOD_REF, foodRefType, 'Old name', foodRefType === 'recipe' ? undefined : 'Brand A', true);
+    return repo;
+  }
+
+  it('updates brand and name on an existing relation and keeps favorite state', async () => {
+    const repo = await seeded();
+    await repo.updateDisplayDenormalized(USER_A, FOOD_REF, { displayName: 'New name', displayBrand: 'Brand B' });
+    expect(await repo.getByFoodRef(USER_A, FOOD_REF)).toMatchObject({
+      displayName: 'New name', displayBrand: 'Brand B', isFavorite: true,
+    });
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['empty string', ''],
+  ])('does not clear the brand when %s is passed', async (_label, value) => {
+    const repo = await seeded();
+    await repo.updateDisplayDenormalized(USER_A, FOOD_REF, { displayBrand: value });
+    expect((await repo.getByFoodRef(USER_A, FOOD_REF))?.displayBrand).toBe('Brand A');
+  });
+
+  it('does not create a relation when none exists', async () => {
+    const repo = getUserFoodRelationRepository();
+    await repo.updateDisplayDenormalized(USER_A, 'nonexistent-ref', { displayBrand: 'Brand B' });
+    expect(await repo.getByFoodRef(USER_A, 'nonexistent-ref')).toBeNull();
+  });
+
+  it('leaves recipe relations untouched', async () => {
+    const repo = await seeded('recipe');
+    await repo.updateDisplayDenormalized(USER_A, FOOD_REF, { displayName: 'Forged', displayBrand: 'Forged' });
+    const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
+    expect(rel?.displayName).toBe('Old name');
+    expect(rel).not.toHaveProperty('displayBrand');
   });
 });

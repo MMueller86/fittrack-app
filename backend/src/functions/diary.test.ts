@@ -11,6 +11,7 @@ import {
   getDiaryHandler,
   listMealsHandler,
 } from './diary';
+import { listFavoritesHandler } from './favorites';
 import { getDiaryRepository, __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { DiaryBulkMutationError } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
@@ -1546,6 +1547,140 @@ describe('addItemHandler — recordUsage foodRefType mapping', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: 'invalid_recipe_portions' });
+  });
+
+  describe('recipe guard read failure (fail-open)', () => {
+    const nutrition = { calories: 100, protein: 5, carbs: 10, fat: 2, fiber: 1 };
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it.each([
+      ['catalog', 'openFoodFacts:5100', 'openFoodFacts'],
+      ['personal', '00000000-0000-4000-8000-0000000000bb', 'reusableItem'],
+    ] as const)('still adds a %s item and logs a warning when the relation read fails', async (_label, productId, sourceType) => {
+      const readError = Object.assign(new Error('Service Unavailable secret-detail'), { code: 503 });
+      vi.spyOn(getUserFoodRelationRepository(), 'getByFoodRef').mockRejectedValue(readError);
+      const ctx = makeContext();
+      const warnSpy = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+      const mealId = await createMeal();
+
+      const res = await addItemHandler(
+        await makeAuthRequest({
+          params: { id: mealId },
+          body: {
+            productId,
+            sourceType,
+            productName: 'Logged Name',
+            inputMode: 'grams',
+            inputAmount: 100,
+            amountGrams: 100,
+            calculatedNutrition: nutrition,
+          },
+        }),
+        ctx,
+      );
+
+      expect(res.status).toBe(201);
+      expect((await getDiaryRepository().getMealById(TEST_USER_ID, mealId))?.items).toHaveLength(1);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      const logged = String(warnSpy.mock.calls[0]![0]);
+      expect(JSON.parse(logged)).toMatchObject({ level: 'warn', event: 'diary.item.recipeGuardReadFailed', errorClass: 'Error' });
+      expect(logged).not.toContain('secret-detail');
+      expect(logged).not.toContain(TEST_USER_ID);
+    });
+
+    it('treats a missing relation (null) as before without a warning', async () => {
+      const ctx = makeContext();
+      const warnSpy = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+      const mealId = await createMeal();
+
+      const res = await addItemHandler(
+        await makeAuthRequest({
+          params: { id: mealId },
+          body: {
+            productId: 'openFoodFacts:5101',
+            sourceType: 'openFoodFacts',
+            productName: 'Logged Name',
+            inputMode: 'grams',
+            inputAmount: 100,
+            amountGrams: 100,
+            calculatedNutrition: nutrition,
+          },
+        }),
+        ctx,
+      );
+
+      expect(res.status).toBe(201);
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('displayBrand retention', () => {
+    const nutrition = { calories: 250, protein: 15, carbs: 20, fat: 8, fiber: 4 };
+    const portion = { label: 'Portion', weightGrams: 30 };
+    const image = 'https://img.invalid/a.jpg';
+
+    async function logItem(productId: string, sourceType: 'openFoodFacts' | 'reusableItem', extra: Record<string, unknown> = {}) {
+      const mealId = await createMeal();
+      const res = await addItemHandler(
+        await makeAuthRequest({
+          params: { id: mealId },
+          body: {
+            productId,
+            sourceType,
+            productName: 'Logged Name',
+            inputMode: 'grams',
+            inputAmount: 100,
+            amountGrams: 100,
+            calculatedNutrition: { calories: 100, protein: 5, carbs: 10, fat: 2, fiber: 1 },
+            ...extra,
+          },
+        }),
+        makeContext(),
+      );
+      expect(res.status).toBe(201);
+      // Flush the fire-and-forget relation update.
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
+
+    it.each([
+      ['catalog', 'openFoodFacts:4711', 'openFoodFacts'],
+      ['personal', '00000000-0000-4000-8000-0000000000aa', 'reusableItem'],
+    ] as const)('keeps the brand of a favorited %s item after logging it', async (foodRefType, foodRef, sourceType) => {
+      const repo = getUserFoodRelationRepository();
+      await repo.setFavorite(TEST_USER_ID, foodRef, foodRefType, 'Fav Name', 'Fav Brand', true, image, nutrition, portion);
+
+      await logItem(foodRef, sourceType);
+
+      const rel = await repo.getByFoodRef(TEST_USER_ID, foodRef);
+      expect(rel).toMatchObject({
+        displayBrand: 'Fav Brand',
+        usageCount: 1,
+        isFavorite: true,
+        usageDates: [{ date: '2026-05-08', mealType: 'breakfast' }],
+      });
+
+      const list = await listFavoritesHandler(await makeAuthRequest(), makeContext());
+      expect(list.status).toBe(200);
+      const favorites = list.jsonBody as Array<Record<string, unknown>>;
+      expect(favorites.find((f) => f.foodRef === foodRef)).toMatchObject({
+        displayBrand: 'Fav Brand',
+        imageUrl: image,
+        nutritionPer100g: nutrition,
+        portion,
+        usageCount: 1,
+      });
+    });
+
+    it('creates a relation without brand and ignores brand fields in the request body', async () => {
+      await logItem('openFoodFacts:4712', 'openFoodFacts', { displayBrand: 'Forged', brand: 'Forged' });
+
+      const rel = await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, 'openFoodFacts:4712');
+      expect(rel?.usageCount).toBe(1);
+      expect(rel?.displayBrand).toBeUndefined();
+    });
   });
 });
 

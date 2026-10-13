@@ -14,6 +14,10 @@ import {
 import { enqueueEnrichment } from '../lib/queueClient';
 import { __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
+import {
+  getUserFoodRelationRepository,
+  __resetUserFoodRelationRepositoryForTests,
+} from '../lib/repositories/userFoodRelationRepository';
 import { addItemHandler, createMealHandler } from './diary';
 import { makeContext, makeAuthRequest, setupTestAuth, teardownTestAuth, signTestToken, TEST_USER_ID } from '../test-utils/http';
 
@@ -30,6 +34,7 @@ afterAll(() => {
 beforeEach(() => {
   __resetReusableItemsRepositoryForTests();
   __resetDiaryRepositoryForTests();
+  __resetUserFoodRelationRepositoryForTests();
   vi.mocked(enqueueEnrichment).mockClear();
 });
 
@@ -430,6 +435,119 @@ describe('PATCH /api/reusable-items/:id — update', () => {
     const dayData = await getDiaryRepository().getDay(TEST_USER_ID, '2026-06-05');
     const fiber = dayData.meals[0]!.items[0]!.macros.fiber;
     expect(fiber).toBeCloseTo(12, 1); // 200g * 6/100 = 12
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /api/reusable-items/:id — denormalized name/brand in UserFoodRelations
+// ---------------------------------------------------------------------------
+
+describe('PATCH /api/reusable-items/:id — relation display sync', () => {
+  const NUTRITION = { calories: 240, protein: 8, carbs: 44, fat: 3 };
+
+  async function createProduct(brand: string | undefined = 'Brand A') {
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: { sourceType: 'manual', name: 'Brot', brand, nutritionPer100g: NUTRITION },
+      }),
+      ctx,
+    );
+    return (res.jsonBody as { item: { id: string } }).item.id;
+  }
+
+  async function favorite(id: string, type: 'personal' | 'recipe' = 'personal') {
+    await getUserFoodRelationRepository().setFavorite(
+      TEST_USER_ID, id, type, 'Brot', type === 'recipe' ? undefined : 'Brand A', true,
+    );
+  }
+
+  async function patch(id: string, body: Record<string, unknown>) {
+    return updateReusableItemHandler(await makeAuthRequest({ params: { id }, body }), ctx);
+  }
+
+  it('updates the brand of an existing relation', async () => {
+    const id = await createProduct();
+    await favorite(id);
+
+    expect((await patch(id, { brand: 'Brand B' })).status).toBe(200);
+
+    await vi.waitFor(async () => {
+      expect((await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, id))?.displayBrand).toBe('Brand B');
+    });
+    expect(await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, id)).toMatchObject({
+      isFavorite: true,
+      displayName: 'Brot',
+    });
+  });
+
+  it('updates the name of an existing relation', async () => {
+    const id = await createProduct();
+    await favorite(id);
+
+    await patch(id, { name: 'Vollkornbrot' });
+
+    await vi.waitFor(async () => {
+      expect((await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, id))?.displayName).toBe('Vollkornbrot');
+    });
+    expect((await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, id))?.displayBrand).toBe('Brand A');
+  });
+
+  it('does not create a relation when none exists', async () => {
+    const id = await createProduct();
+    const spy = vi.spyOn(getUserFoodRelationRepository(), 'updateDisplayDenormalized');
+
+    expect((await patch(id, { brand: 'Brand B' })).status).toBe(200);
+
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+    expect(await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, id)).toBeNull();
+  });
+
+  it('does not touch the relation brand when brand is cleared (null) or empty', async () => {
+    const id = await createProduct();
+    await favorite(id);
+    const spy = vi.spyOn(getUserFoodRelationRepository(), 'updateDisplayDenormalized');
+
+    await patch(id, { brand: null, name: 'Brot' });
+    await patch(id, { brand: '' });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(2));
+
+    expect((await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, id))?.displayBrand).toBe('Brand A');
+  });
+
+  it('does not sync when neither name nor brand is part of the request', async () => {
+    const id = await createProduct();
+    await favorite(id);
+    const spy = vi.spyOn(getUserFoodRelationRepository(), 'updateDisplayDenormalized');
+
+    await patch(id, { nutritionPer100g: { ...NUTRITION, fiber: 2 } });
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('leaves recipe relations unchanged', async () => {
+    const id = await createProduct();
+    await favorite(id, 'recipe');
+    const spy = vi.spyOn(getUserFoodRelationRepository(), 'updateDisplayDenormalized');
+
+    await patch(id, { name: 'Forged', brand: 'Forged' });
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
+
+    const rel = await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, id);
+    expect(rel?.displayName).toBe('Brot');
+    expect(rel).not.toHaveProperty('displayBrand');
+  });
+
+  it('still returns 200 when the relation sync fails', async () => {
+    const id = await createProduct();
+    const spy = vi
+      .spyOn(getUserFoodRelationRepository(), 'updateDisplayDenormalized')
+      .mockRejectedValue(new Error('cosmos down'));
+
+    const res = await patch(id, { brand: 'Brand B' });
+
+    expect(res.status).toBe(200);
+    expect((res.jsonBody as { item: { brand: string } }).item.brand).toBe('Brand B');
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledTimes(1));
   });
 });
 

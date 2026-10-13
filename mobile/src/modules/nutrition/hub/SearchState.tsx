@@ -1,12 +1,11 @@
 ﻿// SearchState -- Story 2: Suchergebnisse, 3-Zeilen-Layout, Keyboard-on-Drag.
-// MacroAndPortionLine: "251 kcal . EW 8 g . KH 43 g . F 3 g . je 100 g"
+// Zeilenaufbau (Thumbnail 52 pt, Nährwertzeile) kommt aus shared/components/FoodProductSummary.
 // FallbackSection immer als ListFooterComponent sichtbar.
 // keyboardDismissMode="on-drag": Tastatur schliesst beim Scrollen.
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -15,13 +14,15 @@ import {
 } from 'react-native';
 import { BottomSheetFlatList } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import type { FoodSearchResult, NutritionValues, PortionInfo, UserFoodRelation } from '@fittrack/shared';
+import type { FoodSearchResult, UserFoodRelation } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { foodApi } from '../../../shared/api/foodApi';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
 import { formatApiError } from '../../../shared/api/apiError';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
+import { FoodProductSummary, type FoodProductBadge } from '../../../shared/components/FoodProductSummary';
+import { isRemoteImageUri } from '../../../shared/components/foodProductSummaryUtils';
 import { RelationRow } from './RelationRow';
 
 interface Props {
@@ -41,88 +42,16 @@ interface Props {
   onQuickAccept?: (product: FoodSearchResult) => void;
 }
 
-const THUMBNAIL_SIZE = 44;
-
 // ---------------------------------------------------------------------------
-// ProductBadge
+// Herkunfts-Badges (Zeile 2 des geteilten FoodProductSummary)
 // ---------------------------------------------------------------------------
 
-type BadgeVariant = 'off' | 'ai' | 'eigen';
-
-function ProductBadge({ label, variant }: { label: string; variant: BadgeVariant }) {
-  return (
-    <View style={variant === 'eigen' ? styles.badgeEigen : styles.badgeDefault}>
-      <Text style={variant === 'eigen' ? styles.badgeTextEigen : styles.badgeTextDefault}>
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Thumbnail mit Buchstaben-Avatar Fallback
-// ---------------------------------------------------------------------------
-
-function Thumbnail({ uri, name }: { uri?: string | null; name: string }) {
-  const [imgError, setImgError] = useState(false);
-  const letter = name.trim().charAt(0).toUpperCase() || '?';
-
-  if (uri && !imgError) {
-    return (
-      <Image
-        source={{ uri }}
-        style={styles.thumbnail}
-        resizeMode="cover"
-        onError={() => setImgError(true)}
-      />
-    );
-  }
-  return (
-    <View style={[styles.thumbnail, styles.thumbnailAvatar]}>
-      <Text style={styles.thumbnailLetter}>{letter}</Text>
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// MacroAndPortionLine -- "251 kcal . EW 8 g . KH 43 g . F 3 g . je 100 g"
-// Makros und Portionsreferenz in einer Zeile -- kompakteres Layout.
-// Nicht rendern wenn keine Kaloriendaten vorhanden.
-// ---------------------------------------------------------------------------
-
-function MacroAndPortionLine({
-  nutrition,
-  nutritionBasis,
-  portion,
-  isAiEstimate,
-}: {
-  nutrition?: NutritionValues;
-  nutritionBasis: string;
-  portion?: PortionInfo;
-  isAiEstimate?: boolean;
-}) {
-  if (!nutrition || nutrition.calories == null) return null;
-
-  const parts: string[] = [`${Math.round(nutrition.calories)} kcal`];
-  if (nutrition.protein != null) parts.push(`EW ${Math.round(nutrition.protein)} g`);
-  if (nutrition.carbs != null) parts.push(`KH ${Math.round(nutrition.carbs)} g`);
-  if (nutrition.fat != null) parts.push(`F ${Math.round(nutrition.fat)} g`);
-
-  // Portionsreferenz ans Ende
-  if (!isAiEstimate || portion) {
-    if (nutritionBasis === 'per100g' || nutritionBasis === 'both') {
-      parts.push('je 100 g');
-    } else if (nutritionBasis === 'perPortion' && portion) {
-      const portionLabel = portion.weightGrams
-        ? `pro ${portion.label} (${Math.round(portion.weightGrams)} g)`
-        : `pro ${portion.label}`;
-      parts.push(portionLabel);
-    }
-  }
-
-  return (
-    <Text style={styles.macroLine} numberOfLines={1}>{parts.join(' \u00b7 ')}</Text>
-  );
+function resultBadges(item: FoodSearchResult): FoodProductBadge[] {
+  const badges: FoodProductBadge[] = [];
+  if (item.source === 'openFoodFacts') badges.push({ label: 'OFF', tone: 'accent' });
+  if (item.source === 'library' && !item.isAiEstimate) badges.push({ label: 'Eigen', tone: 'neutral' });
+  if (item.isAiEstimate) badges.push({ label: 'KI', tone: 'accent' });
+  return badges;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +152,8 @@ export const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst,
           foodRefType: item.source === 'openFoodFacts' ? 'catalog' : 'personal',
           displayName: item.name,
           displayBrand: item.brand,
-          imageUrl: item.imageUrl ?? null,
+          // Blob-Pfade eigener Produkte sind keine URL; das Backend lehnt sie ab (z.string().url()).
+          imageUrl: isRemoteImageUri(item.imageUrl) ? item.imageUrl : null,
           nutritionPer100g: item.nutritionPer100g,
           portion: item.portion ?? null,
         });
@@ -240,9 +170,6 @@ export const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst,
     onPress(item);
   }, [item, onPress]);
 
-  const isOFP = item.source === 'openFoodFacts';
-  const isPersonal = item.source === 'library' && !item.isAiEstimate;
-
   return (
     <Pressable
       style={({ pressed }) => [styles.row, isFirst && styles.rowFirst, pressed && styles.rowPressed]}
@@ -250,15 +177,20 @@ export const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst,
       android_ripple={{ color: colors.surfaceMuted, borderless: false }}
       accessibilityRole="button"
     >
-      <Thumbnail uri={item.imageUrl} name={item.name} />
-
-      <View style={styles.rowBody}>
-        {/* Zeile 1: Produktname + Herz */}
-        <View style={styles.rowLine1}>
-          <Text style={styles.rowName} numberOfLines={1}>{item.name}</Text>
+      <FoodProductSummary
+        name={item.name}
+        brand={item.brand}
+        imageUri={item.imageUrl}
+        badges={resultBadges(item)}
+        incomplete={!item.isComplete}
+        nutrition={item.nutritionPer100g}
+        nutritionBasis={item.nutritionBasis}
+        portion={item.portion}
+        isAiEstimate={item.isAiEstimate}
+        trailing={
           <TouchableOpacity
             onPress={() => void handleFavoriteToggle()}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            hitSlop={{ top: spacing.sm, bottom: spacing.sm, left: spacing.sm, right: spacing.sm }}
             accessibilityLabel={isFavorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufuegen'}
           >
             <Icon
@@ -268,46 +200,25 @@ export const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst,
               color={isFavorite ? colors.negative : colors.textMuted}
             />
           </TouchableOpacity>
-        </View>
-
-        {/* Zeile 2: Marke + Badges + Warnung */}
-        <View style={styles.rowLine2}>
-          {item.brand ? (
-            <Text style={styles.rowBrand} numberOfLines={1}>{item.brand}</Text>
-          ) : null}
-          {isOFP ? <ProductBadge label="OFF" variant="off" /> : null}
-          {isPersonal ? <ProductBadge label="Eigen" variant="eigen" /> : null}
-          {item.isAiEstimate ? <ProductBadge label="KI" variant="ai" /> : null}
-          {!item.isComplete ? (
-            <Icon lib="feather" name="alert-circle" size="sm" color={colors.neutral} />
-          ) : null}
-        </View>
-
-        {/* Zeile 3: Makros + Portion (kombiniert) */}
-        <MacroAndPortionLine
-          nutrition={item.nutritionPer100g}
-          nutritionBasis={item.nutritionBasis}
-          portion={item.portion}
-          isAiEstimate={item.isAiEstimate}
-        />
-
-        {/* Rezept-Modus: Schnellauswahl-Pill */}
-        {quickAcceptLabel && onQuickAccept ? (
-          <View style={styles.rowLineQuickAccept}>
-            <View style={{ flex: 1 }} />
-            <TouchableOpacity
-              style={styles.quickAcceptPill}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onQuickAccept(item); }}
-              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              accessibilityRole="button"
-              accessibilityLabel={`Sofort hinzufügen: ${quickAcceptLabel}`}
-            >
-              <Icon lib="feather" name="plus" size={12} color={colors.primary} />
-              <Text style={styles.quickAcceptText}>{quickAcceptLabel}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-      </View>
+        }
+        footer={
+          quickAcceptLabel && onQuickAccept ? (
+            <View style={styles.rowLineQuickAccept}>
+              <View style={{ flex: 1 }} />
+              <TouchableOpacity
+                style={styles.quickAcceptPill}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onQuickAccept(item); }}
+                hitSlop={{ top: spacing.xs, bottom: spacing.xs, left: spacing.xs, right: spacing.xs }}
+                accessibilityRole="button"
+                accessibilityLabel={`Sofort hinzufügen: ${quickAcceptLabel}`}
+              >
+                <Icon lib="feather" name="plus" size="sm" color={colors.primary} />
+                <Text style={styles.quickAcceptText}>{quickAcceptLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
+      />
     </Pressable>
   );
 });
@@ -445,7 +356,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.sm,
     gap: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
@@ -457,88 +368,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
   },
 
-  // Thumbnail -- 48pt mit Buchstaben-Avatar Fallback
-  thumbnail: {
-    width: THUMBNAIL_SIZE,
-    height: THUMBNAIL_SIZE,
-    borderRadius: radius.sm,
-    flexShrink: 0,
-  },
-  thumbnailAvatar: {
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  thumbnailLetter: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-
-  // Row body
-  rowBody: { flex: 1, gap: 3 },
-
-  // Zeile 1: Name + Herz
-  rowLine1: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  rowName: {
-    ...typography.body2,
-    fontWeight: '700',
-    color: colors.text,
-    flex: 1,
-  },
-
-  // Zeile 2: Marke + Badges
-  rowLine2: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  rowBrand: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    flexShrink: 1,
-  },
-
-  // Badges -- dezenter, nicht dominant
-  badgeDefault: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.full,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    flexShrink: 0,
-  },
-  badgeTextDefault: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: colors.primary,
-    opacity: 0.85,
-  },
-  badgeEigen: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.full,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: colors.border,
-    flexShrink: 0,
-  },
-  badgeTextEigen: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-
-  // Zeile 3: Makros + Portion kombiniert
-  macroLine: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    fontVariant: ['tabular-nums'],
-  },
+  // Thumbnail/Name/Marke/Badges/Nährwerte: shared/components/FoodProductSummary
 
   // States
   spinner: { marginTop: spacing.lg },
@@ -576,7 +406,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     gap: spacing.xs,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -588,7 +418,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   fallbackActionLabel: {
-    fontSize: 10,
+    fontSize: typography.overline.fontSize,
     color: colors.textMuted,
     fontWeight: '500',
     textAlign: 'center',
@@ -609,11 +439,11 @@ const styles = StyleSheet.create({
   quickAcceptPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: spacing.xs,
     backgroundColor: colors.primarySoft,
     borderRadius: radius.full,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    paddingVertical: spacing.xs,
   },
   quickAcceptText: {
     ...typography.caption,

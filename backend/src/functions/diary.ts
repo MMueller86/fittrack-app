@@ -370,8 +370,17 @@ export const addItemHandler = withHandler(
     }
 
     if (d.productId) {
-      const relation = await getUserFoodRelationRepository().getByFoodRef(userId, d.productId);
-      if (relation?.foodRefType === 'recipe') {
+      // Fail-open: a relation read error must not block logging ordinary foods.
+      let isRecipeRelation = false;
+      try {
+        const relation = await getUserFoodRelationRepository().getByFoodRef(userId, d.productId);
+        isRecipeRelation = relation?.foodRefType === 'recipe';
+      } catch (err) {
+        logEvent(ctx, 'warn', 'diary.item.recipeGuardReadFailed', {
+          errorClass: err instanceof Error ? err.name : 'unknown',
+        });
+      }
+      if (isRecipeRelation) {
         return { status: 404, jsonBody: { error: 'Recipe not found' } };
       }
     }
@@ -495,7 +504,6 @@ export const addItemHandler = withHandler(
               foodRef,
               foodRefType,
               displayName: itemName,
-              displayBrand: undefined,
               imageUrl: ('imageUrl' in d && d.imageUrl != null) ? String(d.imageUrl) : undefined,
               ...(d.inputMode ? { lastInputMode: d.inputMode } : {}),
               ...(d.inputAmount != null ? { lastInputAmount: d.inputAmount } : {}),

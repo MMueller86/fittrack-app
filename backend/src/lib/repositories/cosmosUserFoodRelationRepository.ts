@@ -10,7 +10,13 @@ import type {
   PortionInfo,
 } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
-import { EMA_ALPHA, stripRecipeRelationCache, trimUsageDates, type UserFoodRelationRepository } from './userFoodRelationRepository';
+import {
+  EMA_ALPHA,
+  applyDisplayFields,
+  stripRecipeRelationCache,
+  trimUsageDates,
+  type UserFoodRelationRepository,
+} from './userFoodRelationRepository';
 
 export class CosmosUserFoodRelationRepository implements UserFoodRelationRepository {
 
@@ -70,7 +76,7 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
           isFavorite,
           displayName,
           ...(!isRecipe ? {
-            displayBrand,
+            ...(typeof displayBrand === 'string' && displayBrand.length > 0 ? { displayBrand } : {}),
             ...(imageUrl !== undefined ? { imageUrl } : {}),
             ...(nutritionPer100g !== undefined ? { nutritionPer100g } : {}),
             ...(portion !== undefined ? { portion } : {}),
@@ -151,7 +157,10 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
           lastUsedAt: now,
           usageCount: existing.usageCount + 1,
           displayName: input.displayName,
-          ...(input.foodRefType !== 'recipe' ? { displayBrand: input.displayBrand } : {}),
+          // displayBrand nur bei gesetztem Wert überschreiben (Merge-Semantik)
+          ...(input.foodRefType !== 'recipe' && typeof input.displayBrand === 'string' && input.displayBrand.length > 0
+            ? { displayBrand: input.displayBrand }
+            : {}),
           // imageUrl aktualisieren wenn neu geliefert (überschreibt nie mit null wenn bereits gesetzt)
           ...(input.foodRefType !== 'recipe' && input.imageUrl != null ? { imageUrl: input.imageUrl } : {}),
           ...(input.lastInputMode !== undefined ? { lastInputMode: input.lastInputMode } : {}),
@@ -217,8 +226,10 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     try {
       const { resource } = await containers.userFoodRelations.item(id, userId).read<UserFoodRelation>();
       return resource ?? null;
-    } catch {
-      return null;
+    } catch (err) {
+      // Only "not found" means no relation; other read errors must not trigger an overwriting upsert
+      if (typeof err === 'object' && err !== null && (err as { code?: number }).code === 404) return null;
+      throw err;
     }
   }
 
@@ -264,6 +275,19 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     for (const relation of relations) {
       const updated: UserFoodRelation = { ...relation, nutritionPer100g, portion };
       await containers.userFoodRelations.items.upsert(updated);
+    }
+  }
+
+  async updateDisplayDenormalized(
+    userId: string,
+    foodRef: string,
+    fields: { displayName?: string; displayBrand?: string },
+  ): Promise<void> {
+    const { containers } = await getCosmos();
+    const relations = await this.listByFoodRef(userId, foodRef);
+    for (const relation of relations) {
+      const updated = applyDisplayFields(relation, fields);
+      if (updated) await containers.userFoodRelations.items.upsert(updated);
     }
   }
 }

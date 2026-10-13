@@ -43,7 +43,7 @@ type HubMode =
 
 | Mode | Component | Notes |
 |---|---|---|
-| `idle` | `IdleState.tsx` | Favorites chips + recents list |
+| `idle` | inline in `FoodEntryHub.tsx` (filter header + `FoodList.tsx` with `RelationRow.tsx`) | Quick Entry list; no separate idle component |
 | `search` | `SearchState.tsx` | Results + bottom fallback section |
 | `product` | `QuantityView.tsx` | Quantity selection + nutrition preview |
 | `subflow: barcode` | `BarcodeSubFlow.tsx` | Delegates to `BarcodeScannerScreen` |
@@ -82,11 +82,11 @@ Library: `@gorhom/bottom-sheet` v5
 - Backdrop: `BottomSheetBackdrop` with opacity 0.10 (8–12% dimming)
 - `QuantityView` is inline hub content, not a separate product dialog.
 
-## IdleState
+## Idle view
 
-Shows when mode = `idle`. The hub's personal Quick Entry list.
+Shows when mode = `idle`. The hub's personal Quick Entry list. It is rendered inline in `FoodEntryHub.tsx` (filter header, filter modal `Ansicht wählen`) and uses `FoodList.tsx` with `RelationRow.tsx`; the former `IdleState.tsx` and `AlleFavoritenModal.tsx` components no longer exist.
 
-Data source: `favoritesApi.listFavorites()` → sorted by `computeRelevanceOrder()`.
+Data source: `favoritesApi.listFavoritesRanked(mealType, localDate)` (`GET /api/favorites?context=…&localDate=…`) → already ranked by the backend (`sortByRelevance()` in `backend/src/lib/favoritesScoring.ts`). The context meal type is `context.mealType` or, if absent, the time-of-day suggestion. The result is kept in session order until the list is reloaded.
 
 **Layout:**
 - Header: active filter name (h3) + chevron — tapping opens filter modal
@@ -94,9 +94,9 @@ Data source: `favoritesApi.listFavorites()` → sorted by `computeRelevanceOrder
 - Content: `RelationRow` list via `FoodList.tsx`
 
 **Filter options:**
-- **Für dich** (default) — relevance-sorted favorites; shows last-usage info in line 3
+- **Für dich** (default) — backend-ranked favorites; shows last-usage info in line 3
 - **Zuletzt verwendet** — auto-selected on search focus; shows recency info
-- **Mahlzeit filters** (Frühstück, Mittagessen, etc.) — filtered by `mealTypeCounts`
+- **Mahlzeit filters** (Frühstück, Mittagessen, etc.) — ranked favorites that have at least one `usageDates` entry for the meal type, sorted descending by the number of such entries (`sortByMealTypeUsage()`)
 - **Alle** — favorites + personal library + recipes, alphabetical; shows macros
 
 **State transitions during search:**
@@ -123,7 +123,7 @@ In `recipeIngredient` context, recipe references are omitted from favorites and 
 - `mobile/src/modules/nutrition/hub/FoodEntryHub.tsx` — filter state, data loading, hub wiring
 - `mobile/src/modules/nutrition/hub/FoodList.tsx` — generic list component
 - `mobile/src/modules/nutrition/hub/RelationRow.tsx` — unified list row
-- `mobile/src/modules/nutrition/hub/quickEntryRelevance.ts` — `computeRelevanceOrder()`, `computeLastUsageText()`, `computeDirectAddLabel()`
+- `mobile/src/modules/nutrition/hub/FoodEntryHub.utils.ts` — `computeLastUsageText()`, `computeDirectAddLabel()`, `computeMacroText()`, `sortByMealTypeUsage()`, `buildDirectAddItemInput()`, `relativeUsage()`
 
 ## SearchState
 
@@ -209,20 +209,20 @@ These UX decisions are final and must not be reversed without explicit product d
 - Search field height: 52pt (not 44pt)
 - Barcode + AI icons: outside the pill, as standalone icons next to the search field
 - Barcode + AI icon color: `colors.primary` (green, not muted)
-- Quick actions in IdleState: removed (barcode + AI in search row is sufficient)
+- Quick actions in the idle view (formerly `IdleState`, no longer exists): removed (barcode + AI in search row is sufficient)
 - Sticky CompactActionBar above results: removed (replaced by bottom fallback section)
 - Snap point: `['85%']` for the default hub sheet
-- Recents loading: moved from `IdleState` to `FoodEntryHub` level (passed as props)
-- `RecentItem` extracted to `hub/RecentItem.tsx`
+- Recents loading: moved from the former `IdleState` component (no longer exists) to `FoodEntryHub` level (passed as props)
+- Recents rows render through `hub/RelationRow.tsx` (via `hub/FoodList.tsx`); the former `RecentItem` component no longer exists
 
 ## Key Files
 
 | File | Purpose |
 |---|---|
-| `hub/FoodEntryHub.tsx` | Main bottom sheet component |
+| `hub/FoodEntryHub.tsx` | Main bottom sheet component; contains the idle view (filter header) and the filter modal inline |
 | `hub/hubReducer.ts` | State machine |
 | `hub/useFoodEntryHubStore.ts` | Global open/close Zustand store |
-| `hub/IdleState.tsx` | Idle view |
+| `hub/FoodList.tsx` | Generic list used by the idle view |
 | `hub/SearchState.tsx` | Search results view |
 | `hub/QuantityView.tsx` | Quantity selection view |
 | `hub/BarcodeSubFlow.tsx` | Barcode sub-flow wrapper |
@@ -230,5 +230,4 @@ These UX decisions are final and must not be reversed without explicit product d
 | `hub/LabelSubFlow.tsx` | Label scan sub-flow |
 | `hub/ManuellerSubFlow.tsx` | Manual entry sub-flow |
 | `hub/mealTimeRules.ts` | Time-based meal type suggestion |
-| `hub/RecentItem.tsx` | Recent item row component |
-| `hub/AlleFavoritenModal.tsx` | Full favorites overlay |
+| `hub/RelationRow.tsx` | Unified quick-entry / recents row component (52 pt thumbnail) |

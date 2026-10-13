@@ -20,9 +20,10 @@ mobile/src/
 │   ├── auth/                Login screen, auth guards
 │   ├── healthConnect/       HealthConnectScreen (Integrationen)
 │   ├── home/                HomeScreen
+│   ├── legal/               Impressum / Datenschutzerklärung (In-App, legalTexts.ts)
 │   ├── nutrition/           DiaryScreen, FoodEntryHub, AI flows
 │   ├── onboarding/          (planned — currently part of profile)
-│   ├── profile/             ProfileScreen, ProfileWizard, Library
+│   ├── profile/             ProfileScreen (Hub), ProfileDetails, ProfileEdit, ProfileWizard, LibraryScreen
 │   ├── progress/            ProgressScreen, weight chart
 │   ├── recipes/             RecipeListScreen, detail, wizard create/edit flow
 │   ├── scanner/             BarcodeScannerScreen
@@ -57,13 +58,13 @@ Built with React Navigation. Architecture: one bottom tab navigator containing a
 | Nutrition | `DiaryScreen` | FoodEntryHub overlays from here |
 | Recipes | `RecipeListScreen` | Full CRUD through detail + wizard stack |
 | Weight | `ProgressScreen` | Visible tab label: `Progress`; weight chart, trend indicators |
-| Profile | `ProfileScreen` | Settings, library, my products |
+| Profile | `ProfileScreen` | Visible tab label and screen title: `Profil` (route id `Profile` unchanged; constants in `app/navigation/profileTab.ts`); hub with title, one `Basisdaten` card and navigation groups below |
 
 ### Additional Screens (inside stacks)
 
 - `WeightDetailScreen` — from Home or Progress
 - `RecipeDetailScreen`, `RecipeWizardScreen` — in Recipes stack; `RecipeWizardScreen` handles both create and edit (`editId?`)
-- `ProfileEditScreen`, `MyProductsScreen`, `LibraryScreen` — in Profile stack
+- `ProfileDetailsScreen`, `ProfileEditScreen`, `LibraryScreen`, `HealthConnectScreen`, `ImprintScreen`, `PrivacyPolicyScreen` — in Profile stack (routes `ProfileDetails`, `ProfileEdit`, `Library`, `HealthConnect`, `Imprint`, `PrivacyPolicy`); there is no `MyProducts` route
 - `ProfileWizardScreen` — shown as full-screen modal on first launch (no profile exists)
 - `BarcodeScannerScreen` — camera barcode scanner, navigated to from FoodEntryHub
 
@@ -495,6 +496,30 @@ and cleanup of both temporary URIs. These mocked tests are not device evidence.
 Android device behavior remains **UNVERIFIED** pending U-1; no full Done or
 release claim is made before that gate.
 
+### Profile Module (`modules/profile/`) and Legal Module (`modules/legal/`)
+
+- `ProfileScreen.tsx` — Profil-Hub: title, one `Basisdaten` card slot (loading / error / no-profile state card in every non-ready state) and navigation groups below, rendered with `ProfileGroup.tsx` (`ProfileGroup` / `ProfileRow`). Title and the groups `Bibliothek`, `Integrationen`, `Rechtliches` render in every state; `Persönliche Daten` only with a loaded profile. `Profil einrichten` opens `ProfileWizardScreen` locally.
+- `ProfileDetailsScreen.tsx` — read-only `Profil & Tagesziele` (route `ProfileDetails`, param `undefined`): header with back, title and `Bearbeiten` (navigates to `ProfileEdit` with the loaded profile; hidden without a profile), content `Alltag & Training`, `Ziel`, `Tagesziele`. Reloads on focus so values are current after `ProfileEdit`.
+- `ProfileSummaryCards.tsx` — `BasicDataCard` (hub), `LifestyleCard`, `GoalCard`, `TargetsSection` (details) and their label maps.
+- `useProfileData.ts` — loads `GET /api/profile` on focus for hub and details (`status: loading | ready | error`, `profile`, `targets`, `refresh`, `retry`); after a successful first load a failed refresh keeps the data and shows a snackbar.
+- `ProfileStateViews.tsx` — `ProfileLoadingState`, `ProfileErrorState`, `ProfileEmptyState` (setup button only when `onSetup` is passed).
+- `profileHubGroups.ts` — fixed group order `Persönliche Daten` → `Bibliothek` → `Integrationen` → `Gemeinsam` → `Rechtliches` via `getProfileHubGroups({ hasProfile, entries })`; empty groups are not rendered and `Persönliche Daten` is omitted without a profile. `Gemeinsam` (friends / shared household, working name) is `[Planned]` and has no entries yet.
+- `app/navigation/profileTab.ts` — `PROFILE_TAB_ROUTE = 'Profile'` and `PROFILE_TAB_LABEL = 'Profil'`, consumed by `RootNavigator`. The label decision (`Profil` instead of `Mehr`) is documented in [product/02-navigation.md](../product/02-navigation.md#tab-label-profil-entscheidung).
+- `ProfileEditScreen.tsx` — profile editing. No delete action: `Konto löschen` is a disabled placeholder (`Wird später verfügbar`); the mobile app does not call `DELETE /api/profile`.
+- `LibraryScreen.tsx` — single canonical library entry (hub entry `Favoriten & Eigene Lebensmittel`) with tabs `Favoriten` (`FavoritesView`) and `Eigene Lebensmittel` (`OwnFoodsView`). Shared list state in `useLibraryList.ts`, loading/empty/error states in `LibraryStateView.tsx`. `ownFoodItems.ts` filters out `sourceType: 'openFoodFacts'`, so `Eigene Lebensmittel` contains only self-created items. The former `MyProductsScreen` / `MyProducts` route was removed.
+- `LibraryFoodCard.tsx` — shared card container of `FavoritesView` and `OwnFoodsView` (main area, optionally tappable, plus a right 48 pt action button).
+- `favoriteFoodSummary.ts` — pure mapping `UserFoodRelation` → `FoodProductSummary` props (`favoriteSummaryProps`) for `FavoritesView`: origin badge, recipe brand fallback, `Rezept nicht verfügbar` for unavailable recipes, `nutritionBasis` fixed to `per100g`. `FavoritesView` has a single action, removing the favorite (heart, `ConfirmSheet`, snackbar on failure); the former `n× verwendet` line is gone. Product-display and favorites UX rules: [product/05-ux-patterns.md](../product/05-ux-patterns.md#favoriten-in-der-bibliothek).
+- `shared/components/FoodProductSummary.tsx` — presentational product summary (52 pt thumbnail, name, brand, origin badge, nutrition) used by the Search Hub result row (`SearchState.ResultRow`), `OwnFoodsView` and `FavoritesView`. The thumbnail shows an image only for a loadable remote URL (`isRemoteImageUri`); otherwise, or on load failure, it shows the letter avatar. `ResultRow` sends `imageUrl` to `POST /api/favorites` only for remote URLs, otherwise `null`.
+- `modules/healthConnect/HealthConnectScreen.tsx` — Integrationen entry; user-facing copy lives in `healthConnectCopy.ts` and names the target as `Health Connect auf deinem Gerät`.
+- `modules/legal/` — `ImprintScreen` / `PrivacyPolicyScreen` (`LegalScreens.tsx`) render native, scrollable in-app text via `LegalDocumentView.tsx`. The text exists once in `legalTexts.ts` and must match `docs/legal/*.md` (enforced by `legalTexts.test.ts`). `LoginScreen` and `ProfileWizardScreen` (welcome step and preview) show the privacy policy locally via component state (no navigator, no auth required), so it is reachable before the profile is first saved.
+
+**Known limitations / open points:**
+
+- [Open] PO-1 — photos of own foods: the API returns only a blob path (`<userId>/<itemId>.jpg`) in `imageUrl`, not a loadable URL. Search Hub, `Eigene Lebensmittel` and `Favoriten` therefore show the letter avatar. Option C (parity with the Search Hub, avatar fallback) was chosen; there is no backend plan to resolve blob paths.
+- `ProfileWizardScreen` still uses `Alert.alert` and emoji/unicode glyphs. This is deliberately out of scope of the profile redesign (R1/R2) and still conflicts with the design-system rule on app-owned dialogs.
+- Blob-path `imageUrl` in the Food Entry Hub: investigated and fixed. The own-product blob path (`<userId>/<itemId>.jpg`, see PO-1) reached URL-validating endpoints (`POST /api/favorites`, `POST /api/diary/meals/:id/items`) from `QuantityView` (favorite toggle, add), `FoodEntryHub` direct add (`buildDirectAddItemInput`) and `RelationRow` (favorite toggle, `buildRelationFavoriteInput`). All of them now send `imageUrl` only when `isRemoteImageUri` is true, otherwise `null`. Remaining: the recipe-ingredient product built in `FoodEntryHub` still carries the relation's `imageUrl` unchanged, but the ingredient flow does not send it to an endpoint; `QuantityView` renders `product.imageUrl` as `Image` without the remote-URL check, so a blob path there is not shown as the letter avatar (not changed here).
+- Device behaviour of the `ConfirmSheet` inside `LabelScanReviewScreen` (nested modal; edit-save choice `Nur Produkt` / `Produkt + Tagebuch-Einträge`) is only covered by a mocked test — MANUAL VALIDATION REQUIRED on a device.
+
 ### Progress Module (`modules/progress/`)
 
 - `ProgressScreen.tsx` — weight trend chart, progress signals
@@ -505,6 +530,8 @@ release claim is made before that gate.
 `mobile/src/app/theme/` — exports design tokens consumed by all components.
 
 [Rule] Never hardcode hex colors, font sizes, or spacing values. Always use theme tokens.
+
+`colors.overlay` (`rgba(0, 0, 0, 0.6)`) is the shared scrim token for modal backdrops; `ConfirmSheet` and `SyncStatusSheet` use it instead of local `rgba` literals.
 
 See [product/03-design-system.md](../product/03-design-system.md) for the full design system.
 

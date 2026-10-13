@@ -14,7 +14,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -29,7 +28,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NutritionLabelScanResult, ReusableItem } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
+import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
+import { Icon } from '../../shared/components/Icon';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { reusableItemsApi } from '../../shared/api/reusableItemsApi';
 
@@ -126,6 +127,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [historyConfirmOpen, setHistoryConfirmOpen] = useState(false);
 
   const ocrConf = useMemo(() => scanResult ? confidenceLabel(scanResult.ocrConfidence) : null, [scanResult]);
   const aiConf = useMemo(() => scanResult ? confidenceLabel(scanResult.aiConfidence) : null, [scanResult]);
@@ -169,15 +171,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
   }
 
   function handleEditSave() {
-    Alert.alert(
-      'Historische Einträge aktualisieren?',
-      'Sollen alle bisherigen Diary-Einträge mit diesem Produkt auf die neuen Nährwerte (inkl. Ballaststoffe) aktualisiert werden?',
-      [
-        { text: 'Nur Produkt', style: 'default', onPress: () => handleUpdateProduct(false) },
-        { text: 'Produkt + History', style: 'default', onPress: () => handleUpdateProduct(true) },
-        { text: 'Abbrechen', style: 'cancel' },
-      ],
-    );
+    setHistoryConfirmOpen(true);
   }
 
   // Save as ReusableItem + add to diary
@@ -276,12 +270,27 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
         {/* Header — respects Safe Area (notch, status bar) */}
         <View style={[styles.header, { paddingTop: Math.max(spacing.lg, insets.top) }]}>
           <TouchableOpacity onPress={onClose} style={styles.headerBackBtn}>
-            <Text style={styles.cancelText}>{isEditMode ? 'Abbrechen' : '‹ Zurück'}</Text>
+            {isEditMode ? (
+              <Text style={styles.cancelText}>Abbrechen</Text>
+            ) : (
+              <View style={styles.backRow}>
+                <Icon lib="feather" name="chevron-left" size="md" color={colors.primary} />
+                <Text style={styles.cancelText}>Zurück</Text>
+              </View>
+            )}
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {isEditMode ? '✏️ Produkt bearbeiten' : isManual ? '✏️ Produkt eingeben' : '📷 Scan-Ergebnis'}
-          </Text>
-          <View style={{ width: 80 }} />
+          <View style={styles.headerTitleRow}>
+            <Icon
+              lib="feather"
+              name={isEditMode || isManual ? 'edit-2' : 'camera'}
+              size="md"
+              color={colors.text}
+            />
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {isEditMode ? 'Produkt bearbeiten' : isManual ? 'Produkt eingeben' : 'Scan-Ergebnis'}
+            </Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
         <ScrollView
@@ -309,7 +318,10 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
           {!isManual && scanResult && scanResult.warnings.length > 0 && (
             <View style={styles.warningsBox}>
               {scanResult.warnings.map((w, i) => (
-                <Text key={i} style={styles.warningText}>⚠️ {w}</Text>
+                <View key={i} style={styles.warningRow}>
+                  <Icon lib="feather" name="alert-triangle" size="sm" color={colors.negative} />
+                  <Text style={styles.warningText}>{w}</Text>
+                </View>
               ))}
             </View>
           )}
@@ -415,8 +427,16 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
               onPress={() => setTechOpen((o) => !o)}
               activeOpacity={0.7}
             >
-              <Text style={styles.accordionTitle}>🔧 Technisch generierte Felder</Text>
-              <Text style={styles.accordionChevron}>{techOpen ? '▲' : '▼'}</Text>
+              <View style={styles.accordionTitleRow}>
+                <Icon lib="feather" name="tool" size="sm" color={colors.textSecondary} />
+                <Text style={styles.accordionTitle}>Technisch generierte Felder</Text>
+              </View>
+              <Icon
+                lib="feather"
+                name={techOpen ? 'chevron-up' : 'chevron-down'}
+                size="sm"
+                color={colors.textMuted}
+              />
             </TouchableOpacity>
           )}
           {isEditMode && techOpen && (
@@ -424,12 +444,23 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
               {/* AI-Enrichment status */}
               <Text style={styles.techLabel}>KI-Status</Text>
               <View style={styles.techStatusRow}>
-                <Text style={[
+                <View style={[
                   styles.techStatusBadge,
                   existingItem?.searchTermsEnriched ? styles.techStatusEnriched : styles.techStatusPending,
                 ]}>
-                  {existingItem?.searchTermsEnriched ? '✨ KI-angereichert' : '⏳ Anreicherung ausstehend'}
-                </Text>
+                  <Icon
+                    lib="feather"
+                    name={existingItem?.searchTermsEnriched ? 'check-circle' : 'clock'}
+                    size={14}
+                    color={existingItem?.searchTermsEnriched ? colors.positive : colors.neutral}
+                  />
+                  <Text style={[
+                    styles.techStatusText,
+                    { color: existingItem?.searchTermsEnriched ? colors.positive : colors.neutral },
+                  ]}>
+                    {existingItem?.searchTermsEnriched ? 'KI-angereichert' : 'Anreicherung ausstehend'}
+                  </Text>
+                </View>
               </View>
 
               {/* Tokens + custom terms (merged on backend): editable in edit mode */}
@@ -443,7 +474,7 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
                       onPress={() => setEditableSearchTerms((prev) => prev.filter((t) => t !== term))}
                     >
                       <Text style={styles.tagText}>{term}</Text>
-                      <Text style={styles.tagRemoveBtn}> ✕</Text>
+                      <Icon lib="feather" name="x" size={12} color={colors.textMuted} />
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -561,7 +592,10 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
                 {saving ? (
                   <ActivityIndicator color={colors.white} />
                 ) : (
-                  <Text style={styles.primaryBtnText}>💾 Produkt speichern</Text>
+                  <View style={styles.btnContent}>
+                    <Icon lib="feather" name="save" size="sm" color={colors.white} />
+                    <Text style={styles.primaryBtnText}>Produkt speichern</Text>
+                  </View>
                 )}
               </TouchableOpacity>
             </>
@@ -594,12 +628,27 @@ export default function LabelScanReviewScreen({ visible, mealId, scanResult, isM
                   onPress={onClose}
                   disabled={saving}
                 >
-                  <Text style={styles.rescanBtnText}>🔄 Erneut scannen</Text>
+                  <View style={styles.btnContent}>
+                    <Icon lib="feather" name="refresh-cw" size="sm" color={colors.textSecondary} />
+                    <Text style={styles.rescanBtnText}>Erneut scannen</Text>
+                  </View>
                 </TouchableOpacity>
               )}
             </>
           )}
         </ScrollView>
+
+        {/* Verschachteltes Modal im Screen-Modal: Verhalten auf iOS/Android manuell prüfen */}
+        <ConfirmSheet
+          visible={historyConfirmOpen}
+          title="Historische Einträge aktualisieren?"
+          subtitle="Sollen alle bisherigen Tagebuch-Einträge mit diesem Produkt auf die neuen Nährwerte (inkl. Ballaststoffe) aktualisiert werden?"
+          actions={[
+            { label: 'Nur Produkt', onPress: () => handleUpdateProduct(false) },
+            { label: 'Produkt + Tagebuch-Einträge', onPress: () => handleUpdateProduct(true) },
+          ]}
+          onClose={() => setHistoryConfirmOpen(false)}
+        />
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -622,7 +671,10 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   cancelText: { ...typography.body1, color: colors.primary },
-  headerTitle: { ...typography.h3, color: colors.text },
+  backRow: { flexDirection: 'row', alignItems: 'center' },
+  headerTitleRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  headerTitle: { ...typography.h3, color: colors.text, flexShrink: 1 },
+  headerSpacer: { width: 80 },
   scroll: { flex: 1, padding: spacing.md },
   confidenceRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   confidenceBadge: {
@@ -638,7 +690,8 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     marginBottom: spacing.md,
   },
-  warningText: { ...typography.caption, color: colors.negative, marginBottom: 2 },
+  warningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs, marginBottom: 2 },
+  warningText: { ...typography.caption, color: colors.negative, flex: 1 },
   sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.md, marginBottom: spacing.sm },
   fieldLabel: { ...typography.caption, color: colors.textSecondary, marginBottom: 4 },
   input: {
@@ -716,6 +769,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   rescanBtnText: { ...typography.body2, color: colors.textSecondary },
+  btnContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   headerBackBtn: { minWidth: 80 },
   btnDisabled: { opacity: 0.5 },
   portionHint: { ...typography.caption, color: colors.primary, marginBottom: spacing.sm },
@@ -731,8 +785,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  accordionTitle: { ...typography.body2, color: colors.textSecondary, fontWeight: '600' },
-  accordionChevron: { ...typography.caption, color: colors.textMuted },
+  accordionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flex: 1 },
+  accordionTitle: { ...typography.body2, color: colors.textSecondary, fontWeight: '600', flexShrink: 1 },
   accordionBody: {
     paddingHorizontal: spacing.sm,
     paddingBottom: spacing.sm,
@@ -746,14 +800,16 @@ const styles = StyleSheet.create({
   techLabel: { ...typography.caption, color: colors.textSecondary, marginTop: spacing.sm, marginBottom: 4 },
   techStatusRow: { flexDirection: 'row' },
   techStatusBadge: {
-    ...typography.caption,
-    fontWeight: '600',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: radius.sm,
   },
-  techStatusEnriched: { backgroundColor: `${colors.positive}22`, color: colors.positive },
-  techStatusPending: { backgroundColor: `${colors.neutral}22`, color: colors.neutral },
+  techStatusText: { ...typography.caption, fontWeight: '600' },
+  techStatusEnriched: { backgroundColor: `${colors.positive}22` },
+  techStatusPending: { backgroundColor: `${colors.neutral}22` },
   tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: 4 },
   tag: {
     backgroundColor: colors.surfaceMuted,
@@ -771,6 +827,7 @@ const styles = StyleSheet.create({
   tagRemovable: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.sm,
     paddingHorizontal: spacing.xs,
@@ -778,7 +835,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  tagRemoveBtn: { ...typography.caption, color: colors.textMuted },
   termInputRow: { flexDirection: 'row', gap: spacing.xs, marginTop: spacing.sm, alignItems: 'center' },
   termInput: {
     flex: 1,

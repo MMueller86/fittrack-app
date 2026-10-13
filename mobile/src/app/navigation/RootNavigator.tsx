@@ -17,14 +17,16 @@ import RecipeListScreen from '../../modules/recipes/RecipeListScreen';
 import RecipeDetailScreen from '../../modules/recipes/RecipeDetailScreen';
 import RecipeWizardScreen from '../../modules/recipes/RecipeWizardScreen';
 import ProfileScreen from '../../modules/profile/ProfileScreen';
+import ProfileDetailsScreen from '../../modules/profile/ProfileDetailsScreen';
 import ProfileEditScreen from '../../modules/profile/ProfileEditScreen';
-import MyProductsScreen from '../../modules/profile/MyProductsScreen';
 import LibraryScreen from '../../modules/profile/LibraryScreen';
 import HealthConnectScreen from '../../modules/healthConnect/HealthConnectScreen';
+import { ImprintScreen, PrivacyPolicyScreen } from '../../modules/legal/LegalScreens';
 import ProfileWizardScreen, { SKIP_WIZARD_KEY } from '../../modules/profile/ProfileWizardScreen';
 import type { UserProfile } from '@fittrack/shared';
 import type { SpecialActivity } from '@fittrack/shared';
 import { colors } from '../theme';
+import { PROFILE_TAB_LABEL, PROFILE_TAB_ROUTE } from './profileTab';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, ProgressIcon } from '../../assets/icons/TabIcons';
 import { profileApi } from '../../shared/api/profileApi';
 import { useFoodEntryHubStore } from '../../modules/nutrition/hub/useFoodEntryHubStore';
@@ -74,10 +76,12 @@ function HomeStackNavigator() {
 // --- Profile stack ---
 export type ProfileStackParamList = {
   ProfileMain: undefined;
+  ProfileDetails: undefined;
   ProfileEdit: { profile: UserProfile | null };
-  MyProducts: undefined;
   Library: undefined;
   HealthConnect: undefined;
+  Imprint: undefined;
+  PrivacyPolicy: undefined;
 };
 
 const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
@@ -92,10 +96,12 @@ function ProfileStackNavigator() {
       }}
     >
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
+      <ProfileStack.Screen name="ProfileDetails" component={ProfileDetailsScreen} />
       <ProfileStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-      <ProfileStack.Screen name="MyProducts" component={MyProductsScreen} />
       <ProfileStack.Screen name="Library" component={LibraryScreen} />
       <ProfileStack.Screen name="HealthConnect" component={HealthConnectScreen} />
+      <ProfileStack.Screen name="Imprint" component={ImprintScreen} />
+      <ProfileStack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
     </ProfileStack.Navigator>
   );
 }
@@ -242,9 +248,12 @@ export function RootNavigator() {
           }}
         />
         <Tab.Screen
-          name="Profile"
+          name={PROFILE_TAB_ROUTE}
           component={ProfileStackNavigator}
-          options={{ tabBarIcon: ({ color, size }) => <ProfileIcon color={color} size={size} /> }}
+          options={{
+            tabBarLabel: PROFILE_TAB_LABEL,
+            tabBarIcon: ({ color, size }) => <ProfileIcon color={color} size={size} />,
+          }}
         />
       </Tab.Navigator>
     </NavigationContainer>

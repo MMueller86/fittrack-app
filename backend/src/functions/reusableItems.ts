@@ -247,6 +247,21 @@ export const updateReusableItemHandler = withHandler(
       })();
     }
 
+    // Fire-and-forget: sync denormalized name/brand in existing UserFoodRelations.
+    // PATCH brand:null is a no-op for the item, and empty values never clear the relation brand.
+    if (fields.name !== undefined || fields.brand !== undefined) {
+      void (async () => {
+        try {
+          await getUserFoodRelationRepository().updateDisplayDenormalized(userId, item.id, {
+            displayName: fields.name !== undefined ? item.name : undefined,
+            displayBrand: fields.brand !== undefined ? item.brand : undefined,
+          });
+        } catch {
+          // Non-critical — must not fail the product update
+        }
+      })();
+    }
+
     let updatedItemCount = 0;
     if (updateHistory && item.nutritionPer100g) {
       const newPortionGrams = item.portion?.weightGrams;

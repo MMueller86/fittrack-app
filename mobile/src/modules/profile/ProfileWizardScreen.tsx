@@ -38,6 +38,7 @@ import { profileApi, type CalculatePreviewResponse } from '../../shared/api/prof
 import { listWeights } from '../../services/weightsService';
 import { BrandAsset } from '../../shared/components/BrandAsset';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
+import { LegalDocumentView } from '../legal/LegalDocumentView';
 
 export const SKIP_WIZARD_KEY = 'fittrack:skip_wizard';
 
@@ -325,6 +326,8 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
   const [loading, setLoading] = useState(false);
   const [weightFromDiary, setWeightFromDiary] = useState(false);
   const [tooltip, setTooltip] = useState<{ title: string; body: string } | null>(null);
+  // Datenschutz ersetzt den Wizard nur visuell; Schritt und Eingaben bleiben im State erhalten.
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   // Pre-fill weight from diary if new profile
   useEffect(() => {
@@ -476,6 +479,20 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
   // Step renderers
   // ---------------------------------------------------------------------------
 
+  function renderPrivacyLink() {
+    return (
+      <TouchableOpacity
+        style={styles.privacyLink}
+        onPress={() => setShowPrivacy(true)}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Datenschutzerklärung lesen"
+      >
+        <Text style={styles.privacyLinkText}>Datenschutzerklärung</Text>
+      </TouchableOpacity>
+    );
+  }
+
   function renderStep0() {
     function handleSkip() {
       Alert.alert(
@@ -522,6 +539,7 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
         <View style={styles.trustSection}>
           <Text style={styles.trustTitle}>🔒 Deine Daten bleiben privat</Text>
           <Text style={styles.trustBody}>Keine Werbung. Keine Weitergabe. Jederzeit änderbar.</Text>
+          {renderPrivacyLink()}
         </View>
         <TouchableOpacity style={[styles.primaryButton, styles.welcomePrimaryBtn]} onPress={() => setStep(1)} activeOpacity={0.8}>
           <Text style={styles.primaryButtonText}>Profil einrichten →</Text>
@@ -772,6 +790,8 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
           />
         </View>
 
+        {renderPrivacyLink()}
+
         <TouchableOpacity style={styles.primaryButton} onPress={handleSave} disabled={loading} activeOpacity={0.8}>
           {loading
             ? <ActivityIndicator color={colors.background} />
@@ -824,6 +844,10 @@ export default function ProfileWizardScreen({ onComplete, onDismiss, isNewProfil
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
+
+  if (showPrivacy) {
+    return <LegalDocumentView documentId="privacy" onBack={() => setShowPrivacy(false)} interceptHardwareBack />;
+  }
 
   if (step === 0) {
     return (
@@ -943,6 +967,18 @@ const styles = StyleSheet.create({
   ghostButtonText: {
     ...typography.body2,
     color: colors.textMuted,
+  },
+  privacyLink: {
+    minHeight: spacing.xxl,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  privacyLinkText: {
+    ...typography.body2,
+    color: colors.primaryBright,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
 
   // Wizard header

@@ -54,6 +54,7 @@ function makeInput(overrides: Partial<{
   foodRef: string;
   foodRefType: 'catalog' | 'personal' | 'recipe';
   displayName: string;
+  displayBrand: string;
   mealType: MealType;
   usageDate: string;
 }> = {}) {
@@ -67,6 +68,20 @@ function makeInput(overrides: Partial<{
 }
 
 describe('CosmosUserFoodRelationRepository (contract)', () => {
+  it('keeps displayBrand in the stored document when recordUsage omits it', async () => {
+    await repo.setFavorite(USER_A, 'openFoodFacts:contract-food', 'catalog', 'Contract Food', 'Contract Brand', true);
+
+    await repo.recordUsage(USER_A, makeInput({ mealType: 'lunch' }));
+
+    const raw = await ctx!.database
+      .container('userFoodRelations')
+      .item(`${USER_A}:openFoodFacts:contract-food`, USER_A)
+      .read<UserFoodRelation>();
+    expect(raw.resource?.displayBrand).toBe('Contract Brand');
+    expect(raw.resource?.usageCount).toBe(1);
+    expect(raw.resource?.isFavorite).toBe(true);
+  });
+
   it('does not create a relation when usageDate is missing', async () => {
     const input = { ...makeInput({ mealType: 'lunch' }), usageDate: undefined } as unknown as Parameters<typeof repo.recordUsage>[1];
 

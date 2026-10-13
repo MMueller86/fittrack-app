@@ -125,6 +125,21 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-104 | Total-time guard false positives and quadratic digit-run matching, AC-2/6 | Suggestion | Backend | Accepted |
 | FT-QA-2026-105 | Text-only shortening prompt changed without Preparation version change, AC-10 | Suggestion | Backend | Accepted |
 | FT-QA-2026-106 | `ingredientKeys` remain in the recipe-analyze response (documented contract), AC-4 | Suggestion | Backend | Accepted |
+| FT-QA-2026-107 | Profilbereich Redesign: LabelScanReviewScreen Alert.alert/Emoji im Edit-Flow, AC-4/AC-5 | Non-blocking | Frontend | Closed |
+| FT-QA-2026-108 | Profilbereich Redesign: verbliebene direkte Werte in FoodProductSummary/SearchState/SyncStatusSheet, AC-4 | Non-blocking | Frontend | Resolved |
+| FT-QA-2026-109 | Profilbereich Redesign: Rechtliches im Fehler-/Leerzustand des Hubs nicht erreichbar, AC-1/AC-7 | Suggestion | Planner | Closed |
+| FT-QA-2026-110 | Profilbereich Redesign: Datenschutztext vs. Log-Löschung nur in development/preview, AC-12 | Suggestion | Documentation | Accepted |
+| FT-QA-2026-111 | Profilbereich Redesign: Testlücken tabBarLabel/ResultRow/Wizard-Vorschau-Link, AC-1/4/7 | Suggestion | Frontend | Closed |
+| FT-QA-2026-112 | Profilbereich Redesign: uneinheitliche Thumbnail-Größen RelationRow/RecentItem, AC-4 | Suggestion | Frontend | Closed |
+| FT-QA-2026-113 | Profilbereich R2: Icon size={12} Literal in SearchState (Rest von FT-108), R2-AC-12 | Non-blocking | Frontend | Closed |
+| FT-QA-2026-114 | Profilbereich R2: Blob-Pfad-imageUrl in QuantityView/FoodEntryHub an .url()-Endpunkte, R2-AC-10/11 | Non-blocking | Frontend | Closed |
+| FT-QA-2026-115 | Favoriten-Marke: Cosmos getByFoodRef schluckt Lesefehler, Merge-Regel greift dann nicht | Non-blocking | Backend | Closed |
+| FT-QA-2026-116 | Favoriten-Marke: keine Brand-Synchronisation bei Produktänderung | Suggestion | Backend | Closed |
+| FT-QA-2026-117 | KB 04-food-entry-hub/03-food-catalog nennen nicht existierende IdleState/AlleFavoritenModal | Suggestion | Documentation | Closed |
+| FT-QA-2026-118 | Targeted QA 113-117: Rezept-Guard in diary.ts fail-closed nach getByFoodRef-Rethrow, blockiert Loggen bei Lesefehler | Non-blocking | Backend | Closed |
+| FT-QA-2026-119 | Targeted QA 113-117: kein Contract-Test fuer updateDisplayDenormalized | Non-blocking | Backend | Awaiting decision |
+| FT-QA-2026-120 | Targeted QA 113-117: KB verweist auf nicht existierende quickEntryRelevance.ts/computeRelevanceOrder | Non-blocking | Documentation | Closed |
+| FT-QA-2026-121 | Targeted QA 118/120: mealTypeCounts steht noch als aktives Feld in 03-food-catalog.md Z. 118 | Suggestion | Documentation | Awaiting decision |
 
 ## Current Recipe Sharing Acceptance
 
@@ -1619,7 +1634,255 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** Accepted by the user decision of 2026-10-12.
 - **History:** 2026-10-12 - Registered from the Targeted QA report.
 
+### FT-QA-2026-107
+
+- **Finding key:** Profil-F-1
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung.md`
+- **Acceptance criterion:** AC-4, AC-5
+- **Description:** Der Bearbeiten-Flow `Eigene Lebensmittel` öffnet `LabelScanReviewScreen` (mode `edit`). Dieser verwendet weiterhin `Alert.alert` ("Historische Einträge aktualisieren?" mit drei Optionen) sowie Emoji-Zeichen als UI-Icons/Beschriftungen. Die Datei liegt außerhalb der im Plan genannten Scope-Dateien; der Implementierer hat die Lücke offengelegt und in `docs/kb/tech/03-mobile.md` als Known limitation dokumentiert.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md), F-1; `mobile/src/modules/nutrition/LabelScanReviewScreen.tsx` Zeile 172 (`Alert.alert`), Zeilen 282, 312, 418, 431, 446, 564, 597 (Emoji/`✕`); Aufruf in `mobile/src/modules/profile/OwnFoodsView.tsx`.
+- **Recommendation:** Folgeaufgabe: `handleEditSave` auf `ConfirmSheet` (drei Aktionen) und Emoji auf `Icon` umstellen; Scope-Entscheidung beim Planner/PO, da der Screen auch im Erfassungsflow genutzt wird.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("Lasse alles anpassen, außer FT-QA-2026-110"); to be covered by the revised plan.
+- **History:** 2026-10-12 - Registered from the Profilbereich QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - User decision: Fix requested.
+- **History:** 2026-10-12 - Corrected in R2 F-2.4; verified by the [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md) (code and automated tests). Verhalten des verschachtelten Modals auf dem Gerät bleibt MANUAL VALIDATION REQUIRED (Verification Note, kein Finding). Closed.
+
+### FT-QA-2026-108
+
+- **Finding key:** Profil-F-2
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung.md`
+- **Acceptance criterion:** AC-4
+- **Description:** In neu geschriebenen bzw. angepassten Komponenten verbleiben direkte Werte statt Tokens: `FoodProductSummary.tsx` (`paddingVertical: 2`, `spacing.xs + 1`), `SearchState.tsx` (`paddingVertical: 12`, `fontSize: 10`, `gap: 2`/`paddingVertical: 4` in `quickAcceptPill`), `SyncStatusSheet.tsx` (`rgba(0,0,0,0.55)`, `fontSize: 11`, `✕`, feste `hitSlop`). Ob `SyncStatusSheet` in AC-4 fällt, ist im Plan nicht eindeutig.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md), F-2; `FoodProductSummary.tsx` Zeilen 163-181; `SearchState.tsx` Zeilen 357, 407, 419, 440-444; `SyncStatusSheet.tsx` Zeilen 79-82, 163, 233.
+- **Recommendation:** Direkte Werte auf `spacing.*`/`typography.*`/Overlay-Token abbilden.
+- **Status:** Resolved
+- **Decision:** Fix requested by the user on 2026-10-12 ("Lasse alles anpassen, außer FT-QA-2026-110"); to be covered by the revised plan.
+- **History:** 2026-10-12 - Registered from the Profilbereich QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - User decision: Fix requested.
+- **History:** 2026-10-12 - Corrected in R2 F-2.3; [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md): drei Dateien tokenisiert, `colors.overlay` eingeführt; Rest `Icon size={12}` in `SearchState.tsx` Z. 215 als FT-QA-2026-113 erfasst. Status Resolved, bis FT-QA-2026-113 entschieden ist.
+
+### FT-QA-2026-109
+
+- **Finding key:** Profil-F-3
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung.md`
+- **Acceptance criterion:** AC-1, AC-7
+- **Description:** Hub-Gruppen (Bibliothek, Integrationen, Rechtliches) und der Titel `Profil` werden nur im Zustand `ready` mit vorhandenem Profil gerendert. Bei Profil-Ladefehler oder fehlendem Profil sind Impressum und Datenschutz über `Profil > Rechtliches` nicht erreichbar (Datenschutz bleibt über Wizard/Login erreichbar). Entspricht dem Vorverhalten und verletzt den Wortlaut der ACs nicht.
+- **Criticality:** Suggestion
+- **Owner:** Planner
+- **Evidence:** [QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md), F-3; `mobile/src/modules/profile/ProfileScreen.tsx` `renderBody()`.
+- **Recommendation:** Produktentscheidung, ob `Rechtliches` (und ggf. `Integrationen`) auch in Fehler-/Leerzustand angezeigt werden soll.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("Lasse alles anpassen, außer FT-QA-2026-110"); routed to the Planner together with the hub redesign request.
+- **History:** 2026-10-12 - Registered from the Profilbereich QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - User decision: Fix requested.
+- **History:** 2026-10-12 - Solved by the R2 hub redesign (F-2.1, R2-AC-5); verified by the [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md). Closed.
+
+### FT-QA-2026-110
+
+- **Finding key:** Profil-F-4
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung.md`
+- **Acceptance criterion:** AC-12
+- **Description:** Der Datenschutztext sagt, das Diagnoseprotokoll könne "in der Health-Connect-Ansicht manuell" gelöscht werden. `Log leeren` wird nur bei `EXPO_PUBLIC_APP_VARIANT` `development` oder `preview` gerendert. Für die aktuelle Alpha (`preview`) stimmt die Aussage; für eine künftige `production`-Variante wäre sie falsch.
+- **Criticality:** Suggestion
+- **Owner:** Documentation
+- **Evidence:** [QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md), F-4; `HealthConnectScreen.tsx` Zeilen 39-42, 586-608; `mobile/eas.json`; `docs/legal/datenschutzerklaerung-alpha.md`.
+- **Recommendation:** Vor einem Build ohne `development`/`preview`-Variante die Log-Ansicht freigeben oder den Text (MD-Datei und `legalTexts.ts` gemeinsam) anpassen.
+- **Status:** Accepted
+- **Decision:** Accepted by the user on 2026-10-12: es gibt aktuell nur DEV und preview, damit stimmt der Text. Neu bewerten, sobald eine production-Variante gebaut wird.
+- **History:** 2026-10-12 - Registered from the Profilbereich QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - User decision: Accepted.
+
+### FT-QA-2026-111
+
+- **Finding key:** Profil-F-5
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung.md`
+- **Acceptance criterion:** AC-1, AC-4, AC-7
+- **Description:** Testlücken, nur per Code-Review verifiziert: (a) `tabBarLabel: 'Profil'` in `RootNavigator.tsx`; (b) `SearchState.ResultRow` (52-pt-Thumbnail, getrennte Favoriten-/Quick-Accept-Aktionen); (c) Datenschutzlink in der Wizard-Vorschau.
+- **Criticality:** Suggestion
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md), F-5; `ProfileWizardScreen.test.tsx` deckt nur Schritt 0 ab; kein Test für `RootNavigator` oder `ResultRow`.
+- **Recommendation:** Gezielte Tests für Wizard-Vorschau-Link und `ResultRow`-Aktionstrennung ergänzen; Tab-Label ggf. über Konstante testbar machen.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("Lasse alles anpassen, außer FT-QA-2026-110"); to be covered by the revised plan.
+- **History:** 2026-10-12 - Registered from the Profilbereich QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - User decision: Fix requested.
+- **History:** 2026-10-12 - Corrected in R2 (F-2.1, F-2.3); verified by the [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md): `profileTab.test.ts`, `SearchState.ResultRow.test.tsx`, Wizard-Vorschau-Test. Closed.
+
+### FT-QA-2026-112
+
+- **Finding key:** Profil-F-6
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung.md`
+- **Acceptance criterion:** AC-4
+- **Description:** Thumbnail-Größen im Search Hub uneinheitlich: `RelationRow` 50 pt, unreferenziertes `RecentItem` 44 pt, `ResultRow` 52 pt. Beide Komponenten sind nicht Teil der AC-4-Formulierung; `RecentItem` ist als Known limitation dokumentiert.
+- **Criticality:** Suggestion
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md), F-6; `RelationRow.tsx` Zeile 26; `RecentItem.tsx` Zeile 12; `foodProductSummaryUtils.ts` (`FOOD_THUMBNAIL_SIZE = 52`).
+- **Recommendation:** Bei nächster Hub-Überarbeitung `RelationRow` auf `FOOD_THUMBNAIL_SIZE` angleichen; `RecentItem`/`FoodSearchResultList` entfernen oder weiterverwenden.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("Lasse alles anpassen, außer FT-QA-2026-110"); to be covered by the revised plan.
+- **History:** 2026-10-12 - Registered from the Profilbereich QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - User decision: Fix requested.
+- **History:** 2026-10-12 - Corrected in R2 F-2.3; verified by the [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md): `RelationRow` 52 pt, `RecentItem.tsx`/`FoodSearchResultList.tsx` entfernt. Closed.
+
+### FT-QA-2026-113
+
+- **Finding key:** R2Q-01
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md`
+- **Acceptance criterion:** R2-AC-12
+- **Description:** `SearchState.tsx` verwendet im Quick-Accept-Pill weiterhin `<Icon ... size={12} />` mit Literalwert statt eines Icon-Größen-Tokens. Nebenbeobachtung (nicht von der AC-Aufzählung erfasst): `SyncStatusSheet.tsx` `lineHeight: 16`, `maxHeight: 200`.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md), R2Q-01; `mobile/src/modules/nutrition/hub/SearchState.tsx` Z. 215; `mobile/src/shared/components/Icon.tsx` (`IconSize = 'sm' | 'md' | 'lg'`); `SyncStatusSheet.tsx` Z. 232, 237.
+- **Recommendation:** `size="sm"` verwenden (falls optisch akzeptabel) oder benannten Größen-Token ergänzen; Rest-Literale in `SyncStatusSheet` bei Bedarf per Token abbilden.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("korrigiere noch eben die findings").
+- **History:** 2026-10-12 - Registered from the R2 QA report (PASS WITH ISSUES). Rest von FT-QA-2026-108.
+
+### FT-QA-2026-114
+
+- **Finding key:** R2Q-02
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md` (Risiken „Blob-Pfad bei Favorit/Diary“)
+- **Acceptance criterion:** R2-AC-10, R2-AC-11 (Randbereich)
+- **Description:** Der Blob-Pfad-Guard existiert nur in `SearchState.ResultRow`. `QuantityView.tsx` (Z. 312 `addFavorite`, Z. 380 `diaryApi.addItem`) und `FoodEntryHub.tsx` (Z. 767, 804 `diaryApi.addItem`) senden `imageUrl` ungefiltert an Endpunkte mit `z.string().url()`-Schema. Ein Blob-Pfad eigener Lebensmittel mit Foto würde dort mit 400 abgelehnt (stiller Herz-Revert bzw. möglicherweise fehlschlagendes Loggen). Aus dem Code abgeleitet, nicht am laufenden System reproduziert.
+- **Criticality:** Non-blocking
+- **Owner:** Frontend
+- **Evidence:** [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md), R2Q-02; `backend/src/functions/diary.ts` Z. 130; `backend/src/functions/favorites.ts` Z. 23; `backend/src/functions/foodSearch.ts` Z. 56; `backend/src/functions/reusableItems.ts` Z. 346-348; `QuantityView.tsx` Z. 312, 380; `FoodEntryHub.tsx` Z. 767, 804.
+- **Recommendation:** Zuerst in Dev reproduzieren (eigenes Lebensmittel mit Foto favorisieren und loggen). Bei Bestätigung `isRemoteImageUri`-Guard an den Stellen oder, zusammen mit PO-1, serverseitige Auflösung bzw. Schema-Anpassung in einem eigenen Plan.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("korrigiere noch eben die findings").
+- **History:** 2026-10-12 - Registered from the R2 QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - Corrected by Frontend (Guard in `QuantityView`, `FoodEntryHub.buildDirectAddItemInput`, zusätzlich `RelationRow`); verified by the [targeted QA report](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md). Closed. Rest: `QuantityView` rendert Blob-Pfad weiter als `<Image>` (PO-1, in der KB dokumentiert).
+
+### FT-QA-2026-115
+
+- **Finding key:** R2Q-03
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung_R2_Addendum_Favoriten-Marke.md` (Abschnitte 5, 8)
+- **Acceptance criterion:** N/A (bekannte, bewusst nicht behobene Vorbelastung)
+- **Description:** `CosmosUserFoodRelationRepository.getByFoodRef` fängt jeden Lesefehler (auch transiente) und liefert `null`. `recordUsage` und `setFavorite` legen dann ein neues Dokument an und können einen bestehenden Favoriten (inkl. Marke, Nährwerte, `isFavorite`, Nutzungshistorie) überschreiben; die Merge-Regel greift in diesem Fall nicht.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md), R2Q-03; `backend/src/lib/repositories/cosmosUserFoodRelationRepository.ts` Z. 217-226, Aufrufer Z. 62 und 138.
+- **Recommendation:** Nur 404/`undefined` als „nicht vorhanden“ werten, andere Fehler weiterwerfen; Regressionstest mit gemocktem 5xx-Lesefehler.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("korrigiere noch eben die findings").
+- **History:** 2026-10-12 - Registered from the R2 QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - Corrected by Backend; verified by the [targeted QA report](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md). Folgeregression (Rezept-Guard fail-closed) als FT-QA-2026-118 erfasst, behoben und verifiziert ([targeted QA 118/120](reports/QA_Profilebereich_Findings_118_120_Targeted_2026-10-12.md)). Closed.
+
+### FT-QA-2026-116
+
+- **Finding key:** R2Q-04
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung_R2_Addendum_Favoriten-Marke.md` (Abschnitt 8, „Stale Marke“)
+- **Acceptance criterion:** N/A
+- **Description:** Die denormalisierte `displayBrand` einer Relation wird bei einer späteren Markenänderung des Produkts (eigene Lebensmittel über `reusableItems`) nicht synchronisiert; es gibt keine Funktion analog `updateNutritionDenormalized`. Die Marke aktualisiert sich nur beim erneuten Favorisieren.
+- **Criticality:** Suggestion
+- **Owner:** Backend
+- **Evidence:** [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md), R2Q-04; `backend/src/lib/repositories/cosmosUserFoodRelationRepository.ts` (`updateNutritionDenormalized`); `docs/kb/domain/03-food-catalog.md` Z. 125-136.
+- **Recommendation:** Bei Bedarf Backlog-Item für eine Brand-Synchronisation beim Update eines eigenen Lebensmittels.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("korrigiere noch eben die findings").
+- **History:** 2026-10-12 - Registered from the R2 QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - Corrected by Backend (`updateDisplayDenormalized`, Aufruf aus `reusableItems` PATCH); verified by the [targeted QA report](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md). Closed. Contract-Test fehlt: FT-QA-2026-119.
+
+### FT-QA-2026-117
+
+- **Finding key:** R2Q-05
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md` (F-2.5, R2-AC-19)
+- **Acceptance criterion:** R2-AC-19 (Randbereich; bestehende Konflikte, nicht durch R2 verursacht)
+- **Description:** `docs/kb/product/04-food-entry-hub.md` beschreibt `hub/IdleState.tsx` (Zeilen 46, 85, 225) und `hub/AlleFavoritenModal.tsx` (Zeile 234); beide Dateien existieren nicht (vorhanden: `hub/FoodList.tsx`, `RelationRow.tsx`). `docs/kb/domain/03-food-catalog.md` Z. 156 nennt „legacy IdleState“. Der Code ist Ground Truth.
+- **Criticality:** Suggestion
+- **Owner:** Documentation
+- **Evidence:** [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md), R2Q-05; `file_search` nach `hub/{IdleState,AlleFavoritenModal}*` ohne Treffer.
+- **Recommendation:** `04-food-entry-hub.md` (Idle-Ansicht, Dateitabelle) und die Randnotiz in `03-food-catalog.md` an den tatsächlichen Hub-Aufbau angleichen oder als historisch kennzeichnen.
+- **Status:** Closed
+- **Decision:** Fix requested by the user on 2026-10-12 ("korrigiere noch eben die findings").
+- **History:** 2026-10-12 - Registered from the R2 QA report (PASS WITH ISSUES).
+- **History:** 2026-10-12 - Corrected by Frontend; verified by the [targeted QA report](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md). Weitere Reste als FT-QA-2026-120 erfasst und behoben. Closed.
+
+### FT-QA-2026-118
+
+- **Finding key:** T-01
+- **Plan reference:** N/A (Korrektur zu FT-QA-2026-115; Addendum `PLAN_Profilebereich_Redesign_und_Strukturierung_R2_Addendum_Favoriten-Marke.md`, Abschnitt 5)
+- **Acceptance criterion:** N/A
+- **Description:** Mit dem Rethrow in `getByFoodRef` wirkte der Rezept-Guard in `addItemHandler` fail-closed. Der Guard läuft für jedes Hinzufügen mit `productId`; ein transienter Lesefehler ergab 500 und blockierte das Loggen normaler Lebensmittel. Es fehlten ein Handler-Test und die KB-Entscheidung.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [Targeted QA 113-117](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md), T-01; `backend/src/functions/diary.ts` Z. 372-385.
+- **Recommendation:** Guard fail-open mit `logEvent`-Warnung; Handler-Test und KB-Entscheidung ergänzen.
+- **Status:** Closed
+- **Decision:** Routed to the owner as regression of the FT-QA-2026-115 correction (user: "korrigiere noch eben die findings").
+- **History:** 2026-10-12 - Registered from the targeted QA report.
+- **History:** 2026-10-12 - Corrected by Backend (try/catch, Warn-Log `diary.item.recipeGuardReadFailed` mit nur `errorClass`, drei Handler-Tests, KB `02-backend.md`); verified by the [targeted QA 118/120](reports/QA_Profilebereich_Findings_118_120_Targeted_2026-10-12.md) (PASS). Closed.
+
+### FT-QA-2026-119
+
+- **Finding key:** T-02
+- **Plan reference:** N/A (Korrektur zu FT-QA-2026-116)
+- **Acceptance criterion:** N/A
+- **Description:** Die neue Cosmos-Repository-Methode `updateDisplayDenormalized` hat keinen Contract-Test gegen den Emulator (Skill `cosmos-data-model-and-migration` §8, `qa.instructions.md`). Die Mock-Tests belegen die Logik, aber nicht das Verhalten von `listByFoodRef` + `upsert` gegen das echte SDK. Ein Contract-Test könnte in dieser Umgebung nicht ausgeführt werden (kein Emulator).
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [Targeted QA 113-117](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md), T-02; `backend/src/lib/repositories/cosmosUserFoodRelationRepository.contract.test.ts`.
+- **Recommendation:** Contract-Test ergänzen (Relation anlegen, Methode mit neuer Marke/Name aufrufen, Rohdokument prüfen; Fall „keine Relation → kein Dokument“) und mit Emulator ausführen.
+- **Status:** Awaiting decision
+- **Decision:** Pending user decision (Fix requested / Accepted / Deferred). Nicht Teil der „korrigiere die Findings“-Anweisung (Test wäre ohne Emulator unverifiziert).
+- **History:** 2026-10-12 - Registered from the targeted QA report.
+
+### FT-QA-2026-120
+
+- **Finding key:** T-03
+- **Plan reference:** `docs/User Stories/plans/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md` (F-2.5, R2-AC-19; Korrektur zu FT-QA-2026-117)
+- **Acceptance criterion:** R2-AC-19 (Randbereich)
+- **Description:** `04-food-entry-hub.md` (Z. 89, 126) und `03-food-catalog.md` (Z. 159) verwiesen auf nicht existierende `hub/quickEntryRelevance.ts` / `computeRelevanceOrder()`.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** [Targeted QA 113-117](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md), T-03.
+- **Recommendation:** Auf die tatsächliche Struktur (`FoodEntryHub.utils.ts`, Backend-Ranking) korrigieren.
+- **Status:** Closed
+- **Decision:** Routed to the owner (user: "korrigiere noch eben die findings").
+- **History:** 2026-10-12 - Registered from the targeted QA report.
+- **History:** 2026-10-12 - Corrected by Frontend; verified by the [targeted QA 118/120](reports/QA_Profilebereich_Findings_118_120_Targeted_2026-10-12.md) (PASS). Closed.
+
+### FT-QA-2026-121
+
+- **Finding key:** S-01
+- **Plan reference:** N/A (Randbefund zu FT-QA-2026-120)
+- **Acceptance criterion:** N/A
+- **Description:** `docs/kb/domain/03-food-catalog.md` Z. ~118 führt `mealTypeCounts` noch als aktives Feld; der Hub nutzt es nicht mehr (`sortByMealTypeUsage()` über `usageDates`), und es wird nicht mehr geschrieben. In `shared/types/userFoodRelation.ts` Z. ~116 steht nur noch ein veralteter Kommentar.
+- **Criticality:** Suggestion
+- **Owner:** Documentation
+- **Evidence:** [Targeted QA 118/120](reports/QA_Profilebereich_Findings_118_120_Targeted_2026-10-12.md), S-01.
+- **Recommendation:** KB-Zeile korrigieren; Kommentar in `shared/` bei Gelegenheit bereinigen (`shared/` ist nicht Teil dieser Runde).
+- **Status:** Awaiting decision
+- **Decision:** Pending user decision (Fix requested / Accepted / Deferred).
+- **History:** 2026-10-12 - Registered from the targeted QA report.
+
 ## Verification Notes (Not Findings)
+
+### Targeted QA Findings 113-117 Verification Limits (2026-10-12)
+
+- UNVERIFIED: Cosmos-Contract-Tests (Emulator nicht erreichbar, `fetch failed`).
+- MANUAL VALIDATION REQUIRED: Dev-Ablauf (Favorit loggen, Marke eines eigenen Produkts ändern, Direct-Add mit Foto), Sichtprüfung des 16-pt-Icons im Quick-Accept-Pill, Sync-Zuverlässigkeit nach Deploy.
+- Release-Einschätzung QA: kein Blocker; Build und Function-Deploy aus dem committeten Stand.
+- Source: [QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md](reports/QA_Profilebereich_Findings_113-117_Targeted_2026-10-12.md).
+
+### Profilbereich R2 QA 2026-10-12 Verification Limits
+
+- MANUAL VALIDATION REQUIRED: R2-AC-18 (Hub-Höhe, schmale Viewports, große Schrift, TalkBack/VoiceOver), verschachteltes Modal im `LabelScanReviewScreen` (iOS/Android), Dev-Ablauf Favorit → Loggen → Marke bleibt, Bestandsfavorit entfernen und neu setzen; Checkliste im QA-Report.
+- UNVERIFIED / MANUAL VALIDATION REQUIRED: Cosmos-Contract-Test (Emulator nicht erreichbar, `fetch failed`); Rot-vor-Fix-Beleg des Reproduktionstests nur aus dem Implementierer-Handoff (QA ändert keinen Code).
+- Kein Deploy nach Alpha; der Backend-Fix wirkt in Alpha erst nach einem separaten `Deploy to Alpha` auf ausdrückliche User-Anweisung.
+- Source: [PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md).
+
+### Profilbereich Redesign QA 2026-10-12 Verification Limits (R1)
+
+- MANUAL VALIDATION REQUIRED: AC-10 (schmale Viewports, vergrößerte Schrift, Screenreader) sowie Android-Health-Connect-/iOS-Verhalten; Checkliste M-1 bis M-9 im QA-Report.
+- UNVERIFIED: Azure-Region und Retention-Aussagen des Datenschutztexts nicht gegen Azure geprüft (kein Gate laut Plan).
+- Hinweis: `docs/legal/` ist untracked und muss mit dem Änderungssatz committet werden (`legalTexts.test.ts` liest die Dateien).
+- Source: [PLAN_Profilebereich_Redesign_und_Strukturierung.md](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md).
 
 ### Targeted QA 2026-10-12 Verification Limits
 
