@@ -25,10 +25,10 @@ interface FoodEntryHubStore {
   autoFocusSearch: boolean;
   /** If set, hub opens directly into this subflow */
   initialSubflow: 'barcode' | 'ai' | null;
-  /** If true, hub closes automatically after a subflow saves (HomeScreen use case) */
+  /** If true, hub closes automatically after a directly launched subflow saves. */
   autoCloseOnSave: boolean;
   onSuccess: (() => void) | null;
-  /** Pixel offset from screen top where the sheet's top edge should be pinned (HomeScreen use case) */
+  /** Pixel offset from screen top where the sheet's top edge should be pinned. */
   topInset: number;
   /** Recipe mode: pre-populate search field on open */
   initialQuery: string;
@@ -49,9 +49,9 @@ interface FoodEntryHubStore {
     autoFocusSearch?: boolean;
     /** Open hub directly in a subflow */
     initialSubflow?: 'barcode' | 'ai';
-    /** Close hub automatically after save (HomeScreen use case) */
+    /** Close hub automatically after a directly launched subflow saves. */
     autoCloseOnSave?: boolean;
-    /** Pin sheet top to this pixel offset (safeAreaTop + header height) — HomeScreen only */
+    /** Pin sheet top to this pixel offset (safeAreaTop + header height). */
     topInset?: number;
     /** Recipe mode: pre-populate search field on open */
     initialQuery?: string;

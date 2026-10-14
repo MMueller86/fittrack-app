@@ -1,12 +1,26 @@
 import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { DiaryDayResponse } from '@fittrack/shared';
+import {
+  calculateWeightTrendRegressionSeries,
+  type DiaryDayResponse,
+  type WeightEntry,
+} from '@fittrack/shared';
 import { colors } from '../../app/theme';
 import type { MacroTarget } from '../../shared/components/MacroSummaryCard';
 import { DayNutritionCard } from './DayNutritionCard';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const { getWindowWidth, setWindowWidth } = vi.hoisted(() => {
+  let width = 390;
+  return {
+    getWindowWidth: () => width,
+    setWindowWidth: (nextWidth: number) => {
+      width = nextWidth;
+    },
+  };
+});
 
 vi.mock('react-native', () => {
   class AnimatedValue {
@@ -31,6 +45,7 @@ vi.mock('react-native', () => {
     StyleSheet: { absoluteFillObject: {}, create: <T,>(styles: T) => styles },
     Text: 'Text',
     TouchableOpacity: 'TouchableOpacity',
+    useWindowDimensions: () => ({ width: getWindowWidth(), height: 844, scale: 1, fontScale: 1 }),
     View: 'View',
   };
 });
@@ -40,6 +55,7 @@ vi.mock('react-native-svg', () => ({
   Circle: 'Circle',
   G: 'G',
   Line: 'Line',
+  Polyline: 'Polyline',
 }));
 
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
@@ -72,6 +88,38 @@ const TARGET: MacroTarget = {
   },
 };
 
+const REFERENCE_DATE = '2026-10-14';
+
+function weightEntry(date: string, value: number, unit: WeightEntry['unit'] = 'kg'): WeightEntry {
+  return {
+    id: `${date}-${value}-${unit}`,
+    userId: 'user-1',
+    date,
+    value,
+    unit,
+    createdAt: `${date}T12:00:00.000Z`,
+  };
+}
+
+const TREND_ENTRIES = [
+  weightEntry('2026-10-14', 70.6),
+  weightEntry('2026-10-11', 70.5),
+  weightEntry('2026-10-09', 70.4 * 2.20462, 'lbs'),
+  weightEntry('2026-10-07', 70.3),
+  weightEntry('2026-10-05', 70.2),
+  weightEntry('2026-10-03', 70.1),
+  weightEntry('2026-10-01', 70),
+];
+
+function weightEntriesForWeeklySlope(slopeKgPerWeek: number): WeightEntry[] {
+  return Array.from({ length: 7 }, (_, index) => (
+    weightEntry(
+      `2026-10-${String(8 + index).padStart(2, '0')}`,
+      70 + ((index - 3) * slopeKgPerWeek) / 7,
+    )
+  )).reverse();
+}
+
 const activeRenderers: ReactTestRenderer[] = [];
 
 type TestInstanceWithChildren = ReactTestInstance & {
@@ -86,7 +134,7 @@ function getTextContent(node: ReactTestInstance): string {
 
 function getByTestId(renderer: ReactTestRenderer, testID: string): ReactTestInstance {
   const matches = renderer.root.findAll(
-    (node) => node.type === 'View' && node.props.testID === testID,
+    (node) => typeof node.type === 'string' && node.props.testID === testID,
   );
   if (matches.length !== 1) {
     throw new Error(`Expected one element with testID ${testID}, found ${matches.length}`);
@@ -106,7 +154,10 @@ function flattenStyle(style: unknown): Record<string, unknown> {
 function renderCard(
   summary: DiaryDayResponse['summary'] | null = SUMMARY,
   activityBonus = 0,
+  entries: WeightEntry[] = [],
+  screenWidth = 390,
 ): ReactTestRenderer {
+  setWindowWidth(screenWidth);
   let renderer!: ReactTestRenderer;
   act(() => {
     renderer = create(
@@ -115,6 +166,8 @@ function renderCard(
         target={TARGET}
         onPress={vi.fn()}
         activityBonus={activityBonus}
+        entries={entries}
+        referenceDate={REFERENCE_DATE}
       />,
     );
   });
@@ -127,6 +180,172 @@ afterEach(() => {
     const renderer = activeRenderers.pop()!;
     act(() => renderer.unmount());
   }
+  setWindowWidth(390);
+});
+
+describe('DayNutritionCard weight trend', () => {
+  it('converts the latest full-history lbs measurement and keeps the weight panel in the empty-calorie state', () => {
+    const renderer = renderCard(EMPTY_SUMMARY, 0, [weightEntry('2026-09-20', 150, 'lbs')]);
+    const currentWeight = getByTestId(renderer, 'weight-current');
+
+    expect(getTextContent(currentWeight)).toBe('68,04 kg');
+    expect(getByTestId(renderer, 'weight-trend-summary').props.accessibilityLabel)
+      .toBe('Aktuelles Gewicht: 68,04 kg');
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-sparkline')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => (
+      typeof node.props.testID === 'string' && node.props.testID.startsWith('macro-track-')
+    ))).toHaveLength(0);
+  });
+
+  it('shows only current weight when the 14-day window has one measurement', () => {
+    const renderer = renderCard(SUMMARY, 0, [weightEntry(REFERENCE_DATE, 70.4)]);
+
+    expect(getTextContent(getByTestId(renderer, 'weight-current'))).toBe('70,40 kg');
+    expect(getByTestId(renderer, 'weight-trend-summary').props.accessibilityLabel)
+      .toBe('Aktuelles Gewicht: 70,40 kg');
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-sparkline')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => (
+      typeof node.props.testID === 'string'
+      && node.props.testID.startsWith('weight-measurement-')
+    ))).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-trend-label')).toHaveLength(0);
+  });
+
+  it('plots the shared 14-day measurements and raw fitted endpoints with calendar-day spacing', () => {
+    const entries = [
+      ...TREND_ENTRIES,
+      weightEntry('2026-09-30', 69.9),
+      weightEntry('2026-10-15', 70.7),
+    ];
+    const renderer = renderCard(SUMMARY, 0, entries);
+    const series = calculateWeightTrendRegressionSeries(
+      entries,
+      14,
+      new Date(`${REFERENCE_DATE}T12:00:00`),
+    );
+    const actualLine = getByTestId(renderer, 'weight-actual-line');
+    const regressionLine = getByTestId(renderer, 'weight-regression-line');
+    const actualCoordinates = String(actualLine.props.points).split(' ').map((point) => (
+      point.split(',').map(Number)
+    ));
+    const regressionCoordinates = String(regressionLine.props.points).split(' ').map((point) => (
+      point.split(',').map(Number)
+    ));
+    const trendLabel = getByTestId(renderer, 'weight-trend-label');
+
+    expect(series.measurements).toHaveLength(7);
+    expect(series.measurements.find((point) => point.date === '2026-10-09')?.weightKg)
+      .toBeCloseTo(70.4);
+    expect(renderer.root.findAll((node) => (
+      node.type === 'Circle' && typeof node.props.testID === 'string'
+        && node.props.testID.startsWith('weight-measurement-')
+    ))).toHaveLength(7);
+    expect(actualCoordinates).toHaveLength(7);
+    expect(actualCoordinates[0]?.[0]).toBe(3);
+    expect(actualCoordinates[actualCoordinates.length - 1]?.[0]).toBe(101);
+    expect(actualCoordinates[1]?.[0]! - actualCoordinates[0]?.[0]!)
+      .toBeCloseTo(2 / 13 * 98);
+    expect(regressionCoordinates).toHaveLength(2);
+    expect(regressionCoordinates[0]?.[0]).toBe(actualCoordinates[0]?.[0]);
+    expect(regressionCoordinates[1]?.[0]).toBe(actualCoordinates[actualCoordinates.length - 1]?.[0]);
+    expect(regressionCoordinates[0]?.[1]).not.toBe(regressionCoordinates[1]?.[1]);
+    expect(getTextContent(trendLabel)).toBe(new Intl.NumberFormat('de-DE', {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }).format(series.slopeKgPerWeek!) + ' kg/Woche');
+    expect(actualLine.props.stroke).toBe(colors.chart.average);
+    expect(regressionLine.props.stroke).toBe(colors.textSecondary);
+    expect(getByTestId(renderer, 'weight-sparkline').props.importantForAccessibility)
+      .toBe('no-hide-descendants');
+  });
+
+  it('keeps actual measurements but hides regression and rate below seven entries', () => {
+    const renderer = renderCard(SUMMARY, 0, TREND_ENTRIES.slice(0, 6));
+
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-actual-line')).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-regression-line')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-trend-label')).toHaveLength(0);
+    expect(getByTestId(renderer, 'weight-trend-summary').props.accessibilityLabel)
+      .toBe('Aktuelles Gewicht: 70,60 kg');
+  });
+
+  it('hides the rate and fitted line when seven measurements have no date variance', () => {
+    const sameDayEntries = Array.from({ length: 7 }, (_, index) => (
+      weightEntry(REFERENCE_DATE, 70 + index / 10)
+    ));
+    const renderer = renderCard(SUMMARY, 0, sameDayEntries);
+
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-regression-line')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'weight-trend-label')).toHaveLength(0);
+  });
+
+  it('shows a neutral label below the threshold without flattening the fit line', () => {
+    const lowSlopeEntries = Array.from({ length: 7 }, (_, index) => (
+      weightEntry(
+        `2026-10-${String(1 + index * 2).padStart(2, '0')}`,
+        70 + index * 0.005,
+      )
+    ));
+    const renderer = renderCard(SUMMARY, 0, lowSlopeEntries);
+    const regressionLine = getByTestId(renderer, 'weight-regression-line');
+    const points = String(regressionLine.props.points).split(' ').map((point) => (
+      point.split(',').map(Number)
+    ));
+
+    expect(getTextContent(getByTestId(renderer, 'weight-trend-label')))
+      .toBe('0,0 kg/Woche');
+    expect(points[0]?.[1]).not.toBe(points[1]?.[1]);
+  });
+
+  it.each([
+    { slopeKgPerWeek: 0.049, expectedLabel: '0,0 kg/Woche' },
+    { slopeKgPerWeek: -0.049, expectedLabel: '0,0 kg/Woche' },
+    { slopeKgPerWeek: 0.05, expectedLabel: '0,1 kg/Woche' },
+    { slopeKgPerWeek: -0.05, expectedLabel: '−0,1 kg/Woche' },
+    { slopeKgPerWeek: 0.16, expectedLabel: '0,2 kg/Woche' },
+    { slopeKgPerWeek: -0.16, expectedLabel: '−0,2 kg/Woche' },
+  ])('formats raw weekly slope $slopeKgPerWeek without changing its fit line', ({
+    slopeKgPerWeek,
+    expectedLabel,
+  }) => {
+    const entries = weightEntriesForWeeklySlope(slopeKgPerWeek);
+    const series = calculateWeightTrendRegressionSeries(
+      entries,
+      14,
+      new Date(`${REFERENCE_DATE}T12:00:00`),
+    );
+    const renderer = renderCard(SUMMARY, 0, entries);
+    const regressionLine = getByTestId(renderer, 'weight-regression-line');
+    const points = String(regressionLine.props.points).split(' ').map((point) => (
+      point.split(',').map(Number)
+    ));
+
+    expect(series.slopeKgPerWeek).toBeCloseTo(slopeKgPerWeek, 12);
+    if (Math.abs(slopeKgPerWeek) === 0.05) {
+      expect(Math.abs(series.slopeKgPerWeek ?? 0)).toBeGreaterThanOrEqual(0.05);
+    }
+    expect(getTextContent(getByTestId(renderer, 'weight-trend-label'))).toBe(expectedLabel);
+    expect(points[0]?.[1]).not.toBe(points[1]?.[1]);
+  });
+
+  it.each([
+    { screenWidth: 320, direction: 'column' },
+    { screenWidth: 360, direction: 'column' },
+    { screenWidth: 390, direction: 'row' },
+  ])('uses a readable overview layout at $screenWidth dp and keeps macros below it', ({
+    screenWidth,
+    direction,
+  }) => {
+    const renderer = renderCard(SUMMARY, 0, TREND_ENTRIES, screenWidth);
+    const overview = getByTestId(renderer, 'calorie-weight-overview');
+    const overviewStyle = flattenStyle(overview.props.style);
+    const testIDs = renderer.root.findAll((node) => typeof node.props.testID === 'string')
+      .map((node) => String(node.props.testID));
+
+    expect(overviewStyle.flexDirection).toBe(direction);
+    expect(testIDs.indexOf('calorie-weight-overview')).toBeLessThan(testIDs.indexOf('nutrition-divider'));
+    expect(testIDs.indexOf('nutrition-divider')).toBeLessThan(testIDs.indexOf('macro-track-Protein'));
+  });
 });
 
 describe('DayNutritionCard macro tracks', () => {

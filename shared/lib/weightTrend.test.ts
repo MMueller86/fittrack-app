@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { WeightEntry } from '../types/weights';
 import {
+    calculateWeightTrendRegressionSeries,
   calculateWeightTrendPerWeek,
   classifyWeightTrend,
   getWeightEntriesInLastDays,
@@ -103,5 +104,95 @@ describe('weightTrend', () => {
     ];
 
     expect(classifyWeightTrend(calculateWeightTrendPerWeek(entries, 'kg', NOW))).toBe('losing');
+  });
+  it('includes exactly the requested calendar dates and excludes future measurements', () => {
+    const previousTimezone = process.env.TZ;
+    process.env.TZ = 'UTC';
+
+    try {
+      const result = calculateWeightTrendRegressionSeries(
+        [
+          makeEntry('2026-08-22', 77),
+          makeEntry('2026-08-07', 76),
+          makeEntry('2026-08-21', 80),
+          makeEntry('2026-08-08', 79),
+        ],
+        14,
+        NOW,
+      );
+
+      expect(result.measurements.map((entry) => entry.date)).toEqual([
+        '2026-08-08',
+        '2026-08-21',
+      ]);
+    } finally {
+      if (previousTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimezone;
+    }
+  });
+
+  it('returns kg measurements, a raw kg-per-week slope, and fitted regression endpoints', () => {
+    const result = calculateWeightTrendRegressionSeries(
+      [
+        makeEntry('2026-08-15', 78),
+        makeEntry('2026-08-01', 80 * 2.20462, 'lbs'),
+        makeEntry('2026-08-08', 82),
+      ],
+      30,
+      NOW,
+    );
+
+    expect(result.measurements[0]?.weightKg).toBeCloseTo(80, 10);
+    expect(result.slopeKgPerWeek).toBeCloseTo(-1, 10);
+    expect(result.regressionLine?.start.date).toBe('2026-08-01');
+    expect(result.regressionLine?.start.weightKg).toBeCloseTo(81, 10);
+    expect(result.regressionLine?.end.date).toBe('2026-08-15');
+    expect(result.regressionLine?.end.weightKg).toBeCloseTo(79, 10);
+  });
+
+  it('calculates a raw regression from two dates without applying a display threshold', () => {
+    const result = calculateWeightTrendRegressionSeries(
+      [makeEntry('2026-08-01', 80), makeEntry('2026-08-08', 79)],
+      30,
+      NOW,
+    );
+
+    expect(result.slopeKgPerWeek).toBeCloseTo(-1, 10);
+  });
+
+  it('returns measurements but no regression when there are not two distinct dates', () => {
+    const result = calculateWeightTrendRegressionSeries(
+      [makeEntry('2026-08-20', 80), makeEntry('2026-08-20', 79)],
+      14,
+      NOW,
+    );
+
+    expect(result.measurements).toHaveLength(2);
+    expect(result.slopeKgPerWeek).toBeNull();
+    expect(result.regressionLine).toBeNull();
+  });
+
+  it('uses calendar-day regression spacing across the DST spring-forward', () => {
+    const previousTimezone = process.env.TZ;
+    process.env.TZ = 'America/New_York';
+
+    try {
+      const result = calculateWeightTrendRegressionSeries(
+        [
+          makeEntry('2026-03-07', 80),
+          makeEntry('2026-03-14', 79),
+          makeEntry('2026-03-21', 78),
+        ],
+        16,
+        new Date('2026-03-22T16:00:00.000Z'),
+      );
+
+      expect(result.slopeKgPerWeek).toBeCloseTo(-1, 10);
+      expect(result.regressionLine?.start.date).toBe('2026-03-07');
+      expect(result.regressionLine?.end.date).toBe('2026-03-21');
+    } finally {
+      if (previousTimezone === undefined) delete process.env.TZ;
+      else process.env.TZ = previousTimezone;
+    }
   });
 });

@@ -11,6 +11,13 @@ export function canSelectFoodRelation(
     && !(isRecipeContext && relation.foodRefType === 'recipe');
 }
 
+export function isDirectSubflowLaunch(
+  autoCloseOnSave: boolean,
+  initialSubflow: 'barcode' | 'ai' | null,
+): initialSubflow is 'barcode' | 'ai' {
+  return autoCloseOnSave && initialSubflow !== null;
+}
+
 export function computeLastUsageText(item: UserFoodRelation): string | null {
   const { lastInputMode, lastInputAmount, nutritionPer100g, portion } = item;
 

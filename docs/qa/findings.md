@@ -142,6 +142,9 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-121 | Targeted QA 118/120: mealTypeCounts steht noch als aktives Feld in 03-food-catalog.md Z. 118 | Suggestion | Documentation | Awaiting decision |
 | FT-QA-2026-122 | Macro ranges Diary GET contract, AC-13 | Blocking | Backend | Closed |
 | FT-QA-2026-123 | Macro ranges supplemental Backend test typecheck, AC-14 | Non-blocking | Backend | Closed |
+| FT-QA-2026-124 | US-02 weight tracking Knowledge Base accuracy, plan sections 3/16 | Blocking | Documentation (correction routed to Backend) | Closed |
+| FT-QA-2026-125 | US-02 single measurement renders isolated marker, AC-8 | Blocking | Frontend | Closed |
+| FT-QA-2026-126 | US-02 positive trend label adds unapproved plus sign, AC-5 | Blocking | Frontend | Closed |
 
 ## Current Recipe Sharing Acceptance
 
@@ -1896,6 +1899,51 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **History:** 2026-10-14 - User requested correction; routed to Backend. Unrelated existing test-source diagnostics remain out of scope for this finding.
 - **History:** 2026-10-14 - Targeted QA verified `satisfies InsightInputContext`, the 42-test prompt suite, and zero test-typecheck diagnostics in the affected file; closed. Forty-six diagnostics remain elsewhere without a new actionable finding.
 
+### FT-QA-2026-124
+
+- **Finding key:** US02-DOC-01
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md`
+- **Acceptance criterion:** N/A (plan sections 3 and 16)
+- **Description:** The required correction to `docs/kb/domain/05-weight-tracking.md` is incomplete. It still says the chart normalizes values to kg, describes its y bounds as 10% padding with a 0.4 kg minimum, and says the mobile chart and Daily Insight share the 30-day regression. In the implementation, `WeightChart.tsx` plots raw `WeightEntry.value` values and a trailing seven-measurement average; `weightChartUtils.ts` uses snapped 0.5/1/2 kg steps with one step of padding. The 30-day regression is used by the Progress trend row and Daily Insight, not by `WeightChart`. These are the existing-behavior divergences the approved plan requires the Knowledge Base to correct.
+- **Criticality:** Blocking
+- **Owner:** Documentation; correction routed to Backend because the approved Backend work package owns this Knowledge Base update.
+- **Evidence:** [QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md); `docs/kb/domain/05-weight-tracking.md`; `mobile/src/shared/components/WeightChart.tsx`; `mobile/src/shared/components/weightChartUtils.ts`; approved plan sections 3 and 16.
+- **Recommendation:** Correct the weight-tracking Knowledge Base to distinguish `WeightChart` from the Progress trend row/Daily Insight, document its measurement-count window and moving average, raw entry-unit behavior, and actual bounds calculation, while retaining the new Home regression contract.
+- **Status:** Closed
+- **Decision:** Backend corrected the Knowledge Base; targeted QA independently verified the documented chart behavior against the implementation.
+- **History:** 2026-10-14 - Registered from the validated US-02 QA FAIL report. Correction routed to Backend under the approved work package; device and screen-reader limitations remain separate verification notes.
+- **History:** 2026-10-14 - [Fresh QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md) verified the corrected distinction between `WeightChart`, Progress, and Daily Insight. Closed; the report identifies two separate Frontend findings.
+
+### FT-QA-2026-125
+
+- **Finding key:** US02-AC08-01
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md`
+- **Acceptance criterion:** AC-8; plan section 8 (Insufficient history)
+- **Description:** With exactly one measurement inside the 14-day window, the current weight is shown and the trend label/regression line are correctly absent, but the sparkline still renders a lone actual-measurement marker. `WeightTrendSparkline` returns `null` only for zero measurements; it skips the actual polyline for one point but maps every actual point to a `Circle`. This contradicts plan section 8, which requires showing only the current weight for one entry.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md); with `referenceDate="2026-10-14"` and one entry dated `2026-10-14`, `mobile/src/modules/home/DayNutritionCard.tsx` renders `weight-measurement-0`. The current one-entry test uses an older date outside the trend window; the six-entry test correctly verifies visible measurements without a trend.
+- **Recommendation:** Suppress the sparkline and isolated measurement marker when there is exactly one in-window measurement; add a focused in-window one-entry test asserting only current weight is shown. Preserve empty-window and 2-6-entry behavior.
+- **Status:** Closed
+- **Decision:** Frontend suppressed the one-measurement sparkline/marker while preserving zero-window and 2-6-measurement behavior; independent QA verified the correction.
+- **History:** 2026-10-14 - Registered from the fresh US-02 QA FAIL report. No implementation change was made by QA.
+- **History:** 2026-10-14 - Routed to Frontend under correction attempt 1. [Final QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md) verified the exact one-in-window case and preserved zero-window and 2-6-entry cases; closed on PASS.
+
+### FT-QA-2026-126
+
+- **Finding key:** US02-AC05-01
+- **Plan reference:** `docs/User Stories/startpage/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md`
+- **Acceptance criterion:** AC-5; PO-1
+- **Description:** Positive weekly rates include a leading plus sign. At the approved positive boundary, the UI renders `+0,1 kg/Woche`, while AC-5 specifies `0,1 kg/Woche`; the focused test currently asserts the unapproved plus sign.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md); `mobile/src/modules/home/DayNutritionCard.tsx` adds `+` for every non-negative slope in `formatWeeklyTrendLabel`; `mobile/src/modules/home/DayNutritionCard.test.tsx` expects `+0,1 kg/Woche` for `0.05` and positive values above the threshold.
+- **Recommendation:** Match the approved positive output without a leading plus sign; retain the typographic minus for negative values and update positive-boundary and positive-rate assertions.
+- **Status:** Closed
+- **Decision:** Frontend removed the unapproved leading plus sign while preserving negative formatting and raw regression predictions; independent QA verified the correction.
+- **History:** 2026-10-14 - Registered from the fresh US-02 QA FAIL report. No implementation change was made by QA.
+- **History:** 2026-10-14 - Routed to Frontend under correction attempt 1. [Final QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md) verified positive/negative threshold formatting and unchanged regression lines; closed on PASS.
+
 ## Verification Notes (Not Findings)
 
 ### Targeted QA Findings 113-117 Verification Limits (2026-10-12)
@@ -1924,6 +1972,12 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - `UNVERIFIED`: Cosmos legacy-profile contract was not run because no local emulator was listening on `127.0.0.1:18081` or `127.0.0.1:8081`; no remote Cosmos environment was used.
 - `MANUAL VALIDATION REQUIRED`: Physical-device viewport, enlarged-font, and screen-reader checks were not performed; the Home UI tests used `react-test-renderer` only.
 - Source: [Macro target ranges QA report](reports/PLAN_US_Makro-Zielbereiche-und-Visualisierung.md).
+
+### Compact Home Weight Trend QA 2026-10-14 Verification Limits
+
+- `UNVERIFIED`: Physical/emulated device visual checks at 320/360/390 dp, including enlarged system text, were unavailable because `adb` was unavailable.
+- `MANUAL VALIDATION REQUIRED`: TalkBack/VoiceOver announcement of the weight summary and SVG accessibility targets was not checked.
+- Source: [US-02 QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md).
 
 ### Targeted QA 2026-10-12 Verification Limits
 

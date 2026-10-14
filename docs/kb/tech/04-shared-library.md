@@ -143,10 +143,12 @@ pair and any supplied ETag precondition, and computes the persisted fingerprint.
 - `WeightEntry` — date-stamped weight measurement
 
 ### `weightTrend.ts`
-- `calculateWeightTrendPerWeek` — linear regression over the last 30 calendar days, projected to a weekly change
+- `calculateWeightTrendPerWeek` — fixed 30-calendar-day linear regression, projected to a weekly change and converted to the requested weight unit
+- `calculateWeightTrendRegressionSeries(entries, windowDays, now?)` — explicit inclusive local-calendar-day window; returns chronological measurements normalized to kg, a raw `slopeKgPerWeek`, and fitted kg regression endpoints at the first and last measurement dates. Slope and endpoints are `null` unless measurements span two distinct dates. It does not apply a display threshold or classify the slope.
 - `classifyWeightTrend` — shared `gaining | losing | stable` classification using the chart thresholds
 - Date-only window boundaries and regression spacing use UTC-neutral calendar-day ordinals; local `Date` components only select the current local calendar date, so DST and 24-hour instant length do not change the result.
-- Used by both the mobile weight chart and the backend Daily Insight context
+- Date-only window boundaries and regression spacing use UTC-neutral calendar-day ordinals; local `Date` components only select the current local calendar date, so DST and 24-hour instant length do not change the result.
+- The existing mobile trend row and backend Daily Insight context continue to use the fixed 30-day `calculateWeightTrendPerWeek` contract; the explicit-window series API is additive.
 
 ### `hint.ts`
 - `HintId` — `H1`–`H28` situational hints + `M0`–`M9` motivational hints

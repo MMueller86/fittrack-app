@@ -5,6 +5,7 @@ import {
   computeLastUsageText,
   computeMacroText,
   computeDirectAddLabel,
+  isDirectSubflowLaunch,
 } from './FoodEntryHub.utils';
 import { buildRelationFavoriteInput, canToggleFavorite, isUnavailableRecipeRelation } from './RelationRow.utils';
 import type { UserFoodRelation } from '@fittrack/shared';
@@ -21,6 +22,15 @@ function makeItem(overrides: Partial<UserFoodRelation>): UserFoodRelation {
     ...overrides,
   } as UserFoodRelation;
 }
+
+describe('direct subflow launch', () => {
+  it('closes the hub session only for auto-closing initial subflows', () => {
+    expect(isDirectSubflowLaunch(true, 'ai')).toBe(true);
+    expect(isDirectSubflowLaunch(true, 'barcode')).toBe(true);
+    expect(isDirectSubflowLaunch(false, 'ai')).toBe(false);
+    expect(isDirectSubflowLaunch(true, null)).toBe(false);
+  });
+});
 
 describe('computeLastUsageText', () => {
   it('returns reference value when lastInputAmount is absent but nutritionPer100g is present', () => {

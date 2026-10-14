@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -52,6 +53,7 @@ interface Props {
   /** Recipe mode: run a single-food estimate instead of a meal estimate. */
   onIngredientEstimated?: (estimate: AiFoodEstimatePreview, query: string) => void;
   initialQuery?: string;
+  safeAreaTopInset: number;
 }
 
 async function resolveOrCreateMealId(
@@ -68,7 +70,10 @@ async function resolveOrCreateMealId(
   return meal.id;
 }
 
-export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEstimated, initialQuery }: Props) {
+export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEstimated, initialQuery, safeAreaTopInset }: Props) {
+  const safeAreaStyle = Platform.OS === 'android'
+    ? [styles.safeArea, { paddingTop: safeAreaTopInset }]
+    : styles.safeArea;
   const [text, setText] = useState('');
   const [mealPhoto, setMealPhoto] = useState<{
     uri: string;
@@ -265,7 +270,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
         presentationStyle="pageSheet"
         onRequestClose={onClose}
       >
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={safeAreaStyle}>
           <View style={styles.header}>
             <Text style={styles.title}>✨ KI-Lebensmittelschätzung</Text>
             <TouchableOpacity
@@ -337,7 +342,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
         presentationStyle="pageSheet"
         onRequestClose={() => setMealEstimate(null)}
       >
-        <SafeAreaView style={styles.safeArea}>
+        <SafeAreaView style={safeAreaStyle}>
           <View style={styles.header}>
             <TouchableOpacity
               onPress={() => setMealEstimate(null)}
@@ -458,7 +463,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.safeArea}>
+      <SafeAreaView style={safeAreaStyle}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>✨ KI-Mahlzeitschätzung</Text>

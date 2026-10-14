@@ -4,11 +4,26 @@
 // Makros: Ist-Wert/Zielbereich + 150%-Track mit einheitlicher Referenz.
 
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Svg, { Circle, G } from 'react-native-svg';
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import Svg, { Circle, G, Polyline } from 'react-native-svg';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import type { DiaryDayResponse, MacroRange } from '@fittrack/shared';
+import {
+  calculateWeightTrendRegressionSeries,
+  type DiaryDayResponse,
+  type MacroRange,
+  type WeightEntry,
+} from '@fittrack/shared';
 import { Icon } from '../../shared/components/Icon';
+import { computeChartBounds } from '../../shared/components/weightChartUtils';
+import { addLocalDays, differenceInLocalDays } from '../../shared/date/localDate';
 import {
   formatMacroTargetValue,
   type MacroTarget,
@@ -27,6 +42,21 @@ const RING_SIZE = 96;
 const STROKE_W = 9;
 const RING_RADIUS = (RING_SIZE - STROKE_W) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+const WEIGHT_TREND_WINDOW_DAYS = 14;
+const MINIMUM_TREND_MEASUREMENTS = 7;
+const WEEKLY_TREND_NEUTRAL_THRESHOLD_KG_PER_WEEK = 0.05;
+const SPARKLINE_WIDTH = 104;
+const SPARKLINE_HEIGHT = 40;
+const SPARKLINE_INSET = 3;
+const POUNDS_PER_KILOGRAM = 2.20462;
+const weightFormatter = new Intl.NumberFormat('de-DE', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const weeklyTrendFormatter = new Intl.NumberFormat('de-DE', {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
 
 // AnimatedCircle: SVG Circle mit Animated-fähigem strokeDashoffset
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -84,6 +114,199 @@ function DonutRing({ pct, isOver }: { pct: number; isOver: boolean }) {
         />
       </G>
     </Svg>
+  );
+}
+
+type WeightTrendSeries = ReturnType<typeof calculateWeightTrendRegressionSeries>;
+
+function formatWeightKg(weightKg: number): string {
+  return weightFormatter.format(weightKg);
+}
+
+// FE-2 owns the numeric display rule; keep that policy separate from the raw series and chart.
+function formatWeeklyTrendLabel(slopeKgPerWeek: number): string {
+  if (Math.abs(slopeKgPerWeek) < WEEKLY_TREND_NEUTRAL_THRESHOLD_KG_PER_WEEK) {
+    return '0,0 kg/Woche';
+  }
+
+  const sign = slopeKgPerWeek < 0 ? '−' : '';
+  return `${sign}${weeklyTrendFormatter.format(Math.abs(slopeKgPerWeek))} kg/Woche`;
+}
+
+function toKilograms(entry: WeightEntry): number {
+  return entry.unit === 'lbs' ? entry.value / POUNDS_PER_KILOGRAM : entry.value;
+}
+
+function WeightTrendSparkline({
+  series,
+  referenceDate,
+  showRegressionLine,
+}: {
+  series: WeightTrendSeries;
+  referenceDate: string;
+  showRegressionLine: boolean;
+}) {
+  if (series.measurements.length < 2) return null;
+
+  const regressionLine = showRegressionLine ? series.regressionLine : null;
+  const plottedValues = [
+    ...series.measurements.map((point) => point.weightKg),
+    ...(regressionLine ? [regressionLine.start.weightKg, regressionLine.end.weightKg] : []),
+  ];
+  const bounds = computeChartBounds(Math.min(...plottedValues), Math.max(...plottedValues));
+  const windowStart = addLocalDays(referenceDate, -(WEIGHT_TREND_WINDOW_DAYS - 1));
+  const xForDate = (date: string) => {
+    const dayOffset = differenceInLocalDays(date, windowStart);
+    return SPARKLINE_INSET
+      + (dayOffset / (WEIGHT_TREND_WINDOW_DAYS - 1)) * (SPARKLINE_WIDTH - SPARKLINE_INSET * 2);
+  };
+  const yForWeight = (weightKg: number) => (
+    SPARKLINE_HEIGHT - SPARKLINE_INSET
+    - ((weightKg - bounds.yMin) / (bounds.yMax - bounds.yMin))
+      * (SPARKLINE_HEIGHT - SPARKLINE_INSET * 2)
+  );
+  const actualPoints = series.measurements.map((point) => ({
+    x: xForDate(point.date),
+    y: yForWeight(point.weightKg),
+  }));
+  const regressionPoints = regressionLine
+    ? [regressionLine.start, regressionLine.end].map((point) => ({
+      x: xForDate(point.date),
+      y: yForWeight(point.weightKg),
+    }))
+    : [];
+  const toSvgPoints = (points: Array<{ x: number; y: number }>) => (
+    points.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(' ')
+  );
+
+  return (
+    <Svg
+      width={SPARKLINE_WIDTH}
+      height={SPARKLINE_HEIGHT}
+      testID="weight-sparkline"
+      accessible={false}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      {actualPoints.length > 1 && (
+        <Polyline
+          testID="weight-actual-line"
+          points={toSvgPoints(actualPoints)}
+          fill="none"
+          stroke={colors.chart.average}
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      )}
+      {regressionPoints.length === 2 && (
+        <Polyline
+          testID="weight-regression-line"
+          points={toSvgPoints(regressionPoints)}
+          fill="none"
+          stroke={colors.textSecondary}
+          strokeWidth={2}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      )}
+      {actualPoints.map((point, index) => (
+        <Circle
+          key={`${series.measurements[index]!.date}-${index}`}
+          testID={`weight-measurement-${index}`}
+          cx={point.x}
+          cy={point.y}
+          r={1.75}
+          fill={colors.chart.average}
+        />
+      ))}
+    </Svg>
+  );
+}
+
+function WeightTrendSummary({
+  entries,
+  referenceDate,
+  compact,
+}: {
+  entries: WeightEntry[];
+  referenceDate: string;
+  compact: boolean;
+}) {
+  const series = calculateWeightTrendRegressionSeries(
+    entries,
+    WEIGHT_TREND_WINDOW_DAYS,
+    new Date(`${referenceDate}T12:00:00`),
+  );
+  const latestEntry = entries[0];
+  const currentWeightKg = latestEntry ? toKilograms(latestEntry) : null;
+  const hasTrend = series.measurements.length >= MINIMUM_TREND_MEASUREMENTS
+    && series.slopeKgPerWeek !== null
+    && series.regressionLine !== null;
+  const trendLabel = hasTrend && series.slopeKgPerWeek !== null
+    ? formatWeeklyTrendLabel(series.slopeKgPerWeek)
+    : null;
+  const accessibilityLabel = currentWeightKg === null
+    ? 'Kein Gewichtseintrag'
+    : `Aktuelles Gewicht: ${formatWeightKg(currentWeightKg)} kg${trendLabel ? `; Trend: ${trendLabel}` : ''}`;
+
+  return (
+    <View
+      style={[styles.weightSummary, compact && styles.weightSummaryCompact]}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+      testID="weight-trend-summary"
+    >
+      <View
+        style={[styles.weightVisuals, compact && styles.weightVisualsCompact]}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <View style={styles.weightTextGroup}>
+          <Text style={styles.weightTitle}>Gewicht</Text>
+          <Text
+            style={currentWeightKg === null ? styles.weightUnavailable : styles.weightValue}
+            testID="weight-current"
+          >
+            {currentWeightKg === null ? 'Kein Eintrag' : `${formatWeightKg(currentWeightKg)} kg`}
+          </Text>
+          {trendLabel && (
+            <Text style={styles.weightTrend} testID="weight-trend-label">
+              {trendLabel}
+            </Text>
+          )}
+        </View>
+        <WeightTrendSparkline
+          series={series}
+          referenceDate={referenceDate}
+          showRegressionLine={hasTrend}
+        />
+      </View>
+    </View>
+  );
+}
+
+function CalorieWeightOverview({
+  children,
+  entries,
+  referenceDate,
+  compact,
+}: {
+  children: React.ReactNode;
+  entries: WeightEntry[];
+  referenceDate: string;
+  compact: boolean;
+}) {
+  return (
+    <View
+      style={[styles.overview, compact && styles.overviewCompact]}
+      testID="calorie-weight-overview"
+    >
+      <View style={styles.caloriePanel}>{children}</View>
+      <View style={compact ? styles.horizontalSeparator : styles.verticalSeparator} />
+      <WeightTrendSummary entries={entries} referenceDate={referenceDate} compact={compact} />
+    </View>
   );
 }
 
@@ -351,9 +574,21 @@ interface Props {
   target: MacroTarget | null;
   onPress: () => void;
   activityBonus?: number;
+  entries: WeightEntry[];
+  referenceDate: string;
 }
 
-export function DayNutritionCard({ summary, target, onPress, activityBonus }: Props) {
+export function DayNutritionCard({
+  summary,
+  target,
+  onPress,
+  activityBonus,
+  entries,
+  referenceDate,
+}: Props) {
+  const { width: screenWidth } = useWindowDimensions();
+  const compact = screenWidth < 380;
+
   if (!target) return null;
 
   const isEmpty = !summary || summary.calories === 0;
@@ -366,16 +601,18 @@ export function DayNutritionCard({ summary, target, onPress, activityBonus }: Pr
   if (isEmpty) {
     return (
       <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-        <View style={styles.emptyRow}>
-          {/* Leerer Ring */}
-          <DonutRing pct={0} isOver={false} />
-          <View style={styles.emptyText}>
-            <Text style={styles.emptyTitle}>Noch kein Eintrag.</Text>
-            <TouchableOpacity style={styles.ctaBtn} onPress={onPress} activeOpacity={0.75}>
-              <Text style={styles.ctaBtnText}>➕  Essen hinzufügen</Text>
-            </TouchableOpacity>
+        <CalorieWeightOverview entries={entries} referenceDate={referenceDate} compact={compact}>
+          <View style={styles.emptyRow}>
+            {/* Leerer Ring */}
+            <DonutRing pct={0} isOver={false} />
+            <View style={styles.emptyText}>
+              <Text style={styles.emptyTitle}>Noch kein Eintrag.</Text>
+              <TouchableOpacity style={styles.ctaBtn} onPress={onPress} activeOpacity={0.75}>
+                <Text style={styles.ctaBtnText}>➕  Essen hinzufügen</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </CalorieWeightOverview>
         {activityBonusValues && <ActivityBonusRow values={activityBonusValues} />}
       </TouchableOpacity>
     );
@@ -388,33 +625,35 @@ export function DayNutritionCard({ summary, target, onPress, activityBonus }: Pr
 
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
-      {/* ── Kalorien-Bereich: Donut links, Zahlen rechts ── */}
-      <View style={styles.calRow}>
-        {/* Donut mit Text in der Mitte */}
-        <View style={styles.donutWrap}>
-          <DonutRing pct={calPct} isOver={isOver} />
-          <View style={styles.donutCenter}>
-            <Text style={styles.donutValue}>
-              {isOver ? `+${calConsumed - effectiveCalorieTarget}` : remaining}
-            </Text>
-            <Text style={styles.donutLabel}>
-              {isOver ? 'über' : 'kcal\nverfügbar'}
+      <CalorieWeightOverview entries={entries} referenceDate={referenceDate} compact={compact}>
+        {/* ── Kalorien-Bereich: Donut links, Zahlen rechts ── */}
+        <View style={styles.calRow}>
+          {/* Donut mit Text in der Mitte */}
+          <View style={styles.donutWrap}>
+            <DonutRing pct={calPct} isOver={isOver} />
+            <View style={styles.donutCenter}>
+              <Text style={styles.donutValue}>
+                {isOver ? `+${calConsumed - effectiveCalorieTarget}` : remaining}
+              </Text>
+              <Text style={styles.donutLabel}>
+                {isOver ? 'über' : 'kcal\nverfügbar'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Zahlen rechts */}
+          <View style={styles.calInfo}>
+            <Text style={styles.calConsumed}>{calConsumed} kcal</Text>
+            <Text style={styles.calTarget}>
+              Ziel {effectiveCalorieTarget} kcal
+              {bonus > 0 && <Text style={styles.bonusBadge}> +{bonus}</Text>}
             </Text>
           </View>
         </View>
-
-        {/* Zahlen rechts */}
-        <View style={styles.calInfo}>
-          <Text style={styles.calConsumed}>{calConsumed} kcal</Text>
-          <Text style={styles.calTarget}>
-            Ziel {effectiveCalorieTarget} kcal
-            {bonus > 0 && <Text style={styles.bonusBadge}> +{bonus}</Text>}
-          </Text>
-        </View>
-      </View>
+      </CalorieWeightOverview>
 
       {/* ── Makros ── */}
-      <View style={styles.divider} />
+      <View style={styles.divider} testID="nutrition-divider" />
       <MacroRow
         label="Protein"
         value={summary!.protein}
@@ -451,12 +690,73 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
     marginHorizontal: spacing.md,
   },
+  overview: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  overviewCompact: {
+    flexDirection: 'column',
+  },
+  caloriePanel: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+  },
+  verticalSeparator: {
+    width: 1,
+    backgroundColor: colors.border,
+  },
+  horizontalSeparator: {
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  weightSummary: {
+    width: 112,
+    flexShrink: 0,
+    justifyContent: 'center',
+  },
+  weightSummaryCompact: {
+    width: '100%',
+  },
+  weightVisuals: {
+    gap: spacing.xs,
+  },
+  weightVisualsCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  weightTextGroup: {
+    flexShrink: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  weightTitle: {
+    ...typography.caption,
+    color: colors.textMuted,
+  },
+  weightValue: {
+    ...typography.h3,
+    color: colors.text,
+    fontVariant: ['tabular-nums'],
+  },
+  weightUnavailable: {
+    ...typography.body2,
+    color: colors.textSecondary,
+  },
+  weightTrend: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    fontVariant: ['tabular-nums'],
+  },
   // Kalorien-Bereich
   calRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.sm,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   donutWrap: {
     width: RING_SIZE,

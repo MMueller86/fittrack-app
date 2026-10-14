@@ -32,6 +32,7 @@ import { DayStoryCard } from '../../shared/components/DayStoryCard';
 import type { MealMacroSummary } from '../../shared/components/DayStoryCard';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Icon } from '../../shared/components/Icon';
+import { FOOD_ENTRY_HEADER_HEIGHT, FoodEntrySearchRow } from '../../shared/components/FoodEntrySearchRow';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -616,6 +617,21 @@ export default function DiaryScreen({ navigation, route }: Props) {
   };
 
   // Open hub for adding items (replaces AddItemModal as primary entry)
+  const handleOpenFoodEntryShortcut = (initialSubflow?: 'ai' | 'barcode') => {
+    const params = {
+      date,
+      onSuccess: () => { void loadDay(date); },
+      topInset: insets.top + headerRowHeight,
+    };
+
+    if (initialSubflow) {
+      openHub({ ...params, initialSubflow, autoCloseOnSave: true });
+      return;
+    }
+
+    openHub(params);
+  };
+
   const handleOpenAddItem = (mealId: string, _mealName: string) => {
     const meal = orderedMeals.find((m) => m.id === mealId);
     openHub({
@@ -791,54 +807,64 @@ export default function DiaryScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
-      {/* Header + Date navigator — unified single row */}
-      <GestureDetector gesture={Gesture.Pan()
-        .activeOffsetX([-20, 20])
-        .failOffsetY([-20, 20])
-        .onEnd((e) => {
-          'worklet';
-          if (e.translationX < -40) {
-            runOnJS(nextDay)();
-          } else if (e.translationX > 40) {
-            runOnJS(prevDay)();
-          }
-        })
-      }>
-        <View style={styles.headerRow} onLayout={(e) => setHeaderRowHeight(e.nativeEvent.layout.height)}>
-          {/* Left: screen eyebrow label */}
-          <Text style={styles.headerEyebrow}>Ernährung</Text>
-          {/* Center: date navigator */}
-          <View style={styles.dateNavCenter}>
-            <TouchableOpacity
-              onPress={prevDay}
-              style={[styles.dateNavBtn, bulkMutation !== null && styles.dateNavBtnDisabled]}
-              disabled={bulkMutation !== null}
-            >
-              <Text style={styles.dateNavArrow}>‹</Text>
-            </TouchableOpacity>
-            <Text style={styles.dateLabel}>{formatDateLabel(date)}</Text>
-            <TouchableOpacity
-              onPress={nextDay}
-              style={[styles.dateNavBtn, (isToday || bulkMutation !== null) && styles.dateNavBtnDisabled]}
-              disabled={isToday || bulkMutation !== null}
-            >
-              <Text style={[styles.dateNavArrow, (isToday || bulkMutation !== null) && styles.dateNavArrowDisabled]}>›</Text>
-            </TouchableOpacity>
+      <View style={styles.stickyHeader}>
+        <GestureDetector gesture={Gesture.Pan()
+          .activeOffsetX([-20, 20])
+          .failOffsetY([-20, 20])
+          .onEnd((e) => {
+            'worklet';
+            if (e.translationX < -40) {
+              runOnJS(nextDay)();
+            } else if (e.translationX > 40) {
+              runOnJS(prevDay)();
+            }
+          })
+        }>
+          <View
+            testID="diary-header-row"
+            style={styles.headerRow}
+            onLayout={(e) => setHeaderRowHeight(e.nativeEvent.layout.height)}
+          >
+            <Text style={styles.headerEyebrow}>Ernährung</Text>
+            <View style={styles.dateNavCenter}>
+              <TouchableOpacity
+                onPress={prevDay}
+                style={[styles.dateNavBtn, bulkMutation !== null && styles.dateNavBtnDisabled]}
+                disabled={bulkMutation !== null}
+              >
+                <Text style={styles.dateNavArrow}>‹</Text>
+              </TouchableOpacity>
+              <Text style={styles.dateLabel}>{formatDateLabel(date)}</Text>
+              <TouchableOpacity
+                onPress={nextDay}
+                style={[styles.dateNavBtn, (isToday || bulkMutation !== null) && styles.dateNavBtnDisabled]}
+                disabled={isToday || bulkMutation !== null}
+              >
+                <Text style={[styles.dateNavArrow, (isToday || bulkMutation !== null) && styles.dateNavArrowDisabled]}>›</Text>
+              </TouchableOpacity>
+            </View>
+            {selectionMode ? (
+              <TouchableOpacity
+                style={styles.headerAction}
+                onPress={clearSelectionMode}
+                activeOpacity={0.7}
+                disabled={bulkMutation !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Mehrfachauswahl beenden"
+              >
+                <Text style={[styles.headerActionText, styles.headerActionCancelText]}>Abbrechen</Text>
+              </TouchableOpacity>
+            ) : <View style={styles.headerSpacer} />}
           </View>
-          {selectionMode ? (
-            <TouchableOpacity
-              style={styles.headerAction}
-              onPress={clearSelectionMode}
-              activeOpacity={0.7}
-              disabled={bulkMutation !== null}
-              accessibilityRole="button"
-              accessibilityLabel="Mehrfachauswahl beenden"
-            >
-              <Text style={[styles.headerActionText, styles.headerActionCancelText]}>Abbrechen</Text>
-            </TouchableOpacity>
-          ) : <View style={styles.headerSpacer} />}
-        </View>
-      </GestureDetector>
+        </GestureDetector>
+        {!selectionMode && (
+          <FoodEntrySearchRow
+            onSearch={() => handleOpenFoodEntryShortcut()}
+            onAi={() => handleOpenFoodEntryShortcut('ai')}
+            onBarcode={() => handleOpenFoodEntryShortcut('barcode')}
+          />
+        )}
+      </View>
 
       <Animated.View style={[{ flex: 1 }, contentAnimStyle]}>
       {loading ? (
@@ -1050,16 +1076,18 @@ export default function DiaryScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
-  // ─── Unified header row ───
+  stickyHeader: {
+    backgroundColor: colors.background,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: FOOD_ENTRY_HEADER_HEIGHT,
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   headerEyebrow: {
     ...typography.caption,

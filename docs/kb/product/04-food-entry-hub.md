@@ -11,11 +11,13 @@ Key UX principle: the user never thinks about which feature to use — they just
 ## Entry Points
 
 Any part of the app can open the Hub:
-- Diary screen → meal button (mealId + mealType known)
+- Diary screen → persistent search row (selected date, no mealId) or meal button (mealId + mealType known)
 - Home screen → quick-add button (no mealId, mealType from time)
 - Recipe wizard ingredient row → ingredient search context (`purpose: 'recipeIngredient'`)
 
 Diary entry points open the same hub with the same diary workflow. Recipe entry points open the hub as an ingredient picker: product selection and explicit single-food AI estimation call back into `RecipeWizardScreen`, and diary mutations are disabled.
+
+Home and Nutrition use the same search/action row layout and header height. The Food Entry Hub is pinned to the top of that row in both tabs so its sheet starts at the same screen position.
 
 ## State Machine (`hubReducer.ts`)
 
@@ -78,9 +80,13 @@ If ingredient callbacks are supplied and `purpose` is omitted, the store infers 
 Library: `@gorhom/bottom-sheet` v5
 
 - Default hub snap point: `['85%']`
-- Full-height snap point: `['100%']` when the Home-screen direct subflow needs the sheet to occupy the full screen after it becomes visible
+- Full-height snap point: `['100%']` when Home or Diary direct entry needs the sheet to occupy the full screen after it becomes visible
 - Backdrop: `BottomSheetBackdrop` with opacity 0.10 (8–12% dimming)
 - `QuantityView` is inline hub content, not a separate product dialog.
+
+### Full-Screen Subflows
+
+The barcode scanner and AI estimate open as full-screen native modals. This is intentional: the scanner needs the camera preview area, and the AI flow includes input and review steps. When launched from an active Hub, closing a subflow returns to the still-open Hub; a direct Home launch can open the same modal without presenting the Hub sheet. Modal headers use the app-level top safe-area inset; the Hub's `topInset` also includes the Home/Diary header height and must not be reused for modal content.
 
 ## Idle view
 
@@ -198,17 +204,19 @@ In `QuantityView`, the meal type is always editable by the user.
 
 ## Search Field Placeholder
 
-Context-dependent:
+The Hub's actual text input remains context-dependent:
 - Meal type known: `"Für Frühstück suchen…"` (localized to meal type)
 - No meal type: `"Lebensmittel suchen…"`
+
+The Home/Diary entry pill is a button that opens the Hub, not a text input; its visible text and accessibility label are `"Lebensmittel hinzufügen"`. The AI action uses a `KI` monogram in its circular mark with the one-line caption `"Schätzen"`. The barcode action keeps its barcode icon and uses the one-line caption `"Scan"`. Their accessibility labels remain `"KI schätzen"` and `"Barcode scannen"` in both the entry row and Hub.
 
 ## Finalized Decisions (2026-07-08)
 
 These UX decisions are final and must not be reversed without explicit product discussion:
 
 - Search field height: 52pt (not 44pt)
-- Barcode + AI icons: outside the pill, as standalone icons next to the search field
-- Barcode + AI icon color: `colors.primary` (green, not muted)
+- Barcode icon + KI monogram: outside the pill, as standalone circular action marks next to the search field; each labeled action stays within the 52pt row height
+- Barcode icon + KI monogram color: `colors.primary` (green, not muted)
 - Quick actions in the idle view (formerly `IdleState`, no longer exists): removed (barcode + AI in search row is sufficient)
 - Sticky CompactActionBar above results: removed (replaced by bottom fallback section)
 - Snap point: `['85%']` for the default hub sheet

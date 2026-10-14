@@ -3,8 +3,8 @@
 //
 // Struktur (top → bottom):
 //   1. BrandHeader: FitTrack-Logo + Name
-//   2. CoachingHeroCard: Begrüßung + Hint + Gewicht (2-Spalten) + Sparkline
-//   3. DayNutritionCard: Donut-Ring + animierte Kalorien + Makro-Balken
+//   2. CoachingHeroCard: kompakte Begrüßung + Tagesart-Auswahl
+//   3. DayNutritionCard: Donut-Ring + Gewichtstrend + Makro-Balken
 //   4. WeeklyReviewCard: sieben abgeschlossene Tage + KI-Wochenbewertung
 //   5. ActivityCard / ActivityCtaCard: besondere Aktivität
 //   6. InsightCard: KI-Tagesanalyse (async, non-blocking)
@@ -31,8 +31,8 @@ import { profileApi } from '../../shared/api/profileApi';
 import { syncLogger } from '../../services/health/syncLogger';
 import { useDayTypeStore } from '../nutrition/useDayTypeStore';
 import WorkoutTypePicker from './WorkoutTypePicker';
-import { getDayHint } from './getDayHint';
 import { Icon } from '../../shared/components/Icon';
+import { FOOD_ENTRY_HEADER_HEIGHT, FoodEntrySearchRow } from '../../shared/components/FoodEntrySearchRow';
 import { CoachingHeroCard } from './CoachingHeroCard';
 import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { DayNutritionCard } from './DayNutritionCard';
@@ -211,8 +211,6 @@ export default function HomeScreen({ navigation }: Props) {
     setRefreshing(false);
   }, [load, loadWeeklyReview]);
 
-  const latest = entries[0];
-  const previous = entries[1];
   const currentLocalDate = getLocalIsoDate();
   const selectedDayType = dayTypeDate === currentLocalDate
     ? dayType
@@ -242,16 +240,6 @@ export default function HomeScreen({ navigation }: Props) {
     });
   }
 
-  const hint = getDayHint(
-    todayDiary?.summary ?? null,
-    todayTargets ? {
-      calories: todayTargets.calories + (todayDiary?.activityBonus ?? 0),
-      macroRanges: todayTargets.macroRanges,
-    } : null,
-    selectedDayType,
-    selectedWorkoutType,
-  );
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       {/* Sticky Header: Brand + Search Bar */}
@@ -263,36 +251,11 @@ export default function HomeScreen({ navigation }: Props) {
           <Text style={styles.brandName}>{displayName ?? 'Willkommen'}</Text>
         </View>
         {/* Search Row — identisches Layout wie im Food Hub */}
-        <View style={styles.searchRow}>
-          <TouchableOpacity
-            style={styles.searchPill}
-            onPress={() => openHub({ date: getHomeActionDate(), onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Lebensmittel suchen"
-          >
-            <Icon lib="feather" name="search" size="sm" color={colors.textMuted} />
-            <Text style={styles.searchPillPlaceholder}>Lebensmittel suchen…</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.searchAction}
-            onPress={() => openHub({ date: getHomeActionDate(), initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="KI-Analyse"
-          >
-            <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.searchAction}
-            onPress={() => openHub({ date: getHomeActionDate(), initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Barcode scannen"
-          >
-            <Icon lib="mci" name="barcode-scan" size="md" color={colors.primary} />
-          </TouchableOpacity>
-        </View>
+        <FoodEntrySearchRow
+          onSearch={() => openHub({ date: getHomeActionDate(), onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
+          onAi={() => openHub({ date: getHomeActionDate(), initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
+          onBarcode={() => openHub({ date: getHomeActionDate(), initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
+        />
       </View>
 
       <ScrollView
@@ -305,13 +268,9 @@ export default function HomeScreen({ navigation }: Props) {
         <CoachingHeroCard
           displayName={displayName ?? 'Sportler'}
           greeting={getGreeting()}
-          hint={hint}
           dayType={selectedDayType}
           workoutType={selectedWorkoutType}
           onTrainingPress={() => setWorkoutPickerVisible(true)}
-          latest={latest}
-          previous={previous}
-          entries={entries}
         />
 
         {/* ── Tages-Nutrition Card ── */}
@@ -320,6 +279,8 @@ export default function HomeScreen({ navigation }: Props) {
           target={todayTargets}
           onPress={() => navToTab('Nutrition')}
           activityBonus={todayDiary?.activityBonus ?? 0}
+          entries={entries}
+          referenceDate={currentLocalDate}
         />
 
         <WeeklyReviewCard
@@ -420,6 +381,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    minHeight: FOOD_ENTRY_HEADER_HEIGHT,
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
   },
@@ -437,35 +399,4 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Search Row — identisch zum Food Hub
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginHorizontal: spacing.md,
-    marginBottom: 2,
-  },
-  searchPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.full,
-    height: 52,
-    paddingHorizontal: spacing.md,
-  },
-  searchPillPlaceholder: {
-    ...typography.body1,
-    color: colors.textMuted,
-    flex: 1,
-  },
-  searchAction: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

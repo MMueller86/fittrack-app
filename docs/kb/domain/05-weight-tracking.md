@@ -19,7 +19,7 @@ One entry per measurement. Multiple entries per day are allowed (no deduplicatio
 
 ## Units
 
-Display unit `'kg' | 'lbs'` is stored per entry. The chart and progress engine normalize to kg internally.
+The unit `'kg' | 'lbs'` is stored per entry. `WeightChart` plots each `WeightEntry.value` as stored and computes its moving average from those raw values; it does not normalize entries to kg. A series containing both units therefore mixes their numeric scales in the chart. The Progress trend row and Daily Insight use the separate shared regression described below.
 
 ## Weight Chart
 
@@ -36,15 +36,20 @@ Visual elements:
 6. Legend: "Actual" (solid) + "7-day avg" (dashed)
 
 Data processing:
-- Sorted chronologically
-- Filtered to `windowDays` (default 30)
+- Sorted chronologically by date, then keeps the last `windowDays` measurements (default 30); this is a measurement-count window, not a calendar-day filter
 - Requires ≥2 entries to render (shows placeholder otherwise)
-- Y-axis: min/max from data + 10% padding, minimum range 0.4 kg enforced
+- Y-axis bounds: extrema include raw measurements, trailing averages, and the optional target. `computeChartBounds` selects steps documented as 0.5, 1, or 2 kg for numeric ranges ≤2, >2 and ≤10, or >10, respectively; it floors the minimum to a step boundary and subtracts one step, then ceils the maximum and adds one step. The chart passes raw values, so these numeric steps are applied without unit conversion. There is no 10% padding or 0.4 kg minimum-range rule.
 - X-axis: first, middle, last entry dates (deduplicated)
 
-### 7-Day Moving Average
+### Seven-Measurement Moving Average
 
-Trailing window: for each index `i`, average of values at `max(0, i-6)..i`. Partial average at start of series.
+Trailing window: for each index `i`, average of values at `max(0, i-6)..i`. The initial values use a partial window until seven measurements are available. This is a measurement-count average, not an average over seven calendar days, despite the chart legend's "7-day avg" label.
+
+### Explicit-Window Regression Series
+
+`calculateWeightTrendRegressionSeries(entries, windowDays, now?)` builds a chronological series over exactly `windowDays` local calendar dates, including the local date of `now`. Future-dated entries are excluded. Each measurement is normalized to kg; `slopeKgPerWeek` is the raw linear-regression slope in kg/week, and `regressionLine.start` / `.end` are the fitted kg values at the first and last included measurement dates. The slope and line are `null` unless measurements span at least two distinct dates. The helper does not apply a display minimum or classify the direction; those presentation rules belong to its caller.
+
+This explicit-window API is additive. Existing 30-day consumers continue to use `calculateWeightTrendPerWeek` and retain their current window and output-unit behavior.
 
 ## Plateau Detection
 
@@ -83,7 +88,7 @@ The daily insight weight context includes:
 - `isOutlierPrevious` — previous weight is a statistical spike (> 1.5× std dev of 7-day window)
 - `isOutlierLatest` — latest weight is a spike
 
-[Rule] The mobile chart and Daily Insight share the slope-based trend helper in `shared/lib/weightTrend.ts`: a linear regression over the last 30 calendar days, projected to a weekly change and exposed in the Daily context as `weeklyTrend30d`. When `isOutlierPrevious` is true, the AI must not use it for short-term progress comparisons; this 30-day regression is the authoritative direction signal.
+[Rule] The Progress trend row and Daily Insight share `calculateWeightTrendPerWeek` from `shared/lib/weightTrend.ts`: a linear regression over the last 30 calendar days, projected to a weekly change and exposed in the Daily context as `weeklyTrend30d`. `WeightChart` does not use this regression; its dashed overlay is the seven-measurement moving average described above. The explicit-window series helper does not replace or change this 30-day contract. When `isOutlierPrevious` is true, the AI must not use it for short-term progress comparisons; this 30-day regression is the authoritative direction signal.
 
 Existing Daily and durable feedback snapshots are updated by the explicit,
 idempotent migration described in [tech/07-infrastructure.md](../tech/07-infrastructure.md).

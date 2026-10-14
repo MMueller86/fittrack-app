@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { AiFoodEstimatePreview, FoodSearchResult, UserFoodRelation, MealType } from '@fittrack/shared';
 import { Icon } from '../../../shared/components/Icon';
+import { FoodEntryQuickActionButton } from '../../../shared/components/FoodEntryQuickActionButton';
 
 import type { ReusableItem } from '@fittrack/shared';
 import { favoritesApi } from '../../../shared/api/favoritesApi';
@@ -33,7 +34,7 @@ import {
 import { nutritionSyncService } from '../../../services/health/nutritionSyncService';
 import { getLocalIsoDate } from '../../../shared/date/localDate';
 import { colors, radius, spacing, typography } from '../../../app/theme';
-import { buildDirectAddItemInput, canSelectFoodRelation, computeLastUsageText, computeMacroText, computeDirectAddLabel, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
+import { buildDirectAddItemInput, canSelectFoodRelation, computeLastUsageText, computeMacroText, computeDirectAddLabel, isDirectSubflowLaunch, relativeUsage, sortByMealTypeUsage } from './FoodEntryHub.utils';
 export { computeLastUsageText, computeMacroText };
 import { useFoodEntryHubStore } from './useFoodEntryHubStore';
 import { hubReducer, INITIAL_HUB_STATE } from './hubReducer';
@@ -251,8 +252,8 @@ export function FoodEntryHub() {
         setSearchActive(true);
       }
 
-      if (autoCloseOnSave && initialSubflow) {
-        // HomeScreen-Subflow: Bottom Sheet NICHT öffnen — kein sheetIsOpenRef setzen
+      if (isDirectSubflowLaunch(autoCloseOnSave, initialSubflow)) {
+        // Direkt gestarteten Subflow ohne Bottom Sheet öffnen.
         dispatch({ type: 'OPEN_SUBFLOW', flow: initialSubflow });
         return;
       }
@@ -815,7 +816,8 @@ export function FoodEntryHub() {
 
   const handleSubflowClose = useCallback(() => {
     dispatch({ type: 'RESET' });
-  }, []);
+    if (isDirectSubflowLaunch(autoCloseOnSave, initialSubflow)) close();
+  }, [autoCloseOnSave, close, initialSubflow]);
 
   const handleSubflowSaved = useCallback((productName: string) => {
     if (autoCloseOnSave) {
@@ -901,7 +903,7 @@ export function FoodEntryHub() {
               <View style={styles.headerMinimal} />
             )}
 
-            {/* Search Bar — Pill + AI-Icon + Barcode-Icon */}
+            {/* Search Bar — Pill + beschriftete Aktionen */}
             <View style={styles.searchRow}>
               <View style={styles.searchPill}>
                 <View style={styles.searchIconLeft}>
@@ -946,27 +948,18 @@ export function FoodEntryHub() {
                   </TouchableOpacity>
                 ) : null}
               </View>
-              {/* AI-Einstieg — pill-förmiger Button passend zur Suchpill */}
-              <TouchableOpacity
-                style={styles.searchAction}
+              <FoodEntryQuickActionButton
+                action="ai"
                 onPress={() => handleOpenSubflow('ai')}
                 hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                accessibilityRole="button"
-                accessibilityLabel="KI-Analyse"
-              >
-                <Icon lib="mci" name="auto-fix" size="md" color={colors.primary} />
-              </TouchableOpacity>
+              />
               {/* Barcode-Einstieg */}
               {!isRecipeContext ? (
-                <TouchableOpacity
-                  style={styles.searchAction}
+                <FoodEntryQuickActionButton
+                  action="barcode"
                   onPress={() => handleOpenSubflow('barcode')}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Barcode scannen"
-                >
-                  <Icon lib="mci" name="barcode-scan" size="md" color={colors.primary} />
-                </TouchableOpacity>
+                />
               ) : null}
             </View>
 
@@ -1219,6 +1212,7 @@ export function FoodEntryHub() {
         <AISubFlow
           visible
           context={context}
+          safeAreaTopInset={insets.top}
           onClose={handleSubflowClose}
           onSaved={handleSubflowSaved}
           initialQuery={onEstimateIngredient ? (searchQuery.trim() || initialQuery) : undefined}
@@ -1238,6 +1232,7 @@ export function FoodEntryHub() {
         <BarcodeSubFlow
           visible
           context={context}
+          safeAreaTopInset={insets.top}
           onClose={handleSubflowClose}
           onProductFound={handleBarcodeProductFound}
           onProductCreated={handleBarcodeProductCreated}
@@ -1352,15 +1347,6 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
-  },
-  searchAction: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
   },
   searchIconLeft: {
     width: 20,

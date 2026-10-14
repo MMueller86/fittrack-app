@@ -91,6 +91,7 @@ class CameraErrorBoundary extends React.Component<
 interface Props {
   visible: boolean;
   onClose: () => void;
+  safeAreaTopInset?: number;
   /** Called when a matching catalog item is found */
   onProductFound?: (result: FoodSearchResult) => void;
   /** Called when user saved a new personal product from the no-match flow */
@@ -171,11 +172,13 @@ function CameraScanner({
 export default function BarcodeScannerScreen({
   visible,
   onClose,
+  safeAreaTopInset,
   onProductFound,
   onProductCreated,
   onNoMatch,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, safeAreaTopInset ?? 0);
   const [scanState, setScanState] = useState<ScanState>('scanning');
   const [lastBarcode, setLastBarcode] = useState<string | null>(null);
   const [showEditor, setShowEditor] = useState(false);
@@ -241,7 +244,7 @@ export default function BarcodeScannerScreen({
         animationType="slide"
         onRequestClose={onClose}
       >
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.container}>
           {/* Camera — in CameraErrorBoundary gekapselt, da vision-camera Hooks
                in Expo Go laden aber beim Render werfen. Der ErrorBoundary
                fängt den Fehler ab und setzt cameraPermission='denied' statt
@@ -267,7 +270,7 @@ export default function BarcodeScannerScreen({
           {/* Overlay content */}
           <View style={styles.overlay}>
             {/* Header */}
-            <View style={styles.topBar}>
+            <View style={[styles.topBar, { paddingTop: topInset + spacing.sm }]}>
               <TouchableOpacity
                 onPress={onClose}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}

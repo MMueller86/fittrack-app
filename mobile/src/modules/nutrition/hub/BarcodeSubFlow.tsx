@@ -13,6 +13,7 @@ import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 interface Props {
   visible: boolean;
   context: FoodEntryHubContext;
+  safeAreaTopInset: number;
   onClose: () => void;
   /** Gefundenes Produkt → ProduktDialog im Hub öffnen */
   onProductFound: (result: FoodSearchResult) => void;
@@ -25,6 +26,7 @@ interface Props {
 export function BarcodeSubFlow({
   visible,
   context,
+  safeAreaTopInset,
   onClose,
   onProductFound,
   onProductCreated,
@@ -56,6 +58,7 @@ export function BarcodeSubFlow({
     <>
       <BarcodeScannerScreen
         visible={visible && !showLabelSubFlow}
+        safeAreaTopInset={safeAreaTopInset}
         onClose={onClose}
         onProductFound={onProductFound}
         onProductCreated={onProductCreated}

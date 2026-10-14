@@ -58,6 +58,7 @@ const mocks = vi.hoisted(() => ({
     },
   },
   storeHasTargets: true,
+  safeAreaTop: 0,
   openFoodEntryHub: vi.fn(),
   showSnackbar: vi.fn(),
 }));
@@ -110,7 +111,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({
   SafeAreaView: 'SafeAreaView',
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  useSafeAreaInsets: () => ({ top: mocks.safeAreaTop, right: 0, bottom: 0, left: 0 }),
 }));
 vi.mock('react-native-gesture-handler', () => {
   const createGesture = () => {
@@ -459,6 +460,7 @@ async function renderScreen(responses: DiaryDayResponse[]): Promise<ReactTestRen
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.safeAreaTop = 0;
   mocks.storeHasTargets = true;
   mocks.apiGetProfile.mockResolvedValue({ targets: mocks.profileTargets });
   mocks.syncNutritionUpsert.mockResolvedValue(undefined);
@@ -474,6 +476,51 @@ afterEach(() => {
 });
 
 describe('DiaryScreen F2 bulk actions', () => {
+  it('opens search, AI and barcode with the selected date and aligned sheet inset', async () => {
+    mocks.safeAreaTop = 24;
+    const renderer = await renderScreen([makeDay([])]);
+    const headerRows = renderer.root.findAll((node) => node.props.testID === 'diary-header-row');
+    if (headerRows.length !== 1) throw new Error(`Expected one diary header row, found ${headerRows.length}`);
+    const headerRow = headerRows[0]!;
+    const onLayout = headerRow.props.onLayout as (
+      event: { nativeEvent: { layout: { height: number } } },
+    ) => void;
+    await act(async () => onLayout({ nativeEvent: { layout: { height: 36 } } }));
+
+    expect(renderer.root.findAll((node) => node.props.children === 'Lebensmittel hinzufügen')).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.props.children === 'KI')).toHaveLength(1);
+    const actionCaptions = renderer.root.findAll((node) => (
+      node.props.children === 'Schätzen' || node.props.children === 'Scan'
+    ));
+    expect(actionCaptions.map((caption) => caption.props.children)).toEqual(['Schätzen', 'Scan']);
+    expect(actionCaptions.every((caption) => caption.props.numberOfLines === 1)).toBe(true);
+
+    await press(getByLabel(renderer, 'Lebensmittel hinzufügen'));
+    expect(mocks.openFoodEntryHub).toHaveBeenLastCalledWith(expect.objectContaining({
+      date: DATE,
+      topInset: 60,
+      onSuccess: expect.any(Function),
+    }));
+
+    mocks.openFoodEntryHub.mockClear();
+    await press(getByLabel(renderer, 'KI schätzen'));
+    expect(mocks.openFoodEntryHub).toHaveBeenLastCalledWith(expect.objectContaining({
+      date: DATE,
+      initialSubflow: 'ai',
+      autoCloseOnSave: true,
+      topInset: 60,
+    }));
+
+    mocks.openFoodEntryHub.mockClear();
+    await press(getByLabel(renderer, 'Barcode scannen'));
+    expect(mocks.openFoodEntryHub).toHaveBeenLastCalledWith(expect.objectContaining({
+      date: DATE,
+      initialSubflow: 'barcode',
+      autoCloseOnSave: true,
+      topInset: 60,
+    }));
+  });
+
   it('does not show current profile macro targets for a historical diary day', async () => {
     const historicalDate = addLocalDays(getLocalIsoDate(), -1);
     await renderScreenWithRouteDate([makeDay([])], historicalDate);
