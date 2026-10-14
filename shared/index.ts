@@ -18,6 +18,7 @@ export * from './types/weeklyReview';
 export * from './lib/nutritionCalculator';
 export * from './lib/recipeCalculator';
 export * from './lib/profileCalculator';
+export * from './lib/macroRanges';
 export * from './lib/goalContext';
 export * from './lib/weightTrend';
 export * from './lib/plateauDetector';

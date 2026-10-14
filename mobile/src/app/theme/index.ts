@@ -53,6 +53,13 @@ export const colors = {
   negative: palette.negative,
   neutral: palette.neutral,
 
+  macro: {
+    protein: '#3B82F6',
+    carbohydrates: palette.primary,
+    fat: palette.warning,
+    fiber: '#8B5CF6',
+  },
+
   divider: palette.border,
   white: palette.white,
   overlay: palette.overlay,

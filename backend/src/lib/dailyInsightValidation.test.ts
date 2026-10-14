@@ -197,6 +197,29 @@ describe('validateDailyInsightResponse', () => {
     )).toThrow('open day as completed');
   });
 
+  it.each([
+    'Deine letzten Tage zeigen, dass du in der Regel gut im Proteinbereich liegst.',
+    'Gestern lag deine Eiweißaufnahme unter dem aktuellen Bereich.',
+    'In den vergangenen drei Tagen waren deine Kohlenhydrate zu hoch.',
+  ])('rejects historical macro judgments against the current range: %s', (summary) => {
+    const base = makeContext();
+    const context = makeContext({
+      nutrition: { ...base.nutrition, last3Days: [historicalDay()] },
+    });
+    expect(() => validateDailyInsightResponse(response({ summary }), context)).toThrow(
+      'Daily insight compares historical macro intake with the current range',
+    );
+  });
+
+  it('allows factual historical macro intake without a range comparison', () => {
+    const base = makeContext();
+    const context = makeContext({
+      nutrition: { ...base.nutrition, last3Days: [historicalDay()] },
+    });
+    const factualHistory = response({ summary: 'Gestern hast du 145 g Protein aufgenommen.' });
+    expect(validateDailyInsightResponse(factualHistory, context)).toEqual(factualHistory);
+  });
+
   it('rejects phase-progress calorie-increase advice based on an open budget at noon', () => {
     const base = makeContext();
     const context = makeContext({

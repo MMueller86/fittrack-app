@@ -10,6 +10,11 @@ import {
   roundToNearest,
   calculateProfileTargets,
 } from './profileCalculator';
+import {
+  calculateMacroRanges,
+  classifyProteinCoachingBand,
+  isWithinMacroRange,
+} from './macroRanges';
 import type { ProfileInput } from '../types/profile';
 
 // ---------------------------------------------------------------------------
@@ -235,6 +240,49 @@ describe('calculateMacros', () => {
   });
 });
 
+describe('calculateMacroRanges', () => {
+  it('rounds protein first and derives carbohydrate bounds from calories and fat', () => {
+    expect(calculateMacroRanges(81, 2450, 75)).toEqual({
+      proteinG: { minG: 122, maxG: 162 },
+      carbsG: { minG: 282, maxG: 322 },
+    });
+  });
+
+  it('clamps carbohydrate bounds to zero when protein and fat use the full budget', () => {
+    expect(calculateMacroRanges(80, 1000, 200)).toEqual({
+      proteinG: { minG: 120, maxG: 160 },
+      carbsG: { minG: 0, maxG: 0 },
+    });
+  });
+});
+
+describe('macro range evaluation', () => {
+  const proteinRange = calculateMacroRanges(80, 2200, 70).proteinG;
+
+  it.each([
+    [119.99, 'below_range'],
+    [120, 'in_range'],
+    [160, 'in_range'],
+    [160.01, 'above_range'],
+    [176, 'above_range'],
+    [176.01, 'above_coaching_threshold'],
+  ] as const)('classifies %s g at 80 kg as %s', (proteinG, expected) => {
+    expect(classifyProteinCoachingBand(proteinG, 80, proteinRange)).toBe(expected);
+  });
+
+  it('uses the rounded range when body weight is unavailable and fails closed without a range', () => {
+    expect(classifyProteinCoachingBand(120, null, proteinRange)).toBe('in_range');
+    expect(classifyProteinCoachingBand(120, null, null)).toBe('unknown');
+  });
+
+  it('checks macro range bounds inclusively', () => {
+    expect(isWithinMacroRange(120, proteinRange)).toBe(true);
+    expect(isWithinMacroRange(160, proteinRange)).toBe(true);
+    expect(isWithinMacroRange(119.99, proteinRange)).toBe(false);
+    expect(isWithinMacroRange(160.01, proteinRange)).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // calculateProfileTargets — full end-to-end (spec example)
 // ---------------------------------------------------------------------------
@@ -290,7 +338,25 @@ describe('calculateProfileTargets (spec example)', () => {
 
   it('stores formula version in meta', () => {
     const { meta } = calculateProfileTargets(specInput);
-    expect(meta.formulaVersion).toBe('profile-targets-v1-pal');
+    expect(meta.formulaVersion).toBe('profile-targets-v2-macro-ranges');
+  });
+
+  it('adds day-specific ranges without changing the legacy scalar targets', () => {
+    const { targets } = calculateProfileTargets(specInput);
+
+    expect(targets.restDay.macroRanges).toEqual(
+      calculateMacroRanges(specInput.weightKg, targets.restDay.calories, targets.restDay.fatG),
+    );
+    expect(targets.trainingDay.macroRanges).toEqual(
+      calculateMacroRanges(specInput.weightKg, targets.trainingDay.calories, targets.trainingDay.fatG),
+    );
+    expect(targets.restDay.proteinG).toBe(160);
+    expect(targets.restDay.carbsG).toBe(285);
+    expect(targets.restDay.fatG).toBe(75);
+    expect(targets.restDay.fiberG).toBe(34);
+    expect(targets.trainingDay.macroRanges!.carbsG.maxG).toBeGreaterThan(
+      targets.restDay.macroRanges!.carbsG.maxG,
+    );
   });
 });
 

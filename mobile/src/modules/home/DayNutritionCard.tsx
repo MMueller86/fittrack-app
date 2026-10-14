@@ -1,14 +1,26 @@
 // DayNutritionCard — HomeScreen-spezifische Kalorien + Makro-Karte.
 // Bewusst NICHT shared: andere Hierarchie als MacroSummaryCard im DiaryScreen.
 // Kalorien: animierter Donut-Ring (SVG + Animated API).
-// Makros: Label | Wert/Ziel | Rest | % + farbiger Balken darunter.
+// Makros: Ist-Wert/Zielbereich + 150%-Track mit einheitlicher Referenz.
 
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import type { DiaryDayResponse } from '@fittrack/shared';
-import type { MacroTarget } from '../../shared/components/MacroSummaryCard';
+import type { DiaryDayResponse, MacroRange } from '@fittrack/shared';
+import { Icon } from '../../shared/components/Icon';
+import {
+  formatMacroTargetValue,
+  type MacroTarget,
+} from '../../shared/components/MacroSummaryCard';
+import {
+  formatMacroAmount,
+  getActivityBonusTrackValues,
+  getMacroTrackGeometry,
+  MACRO_TRACK_HEIGHT,
+  type ActivityBonusTrackValues,
+  type MacroTrackGeometry,
+} from './dayNutritionTrackGeometry';
 
 // ── Donut-Konstanten ──
 const RING_SIZE = 96;
@@ -75,44 +87,146 @@ function DonutRing({ pct, isOver }: { pct: number; isOver: boolean }) {
   );
 }
 
-// ── Makro-Zeile ──
 interface MacroRowProps {
   label: string;
   value: number;
-  target: number;
+  target: number | MacroRange | null;
   color: string;
-  unit?: string;
+  showTargetFlag?: boolean;
 }
 
-function MacroRow({ label, value, target, color, unit }: MacroRowProps) {
-  const resolvedUnit = unit ?? 'g';
-  const pct = clamp(value, target);
-  const pctDisplay = Math.round(pct * 100);
-  const remaining = Math.max(0, Math.round(target - value));
-  const isOver = value > target;
+function MacroTrack({
+  geometry,
+  color,
+  testID,
+}: {
+  geometry: MacroTrackGeometry;
+  color: string;
+  testID: string;
+}) {
+  return (
+    <View style={rowStyles.macroTrack} testID={testID}>
+      <View style={rowStyles.rail} />
+      {geometry.rangePosition && (
+        <View
+          testID={`${testID}-range`}
+          style={[
+            rowStyles.rangeBand,
+            {
+              left: `${geometry.rangePosition.start * 100}%`,
+              width: `${(geometry.rangePosition.end - geometry.rangePosition.start) * 100}%`,
+              borderColor: color,
+            },
+          ]}
+        >
+          <View style={[rowStyles.rangeTint, { backgroundColor: color }]} />
+        </View>
+      )}
+      <View
+        testID={`${testID}-fill`}
+        style={[
+          rowStyles.macroFill,
+          { width: `${geometry.fillRatio * 100}%`, backgroundColor: color },
+        ]}
+      />
+      {geometry.rangePosition && (
+        <View
+          testID={`${testID}-range-start`}
+          style={[
+            rowStyles.rangeStart,
+            { left: `${geometry.rangePosition.start * 100}%`, backgroundColor: color },
+          ]}
+        />
+      )}
+      {geometry.referencePosition != null && (
+        <View
+          testID={`${testID}-reference`}
+          style={[
+            rowStyles.referenceMarker,
+            { left: `${geometry.referencePosition * 100}%` },
+          ]}
+        />
+      )}
+    </View>
+  );
+}
+
+function MacroRow({ label, value, target, color, showTargetFlag = false }: MacroRowProps) {
+  const geometry = getMacroTrackGeometry(value, target);
+  const targetLabel = formatMacroTargetValue(target);
+  const accessibilityTarget = target == null
+    ? 'Ziel nicht verfügbar'
+    : typeof target === 'number'
+      ? `Ziel ${formatMacroAmount(target)} g`
+      : `Zielbereich ${formatMacroAmount(target.minG)} bis ${formatMacroAmount(target.maxG)} g`;
+  const accessibilityLabel = `${label}: ${formatMacroAmount(value)} g; ${accessibilityTarget}`;
 
   return (
-    <View style={rowStyles.wrap}>
+    <View
+      style={rowStyles.wrap}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
       <View style={rowStyles.infoRow}>
         <Text style={rowStyles.label}>{label}</Text>
-        <Text style={rowStyles.valueText}>
-          <Text style={{ color }}>{Math.round(value)}</Text>
-          <Text style={rowStyles.sep}> / {target} {resolvedUnit}</Text>
-        </Text>
-        <Text style={rowStyles.remaining}>
-          {isOver
-            ? `+${Math.round(value - target)} ${resolvedUnit}`
-            : `noch ${remaining} ${resolvedUnit}`}
-        </Text>
-        <Text style={[rowStyles.pct, { color }]}>{pctDisplay} %</Text>
+        <View style={rowStyles.valueGroup} testID={`macro-values-${label}`}>
+          {showTargetFlag && geometry.referencePosition != null && (
+            <View
+              style={rowStyles.targetFlag}
+              testID="macro-target-flag"
+              pointerEvents="none"
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            >
+              <Icon lib="mci" name="flag-checkered" size="sm" color={colors.textSecondary} />
+            </View>
+          )}
+          <Text style={[rowStyles.valueText, rowStyles.macroValueText]}>
+            <Text style={{ color }}>{formatMacroAmount(value)}</Text>
+            {targetLabel == null ? (
+              <Text style={rowStyles.targetText}> g</Text>
+            ) : (
+              <Text style={rowStyles.targetText}> / {targetLabel} g</Text>
+            )}
+          </Text>
+        </View>
       </View>
-      <View style={rowStyles.track}>
+      <MacroTrack
+        geometry={geometry}
+        color={color}
+        testID={`macro-track-${label}`}
+      />
+    </View>
+  );
+}
+
+function ActivityBonusRow({ values }: { values: ActivityBonusTrackValues }) {
+  const accessibilityLabel = `Aktivitätsbonus: ${formatMacroAmount(values.valueKcal)} kcal von ${formatMacroAmount(values.targetKcal)} kcal`;
+
+  return (
+    <View
+      style={rowStyles.activityWrap}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={accessibilityLabel}
+    >
+      <View style={rowStyles.infoRow}>
+        <Text style={rowStyles.activityLabel}>Aktivitätsbonus</Text>
+        <Text style={rowStyles.valueText}>
+          <Text style={{ color: colors.chart.specialActivityOutline }}>
+            {formatMacroAmount(values.valueKcal)}
+          </Text>
+          <Text style={rowStyles.targetText}> / {formatMacroAmount(values.targetKcal)} kcal</Text>
+        </Text>
+      </View>
+      <View style={rowStyles.track} testID="activity-bonus-track">
         <View
           style={[
             rowStyles.fill,
             {
-              width: `${pctDisplay}%`,
-              backgroundColor: isOver ? colors.negative : color,
+              width: `${values.fillRatio * 100}%`,
+              backgroundColor: colors.chart.specialActivityOutline,
             },
           ]}
         />
@@ -125,41 +239,110 @@ const rowStyles = StyleSheet.create({
   wrap: {
     marginBottom: spacing.sm,
   },
+  activityWrap: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    marginTop: spacing.xs,
+    paddingTop: spacing.sm,
+  },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: spacing.xs,
   },
   label: {
     ...typography.caption,
     color: colors.textMuted,
+    flexShrink: 1,
+    maxWidth: '50%',
+  },
+  activityLabel: {
+    ...typography.caption,
+    color: colors.chart.specialActivityOutline,
     width: 104,
   },
   valueText: {
     ...typography.caption,
+    letterSpacing: 0,
     fontWeight: '600' as const,
     flex: 1,
-  },
-  sep: { color: colors.textSecondary },
-  remaining: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    width: 72,
+    flexShrink: 1,
     textAlign: 'right',
+    marginLeft: spacing.sm,
+    fontVariant: ['tabular-nums'],
   },
-  pct: {
-    ...typography.caption,
-    fontWeight: '700' as const,
-    width: 34,
-    textAlign: 'right',
+  targetText: { color: colors.textSecondary },
+  valueGroup: {
+    flex: 1,
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: spacing.xs,
+    marginLeft: spacing.sm,
+  },
+  macroValueText: {
+    flex: 0,
+    marginLeft: 0,
+  },
+  targetFlag: {
+    width: spacing.md,
+    height: spacing.md,
+    flexShrink: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    opacity: 0.5,
   },
   track: {
-    height: 4,
+    height: MACRO_TRACK_HEIGHT,
     backgroundColor: colors.border,
-    borderRadius: 2,
+    borderRadius: radius.full,
     overflow: 'hidden',
   },
-  fill: { height: '100%', borderRadius: 2 },
+  fill: { height: '100%', borderRadius: radius.full },
+  macroTrack: {
+    height: spacing.md,
+    justifyContent: 'center',
+  },
+  rail: {
+    height: MACRO_TRACK_HEIGHT,
+    backgroundColor: colors.border,
+    borderRadius: radius.full,
+  },
+  macroFill: {
+    position: 'absolute',
+    height: MACRO_TRACK_HEIGHT,
+    borderRadius: radius.full,
+  },
+  rangeBand: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    borderWidth: 1,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  rangeTint: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.18,
+  },
+  rangeStart: {
+    position: 'absolute',
+    top: spacing.xs,
+    bottom: spacing.xs,
+    width: 1,
+  },
+  referenceMarker: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: spacing.xs,
+    marginLeft: -spacing.xs / 2,
+    backgroundColor: colors.text,
+    borderWidth: 1,
+    borderColor: colors.surface,
+    borderRadius: radius.full,
+  },
 });
 
 // ── Haupt-Component ──
@@ -174,6 +357,11 @@ export function DayNutritionCard({ summary, target, onPress, activityBonus }: Pr
   if (!target) return null;
 
   const isEmpty = !summary || summary.calories === 0;
+  const bonus = activityBonus ?? 0;
+  const calConsumed = Math.round(summary?.calories ?? 0);
+  const activityBonusValues = bonus > 0
+    ? getActivityBonusTrackValues(calConsumed, target.calories, bonus)
+    : null;
 
   if (isEmpty) {
     return (
@@ -188,13 +376,12 @@ export function DayNutritionCard({ summary, target, onPress, activityBonus }: Pr
             </TouchableOpacity>
           </View>
         </View>
+        {activityBonusValues && <ActivityBonusRow values={activityBonusValues} />}
       </TouchableOpacity>
     );
   }
 
-  const bonus = activityBonus ?? 0;
   const effectiveCalorieTarget = Math.round(target.calories + bonus);
-  const calConsumed = Math.round(summary!.calories);
   const remaining = Math.round(Math.max(0, effectiveCalorieTarget - calConsumed));
   const isOver = calConsumed > effectiveCalorieTarget;
   const calPct = clamp(summary!.calories, effectiveCalorieTarget);
@@ -228,19 +415,27 @@ export function DayNutritionCard({ summary, target, onPress, activityBonus }: Pr
 
       {/* ── Makros ── */}
       <View style={styles.divider} />
-      <MacroRow label="Protein" value={summary!.protein} target={target.proteinG} color="#3B82F6" />
-      <MacroRow label="Kohlenhydrate" value={summary!.carbs} target={target.carbsG} color={colors.primary} />
-      <MacroRow label="Fett" value={summary!.fat} target={target.fatG} color="#F59E0B" />
-      <MacroRow label="Ballaststoffe" value={summary!.fiber} target={target.fiberG} color="#8B5CF6" />
-      {(activityBonus ?? 0) > 0 && (
-        <MacroRow
-          label="Aktivitätsbonus"
-          value={Math.max(0, calConsumed - target.calories)}
-          target={Math.round(activityBonus!)}
-          color={colors.primary}
-          unit="kcal"
-        />
-      )}
+      <MacroRow
+        label="Protein"
+        value={summary!.protein}
+        target={target.macroRanges?.proteinG ?? null}
+        color={colors.macro.protein}
+        showTargetFlag
+      />
+      <MacroRow
+        label="Kohlenhydrate"
+        value={summary!.carbs}
+        target={target.macroRanges?.carbsG ?? null}
+        color={colors.macro.carbohydrates}
+      />
+      <MacroRow label="Fett" value={summary!.fat} target={target.fatG} color={colors.macro.fat} />
+      <MacroRow
+        label="Ballaststoffe"
+        value={summary!.fiber}
+        target={target.fiberG}
+        color={colors.macro.fiber}
+      />
+      {activityBonusValues && <ActivityBonusRow values={activityBonusValues} />}
     </TouchableOpacity>
   );
 }

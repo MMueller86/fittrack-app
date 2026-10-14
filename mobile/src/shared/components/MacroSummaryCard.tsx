@@ -3,15 +3,22 @@
 
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { DiaryDayResponse } from '@fittrack/shared';
+import type { DayTargets, DiaryDayResponse, MacroRange } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 
-export interface MacroTarget {
-  calories: number;
-  proteinG: number;
-  carbsG: number;
-  fatG: number;
-  fiberG: number;
+export type MacroTarget = DayTargets;
+
+export function formatMacroTargetValue(target: number | MacroRange | null | undefined): string | null {
+  if (typeof target === 'number') return Number.isFinite(target) ? String(target) : null;
+  if (
+    !target
+    || !Number.isFinite(target.minG)
+    || !Number.isFinite(target.maxG)
+    || target.minG > target.maxG
+  ) {
+    return null;
+  }
+  return `${target.minG}–${target.maxG}`;
 }
 
 function clamp(value: number, max: number): number {
@@ -28,21 +35,25 @@ function MacroRow({
 }: {
   label: string;
   value: number;
-  target: number;
+  target: number | MacroRange | null;
   color: string;
   showRemaining?: boolean;
 }) {
-  const pct = clamp(value, target);
-  const remaining = Math.max(0, Math.round(target - value));
-  const isOver = value > target;
+  const progressTarget = typeof target === 'number' ? target : target?.maxG ?? 0;
+  const completionTarget = typeof target === 'number' ? target : target?.minG;
+  const targetLabel = formatMacroTargetValue(target);
+  const pct = clamp(value, progressTarget);
+  const remaining = completionTarget == null ? 0 : Math.max(0, Math.round(completionTarget - value));
+  const isOver = completionTarget != null && value >= completionTarget;
   return (
     <View style={macroStyles.row}>
       <View style={macroStyles.labelCol}>
         <Text style={macroStyles.label}>{label}</Text>
         <Text style={macroStyles.values}>
           <Text style={{ color }}>{Math.round(value)} g</Text>
-          <Text style={macroStyles.separator}> / </Text>
-          <Text style={macroStyles.targetText}>{target} g</Text>
+          {targetLabel != null ? (
+            <Text style={macroStyles.targetText}>{' / '}{targetLabel} g</Text>
+          ) : null}
           {showRemaining && !isOver && remaining > 0 ? (
             <Text style={macroStyles.remainingText}> · {remaining} g</Text>
           ) : null}
@@ -71,7 +82,6 @@ const macroStyles = StyleSheet.create({
   labelCol: { width: 145 },
   label: { ...typography.caption, color: colors.textMuted, marginBottom: 2 },
   values: { ...typography.caption, fontWeight: '600' },
-  separator: { color: colors.textMuted },
   targetText: { color: colors.textSecondary },
   remainingText: { color: colors.textMuted },
   trackWrap: { flex: 1 },
@@ -129,8 +139,8 @@ export function MacroSummaryCard({ summary, target, showRemaining }: Props) {
 
       {/* ── Makros ── */}
       <View style={styles.macroSection}>
-        <MacroRow label="Protein" value={summary.protein} target={target.proteinG} color="#3B82F6" showRemaining={showRemaining} />
-        <MacroRow label="Kohlenhydrate" value={summary.carbs} target={target.carbsG} color={colors.primary} showRemaining={showRemaining} />
+        <MacroRow label="Protein" value={summary.protein} target={target.macroRanges?.proteinG ?? null} color="#3B82F6" showRemaining={showRemaining} />
+        <MacroRow label="Kohlenhydrate" value={summary.carbs} target={target.macroRanges?.carbsG ?? null} color={colors.primary} showRemaining={showRemaining} />
         <MacroRow label="Fett" value={summary.fat} target={target.fatG} color="#F59E0B" showRemaining={showRemaining} />
         <MacroRow label="Ballaststoffe" value={summary.fiber} target={target.fiberG} color="#8B5CF6" showRemaining={showRemaining} />
       </View>

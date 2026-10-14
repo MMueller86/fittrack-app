@@ -140,6 +140,8 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-119 | Targeted QA 113-117: kein Contract-Test fuer updateDisplayDenormalized | Non-blocking | Backend | Awaiting decision |
 | FT-QA-2026-120 | Targeted QA 113-117: KB verweist auf nicht existierende quickEntryRelevance.ts/computeRelevanceOrder | Non-blocking | Documentation | Closed |
 | FT-QA-2026-121 | Targeted QA 118/120: mealTypeCounts steht noch als aktives Feld in 03-food-catalog.md Z. 118 | Suggestion | Documentation | Awaiting decision |
+| FT-QA-2026-122 | Macro ranges Diary GET contract, AC-13 | Blocking | Backend | Closed |
+| FT-QA-2026-123 | Macro ranges supplemental Backend test typecheck, AC-14 | Non-blocking | Backend | Closed |
 
 ## Current Recipe Sharing Acceptance
 
@@ -191,9 +193,10 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Owner:** Backend.
 - **Evidence:** [Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md), F/R/G records, fixture synthetic-saved-oven-seven-steps, savedSource6 versus final outputs; each HTTP200/usage1.
 - **Recommendation:** Scope-bounded fidelity correction, independent new source/export comparison and documented human review. No cooking-criterion or renderer-limit relaxation, no automatic oven semantic-PASS claim.
-- **Status:** Awaiting decision.
-- **Decision:** User requested corrections on 2026-10-10. Route to Backend, correction attempt 1; independent QA required. No deployment.
+- **Status:** Resolved
+- **Decision:** User requested correction on 2026-10-14; Backend reports the fixture now satisfies the current `InsightInputContext` type without an unsafe cast. Independent targeted QA is required before closure.
 - **History:** 2026-10-10 - Registered from validated Q-21 FAIL; historical reports/findings preserved. Human culinary approval remains a separate manual validation limit.
+- **History:** 2026-10-14 - Backend reports the focused prompt tests pass and the supplemental test TypeScript check has no remaining diagnostic in `dailyInsightPrompt.test.ts`; 46 diagnostics remain in other test sources. Awaiting independent targeted QA verification.
 - **History:** 2026-10-10 - Correction attempt 1 independently reviewed: F endpoint retained, R/G accepted outputs still omit it. Remains open; route final correction attempt 2. CORR1 F2/5, R11/14, G38/42; no deploy.
 - **History:** 2026-10-10 - FINAL2 independently reproduces endpoint loss in all three accepted oven outputs; F loses its initial endpoint during full-draft correction. Two attempts exhausted; STOP awaiting explicit user direction, no third candidate or deploy.
 - **History:** 2026-10-10 - User challenges mandatory doneness clause; current v12 QA treats it as disputed interpretation/product clarification, not an independently conclusive literal-phrase blocker. No waiver or human approval inferred. Awaiting decision; separate current cheese-action defect tracked as FT094.
@@ -1861,6 +1864,38 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** Pending user decision (Fix requested / Accepted / Deferred).
 - **History:** 2026-10-12 - Registered from the targeted QA report.
 
+### FT-QA-2026-122
+
+- **Finding key:** QA-MR-01
+- **Plan reference:** `docs/User Stories/PLAN_US_Makro-Zielbereiche-und-Visualisierung.md`
+- **Acceptance criterion:** AC-13
+- **Description:** `GET /api/diary` intentionally omits `targets` and `macroRanges`, but no handler or contract test explicitly asserts those fields are absent from the serialized response. The approved test strategy requires this regression assertion for ordinary and special-activity days.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [QA report](reports/PLAN_US_Makro-Zielbereiche-und-Visualisierung.md); `backend/src/functions/diary.ts`; `shared/types/diary.ts`; `backend/src/functions/diary.test.ts` lacked assertions that the serialized response does not contain `targets` or `macroRanges`.
+- **Recommendation:** Add a Diary handler or contract regression test asserting both fields are absent for ordinary and special-activity responses; preserve the current response contract.
+- **Status:** Closed
+- **Decision:** Backend correction attempt 1 independently verified; Diary GET remains unchanged and the response-contract regression test passes.
+- **History:** 2026-10-14 - Registered from the validated macro-ranges QA FAIL report; correction requested without changing the Diary API contract.
+- **History:** 2026-10-14 - Backend added ordinary-day and special-activity serialized Diary response assertions; focused tests, full Backend suite, and backend build verification reported passing. Awaiting independent QA verification.
+- **History:** 2026-10-14 - Independent targeted QA verified both serialized response assertions; AC-13 passes. Closed on the [final QA report](reports/PLAN_US_Makro-Zielbereiche-und-Visualisierung.md).
+
+### FT-QA-2026-123
+
+- **Finding key:** QA-MR-02
+- **Plan reference:** `docs/User Stories/PLAN_US_Makro-Zielbereiche-und-Visualisierung.md`
+- **Acceptance criterion:** AC-14
+- **Description:** The supplemental Backend test-inclusive TypeScript check exits 2 with 47 diagnostics across test sources. One diagnostic is in the modified Daily Insight prompt test at line 299, where a legacy scalar-target activity fixture is cast directly to the current `InsightInputContext`. The Diary regression test has no diagnostics; the prescribed production typecheck, full Vitest suite, and build verifier pass.
+- **Criticality:** Non-blocking
+- **Owner:** Backend
+- **Evidence:** [Final QA report](reports/PLAN_US_Makro-Zielbereiche-und-Visualisierung.md); `npx tsc --noEmit -p tsconfig.test.json` from `backend/` exits 2 with 47 test-source diagnostics, including `backend/src/lib/prompts/dailyInsightPrompt.test.ts(299,64)` TS2352 and zero diagnostics in `backend/src/functions/diary.test.ts`.
+- **Recommendation:** Align or explicitly model the legacy activity fixture against the current `InsightInputContext` type, and track the remaining test-inclusive diagnostics separately.
+- **Status:** Closed
+- **Decision:** User requested a fix on 2026-10-14; targeted QA independently verified the fixture correction and focused tests.
+- **History:** 2026-10-14 - Registered from the final macro-ranges QA report (PASS WITH ISSUES).
+- **History:** 2026-10-14 - User requested correction; routed to Backend. Unrelated existing test-source diagnostics remain out of scope for this finding.
+- **History:** 2026-10-14 - Targeted QA verified `satisfies InsightInputContext`, the 42-test prompt suite, and zero test-typecheck diagnostics in the affected file; closed. Forty-six diagnostics remain elsewhere without a new actionable finding.
+
 ## Verification Notes (Not Findings)
 
 ### Targeted QA Findings 113-117 Verification Limits (2026-10-12)
@@ -1883,6 +1918,12 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - UNVERIFIED: Azure-Region und Retention-Aussagen des Datenschutztexts nicht gegen Azure geprüft (kein Gate laut Plan).
 - Hinweis: `docs/legal/` ist untracked und muss mit dem Änderungssatz committet werden (`legalTexts.test.ts` liest die Dateien).
 - Source: [PLAN_Profilebereich_Redesign_und_Strukturierung.md](reports/PLAN_Profilebereich_Redesign_und_Strukturierung.md).
+
+### Macro Target Ranges QA 2026-10-14 Verification Limits
+
+- `UNVERIFIED`: Cosmos legacy-profile contract was not run because no local emulator was listening on `127.0.0.1:18081` or `127.0.0.1:8081`; no remote Cosmos environment was used.
+- `MANUAL VALIDATION REQUIRED`: Physical-device viewport, enlarged-font, and screen-reader checks were not performed; the Home UI tests used `react-test-renderer` only.
+- Source: [Macro target ranges QA report](reports/PLAN_US_Makro-Zielbereiche-und-Visualisierung.md).
 
 ### Targeted QA 2026-10-12 Verification Limits
 

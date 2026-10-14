@@ -73,11 +73,11 @@ If `stepsPerDay` is provided → lookup in step-PAL table (linear interpolation)
 | ≥17500 | 1.90 |
 
 If `activityLevel` provided (fallback):
-- `sedentary` → 1.35, `light` → 1.50, `active` → 1.60, `very_active` → 1.75
+- `sedentary` → 1.40, `light` → 1.55, `active` → 1.70, `very_active` → 1.90
 
 ### Step 3: Training Bonus
 
-Additional kcal/day from training (linear interpolation per minutes/session × frequency):
+Additional kcal for a training day (linear interpolation by minutes per session):
 
 | Minutes/session | Bonus per session |
 |---|---|
@@ -88,17 +88,23 @@ Additional kcal/day from training (linear interpolation per minutes/session × f
 | 120 | 450 kcal |
 | ≥150 | 550 kcal |
 
-Scaled by `trainingFrequencyPerWeek / 7` to get daily average.
+Used directly for the per-training-day target. The current calculator does not
+scale this bonus by `trainingFrequencyPerWeek`.
 
-### Step 4: Maintenance Calories
+### Step 4: Rest/Training-Day Calories
 
-`maintenanceCalories = bmr × pal + trainingBonus`
+`maintenanceRestDay = bmr × pal`
+
+The raw rest-day target adds the goal adjustment to `maintenanceRestDay`. The
+raw training-day target also adds the duration-based training bonus. Each
+target is rounded to the nearest 50 kcal before the minimum-calorie guardrail
+is applied.
 
 ### Step 5: Goal Adjustment
 
 Goal deficit/surplus applied:
 - `lose_weight` gentle → -250 kcal, moderate → -500, aggressive → -750
-- `gain_muscle` gentle → +200 kcal, moderate → +400, aggressive → +600
+- `gain_muscle` gentle → +200 kcal, moderate → +350, aggressive → +500
 - `maintain` → 0 adjustment
 - `recomposition` → −100 kcal (slight deficit; same macro formula as other goals)
 
@@ -127,15 +133,44 @@ Protein and fat are rounded to the nearest 5 g. Carbs to the nearest 5 g.
 
 If the calorie target is very low (e.g., at the minimum guardrail), carbs can reach 0 g — never negative.
 
+### Profile-day macro ranges
+
+The additive `macroRanges` block is calculated independently for `restDay` and
+`trainingDay`, using each day's own calories and rounded fat target. Protein is
+rounded to whole grams first; carbohydrate bounds then use the opposite protein
+bound:
+
+```text
+proteinMinG = Math.round(1.5 * weightKg)
+proteinMaxG = Math.round(2.0 * weightKg)
+carbsMinG   = Math.max(0, Math.round((calories - 4 * proteinMaxG - 9 * fatG) / 4))
+carbsMaxG   = Math.max(0, Math.round((calories - 4 * proteinMinG - 9 * fatG) / 4))
+```
+
+Thus the higher protein bound produces the lower carbohydrate bound. Both
+carbohydrate values are non-negative and `minG <= maxG`. These ranges do not
+replace or recalculate the legacy scalar macro fields.
+
 ## Stored Profile Document
 
 `UserProfile` — the complete document stored in Cosmos `profiles` container.
 
 - All `ProfileInput` fields
-- `targets: ProfileTargets` — `{ rest: DayTargets, training: DayTargets }`
+- `targets: ProfileTargets` — separate `restDay` and `trainingDay` targets with legacy scalar macros and optional `macroRanges`
 - `calculationMeta: CalculationMeta` — intermediate values for audit and recalculation
 - `createdAt`, `updatedAt`
 - `id` = `'profile'` (one profile per user, `userId` is the partition key)
+
+New calculations store protein and carbohydrate ranges for both profile days,
+using each day's own calories and fat target. Legacy documents without ranges
+remain readable: `ProfileRepository.get()` derives the missing values from the
+existing profile weight and per-day calories/fat without writing them back. A
+subsequent profile recalculation stores ranges and uses
+`profile-targets-v2-macro-ranges`; existing
+`profile-targets-v1-pal` metadata remains valid until then. `ProfileInput` is
+unchanged, and the existing scalar targets keep their prior meaning. The
+resolver is implemented for in-memory and Cosmos-backed reads; the Cosmos
+emulator contract remains unverified. No migration or backfill is performed.
 
 ### Historical target boundary
 

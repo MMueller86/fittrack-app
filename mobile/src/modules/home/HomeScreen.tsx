@@ -40,7 +40,7 @@ import { WeeklyReviewCard } from './WeeklyReviewCard';
 import { InsightCard } from './InsightCard';
 import { getInsight, type DailyInsightResponse } from '../../services/insightService';
 import { aiApi } from '../../shared/api/aiApi';
-import { getLocalDateContext } from '../../shared/date/localDate';
+import { getLocalDateContext, getLocalIsoDate } from '../../shared/date/localDate';
 import type {
   WeightEntry,
   DiaryDayResponse,
@@ -91,7 +91,7 @@ export default function HomeScreen({ navigation }: Props) {
   const weeklyRequestId = useRef(0);
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
-  const { dayType, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
+  const { dayType, dayTypeDate, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
   const [workoutPickerVisible, setWorkoutPickerVisible] = useState(false);
   const [activityPickerVisible, setActivityPickerVisible] = useState(false);
   const [activityBonusSheetVisible, setActivityBonusSheetVisible] = useState(false);
@@ -213,8 +213,15 @@ export default function HomeScreen({ navigation }: Props) {
 
   const latest = entries[0];
   const previous = entries[1];
+  const currentLocalDate = getLocalIsoDate();
+  const selectedDayType = dayTypeDate === currentLocalDate
+    ? dayType
+    : todayDiary?.dayType === 'training' ? 'training' : 'rest';
+  const selectedWorkoutType = dayTypeDate === currentLocalDate
+    ? workoutType
+    : selectedDayType === 'training' ? todayDiary?.workoutType ?? null : null;
   const todayTargets = targets
-    ? dayType === 'training'
+    ? selectedDayType === 'training'
       ? targets.trainingDay
       : targets.restDay
     : null;
@@ -239,10 +246,10 @@ export default function HomeScreen({ navigation }: Props) {
     todayDiary?.summary ?? null,
     todayTargets ? {
       calories: todayTargets.calories + (todayDiary?.activityBonus ?? 0),
-      proteinG: todayTargets.proteinG,
+      macroRanges: todayTargets.macroRanges,
     } : null,
-    dayType,
-    workoutType,
+    selectedDayType,
+    selectedWorkoutType,
   );
 
   return (
@@ -299,8 +306,8 @@ export default function HomeScreen({ navigation }: Props) {
           displayName={displayName ?? 'Sportler'}
           greeting={getGreeting()}
           hint={hint}
-          dayType={dayType}
-          workoutType={workoutType}
+          dayType={selectedDayType}
+          workoutType={selectedWorkoutType}
           onTrainingPress={() => setWorkoutPickerVisible(true)}
           latest={latest}
           previous={previous}

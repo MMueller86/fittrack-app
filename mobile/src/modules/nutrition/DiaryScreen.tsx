@@ -23,12 +23,13 @@ import type {
   Meal,
   MealItem,
   MealType,
+  ProfileTargets,
 } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
+import { profileApi } from '../../shared/api/profileApi';
 import { DayStoryCard } from '../../shared/components/DayStoryCard';
 import type { MealMacroSummary } from '../../shared/components/DayStoryCard';
-import type { MacroTarget } from '../../shared/components/MacroSummaryCard';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Icon } from '../../shared/components/Icon';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
@@ -330,12 +331,12 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const [date, setDate] = useState(initialRouteDate ?? getLocalIsoDate());
   const consumedRouteDate = useRef<string | null>(null);
   const [data, setData] = useState<DiaryDayResponse | null>(null);
+  const [loadedProfileTargets, setLoadedProfileTargets] = useState<ProfileTargets | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { dayType, targets, hydrateDayType } = useDayTypeStore();
-  const todayTargets = targets ? (dayType === 'training' ? targets.trainingDay : targets.restDay) : null;
+  const { dayType, targets, setTargets, hydrateDayType } = useDayTypeStore();
   const openHub = useFoodEntryHubStore((s) => s.open);
   const insets = useSafeAreaInsets();
   const [headerRowHeight, setHeaderRowHeight] = useState(0);
@@ -488,6 +489,25 @@ export default function DiaryScreen({ navigation, route }: Props) {
     }
   };
   const isToday = date === getLocalIsoDate();
+  const profileTargets = targets ?? loadedProfileTargets;
+  const todayTargets = isToday && profileTargets
+    ? data?.dayType === 'training' ? profileTargets.trainingDay : profileTargets.restDay
+    : null;
+
+  useEffect(() => {
+    if (!isToday || targets) return;
+    let isCurrent = true;
+    void profileApi.getMe()
+      .then(({ targets: profileTargetsResult }) => {
+        if (!isCurrent) return;
+        setLoadedProfileTargets(profileTargetsResult);
+        if (profileTargetsResult) setTargets(profileTargetsResult);
+      })
+      .catch(() => {
+        if (isCurrent) setLoadedProfileTargets(null);
+      });
+    return () => { isCurrent = false; };
+  }, [isToday, setTargets, targets]);
 
   const startSelectionMode = (initialSelection = new Set<string>()) => {
     setSelectedItemKeys(new Set(initialSelection));
@@ -844,7 +864,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
           {data && (
             <DayStoryCard
               summary={data.summary}
-              target={todayTargets ?? { calories: 2000, proteinG: 150, carbsG: 200, fatG: 70, fiberG: 25 } satisfies MacroTarget}
+              target={todayTargets}
               meals={orderedMeals.map((m) => ({ type: m.type, items: m.items ?? [] }))}
               mealSummaries={mealSummaries}
               scrollRef={scrollViewRef}
@@ -961,7 +981,6 @@ export default function DiaryScreen({ navigation, route }: Props) {
           mealName={orderedMeals.find((m) => m.id === editingMealId)?.name ?? ''}
           dateLabel={formatDateLabel(date)}
           item={editingItem}
-          proteinTarget={todayTargets?.proteinG}
           onSaved={handleEditSaved}
           onDeleted={handleDeleteItem}
           onClose={() => setEditingItem(null)}

@@ -71,7 +71,11 @@ for the route request contract.
 - `specialActivity?: SpecialActivity` — persisted result of a special activity calculation (see below)
 - `calorieTargetSnapshot?` — optional historical base-target snapshot captured on an explicit day-context write; contains `calories`, `capturedAt`, `source: 'profile'` and an optional `profileUpdatedAt`
 
-The diary GET endpoint assembles `DayMeta` and selects the correct `DayTargets` accordingly.
+The diary GET handler selects the profile `DayTargets` internally for hint
+evaluation. An explicit `dayType: 'training'` selects `trainingDay`; otherwise
+the handler selects `restDay`, or its fixed calorie-only fallback when no
+profile exists. The current GET response does not include `targets` or
+`macroRanges`.
 
 ### Historical target read rules
 
@@ -123,7 +127,7 @@ date matches the offset-adjusted local date; otherwise its status remains
 See [tech/09-api-reference.md](../tech/09-api-reference.md) for the complete
 cache, local-midnight, and TTL contract.
 
-The v14 Daily Insight also applies one global stale-weight safety rule across
+The active v18 Daily Insight also applies one global stale-weight safety rule across
 all intents: day 14 is current, day 15 is stale, stale-as-current wording is
 rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
 accepted. The full prompt and failure contract is documented in
@@ -222,18 +226,43 @@ state solely because the requested date differs from the current local date.
 
 `HintState` — persisted in Cosmos to track last-shown timestamps for each `HintId` per user.
 
+### Macro-range hint behavior
+
+When a profile is available, the hint engine receives the selected profile-day
+`macroRanges`. A special-activity bonus is added only to the calorie target
+passed to hint evaluation; it does not change the selected protein or
+carbohydrate ranges. The no-profile fallback has no ranges, so macro-range
+checks do not invent bounds.
+
+Protein classification uses actual protein grams per kilogram when usable body
+weight is available: below `1.5 g/kg` is `below_range`, `1.5–2.0 g/kg`
+inclusive is `in_range`, above `2.0` through `2.2 g/kg` inclusive is
+`above_range`, and above `2.2 g/kg` is `above_coaching_threshold`. Without
+usable weight, the classifier falls back to the rounded range bounds; without
+a valid range it returns `unknown`. H3/H4 retain their low-intake fractions of
+the range minimum, H8 requires a training day and `below_range`, H15/H17 use
+`in_range`, and H28 requires the high coaching band after dinner and retains
+its seven-day cooldown.
+
+H16 is positive only when protein is in range, carbohydrates are within their
+inclusive range, and fat is within 10% of its scalar target. Carbohydrates
+outside their range do not create a negative hint; they only prevent H16.
+
 ## Diary GET Response
 
-`DiaryDayResponse` (assembled by the diary function handler):
-- `date` — ISO date
+`GET /api/diary` currently returns:
 - `meals: Meal[]`
 - `summary: DaySummary`
-- `targets: DayTargets` — resolved for current day type
-- `dayType: 'rest' | 'training'`
+- `dayType: 'rest' | 'training' | null` — null when no day metadata exists
+- `workoutType: WorkoutType | null` — null when absent
 - `hint: HintResult`
-- `specialActivity?: SpecialActivity | null` — persisted special activity for the day, or null
-- `activityBonus?: number` — extra calories from the special activity (0 when none)
-- `previousDayHasActivity?: boolean` — true when the previous day had a special activity logged
+- `specialActivity: SpecialActivity | null`
+- `activityBonus: number` — zero when there is no special activity
+- `previousDayHasActivity: boolean`
+
+The current response does not include `date` or `targets`; in particular,
+`macroRanges` are not part of `DiaryDayResponse`. Clients obtain profile-day
+ranges through the Profile API.
 
 ## Business Rules
 

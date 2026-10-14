@@ -23,9 +23,11 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `UserProfile` — full stored profile document (includes `targets`, `calculationMeta`)
 
 ### `nutrition.ts`
-- `DayTargets` — `{ calories, protein, carbs, fat, fiber }` per day type
-- `ProfileTargets` — `{ rest: DayTargets, training: DayTargets }`
-- `CalculationMeta` — `{ bmr, pal, maintenanceCalories, ... }` stored for audit/reconstruction
+- `MacroRange` — `{ minG, maxG }`; `MacroRanges` — protein and carbohydrate ranges
+- `ProteinCoachingBand` — `'below_range' | 'in_range' | 'above_range' | 'above_coaching_threshold' | 'unknown'`
+- `DayTargets` — calorie, legacy scalar macro/fiber targets, plus optional `macroRanges` for legacy profile reads
+- `ProfileTargets` — `{ restDay: DayTargets, trainingDay: DayTargets }`
+- `CalculationMeta` — `{ formulaVersion, bmr, pal, ... }` stored for audit/reconstruction; legacy profile formula versions remain readable
 
 ### `diary.ts`
 - `MealType` — `'breakfast' | 'lunch' | 'dinner' | 'snack' | 'preworkout' | 'postworkout'`
@@ -150,13 +152,14 @@ pair and any supplied ETag precondition, and computes the persisted fingerprint.
 - `HintId` — `H1`–`H28` situational hints + `M0`–`M9` motivational hints
 - `HintCategory` — `'orientation' | 'daycontext' | 'positive' | 'motivation'`
 - `HintResult` — `{ id, text, emoji, category }`
-- `HintContext` — input to the rule engine (meals, summary, targets, dayType, currentLocalDate, nullable currentHour, bmr)
+- `HintContext` — input to the rule engine (meals, summary, selected profile-day `targets`, dayType, currentLocalDate, nullable currentHour, bmr, weightKg, recent-day calorie percentages)
 
 ### `insight.ts`
 - `InsightStatus` — `'fresh' | 'cached' | 'quota_exceeded' | 'unavailable'`
 - `InsightResponse` — daily AI briefing payload
 - `InsightWeightContext` — weight data sent to the AI; includes `latestKg`, `previousKg`, `targetKg`, the 30-day regression direction projected per week as `weeklyTrend30d`, `last7Values`, `isOutlierPrevious`, `isOutlierLatest`, `daysSinceLastMeasurement`, `lastMeasurementDate: string | null` (ISO date of last measurement)
-- `InsightNutritionDay`, `InsightInputContext` — AI input context
+- `InsightNutritionContext` — current intake, effective calorie target, optional profile-day `macroRanges`, `remainingProteinG`, and `proteinCoachingBand`; legacy scalar targets remain in the server context for compatibility
+- `InsightNutritionDay`, `InsightInputContext` — historical nutrition and complete server-owned AI input context
 
 ### `aiMealEstimate.ts`
 - `AiMealEstimatePreview` — meal image estimate result
@@ -174,7 +177,8 @@ All functions are pure (no I/O, no state).
 
 | File | Exports | Purpose |
 |---|---|---|
-| `profileCalculator.ts` | `calculateProfileTargets(input)` | Mifflin-St Jeor BMR, PAL from steps/activity, training bonus, macro targets |
+| `profileCalculator.ts` | `calculateProfileTargets(input)` | Mifflin-St Jeor BMR, PAL from steps/activity, training bonus, legacy scalar targets and per-day macro ranges |
+| `macroRanges.ts` | `calculateMacroRanges()`, `isWithinMacroRange()`, `classifyProteinCoachingBand()` and protein-range constants | Pure range calculation and inclusive range/coaching classification |
 | `nutritionCalculator.ts` | `calculateNutrition(item, mode, amount)` | Scales per-100g values to portion/grams |
 | `goalContext.ts` | `evaluateWeightDelta()`, `progressGrowsOnDecrease()` | Goal-relative progress direction |
 | `plateauDetector.ts` | `computePlateauSignal(entries)` | Std-dev plateau detection over 28-day window |
@@ -182,6 +186,21 @@ All functions are pure (no I/O, no state).
 | `activityBonusCalculator.ts` | `calculateActivityBonus(inputs, weightKg, dailyCalorieTarget)` | V3 piecewise-linear MET model for hiking; returns `ActivityBonusResult` including V3 intermediates |
 | `cyclingBonusCalculator.ts` | `calculateCyclingActivityBonus(inputs, weightKg, dailyCalorieTarget)` | `cycling-met-estimator@1.1.0` — speed + elevation + terrain + eBike MET model for cycling; 250 spec test cases |
 | `weeklyReviewCalculator.ts` | `calculateWeeklyNutritionReview(input)`, `getWeeklyReviewPeriod()`, `getWeeklyTargetBand()` | Pure Wochenzeitraum, Tagesprozente, Zielband sowie Summen/Durchschnitte |
+
+`calculateProfileTargets()` applies `calculateMacroRanges()` separately to
+`restDay` and `trainingDay`, using each day's own calories and fat. Protein
+bounds are `Math.round(1.5 * weightKg)` and `Math.round(2.0 * weightKg)`;
+carbohydrate bounds use the opposite protein bound, `4 kcal/g` protein,
+`9 kcal/g` fat, `Math.round`, and a zero minimum. Existing scalar protein,
+carbohydrate, fat, and fiber targets retain their prior calculations.
+
+The shared constants are `PROTEIN_MIN_G_PER_KG = 1.5`,
+`PROTEIN_MAX_G_PER_KG = 2.0`, and
+`PROTEIN_COACHING_THRESHOLD_G_PER_KG = 2.2`. With a valid weight,
+`classifyProteinCoachingBand()` classifies actual grams per kilogram; without
+one, it compares against the rounded range. The `2.2 g/kg` threshold is a
+coaching boundary, not a medical limit. `isWithinMacroRange()` uses inclusive
+bounds and rejects missing or invalid ranges.
 
 ### Weekly review calculation contract
 

@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { getDayHint } from './getDayHint';
 
-const BASE_SUMMARY = { calories: 1200, protein: 80, carbs: 150, fat: 40, fiber: 15 };
-const BASE_TARGETS = { calories: 2000, proteinG: 165 };
+const BASE_SUMMARY = { calories: 1200, protein: 140, carbs: 150, fat: 40, fiber: 15 };
+const BASE_TARGETS = {
+  calories: 2000,
+  macroRanges: {
+    proteinG: { minG: 120, maxG: 160 },
+    carbsG: { minG: 200, maxG: 300 },
+  },
+};
 
 describe('getDayHint', () => {
   describe('1. Kein Eintrag heute', () => {
@@ -58,35 +64,55 @@ describe('getDayHint', () => {
     });
   });
 
-  describe('3. Protein-Hinweis (unter 50% des Ziels)', () => {
-    it('zeigt Protein-Hinweis wenn Protein < 50% des Ziels', () => {
-      // protein: 60, target: 165 → 60 < 82.5 → Hinweis
-      const summary = { ...BASE_SUMMARY, protein: 60 };
+  describe('3. Protein-Hinweis (unterhalb des Zielbereichs)', () => {
+    it('zeigt Protein-Hinweis bei mehr als 20 g bis zur unteren Bereichsgrenze', () => {
+      const summary = { ...BASE_SUMMARY, protein: 99 };
       expect(getDayHint(summary, BASE_TARGETS, 'rest', null)).toBe(
-        'Dir fehlen noch 105 g Protein.',
+        'Bis zu deinem Protein-Zielbereich fehlen dir noch 21 g.',
       );
     });
 
-    it('zeigt Protein-Hinweis bei genau 49%', () => {
-      // 49% von 165 = 80.85 → protein = 80 → < 82.5 → Hinweis
-      const summary = { ...BASE_SUMMARY, protein: 80 };
+    it('zeigt keinen Protein-Hinweis, wenn die untere Bereichsgrenze erreicht ist', () => {
+      const summary = { ...BASE_SUMMARY, protein: 120 };
       expect(getDayHint(summary, BASE_TARGETS, 'rest', null)).toBe(
-        'Dir fehlen noch 85 g Protein.',
+        'Noch 800 kcal verfügbar.',
       );
     });
 
-    it('zeigt keinen Protein-Hinweis wenn Protein >= 50% des Ziels', () => {
-      // protein: 90 >= 82.5 → kein Protein-Hinweis → Kalorien-Hinweis
-      const summary = { ...BASE_SUMMARY, protein: 90 };
+    it('zeigt an der oberen Grenze und darüber keinen negativen Protein-Hinweis', () => {
+      for (const protein of [160, 161, 170]) {
+        const summary = { ...BASE_SUMMARY, protein };
+        const result = getDayHint(summary, BASE_TARGETS, 'rest', null);
+        expect(result).not.toContain('Protein');
+      }
+    });
+
+    it('sperrt Empfehlungen bei höchstens 20 g bis zur unteren Bereichsgrenze', () => {
+      const summary = { ...BASE_SUMMARY, protein: 100 };
+      expect(getDayHint(summary, BASE_TARGETS, 'rest', null)).toBe(
+        'Noch 800 kcal verfügbar.',
+      );
+    });
+
+    it('wertet Kohlenhydrate außerhalb ihres Richtbereichs nicht negativ', () => {
+      const summary = { ...BASE_SUMMARY, carbs: 0 };
       const result = getDayHint(summary, BASE_TARGETS, 'rest', null);
-      expect(result).not.toContain('Protein');
+      expect(result).toBe('Noch 800 kcal verfügbar.');
+      expect(result).not.toContain('Kohlenhydrate');
+    });
+
+    it('verwendet ohne Makrobereiche keinen Legacy-Protein-Punktwert', () => {
+      const summary = { ...BASE_SUMMARY, protein: 0 };
+      expect(getDayHint(summary, { calories: 2000 }, 'rest', null)).toBe(
+        'Noch 800 kcal verfügbar.',
+      );
     });
   });
 
   describe('4. Kalorien-Hinweis', () => {
     it('zeigt verbleibende Kalorien', () => {
       // 2000 - 1200 = 800 kcal remaining
-      const summary = { ...BASE_SUMMARY, protein: 90 }; // protein ok
+      const summary = { ...BASE_SUMMARY, protein: 130 }; // innerhalb des Protein-Zielbereichs
       expect(getDayHint(summary, BASE_TARGETS, 'rest', null)).toBe(
         'Noch 800 kcal verfügbar.',
       );

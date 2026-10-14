@@ -7,6 +7,8 @@ import {
   calculatePreviewHandler,
 } from './profile';
 import { __resetProfileRepositoryForTests } from '../lib/repositories/profileRepository';
+import { getProfileRepository } from '../lib/repositories/profileRepository';
+import { calculateMacroRanges } from '../../../shared/lib/macroRanges';
 import {
   makeContext,
   makeAuthRequest,
@@ -76,6 +78,21 @@ describe('GET /api/profile/me', () => {
     expect(body.profile.targetWeightKg).toBe(75);
     expect(body.profile.goal).toBe('lose_weight');
     expect(body.targets.restDay.calories).toBeGreaterThan(0);
+    expect(body.targets.restDay.macroRanges).toEqual(body.profile.targets.restDay.macroRanges);
+    expect(body.targets.trainingDay.macroRanges).toEqual(body.profile.targets.trainingDay.macroRanges);
+  });
+
+  it('leaves display-name-only profile projections readable', async () => {
+    await getProfileRepository().upsert({
+      id: 'profile',
+      userId: TEST_USER_ID,
+      displayName: 'Sportler',
+    } as unknown as UserProfile);
+
+    const res = await getProfileHandler(await makeAuthRequest(), makeContext());
+
+    expect(res.status).toBe(200);
+    expect((res.jsonBody as { profile: UserProfile }).profile.displayName).toBe('Sportler');
   });
 
   it('returns 401 without token', async () => {
@@ -103,6 +120,8 @@ describe('POST /api/profile', () => {
     expect(body.profile.sports).toEqual(['strength']);
     expect(body.targets.restDay.calories).toBeGreaterThan(0);
     expect(body.targets.trainingDay.calories).toBeGreaterThan(body.targets.restDay.calories);
+    expect(body.targets.restDay.macroRanges).toBeDefined();
+    expect(body.targets.trainingDay.macroRanges).toBeDefined();
   });
 
   it('stores calculationMeta with formulaVersion', async () => {
@@ -111,7 +130,7 @@ describe('POST /api/profile', () => {
       makeContext(),
     );
     const body = res.jsonBody as { profile: UserProfile };
-    expect(body.profile.calculationMeta.formulaVersion).toBe('profile-targets-v1-pal');
+    expect(body.profile.calculationMeta.formulaVersion).toBe('profile-targets-v2-macro-ranges');
     expect(body.profile.calculationMeta.bmr).toBeGreaterThan(0);
     expect(body.profile.calculationMeta.pal).toBeCloseTo(1.60, 1);
   });
@@ -151,6 +170,43 @@ describe('POST /api/profile', () => {
     expect(res.status).toBe(401);
   });
 
+  it('resolves missing ranges for a legacy profile without changing its scalar targets', async () => {
+    const createRes = await createProfileHandler(
+      await makeAuthRequest({ body: validInput }),
+      makeContext(),
+    );
+    const created = (createRes.jsonBody as { profile: UserProfile }).profile;
+    const restDay = { ...created.targets.restDay };
+    const trainingDay = { ...created.targets.trainingDay };
+    delete restDay.macroRanges;
+    delete trainingDay.macroRanges;
+
+    await getProfileRepository().upsert({
+      ...created,
+      targets: { restDay, trainingDay },
+      calculationMeta: {
+        ...created.calculationMeta,
+        formulaVersion: 'profile-targets-v1-pal',
+      },
+    });
+
+    const res = await getProfileHandler(await makeAuthRequest(), makeContext());
+    expect(res.status).toBe(200);
+    const body = res.jsonBody as { profile: UserProfile; targets: ProfileTargets };
+
+    expect(body.profile.calculationMeta.formulaVersion).toBe('profile-targets-v1-pal');
+    expect(body.targets.restDay.macroRanges).toEqual(
+      calculateMacroRanges(body.profile.weightKg, body.targets.restDay.calories, body.targets.restDay.fatG),
+    );
+    expect(body.targets.trainingDay.macroRanges).toEqual(
+      calculateMacroRanges(body.profile.weightKg, body.targets.trainingDay.calories, body.targets.trainingDay.fatG),
+    );
+    expect(body.targets.restDay.proteinG).toBe(restDay.proteinG);
+    expect(body.targets.restDay.carbsG).toBe(restDay.carbsG);
+    expect(body.targets.restDay.fatG).toBe(restDay.fatG);
+    expect(body.targets.restDay.fiberG).toBe(restDay.fiberG);
+  });
+
   it('accepts activityLevel fallback when stepsPerDay is null', async () => {
     const res = await createProfileHandler(
       await makeAuthRequest({
@@ -186,6 +242,8 @@ describe('PUT /api/profile', () => {
     expect(body.profile.goal).toBe('maintain');
     // maintain: rest == training (no bonus net change in goal adj but training bonus applies)
     expect(body.targets.restDay.calories).toBeGreaterThan(0);
+    expect(body.targets.restDay.macroRanges).toBeDefined();
+    expect(body.targets.trainingDay.macroRanges).toBeDefined();
   });
 
   it('preserves createdAt when updating', async () => {
@@ -270,6 +328,8 @@ describe('POST /api/profile/calculate-preview', () => {
     const body = res.jsonBody as { targets: ProfileTargets };
     expect(body.targets.restDay.calories).toBeGreaterThan(0);
     expect(body.targets.trainingDay.calories).toBeGreaterThan(body.targets.restDay.calories);
+    expect(body.targets.restDay.macroRanges).toBeDefined();
+    expect(body.targets.trainingDay.macroRanges).toBeDefined();
 
     // Must NOT save to repository
     const getRes = await getProfileHandler(await makeAuthRequest(), makeContext());
@@ -282,7 +342,7 @@ describe('POST /api/profile/calculate-preview', () => {
       makeContext(),
     );
     const body = res.jsonBody as { calculationMeta: { formulaVersion: string } };
-    expect(body.calculationMeta.formulaVersion).toBe('profile-targets-v1-pal');
+    expect(body.calculationMeta.formulaVersion).toBe('profile-targets-v2-macro-ranges');
   });
 
   it('returns 401 without token', async () => {

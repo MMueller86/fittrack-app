@@ -26,10 +26,14 @@
 ```ts
 interface DayTargets {
   calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber: number;
+  proteinG: number;
+  fatG: number;
+  carbsG: number;
+  fiberG: number;
+  macroRanges?: {
+    proteinG: { minG: number; maxG: number };
+    carbsG: { minG: number; maxG: number };
+  };
 }
 ```
 
@@ -43,6 +47,20 @@ interface ProfileTargets {
 ```
 
 The correct `DayTargets` to use for a given day is determined by the day's `dayType` field in `DayMeta`.
+
+For current profile targets, `macroRanges` is calculated independently for
+`restDay` and `trainingDay`. Protein bounds are rounded to whole grams first:
+`Math.round(1.5 * weightKg)` through `Math.round(2.0 * weightKg)`. Carbohydrate
+bounds then use that day's calories and fat target, with `4 kcal/g` protein
+and `9 kcal/g` fat; both use `Math.round` and are clamped to at least `0 g`.
+The lower carbohydrate bound uses the upper protein bound, and vice versa.
+Legacy scalar fields remain numeric and retain their previous meaning. The
+optional type reflects older stored profiles; profile API reads resolve absent
+ranges without writing a migration.
+
+A special-activity bonus changes only the effective calorie target. It is not
+allocated to protein or carbohydrates and does not change the selected
+profile-day macro ranges.
 
 ### Historical day-target snapshots
 

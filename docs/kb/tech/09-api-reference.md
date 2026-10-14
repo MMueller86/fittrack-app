@@ -19,6 +19,15 @@ All endpoints are prefixed with `/api`. Auth level is `anonymous` on the Azure F
 
 Request body for POST/PUT: `ProfileInput` — validated with Zod.
 
+Successful GET, POST, PUT, and calculate-preview responses include
+`targets.restDay.macroRanges` and `targets.trainingDay.macroRanges`, each with
+`proteinG` and `carbsG` `{ minG, maxG }` bounds. GET also includes the ranges
+inside `profile.targets`. Legacy profiles are completed in the read response
+from their weight and each profile day's stored calories/fat; the read does not
+write or backfill the document. Existing numeric `proteinG`/`carbsG` fields and
+the `ProfileInput` request shape are unchanged. GET still returns null profile
+and targets when no profile exists.
+
 ## Weights
 
 | Method | Route | Auth | Notes |
@@ -31,7 +40,7 @@ Request body for POST/PUT: `ProfileInput` — validated with Zod.
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/diary?date=YYYY-MM-DD&localDate=YYYY-MM-DD&localHour=0..23` | Yes | Full day: meals + summary + hint + dayMeta; `date` and `localDate` are required, `localHour` is optional |
+| GET | `/api/diary?date=YYYY-MM-DD&localDate=YYYY-MM-DD&localHour=0..23` | Yes | Meals + summary + hint + day metadata/activity fields; no `targets` object; `date` and `localDate` are required, `localHour` is optional |
 | POST | `/api/diary/meals` | Yes | Create meal for a date |
 | PUT | `/api/diary/meals/{mealId}` | Yes | Update meal metadata |
 | DELETE | `/api/diary/meals/{mealId}` | Yes | |
@@ -50,6 +59,15 @@ current local device date used for local state decisions. Both must be real
 `YYYY-MM-DD` calendar dates. `localHour` accepts an integer from `0` through
 `23`; a missing, non-integer, or out-of-range value is represented as unknown
 and never replaced with a server or UTC hour.
+
+The current Diary GET response contains `meals`, `summary`, `dayType`,
+`workoutType`, `hint`, `specialActivity`, `activityBonus`, and
+`previousDayHasActivity`. `dayType` and `workoutType` are `null` when the
+corresponding day metadata is absent. The response does not include `date`,
+`targets`, or `macroRanges`; the handler uses selected profile-day ranges
+internally for hint evaluation. Profile ranges are returned by the Profile API
+above. A special-activity bonus affects only the calorie target used for hint
+evaluation, not the selected profile-day macro ranges.
 
 ### Bulk diary item mutations
 
@@ -894,7 +912,7 @@ failures plus quota exhaustion remain friendly HTTP `200` responses.
 	"cta": "Ernährung öffnen",
 	"ctaTarget": "Nutrition",
 	"generatedAt": "2026-08-20T08:30:00.000Z",
-	"promptVersion": "v17",
+	"promptVersion": "v18",
 	"status": "fresh",
 	"feedbackAvailable": true
 }
@@ -910,25 +928,32 @@ legacy or incomplete instance, including friendly quota/unavailable responses.
 The POST guard remains authoritative and rejects incomplete provenance with
 `feedback_snapshot_unavailable`.
 
+Daily Insight v18 uses profile-day macro ranges only in its server-owned
+context and provider input; it does not add macro fields to the public
+`InsightResponse` or change the Structured Output schema. The existing
+`daily-insight` quota behavior is unchanged. Weekly Insight remains a separate
+calorie-based contract and does not receive these personal macro ranges.
+
 Daily documents are stored as `_docType: "dailyInsight"` under the existing
-`aiInsights` container with `id = ${userId}:${date}`. The selected v17 intent,
+`aiInsights` container with `id = ${userId}:${date}`. The selected v18 intent,
 input context, input hash, exact system/user prompt snapshot, model, token
 usage, and intelligence version are server-owned persistence fields. Daily
 quota is checked before Azure OpenAI and tracked only after a valid response;
 quota exhaustion remains a friendly HTTP `200` response and is not tracked.
-The active v17 prompt and server validator apply the stale-weight guard to all
+The active v18 prompt and server validator apply the stale-weight guard to all
 intents: day 14 remains current, day 15 is stale, stale-as-current wording is
 rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
 accepted. Context, provider, truncation/content-filter, or validation failures
 return HTTP `200` with `status: "unavailable"`; the failed result is not
 persisted and does not consume or track Daily quota.
 
-Daily v17 retains v16's removal of contradictory below-target guidance and
+Daily v18 retains the removal of contradictory below-target guidance and
 adds the existing activity open-day rule as a final context guard independently
 of protein gap/local hour; unknown completion and fueling stay conditional.
-the strict open-day rule, public fields and failure contract remain unchanged.
-The append-only release manifest retains v14/v15/v16; the existing complete,
-unexpired same-date v14 cache exception remains effective under v17.
+The v18 prompt also enforces the range-only macro semantics; public fields,
+Structured Output, quota, and failure contract remain unchanged. The append-only
+release manifest retains v14-v17 history; the existing complete, unexpired
+same-date v14 cache exception remains effective under v18.
 
 The server-owned `inputContext.weight.weeklyTrend30d` is not exposed in the
 public response. It is the `gaining | losing | stable | null` direction
@@ -999,7 +1024,7 @@ TTL/expiry.
 | `response` | Complete server-generated/displayed Daily response |
 | `promptSnapshot.system` | Exact system prompt stored for this Daily instance and sent to Azure OpenAI |
 | `promptSnapshot.user` | Exact serialized user message sent to Azure OpenAI |
-| `promptVersion` | Stored Daily prompt version, currently `v17` for new generations |
+| `promptVersion` | Stored Daily prompt version, currently `v18` for new generations |
 | `intent` | Deterministic server-selected `InsightIntent` |
 | `inputContext` | Complete server-built `InsightInputContext` used for generation |
 | `inputHash` | Server-computed hash for the Daily input and active prompt |

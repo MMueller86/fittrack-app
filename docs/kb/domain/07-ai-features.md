@@ -384,6 +384,33 @@ conditional wording. Long/intensive endurance activity is handled with
 qualitative fueling (including carbohydrates or energy), fluids, and recovery
 language, without adding unapproved numeric nutrition thresholds.
 
+### Macro-range context (v18)
+
+For current-day nutrition, the backend selects `restDay` or `trainingDay` from
+the stored day type (defaulting to `restDay`) and carries that profile day's
+`macroRanges` into the Daily Insight context. A special-activity bonus changes
+only the effective calorie target; it does not change those ranges or allocate
+bonus calories to a macro.
+
+When current intake and a usable protein range exist, `remainingProteinG` is
+the non-negative rounded distance from consumed protein to the range's lower
+bound. `proteinCoachingBand` uses actual protein per kilogram when usable body
+weight is available: below `1.5 g/kg` is `below_range`, `1.5–2.0 g/kg`
+inclusive is `in_range`, above `2.0` through `2.2 g/kg` inclusive is
+`above_range`, and above `2.2 g/kg` is `above_coaching_threshold`. If weight
+is unavailable or stale, the rounded range bounds are used; missing usable
+intake or ranges produce an unknown band. The `2.2 g/kg` threshold is a
+non-medical coaching parameter, not a safety limit. The existing 20 g stop for
+additional protein recommendations is measured against the rounded protein
+lower bound.
+
+The v18 prompt and provider projection use the ranges and server-computed
+coaching signals, never legacy scalar `proteinG` or `carbsG` values, to assess
+protein or carbohydrates. The carbohydrate range is guidance only: values
+outside it are not described as too low or too high and do not justify a
+negative correction. Historical days do not receive current macro targets.
+Weekly Insight remains calorie-based and receives no profile macro ranges.
+
 The current Mobile Daily request also sends `timezoneOffsetMinutes`, interpreted
 as local time minus UTC (for example, UTC+2 is `120`). Only integer values in
 `[-840,840]` are valid. The request also requires a real `date`; missing,
@@ -403,9 +430,9 @@ unchanged for valid requests. Context/provider and server-validation failures
 remain friendly HTTP `200` `unavailable` responses, and quota exhaustion remains
 friendly HTTP `200` `quota_exceeded` without usage tracking.
 
-### v17 prompt, output, and failure contract
+### v18 prompt, output, and failure contract
 
-`DAILY_INSIGHT_PROMPT_VERSION = 'v17'`. The selected focused module is combined
+`DAILY_INSIGHT_PROMPT_VERSION = 'v18'`. The selected focused module is combined
 with the shared German tone/output contract. The backend stores the exact
 `promptSnapshot.system` and serialized `promptSnapshot.user` sent to Azure
 OpenAI. Strict Structured Outputs use `json_schema`, `strict: true`, required
@@ -420,11 +447,17 @@ and the historical v15 fingerprint
 `sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`.
 The historical v16 fingerprint remains
 `sha256:3e68d4dd0b6e49003936a278f3e65d693645ebfb41ee5ced3ea7daa3efa70893`.
-The appended active v17 fingerprint is
+The historical v17 fingerprint is
 `sha256:0373462c2f0e3b3050c51b4cfe468c6aca238ce3c0b15cf80c5be2b8847e4386`
-with assembly version `v2`. Historical release records are unchanged.
+with assembly version `v2`. The active v18 fingerprint is
+`sha256:853697f9be7a8234443ff6ac89470485bb5e45a528539425a48b0f0e54f2ddae`,
+also with assembly version `v2`. The append-only historical records are
+unchanged. The WP-B2 handoff records passing focused tests and live evaluations
+for v18; earlier v17 evaluation results remain historical.
 
-The separate Q-21 Daily fix removes a shared-tone contradiction that asked for
+The following Q-21/CORR1 findings describe historical v17 evaluation evidence,
+not the current v18 gate result. The separate Q-21 Daily fix removes a
+shared-tone contradiction that asked for
 below-target wording despite the open-day prohibition. A positive remainder
 now permits only forward-looking open-room wording, subject to stricter intent
 rules; the four forbidden completed-day phrases remain prohibited. The actual
@@ -480,7 +513,7 @@ current and day 15 is stale. A stale-as-current sentence such as
 wording such as `Der Trend deines Gewichts ist nicht aktuell.` is accepted.
 The runtime root cause was that the stale rules had previously existed only in
 `promptWeight`, while deterministic `nutrition_guidance` selected
-`promptNutrition`; the fix introduced in v11 remains active in v17 and applies the shared guard to that path and all other
+`promptNutrition`; the fix introduced in v11 remains active in v18 and applies the shared guard to that path and all other
 intents. Server-side validation remains strict and was not weakened.
 
 Negative calorie budget is authoritative. A `remainingProteinG` value of
@@ -488,7 +521,7 @@ Negative calorie budget is authoritative. A `remainingProteinG` value of
 state creates an additional protein action, and a negative calorie budget
 blocks further same-day food recommendations.
 
-For v17, a positive `remainingCalories` value is an unfinished target budget,
+For v18, a positive `remainingCalories` value is an unfinished target budget,
 not evidence of an achieved energy deficit or a completed energy balance. This
 also applies to `phase_progress`: the open-day guard keeps the narrative based
 on weight signals, does not present the remainder as an eating budget or base
@@ -523,12 +556,14 @@ fingerprint, concrete system-prompt hash, and exact prompt snapshot, model,
 response, token usage, and intelligence version. The hash includes the release
 version, both prompt identities, intent, local-hour bucket, activity/status
 data, semantic nutrition buckets, current and historical nutrition/targets,
-weight/progress signals, and the other prompt inputs. Missing or mismatched
+the exact current profile-day `macroRanges`, `proteinCoachingBand`, and
+protein-gap signal, weight/progress signals, and the other prompt inputs.
+Missing or mismatched
 prompt version, `promptFingerprint`, `systemPromptHash`, `intent`, or
 `promptSnapshot` is a hard cache invalidation, independent of the regeneration
 interval, daily limit, or admin status. A complete, unexpired v14 same-date
-Daily remains cached and is returned unchanged until its existing expiry; v17,
-like v15/v16, does not overwrite it early. After expiry, the date key may receive a new v17
+Daily remains cached and is returned unchanged until its existing expiry; v18,
+like v15/v16/v17, does not overwrite it early. After expiry, the date key may receive a new v18
 document. A v14 entry without complete provenance does not qualify for
 preservation and follows hard invalidation.
 
@@ -671,4 +706,4 @@ Required: API version ≥ `2024-07-01`, model ≥ `gpt-4o-mini 2024-07-18`.
 
 ## Prompt Versioning
 
-Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v15'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily document in Cosmos. The concrete `systemPromptHash` is stored for the exact composed system prompt used by that instance. When a provider-visible prompt, guard, assembly, or schema change affects output interpretation, the version must be incremented and the append-only release manifest updated.
+Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v18'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily document in Cosmos. The concrete `systemPromptHash` is stored for the exact composed system prompt used by that instance. When a provider-visible prompt, guard, assembly, or schema change affects output interpretation, the version must be incremented and the append-only release manifest updated.

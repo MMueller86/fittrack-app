@@ -1712,23 +1712,33 @@ describe('GET /api/diary — specialActivity response fields', () => {
     });
   }
 
+  function expectNoTopLevelProfileTargets(body: unknown): void {
+    const serializedBody = JSON.stringify(body);
+    if (serializedBody == null) throw new Error('Diary response could not be serialized');
+
+    const parsedBody = JSON.parse(serializedBody) as Record<string, unknown>;
+    expect(parsedBody).not.toHaveProperty('targets');
+    expect(parsedBody).not.toHaveProperty('macroRanges');
+  }
+
   beforeEach(() => {
     __resetDayMetaRepositoryForTests();
     __resetHintStateRepositoryForTests();
   });
 
-  it('returns specialActivity: null and activityBonus: 0 when no activity is set', async () => {
+  it('serializes an ordinary-day response without top-level targets or macroRanges', async () => {
     const req = await makeGetRequest(GET_DATE);
     const res = await getDiaryHandler(req, makeContext());
 
     expect(res.status).toBe(200);
+    expectNoTopLevelProfileTargets(res.jsonBody);
     const body = res.jsonBody as { specialActivity: null; activityBonus: number; previousDayHasActivity: boolean };
     expect(body.specialActivity).toBeNull();
     expect(body.activityBonus).toBe(0);
     expect(body.previousDayHasActivity).toBe(false);
   });
 
-  it('returns correct activityBonus when specialActivity is set for the requested day', async () => {
+  it('serializes a special-activity-day response without top-level targets or macroRanges', async () => {
     const mockActivity: SpecialActivity = {
       type: 'hiking',
       movementTimeMinutes: 240,
@@ -1749,6 +1759,7 @@ describe('GET /api/diary — specialActivity response fields', () => {
     const res = await getDiaryHandler(req, makeContext());
 
     expect(res.status).toBe(200);
+    expectNoTopLevelProfileTargets(res.jsonBody);
     const body = res.jsonBody as { specialActivity: SpecialActivity; activityBonus: number };
     expect(body.activityBonus).toBeCloseTo(926.67, 1);
     expect(body.specialActivity?.type).toBe('hiking');

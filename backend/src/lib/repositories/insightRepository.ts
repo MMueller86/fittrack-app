@@ -253,10 +253,20 @@ export function computeInputHash(
       targets: ctx.nutrition.targets
         ? {
             calories: roundCalories(ctx.nutrition.targets.calories),
-            proteinG: roundMacro(ctx.nutrition.targets.proteinG),
-            carbsG: roundMacro(ctx.nutrition.targets.carbsG),
             fatG: roundMacro(ctx.nutrition.targets.fatG),
             fiberG: roundMacro(ctx.nutrition.targets.fiberG),
+            macroRanges: ctx.nutrition.targets.macroRanges == null
+              ? null
+              : {
+                  proteinG: {
+                    minG: ctx.nutrition.targets.macroRanges.proteinG.minG,
+                    maxG: ctx.nutrition.targets.macroRanges.proteinG.maxG,
+                  },
+                  carbsG: {
+                    minG: ctx.nutrition.targets.macroRanges.carbsG.minG,
+                    maxG: ctx.nutrition.targets.macroRanges.carbsG.maxG,
+                  },
+                },
             baseCalories: roundCalories(ctx.nutrition.targets.baseCalories),
             activityBonusCalories: roundCalories(ctx.nutrition.targets.activityBonusCalories),
             targetSource: ctx.nutrition.targets.targetSource ?? null,
@@ -264,6 +274,7 @@ export function computeInputHash(
         : null,
       remainingCalories: roundCalories(ctx.nutrition.remainingCalories),
       remainingProteinG: roundMacro(ctx.nutrition.remainingProteinG),
+      proteinCoachingBand: ctx.nutrition.proteinCoachingBand ?? null,
       remainingCaloriesBucket: getRemainingCaloriesBucket(ctx.nutrition.remainingCalories),
       remainingProteinBucket: getRemainingProteinBucket(ctx.nutrition.remainingProteinG),
       last3Days: ctx.nutrition.last3Days.map((day) => ({
@@ -299,7 +310,8 @@ function shouldPreserveV14CacheUntilExpiry(
   activePromptVersion: string | undefined,
 ): boolean {
   const expiresAt = Date.parse(cached.expiresAt);
-  return (activePromptVersion === 'v15' || activePromptVersion === 'v16' || activePromptVersion === 'v17')
+  return (activePromptVersion === 'v15' || activePromptVersion === 'v16'
+    || activePromptVersion === 'v17' || activePromptVersion === 'v18')
     && cached.promptVersion === 'v14'
     && Number.isFinite(expiresAt)
     && expiresAt > now.getTime()

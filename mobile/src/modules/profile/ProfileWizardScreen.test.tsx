@@ -68,8 +68,28 @@ describe('ProfileWizardScreen privacy access', () => {
   it('opens the Datenschutz text from the preview step without saving and keeps the inputs', async () => {
     mocks.profileApi.calculatePreview.mockResolvedValue({
       targets: {
-        restDay: { calories: 2000, proteinG: 120, fatG: 70, carbsG: 220, fiberG: 30 },
-        trainingDay: { calories: 2200, proteinG: 130, fatG: 75, carbsG: 250, fiberG: 30 },
+        restDay: {
+          calories: 2000,
+          proteinG: 144,
+          fatG: 70,
+          carbsG: 220,
+          fiberG: 30,
+          macroRanges: {
+            proteinG: { minG: 120, maxG: 160 },
+            carbsG: { minG: 183, maxG: 223 },
+          },
+        },
+        trainingDay: {
+          calories: 2200,
+          proteinG: 144,
+          fatG: 75,
+          carbsG: 250,
+          fiberG: 30,
+          macroRanges: {
+            proteinG: { minG: 120, maxG: 160 },
+            carbsG: { minG: 221, maxG: 261 },
+          },
+        },
       },
       calculationMeta: { bmr: 1700, pal: 1.4, goalAdjustment: 0 },
     });
@@ -100,6 +120,15 @@ describe('ProfileWizardScreen privacy access', () => {
       await Promise.resolve();
     });
     expect(texts(renderer)).toContain('Deine Ziele');
+    const previewTexts = texts(renderer);
+    expect(previewTexts.filter((value) => value === '120–160 g')).toHaveLength(2);
+    expect(previewTexts).toContain('183–223 g');
+    expect(previewTexts).toContain('221–261 g');
+    expect(previewTexts).toContain('2000 kcal');
+    expect(previewTexts).toContain('2200 kcal');
+    expect(previewTexts).toContain('70 g');
+    expect(previewTexts).toContain('75 g');
+    expect(previewTexts.filter((value) => value === '30 g')).toHaveLength(2);
 
     pressByLabel(renderer, 'Datenschutzerklärung lesen');
     const privacy = texts(renderer);

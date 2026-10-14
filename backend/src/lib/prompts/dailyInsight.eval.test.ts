@@ -4,7 +4,7 @@ import { DailyInsightValidationError } from '../dailyInsightValidation';
 import { DAILY_INSIGHT_PROMPT_VERSION } from './dailyInsightPrompt';
 import { DAILY_INSIGHT_EVAL_FIXTURES } from './dailyInsight.eval.fixtures';
 
-const TESTED_PROMPT_VERSION = 'v17';
+const TESTED_PROMPT_VERSION = 'v18';
 
 it('daily insight prompt version matches fixture expectations', () => {
   expect(DAILY_INSIGHT_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);

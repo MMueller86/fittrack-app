@@ -37,6 +37,13 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+export function formatMacroTargetValue(
+  value: number,
+  range?: { minG: number; maxG: number },
+): string {
+  return range ? `${range.minG}–${range.maxG} g` : `${value} g`;
+}
+
 function MacroGrid({
   targets,
   title,
@@ -58,7 +65,7 @@ function MacroGrid({
           <Text style={styles.macroLabel}>kcal</Text>
         </View>
         <View style={styles.macroItem}>
-          <Text style={styles.macroValue}>{targets.proteinG} g</Text>
+          <Text style={styles.macroValue}>{formatMacroTargetValue(targets.proteinG, targets.macroRanges?.proteinG)}</Text>
           <Text style={styles.macroLabel}>Protein</Text>
         </View>
         <View style={styles.macroItem}>
@@ -66,7 +73,7 @@ function MacroGrid({
           <Text style={styles.macroLabel}>Fett</Text>
         </View>
         <View style={styles.macroItem}>
-          <Text style={styles.macroValue}>{targets.carbsG} g</Text>
+          <Text style={styles.macroValue}>{formatMacroTargetValue(targets.carbsG, targets.macroRanges?.carbsG)}</Text>
           <Text style={styles.macroLabel}>Carbs</Text>
         </View>
       </View>

@@ -25,7 +25,17 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
     },
     nutrition: {
       today: { calories: 1500, protein: 100, carbs: 150, fat: 50, fiber: 20, hasMealItem: true },
-      targets: { calories: 2000, proteinG: 140, carbsG: 220, fatG: 70, fiberG: 30 },
+      targets: {
+        calories: 2000,
+        proteinG: 140,
+        carbsG: 220,
+        fatG: 70,
+        fiberG: 30,
+        macroRanges: {
+          proteinG: { minG: 140, maxG: 180 },
+          carbsG: { minG: 160, maxG: 220 },
+        },
+      },
       remainingCalories: 500,
       remainingProteinG: 40,
       last3Days: [],
@@ -103,7 +113,24 @@ describe('generateDailyInsight', () => {
     });
     expect(request.messages[0]?.content).toBe(result.promptSnapshot.system);
     expect(request.messages[1]?.content).toBe(result.promptSnapshot.user);
-    expect(JSON.parse(result.promptSnapshot.user)).toEqual({ intent: 'nutrition_guidance', context });
+    expect(JSON.parse(result.promptSnapshot.user)).toEqual({
+      intent: 'nutrition_guidance',
+      context: {
+        ...context,
+        nutrition: {
+          ...context.nutrition!,
+          targets: {
+            calories: 2000,
+            fatG: 70,
+            fiberG: 30,
+            macroRanges: {
+              proteinG: { minG: 140, maxG: 180 },
+              carbsG: { minG: 160, maxG: 220 },
+            },
+          },
+        },
+      },
+    });
   });
 
   it('uses a server-provided prompt snapshot verbatim', async () => {

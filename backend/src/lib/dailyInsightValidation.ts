@@ -43,6 +43,8 @@ const HISTORICAL_TARGET_RELATION = /(?<![\p{L}\p{N}_])(?:über|oberhalb|darüber
 const HISTORICAL_ABOVE_TARGET = /(?<![\p{L}\p{N}_])(?:über|oberhalb|darüber|mehr\s+als|zu\s+viel|überschritten)(?![\p{L}\p{N}_])/iu;
 const HISTORICAL_BELOW_TARGET = /(?<![\p{L}\p{N}_])(?:unter|unterhalb|darunter|weniger\s+als|zu\s+wenig|unterschritten|verfehlt)(?![\p{L}\p{N}_])/iu;
 const HISTORICAL_NUTRITION_CLAIM = /(?<![\p{L}\p{N}_])(?:kalorien|kcal|protein|eiweiß|makros?|aufnahme|gegessen|mahlzeit)(?![\p{L}\p{N}_])/iu;
+const RECENT_DAYS_REFERENCE = /\b(?:letzten|vergangenen|vorangegangenen|zurückliegenden)\s+(?:(?:drei|\d+)\s+)?tage[n]?\b/iu;
+const HISTORICAL_MACRO_RANGE_CLAIM = /\b(?:protein|eiweiß|kohlenhydrat|makro)\w*(?:bereich|ziel)\w*\b|\b(?:protein|eiweiß|kohlenhydrat|makro)\w*\b[^.!?]{0,80}\b(?:bereich|ziel|unter(?:halb)?|über(?:halb)?|oberhalb|unterhalb|innerhalb|außerhalb|zu\s+(?:hoch|niedrig|viel|wenig)|gut|schlecht|verfehlt|erreicht|überschritten|unterschritten)\b|\b(?:bereich|ziel|unter(?:halb)?|über(?:halb)?|oberhalb|unterhalb|innerhalb|außerhalb|zu\s+(?:hoch|niedrig|viel|wenig)|gut|schlecht|verfehlt|erreicht|überschritten|unterschritten)\b[^.!?]{0,80}\b(?:protein|eiweiß|kohlenhydrat|makro)\w*\b/iu;
 const HISTORICAL_DATA_UNAVAILABLE_DISCLAIMER = /\b(?:keine[nr]?\s+(?:ernährungs-?\s*)?einträge|keine[nr]?\s+daten|nicht\s+(?:verlässlich|belastbar|eindeutig)\s+einordn\w*|lässt\s+sich\s+(?:nicht|kaum)\s+(?:verlässlich\s+)?einordn\w*)\b/i;
 const HISTORICAL_TARGET_AS_STORED_FACT = /\b(?:damalig\w*|historisch\w*|gespeichert\w*)\b|\b(?:ziel|tagesziel|kalorienziel)\s+(?:war|betrug|lag)\b|\b(?:war|betrug)\s+dein(?:e)?\s+(?:tagesziel|ziel)\b/i;
 const EXPLICIT_CURRENT_PROFILE_TARGET = /\b(?:heutig\w*|aktuell\w*)\s+(?:profil(?:kalorien)?ziel|kalorienziel|tagesziel|ziel)\b/i;
@@ -138,6 +140,7 @@ function validateHistoricalNutritionSemantics(
   context: InsightInputContext,
 ): void {
   let previousHistoricalDayIndex: number | null = null;
+  let recentDaysContext = false;
   for (const sentence of getResponseSentences(response)) {
     const mentionedDayIndex = getHistoricalDayIndex(sentence);
     if (mentionedDayIndex != null) {
@@ -145,7 +148,20 @@ function validateHistoricalNutritionSemantics(
     } else if (/\b(?:heute|heutig\w*|aktuell\w*)\b/i.test(sentence)) {
       previousHistoricalDayIndex = null;
     }
+    if (RECENT_DAYS_REFERENCE.test(sentence)) {
+      recentDaysContext = true;
+    } else if (mentionedDayIndex == null && /\b(?:heute|heutig\w*|aktuell\w*)\b/i.test(sentence)) {
+      recentDaysContext = false;
+    }
     const dayIndex = mentionedDayIndex ?? previousHistoricalDayIndex;
+    if (
+      (dayIndex != null || recentDaysContext)
+      && HISTORICAL_MACRO_RANGE_CLAIM.test(sentence)
+    ) {
+      throw new DailyInsightValidationError(
+        'Daily insight compares historical macro intake with the current range',
+      );
+    }
     if (dayIndex == null) continue;
 
     const day = context.nutrition.last3Days[dayIndex];

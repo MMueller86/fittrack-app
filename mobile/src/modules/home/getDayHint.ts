@@ -2,7 +2,7 @@
 // Wird im HomeScreen unter der Begrüßung angezeigt.
 // Separate Datei → vollständig unit-testbar ohne RN-Imports.
 
-import type { WorkoutType } from '@fittrack/shared';
+import type { MacroRanges, WorkoutType } from '@fittrack/shared';
 
 export interface DayHintSummary {
   calories: number;
@@ -14,7 +14,7 @@ export interface DayHintSummary {
 
 export interface DayHintTargets {
   calories: number;
-  proteinG: number;
+  macroRanges?: MacroRanges;
 }
 
 const WORKOUT_HINT_LABELS: Record<WorkoutType, string> = {
@@ -30,7 +30,7 @@ const WORKOUT_HINT_LABELS: Record<WorkoutType, string> = {
  * Priorität:
  * 1. Kein Eintrag heute → Einstiegs-CTA
  * 2. Trainingstag → Trainingshinweis
- * 3. Protein < 50 % des Ziels → Protein-Hinweis
+ * 3. Mehr als 20 g bis zur unteren Protein-Zielgrenze → Protein-Hinweis
  * 4. Sonst → verbleibende Kalorien
  */
 export function getDayHint(
@@ -55,10 +55,20 @@ export function getDayHint(
     return 'Alles im Blick.';
   }
 
-  // 3. Protein unter 50 % des Ziels → Protein-Hinweis
-  if (targets.proteinG > 0 && summary.protein < targets.proteinG * 0.5) {
-    const remaining = Math.max(0, Math.round(targets.proteinG - summary.protein));
-    return `Dir fehlen noch ${remaining} g Protein.`;
+  // 3. Protein-Hinweis richtet sich nur nach der gerundeten unteren Bereichsgrenze.
+  const proteinRange = targets.macroRanges?.proteinG;
+  if (
+    proteinRange
+    && Number.isFinite(proteinRange.minG)
+    && Number.isFinite(proteinRange.maxG)
+    && proteinRange.minG >= 0
+    && proteinRange.minG <= proteinRange.maxG
+    && summary.protein < proteinRange.minG
+  ) {
+    const remaining = Math.round(proteinRange.minG - summary.protein);
+    if (remaining > 20) {
+      return `Bis zu deinem Protein-Zielbereich fehlen dir noch ${remaining} g.`;
+    }
   }
 
   // 4. Verbleibende Kalorien

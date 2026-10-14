@@ -2,6 +2,7 @@
 
 import type { UserProfile } from '@fittrack/shared';
 import { getCosmos } from '../cosmos';
+import { resolveProfileMacroRanges } from '../profileMacroRanges';
 import type { ProfileRepository } from './profileRepository';
 
 export class CosmosProfileRepository implements ProfileRepository {
@@ -11,7 +12,7 @@ export class CosmosProfileRepository implements ProfileRepository {
       const { resource } = await containers.profiles
         .item('profile', userId)
         .read<UserProfile>();
-      return resource ?? null;
+      return resource ? resolveProfileMacroRanges(resource) : null;
     } catch (err: unknown) {
       if ((err as { code?: number }).code === 404) return null;
       throw err;

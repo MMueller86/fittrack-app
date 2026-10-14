@@ -131,6 +131,8 @@ See [tech/05-authentication.md](05-authentication.md) for full flow.
 ### Nutrition Module (`modules/nutrition/`)
 
 - `DiaryScreen.tsx` — daily diary view with meal cards and hint display
+- Current-day Home and diary macro views use the selected profile day's `macroRanges` for protein and carbohydrates. The diary selects `restDay` or `trainingDay` from the response's `dayType`; if profile targets have not hydrated, it loads them from the profile API. The Home protein hint compares consumption with `proteinG.minG` and appears only when more than 20 g remain. Activity bonuses affect calorie targets only.
+- Historical diary views do not receive current profile targets: the diary response has no historical macro-target snapshot, so protein and carbohydrate consumption remain visible without an implied goal.
 - `hub/` — FoodEntryHub (bottom sheet workspace for food entry)
 - `MealParserReviewScreen.tsx` — review AI-parsed meal text before saving
 - `FoodEstimateReviewScreen.tsx` — review/edit AI food estimates
@@ -501,6 +503,7 @@ release claim is made before that gate.
 - `ProfileScreen.tsx` — Profil-Hub: title, one `Basisdaten` card slot (loading / error / no-profile state card in every non-ready state) and navigation groups below, rendered with `ProfileGroup.tsx` (`ProfileGroup` / `ProfileRow`). Title and the groups `Bibliothek`, `Integrationen`, `Rechtliches` render in every state; `Persönliche Daten` only with a loaded profile. `Profil einrichten` opens `ProfileWizardScreen` locally.
 - `ProfileDetailsScreen.tsx` — read-only `Profil & Tagesziele` (route `ProfileDetails`, param `undefined`): header with back, title and `Bearbeiten` (navigates to `ProfileEdit` with the loaded profile; hidden without a profile), content `Alltag & Training`, `Ziel`, `Tagesziele`. Reloads on focus so values are current after `ProfileEdit`.
 - `ProfileSummaryCards.tsx` — `BasicDataCard` (hub), `LifestyleCard`, `GoalCard`, `TargetsSection` (details) and their label maps.
+- Profile target display — the wizard preview and `TargetsSection` show each rest/training day's `macroRanges.proteinG` and `macroRanges.carbsG` as gram ranges. Calories, fat and the existing fiber presentation are unchanged; Mobile does not derive ranges and falls back to scalar protein/carbohydrate values only when `macroRanges` is absent.
 - `useProfileData.ts` — loads `GET /api/profile` on focus for hub and details (`status: loading | ready | error`, `profile`, `targets`, `refresh`, `retry`); after a successful first load a failed refresh keeps the data and shows a snackbar.
 - `ProfileStateViews.tsx` — `ProfileLoadingState`, `ProfileErrorState`, `ProfileEmptyState` (setup button only when `onSetup` is passed).
 - `profileHubGroups.ts` — fixed group order `Persönliche Daten` → `Bibliothek` → `Integrationen` → `Gemeinsam` → `Rechtliches` via `getProfileHubGroups({ hasProfile, entries })`; empty groups are not rendered and `Persönliche Daten` is omitted without a profile. `Gemeinsam` (friends / shared household, working name) is `[Planned]` and has no entries yet.

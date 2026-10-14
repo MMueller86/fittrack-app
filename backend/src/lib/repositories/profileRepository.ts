@@ -6,6 +6,7 @@
 
 import type { UserProfile } from '@fittrack/shared';
 import { isCosmosConfigured } from '../cosmos';
+import { resolveProfileMacroRanges } from '../profileMacroRanges';
 import { CosmosProfileRepository } from './cosmosProfileRepository';
 
 export interface ProfileRepository {
@@ -18,7 +19,8 @@ class InMemoryProfileRepository implements ProfileRepository {
   private readonly profiles = new Map<string, UserProfile>();
 
   async get(userId: string): Promise<UserProfile | null> {
-    return this.profiles.get(userId) ?? null;
+    const profile = this.profiles.get(userId);
+    return profile ? resolveProfileMacroRanges(profile) : null;
   }
 
   async upsert(profile: UserProfile): Promise<UserProfile> {

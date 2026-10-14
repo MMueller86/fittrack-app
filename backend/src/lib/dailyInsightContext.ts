@@ -16,6 +16,7 @@ import {
   calculateWeightTrendPerWeek,
   classifyWeightTrend,
 } from '../../../shared/lib/weightTrend';
+import { classifyProteinCoachingBand } from '../../../shared/lib/macroRanges';
 import { computeProgressIntelligence } from './progressIntelligence';
 import { getDiaryRepository, type DiaryRepository, type DiaryDayResult } from './repositories/diaryRepository';
 import { getDayMetaRepository, type DayMetaRepository } from './repositories/dayMetaRepository';
@@ -223,6 +224,7 @@ export async function buildDailyInsightContext(
         carbsG: selectedProfileTarget.carbsG,
         fatG: selectedProfileTarget.fatG,
         fiberG: selectedProfileTarget.fiberG,
+        macroRanges: selectedProfileTarget.macroRanges,
         baseCalories: currentTarget.baseTargetCalories,
         activityBonusCalories: currentTarget.activityBonusCalories,
         targetSource: currentTarget.targetSource,
@@ -243,8 +245,16 @@ export async function buildDailyInsightContext(
     ? Math.round(targets.calories - today.calories)
     : null;
   const remainingProteinG = targets && today
-    ? Math.max(0, Math.round(targets.proteinG - today.protein))
+    && targets.macroRanges?.proteinG != null
+    ? Math.max(0, Math.round(targets.macroRanges.proteinG.minG - today.protein))
     : null;
+  const proteinCoachingBand = targets && today
+    ? classifyProteinCoachingBand(
+        today.protein,
+        isWeightStale ? null : profile?.weightKg,
+        targets.macroRanges?.proteinG,
+      )
+    : 'unknown';
 
   return {
     date: input.date,
@@ -270,6 +280,7 @@ export async function buildDailyInsightContext(
       targets,
       remainingCalories,
       remainingProteinG,
+      proteinCoachingBand,
       last3Days,
     },
     userGoal: profile?.goal ?? 'maintain',

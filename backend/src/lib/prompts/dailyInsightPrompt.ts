@@ -11,7 +11,10 @@ import { DAILY_INSIGHT_MORNING_MODULE } from './promptMorning';
 import { DAILY_INSIGHT_NUTRITION_MODULE } from './promptNutrition';
 import { DAILY_INSIGHT_WEIGHT_MODULE } from './promptWeight';
 
-export const DAILY_INSIGHT_PROMPT_VERSION = 'v17' as const;
+export const DAILY_INSIGHT_PROMPT_VERSION = 'v18' as const;
+const DAILY_INSIGHT_ACTIVE_MACRO_GUARD = `## Abschließende Regel für Makro-Einordnungen
+Beurteile aktuelle Protein- und Kohlenhydrataufnahmen ausschließlich anhand von nutrition.targets.macroRanges. Verwende für Protein die serverseitige nutrition.proteinCoachingBand und die Lücke nutrition.remainingProteinG unverändert; leite Status oder Empfehlungen niemals aus den alten Einzelzielen proteinG oder carbsG ab. Fehlen aktuelle Aufnahme oder Bereiche, ist die Einordnung unbekannt und darf nicht rekonstruiert werden. Bei "below_range" verwende ausschließlich "unterhalb des Proteinbereichs" oder "unter der Protein-Untergrenze". Sage niemals "unter deinem Zielbereich" oder "unter deinem Ziel" und fordere den Nutzer nie auf, unterhalb des Proteinbereichs zu bleiben. Der Kohlenhydratbereich ist Orientierung: Werte außerhalb davon sind weder zu niedrig noch zu hoch und begründen keine Korrektur. Makros in last3Days sind ausschließlich historische Aufnahmewerte; erwähne sie nicht in einer Makro-Einordnung und vergleiche oder bewerte sie niemals anhand der heutigen Bereiche.`;
+
 export const DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION = 'v2' as const;
 
 export interface DailyInsightPromptSnapshot {
@@ -77,7 +80,10 @@ export const DAILY_INSIGHT_PROMPT_BUNDLE: DailyInsightPromptBundle = {
   sharedTone: DAILY_INSIGHT_SHARED_TONE,
   outputContract: DAILY_INSIGHT_OUTPUT_CONTRACT,
   intentModules: sortedIntentModules,
-  guardTexts: DAILY_INSIGHT_PROMPT_GUARD_TEXTS,
+  guardTexts: {
+    ...DAILY_INSIGHT_PROMPT_GUARD_TEXTS,
+    activeMacroRangesOnly: DAILY_INSIGHT_ACTIVE_MACRO_GUARD,
+  },
   guardPolicy: DAILY_INSIGHT_PROMPT_GUARD_POLICY,
   strictStructuredOutputSchema: DAILY_INSIGHT_SCHEMA,
 };
@@ -146,17 +152,27 @@ function buildMorningHistoricalSourceGuard(context: InsightInputContext): string
 function buildPromptInputContext(
   intent: InsightIntent,
   context: InsightInputContext,
-): InsightInputContext {
-  const historicalDays = context.nutrition?.last3Days;
-  if (intent !== 'morning_orientation' || historicalDays == null) return context;
+ ) {
+  const nutrition = context.nutrition;
+  if (nutrition == null) return context;
+
+  const projectedTargets = nutrition.targets == null
+    ? nutrition.targets
+    : (({ proteinG: _proteinG, carbsG: _carbsG, ...targets }) => targets)(nutrition.targets);
+  const historicalDays = nutrition.last3Days;
 
   return {
     ...context,
     nutrition: {
-      ...context.nutrition,
-      last3Days: historicalDays.map((day) => day.targetSource === 'profile_fallback'
-        ? { ...day, baseTargetCalories: null, effectiveTargetCalories: null }
-        : day),
+      ...nutrition,
+      targets: projectedTargets,
+      ...(intent === 'morning_orientation' && historicalDays != null
+        ? {
+            last3Days: historicalDays.map((day) => day.targetSource === 'profile_fallback'
+              ? { ...day, baseTargetCalories: null, effectiveTargetCalories: null }
+              : day),
+          }
+        : {}),
     },
   };
 }
@@ -255,6 +271,7 @@ export function buildDailyInsightPrompt(
       && remainingCalories != null
       && remainingCalories > DAILY_INSIGHT_PROMPT_GUARD_POLICY.openCalorieBudget.threshold
       ? [DAILY_INSIGHT_PROMPT_GUARD_TEXTS.activityOpenDay] : []),
+    DAILY_INSIGHT_ACTIVE_MACRO_GUARD,
   ].join('\n\n');
   const user = JSON.stringify({ intent, context: buildPromptInputContext(intent, context) });
   return { system, user };

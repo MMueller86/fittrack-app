@@ -86,6 +86,14 @@ Der Home-Katalog wird in Picker, Coachingkarte und Wochenmarkern verwendet. Sond
 
 **Aktueller Implementierungsstand (2026-08-19):** Links im Header steht `Letzte 7 Tage`; rechts oben steht einzeilig `Zielerreichung: <Wert>`. Darunter folgt rechtsbündig nur `<Gegessen> / <Ziel> kcal` ohne sichtbares Ziel-Label und mit kleinem Abstand zur rechten Kartenkante. Die beiden unteren Bilanzzeilen, einschließlich `Ø Ziel / Tag`, entfallen. Über jedem Balken stehen Prozentwert und Tagesverbrauch ohne wiederholte `kcal`-Einheit; die Accessibility-Beschreibungen behalten die vollständigen Einheiten. Diese Regel ersetzt die frühere Beschreibung der zwei unteren Bilanzzeilen.
 
+## Tages-Nutrition-Karte (Home)
+
+Die `DayNutritionCard` behält den Kalorien-Donut und seine Berechnung mit effektivem Kalorienziel einschließlich Aktivitätsbonus bei. Darunter stehen vier lineare Makro-Tracks für `Protein`, `Kohlenhydrate`, `Fett` und `Ballaststoffe`. Jeder Track skaliert bis `150 %` seines Ziels; die `100 %`-Referenz liegt bei zwei Dritteln der Trackbreite, ohne zusätzliche Prozentbeschriftung oder dafür reservierte Abstandszeile. Makro-Zielbereiche erscheinen als halbtransparent getönte, fein umrandete Zielkorridore in der jeweiligen Makrofarbe, die höher als die Fortschrittsfüllung sind. Die Untergrenze erhält einen dezenten farbigen Strich; die Obergrenze und die festen Ziele von Fett und Ballaststoffen erhalten dieselbe kontrastreiche helle Ziellinie mit dunkler Kontur. Korridor und Ziellinie bleiben auch bei gefülltem oder überschrittenem Ziel sichtbar. Ist-Wert und Ziel beziehungsweise Zielbereich bleiben rechtsbündig in Gramm; die Beschriftungen können bei schmaler Breite umbrechen. Die Füllung behält ihre Makrofarbe und wird am Ende des `150 %`-Tracks begrenzt.
+
+In der bestehenden Protein-Wertzeile steht bei verfügbarem Ziel eine kleine dekorative karierte Rennsport-Zielflagge (`flag-checkered` aus dem bestehenden MaterialCommunityIcons-Katalog, Größe `sm`) unmittelbar links vom Zahlenblock, mit `50 %` Deckkraft. Ihre Breite ist reserviert, damit auch dreistellige Werte nicht vom Icon überlagert werden. Sie erzeugt keine eigene Zeile und ist nicht fest an die horizontale Position der Balken-Ziellinie gebunden; diese bleibt unverändert.
+
+Ein positiver Aktivitätsbonus erscheint zusätzlich als eigene `Aktivitätsbonus`-Zeile in kcal, nicht als fünfter Makro-Track. Sie zeigt die bereits verbrauchten kcal oberhalb des Basisziels im Verhältnis zum Bonusziel. Diese Zeile ändert weder den effektiven Kalorienzielwert noch die Berechnung des Kalorienrings.
+
 ## Typography
 
 ```ts

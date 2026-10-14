@@ -14,6 +14,10 @@ const TARGETS: DayTargets = {
   fatG: 70,
   carbsG: 200,
   fiberG: 25,
+  macroRanges: {
+    proteinG: { minG: 120, maxG: 160 },
+    carbsG: { minG: 150, maxG: 250 },
+  },
 };
 
 function makeMeal(type: Meal['type'], items: Meal['items'] = []): Meal {
@@ -278,11 +282,11 @@ describe('H7 — dinner missing', () => {
 // ---------------------------------------------------------------------------
 
 describe('H8 — training + protein deficit', () => {
-  it('fires on training day when protein < 95%', () => {
+  it('fires on training day when protein is below the lower range bound', () => {
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch')],
-      summary: { calories: 1800, protein: 130, carbs: 200, fat: 60, fiber: 22 },
-      // protein 130/150 = 86.7%
+      summary: { calories: 1800, protein: 110, carbs: 200, fat: 60, fiber: 22 },
+      // The profile-day lower range bound is 120 g.
       dayType: 'training',
       currentHour: 15,
     });
@@ -301,7 +305,7 @@ describe('H8 — training + protein deficit', () => {
     expect(hint.id).not.toBe('H8');
   });
 
-  it('does NOT fire when protein >= 95%', () => {
+  it('does NOT fire when protein is within the range', () => {
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
       summary: { calories: 2000, protein: 148, carbs: 200, fat: 70, fiber: 25 },
@@ -472,7 +476,7 @@ describe('H13 — rest day', () => {
     const ctx = makeCtx({
       currentLocalDate: localDate,
       meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
-      summary: { calories: 1900, protein: 145, carbs: 230, fat: 65, fiber: 15 },
+      summary: { calories: 1900, protein: 145, carbs: 130, fat: 65, fiber: 15 },
       dayType: 'rest',
       currentHour: 18,
     });
@@ -526,7 +530,7 @@ describe('H16 — balanced macros', () => {
 });
 
 describe('H15 — protein goal reached', () => {
-  it('fires when protein >= 95% (rest day with H13 in cooldown)', () => {
+  it('fires when protein is in range (rest day with H13 in cooldown)', () => {
     // Rest day: suppress H13 via cooldown so H15 can fire
     const state: HintState = {
       id: 'hintState',
@@ -540,12 +544,36 @@ describe('H15 — protein goal reached', () => {
     };
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
-      summary: { calories: 1900, protein: 145, carbs: 235, fat: 65, fiber: 15 },
-      // protein 145/150 = 96.7%; carbs 235/200=117.5% outside ±10% → H16 won't fire; fiber=15 suppresses H21
+      summary: { calories: 1900, protein: 145, carbs: 130, fat: 65, fiber: 15 },
+      // Protein is in range; carbohydrate intake is below range, so H16 does not fire.
       dayType: 'rest',
       currentHour: 18,  // H22 fires at ≥19h
     });
     const { hint } = evaluateHint(ctx, state);
+    expect(hint.id).toBe('H15');
+  });
+
+  it('counts intake inside the range as reached even below the legacy scalar threshold', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const state: HintState = {
+      id: 'hintState',
+      userId: 'user1',
+      _docType: 'hintState',
+      lastHintId: 'H13',
+      lastHintDate: today,
+      lastHintGeneratedAt: new Date().toISOString(),
+      cooldownHistory: { H13: today },
+      motivationIndex: 0,
+    };
+    const ctx = makeCtx({
+      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+      summary: { calories: 1900, protein: 125, carbs: 100, fat: 65, fiber: 15 },
+      currentLocalDate: today,
+      currentHour: 18,
+    });
+
+    const { hint } = evaluateHint(ctx, state);
+
     expect(hint.id).toBe('H15');
   });
 
@@ -883,10 +911,10 @@ describe('H3 fix — protein context awareness', () => {
   });
 
   it('fires after 2+ meals when protein is genuinely low (<25%)', () => {
-    // 2 meals, total protein 35g / 150g target = 23%; hour=16 avoids H20 (12-15h window)
+    // 2 meals, total protein 25g / 120g lower bound <25%; hour=16 avoids H20.
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch')],
-      summary: { calories: 800, protein: 35, carbs: 100, fat: 25, fiber: 11 },
+      summary: { calories: 800, protein: 25, carbs: 100, fat: 25, fiber: 11 },
       currentHour: 16,
     });
     const { hint } = evaluateHint(ctx, noState());
@@ -1288,21 +1316,57 @@ describe('H27 — under BMR after dinner', () => {
 });
 
 // ---------------------------------------------------------------------------
-// H28: Protein < 1.5g per kg body weight after dinner
+// H28: Protein above 2.2g per kg body weight after dinner
 // ---------------------------------------------------------------------------
 
 describe('H28 — protein per kg bodyweight', () => {
-  it('fires after dinner when protein < 1.5g/kg, includes personalized target in text', () => {
-    // weightKg=80, 1.5*80=120g threshold; total protein=95 < 120 ✓
+  it('may coach after dinner when protein is above 2.2g/kg', () => {
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
-      summary: { calories: 1900, protein: 95, carbs: 220, fat: 65, fiber: 24 },
-      currentHour: 20,
+      summary: { calories: 1900, protein: 180, carbs: 220, fat: 65, fiber: 15 },
+      dayType: 'training',
+      currentHour: 18,
       weightKg: 80,
     });
     const { hint } = evaluateHint(ctx, noState());
     expect(hint.id).toBe('H28');
-    expect(hint.text).toContain('120 g');
+    expect(hint.text).toContain('reichlich Protein');
+  });
+
+  it('does not coach at exactly 2.2g/kg but does above the boundary', () => {
+    const makeHighProteinCtx = (protein: number) => makeCtx({
+      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+      summary: { calories: 1900, protein, carbs: 220, fat: 65, fiber: 15 },
+      dayType: 'training',
+      currentHour: 18,
+      weightKg: 80,
+    });
+
+    expect(evaluateHint(makeHighProteinCtx(176), noState()).hint.id).not.toBe('H28');
+    expect(evaluateHint(makeHighProteinCtx(177), noState()).hint.id).toBe('H28');
+  });
+
+  it('respects the weekly cooldown', () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const state: HintState = {
+      id: 'hintState',
+      userId: 'user1',
+      _docType: 'hintState',
+      lastHintId: 'H28',
+      lastHintDate: today,
+      lastHintGeneratedAt: new Date().toISOString(),
+      cooldownHistory: { H28: today },
+      motivationIndex: 0,
+    };
+    const ctx = makeCtx({
+      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
+      summary: { calories: 1900, protein: 180, carbs: 220, fat: 65, fiber: 15 },
+      dayType: 'training',
+      currentHour: 18,
+      weightKg: 80,
+    });
+
+    expect(evaluateHint(ctx, state).hint.id).not.toBe('H28');
   });
 
   it('does NOT fire when dinner is not logged', () => {
@@ -1341,7 +1405,7 @@ describe('H28 — protein per kg bodyweight', () => {
 });
 
 // ---------------------------------------------------------------------------
-// isHighProteinCalShare gate: H3, H4, H8, H28 must NOT fire when ≥30% of
+// isHighProteinCalShare gate: H3, H4, H8 must NOT fire when ≥30% of
 // total calories already come from protein
 // ---------------------------------------------------------------------------
 
@@ -1350,16 +1414,17 @@ describe('isHighProteinCalShare gate', () => {
   const highProteinSummary = { calories: 900, protein: 75, carbs: 80, fat: 20, fiber: 8 };
 
   it('H3 does NOT fire when protein-cal share ≥30%', () => {
-    // proteinPct: 75/150 = 50% — normally H3 requires < 25%, won't fire anyway.
-    // Use a context where proteinPct < 25% but isHighProteinCalShare is true.
-    // protein=25g on 900 kcal target → 25/150=16.7% < 25%, but 25*4=100/900=11% < 30%
-    // We need proteinPct < 25% AND calorie-share ≥ 30%:
-    // protein=70g, calories=800 kcal → proteinPct=70/150=46% — nope.
-    // Let's use targets.proteinG=400 → proteinPct=75/400=18.75% < 25%, and 75*4/900=33% ≥ 30%
+    // The range minimum makes 75g less than 25% while the calorie share remains 33%.
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch')],
-      summary: { calories: 900, protein: 75, carbs: 80, fat: 20, fiber: 8 },
-      targets: { ...TARGETS, proteinG: 400 }, // artificial high target → proteinPct < 25%
+      summary: highProteinSummary,
+      targets: {
+        ...TARGETS,
+        macroRanges: {
+          ...TARGETS.macroRanges!,
+          proteinG: { minG: 400, maxG: 500 },
+        },
+      },
       currentHour: 16,
     });
     const { hint } = evaluateHint(ctx, noState());
@@ -1367,11 +1432,17 @@ describe('isHighProteinCalShare gate', () => {
   });
 
   it('H4 does NOT fire when protein-cal share ≥30%', () => {
-    // 3+ meals, proteinPct < 35%, but calorie-share ≥ 30%
+    // 75/250 = 30% (<35%, but not <25%); calorie share remains 33%.
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
-      summary: { calories: 900, protein: 75, carbs: 80, fat: 20, fiber: 8 },
-      targets: { ...TARGETS, proteinG: 400 }, // proteinPct=18.75% < 35%, but 33% kcal from protein
+      summary: highProteinSummary,
+      targets: {
+        ...TARGETS,
+        macroRanges: {
+          ...TARGETS.macroRanges!,
+          proteinG: { minG: 250, maxG: 350 },
+        },
+      },
       currentHour: 20,
     });
     const { hint } = evaluateHint(ctx, noState());
@@ -1379,11 +1450,17 @@ describe('isHighProteinCalShare gate', () => {
   });
 
   it('H8 does NOT fire on training day when protein-cal share ≥30%', () => {
-    // training + proteinPct < 95% + 2+ meals — but isHighProteinCalShare blocks it
+    // 75/250 = 30% leaves H3 ineligible, so this reaches H8's range-based condition.
     const ctx = makeCtx({
       meals: [makeMeal('breakfast'), makeMeal('lunch')],
-      summary: { calories: 900, protein: 75, carbs: 80, fat: 20, fiber: 8 },
-      targets: { ...TARGETS, proteinG: 400 }, // proteinPct=18.75% < 95%
+      summary: highProteinSummary,
+      targets: {
+        ...TARGETS,
+        macroRanges: {
+          ...TARGETS.macroRanges!,
+          proteinG: { minG: 250, maxG: 350 },
+        },
+      },
       dayType: 'training',
       currentHour: 16,
     });
@@ -1391,15 +1468,4 @@ describe('isHighProteinCalShare gate', () => {
     expect(hint.id).not.toBe('H8');
   });
 
-  it('H28 does NOT fire when protein-cal share ≥30%', () => {
-    // After dinner, protein < 1.5g/kg (75 < 80*1.5=120), but calorie-share ≥ 30%
-    const ctx = makeCtx({
-      meals: [makeMeal('breakfast'), makeMeal('lunch'), makeMeal('dinner')],
-      summary: { calories: 900, protein: 75, carbs: 80, fat: 20, fiber: 8 },
-      currentHour: 20,
-      weightKg: 80, // 80*1.5=120g; protein=75 < 120 would normally trigger H28
-    });
-    const { hint } = evaluateHint(ctx, noState());
-    expect(hint.id).not.toBe('H28');
-  });
 });

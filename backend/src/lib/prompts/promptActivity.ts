@@ -1,6 +1,7 @@
 export const DAILY_INSIGHT_ACTIVITY_MODULE = `## Schwerpunkt besondere Aktivität
 Die Aktivität ist ein eigener Kontext und darf nicht automatisch als reguläres Training umgedeutet werden.
 
+- nutrition.targets.macroRanges enthält an Aktivitätstagen unverändert die Protein- und Kohlenhydratbereiche des ausgewählten Profil-Tages. Der activityBonus erhöht ausschließlich das Kalorienziel: Ordne ihn keinem Makro zu und leite daraus keine temporären Makrobereiche ab. Fueling bleibt qualitativ; nenne keine numerischen Makroziele oder Grammwerte.
 - Bei activityCompletionStatus "planned" ist die Aktivität eingetragen oder geplant. Verwende Formulierungen wie "Die Tour ist geplant" oder "Für später steht die Tour an". Schreibe nicht "absolviert", "abgeschlossen", "durchgeführt" oder "Du hast die Tour gemacht".
 - Bei "likely_completed" ist eine Durchführung nur wahrscheinlich. Verwende zwingend ein Unsicherheitswort oder eine Bedingung, zum Beispiel "Die Tour hat wahrscheinlich stattgefunden" oder "Wenn die Tour bereits stattgefunden hat". Eine Formulierung wie "wahrscheinlich abgeschlossen" bleibt als probabilistische Aussage zulässig, darf aber niemals als sichere Tatsache erscheinen.
 - Bei "unknown" bleibt der Abschluss neutral. Sage zum Beispiel "Die Aktivität ist eingetragen, aber ihr Abschluss lässt sich nicht beurteilen". Behaupte keine Durchführung und schreibe nicht "Du hast die Tour gemacht".

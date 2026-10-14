@@ -614,9 +614,24 @@ Daily quota.
 	hours or a non-current requested date. Without an activity the status and
 	source are `null`. `likely_completed` is probabilistic, never a confirmed
 	completion fact; the persisted `SpecialActivity` type is unchanged.
+- **Current macro-range contract (v18):** the current context selects the
+	stored profile-day ranges (`trainingDay` only for an explicit training day,
+	otherwise `restDay`). A special-activity bonus changes the effective calorie
+	target only; it does not change protein or carbohydrate ranges. The context
+	carries `remainingProteinG` to the rounded protein lower bound and the
+	server-computed `proteinCoachingBand`. With usable weight, bands use actual
+	g/kg: `<1.5` below range, `1.5–2.0` inclusive in range, `(2.0,2.2]` above
+	range without the high-protein coaching hint, and `>2.2` above the coaching
+	threshold. Without usable weight the rounded bounds are used; missing range
+	or intake is unknown. The provider projection removes legacy scalar
+	`proteinG` and `carbsG`; the active prompt evaluates only ranges and the
+	server-computed signals. Carbohydrate values outside their range are not
+	negative judgments. Weekly Insight remains calorie-based and receives no
+	personal macro ranges. This is internal context only: public response,
+	Structured Output, and quota contracts are unchanged.
 
-**v17 prompt and validation contract:**
-- `DAILY_INSIGHT_PROMPT_VERSION` is `'v17'`. The selected intent module is
+**v18 prompt and validation contract:**
+- `DAILY_INSIGHT_PROMPT_VERSION` is `'v18'`. The selected intent module is
 	combined with the shared German tone/output contract and the exact system
 	prompt plus serialized user message are persisted as `promptSnapshot`.
 - The active composition root is
@@ -628,8 +643,10 @@ Daily quota.
 	`sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`
 	unchanged. The historical v16 fingerprint remains
 	`sha256:3e68d4dd0b6e49003936a278f3e65d693645ebfb41ee5ced3ea7daa3efa70893`
-	and the appended active v17 fingerprint is
+	and the historical v17 fingerprint is
 	`sha256:0373462c2f0e3b3050c51b4cfe468c6aca238ce3c0b15cf80c5be2b8847e4386`
+	with assembly version `v2`; the active v18 fingerprint is
+	`sha256:853697f9be7a8234443ff6ac89470485bb5e45a528539425a48b0f0e54f2ddae`
 	with assembly version `v2`.
 	`promptVersion` plus `promptFingerprint` form the release identity.
 	`systemPromptHash` additionally hashes the exact context-dependent
@@ -656,7 +673,7 @@ Daily quota.
 	claim such as `Dein Gewicht ist heute klar gesunken.` is rejected, while an
 	explicit stale notice such as `Der Trend deines Gewichts ist nicht aktuell.`
 	is accepted.
-- The runtime root cause was corrected in v11 and remains active in v17: stale-weight rules had been
+- The runtime root cause was corrected in v11 and remains active in v18: stale-weight rules had been
 	present only in `promptWeight`, while deterministic `nutrition_guidance`
 	routing selected `promptNutrition`. The shared guard now covers that path
 	and all other intents; server-side validation remains strict and was not
@@ -676,6 +693,9 @@ Daily quota.
 	contradicts that target. A read-only `profile_fallback` cannot be called the
 	target stored for that past day. `morning_orientation` requires local hour
 	`0..9` and no current MealItem; a missing prior-day item is not zero intake.
+- The following Q-21/CORR1 results are historical v17 evaluation evidence, not
+	the current v18 gate result. The WP-B2 handoff records passing focused tests
+	and live evaluations for v18; earlier v17 results remain historical.
 - Q-21's separate Daily v16 fix removes the shared-tone instruction to use
 	below-target wording when the current day is open, without weakening the
 	strict open-day validator. Regression uses the actual `stale-weight`
@@ -703,7 +723,10 @@ Daily quota.
 	bucket, activity/status data, current and historical nutrition/target data,
 	weight/progress signals, and other prompt inputs, as well as the global
 	`promptFingerprint`, the concrete `systemPromptHash`, and semantic
-	`remainingCalories`/`remainingProteinG` buckets. The calorie buckets are
+	`remainingCalories`/`remainingProteinG` buckets. Current profile-day
+	`macroRanges` are included with exact bounds, together with
+	`proteinCoachingBand`; the protein gap is represented by its rounded value
+	and semantic bucket. The calorie buckets are
 	`unknown`, `negative`, `zero`, and `positive`; the protein buckets are
 	`unknown`, `nearly_complete_below`, `nearly_complete_at`, and `gap`, with
 	the protein boundary at 20 g. Non-finite values are `unknown`. This keeps
@@ -717,8 +740,8 @@ Daily quota.
 	hash; a changed prompt cannot remain a cache hit because a manual version
 	was left unchanged.
 - A complete, unexpired v14 same-date Daily is returned unchanged until its
-	existing expiry and is not overwritten by v17 early, retaining the v15/v16 rule.
-	After expiry, that key can receive a new v17 document. A v14 document without complete provenance
+	existing expiry and is not overwritten by v18 early, retaining the v15-v17 rule.
+	After expiry, that key can receive a new v18 document. A v14 document without complete provenance
 	does not qualify for this preservation rule. Daily documents retain their
 	existing per-document TTL/expires-at behaviour. Feedback documents are
 	separate and have no TTL; see the API and domain contracts below.
@@ -831,7 +854,7 @@ Located in `backend/src/lib/prompts/`:
 - `foodEstimate.ts` — system prompt for food estimation
 - `mealEstimate.ts` — system prompt for meal image estimation
 - `recipeAnalyze.ts` — system prompt for recipe text analysis
-- `dailyInsightPrompt.ts` (active v17 composition root), `dailyInsightPromptManifest.ts` (preserved v14/v15/v16 and active v17 release locks), and `../dailyInsightSchema.ts` (shared Strict Structured Output schema), plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight prompt (versioned). The root is the only active composition path; it builds the exact snapshot used by the provider.
+- `dailyInsightPrompt.ts` (active v18 composition root), `dailyInsightPromptManifest.ts` (preserved v14-v17 history and active v18 release lock), and `../dailyInsightSchema.ts` (shared Strict Structured Output schema), plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight prompt (versioned). The root is the only active composition path; it builds the exact snapshot used by the provider.
 - `dailyInsight.eval.test.ts` and `dailyInsight.eval.fixtures.ts` — live Daily Insight prompt evaluations
 - `weeklyInsightV2.ts` — weekly insight system prompt and sanitized context contract (versioned)
 

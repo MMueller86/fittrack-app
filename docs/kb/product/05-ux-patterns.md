@@ -437,6 +437,12 @@ Das Tages-Overlay hält Kalorienvergleich und absolute Makrowerte als getrennte 
 
 **Aktueller Implementierungsstand (2026-08-19):** Links im Header steht `Letzte 7 Tage`; rechts oben steht einzeilig `Zielerreichung: <Wert>`. Darunter folgt rechtsbündig nur `<Gegessen> / <Ziel> kcal` ohne sichtbares Ziel-Label. Die beiden unteren Bilanzzeilen entfallen. Über jedem Balken stehen Prozentwert und Tages-kcal ohne wiederholte `kcal`-Einheit; die Einheit bleibt im Header und in den Accessibility-Beschreibungen erhalten. Diese Regel ersetzt die frühere Beschreibung von zwei Bilanzzeilen unter dem Diagramm.
 
+## Profil-Makroziele im Tagebuch
+
+Die Vorschau im Profilwizard zeigt beide Profil-Tagesziele `Ruhetag` und `Trainingstag`; der gespeicherte Screen `ProfileDetails` zeigt dieselben Gruppen unter `Tagesziele`. Vorhandene Makro-Zielbereiche werden als `min–max g` angezeigt; Einzelziele bleiben Einzelwerte.
+
+Das aktive Tagebuch verwendet für `Heute` die Ziele des geladenen Profils und wählt anhand des Tagestyps zwischen Ruhe- und Trainingstag. Ohne Profil werden keine Profilziele angezeigt. Für historische Tage werden keine Makroziele abgeleitet. Die Profilziele stammen nicht aus dem Diary-GET: dessen bestehender Vertrag bleibt unverändert und enthält weder `targets` noch `macroRanges`.
+
 ## Profil-Hub
 
 Tab und Hauptscreen heißen sichtbar `Profil` (Route-ID `Profile`, Screen `ProfileScreen`; Begründung des Labels in [02-navigation.md](02-navigation.md#tab-label-profil-entscheidung)). Der Hub zeigt den Titel `Profil`, genau eine Karte (`Basisdaten`) und darunter die Navigationsgruppen als `ProfileGroup` mit `ProfileRow`-Zeilen (`mobile/src/modules/profile/ProfileGroup.tsx`). Es gibt keine `Bearbeiten`-Aktion im Hub. `Alltag & Training`, `Ziel` und `Tagesziele` stehen im read-only Screen `ProfileDetails` (`Profil & Tagesziele`), dessen Header-Aktion `Bearbeiten` `ProfileEdit` öffnet. Karten und Zustandsansichten sind in `ProfileSummaryCards.tsx` und `ProfileStateViews.tsx` gekapselt; `useProfileData.ts` lädt `GET /api/profile` für beide Screens (Laden bei Fokus, Pull-to-Refresh). Gruppen und Einträge sind in `profileHubGroups.ts` definiert; die Reihenfolge ist fest:

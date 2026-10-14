@@ -11,9 +11,11 @@ import type {
 } from '@fittrack/shared';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
+import { addLocalDays, getLocalIsoDate } from '../../shared/date/localDate';
 
 const mocks = vi.hoisted(() => ({
   apiGetDay: vi.fn(),
+  apiGetProfile: vi.fn(),
   apiSetSpecialActivity: vi.fn(),
   apiRemoveSpecialActivity: vi.fn(),
   apiListAllMeals: vi.fn(),
@@ -29,6 +31,33 @@ const mocks = vi.hoisted(() => ({
   syncNutritionDelete: vi.fn(),
   syncNutritionDeleteMeal: vi.fn(),
   hydrateDayType: vi.fn(),
+  setTargets: vi.fn(),
+  dayStoryTarget: vi.fn(),
+  profileTargets: {
+    restDay: {
+      calories: 2000,
+      proteinG: 150,
+      fatG: 70,
+      carbsG: 250,
+      fiberG: 25,
+      macroRanges: {
+        proteinG: { minG: 120, maxG: 160 },
+        carbsG: { minG: 200, maxG: 300 },
+      },
+    },
+    trainingDay: {
+      calories: 2300,
+      proteinG: 150,
+      fatG: 75,
+      carbsG: 325,
+      fiberG: 25,
+      macroRanges: {
+        proteinG: { minG: 120, maxG: 160 },
+        carbsG: { minG: 275, maxG: 375 },
+      },
+    },
+  },
+  storeHasTargets: true,
   openFoodEntryHub: vi.fn(),
   showSnackbar: vi.fn(),
 }));
@@ -48,6 +77,10 @@ vi.mock('../../shared/api/diaryApi', () => ({
     bulkMoveItems: mocks.apiBulkMoveItems,
     bulkCopyItems: mocks.apiBulkCopyItems,
   },
+}));
+
+vi.mock('../../shared/api/profileApi', () => ({
+  profileApi: { getMe: mocks.apiGetProfile },
 }));
 
 vi.mock('../../services/health/nutritionSyncService', () => ({
@@ -102,7 +135,12 @@ vi.mock('react-native-reanimated', () => ({
   withTiming: (value: number) => value,
 }));
 
-vi.mock('../../shared/components/DayStoryCard', () => ({ DayStoryCard: () => null }));
+vi.mock('../../shared/components/DayStoryCard', () => ({
+  DayStoryCard: ({ target }: { target: unknown }) => {
+    mocks.dayStoryTarget(target);
+    return null;
+  },
+}));
 vi.mock('../../shared/components/Icon', () => ({ Icon: () => null }));
 vi.mock('../../shared/components/Snackbar', () => ({
   Snackbar: () => null,
@@ -180,7 +218,12 @@ vi.mock('../../shared/components/ConfirmSheet', async () => {
   };
 });
 vi.mock('./useDayTypeStore', () => ({
-  useDayTypeStore: () => ({ dayType: 'rest', targets: null, hydrateDayType: mocks.hydrateDayType }),
+  useDayTypeStore: () => ({
+    dayType: 'rest',
+    targets: mocks.storeHasTargets ? mocks.profileTargets : null,
+    setTargets: mocks.setTargets,
+    hydrateDayType: mocks.hydrateDayType,
+  }),
 }));
 vi.mock('./hub/useFoodEntryHubStore', () => ({ useFoodEntryHubStore: () => mocks.openFoodEntryHub }));
 vi.mock('./EditItemSheet', async () => {
@@ -370,7 +413,7 @@ async function longPress(instance: ReactTestInstance): Promise<void> {
   });
 }
 
-async function renderScreenWithRouteDate(responses: DiaryDayResponse[]): Promise<{
+async function renderScreenWithRouteDate(responses: DiaryDayResponse[], initialDate = DATE): Promise<{
   renderer: ReactTestRenderer;
   updateRouteDate: (date: string) => Promise<void>;
 }> {
@@ -384,7 +427,7 @@ async function renderScreenWithRouteDate(responses: DiaryDayResponse[]): Promise
   const navigation = { setParams: vi.fn() } as unknown as ScreenProps['navigation'];
   let setRouteDate!: (date: string) => void;
   function RouteHarness() {
-    const [date, updateDate] = React.useState(DATE);
+    const [date, updateDate] = React.useState(initialDate);
     setRouteDate = updateDate;
     const route = {
       key: 'diary-route',
@@ -416,6 +459,8 @@ async function renderScreen(responses: DiaryDayResponse[]): Promise<ReactTestRen
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.storeHasTargets = true;
+  mocks.apiGetProfile.mockResolvedValue({ targets: mocks.profileTargets });
   mocks.syncNutritionUpsert.mockResolvedValue(undefined);
   mocks.syncNutritionDelete.mockResolvedValue(undefined);
   mocks.syncNutritionDeleteMeal.mockResolvedValue(undefined);
@@ -429,6 +474,29 @@ afterEach(() => {
 });
 
 describe('DiaryScreen F2 bulk actions', () => {
+  it('does not show current profile macro targets for a historical diary day', async () => {
+    const historicalDate = addLocalDays(getLocalIsoDate(), -1);
+    await renderScreenWithRouteDate([makeDay([])], historicalDate);
+
+    expect(mocks.dayStoryTarget).toHaveBeenLastCalledWith(null);
+  });
+
+  it('uses the selected profile-day ranges for today', async () => {
+    const today = getLocalIsoDate();
+    await renderScreenWithRouteDate([{ ...makeDay([]), dayType: 'training' }], today);
+
+    expect(mocks.dayStoryTarget).toHaveBeenLastCalledWith(mocks.profileTargets.trainingDay);
+  });
+
+  it('loads profile ranges when today is opened before the profile store is hydrated', async () => {
+    mocks.storeHasTargets = false;
+    const today = getLocalIsoDate();
+    await renderScreenWithRouteDate([{ ...makeDay([]), dayType: 'training' }], today);
+
+    expect(mocks.apiGetProfile).toHaveBeenCalledTimes(1);
+    expect(mocks.dayStoryTarget).toHaveBeenLastCalledWith(mocks.profileTargets.trainingDay);
+  });
+
     it('renders the German meal label when the API meal name is English', async () => {
       const renderer = await renderScreen([makeDay([
         makeMeal('meal-breakfast', 'breakfast', 'Breakfast', [makeItem('item-1', 'Haferflocken')]),

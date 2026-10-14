@@ -10,6 +10,7 @@ import {
   buildDailyInsightContext,
   resolveActivityCompletionStatus,
 } from './dailyInsightContext';
+import { calculateMacroRanges } from '../../../shared/lib/macroRanges';
 
 const USER_ID = 'context-test-user';
 const REFERENCE_DATE = '2026-08-14';
@@ -81,8 +82,22 @@ function profile(): UserProfile {
     goal: 'maintain',
     goalIntensity: null,
     targets: {
-      restDay: { calories: 2000, proteinG: 150, carbsG: 200, fatG: 70, fiberG: 25 },
-      trainingDay: { calories: 2400, proteinG: 160, carbsG: 250, fatG: 75, fiberG: 28 },
+      restDay: {
+        calories: 2000,
+        proteinG: 150,
+        carbsG: 200,
+        fatG: 70,
+        fiberG: 25,
+        macroRanges: calculateMacroRanges(70, 2000, 70),
+      },
+      trainingDay: {
+        calories: 2400,
+        proteinG: 160,
+        carbsG: 250,
+        fatG: 75,
+        fiberG: 28,
+        macroRanges: calculateMacroRanges(70, 2400, 75),
+      },
     },
     calculationMeta: {
       formulaVersion: 'profile-targets-v1-pal',
@@ -234,6 +249,42 @@ describe('local-day activity status', () => {
 });
 
 describe('buildDailyInsightContext', () => {
+  it('uses selected profile-day ranges unchanged by a special-activity calorie bonus', async () => {
+    const selectedTargets = profile().targets.trainingDay;
+    const repositories = makeRepositories({
+      days: { [REFERENCE_DATE]: diary(REFERENCE_DATE, [meal(300)]) },
+      metas: {
+        [REFERENCE_DATE]: meta(REFERENCE_DATE, {
+          dayType: 'training',
+          calorieTargetSnapshot: {
+            calories: 2400,
+            capturedAt: '2026-08-14T08:00:00.000Z',
+            source: 'profile',
+          },
+          specialActivity: activity({ activityBonus: 400 }),
+        }),
+      },
+    });
+
+    const context = await buildDailyInsightContext({
+      userId: USER_ID,
+      date: REFERENCE_DATE,
+      localHour: 19,
+      timezoneOffsetMinutes: 0,
+      isCurrentDay: true,
+      repositories,
+    });
+
+    expect(context.nutrition.targets).toMatchObject({
+      calories: 2800,
+      baseCalories: 2400,
+      activityBonusCalories: 400,
+      macroRanges: selectedTargets.macroRanges,
+    });
+    expect(context.nutrition.remainingProteinG).toBe(85);
+    expect(context.nutrition.proteinCoachingBand).toBe('below_range');
+  });
+
   it('builds current and three historical days with zero-kcal and target-source semantics', async () => {
     const historicalDates = ['2026-08-13', '2026-08-12', '2026-08-11'];
     const repositories = makeRepositories({

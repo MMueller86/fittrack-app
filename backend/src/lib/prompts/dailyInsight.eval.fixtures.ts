@@ -1,4 +1,4 @@
-import type { InsightInputContext, InsightIntent, InsightNutritionDay } from '@fittrack/shared';
+import type { InsightInputContext, InsightIntent, InsightNutritionDay, MacroRanges } from '@fittrack/shared';
 
 export interface DailyInsightEvalFixture {
   id: string;
@@ -25,6 +25,33 @@ const COMMON_FORBIDDEN_PHRASES = [
   'weeklytrend30d',
   'std dev',
   'medizinische diagnose',
+];
+
+// Derived from the approved 80 kg, 2000 kcal, 70 g fat profile-day example.
+const BASE_MACRO_RANGES: MacroRanges = {
+  proteinG: { minG: 120, maxG: 160 },
+  carbsG: { minG: 183, maxG: 223 },
+};
+const ACTIVITY_PROFILE_DAY_MACRO_RANGES: MacroRanges = {
+  proteinG: { minG: 120, maxG: 160 },
+  carbsG: { minG: 224, maxG: 264 },
+};
+const ENDURANCE_PROFILE_DAY_MACRO_RANGES: MacroRanges = {
+  proteinG: { minG: 120, maxG: 160 },
+  carbsG: { minG: 213, maxG: 253 },
+};
+const NEGATIVE_CARBOHYDRATE_JUDGMENTS = [
+  'zu wenig kohlenhydrate',
+  'zu wenige kohlenhydrate',
+  'zu niedrige kohlenhydratzufuhr',
+  'kohlenhydratbereich unterschritten',
+  'unter dem kohlenhydratbereich',
+  'kohlenhydratziel verfehlt',
+  'zu viele kohlenhydrate',
+  'zu hohe kohlenhydratzufuhr',
+  'kohlenhydratbereich überschritten',
+  'über dem kohlenhydratbereich',
+  'kohlenhydratziel überschritten',
 ];
 
 const historicalDay: InsightNutritionDay = {
@@ -62,9 +89,17 @@ function baseContext(overrides: Partial<InsightInputContext> = {}): InsightInput
     },
     nutrition: {
       today: { calories: 1500, protein: 100, carbs: 150, fat: 50, fiber: 20, hasMealItem: true },
-      targets: { calories: 2000, proteinG: 140, carbsG: 220, fatG: 70, fiberG: 30 },
+      targets: {
+        calories: 2000,
+        proteinG: 140,
+        carbsG: 220,
+        fatG: 70,
+        fiberG: 30,
+        macroRanges: BASE_MACRO_RANGES,
+      },
       remainingCalories: 500,
-      remainingProteinG: 40,
+      remainingProteinG: 20,
+      proteinCoachingBand: 'below_range',
       last3Days: [historicalDay, { ...historicalDay, date: '2026-08-18' }, { ...historicalDay, date: '2026-08-17' }],
     },
     userGoal: 'lose_weight',
@@ -123,7 +158,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().nutrition,
         today: { calories: 1300, protein: 100, carbs: 130, fat: 45, fiber: 18, hasMealItem: true },
         remainingCalories: 700,
-        remainingProteinG: 40,
+        remainingProteinG: 20,
       },
       weight: {
         ...baseContext().weight,
@@ -183,12 +218,14 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
           carbsG: 360,
           fatG: 85,
           fiberG: 30,
+          macroRanges: ACTIVITY_PROFILE_DAY_MACRO_RANGES,
           baseCalories: 2300,
           activityBonusCalories: 700,
           targetSource: 'special_activity_snapshot',
         },
         remainingCalories: 200,
-        remainingProteinG: 10,
+        remainingProteinG: 0,
+        proteinCoachingBand: 'in_range',
       },
     }),
     intent: 'activity_focus',
@@ -218,12 +255,14 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
           carbsG: 220,
           fatG: 70,
           fiberG: 30,
+          macroRanges: BASE_MACRO_RANGES,
           baseCalories: 2000,
           activityBonusCalories: 0,
           targetSource: 'profile_fallback',
         },
         remainingCalories: null,
         remainingProteinG: null,
+        proteinCoachingBand: 'unknown',
         last3Days: [
           {
             date: '2026-08-19',
@@ -278,6 +317,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         today: null,
         remainingCalories: null,
         remainingProteinG: null,
+        proteinCoachingBand: 'unknown',
         last3Days: [
           {
             date: '2026-08-19',
@@ -329,6 +369,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         today: null,
         remainingCalories: null,
         remainingProteinG: null,
+        proteinCoachingBand: 'unknown',
         last3Days: [
           {
             ...historicalDay,
@@ -446,12 +487,14 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
           carbsG: 420,
           fatG: 90,
           fiberG: 30,
+          macroRanges: ENDURANCE_PROFILE_DAY_MACRO_RANGES,
           baseCalories: 2300,
           activityBonusCalories: 1100,
           targetSource: 'special_activity_snapshot',
         },
         remainingCalories: 700,
-        remainingProteinG: 60,
+        remainingProteinG: 30,
+        proteinCoachingBand: 'below_range',
       },
     }),
     intent: 'activity_focus',
@@ -508,9 +551,11 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
           carbsG: 220,
           fatG: 70,
           fiberG: 30,
+          macroRanges: BASE_MACRO_RANGES,
         },
         remainingCalories: -180,
-        remainingProteinG: 35,
+        remainingProteinG: 15,
+        proteinCoachingBand: 'below_range',
       },
     }),
     intent: 'nutrition_guidance',
@@ -537,7 +582,9 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().nutrition,
         today: { calories: 1600, protein: 70, carbs: 160, fat: 50, fiber: 20, hasMealItem: true },
         remainingCalories: 600,
-        remainingProteinG: 80,
+        remainingProteinG: 50,
+        proteinCoachingBand: 'below_range',
+        last3Days: [],
       },
     }),
     intent: 'nutrition_guidance',
@@ -550,6 +597,10 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       ...COMMON_FORBIDDEN_PHRASES,
       'fast optimal',
       'proteinziel ist erreicht',
+      'unter dem ziel von',
+      'unter deinem ziel von',
+      'letzten tage zeigen',
+      'in der regel gut im proteinbereich',
     ],
   },
   {
@@ -559,9 +610,11 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       currentHourLocal: 18,
       nutrition: {
         ...baseContext().nutrition,
-        today: { calories: 1600, protein: 130, carbs: 160, fat: 50, fiber: 20, hasMealItem: true },
+        today: { calories: 1600, protein: 110, carbs: 160, fat: 50, fiber: 20, hasMealItem: true },
         remainingCalories: 600,
         remainingProteinG: 10,
+        proteinCoachingBand: 'below_range',
+        last3Days: [],
       },
     }),
     intent: 'nutrition_guidance',
@@ -580,13 +633,56 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       'hähnchenbrust',
     ],
     expectNullActionFields: true,
+    expectUnavailableOnValidationError: [
+      'Daily insight judges an open day as completed',
+      'Daily insight treats a target-relative calorie difference as an achieved energy balance',
+    ],
+  },
+  {
+    id: 'carbohydrates-below-range-neutral',
+    description: 'Carbohydrate intake below its advisory range is not described as inadequate.',
+    input: baseContext({
+      nutrition: {
+        ...baseContext().nutrition,
+        today: { calories: 1420, protein: 90, carbs: 100, fat: 60, fiber: 20, hasMealItem: true },
+        remainingCalories: 580,
+        remainingProteinG: 30,
+        proteinCoachingBand: 'below_range',
+        last3Days: [],
+      },
+    }),
+    intent: 'nutrition_guidance',
+    // AC-7 / PO-4: an intake below the carbohydrate range is not a negative assessment.
+    forbiddenPhrases: [...COMMON_FORBIDDEN_PHRASES, ...NEGATIVE_CARBOHYDRATE_JUDGMENTS],
+  },
+  {
+    id: 'carbohydrates-above-range-neutral',
+    description: 'Carbohydrate intake above its advisory range is not described as excessive.',
+    input: baseContext({
+      nutrition: {
+        ...baseContext().nutrition,
+        today: { calories: 1840, protein: 90, carbs: 250, fat: 40, fiber: 20, hasMealItem: true },
+        remainingCalories: 160,
+        remainingProteinG: 30,
+        proteinCoachingBand: 'below_range',
+      },
+    }),
+    intent: 'nutrition_guidance',
+    // AC-7 / PO-4: an intake above the carbohydrate range is not a strict-limit violation.
+    forbiddenPhrases: [...COMMON_FORBIDDEN_PHRASES, ...NEGATIVE_CARBOHYDRATE_JUDGMENTS],
   },
   {
     id: 'empty-morning',
     description: 'An empty early morning uses historical data without judging today.',
     input: baseContext({
       currentHourLocal: 8,
-      nutrition: { ...baseContext().nutrition, today: null, remainingCalories: null, remainingProteinG: null },
+      nutrition: {
+        ...baseContext().nutrition,
+        today: null,
+        remainingCalories: null,
+        remainingProteinG: null,
+        proteinCoachingBand: 'unknown',
+      },
     }),
     intent: 'morning_orientation',
     // US Insight F7 and the zero-versus-missing contract: no current MealItem is not a deficit.
@@ -608,6 +704,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         today: null,
         remainingCalories: null,
         remainingProteinG: null,
+        proteinCoachingBand: 'unknown',
         last3Days: [
           {
             ...historicalDay,
@@ -653,6 +750,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         today: null,
         remainingCalories: null,
         remainingProteinG: null,
+        proteinCoachingBand: 'unknown',
       },
     }),
     intent: 'general',

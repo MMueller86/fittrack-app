@@ -60,12 +60,17 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
         carbsG: 220,
         fatG: 70,
         fiberG: 30,
+        macroRanges: {
+          proteinG: { minG: 120, maxG: 160 },
+          carbsG: { minG: 150, maxG: 250 },
+        },
         baseCalories: 2100,
         activityBonusCalories: 0,
         targetSource: 'profile_fallback',
       },
       remainingCalories: 500,
       remainingProteinG: 40,
+      proteinCoachingBand: 'in_range',
       last3Days: [
         {
           date: '2026-06-29',
@@ -316,6 +321,36 @@ describe('computeInputHash', () => {
     expect(base).not.toBe(computeInputHash(ctx, 'v14', 'general', 'sha256:fingerprint-a', 'sha256:system-b'));
   });
 
+  it('includes exact macro-range boundaries and protein coaching state, not legacy scalar targets', () => {
+    const base = makeContext();
+    const targets = base.nutrition.targets!;
+    const changedRange = makeContext({
+      nutrition: {
+        ...base.nutrition,
+        targets: {
+          ...targets,
+          macroRanges: {
+            proteinG: { ...targets.macroRanges!.proteinG, minG: 121 },
+            carbsG: targets.macroRanges!.carbsG,
+          },
+        },
+      },
+    });
+    const changedCoachingBand = makeContext({
+      nutrition: { ...base.nutrition, proteinCoachingBand: 'above_range' },
+    });
+    const changedLegacyScalars = makeContext({
+      nutrition: {
+        ...base.nutrition,
+        targets: { ...targets, proteinG: 180, carbsG: 300 },
+      },
+    });
+
+    expect(computeInputHash(base, 'v18')).not.toBe(computeInputHash(changedRange, 'v18'));
+    expect(computeInputHash(base, 'v18')).not.toBe(computeInputHash(changedCoachingBand, 'v18'));
+    expect(computeInputHash(base, 'v18')).toBe(computeInputHash(changedLegacyScalars, 'v18'));
+  });
+
   it('keeps semantic calorie and protein boundary changes visible to the hash', () => {
     const base = makeContext();
     const justOverBudget = makeContext({
@@ -545,7 +580,7 @@ describe('shouldRegenerate', () => {
     expect(shouldRegenerate(incompleteV10, baseHash, now, false, 'v10')).toBe(true);
   });
 
-  it('preserves an unexpired v14 Daily until expiry when v15 becomes active', () => {
+  it.each(['v15', 'v18'] as const)('preserves an unexpired v14 Daily until expiry when %s becomes active', (activePromptVersion) => {
     const v14 = makeDocument({
       promptVersion: 'v14',
       promptFingerprint: 'sha256:v14-fingerprint',
@@ -556,35 +591,35 @@ describe('shouldRegenerate', () => {
       inputHash: 'v14-hash',
       dailyGenerations: MAX_DAILY_GENERATIONS,
     });
-    const activeV15 = {
-      promptVersion: 'v15',
-      promptFingerprint: 'sha256:v15-fingerprint',
-      systemPromptHash: 'sha256:v15-system',
+    const activePrompt = {
+      promptVersion: activePromptVersion,
+      promptFingerprint: `sha256:${activePromptVersion}-fingerprint`,
+      systemPromptHash: `sha256:${activePromptVersion}-system`,
       intent: 'general' as const,
-      promptSnapshot: { system: 'v15 system', user: 'v15 user' },
+      promptSnapshot: { system: `${activePromptVersion} system`, user: `${activePromptVersion} user` },
     };
 
     expect(shouldRegenerate(
       v14,
-      'v15-hash',
+      `${activePromptVersion}-hash`,
       now,
       true,
-      activeV15.promptVersion,
-      activeV15.promptFingerprint,
-      activeV15.systemPromptHash,
-      activeV15.intent,
-      activeV15.promptSnapshot,
+      activePrompt.promptVersion,
+      activePrompt.promptFingerprint,
+      activePrompt.systemPromptHash,
+      activePrompt.intent,
+      activePrompt.promptSnapshot,
     )).toBe(false);
     expect(shouldRegenerate(
       { ...v14, expiresAt: new Date(now.getTime() - 1).toISOString() },
-      'v15-hash',
+      `${activePromptVersion}-hash`,
       now,
       true,
-      activeV15.promptVersion,
-      activeV15.promptFingerprint,
-      activeV15.systemPromptHash,
-      activeV15.intent,
-      activeV15.promptSnapshot,
+      activePrompt.promptVersion,
+      activePrompt.promptFingerprint,
+      activePrompt.systemPromptHash,
+      activePrompt.intent,
+      activePrompt.promptSnapshot,
     )).toBe(true);
   });
 

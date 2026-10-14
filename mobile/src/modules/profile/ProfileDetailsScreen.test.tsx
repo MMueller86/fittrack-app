@@ -54,8 +54,28 @@ const profile = {
 };
 
 const targets = {
-  restDay: { calories: 2000, proteinG: 150, fatG: 60, carbsG: 200 },
-  trainingDay: { calories: 2300, proteinG: 160, fatG: 65, carbsG: 250 },
+  restDay: {
+    calories: 2000,
+    proteinG: 150,
+    fatG: 60,
+    carbsG: 200,
+    fiberG: 28,
+    macroRanges: {
+      proteinG: { minG: 123, maxG: 164 },
+      carbsG: { minG: 201, maxG: 242 },
+    },
+  },
+  trainingDay: {
+    calories: 2300,
+    proteinG: 160,
+    fatG: 65,
+    carbsG: 250,
+    fiberG: 32,
+    macroRanges: {
+      proteinG: { minG: 123, maxG: 164 },
+      carbsG: { minG: 265, maxG: 306 },
+    },
+  },
 };
 
 function textNodes(renderer: ReactTestRenderer): string[] {
@@ -133,12 +153,30 @@ describe('ProfileDetailsScreen', () => {
     expect(nodes).toContain('Tagesziele');
     expect(all).toContain('Ruhetag');
     expect(all).toContain('Trainingstag');
+    expect(nodes.filter((value) => value === '123–164 g')).toHaveLength(2);
+    expect(nodes).toContain('201–242 g');
+    expect(nodes).toContain('265–306 g');
     expect(all).toContain('2000');
-    expect(all).toContain('150 g');
+    expect(all).toContain('60 g');
     expect(all).toContain('2300');
-    expect(all).toContain('250 g');
+    expect(all).toContain('65 g');
     expect(all).not.toContain('Basisdaten');
     expect(refreshControls(renderer)).toHaveLength(1);
+  });
+
+  it('keeps legacy scalar targets when a profile response has no macro ranges', async () => {
+    const legacyTargets = {
+      restDay: { calories: 2000, proteinG: 150, fatG: 60, carbsG: 200, fiberG: 28 },
+      trainingDay: { calories: 2300, proteinG: 160, fatG: 65, carbsG: 250, fiberG: 32 },
+    };
+    mocks.profileApi.getMe.mockResolvedValue({ profile, targets: legacyTargets });
+    const { renderer } = await renderScreen();
+
+    const all = text(renderer);
+    expect(all).toContain('150 g');
+    expect(all).toContain('200 g');
+    expect(all).toContain('160 g');
+    expect(all).toContain('250 g');
   });
 
   it('navigates back and to ProfileEdit with the loaded profile', async () => {

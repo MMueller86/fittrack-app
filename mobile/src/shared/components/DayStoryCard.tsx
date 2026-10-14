@@ -6,10 +6,10 @@ import React, { RefObject, useState } from 'react';
 import { Icon } from './Icon';
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
-import type { DiaryDayResponse, MealType } from '@fittrack/shared';
+import type { DiaryDayResponse, MacroRange, MealType } from '@fittrack/shared';
 import type { HintResult } from '../../../../shared/types/hint';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import type { MacroTarget } from './MacroSummaryCard';
+import { formatMacroTargetValue, type MacroTarget } from './MacroSummaryCard';
 import { MealChip } from './MealChip';
 
 // ─── Public types ─────────────────────────────────────────────────────────────
@@ -138,11 +138,13 @@ const MEAL_SHORT: Partial<Record<MealType, string>> = {
 // ─── Macro line ───────────────────────────────────────────────────────────────
 // isCalorie: kcal row keeps its ring-colour on the value; all others use colors.text
 function MacroLine({
-  color, label, value, target, unit, isCalorie, onPress,
+  color, label, value, target, targetRange, unit, isCalorie, onPress,
 }: {
-  color: string; label: string; value: number; target: number; unit: string;
+  color: string; label: string; value: number; target: number | null; targetRange?: MacroRange | null; unit: string;
   isCalorie?: boolean; onPress?: () => void;
 }) {
+  const targetLabel = formatMacroTargetValue(targetRange ?? target);
+
   return (
     <TouchableOpacity
       style={styles.macroLine}
@@ -156,9 +158,11 @@ function MacroLine({
         <Text style={[styles.macroValue, isCalorie ? { color } : null]}>
           {Math.round(value)}
         </Text>
-        <Text style={styles.macroTarget}>
-          {' / '}{target}{unit ? ` ${unit}` : ''}
-        </Text>
+        {targetLabel != null ? (
+          <Text style={styles.macroTarget}>
+            {' / '}{targetLabel}{unit ? ` ${unit}` : ''}
+          </Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -193,12 +197,14 @@ function MacroBreakdownSheet({
   macroKey: MacroKey;
   mealSummaries: MealMacroSummary[];
   totalConsumed: number;
-  target: number;
+  target: number | MacroRange | null;
   onClose: () => void;
 }) {
   const [expandedMeal, setExpandedMeal] = useState<MealType | null>(null);
   const meta = MACRO_META[macroKey];
   const unit = meta.unit ? ` ${meta.unit}` : '';
+  const targetLabel = formatMacroTargetValue(target);
+  const targetKindLabel = typeof target === 'number' ? 'Ziel: ' : 'Zielbereich: ';
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -298,7 +304,11 @@ function MacroBreakdownSheet({
             <Text style={{ color: meta.color, fontWeight: '700' as const }}>
               {Math.round(totalConsumed)}{unit}
             </Text>
-            {'  /  Ziel: '}{Math.round(target)}{unit}
+            {targetLabel != null ? (
+              <>
+                {'  /  '}{targetKindLabel}{targetLabel}{unit}
+              </>
+            ) : null}
           </Text>
         </View>
       </View>
@@ -575,7 +585,7 @@ const bonusStyles = StyleSheet.create({
 // ─── Main component ───────────────────────────────────────────────────────────
 interface DayStoryCardProps {
   summary: DiaryDayResponse['summary'];
-  target: MacroTarget;
+  target: MacroTarget | null;
   meals: Array<{ type: MealType; items: unknown[] }>;
   mealSummaries: MealMacroSummary[];
   scrollRef: RefObject<ScrollView | null>;
@@ -592,16 +602,21 @@ export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef,
   const [activeMacro, setActiveMacro] = useState<MacroKey | null>(null);
 
   const calConsumed = Math.round(summary.calories);
-  const baseCalTarget = target.calories;
-  const hasBonus = !!(activityBonusInfo && activityBonusInfo.bonus > 0);
-  const calTarget = Math.round(hasBonus ? baseCalTarget + activityBonusInfo!.bonus : baseCalTarget);
-  const calPct = Math.min(calConsumed / (calTarget || 1), 1.5);
-  const calRemaining = Math.round(Math.max(0, calTarget - calConsumed));
-  const calOver = calConsumed > calTarget;
+  const baseCalTarget = target?.calories ?? null;
+  const hasBonus = baseCalTarget != null && !!(activityBonusInfo && activityBonusInfo.bonus > 0);
+  const calTarget = baseCalTarget == null
+    ? null
+    : Math.round(baseCalTarget + (hasBonus ? activityBonusInfo!.bonus : 0));
+  const calPct = calTarget == null ? 0 : Math.min(calConsumed / (calTarget || 1), 1.5);
+  const calRemaining = calTarget == null ? 0 : Math.round(Math.max(0, calTarget - calConsumed));
+  const calOver = calTarget != null && calConsumed > calTarget;
 
   const protein = summary.protein;
-  const proteinTarget = target.proteinG;
-  const proteinPct = Math.min(protein / (proteinTarget || 1), 1);
+  const proteinRange = target?.macroRanges?.proteinG ?? null;
+  const proteinRangeMinG = proteinRange?.minG ?? null;
+  const proteinPct = proteinRangeMinG == null
+    ? 0
+    : Math.min(protein / (proteinRangeMinG || 1), 1);
 
   const carbs = summary.carbs;
   const fat = summary.fat;
@@ -631,10 +646,12 @@ export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef,
           {/* Centered label inside gauge — 3-level hierarchy */}
           <View style={styles.gaugeCenter} pointerEvents="none">
             <Text style={[styles.gaugeValue, { color: gaugeColor(calPct) }]}>
-              {calOver ? `+${calConsumed - calTarget}` : calRemaining}
+                {calTarget == null ? calConsumed : calOver ? `+${calConsumed - calTarget}` : calRemaining}
             </Text>
             <Text style={styles.gaugeUnit}>kcal</Text>
-            <Text style={styles.gaugeLabel}>{calOver ? 'drüber' : 'übrig'}</Text>
+              <Text style={styles.gaugeLabel}>
+                {calTarget == null ? 'verzehrt' : calOver ? 'drüber' : 'übrig'}
+              </Text>
           </View>
         </TouchableOpacity>
 
@@ -642,17 +659,17 @@ export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef,
         <View style={styles.macroPanel}>
           {hasBonus ? (
             <ActivityBonusLines
-              baseTarget={baseCalTarget}
+              baseTarget={baseCalTarget ?? 0}
               bonus={activityBonusInfo!.bonus}
               onShowBreakdown={activityBonusInfo!.onShowBreakdown}
             />
           ) : (
             <MacroLine isCalorie color={gaugeColor(calPct)} label="kcal" value={calConsumed} target={calTarget} unit="" onPress={() => setActiveMacro('calories')} />
           )}
-          <MacroLine color={PROTEIN_COLOR}  label="EW"   value={protein}        target={proteinTarget}   unit="g" onPress={() => setActiveMacro('protein')} />
-          <MacroLine color={CARBS_COLOR}    label="KH"   value={carbs}          target={target.carbsG}  unit="g" onPress={() => setActiveMacro('carbs')} />
-          <MacroLine color={FAT_COLOR}      label="Fett" value={fat}            target={target.fatG}    unit="g" onPress={() => setActiveMacro('fat')} />
-          <MacroLine color={FIBER_COLOR}    label="Bst"  value={summary.fiber}  target={target.fiberG}  unit="g" onPress={() => setActiveMacro('fiber')} />
+          <MacroLine color={PROTEIN_COLOR} label="EW" value={protein} target={null} targetRange={proteinRange} unit="g" onPress={() => setActiveMacro('protein')} />
+          <MacroLine color={CARBS_COLOR} label="KH" value={carbs} target={null} targetRange={target?.macroRanges?.carbsG} unit="g" onPress={() => setActiveMacro('carbs')} />
+          <MacroLine color={FAT_COLOR} label="Fett" value={fat} target={target?.fatG ?? null} unit="g" onPress={() => setActiveMacro('fat')} />
+          <MacroLine color={FIBER_COLOR} label="Bst" value={summary.fiber} target={target?.fiberG ?? null} unit="g" onPress={() => setActiveMacro('fiber')} />
         </View>
       </View>
 
@@ -689,11 +706,11 @@ export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef,
             : summary.fiber
           }
           target={
-            activeMacro === 'calories' ? target.calories
-            : activeMacro === 'protein' ? target.proteinG
-            : activeMacro === 'carbs'   ? target.carbsG
-            : activeMacro === 'fat'     ? target.fatG
-            : target.fiberG
+            activeMacro === 'calories' ? target?.calories ?? null
+            : activeMacro === 'protein' ? proteinRange
+            : activeMacro === 'carbs' ? target?.macroRanges?.carbsG ?? null
+            : activeMacro === 'fat' ? target?.fatG ?? null
+            : target?.fiberG ?? null
           }
           onClose={() => setActiveMacro(null)}
         />

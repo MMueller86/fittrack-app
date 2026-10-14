@@ -39,6 +39,7 @@ import { listWeights } from '../../services/weightsService';
 import { BrandAsset } from '../../shared/components/BrandAsset';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { LegalDocumentView } from '../legal/LegalDocumentView';
+import { formatMacroTargetValue } from './ProfileSummaryCards';
 
 export const SKIP_WIZARD_KEY = 'fittrack:skip_wizard';
 
@@ -262,16 +263,16 @@ function MacroCard({
   targets,
 }: {
   title: string;
-  targets: { calories: number; proteinG: number; fatG: number; carbsG: number; fiberG: number };
+  targets: CalculatePreviewResponse['targets']['restDay'];
 }) {
   return (
     <View style={styles.macroCard}>
       <Text style={styles.macroCardTitle}>{title}</Text>
       <View style={styles.macroRow}>
         <MacroItem label="Kalorien" value={`${targets.calories} kcal`} highlight />
-        <MacroItem label="Protein" value={`${targets.proteinG} g`} />
+        <MacroItem label="Protein" value={formatMacroTargetValue(targets.proteinG, targets.macroRanges?.proteinG)} />
         <MacroItem label="Fett" value={`${targets.fatG} g`} />
-        <MacroItem label="Kohlenhydrate" value={`${targets.carbsG} g`} />
+        <MacroItem label="Kohlenhydrate" value={formatMacroTargetValue(targets.carbsG, targets.macroRanges?.carbsG)} />
         {targets.fiberG > 0 && <MacroItem label="Ballaststoffe" value={`${targets.fiberG} g`} />}
       </View>
     </View>

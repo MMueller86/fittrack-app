@@ -22,14 +22,14 @@ const intents: InsightIntent[] = [
   'general',
 ];
 
-describe('daily insight v17 prompts', () => {
+describe('daily insight v18 prompts', () => {
   it('CORR2 gives the exact unknown-activity context a final activity open-day guard', () => {
     const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'unknown-activity')!;
     expect(fixture.intent).toBe('activity_focus');
     expect(fixture.input.currentHourLocal).toBeNull();
     expect(fixture.input.activityCompletionStatus).toBe('unknown');
     expect(fixture.input.nutrition.remainingCalories).toBe(500);
-    expect(fixture.input.nutrition.remainingProteinG).toBe(40);
+    expect(fixture.input.nutrition.remainingProteinG).toBe(20);
     const before = structuredClone(fixture.input);
     const snapshot = buildDailyInsightPrompt(fixture.intent, fixture.input);
     expect(snapshot.system).toContain('Abschließender Schutz für activity_focus am offenen Tag');
@@ -38,7 +38,9 @@ describe('daily insight v17 prompts', () => {
     expect(snapshot.system).toContain('Nenne weder die bisherige Aufnahme noch den Restbetrag');
     expect(snapshot.system).toContain('Fueling, Flüssigkeit und Erholung bleiben konditional');
     expect(snapshot.system).not.toContain('Bei positivem Rest beschreibe nur den noch offenen Spielraum,');
-    expect(JSON.parse(snapshot.user)).toEqual({ intent: fixture.intent, context: before });
+    expect(JSON.parse(snapshot.user).intent).toBe(fixture.intent);
+    expect(JSON.parse(snapshot.user).context.nutrition.targets).not.toHaveProperty('proteinG');
+    expect(JSON.parse(snapshot.user).context.nutrition.targets).not.toHaveProperty('carbsG');
     expect(fixture.input).toEqual(before);
   });
 
@@ -64,12 +66,28 @@ describe('daily insight v17 prompts', () => {
     expect(snapshot.system).toContain('Bei positivem Rest beschreibe nur den noch offenen Spielraum');
     expect(snapshot.system).toContain('"unter dem Ziel"');
     expect(snapshot.system).toContain('Schutz für phase_progress an einem offenen Tag');
-    expect(JSON.parse(snapshot.user)).toEqual({ intent: fixture.intent, context: before });
+    const expectedProviderTargets = Object.fromEntries(
+      Object.entries(before.nutrition.targets!).filter(([key]) => key !== 'proteinG' && key !== 'carbsG'),
+    );
+    expect(JSON.parse(snapshot.user)).toEqual({
+      intent: fixture.intent,
+      context: {
+        ...before,
+        nutrition: { ...before.nutrition, targets: expectedProviderTargets },
+      },
+    });
+    const providerContext = JSON.parse(snapshot.user).context as InsightInputContext;
+    expect(providerContext.nutrition.targets?.macroRanges)
+      .toEqual(fixture.input.nutrition.targets?.macroRanges);
+    expect(providerContext.nutrition.targets).not.toHaveProperty('proteinG');
+    expect(providerContext.nutrition.targets).not.toHaveProperty('carbsG');
+    expect(providerContext.nutrition.remainingProteinG).toBe(fixture.input.nutrition.remainingProteinG);
+    expect(providerContext.nutrition.proteinCoachingBand).toBe(fixture.input.nutrition.proteinCoachingBand);
     expect(fixture.input).toEqual(before);
   });
 
-  it('uses the v17 version and has one module for every intent', () => {
-    expect(DAILY_INSIGHT_PROMPT_VERSION).toBe('v17');
+  it('uses the v18 version and has one module for every intent', () => {
+    expect(DAILY_INSIGHT_PROMPT_VERSION).toBe('v18');
     for (const intent of intents) {
       expect(DAILY_INSIGHT_PROMPT_MODULES[intent].length).toBeGreaterThan(0);
     }
@@ -278,10 +296,23 @@ describe('daily insight v17 prompts', () => {
   });
 
   it('hardens the current effective activity budget contract', () => {
-    const snapshot = buildDailyInsightPrompt('activity_focus', {
+    const activityContext = {
       ...context,
-      specialActivity: {} as InsightInputContext['specialActivity'],
+      specialActivity: {
+        type: 'hiking',
+        movementTimeMinutes: 120,
+        distanceKm: 8,
+        elevationGainM: 500,
+        estimatedMet: 6,
+        activityCalories: 840,
+        alreadyAccountedCalories: 140,
+        activityBonus: 700,
+        bodyWeightKg: 70,
+        dailyCalorieTarget: 2300,
+        calculatedAt: '2026-08-20T12:00:00.000Z',
+      },
       nutrition: {
+        today: null,
         targets: {
           calories: 3000,
           proteinG: 140,
@@ -296,14 +327,40 @@ describe('daily insight v17 prompts', () => {
         remainingProteinG: 10,
         last3Days: [],
       },
-    } as InsightInputContext);
+    } satisfies InsightInputContext;
+    const snapshot = buildDailyInsightPrompt('activity_focus', activityContext);
 
     expect(snapshot.system).toContain('Verbindlicher Vertrag für das aktuelle effektive Aktivitätsziel');
     expect(snapshot.system).toContain('Kalorienziel');
     expect(snapshot.system).toContain('keine zusätzliche Proteinquelle');
   });
 
-  it('computes a stable fingerprint for the complete v17 bundle', () => {
+  it('uses range-based macro semantics and keeps activity bonus calorie-only', () => {
+    const nutritionModule = DAILY_INSIGHT_PROMPT_MODULES.nutrition_guidance;
+    const activityModule = DAILY_INSIGHT_PROMPT_MODULES.activity_focus;
+
+    expect(nutritionModule).toContain('nutrition.targets.macroRanges');
+    expect(nutritionModule).toContain('nutrition.proteinCoachingBand');
+    expect(nutritionModule).toContain('Werte außerhalb dürfen weder als zu niedrig/zu hoch');
+    expect(nutritionModule).toContain('Es gibt keine historischen Makro-Zielbereiche');
+    expect(activityModule).toContain('Der activityBonus erhöht ausschließlich das Kalorienziel');
+    expect(activityModule).toContain('keine temporären Makrobereiche');
+    expect(activityModule).toContain('keine numerischen Makroziele oder Grammwerte');
+  });
+
+  it('appends the active-range-only macro guard to every intent', () => {
+    for (const intent of intents) {
+      const system = buildDailyInsightPrompt(intent, context).system;
+      const guardIndex = system.lastIndexOf('## Abschließende Regel für Makro-Einordnungen');
+
+      expect(guardIndex).toBeGreaterThan(system.lastIndexOf('## Ausgabe'));
+      expect(system.slice(guardIndex)).toContain('nutrition.targets.macroRanges');
+      expect(system.slice(guardIndex)).toContain('nutrition.proteinCoachingBand');
+      expect(system.slice(guardIndex)).toContain('Makros in last3Days');
+    }
+  });
+
+  it('computes a stable fingerprint for the complete v18 bundle', () => {
     expect(DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION).toBe('v2');
     expect(DAILY_INSIGHT_PROMPT_FINGERPRINT).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(computeDailyInsightPromptFingerprint(DAILY_INSIGHT_PROMPT_BUNDLE))

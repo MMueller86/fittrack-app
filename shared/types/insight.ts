@@ -3,6 +3,7 @@
 
 import type { GoalType, GoalIntensity } from './profile';
 import type { DayType, SpecialActivity, WorkoutType } from './diary';
+import type { MacroRanges, ProteinCoachingBand } from './nutrition';
 import type { WeeklyTargetSource } from './weeklyReview';
 
 /** How fresh the insight is and whether it could be generated at all. */
@@ -142,6 +143,8 @@ export interface InsightNutritionContext {
     carbsG: number;
     fatG: number;
     fiberG: number;
+    /** Profile-day ranges; absent on legacy context snapshots. */
+    macroRanges?: MacroRanges;
     /** Current base target before a special-activity bonus, when resolvable. */
     baseCalories?: number | null;
     activityBonusCalories?: number | null;
@@ -155,6 +158,8 @@ export interface InsightNutritionContext {
    */
   remainingCalories: number | null;
   remainingProteinG: number | null;
+  /** Classification based on today's protein, selected range, and current weight when available. */
+  proteinCoachingBand?: ProteinCoachingBand;
   /** Last 3 completed diary days for trend context */
   last3Days: InsightNutritionDay[];
 }

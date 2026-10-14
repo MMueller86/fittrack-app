@@ -15,6 +15,7 @@
 import type { Meal } from '../../../shared/types/diary';
 import type { FoodCategory } from '../../../shared/types/foodCategory';
 import type { HintContext, HintId, HintResult, HintState, HintCategory } from '../../../shared/types/hint';
+import { classifyProteinCoachingBand, isWithinMacroRange } from '../../../shared/lib/macroRanges';
 
 // ---------------------------------------------------------------------------
 // Motivational hint pool (cyclic, 10 entries indexed M0-M9)
@@ -42,6 +43,7 @@ const COOLDOWN_DAYS: Partial<Record<HintId, number>> = {
   H15: 2,
   H16: 2,
   H17: 2,
+  H28: 7,
   H21: 2,
   H22: 1,
   H25: 2,
@@ -123,7 +125,8 @@ interface RuleCtx {
   hasDinner: boolean;
   hasSnack: boolean;
   calPct: number;
-  proteinPct: number;
+  proteinPct: number | null;
+  proteinBand: ReturnType<typeof classifyProteinCoachingBand>;
   fiberPct: number;
   remainingCalPct: number;
   categories: Set<FoodCategory>;
@@ -133,11 +136,8 @@ interface RuleCtx {
   dayType: 'rest' | 'training';
   currentHour: number | null;
   bmr: number | undefined;
-  weightKg: number | undefined;
   recentDaysCaloriesPct: number[];
   rawCalories: number;
-  rawProtein: number;
-  rawTargetProteinG: number;
   /** True when ≥30% of today's total calories come from protein. */
   isHighProteinCalShare: boolean;
 }
@@ -173,7 +173,6 @@ const RULES: RuleDef[] = [
     condition: ({ hasBreakfast, currentHour }) => !hasBreakfast && isHourBetween(currentHour, 8, 13),
   },
 
-  // H26: 3 consecutive days over 115% -- highest warning level [1-day cooldown]
   {
     id: 'H26',
     category: 'orientation',
@@ -204,19 +203,14 @@ const RULES: RuleDef[] = [
       hasDinner && bmr !== undefined && rawCalories > 0 && rawCalories < bmr * 0.9,
   },
 
-  // H28: Protein < 1.5g/kg body weight -- only after dinner is logged [dynamic text]
-  // Gate: does NOT fire when protein-cal share is already ≥30%
+  // H28: Protein above the coaching threshold -- only after dinner is logged
   {
     id: 'H28',
     category: 'orientation',
     emoji: '💪',
-    text: ({ rawProtein, weightKg }) => {
-      const target = weightKg !== undefined ? Math.round(weightKg * 1.5) : null;
-      const targetStr = target !== null ? ` Bei dir sind das ${target} g.` : '';
-      return `Dein Proteinziel ist heute nicht erreicht – kein Problem für einen Tag. Achte aber darauf, dauerhaft mindestens 1,5 g je kg Körpergewicht zu treffen.${targetStr}`;
-    },
-    condition: ({ hasDinner, rawProtein, weightKg, isHighProteinCalShare }) =>
-      hasDinner && weightKg !== undefined && rawProtein > 0 && rawProtein < weightKg * 1.5 && !isHighProteinCalShare,
+    text: 'Du hast heute bereits reichlich Protein aufgenommen. Bei weiteren Mahlzeiten kannst du auch Kohlenhydrate, gesunde Fette oder Lebensmittel wählen, die dir schmecken.',
+    condition: ({ hasDinner, proteinBand }) =>
+      hasDinner && proteinBand === 'above_coaching_threshold',
   },
 
   // H18: High-protein breakfast (≥30% of breakfast calories from protein)
@@ -254,7 +248,7 @@ const RULES: RuleDef[] = [
       mealCount >= 2 && calPct >= 35 && calPct <= 65 && isHourBetween(currentHour, 12, 16),
   },
 
-  // H3: Protein < 25% of daily target (only after 2+ meals)
+  // H3: Protein < 25% of the lower range bound (only after 2+ meals)
   // Gate: does NOT fire when protein-cal share is already ≥30%
   {
     id: 'H3',
@@ -262,10 +256,10 @@ const RULES: RuleDef[] = [
     emoji: '💪',
     text: 'Bei deiner nächsten Mahlzeit darf es gerne etwas proteinreicher werden.',
     condition: ({ proteinPct, mealCount, isHighProteinCalShare }) =>
-      proteinPct < 25 && mealCount >= 2 && !isHighProteinCalShare,
+      proteinPct != null && proteinPct < 25 && mealCount >= 2 && !isHighProteinCalShare,
   },
 
-  // H4: Protein < 35% with 3+ meals
+  // H4: Protein < 35% of the lower range bound with 3+ meals
   // Gate: does NOT fire when protein-cal share is already ≥30%
   {
     id: 'H4',
@@ -273,7 +267,7 @@ const RULES: RuleDef[] = [
     emoji: '🥩',
     text: 'Etwas Eiweiß würde deine bisherigen Mahlzeiten gut ergänzen.',
     condition: ({ proteinPct, mealCount, isHighProteinCalShare }) =>
-      proteinPct < 35 && mealCount >= 3 && !isHighProteinCalShare,
+      proteinPct != null && proteinPct < 35 && mealCount >= 3 && !isHighProteinCalShare,
   },
 
   // H5: Fiber < 40% of daily target (only after 2+ meals)
@@ -325,15 +319,18 @@ const RULES: RuleDef[] = [
       !hasDinner && (hasBreakfast || hasLunch) && isHourAtLeast(currentHour, 17),
   },
 
-  // H8: Training day, protein not yet reached (2+ meals or after 15:00)
+  // H8: Training day, protein is below the lower range bound
   // Gate: does NOT fire when protein-cal share is already ≥30%
   {
     id: 'H8',
     category: 'orientation',
     emoji: '💪',
     text: 'Nach deinem Training lohnt sich heute noch eine proteinreiche Mahlzeit.',
-    condition: ({ dayType, proteinPct, mealCount, currentHour, isHighProteinCalShare }) =>
-      dayType === 'training' && proteinPct < 95 && (mealCount >= 2 || isHourAtLeast(currentHour, 15)) && !isHighProteinCalShare,
+    condition: ({ dayType, proteinBand, mealCount, currentHour, isHighProteinCalShare }) =>
+      dayType === 'training'
+      && proteinBand === 'below_range'
+      && (mealCount >= 2 || isHourAtLeast(currentHour, 15))
+      && !isHighProteinCalShare,
   },
 
   // H12: High variety ≥5 food categories
@@ -426,7 +423,7 @@ const RULES: RuleDef[] = [
     category: 'positive',
     emoji: '💪',
     text: 'Dein Proteinziel hast du heute bereits erreicht.',
-    condition: ({ proteinPct }) => proteinPct >= 95,
+    condition: ({ proteinBand }) => proteinBand === 'in_range',
   },
 
   // H17: Training day + protein reached
@@ -435,7 +432,7 @@ const RULES: RuleDef[] = [
     category: 'positive',
     emoji: '🏋️',
     text: 'Training und Ernährung ergänzen sich heute optimal.',
-    condition: ({ dayType, proteinPct }) => dayType === 'training' && proteinPct >= 95,
+    condition: ({ dayType, proteinBand }) => dayType === 'training' && proteinBand === 'in_range',
   },
 ];
 
@@ -487,7 +484,15 @@ export function evaluateHint(context: HintContext, state: HintState | null): Eva
   // Pre-compute all values needed by rule conditions
   const mealCount = meals.filter((m) => m.items.length > 0).length;
   const calPct = pct(summary.calories, targets.calories);
-  const proteinPct = pct(summary.protein, targets.proteinG);
+  const proteinRange = targets.macroRanges?.proteinG;
+  const proteinPct = proteinRange == null
+    ? null
+    : pct(summary.protein, proteinRange.minG);
+  const proteinBand = classifyProteinCoachingBand(
+    summary.protein,
+    context.weightKg,
+    proteinRange,
+  );
   const fiberPct = pct(summary.fiber ?? 0, targets.fiberG);
   const remainingCalPct = 100 - calPct;
 
@@ -514,6 +519,7 @@ export function evaluateHint(context: HintContext, state: HintState | null): Eva
     hasSnack,
     calPct,
     proteinPct,
+    proteinBand,
     fiberPct,
     remainingCalPct,
     categories,
@@ -523,11 +529,8 @@ export function evaluateHint(context: HintContext, state: HintState | null): Eva
     dayType,
     currentHour,
     bmr: context.bmr,
-    weightKg: context.weightKg,
     recentDaysCaloriesPct: context.recentDaysCaloriesPct ?? [],
     rawCalories: summary.calories,
-    rawProtein: summary.protein,
-    rawTargetProteinG: targets.proteinG,
     isHighProteinCalShare,
   };
 
@@ -540,9 +543,9 @@ export function evaluateHint(context: HintContext, state: HintState | null): Eva
     // H16 special case: needs fat/carbs from summary, not available in RuleCtx
     if (rule.id === 'H16') {
       if (mealCount > 0) {
-        const proteinOk = targets.proteinG > 0 && Math.abs(proteinPct - 100) <= 10;
+        const proteinOk = proteinBand === 'in_range';
         const fatOk = targets.fatG > 0 && Math.abs(pct(summary.fat, targets.fatG) - 100) <= 10;
-        const carbsOk = targets.carbsG > 0 && Math.abs(pct(summary.carbs, targets.carbsG) - 100) <= 10;
+        const carbsOk = isWithinMacroRange(summary.carbs, targets.macroRanges?.carbsG);
         if (proteinOk && fatOk && carbsOk && !isCooledDown('H16', cooldownHistory, today)) {
           hint = makeHint('H16', rule.text as string, rule.emoji, rule.category);
         }

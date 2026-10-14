@@ -114,6 +114,11 @@ Available repositories:
 - `weightsRepository`, `dayMetaRepository`, `hintStateRepository`
 - `insightRepository`, `userFoodRelationRepository`
 
+`ProfileRepository.get()` resolves missing legacy `macroRanges` in memory from
+the profile weight and each day's stored calorie and fat targets. This read
+compatibility does not write the derived values back; a later profile
+recalculation persists the new ranges.
+
 `UserFoodRelationRepository.recordUsage()` requires the explicit date-only date of
 the diary meal for `usageDates`; it never derives a user date from the server
 clock. `lastUsedAt` and `createdAt` remain UTC instants. Missing internal usage

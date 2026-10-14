@@ -1,6 +1,7 @@
 import type { Gender, ActivityLevel, GoalType, GoalIntensity } from '../types/profile';
 import type { DayTargets, ProfileTargets, CalculationMeta } from '../types/nutrition';
 import type { ProfileInput } from '../types/profile';
+import { calculateMacroRanges } from './macroRanges';
 
 // ---------------------------------------------------------------------------
 // Step–PAL lookup table
@@ -263,7 +264,7 @@ export function calculateProfileTargets(input: ProfileInput): ProfileCalculation
   const trainingMacros = calculateMacros(trainingCalories, input.weightKg, input.goal);
 
   const meta: CalculationMeta = {
-    formulaVersion: 'profile-targets-v1-pal',
+    formulaVersion: 'profile-targets-v2-macro-ranges',
     bmr: Math.round(bmr),
     pal: Math.round(pal * 100) / 100,
     maintenanceRestDay: Math.round(maintenanceRestDay),
@@ -273,8 +274,16 @@ export function calculateProfileTargets(input: ProfileInput): ProfileCalculation
 
   return {
     targets: {
-      restDay: { calories: restCalories, ...restMacros },
-      trainingDay: { calories: trainingCalories, ...trainingMacros },
+      restDay: {
+        calories: restCalories,
+        ...restMacros,
+        macroRanges: calculateMacroRanges(input.weightKg, restCalories, restMacros.fatG),
+      },
+      trainingDay: {
+        calories: trainingCalories,
+        ...trainingMacros,
+        macroRanges: calculateMacroRanges(input.weightKg, trainingCalories, trainingMacros.fatG),
+      },
     },
     meta,
     restDayCapped,

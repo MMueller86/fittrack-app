@@ -399,7 +399,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     expect(generateDailyInsight).toHaveBeenCalledTimes(1);
   });
 
-  it('invalidates an old Daily cache entry before returning a fresh v16 response', async () => {
+  it('invalidates an old Daily cache entry before returning a fresh v18 response', async () => {
     const context = makeInputContext();
     const cached = makeDaily(context, {
       promptVersion: 'v9',
@@ -471,7 +471,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     });
   });
 
-  it('generates and stores v16 after a same-date v14 cache expires', async () => {
+  it('generates and stores v18 after a same-date v14 cache expires', async () => {
     const context = makeInputContext();
     await getInsightRepository().upsert(makeV14Cache(context, {
       expiresAt: '2026-08-20T11:59:59.000Z',
