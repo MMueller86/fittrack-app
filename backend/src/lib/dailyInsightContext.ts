@@ -1,10 +1,10 @@
 import type {
-  ActivityCompletionStatus,
-  ActivityStatusSource,
   DayMeta,
   InsightInputContext,
   InsightNutritionDay,
   InsightWeightContext,
+  DailyInsightActivityStatus,
+  DailyInsightProteinStatus,
   Meal,
   SpecialActivity,
 } from '@fittrack/shared';
@@ -16,23 +16,19 @@ import {
   calculateWeightTrendPerWeek,
   classifyWeightTrend,
 } from '../../../shared/lib/weightTrend';
-import { classifyProteinCoachingBand } from '../../../shared/lib/macroRanges';
+import { PROTEIN_MAX_G_PER_KG, PROTEIN_MIN_G_PER_KG } from '../../../shared/lib/macroRanges';
 import { computeProgressIntelligence } from './progressIntelligence';
 import { getDiaryRepository, type DiaryRepository, type DiaryDayResult } from './repositories/diaryRepository';
 import { getDayMetaRepository, type DayMetaRepository } from './repositories/dayMetaRepository';
 import {
   getInsightRepository,
+  getCurrentLocalDate,
   isCurrentDayForOffset,
   normalizeTimezoneOffsetMinutes,
   type InsightRepository,
 } from './repositories/insightRepository';
 import { getProfileRepository, type ProfileRepository } from './repositories/profileRepository';
 import { getWeightsRepository, type WeightsRepository } from './repositories/weightsRepository';
-
-export interface ActivityCompletionResolution {
-  status: ActivityCompletionStatus | null;
-  source: ActivityStatusSource | null;
-}
 
 export interface DailyInsightContextRepositories {
   diary: Pick<DiaryRepository, 'getDay'>;
@@ -53,39 +49,46 @@ export interface BuildDailyInsightContextInput {
   isCurrentDay?: boolean;
 }
 
-/** Derives activity completion without turning an invalid client hour into a fact. */
-export function resolveActivityCompletionStatus(
-  activity: SpecialActivity | null | undefined,
-  localHour: number | null | undefined,
-  isCurrentDay = true,
-): ActivityCompletionResolution {
-  if (activity == null) {
-    return { status: null, source: null };
+export const DAILY_INSIGHT_PROTEIN_HIGH_THRESHOLD_G_PER_KG = 2.5;
+
+const REQUIRED_MEAL_TYPES = ['breakfast', 'lunch', 'dinner'] as const;
+
+function classifyDailyInsightProteinStatus(
+  proteinG: number | null,
+  weightKg: number | null | undefined,
+  isWeightStale: boolean,
+): DailyInsightProteinStatus {
+  if (proteinG == null || !Number.isFinite(proteinG) || proteinG < 0
+    || weightKg == null || !Number.isFinite(weightKg) || weightKg <= 0 || isWeightStale) {
+    return 'unknown';
   }
 
-  if (
-    !isCurrentDay ||
-    localHour == null ||
-    !Number.isInteger(localHour) ||
-    localHour < 0 ||
-    localHour > 23
-  ) {
-    return { status: 'unknown', source: 'unavailable' };
-  }
-
-  return {
-    status: localHour < 20 ? 'planned' : 'likely_completed',
-    source: 'local_time_heuristic',
-  };
+  const gramsPerKg = proteinG / weightKg;
+  if (gramsPerKg < PROTEIN_MIN_G_PER_KG) return 'below_range';
+  if (gramsPerKg <= PROTEIN_MAX_G_PER_KG) return 'in_range';
+  if (gramsPerKg < DAILY_INSIGHT_PROTEIN_HIGH_THRESHOLD_G_PER_KG) return 'above_range';
+  return 'at_or_above_2_5_g_per_kg';
 }
 
-/** Scalar convenience for callers that only need the status value. */
-export function getActivityCompletionStatus(
+function hasRequiredMealTypes(meals: readonly Meal[]): boolean {
+  return REQUIRED_MEAL_TYPES.every((type) =>
+    meals.some((meal) => meal.type === type && (meal.items ?? []).length > 0),
+  );
+}
+
+export function resolveDailyInsightActivityStatus(
   activity: SpecialActivity | null | undefined,
+  requestedDate: string,
+  currentLocalDate: string | null,
   localHour: number | null | undefined,
-  isCurrentDay = true,
-): ActivityCompletionStatus | null {
-  return resolveActivityCompletionStatus(activity, localHour, isCurrentDay).status;
+  isCurrentDay: boolean,
+): DailyInsightActivityStatus | null {
+  if (activity == null) return null;
+  if (currentLocalDate != null && requestedDate < currentLocalDate) return 'completed';
+  if (isCurrentDay && localHour != null && Number.isInteger(localHour) && localHour >= 22 && localHour <= 23) {
+    return 'completed';
+  }
+  return 'unknown';
 }
 
 export function hasMealItem(meals: readonly Meal[]): boolean {
@@ -167,6 +170,7 @@ export async function buildDailyInsightContext(
   const repositories = getDefaultRepositories(input);
   const now = input.now ?? new Date();
   const timezoneOffsetMinutes = normalizeTimezoneOffsetMinutes(input.timezoneOffsetMinutes);
+  const currentLocalDate = getCurrentLocalDate(now, timezoneOffsetMinutes);
   const isCurrentDay = timezoneOffsetMinutes == null
     ? false
     : input.isCurrentDay ?? isCurrentDayForOffset(input.date, now, timezoneOffsetMinutes);
@@ -208,8 +212,10 @@ export async function buildDailyInsightContext(
   const isWeightStale = daysSinceLastMeasurement !== null && daysSinceLastMeasurement > 14;
   const hasTodayMealItem = hasMealItem(diaryToday.meals);
   const currentTarget = resolveHistoricalTarget(toDayMetaInput(dayMeta), profile?.targets ?? null);
-  const activityStatus = resolveActivityCompletionStatus(
+  const dailyActivityStatus = resolveDailyInsightActivityStatus(
     dayMeta?.specialActivity,
+    input.date,
+    currentLocalDate,
     localHour,
     isCurrentDay,
   );
@@ -244,17 +250,14 @@ export async function buildDailyInsightContext(
   const remainingCalories = targets && today
     ? Math.round(targets.calories - today.calories)
     : null;
-  const remainingProteinG = targets && today
-    && targets.macroRanges?.proteinG != null
-    ? Math.max(0, Math.round(targets.macroRanges.proteinG.minG - today.protein))
-    : null;
-  const proteinCoachingBand = targets && today
-    ? classifyProteinCoachingBand(
-        today.protein,
-        isWeightStale ? null : profile?.weightKg,
-        targets.macroRanges?.proteinG,
-      )
-    : 'unknown';
+  const dailyInsightProteinStatus = classifyDailyInsightProteinStatus(
+    today?.protein ?? null,
+    profile?.weightKg,
+    isWeightStale,
+  );
+  const mealAdviceAllowed = hasRequiredMealTypes(diaryToday.meals)
+    && remainingCalories != null
+    && remainingCalories >= 300;
 
   return {
     date: input.date,
@@ -279,8 +282,8 @@ export async function buildDailyInsightContext(
       today,
       targets,
       remainingCalories,
-      remainingProteinG,
-      proteinCoachingBand,
+      dailyInsightProteinStatus,
+      mealAdviceAllowed,
       last3Days,
     },
     userGoal: profile?.goal ?? 'maintain',
@@ -301,8 +304,7 @@ export async function buildDailyInsightContext(
     currentHourLocal: localHour,
     timezoneOffsetMinutes,
     specialActivity: dayMeta?.specialActivity ?? null,
-    activityCompletionStatus: activityStatus.status,
-    activityStatusSource: activityStatus.source,
+    dailyActivityStatus,
   };
 }
 

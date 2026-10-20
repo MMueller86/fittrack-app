@@ -34,6 +34,13 @@ Every document is intentionally focused. Cross-references are used instead of du
 | [06-recipes.md](domain/06-recipes.md) | Recipe model, ingredients, nutrition, image storage | Backend + Frontend |
 | [07-ai-features.md](domain/07-ai-features.md) | AI use cases, workflows, confidence, user review | Backend + AI agent |
 | [08-quota-system.md](domain/08-quota-system.md) | User tiers, limits per feature, enforcement, 429 format | Backend |
+| [09-daily-insight.md](domain/09-daily-insight.md) | Daily Insight rules, signals, safety, and mobile contract | Backend + Frontend + QA |
+
+### Archive — `archive/`
+
+| Document | Purpose | Primary Consumer |
+|---|---|---|
+| [daily-insight-history-2026-10.md](archive/daily-insight-history-2026-10.md) | Historical Daily Insight evidence and contract text (v17 to v23); not current behavior | QA + Planner (reference only) |
 
 ### Product & UX — `product/`
 

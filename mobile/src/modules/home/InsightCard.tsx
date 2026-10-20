@@ -15,8 +15,8 @@ import * as Crypto from 'expo-crypto';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { Icon } from '../../shared/components/Icon';
 import { aiApi, getInsightFeedbackApiError } from '../../shared/api/aiApi';
-import type { InsightCtaTarget } from '@fittrack/shared';
 import type { DailyInsightResponse } from '../../services/insightService';
+import { InfoOverlay } from '../../shared/components/InfoOverlay';
 
 // ---------------------------------------------------------------------------
 // Skeleton (Lade-Zustand)
@@ -68,15 +68,12 @@ function InsightSkeleton() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// CTA navigation target mapping
-// ---------------------------------------------------------------------------
-
 interface Props {
   insight: DailyInsightResponse | null;
   date?: string | null;
-  onCtaPress?: (target: InsightCtaTarget) => void;
   onFeedbackSuccess?: () => void;
+  detail?: { visible: boolean; onClose: () => void };
+  inlineDetail?: boolean;
 }
 
 interface FeedbackTarget {
@@ -126,7 +123,7 @@ function getFeedbackErrorMessage(error: unknown): string {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Props) {
+export function InsightCard({ insight, date, onFeedbackSuccess, detail, inlineDetail = false }: Props) {
   const opacity = useRef(new Animated.Value(0)).current;
   const feedbackSheetRef = useRef<BottomSheetModal>(null);
   const submissionRef = useRef<FeedbackSubmission | null>(null);
@@ -153,7 +150,7 @@ export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Pr
 
   // Fade in when insight arrives
   useEffect(() => {
-    if (insight) {
+    if (insight && !detail) {
       opacity.setValue(0);
       Animated.timing(opacity, {
         toValue: 1,
@@ -171,6 +168,7 @@ export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Pr
     if (!insight || !date || feedbackUnavailable || !canSubmitFeedback(insight)) return;
 
     setMenuVisible(false);
+    detail?.onClose();
     setFeedbackTarget({ date, insightGeneratedAt: insight.generatedAt });
     setFeedbackComment('');
     setFeedbackError(null);
@@ -179,7 +177,7 @@ export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Pr
     submissionRef.current = { id: Crypto.randomUUID(), comment: '' };
     lastAttemptedCommentRef.current = null;
     feedbackSheetRef.current?.present();
-  }, [date, feedbackUnavailable, insight]);
+  }, [date, feedbackUnavailable, insight, detail]);
 
   const handleCommentChange = (value: string) => {
     setFeedbackComment(value);
@@ -252,7 +250,7 @@ export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Pr
     const feedbackAvailable = date != null && !feedbackUnavailable && canSubmitFeedback(insight);
 
     cardContent = (
-      <Animated.View style={[styles.card, { opacity }]}>
+      <Animated.View style={detail || inlineDetail ? styles.detailContent : [styles.card, { opacity }]}>
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={styles.headerIdentity}>
@@ -262,13 +260,13 @@ export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Pr
           {feedbackAvailable ? (
             <TouchableOpacity
               style={styles.menuButton}
-              onPress={() => setMenuVisible(true)}
+              onPress={detail || inlineDetail ? openFeedback : () => setMenuVisible(true)}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel="Weitere Optionen"
+              accessibilityLabel={detail || inlineDetail ? 'Feedback geben' : 'Weitere Optionen'}
               accessibilityState={{ expanded: menuVisible }}
             >
-              <Icon lib="feather" name="more-vertical" size="md" color={colors.textSecondary} />
+              <Icon lib="feather" name={detail || inlineDetail ? 'message-square' : 'more-vertical'} size="md" color={colors.textSecondary} />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -284,23 +282,17 @@ export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Pr
           <Text style={styles.recommendation}>{insight.recommendation}</Text>
         ) : null}
 
-        {/* CTA */}
-        {insight.cta && insight.ctaTarget && onCtaPress ? (
-          <TouchableOpacity
-            style={styles.cta}
-            onPress={() => onCtaPress(insight.ctaTarget!)}
-            activeOpacity={0.75}
-          >
-            <Text style={styles.ctaText}>{insight.cta}</Text>
-          </TouchableOpacity>
-        ) : null}
       </Animated.View>
     );
   }
 
   return (
     <>
-      {cardContent}
+      {detail ? (
+        <InfoOverlay visible={detail.visible} title="FitTrack Insight" body="" onClose={detail.onClose}>
+          {cardContent}
+        </InfoOverlay>
+      ) : cardContent}
 
       <Modal
         visible={menuVisible}
@@ -410,6 +402,9 @@ export function InsightCard({ insight, date, onCtaPress, onFeedbackSuccess }: Pr
 // ---------------------------------------------------------------------------
 
 const styles = StyleSheet.create({
+  detailContent: {
+    gap: spacing.sm,
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.xl,
@@ -468,20 +463,6 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '500' as const,
     fontStyle: 'italic',
-  },
-  // CTA
-  cta: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.xs,
-  },
-  ctaText: {
-    ...typography.caption,
-    color: colors.background,
-    fontWeight: '600' as const,
   },
   // Muted text (quota / unavailable)
   mutedText: {

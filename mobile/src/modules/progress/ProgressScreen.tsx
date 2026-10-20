@@ -1,69 +1,94 @@
 // ProgressScreen — the Progress tab (formerly WeightDetailScreen).
 //
-// Dashboard-first layout answering 5 key user questions in order:
-//   1. Wo stehe ich heute?          → ProgressHeroCard
-//   2. Entwickle ich mich richtig?  → ProgressHeroCard (delta + trend pill)
-//   3. Wie weit bis zum Ziel?       → ProgressHeroCard (goal progress bar)
-//   4. Neue Messung hinzufügen?     → NewMeasurementCard
-//   5. Bisheriger Verlauf?          → WeightChart + TrendStatsRow + HistoryList
+// Dashboard-first layout: current weight and entry first, followed by the
+// chart, trend summary, and grouped history.
 //
 // Technical: WeightEntry, weightsService, and all backend types are unchanged.
 // This file is a new presentation layer — no breaking changes to shared types.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
-  Dimensions,
   Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { addWeight, deleteWeight, listWeights } from '../../services/weightsService';
+import { addWeight, deleteWeight, listWeights, updateWeight } from '../../services/weightsService';
 import { healthSyncService } from '../../services/health/healthSyncService';
-import type { WeightEntry, WeightUnit, GoalType } from '@fittrack/shared';
+import type { WeightEntry, GoalType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
+import { addLocalDays, getLocalIsoDate } from '../../shared/date/localDate';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
 import { WeightChart } from '../../shared/components/WeightChart';
-import { ProgressHeroCard } from '../../shared/components/ProgressHeroCard';
-import { TrendStatsRow } from '../../shared/components/TrendStatsRow';
-import { NewMeasurementCard } from '../../shared/components/NewMeasurementCard';
+import { ProgressHeroCard, WeightEntryForm } from '../../shared/components/ProgressHeroCard';
 import { HistoryList } from '../../shared/components/HistoryList';
+import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
+import { Icon } from '../../shared/components/Icon';
 import { profileApi } from '../../shared/api/profileApi';
+import { ProgressCalendar } from './ProgressCalendar';
+import { getProgressAverageForWindow, getProgressEntriesForDate, getProgressEntriesInWindow, parseWeightInput, type ProgressWindowDays } from './progressUtils';
+import { formatKilograms } from '../../shared/weightFormatting';
 
-// Chart time-window options. 0 = show all entries.
-type WindowDays = 30 | 90 | 0;
-
-const WINDOW_OPTIONS: { label: string; value: WindowDays }[] = [
+const WINDOW_OPTIONS: { label: string; value: ProgressWindowDays }[] = [
+  { label: '7T', value: 7 },
   { label: '30T', value: 30 },
   { label: '90T', value: 90 },
   { label: 'Alle', value: 0 },
 ];
 
+function sortWeightEntries(entries: WeightEntry[]): WeightEntry[] {
+  return [...entries].sort((left, right) =>
+    right.date.localeCompare(left.date)
+      || right.createdAt.localeCompare(left.createdAt)
+      || left.id.localeCompare(right.id),
+  );
+}
+
+function formatWeightInput(value: number): string {
+  return String(value).replace('.', ',');
+}
+
+function formatEditorDate(iso: string): string {
+  const [year, month, day] = iso.split('-').map(Number);
+  return new Date(year, month - 1, day, 12).toLocaleDateString('de-DE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 export default function ProgressScreen() {
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [input, setInput] = useState('');
-  const [unit, setUnit] = useState<WeightUnit>('kg');
+  const [selectedDate, setSelectedDate] = useState(() => getLocalIsoDate());
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [editorVisible, setEditorVisible] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<WeightEntry | null>(null);
   const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
   const [goalType, setGoalType] = useState<GoalType>('lose_weight');
-  const [windowDays, setWindowDays] = useState<WindowDays>(30);
-
-  // Ref allows optimistic-delete rollback without stale closure
-  const entriesRef = useRef<WeightEntry[]>(entries);
-  useEffect(() => {
-    entriesRef.current = entries;
-  }, [entries]);
+  const [windowDays, setWindowDays] = useState<ProgressWindowDays>(7);
+  const { width: screenWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const load = useCallback(async () => {
     try {
@@ -72,7 +97,7 @@ export default function ProgressScreen() {
         listWeights(),
         profileApi.getMe(),
       ]);
-      setEntries(data);
+      setEntries(sortWeightEntries(data));
       if (profileData.profile?.targetWeightKg) {
         setTargetWeightKg(profileData.profile.targetWeightKg);
       }
@@ -94,72 +119,153 @@ export default function ProgressScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load]);
 
   const onSave = useCallback(async () => {
-    const normalized = input.replace(',', '.').trim();
-    const value = Number(normalized);
-    if (!Number.isFinite(value) || value <= 0) {
-      Alert.alert('Ungültiger Wert', 'Bitte gib eine positive Zahl ein (z.B. 78.5).');
+    const value = parseWeightInput(input);
+    if (value === null) {
+      setInputError(input.trim()
+        ? 'Bitte gib ein gültiges Gewicht größer als 0 kg ein.'
+        : 'Bitte gib dein Gewicht in kg ein.');
       return;
     }
+    const dateToSave = editorVisible ? selectedDate : getLocalIsoDate();
+    if (!editingEntryId && dateToSave > getLocalIsoDate()) {
+      setSaveError('Zukünftige Messungen können nicht eingetragen werden.');
+      return;
+    }
+
     Keyboard.dismiss();
+    setInputError(null);
+    setSaveError(null);
     setSaving(true);
     try {
-      const created = await addWeight({ value, unit });
-      setEntries((prev) => [created, ...prev]);
+      const entryToUpdate = editingEntryId
+        ? entries.find((entry) => entry.id === editingEntryId)
+        : entries.find((entry) => entry.date === dateToSave);
+      if (editingEntryId && !entryToUpdate) {
+        setSaveError('Diese Messung ist nicht mehr verfügbar. Bitte lade den Verlauf neu.');
+        return;
+      }
+      if (entryToUpdate && entryToUpdate.unit !== 'kg') {
+        setSaveError('Diese Messung kann nur in Kilogramm aktualisiert werden.');
+        return;
+      }
+
+      const savedEntry = entryToUpdate
+        ? await updateWeight(entryToUpdate.id, value)
+        : await addWeight({ value, unit: 'kg', date: dateToSave });
+      setEntries((previous) => sortWeightEntries(entryToUpdate
+        ? previous.map((entry) => entry.id === savedEntry.id ? savedEntry : entry)
+        : [...previous, savedEntry]));
       setInput('');
+      setEditingEntryId(null);
+      setSelectedDate(getLocalIsoDate());
+      if (editorVisible) {
+        setEditorVisible(false);
+      }
       // fire-and-forget — FitTrack-Flow nicht blockieren
-      void healthSyncService.syncWeightUpsert(created);
-    } catch (e) {
-      Alert.alert('Fehler', formatApiError(e, 'Speichern fehlgeschlagen'));
+      void healthSyncService.syncWeightUpsert(savedEntry);
+    } catch (saveFailure) {
+      setSaveError(formatApiError(saveFailure, 'Speichern fehlgeschlagen. Bitte versuche es erneut.'));
     } finally {
       setSaving(false);
     }
-  }, [input, unit]);
+  }, [editingEntryId, editorVisible, entries, input, selectedDate]);
 
-  const onDelete = useCallback((entry: WeightEntry) => {
-    Alert.alert(
-      'Eintrag löschen?',
-      `${entry.date} — ${entry.value.toFixed(1)} ${entry.unit}`,
-      [
-        { text: 'Abbrechen', style: 'cancel' },
-        {
-          text: 'Löschen',
-          style: 'destructive',
-          onPress: async () => {
-            const snapshot = entriesRef.current;
-            setEntries((prev) => prev.filter((e) => e.id !== entry.id));
-            try {
-              await deleteWeight(entry.id);
-              void healthSyncService.syncWeightDelete(entry.id);
-            } catch (e) {
-              setEntries(snapshot);
-              Alert.alert('Fehler', formatApiError(e, 'Löschen fehlgeschlagen'));
-            }
-          },
-        },
-      ],
-    );
+  const onInputChange = useCallback((value: string) => {
+    setInput(value);
+    setInputError(null);
+    setSaveError(null);
   }, []);
 
-  const latest = entries[0];
-  const previous = entries[1];
+  const onSelectCalendarDate = useCallback((date: string) => {
+    if (date > getLocalIsoDate()) return;
+    const entry = entries.find((current) => current.date === date);
+    if (entry && entry.unit !== 'kg') {
+      setMutationError('Diese Messung kann in Progress nicht bearbeitet werden.');
+      setCalendarVisible(false);
+      return;
+    }
+    setSelectedDate(date);
+    setEditingEntryId(entry?.id ?? null);
+    setInput(entry ? formatWeightInput(entry.value) : '');
+    setInputError(null);
+    setSaveError(null);
+    setMutationError(null);
+    setCalendarVisible(false);
+    setEditorVisible(true);
+  }, [entries]);
+
+  const onEditEntry = useCallback((entry: WeightEntry) => {
+    if (entry.unit !== 'kg') {
+      setMutationError('Diese Messung kann in Progress nicht bearbeitet werden.');
+      return;
+    }
+    setSelectedDate(entry.date);
+    setEditingEntryId(entry.id);
+    setInput(formatWeightInput(entry.value));
+    setInputError(null);
+    setSaveError(null);
+    setCalendarVisible(false);
+    setEditorVisible(true);
+  }, []);
+
+  const onCancelEdit = useCallback(() => {
+    setEditorVisible(false);
+    setSelectedDate(getLocalIsoDate());
+    setEditingEntryId(null);
+    setInput('');
+    setInputError(null);
+    setSaveError(null);
+  }, []);
+
+  const onOpenCalendar = useCallback(() => setCalendarVisible(true), []);
+  const onCloseCalendar = useCallback(() => setCalendarVisible(false), []);
+
+  const onDelete = useCallback((entry: WeightEntry) => {
+    setMutationError(null);
+    setDeleteTarget(entry);
+  }, []);
+
+  const confirmDelete = useCallback(async (entry: WeightEntry) => {
+    setEntries((prev) => prev.filter((current) => current.id !== entry.id));
+    if (editingEntryId === entry.id) onCancelEdit();
+    try {
+      await deleteWeight(entry.id);
+      void healthSyncService.syncWeightDelete(entry.id);
+    } catch (deleteFailure) {
+      setEntries((current) => {
+        if (current.some((currentEntry) => currentEntry.id === entry.id)) return current;
+        return sortWeightEntries([...current, entry]);
+      });
+      setMutationError(formatApiError(deleteFailure, 'Eintrag konnte nicht gelöscht werden.'));
+    } finally {
+      setDeleteTarget(null);
+    }
+  }, [editingEntryId, onCancelEdit]);
+
+  const sortedEntries = useMemo(() => sortWeightEntries(entries), [entries]);
+  const today = getLocalIsoDate();
+  const latest = sortedEntries.find((entry) => entry.date <= today);
   // Oldest entry = starting point for total progress calculation
-  const startEntry = entries.length > 0 ? entries[entries.length - 1] : undefined;
-
-  const chartWidth = useMemo(
-    () => Dimensions.get('window').width - spacing.lg * 2 - spacing.md * 2,
-    [],
+  const startEntry = sortedEntries.length > 0 ? sortedEntries[sortedEntries.length - 1] : undefined;
+  const todayEntry = getProgressEntriesForDate(sortedEntries, today)[0];
+  const chartEntries = useMemo(
+    () => getProgressEntriesInWindow(sortedEntries, windowDays, today),
+    [sortedEntries, today, windowDays],
   );
-
-  // WindowDays = 0 means "all" — pass a large value that covers any realistic history
-  const effectiveWindowDays = windowDays === 0 ? 99999 : windowDays;
+  const chartAverage = getProgressAverageForWindow(sortedEntries, windowDays, today);
+  const chartAverageLabel = windowDays === 0 ? 'Ø Gesamt' : `Ø ${windowDays} Tage`;
+  const chartWidth = screenWidth - spacing.md * 4;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
@@ -171,12 +277,8 @@ export default function ProgressScreen() {
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Progress</Text>
-        </View>
-
         {error ? <ErrorBanner error={error} onRetry={load} /> : null}
+        {mutationError ? <ErrorBanner error={mutationError} /> : null}
 
         {loading ? (
           <ActivityIndicator
@@ -186,78 +288,175 @@ export default function ProgressScreen() {
           />
         ) : (
           <>
-            {/* 1–3: Current value + delta + goal progress */}
             <ProgressHeroCard
+              entries={sortedEntries}
               latest={latest}
-              previous={previous}
               startEntry={startEntry}
               targetWeightKg={targetWeightKg}
-              unit={unit}
               goalType={goalType}
-            />
-
-            {/* Chart — only shown with ≥2 entries (WeightChart requires it) */}
-            {entries.length >= 2 && (
-              <View style={styles.chartCard}>
-                <View style={styles.chartHeader}>
-                  <Text style={styles.chartTitle}>Entwicklung</Text>
-                  <View style={styles.windowRow}>
-                    {WINDOW_OPTIONS.map((opt) => (
-                      <TouchableOpacity
-                        key={opt.value}
-                        onPress={() => setWindowDays(opt.value)}
-                        style={[
-                          styles.windowChip,
-                          windowDays === opt.value && styles.windowChipActive,
-                        ]}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: windowDays === opt.value }}
-                      >
-                        <Text
-                          style={[
-                            styles.windowChipLabel,
-                            windowDays === opt.value && styles.windowChipLabelActive,
-                          ]}
-                        >
-                          {opt.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-                <WeightChart
-                  entries={entries}
-                  width={chartWidth}
-                  height={220}
-                  windowDays={effectiveWindowDays}
-                  targetWeightKg={targetWeightKg}
-                />
-              </View>
-            )}
-
-            {/* Stats row: Ø 7T / Ø 30T / weekly change */}
-            <TrendStatsRow entries={entries} unit={unit} />
-
-            {/* 4: New measurement */}
-            <NewMeasurementCard
-              unit={unit}
-              onUnitChange={setUnit}
+              today={today}
+              showTodayForm={!todayEntry}
+              onOpenCalendar={onOpenCalendar}
               input={input}
-              onInputChange={setInput}
+              onInputChange={onInputChange}
               onSave={onSave}
               saving={saving}
+              inputError={inputError}
+              saveError={saveError}
             />
+
+            <View style={styles.chartCard}>
+              <View style={styles.chartHeader}>
+                <View style={styles.windowRow}>
+                  {WINDOW_OPTIONS.map((opt) => (
+                    <TouchableOpacity
+                      key={opt.value}
+                      onPress={() => setWindowDays(opt.value)}
+                      style={[
+                        styles.windowChip,
+                        windowDays === opt.value && styles.windowChipActive,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: windowDays === opt.value }}
+                    >
+                      <Text
+                        style={[
+                          styles.windowChipLabel,
+                          windowDays === opt.value && styles.windowChipLabelActive,
+                        ]}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                {chartAverage !== null ? (
+                  <View
+                    style={styles.chartAverageRow}
+                    accessible
+                    accessibilityLabel={`${chartAverageLabel}: ${formatKilograms(chartAverage)} kg`}
+                  >
+                    <Text style={styles.chartAverageValue}>{formatKilograms(chartAverage)} kg</Text>
+                  </View>
+                ) : null}
+              </View>
+              {chartEntries.length >= 2 ? (
+                <WeightChart
+                  entries={chartEntries}
+                  averageEntries={sortedEntries}
+                  averageWindowDays={windowDays === 0 ? 90 : windowDays}
+                  width={chartWidth}
+                  height={220}
+                  windowDays={chartEntries.length}
+                  targetWeightKg={targetWeightKg}
+                  calendarWindow={windowDays === 7 ? { firstDate: addLocalDays(today, -6), lastDate: today } : undefined}
+                />
+              ) : (
+                <View style={styles.chartEmpty}>
+                  <Text style={styles.chartEmptyText}>
+                    {entries.length < 2
+                      ? 'Nach zwei Messungen erscheint hier deine Entwicklung.'
+                      : 'Für diesen Zeitraum gibt es noch nicht genug Messungen.'}
+                  </Text>
+                </View>
+              )}
+            </View>
 
             {/* 5: History */}
             <Text style={styles.sectionLabel}>Verlauf</Text>
             <HistoryList
-              entries={entries}
-              unit={unit}
+              entries={sortedEntries}
               onDelete={onDelete}
+              onEdit={onEditEntry}
             />
           </>
         )}
       </ScrollView>
+      <Modal
+        visible={calendarVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={onCloseCalendar}
+      >
+          <View style={styles.calendarModalRoot}>
+          <TouchableOpacity
+            style={styles.calendarBackdrop}
+            onPress={onCloseCalendar}
+            activeOpacity={1}
+            accessible={false}
+          />
+          <View style={[styles.calendarSheet, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+            <ProgressCalendar
+              selectedDate={selectedDate}
+              today={today}
+              entries={sortedEntries}
+              onSelectDate={onSelectCalendarDate}
+              onClose={onCloseCalendar}
+            />
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={editorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={onCancelEdit}
+      >
+          <KeyboardAvoidingView
+            style={styles.calendarModalRoot}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+          <TouchableOpacity
+            style={styles.calendarBackdrop}
+            onPress={onCancelEdit}
+            activeOpacity={1}
+            accessible={false}
+          />
+          <View style={[styles.editorSheet, { paddingBottom: Math.max(insets.bottom, spacing.md) }]}>
+            <View style={styles.editorHeader}>
+              <View style={styles.editorHeading}>
+                <Text style={styles.editorTitle} accessibilityRole="header">
+                  {editingEntryId ? 'Gewicht aktualisieren' : 'Gewicht eintragen'}
+                </Text>
+                <Text style={styles.editorDate}>{formatEditorDate(selectedDate)}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.editorCloseButton}
+                onPress={onCancelEdit}
+                accessibilityRole="button"
+                accessibilityLabel="Gewichtseingabe schließen"
+              >
+                <Icon lib="feather" name="x" size="md" color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              style={styles.editorFormScroll}
+              keyboardShouldPersistTaps="handled"
+            >
+              <WeightEntryForm
+                isEditing={editingEntryId !== null}
+                input={input}
+                onInputChange={onInputChange}
+                onSave={onSave}
+                saving={saving}
+                inputError={inputError}
+                saveError={saveError}
+              />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      <ConfirmSheet
+        visible={deleteTarget !== null}
+        title="Eintrag löschen?"
+        subtitle={deleteTarget
+          ? `${formatKilograms(deleteTarget.value, 2)} kg · ${deleteTarget.date}`
+          : undefined}
+        actions={deleteTarget
+          ? [{ label: 'Eintrag löschen', destructive: true, onPress: () => { void confirmDelete(deleteTarget); } }]
+          : []}
+        onClose={() => setDeleteTarget(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -268,15 +467,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
-  },
-  header: {
-    marginBottom: spacing.lg,
-  },
-  headerTitle: {
-    ...typography.h1,
-    color: colors.text,
   },
   initialLoader: {
     marginTop: spacing.xxl,
@@ -289,23 +482,103 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+  calendarModalRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  calendarBackdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    backgroundColor: colors.overlay,
+  },
+  calendarSheet: {
+    width: '100%',
+    paddingHorizontal: spacing.md,
+  },
+  editorSheet: {
+    width: '100%',
+    maxWidth: 480,
+    maxHeight: '100%',
+    flexShrink: 1,
+    alignSelf: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingTop: spacing.md,
+    paddingHorizontal: spacing.md,
+  },
+  editorFormScroll: {
+    flexShrink: 1,
+  },
+  editorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  editorHeading: {
+    flex: 1,
+    minWidth: 0,
+  },
+  editorTitle: {
+    ...typography.h3,
+    color: colors.text,
+  },
+  editorDate: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    textTransform: 'capitalize',
+  },
+  editorCloseButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.full,
+    backgroundColor: colors.surfaceMuted,
+  },
   chartHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  chartTitle: {
-    ...typography.h3,
-    color: colors.text,
+  chartEmpty: {
+    height: 220,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  chartEmptyText: {
+    ...typography.body2,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   windowRow: {
     flexDirection: 'row',
     gap: spacing.xs,
   },
+  chartAverageRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginLeft: spacing.sm,
+  },
+  chartAverageValue: {
+    ...typography.h3,
+    color: colors.text,
+  },
   windowChip: {
+    minWidth: spacing.xxl,
+    minHeight: spacing.xxl,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: radius.full,
     backgroundColor: colors.surfaceMuted,
   },

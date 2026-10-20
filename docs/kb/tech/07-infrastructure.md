@@ -186,7 +186,7 @@ which creates a new Function App rather than changing this Y1 app in place.
 `_deploy_staging/package.json` is a production-only Node 22 manifest. It
 contains the backend runtime packages and the renderer packages
 `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static ~1.46.0`,
-`@tabler/icons ~3.46.0`, `sharp ^0.34.5`, and `hyphen ^1.14.1` for German
+`@tabler/icons ~3.46.0`, `sharp ^0.35.5`, and `hyphen ^1.14.1` for German
 detail-text hyphenation. `pixelmatch`, TypeScript,
 Vitest, and type packages remain in the backend workspace for tests and builds;
 they are not installed in production staging. The staging lockfile is generated
@@ -194,6 +194,13 @@ from this manifest. The standard Windows-to-Linux release uses the Azure Oryx
 remote build, which installs the lockfile dependencies on Linux; do not run
 `npm ci` for staging on Windows and do not package Windows-native `sharp` or
 Resvg modules.
+
+The manifest overrides `fflate` to `0.7.5`, including Satori's declared `0.7.3`
+dependency. The staging lock resolves `satori@0.33.5`, `fflate@0.7.5`,
+`form-data@4.0.6`, and `sharp@0.35.5` while keeping the declared Satori range
+in its existing `~0.33.4` line. The root workspace lock separately retains
+`form-data@2.5.5` under `@azure/ms-rest-js`; that dependency is not part of
+the standalone staging graph.
 
 ### Instagram renderer package and asset gate
 

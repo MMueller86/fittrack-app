@@ -341,6 +341,28 @@ The preview is advisory and transient. Per the US-05 product decision, this work
 
 ## 7. Daily Insight
 
+[Current] Daily Insight release v30 / prompt v29 / assembly v13 uses the B1.1 context as
+authoritative and describes only the current moment. Prior-day diary entries,
+targets, and activities are omitted from provider input. Meal, snack, and food
+advice eligibility is supplied as `mealAdviceAllowed` and protein status as
+`dailyInsightProteinStatus`; both are instructions in the prompt, no longer
+runtime wording checks. The former 20-g protein lock and its deterministic safety
+fallback are removed. The selected intent prioritizes its topic but does not
+suppress other relevant supplied current signals. Activity status is
+`completed` or `unknown`; no `likely_completed` compatibility state is
+inferred. Summary text has no word-count minimum and is limited to 5,000
+characters. The runtime validator enforces only the strict schema, the greeting
+and one-sentence `shortInsight` structure, and that every
+calorie number in the output was supplied in the context (see the
+[Server Validation Scope](09-daily-insight.md#server-validation-scope-2026-10-20)).
+The earlier keyword rules (prohibited terms, open-day completion phrases, target
+relation direction, unknown-activity completion, stale-weight markers, energy
+balance, historical days) and the one-shot safety fallbacks were removed on
+2026-10-20 and exist only as prompt guidance. Calorie differences do not prove
+physiological energy balance. The central
+[Daily Insight rulebook](09-daily-insight.md) owns the product rules. Weekly
+Insight diagnostics are separate and do not count as US-03 Daily failures.
+
 **Trigger:** `GET /api/ai/daily-insight` (once per day per user)
 
 The backend builds a server-owned `InsightInputContext` from the current diary
@@ -373,43 +395,31 @@ is:
 5. `nutrition_guidance` when current nutrition and targets are available;
 6. `general` otherwise.
 
-The AI receives the selected intent but cannot change it. For a present current-
-day activity, `localHour` `0..19` yields `planned` and `20..23` yields
-`likely_completed`. Missing, invalid, or non-current-day hour data yields
-`unknown`; without an activity, status and source are `null`. The source is
-`local_time_heuristic` for valid hours and `unavailable` for unknown status.
-There is no confirmed `completed` status. `planned` and `unknown` forbid
-completed-activity language; `likely_completed` permits only probabilistic or
-conditional wording. Long/intensive endurance activity is handled with
-qualitative fueling (including carbohydrates or energy), fluids, and recovery
-language, without adding unapproved numeric nutrition thresholds.
+The AI receives the selected intent but cannot change it. For a present
+activity, `dailyActivityStatus` is `completed` for a requested past local date
+or a current-day local hour of `22..23`; otherwise it is `unknown`. Without an
+activity, status is `null`. The provider cannot infer planned or likely-
+completed states. Long/intensive endurance activity is handled with qualitative fueling (including
+carbohydrates or energy), fluids, and recovery language, without adding
+unapproved numeric nutrition thresholds.
 
-### Macro-range context (v18)
+### Effective calorie budget
 
-For current-day nutrition, the backend selects `restDay` or `trainingDay` from
-the stored day type (defaulting to `restDay`) and carries that profile day's
-`macroRanges` into the Daily Insight context. A special-activity bonus changes
-only the effective calorie target; it does not change those ranges or allocate
-bonus calories to a macro.
+`nutrition.targets.calories` is the server-resolved effective target. An
+explicit training day uses its profile `trainingDay` target; the default/rest
+day uses `restDay`. A Special Activity's effective target includes its
+recorded activity bonus exactly once. `nutrition.today.calories` is logged
+intake and `nutrition.remainingCalories` is the exact target-minus-intake
+difference. `activity_focus` may state these supplied values and the exact
+named bonus. It must not add the bonus again, substitute the Special Activity's
+base target for the effective target, estimate activity calories burned, or
+claim an achieved energy deficit/surplus. The activity-focus provider
+projection retains qualitative activity signals and the supplied target/bonus
+but omits `activityCalories`, `estimatedMet`, and `alreadyAccountedCalories`.
+The bonus changes calories only; it does not change the selected profile-day
+macro ranges.
 
-When current intake and a usable protein range exist, `remainingProteinG` is
-the non-negative rounded distance from consumed protein to the range's lower
-bound. `proteinCoachingBand` uses actual protein per kilogram when usable body
-weight is available: below `1.5 g/kg` is `below_range`, `1.5–2.0 g/kg`
-inclusive is `in_range`, above `2.0` through `2.2 g/kg` inclusive is
-`above_range`, and above `2.2 g/kg` is `above_coaching_threshold`. If weight
-is unavailable or stale, the rounded range bounds are used; missing usable
-intake or ranges produce an unknown band. The `2.2 g/kg` threshold is a
-non-medical coaching parameter, not a safety limit. The existing 20 g stop for
-additional protein recommendations is measured against the rounded protein
-lower bound.
-
-The v18 prompt and provider projection use the ranges and server-computed
-coaching signals, never legacy scalar `proteinG` or `carbsG` values, to assess
-protein or carbohydrates. The carbohydrate range is guidance only: values
-outside it are not described as too low or too high and do not justify a
-negative correction. Historical days do not receive current macro targets.
-Weekly Insight remains calorie-based and receives no profile macro ranges.
+### Daily request boundary
 
 The current Mobile Daily request also sends `timezoneOffsetMinutes`, interpreted
 as local time minus UTC (for example, UTC+2 is `120`). Only integer values in
@@ -418,8 +428,8 @@ malformed, calendar-invalid, fractional, or out-of-range date/offset values
 return HTTP `400` at the handler boundary, before context construction, cache
 reads, quota checks, or AI calls. The handler never substitutes a backend UTC
 date or UTC expiry. A valid offset compares the requested date with the
-offset-adjusted local date, enables the validated `localHour` activity heuristic
-only for that current day, and sets new Daily documents to expire at the next
+offset-adjusted local date before resolving `dailyActivityStatus`; for the
+current day, only local hours `22..23` produce `completed`. New Daily documents expire at the next
 local midnight represented as UTC. The Cosmos `ttl` is the ceiling of the
 remaining seconds. The normalized offset is part of the input hash, so a
 changed normalized offset follows the normal cache regeneration rules.
@@ -430,9 +440,9 @@ unchanged for valid requests. Context/provider and server-validation failures
 remain friendly HTTP `200` `unavailable` responses, and quota exhaustion remains
 friendly HTTP `200` `quota_exceeded` without usage tracking.
 
-### v18 prompt, output, and failure contract
+### Prompt, output, and failure contract
 
-`DAILY_INSIGHT_PROMPT_VERSION = 'v18'`. The selected focused module is combined
+`DAILY_INSIGHT_PROMPT_VERSION = 'v29'` (release v30). The selected focused module is combined
 with the shared German tone/output contract. The backend stores the exact
 `promptSnapshot.system` and serialized `promptSnapshot.user` sent to Azure
 OpenAI. Strict Structured Outputs use `json_schema`, `strict: true`, required
@@ -442,35 +452,18 @@ The active composition root is `backend/src/lib/prompts/dailyInsightPrompt.ts`.
 The shared Strict Structured Output schema is defined in
 `backend/src/lib/dailyInsightSchema.ts`, and the append-only release manifest
 is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`. It preserves the
-v14 fingerprint `sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`
-and the historical v15 fingerprint
-`sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`.
-The historical v16 fingerprint remains
-`sha256:3e68d4dd0b6e49003936a278f3e65d693645ebfb41ee5ced3ea7daa3efa70893`.
-The historical v17 fingerprint is
-`sha256:0373462c2f0e3b3050c51b4cfe468c6aca238ce3c0b15cf80c5be2b8847e4386`
-with assembly version `v2`. The active v18 fingerprint is
-`sha256:853697f9be7a8234443ff6ac89470485bb5e45a528539425a48b0f0e54f2ddae`,
-also with assembly version `v2`. The append-only historical records are
-unchanged. The WP-B2 handoff records passing focused tests and live evaluations
-for v18; earlier v17 evaluation results remain historical.
+v14 fingerprint and every later release record (v15 through v29) unchanged. The
+active release is v30 / prompt v29 / assembly v13 with fingerprint
+`sha256:827de73de0186f5320ad02e23c2896cd82a2e85a4d20a08040cdaefc688037eb`.
+Earlier fingerprints and their evidence are in the
+[Daily Insight history archive](../archive/daily-insight-history-2026-10.md).
 
-The following Q-21/CORR1 findings describe historical v17 evaluation evidence,
-not the current v18 gate result. The separate Q-21 Daily fix removes a
-shared-tone contradiction that asked for
-below-target wording despite the open-day prohibition. A positive remainder
-now permits only forward-looking open-room wording, subject to stricter intent
-rules; the four forbidden completed-day phrases remain prohibited. The actual
-`stale-weight` fixture selects `phase_progress` with 500 kcal still open.
-Its unchanged strict validator rejection is regression-tested; CORR1 stale-weight
-passes but unknown-activity fails. V17 removes the shared-tone permission to
-describe rest budget for activity_focus and appends that intent's existing
-open-day rule after the output contract, independently of protein gap/local
-hour. Unknown completion remains neutral; fueling/liquids/recovery stay
-conditional. Exact unknown-activity fixture and strict rejection regressions
-are offline, not invented raw provider output. G evidence contains no raw Daily
-text; exact causal wording and new live success remain unverified. This is not
-a Preparation/Import/Weekly-caused bug; Weekly does not consume sharedTone.
+The active activity-focus contract allows exact current intake, effective target,
+and remaining calories. A named Special Activity bonus is already included in
+the effective target and may be stated only as that bonus, never as activity
+calorie expenditure. The provider projection withholds the expenditure fields
+`activityCalories`, `estimatedMet`, and `alreadyAccountedCalories` while retaining
+qualitative context. Unknown activity status is not to be described as planned.
 
 The release identity is dual: `promptVersion` is the human-readable release
 identifier and `promptFingerprint` is the SHA-256 identity of the canonical
@@ -482,70 +475,65 @@ This third value distinguishes the concrete provider system prompt even when
 the global bundle identity and release version are unchanged.
 
 A positive or negative `remainingCalories` value is only a target-relative
-intake difference, not a measured energy balance. Validation rejects
+intake difference, not a measured energy balance. The prompt forbids
 affirmative achieved deficit/surplus claims across all user-visible text fields
-while allowing explicit denials and supported above/below-target comparisons.
+while allowing explicit denials and supported above/below-target comparisons;
+since 2026-10-20 this is no longer a runtime validator rule.
 For an open-day `phase_progress` insight, weight signals remain the progress
 basis; remaining calories are not presented as an eating budget and do not
-justify increasing intake or an eating recommendation/CTA. Independent
+justify increasing intake or an eating recommendation. Independent
 non-nutrition guidance remains possible.
 
+The same single provider call now also requires `greeting` (max 120 JavaScript
+string units) and `shortInsight` (max 240). PO-1 greeting is exactly
+`Hallo, <server displayName>! <one context-appropriate friendly emoji>`, without
+time-of-day language; the existing missing-name fallback remains `Sportler`.
+The short insight must be one self-contained complete German sentence,
+consistent with the full text and derived only from server FitTrack context.
+It cannot invent missing data, add a new recommendation or bypass activity,
+macro, budget, protein or stale-weight rules (prompt rules). Runtime checks the
+name/emoji prefix and the length/plain-single-sentence structure; these
+heuristics do not prove grammatical or semantic quality. The live eval asserts
+structure and supplied numbers only; wording is reviewed manually from the saved
+artifacts (see the Server Validation Scope in the rulebook). Generation uses
+temperature `0`, the unchanged 400-token budget and one call; there is no second
+production summary. Earlier judge-based and emulator-gate evidence is in the
+[Daily Insight history archive](../archive/daily-insight-history-2026-10.md).
+
 The server validates the parsed response and rejects provider truncation or
-content filtering, empty/invalid/schema-invalid responses, CTA/target
-mismatches, budget/protein contradictions, definitive activity claims,
-stale-as-current weight claims, unsupported historical target comparisons,
-unsupported claims about unlogged historical nutrition, invalid morning-source
-use, and forbidden technical wording. The public contract is character-based:
-`title` is at most 40 characters, `summary` at most 600,
-`recommendation` at most 240, and `cta` at most 80. There is no server-side
+content filtering, empty/invalid/schema-invalid responses, an invalid greeting
+or short-insight structure, and calorie numbers
+that were not supplied in the context. It does not validate wording. The public contract is
+character-based:
+`greeting` is at most 120, `shortInsight` at most 240,
+`title` is at most 40 characters, `summary` at most 5,000,
+`recommendation` at most 240. There is no server-side
 60-120-word summary validator. A failed context read, provider failure,
 truncation/content-filter result, or server validation failure returns friendly
 `unavailable` as HTTP `200`, is not persisted, and does not consume or track
 Daily quota. Quota exhaustion is also a friendly HTTP `200` with
 `status: 'quota_exceeded'` and no tracking.
 
-The stale-weight safety contract introduced in v15 remains global because the shared tone guard is
-included in every selected intent, not only the weight-focused modules. For
-`daysSinceLastMeasurement > 14`, weight or trend language is allowed only with
-an explicit stale marker such as `veraltet` or `nicht aktuell`; day 14 remains
-current and day 15 is stale. A stale-as-current sentence such as
-`Dein Gewicht ist heute klar gesunken.` is rejected, while explicit stale
-wording such as `Der Trend deines Gewichts ist nicht aktuell.` is accepted.
-The runtime root cause was that the stale rules had previously existed only in
-`promptWeight`, while deterministic `nutrition_guidance` selected
-`promptNutrition`; the fix introduced in v11 remains active in v18 and applies the shared guard to that path and all other
-intents. Server-side validation remains strict and was not weakened.
+The stale-weight rule introduced in v15 is global because the shared tone guard is
+included in every selected intent. For `daysSinceLastMeasurement > 14` (day 14
+remains current, day 15 is stale), weight or trend is omitted or marked with an
+explicit stale marker such as `veraltet` or `nicht aktuell`, and since v28 the
+`title` does not mention weight, trend, or kg. This is a prompt rule; the runtime
+validator no longer checks it (see the Server Validation Scope in the rulebook).
 
-Negative calorie budget is authoritative. A `remainingProteinG` value of
-`null` is unknown; a value at most 20 is treated as nearly complete. Neither
-state creates an additional protein action, and a negative calorie budget
-blocks further same-day food recommendations.
-
-For v18, a positive `remainingCalories` value is an unfinished target budget,
-not evidence of an achieved energy deficit or a completed energy balance. This
-also applies to `phase_progress`: the open-day guard keeps the narrative based
-on weight signals, does not present the remainder as an eating budget or base
-an eating recommendation/CTA on using it, and deterministic validation rejects
-achieved deficit or surplus language while allowing a target-relative control.
-For `activity_focus`, a positive remainder keeps the day open: the activity
-target is context only, and the response does not compare logged intake or the
-remaining amount against it. Historical target comparisons use that date's resolved effective target and
-consumed calories;
-missing nutrition, an unavailable/ambiguous source, a contradictory comparison
-direction, or a profile fallback presented as a then-stored target is rejected.
-`morning_orientation` is valid only before local hour 10 with no current
-MealItem; a missing prior-day MealItem remains unknown, not zero intake.
+A negative calorie budget (`remainingCalories < 0`) is authoritative: the prompt
+forbids further same-day food recommendations, and `recommendation` stays
+`null`. The response has no CTA/navigation fields. Protein interpretation follows the server-derived
+`dailyInsightProteinStatus`; there is no protein-gap threshold or lock.
 
 The cache hash preserves the prompt's semantic boundaries instead of relying
 only on rounded numeric values. `remainingCalories` is bucketed as
 `unknown` for `null`, undefined, or non-finite values, `negative` for values
 below zero, `zero` for exactly zero, and `positive` for values above zero.
-`remainingProteinG` is bucketed as `unknown` for `null`, undefined, or
-non-finite values, `nearly_complete_below` for values below 20,
-`nearly_complete_at` for exactly 20, and `gap` for values above 20. Therefore
-the cache distinguishes `-0.01`, `0`, and `0.01`, as well as `19.99`, `20`,
-and `20.01`, while retaining the existing rounding stability outside a
-controlling boundary.
+Therefore the cache distinguishes `-0.01`, `0`, and `0.01`, while retaining the
+existing rounding stability elsewhere. The hash also includes
+`dailyInsightProteinStatus`, `mealAdviceAllowed`, and the profile-day
+`macroRanges` with exact bounds.
 
 ### Daily cache and persistence
 
@@ -561,11 +549,10 @@ protein-gap signal, weight/progress signals, and the other prompt inputs.
 Missing or mismatched
 prompt version, `promptFingerprint`, `systemPromptHash`, `intent`, or
 `promptSnapshot` is a hard cache invalidation, independent of the regeneration
-interval, daily limit, or admin status. A complete, unexpired v14 same-date
-Daily remains cached and is returned unchanged until its existing expiry; v18,
-like v15/v16/v17, does not overwrite it early. After expiry, the date key may receive a new v18
-document. A v14 entry without complete provenance does not qualify for
-preservation and follows hard invalidation.
+interval, daily limit, or admin status. The existing complete unexpired v14
+same-date preservation exception remains restricted to active v15-v18. It is
+not extended to v19 or later, including v29: all follow normal identity invalidation, including for
+v14. A missing compact pair alone is never an invalidation/refresh trigger.
 
 An unchanged hash returns `cached`. A changed hash is subject to a 30-minute
 minimum interval and a maximum of three generations for non-admin users;
@@ -583,6 +570,17 @@ change. Legacy Daily documents remain readable through the repository, but
 Missing or mismatched current provenance makes them ineligible for a cache hit
 and for new feedback. Legacy feedback documents remain readable with their
 historical fields and are not rewritten or backfilled.
+
+The compact pair is likewise optional Class 0 data inside Daily and Feedback
+`response`. New validated generations persist both, and exact-instance
+feedback copies them unchanged. Old responses remain readable without fields;
+there is no migration, backfill, deletion, new container/index or rewrite.
+Caching this advisory text does not write nutrition, training or profile data.
+[Planned F-1] Without a successful available Insight and a valid complete pair,
+Home uses the existing static greeting without short text or detail action,
+including loading/network/AI/validation/quota failures. There is no special
+legacy display or forced generation, and opening details/selecting day type
+must not trigger AI. The B-1 backend does not implement this UI.
 
 ### Negative feedback and traceability
 
@@ -706,4 +704,4 @@ Required: API version ≥ `2024-07-01`, model ≥ `gpt-4o-mini 2024-07-18`.
 
 ## Prompt Versioning
 
-Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v18'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily document in Cosmos. The concrete `systemPromptHash` is stored for the exact composed system prompt used by that instance. When a provider-visible prompt, guard, assembly, or schema change affects output interpretation, the version must be incremented and the append-only release manifest updated.
+Each prompt has a version constant (e.g., `DAILY_INSIGHT_PROMPT_VERSION = 'v20'`). This readable version and the computed global `promptFingerprint` are stored with each new generated Daily document in Cosmos. The concrete `systemPromptHash` is stored for the exact composed system prompt used by that instance. When a provider-visible prompt, guard, assembly, or schema change affects output interpretation, the version must be incremented and the append-only release manifest updated.

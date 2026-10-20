@@ -9,6 +9,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import type { WeightEntry, GoalType } from '@fittrack/shared';
 import { evaluateWeightDelta } from '@fittrack/shared';
+import { formatKilograms } from '../weightFormatting';
 
 interface TrendPillProps {
   latest?: WeightEntry;
@@ -27,15 +28,15 @@ export function TrendPill({ latest, previous, goalType = 'lose_weight' }: TrendP
   if (!previous) {
     return (
       <View style={[styles.pill, styles.neutralPill]}>
-        <Text style={styles.neutralText}>First entry</Text>
+        <Text style={styles.neutralText}>Erste Messung</Text>
       </View>
     );
   }
   const delta = latest.value - previous.value;
-  if (parseFloat(Math.abs(delta).toFixed(2)) === 0) {
+  if (Math.round(Math.abs(delta) * 10) === 0) {
     return (
       <View style={[styles.pill, styles.neutralPill]}>
-        <Text style={styles.neutralText}>● No change</Text>
+        <Text style={styles.neutralText}>Keine Veränderung</Text>
       </View>
     );
   }
@@ -51,12 +52,12 @@ export function TrendPill({ latest, previous, goalType = 'lose_weight' }: TrendP
   const bg = isNeutral
     ? colors.surfaceMuted
     : isPositive
-    ? 'rgba(103, 178, 62, 0.15)'
-    : 'rgba(226, 107, 107, 0.15)';
+    ? colors.primarySoft
+    : colors.surfaceMuted;
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       <Text style={[styles.pillText, { color }]}>
-        {arrow} {Math.abs(delta).toFixed(2)} {latest.unit}
+        {arrow} {formatKilograms(Math.abs(delta))} {latest.unit}
       </Text>
     </View>
   );

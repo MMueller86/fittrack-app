@@ -26,6 +26,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
+    this.setState({ componentStack: info.componentStack ?? null });
     console.error('[ErrorBoundary] Uncaught error:', error.message);
     console.error('[ErrorBoundary] JS Stack:', error.stack);
     console.error('[ErrorBoundary] Component stack:', info.componentStack);
@@ -64,9 +65,18 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
           {componentStack ? (
             <View style={styles.stackBox}>
-              <Text style={styles.errorLabel}>Component Stack (kopierbar):</Text>
+              <Text style={styles.errorLabel}>React-Komponenten (kopierbar):</Text>
               <Text style={styles.stackText} selectable>
                 {componentStack}
+              </Text>
+            </View>
+          ) : null}
+
+          {error.stack ? (
+            <View style={styles.stackBox}>
+              <Text style={styles.errorLabel}>JavaScript-Stack (kopierbar):</Text>
+              <Text style={styles.stackText} selectable>
+                {error.stack}
               </Text>
             </View>
           ) : null}

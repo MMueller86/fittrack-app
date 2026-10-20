@@ -1,23 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const postMock = vi.hoisted(() => vi.fn());
+const putMock = vi.hoisted(() => vi.fn());
 const getLocalIsoDateMock = vi.hoisted(() => vi.fn());
 
 vi.mock('../shared/api/client', () => ({
-  apiClient: { post: postMock },
+  apiClient: { post: postMock, put: putMock },
 }));
 
 vi.mock('../shared/date/localDate', () => ({
   getLocalIsoDate: getLocalIsoDateMock,
 }));
 
-import { addWeight } from './weightsService';
+import { addWeight, updateWeight } from './weightsService';
 
 describe('addWeight', () => {
   beforeEach(() => {
     postMock.mockReset();
+    putMock.mockReset();
     getLocalIsoDateMock.mockReset();
     postMock.mockResolvedValue({ data: { id: 'weight-1' } });
+    putMock.mockResolvedValue({ data: { id: 'weight-1', value: 73.2 } });
     getLocalIsoDateMock.mockReturnValue('2026-08-20');
   });
 
@@ -38,5 +41,13 @@ describe('addWeight', () => {
       date: '2026-08-19',
     });
     expect(getLocalIsoDateMock).not.toHaveBeenCalled();
+  });
+
+  it('updates only the selected entry value by ID', async () => {
+    const updatedEntry = { id: 'weight-1', value: 73.2 };
+
+    await expect(updateWeight('weight-1', 73.2)).resolves.toEqual(updatedEntry);
+
+    expect(putMock).toHaveBeenCalledWith('/weights/weight-1', { value: 73.2 });
   });
 });

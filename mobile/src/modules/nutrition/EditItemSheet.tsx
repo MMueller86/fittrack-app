@@ -177,7 +177,7 @@ export default function EditItemSheet({
     if (visible) {
       dragY.value = 0;
       slideY.value = 600;
-      slideY.value = withSpring(0, { damping: 22, stiffness: 160 });
+      slideY.value = withTiming(0, { duration: 220 });
     }
   }, [visible]);
 

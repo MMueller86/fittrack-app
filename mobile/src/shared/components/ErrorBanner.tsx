@@ -30,7 +30,7 @@ export function ErrorBanner({ error, onRetry }: Props) {
     <View style={styles.container}>
       <Text style={styles.icon}>⚠</Text>
       <View style={styles.body}>
-        <Text style={styles.title}>Request failed</Text>
+        <Text style={styles.title}>Fehler</Text>
         <Text style={styles.detail}>{error}</Text>
         {onRetry ? (
           <TouchableOpacity
@@ -39,7 +39,7 @@ export function ErrorBanner({ error, onRetry }: Props) {
             style={[styles.retryBtn, retrying && styles.retryBtnDisabled]}
             accessibilityRole="button"
           >
-            <Text style={styles.retryLabel}>{retrying ? 'Retrying…' : 'Retry'}</Text>
+            <Text style={styles.retryLabel}>{retrying ? 'Wird erneut versucht...' : 'Erneut versuchen'}</Text>
           </TouchableOpacity>
         ) : null}
       </View>

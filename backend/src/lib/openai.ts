@@ -3,6 +3,7 @@
 // Uses Structured Outputs (API version >= 2024-07-01, model >= gpt-4o-mini 2024-07-18).
 
 import { AzureOpenAI } from 'openai';
+import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions/completions';
 import type { RecipeExportPreparationDiagnostic } from './recipeAnalyzeValidation';
 import { importContractViolations } from './recipeAnalyzeValidation';
 import { redistributeExportReferences, sortExportStepsBySourceOrder } from './recipePreparationOrder';
@@ -30,7 +31,11 @@ import {
 } from './prompts/weeklyInsightV2';
 import type { InsightInputContext, InsightIntent, InsightResponse } from '@fittrack/shared';
 import { selectInsightIntent } from './dailyInsightIntent';
-import { toInsightResponse, validateDailyInsightResponse } from './dailyInsightValidation';
+import {
+  DailyInsightValidationError,
+  toInsightResponse,
+  validateDailyInsightResponse,
+} from './dailyInsightValidation';
 import { validateWeeklyInsightExceedanceClaims } from './weeklyInsightValidation';
 import {
   RECIPE_EXPORT_MAX_STEP_LENGTH,
@@ -950,6 +955,8 @@ export interface GenerateInsightResult {
   promptSnapshot: DailyInsightPromptSnapshot;
 }
 
+const DAILY_INSIGHT_SEMANTIC_CORRECTION_LIMIT = 1;
+
 /**
  * Generate a daily AI insight from a structured input context.
  * Returns structured JSON parsed and validated by Zod.
@@ -962,50 +969,80 @@ export async function generateDailyInsight(
 ): Promise<GenerateInsightResult> {
   const client = getClient();
   const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  let messages: ChatCompletionMessageParam[] = [
+    { role: 'system', content: promptSnapshot.system },
+    { role: 'user', content: promptSnapshot.user },
+  ];
+  let tokensUsed = 0;
 
-  const completion = await client.chat.completions.create({
-    model: deployment,
-    messages: [
-      { role: 'system', content: promptSnapshot.system },
-      { role: 'user', content: promptSnapshot.user },
-    ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'daily_insight',
-        strict: true,
-        schema: DAILY_INSIGHT_SCHEMA,
+  for (let correction = 0; correction <= DAILY_INSIGHT_SEMANTIC_CORRECTION_LIMIT; correction += 1) {
+    const completion = await client.chat.completions.create({
+      model: deployment,
+      messages,
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'daily_insight',
+          strict: true,
+          schema: DAILY_INSIGHT_SCHEMA,
+        },
       },
-    },
-    temperature: 0.4,
-    max_tokens: 400,
-  });
+      temperature: 0,
+      max_tokens: 400,
+    });
 
-  const choice = completion.choices[0];
-  if (choice?.finish_reason === 'length' || choice?.finish_reason === 'content_filter') {
-    throw new Error(`Daily insight response rejected by provider: ${choice.finish_reason}`);
+    const choice = completion.choices[0];
+    if (choice?.finish_reason === 'length' || choice?.finish_reason === 'content_filter') {
+      throw new Error(`Daily insight response rejected by provider: ${choice.finish_reason}`);
+    }
+
+    const raw = choice?.message?.content;
+    if (!raw) throw new Error('Empty response from Azure OpenAI (daily-insight)');
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new Error('Invalid JSON response from Azure OpenAI (daily-insight)');
+    }
+
+    tokensUsed += completion.usage?.total_tokens ?? 0;
+    try {
+      const validated = validateDailyInsightResponse(parsed, context, intent);
+      return {
+        response: toInsightResponse(validated),
+        tokensUsed,
+        intent,
+        promptSnapshot,
+      };
+    } catch (error) {
+      if (!(error instanceof DailyInsightValidationError)) {
+        throw error;
+      }
+      if (correction === DAILY_INSIGHT_SEMANTIC_CORRECTION_LIMIT) {
+        throw error;
+      }
+
+      messages = [
+        {
+          role: 'system',
+          content: `${promptSnapshot.system}\n\n## Verbindliche Korrektur\nDie vorherige Antwort wurde von der serverseitigen Fachprüfung abgelehnt. Erzeuge die Antwort anhand des ursprünglichen Kontexts neu und gib das vollständige JSON-Objekt im vorgegebenen Schema aus. Übernimm keine beanstandete Aussage.`,
+        },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            ...JSON.parse(promptSnapshot.user),
+            correction: {
+              rejectedRule: error.message,
+              instruction: 'Entferne die beanstandete Aussage und prüfe jede übrige Aussage erneut am ursprünglichen Kontext. Erfinde keine Werte.',
+            },
+          }),
+        },
+      ];
+    }
   }
 
-  const raw = choice?.message?.content;
-  if (!raw) throw new Error('Empty response from Azure OpenAI (daily-insight)');
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('Invalid JSON response from Azure OpenAI (daily-insight)');
-  }
-
-  const validated = validateDailyInsightResponse(parsed, context, intent);
-
-  const tokensUsed = completion.usage?.total_tokens ?? 0;
-
-  return {
-    response: toInsightResponse(validated),
-    tokensUsed,
-    intent,
-    promptSnapshot,
-  };
+  throw new Error('Daily insight semantic correction limit exhausted');
 }
 
 /** Exposed for mocking in tests. */

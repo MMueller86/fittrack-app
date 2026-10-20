@@ -59,7 +59,7 @@ import type {
 
 type SatoriRenderer = typeof import("satori").default;
 type ResvgConstructor = typeof import("@resvg/resvg-js").Resvg;
-type SharpFactory = typeof import("sharp");
+type SharpFactory = typeof import("sharp").default;
 
 type RuntimeDependencies = {
   satori: SatoriRenderer;

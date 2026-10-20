@@ -185,6 +185,21 @@ describe('CosmosInsightRepository.listRecent (contract)', () => {
 });
 
 describe('CosmosInsightRepository Daily provenance compatibility (contract)', () => {
+  it('roundtrips compact fields with Daily identity, provenance, TTL and partition isolation', async () => {
+    const document = makeDailyDocument();
+    document.promptVersion = 'v19';
+    document.response = {
+      ...document.response,
+      promptVersion: 'v19',
+      greeting: 'Hallo, Sportler! 👋',
+      shortInsight: 'Dein Tag ist noch offen.',
+    };
+    await repo.upsert(document);
+    await expect(repo.get(USER_A, document.date)).resolves.toMatchObject(document);
+    await expect(repo.get(USER_B, document.date)).resolves.toBeNull();
+    await expect(repo.getWeekly(USER_A, document.date)).resolves.toBeNull();
+  });
+
   it('reads a legacy Daily without prompt identities', async () => {
     const document = makeDailyDocument();
     const legacy: InsightDocument = { ...document };
@@ -199,12 +214,19 @@ describe('CosmosInsightRepository Daily provenance compatibility (contract)', ()
     const stored = await repo.get(USER_A, document.date);
     expect(stored?.promptFingerprint).toBeUndefined();
     expect(stored?.systemPromptHash).toBeUndefined();
+    expect(stored?.response.greeting).toBeUndefined();
+    expect(stored?.response.shortInsight).toBeUndefined();
   });
 });
 
 describe('CosmosInsightRepository feedback documents (contract)', () => {
-  it('creates a no-TTL feedback snapshot and keeps it separate from Daily reads', async () => {
+  it('creates a no-TTL feedback snapshot with compact fields and keeps it separate from Daily reads', async () => {
     const document = makeDailyDocument();
+    document.response = {
+      ...document.response,
+      greeting: 'Hallo, Sportler! 👋',
+      shortInsight: 'Dein Tag ist noch offen.',
+    };
     const feedback = {
       id: makeFeedbackId(USER_A, '11111111-1111-4111-8111-111111111111'),
       userId: USER_A,
@@ -328,6 +350,9 @@ describe('CosmosInsightRepository feedback documents (contract)', () => {
       id: feedbackId,
       processingStatus: 'Open',
     });
+    const stored = await repo.getFeedbackBySubmissionId(USER_A, submissionId);
+    expect(stored?.response.greeting).toBeUndefined();
+    expect(stored?.response.shortInsight).toBeUndefined();
   });
 
   it('updates processing status with exact partition/id/docType guard and terminal semantics', async () => {

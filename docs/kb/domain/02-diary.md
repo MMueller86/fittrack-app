@@ -66,6 +66,10 @@ for the route request contract.
 
 `DayMeta` — per-day metadata stored as `_docType: 'dayMeta'` in the existing `nutritionDiaryMeals` Cosmos container.
 
+Diary reads return meal documents only. They retain legacy meals without a
+`_docType` and accept explicit `_docType: 'meal'`, while excluding `DayMeta`
+and other document types stored in the shared container.
+
 - `dayType: 'rest' | 'training'` — determines which targets apply
 - `workoutType` — optional label for training days
 - `specialActivity?: SpecialActivity` — persisted result of a special activity calculation (see below)
@@ -94,23 +98,23 @@ baked into the user's daily calorie target. The stored activity remains a
 
 ### Daily Insight activity-status boundary
 
-The Daily Insight derives a temporary language context from the requested
-current-day `localHour`; it does not change the diary activity contract or
-persist a new status:
+The user-facing Daily Insight activity rule and its local-time exceptions are
+maintained in the [central Daily Insight rulebook](09-daily-insight.md). The
+diary model itself stores no completion-status field; the backend derives a
+temporary status for the request.
+
+The Daily Insight derives a temporary language context for a present activity;
+it does not change the diary activity contract or persist a new status:
 
 | Condition with a present `specialActivity` | Daily status | Meaning |
 |---|---|---|
-| Valid `localHour` `0..19` for the current day | `planned` | Logged/planned, not treated as completed |
-| Valid `localHour` `20..23` for the current day | `likely_completed` | Probabilistic or conditional language only |
-| Missing, non-integer, or out-of-range hour | `unknown` | No completion statement |
-| Requested date is not the current day | `unknown` | Current local time is not applied retrospectively |
+| Requested date is before the current local date | `completed` | A past-day activity is treated as completed under the server rule |
+| Current day and valid `localHour` `22..23` | `completed` | Server-confirmed completion window |
+| Otherwise, including missing/invalid hour or non-current future date | `unknown` | Do not claim planned or completed |
 
-Without a special activity, the status and its source are `null`. The source is
-`local_time_heuristic` for valid current-day hours and `unavailable` for an
-unknown status. There is deliberately no `completed` value: the activity
-entry has no confirmed completion source. `likely_completed` must never be
-worded as a confirmed fact, and `planned`/`unknown` must not use completed-
-activity language.
+Without a special activity, the status is `null`. The status values are only
+`completed` and `unknown`; the provider must not infer a planned or likely-
+completed state from the activity entry or time of day.
 
 The status is used only by the Daily Insight context and prompt. Historical
 activity snapshots remain available for their own target and activity data;
@@ -121,16 +125,17 @@ the requested local current day and the safety boundary for this heuristic. The
 Daily request requires a real `date` and an integer offset in that range;
 missing, malformed, or out-of-range values are rejected with HTTP `400` at the
 handler boundary. There is no UTC date, hour, or expiry fallback. With a valid
-offset, an activity is treated as current-day evidence only when the requested
-date matches the offset-adjusted local date; otherwise its status remains
-`unknown`.
+offset, the server resolves the requested date against the offset-adjusted
+local date before applying the completion rule.
 See [tech/09-api-reference.md](../tech/09-api-reference.md) for the complete
 cache, local-midnight, and TTL contract.
 
-The active v18 Daily Insight also applies one global stale-weight safety rule across
-all intents: day 14 is current, day 15 is stale, stale-as-current wording is
-rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
-accepted. The full prompt and failure contract is documented in
+The active Daily Insight prompt also applies one global stale-weight rule across
+all intents: day 14 is current, day 15 is stale, and stale weight is omitted or
+marked with an explicit marker such as `veraltet` or `nicht aktuell`. Since
+2026-10-20 this is a prompt rule only; the runtime validator no longer checks it
+(see the [rulebook](09-daily-insight.md#server-validation-scope-2026-10-20)). The full prompt
+and failure contract is documented in
 [domain/07-ai-features.md](07-ai-features.md).
 
 ### Activity Bonus

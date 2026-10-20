@@ -32,7 +32,7 @@ import { DayStoryCard } from '../../shared/components/DayStoryCard';
 import type { MealMacroSummary } from '../../shared/components/DayStoryCard';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Icon } from '../../shared/components/Icon';
-import { FOOD_ENTRY_HEADER_HEIGHT, FoodEntrySearchRow } from '../../shared/components/FoodEntrySearchRow';
+import { FoodEntrySearchRow } from '../../shared/components/FoodEntrySearchRow';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -330,6 +330,7 @@ function MealCard({
 export default function DiaryScreen({ navigation, route }: Props) {
   const initialRouteDate = isValidDateOnly(route.params?.date) ? route.params.date : null;
   const [date, setDate] = useState(initialRouteDate ?? getLocalIsoDate());
+  const activeDateRef = useRef(date);
   const consumedRouteDate = useRef<string | null>(null);
   const [data, setData] = useState<DiaryDayResponse | null>(null);
   const [loadedProfileTargets, setLoadedProfileTargets] = useState<ProfileTargets | null>(null);
@@ -340,7 +341,6 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const { dayType, targets, setTargets, hydrateDayType } = useDayTypeStore();
   const openHub = useFoodEntryHubStore((s) => s.open);
   const insets = useSafeAreaInsets();
-  const [headerRowHeight, setHeaderRowHeight] = useState(0);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedItemKeys, setSelectedItemKeys] = useState<Set<string>>(() => new Set());
   const [bulkMutation, setBulkMutation] = useState<'delete' | 'move' | 'copy' | null>(null);
@@ -365,6 +365,10 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const contentAnimStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
 
   const routeDate = route.params?.date;
+  useEffect(() => {
+    activeDateRef.current = date;
+  }, [date]);
+
   useEffect(() => {
     if (routeDate == null) {
       consumedRouteDate.current = null;
@@ -621,7 +625,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
     const params = {
       date,
       onSuccess: () => { void loadDay(date); },
-      topInset: insets.top + headerRowHeight,
+      topInset: insets.top,
     };
 
     if (initialSubflow) {
@@ -639,7 +643,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
       date,
       mealType: meal?.type,
       onSuccess: () => { void loadDay(date); },
-      topInset: insets.top + headerRowHeight,
+      topInset: insets.top,
     });
   };
 
@@ -714,6 +718,59 @@ export default function DiaryScreen({ navigation, route }: Props) {
     });
   };
 
+  const handleUndoMove = async (
+    sourceDate: string,
+    originalItems: DiaryItemReference[],
+    movedItems: MealItem[],
+    movedTargetMeal: Meal,
+    removeEmptyTarget: boolean,
+  ): Promise<void> => {
+    if (bulkMutationInFlight.current) return;
+
+    bulkMutationInFlight.current = true;
+    setBulkMutation('move');
+    try {
+      if (originalItems.length !== movedItems.length) {
+        throw new Error('Moved item mapping is incomplete');
+      }
+
+      const referencesBySourceMeal = new Map<string, DiaryItemReference[]>();
+      originalItems.forEach((reference, index) => {
+        const references = referencesBySourceMeal.get(reference.mealId) ?? [];
+        references.push({ mealId: movedTargetMeal.id, itemId: movedItems[index]!.id });
+        referencesBySourceMeal.set(reference.mealId, references);
+      });
+
+      for (const [sourceMealId, references] of referencesBySourceMeal) {
+        await diaryApi.bulkMoveItems({
+          sourceDate,
+          items: references,
+          target: { mealId: sourceMealId },
+        });
+      }
+
+      if (removeEmptyTarget) {
+        try {
+          const currentDay = await diaryApi.getDay(sourceDate);
+          const targetMeal = currentDay.meals.find((meal) => meal.id === movedTargetMeal.id);
+          if (targetMeal && targetMeal.items.length === 0) {
+            await diaryApi.deleteMeal(targetMeal);
+          }
+        } catch {
+          // Leave the target meal intact when its current contents cannot be verified.
+        }
+      }
+
+      if (activeDateRef.current === sourceDate) await loadDay(sourceDate);
+    } catch {
+      if (activeDateRef.current === sourceDate) await loadDay(sourceDate);
+      showSnackbar({ message: 'Das Verschieben konnte nicht vollständig rückgängig gemacht werden. Bitte prüfe das Tagebuch.' });
+    } finally {
+      bulkMutationInFlight.current = false;
+      setBulkMutation(null);
+    }
+  };
+
   const handleMoveItems = async (
     items: DiaryItemReference[],
     target: DiaryBulkMoveTarget,
@@ -731,6 +788,15 @@ export default function DiaryScreen({ navigation, route }: Props) {
         message: reloaded
           ? `${countLabel} nach ${MEAL_LABELS[result.targetMeal.type]} verschoben.`
           : `${countLabel} verschoben. Tagebuchansicht konnte nicht aktualisiert werden.`,
+        undoLabel: 'Rückgängig',
+        durationMs: 5000,
+        onUndo: () => handleUndoMove(
+          date,
+          items,
+          result.targetMeal.items.slice(-result.movedCount),
+          result.targetMeal,
+          'newMealType' in target,
+        ),
       });
       return true;
     } catch (error) {
@@ -808,6 +874,13 @@ export default function DiaryScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.stickyHeader}>
+        {!selectionMode && (
+          <FoodEntrySearchRow
+            onSearch={() => handleOpenFoodEntryShortcut()}
+            onAi={() => handleOpenFoodEntryShortcut('ai')}
+            onBarcode={() => handleOpenFoodEntryShortcut('barcode')}
+          />
+        )}
         <GestureDetector gesture={Gesture.Pan()
           .activeOffsetX([-20, 20])
           .failOffsetY([-20, 20])
@@ -823,26 +896,27 @@ export default function DiaryScreen({ navigation, route }: Props) {
           <View
             testID="diary-header-row"
             style={styles.headerRow}
-            onLayout={(e) => setHeaderRowHeight(e.nativeEvent.layout.height)}
           >
-            <Text style={styles.headerEyebrow}>Ernährung</Text>
+            <Text testID="diary-date-label" style={styles.dateLabel}>{formatDateLabel(date)}</Text>
             <View style={styles.dateNavCenter}>
               <TouchableOpacity
                 onPress={prevDay}
                 style={[styles.dateNavBtn, bulkMutation !== null && styles.dateNavBtnDisabled]}
                 disabled={bulkMutation !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Vorheriger Tag"
               >
-                <Text style={styles.dateNavArrow}>‹</Text>
+                <Icon lib="feather" name="chevron-left" size="sm" color={colors.textSecondary} />
               </TouchableOpacity>
-              <Text style={styles.dateLabel}>{formatDateLabel(date)}</Text>
               <TouchableOpacity
                 onPress={nextDay}
                 style={[styles.dateNavBtn, (isToday || bulkMutation !== null) && styles.dateNavBtnDisabled]}
                 disabled={isToday || bulkMutation !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Nächster Tag"
               >
-                <Text style={[styles.dateNavArrow, (isToday || bulkMutation !== null) && styles.dateNavArrowDisabled]}>›</Text>
+                <Icon lib="feather" name="chevron-right" size="sm" color={colors.textSecondary} />
               </TouchableOpacity>
-            </View>
             {selectionMode ? (
               <TouchableOpacity
                 style={styles.headerAction}
@@ -854,16 +928,10 @@ export default function DiaryScreen({ navigation, route }: Props) {
               >
                 <Text style={[styles.headerActionText, styles.headerActionCancelText]}>Abbrechen</Text>
               </TouchableOpacity>
-            ) : <View style={styles.headerSpacer} />}
+            ) : null}
+            </View>
           </View>
         </GestureDetector>
-        {!selectionMode && (
-          <FoodEntrySearchRow
-            onSearch={() => handleOpenFoodEntryShortcut()}
-            onAi={() => handleOpenFoodEntryShortcut('ai')}
-            onBarcode={() => handleOpenFoodEntryShortcut('barcode')}
-          />
-        )}
       </View>
 
       <Animated.View style={[{ flex: 1 }, contentAnimStyle]}>
@@ -1069,7 +1137,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
       )}
 
       {/* Snackbar (item delete undo + error feedback) */}
-      <Snackbar ref={snackbarRef} />
+      <Snackbar ref={snackbarRef} bottomOffset={spacing.md} />
     </SafeAreaView>
   );
 }
@@ -1078,6 +1146,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background },
   stickyHeader: {
     backgroundColor: colors.background,
+    paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -1086,26 +1155,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: FOOD_ENTRY_HEADER_HEIGHT,
+    minHeight: spacing.xxl,
     paddingHorizontal: spacing.md,
-  },
-  headerEyebrow: {
-    ...typography.caption,
-    fontWeight: '600' as const,
-    color: colors.textMuted,
-    width: 88,
+    gap: spacing.sm,
   },
   dateNavCenter: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
   },
-  headerSpacer: {
-    width: 88,
-  },
   headerAction: {
-    width: 88,
-    height: 36,
+    minHeight: spacing.xxl,
+    paddingHorizontal: spacing.sm,
     alignItems: 'flex-end',
     justifyContent: 'center',
   },
@@ -1146,17 +1207,13 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   dateNavBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
+    width: spacing.xxl,
+    height: spacing.xxl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dateNavBtnDisabled: { opacity: 0.35 },
-  dateNavArrow: { ...typography.h2, color: colors.primary, lineHeight: 28 },
-  dateNavArrowDisabled: { color: colors.textDisabled },
-  dateLabel: { ...typography.h3, color: colors.text },
+  dateLabel: { ...typography.body2, color: colors.textSecondary, flex: 1, letterSpacing: 0 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.md },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },

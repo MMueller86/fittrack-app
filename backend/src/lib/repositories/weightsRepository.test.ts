@@ -126,4 +126,76 @@ describe('InMemoryWeightsRepository (via factory)', () => {
     expect(await repo.delete('user-1', 'a')).toBe(false);
     expect(await repo.delete('user-1', 'never-existed')).toBe(false);
   });
+
+  it('updates only the value of the matching user-owned entry', async () => {
+    const repo = getWeightsRepository();
+    const userOneEntry = {
+      id: 'shared-id',
+      userId: 'user-1',
+      date: '2026-04-30',
+      value: 80,
+      unit: 'kg' as const,
+      createdAt: '2026-04-30T08:00:00.000Z',
+    };
+    const userTwoEntry = {
+      ...userOneEntry,
+      userId: 'user-2',
+      value: 70,
+      unit: 'lbs' as const,
+    };
+    await repo.add(userOneEntry);
+    await repo.add(userTwoEntry);
+
+    expect(await repo.updateValue('user-1', 'shared-id', 82.5)).toEqual({ ...userOneEntry, value: 82.5 });
+    expect(await repo.list('user-1')).toEqual([{ ...userOneEntry, value: 82.5 }]);
+    expect(await repo.list('user-2')).toEqual([userTwoEntry]);
+  });
+
+  it('leaves a same-date sibling entry completely unchanged when updating one ID', async () => {
+    const repo = getWeightsRepository();
+    const targetEntry = {
+      id: 'entry-to-update',
+      userId: 'user-1',
+      date: '2026-04-30',
+      value: 80,
+      unit: 'kg' as const,
+      createdAt: '2026-04-30T08:00:00.000Z',
+    };
+    const siblingEntry = {
+      id: 'same-day-sibling',
+      userId: 'user-1',
+      date: '2026-04-30',
+      value: 175,
+      unit: 'lbs' as const,
+      createdAt: '2026-04-30T09:00:00.000Z',
+    };
+    await repo.add(targetEntry);
+    await repo.add(siblingEntry);
+
+    const targetBeforeUpdate = { ...targetEntry };
+    const siblingBeforeUpdate = { ...siblingEntry };
+    const updated = await repo.updateValue('user-1', targetEntry.id, 82.5);
+
+    expect(updated).toEqual({ ...targetBeforeUpdate, value: 82.5 });
+    expect(await repo.list('user-1')).toEqual([
+      siblingBeforeUpdate,
+      { ...targetBeforeUpdate, value: 82.5 },
+    ]);
+  });
+
+  it('returns null when the ID is not owned by the requested user', async () => {
+    const repo = getWeightsRepository();
+    await repo.add({
+      id: 'owned-by-one',
+      userId: 'user-1',
+      date: '2026-04-30',
+      value: 80,
+      unit: 'kg',
+      createdAt: '2026-04-30T08:00:00.000Z',
+    });
+
+    expect(await repo.updateValue('user-2', 'owned-by-one', 82)).toBeNull();
+    expect(await repo.updateValue('user-1', 'missing', 82)).toBeNull();
+    expect(await repo.list('user-1')).toMatchObject([{ value: 80 }]);
+  });
 });

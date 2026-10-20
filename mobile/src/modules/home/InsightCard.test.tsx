@@ -51,6 +51,8 @@ vi.mock('react-native', async () => {
       View: 'Animated.View',
     },
     Modal,
+    Pressable: 'Pressable',
+    ScrollView: 'ScrollView',
     StyleSheet: {
       absoluteFillObject: {},
       create: <T,>(styles: T) => styles,
@@ -102,6 +104,7 @@ vi.mock('@gorhom/bottom-sheet', async () => {
 });
 
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
+vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 24, bottom: 24 }) }));
 
 const DATE = '2026-08-20';
 const GENERATED_AT = '2026-08-20T08:30:00.000Z';
@@ -113,8 +116,6 @@ const BASE_INSIGHT: DailyInsightResponse = {
   title: 'Dein Tagesfokus',
   summary: 'Eine stabile Analyse für den heutigen Tag.',
   recommendation: 'Plane den nächsten kleinen Schritt.',
-  cta: 'Ernährung öffnen',
-  ctaTarget: 'Nutrition',
   generatedAt: GENERATED_AT,
   promptVersion: 'v11',
   status: 'fresh',
@@ -157,6 +158,7 @@ async function renderCard(options: {
   insight?: DailyInsightResponse | null;
   date?: string | null;
   onFeedbackSuccess?: () => void;
+  detail?: { visible: boolean; onClose: () => void };
 } = {}): Promise<ReactTestRenderer> {
   let renderer!: ReactTestRenderer;
   await act(async () => {
@@ -165,6 +167,7 @@ async function renderCard(options: {
         insight={options.insight === undefined ? makeInsight() : options.insight}
         date={options.date === undefined ? DATE : options.date}
         onFeedbackSuccess={options.onFeedbackSuccess}
+        detail={options.detail}
       />,
     );
   });
@@ -251,6 +254,37 @@ afterEach(() => {
 });
 
 describe('InsightCard feedback interaction matrix', () => {
+  it.each(['Schließen', 'Overlay schließen', 'Android Back'])('dismisses detail through %s without loading another insight', async (action) => {
+    const onClose = vi.fn();
+    const renderer = await renderCard({ detail: { visible: true, onClose } });
+    expect(getText(renderer, BASE_INSIGHT.summary)).toBeDefined();
+    expect(getText(renderer, BASE_INSIGHT.recommendation!)).toBeDefined();
+    if (action === 'Android Back') {
+      const callback = renderer.root.findAll((node) => node.type === 'Modal')[0]!.props.onRequestClose;
+      if (typeof callback !== 'function') throw new Error('Expected platform back handler');
+      await act(async () => callback());
+    } else {
+      await press(getByLabel(renderer, action));
+    }
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('hands detail feedback to the existing sheet with exact provenance and stable retry ID', async () => {
+    const onClose = vi.fn();
+    const renderer = await renderCard({ detail: { visible: true, onClose } });
+    feedbackApiMock().mockRejectedValueOnce(new Error('offline'));
+    await press(getByLabel(renderer, 'Feedback geben'));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(hasFeedbackSheet(renderer)).toBe(true);
+    await changeComment(renderer, 'Nicht hilfreich');
+    await startSubmit(renderer);
+    await flushAsync();
+    await startSubmit(renderer);
+    expect(feedbackApiMock()).toHaveBeenCalledTimes(2);
+    expect(feedbackApiMock().mock.calls[0]?.[0]).toEqual(feedbackApiMock().mock.calls[1]?.[0]);
+    expect(feedbackApiMock().mock.calls[1]?.[0]).toMatchObject({ date: DATE, insightGeneratedAt: GENERATED_AT });
+  });
+
   it.each([
     { name: 'fresh insight', insight: makeInsight({ status: 'fresh' }), date: DATE, visible: true },
     { name: 'cached insight', insight: makeInsight({ status: 'cached' }), date: DATE, visible: true },

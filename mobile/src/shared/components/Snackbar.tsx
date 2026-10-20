@@ -30,7 +30,11 @@ interface State {
   visible: boolean;
 }
 
-export const Snackbar = React.forwardRef<SnackbarHandle>((_, ref) => {
+interface SnackbarProps {
+  bottomOffset?: number;
+}
+
+export const Snackbar = React.forwardRef<SnackbarHandle, SnackbarProps>(({ bottomOffset }, ref) => {
   const insets = useSafeAreaInsets();
   const [state, setState] = useState<State | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
@@ -82,7 +86,7 @@ export const Snackbar = React.forwardRef<SnackbarHandle>((_, ref) => {
     <Animated.View
       style={[
         styles.container,
-        { bottom: Math.max(insets.bottom, spacing.md) + 64, opacity },
+        { bottom: bottomOffset ?? Math.max(insets.bottom, spacing.md) + 64, opacity },
       ]}
       pointerEvents="box-none"
     >

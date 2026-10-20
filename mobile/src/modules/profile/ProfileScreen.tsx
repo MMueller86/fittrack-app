@@ -1,6 +1,6 @@
-// ProfileScreen — Profil-Hub: Titel, Kartenplatz (Basisdaten bzw. Lade-/Fehler-/Leerzustand), darunter die
+// ProfileScreen — Profil-Hub: Kartenplatz (Basisdaten bzw. Lade-/Fehler-/Leerzustand), darunter die
 // Navigationsgruppen (Persönliche Daten, Bibliothek, Integrationen, Gemeinsam, Rechtliches — siehe profileHubGroups.ts).
-// Titel und die Gruppen Bibliothek, Integrationen, Rechtliches werden in jedem Zustand gerendert.
+// Der aktive Tab liefert den Screen-Kontext; Bibliothek, Integrationen und Rechtliches bleiben immer sichtbar.
 
 import React, { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -63,8 +63,6 @@ export default function ProfileScreen({ navigation }: Props) {
         contentContainerStyle={styles.scroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} />}
       >
-        <Text style={styles.screenTitle} accessibilityRole="header">Profil</Text>
-
         {renderCardSlot()}
 
         {getProfileHubGroups({ hasProfile: status === 'ready' && profile !== null }).map((group) => (
@@ -89,7 +87,6 @@ export default function ProfileScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
-  screenTitle: { ...typography.h2, color: colors.text, marginBottom: spacing.md },
   stateCard: {
     ...profileCardStyle,
     alignItems: 'center',

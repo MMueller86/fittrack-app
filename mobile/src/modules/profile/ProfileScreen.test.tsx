@@ -104,7 +104,7 @@ function pressByLabel(renderer: ReactTestRenderer, label: string) {
 
 function expectPermanentGroups(renderer: ReactTestRenderer) {
   const all = text(renderer);
-  expect(all.indexOf('Profil |')).toBeGreaterThanOrEqual(0);
+  expect(textNodes(renderer)).not.toContain('Profil');
   expect(all).toContain('Bibliothek');
   expect(all).toContain('Favoriten & Eigene Lebensmittel');
   expect(all).toContain('Integrationen');
@@ -136,13 +136,13 @@ beforeEach(() => {
 });
 
 describe('ProfileScreen', () => {
-  it('shows title, one Basisdaten card and the groups in fixed order without detail cards', async () => {
+  it('shows one Basisdaten card and the groups in fixed order without a repeated tab title', async () => {
     mocks.profileApi.getMe.mockResolvedValue({ profile, targets });
     const { renderer } = await renderScreen();
 
     const nodes = textNodes(renderer);
     const all = text(renderer);
-    expect(all.indexOf('Profil |')).toBe(0);
+    expect(textNodes(renderer)).not.toContain('Profil');
     expect(all).toContain('Basisdaten');
     expect(nodes.filter((t) => t === 'Basisdaten')).toHaveLength(1);
     expect(all).toContain('Männlich');
@@ -152,7 +152,6 @@ describe('ProfileScreen', () => {
     expect(all).toContain('78 kg');
 
     const order = [
-      'Profil |',
       'Basisdaten',
       'Persönliche Daten',
       'Profil & Tagesziele',
@@ -191,7 +190,7 @@ describe('ProfileScreen', () => {
     expect(refreshControls(renderer)).toHaveLength(1);
   });
 
-  it('keeps title and permanent groups while loading and shows the labelled spinner', async () => {
+  it('keeps permanent groups while loading and shows the labelled spinner', async () => {
     mocks.profileApi.getMe.mockReturnValue(new Promise(() => {}));
     const { renderer, navigation } = await renderScreen();
 

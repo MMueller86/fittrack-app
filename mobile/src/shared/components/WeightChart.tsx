@@ -17,6 +17,8 @@ import Svg, {
 import { colors, spacing, typography } from '../../app/theme';
 import type { WeightEntry } from '@fittrack/shared';
 import { computeChartBounds } from './weightChartUtils';
+import { formatKilograms } from '../weightFormatting';
+import { addLocalDays } from '../date/localDate';
 
 interface WeightChartProps {
   entries: WeightEntry[];
@@ -25,6 +27,9 @@ interface WeightChartProps {
   width: number;
   targetWeightKg?: number;
   showLegend?: boolean;
+  calendarWindow?: { firstDate: string; lastDate: string };
+  averageEntries?: WeightEntry[];
+  averageWindowDays?: 7 | 30 | 90;
 }
 
 interface Point {
@@ -36,15 +41,31 @@ interface Point {
 
 const PAD = { top: 20, right: 20, bottom: 36, left: 44 };
 
-const LINE_COLOR   = '#8FD157';
-const AVG_COLOR    = '#7CB9E8';
-const TARGET_COLOR = '#F5A623';
+const LINE_COLOR   = colors.chart.line;
+const AVG_COLOR    = colors.chart.average;
+const TARGET_COLOR = colors.warning;
 
 function movingAverage(values: number[], window = 7): number[] {
   return values.map((_, i) => {
     const start = Math.max(0, i - (window - 1));
     const slice = values.slice(start, i + 1);
     return slice.reduce((s, v) => s + v, 0) / slice.length;
+  });
+}
+
+function calendarMovingAverage(
+  points: WeightEntry[],
+  entries: WeightEntry[],
+  windowDays: 7 | 30 | 90,
+): number[] {
+  return points.map((point) => {
+    const firstDate = addLocalDays(point.date, 1 - windowDays);
+    const values = entries
+      .filter((entry) => entry.date >= firstDate && entry.date <= point.date)
+      .map((entry) => entry.value);
+    return values.length > 0
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
+      : point.value;
   });
 }
 
@@ -119,6 +140,9 @@ export function WeightChart({
   width,
   targetWeightKg,
   showLegend = true,
+  calendarWindow,
+  averageEntries,
+  averageWindowDays,
 }: WeightChartProps) {
   const data = useMemo(() => {
     const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
@@ -136,18 +160,24 @@ export function WeightChart({
   }
 
   const values = data.map((e) => e.value);
-  const avg = movingAverage(values, 7);
+  const avg = averageWindowDays !== undefined
+    ? calendarMovingAverage(data, averageEntries ?? data, averageWindowDays)
+    : movingAverage(values, 7);
+  const averageLabel = averageWindowDays !== undefined
+    ? `Gleitender Ø ${averageWindowDays}T`
+    : 'Gleitender Ø 7 Messungen';
 
-  const minRaw = Math.min(...values, ...avg, ...(targetWeightKg !== undefined ? [targetWeightKg] : []));
-  const maxRaw = Math.max(...values, ...avg, ...(targetWeightKg !== undefined ? [targetWeightKg] : []));
+  const minRaw = Math.min(...values, ...avg);
+  const maxRaw = Math.max(...values, ...avg);
   const { yMin: min, yMax: max, ticks } = computeChartBounds(minRaw, maxRaw, targetWeightKg);
+  const targetVisible = targetWeightKg !== undefined && targetWeightKg >= min && targetWeightKg <= max;
 
   const innerW = width - PAD.left - PAD.right;
   const innerH = height - PAD.top - PAD.bottom;
   const bottomY = PAD.top + innerH;
 
-  const firstMs   = dateToMs(data[0]!.date);
-  const lastMs    = dateToMs(data[data.length - 1]!.date);
+  const firstMs   = dateToMs(calendarWindow?.firstDate ?? data[0]!.date);
+  const lastMs    = dateToMs(calendarWindow?.lastDate ?? data[data.length - 1]!.date);
   const dateRange = Math.max(lastMs - firstMs, 1);
 
   const xFor = (i: number) =>
@@ -187,6 +217,9 @@ export function WeightChart({
   dotIndices.add(n - 1);
 
   const xLabelIdx = Array.from(new Set([0, Math.floor((n - 1) / 2), n - 1]));
+  const xLabelDates = Array.from(new Set(calendarWindow
+    ? [calendarWindow.firstDate, addLocalDays(calendarWindow.firstDate, 3), calendarWindow.lastDate]
+    : xLabelIdx.map((index) => data[index]!.date)));
 
   const pillW = 62;
   const pillH = 17;
@@ -224,7 +257,7 @@ export function WeightChart({
               <SvgText
                 x={PAD.left - 5}
                 y={y + 4}
-                fontSize={9}
+                fontSize={typography.overline.fontSize}
                 fill={colors.textMuted}
                 textAnchor="end"
               >
@@ -235,16 +268,16 @@ export function WeightChart({
         })}
 
         {/* X-axis labels */}
-        {xLabelIdx.map((i) => (
+        {xLabelDates.map((date) => (
           <SvgText
-            key={`xlab-${i}`}
-            x={xFor(i)}
+            key={`xlab-${date}`}
+            x={PAD.left + ((dateToMs(date) - firstMs) / dateRange) * innerW}
             y={height - 10}
-            fontSize={9}
+            fontSize={typography.overline.fontSize}
             fill={colors.textMuted}
             textAnchor="middle"
           >
-            {formatShortDate(data[i].date)}
+            {formatShortDate(date)}
           </SvgText>
         ))}
 
@@ -262,7 +295,7 @@ export function WeightChart({
           <Path key={`fill-${si}`} d={areaPath(seg, bottomY)} fill="url(#areaGrad)" />
         ))}
 
-        {/* 7-day moving average — dashed, per segment */}
+        {/* Selected calendar-window average — dashed, per segment */}
         {avgSegments.map((seg, si) => (
           <Path
             key={`avg-${si}`}
@@ -330,7 +363,7 @@ export function WeightChart({
         })}
 
         {/* Target weight — dashed line + orange pill badge */}
-        {targetWeightKg !== undefined && (() => {
+        {targetVisible && targetWeightKg !== undefined && (() => {
           const ty = yFor(targetWeightKg);
           const inRange = ty >= PAD.top && ty <= PAD.top + innerH;
           if (!inRange) return null;
@@ -358,12 +391,12 @@ export function WeightChart({
               <SvgText
                 x={pillX + pillW / 2}
                 y={pillY + 11}
-                fontSize={9.5}
+                fontSize={typography.overline.fontSize}
                 fontWeight="700"
-                fill="#1A1A1A"
+                fill={colors.background}
                 textAnchor="middle"
               >
-                Ziel {targetWeightKg.toFixed(1)}
+                Ziel {formatKilograms(targetWeightKg)}
               </SvgText>
             </React.Fragment>
           );
@@ -378,10 +411,14 @@ export function WeightChart({
             <Text style={styles.legendLabel}>Gewicht</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={styles.legendDash} />
-            <Text style={styles.legendLabel}>Ø 7 Tage</Text>
+            <View style={styles.legendAverageLine} testID="weight-average-legend-swatch">
+              <View style={styles.legendAverageDash} testID="weight-average-legend-dash" />
+              <View style={styles.legendAverageDash} testID="weight-average-legend-dash" />
+              <View style={styles.legendAverageDash} testID="weight-average-legend-dash" />
+            </View>
+            <Text style={styles.legendLabel}>{averageLabel}</Text>
           </View>
-          {targetWeightKg !== undefined && (
+          {targetVisible && (
             <View style={styles.legendItem}>
               <View style={[styles.legendDash, { borderColor: TARGET_COLOR }]} />
               <Text style={styles.legendLabel}>Ziel</Text>
@@ -429,9 +466,19 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     borderColor: AVG_COLOR,
   },
+  legendAverageLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  legendAverageDash: {
+    width: 4,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: AVG_COLOR,
+  },
   legendLabel: {
     ...typography.caption,
-    fontSize: 10,
     color: colors.textSecondary,
   },
 });

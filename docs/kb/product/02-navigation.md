@@ -14,7 +14,7 @@ RootNavigator (NavigationContainer)
 │       ├── DiaryMain → DiaryScreen
 │       ├── HikingInput → HikingInputScreen (param: date, existing?)
 │       └── CyclingInput → CyclingInputScreen (param: date, existing?)
-├── Tab: Recipes
+├── Tab: Rezepte (route id `Recipes`)
 │   └── RecipeStack
 │       ├── RecipeList → RecipeListScreen
 │       ├── RecipeDetail → RecipeDetailScreen (param: id, transient intent?)
@@ -24,7 +24,7 @@ RootNavigator (NavigationContainer)
 │       └── ProgressMain → ProgressScreen
 └── Tab: Profil (route id `Profile`)
     └── ProfileStack
-        ├── ProfileMain → ProfileScreen (Profil-Hub: Titel, Karte `Basisdaten`, Linkgruppen)
+        ├── ProfileMain → ProfileScreen (Profil-Hub: Karte `Basisdaten`, Linkgruppen; kein wiederholter Seitentitel)
         ├── ProfileDetails → ProfileDetailsScreen (Alltag & Training, Ziel, Tagesziele; Header-Aktion `Bearbeiten`)
         ├── ProfileEdit → ProfileEditScreen (param: profile; nur über ProfileDetails erreichbar)
         ├── Library → LibraryScreen (Tabs `Favoriten` / `Eigene Lebensmittel`; einziger Bibliotheksweg)
@@ -42,10 +42,10 @@ Modals (overlaid on top):
 
 ### Profil-Hub: Informationsarchitektur
 
-`ProfileMain` zeigt von oben nach unten den Titel `Profil`, genau eine Karte (`Basisdaten`: Geschlecht, Alter, Größe, Gewicht, Zielgewicht) und danach die Navigationsgruppen aus `mobile/src/modules/profile/profileHubGroups.ts` in fester Reihenfolge (leere Gruppen werden nicht gerendert). `Alltag & Training`, `Ziel` und `Tagesziele` liegen nicht im Hub, sondern in `ProfileDetails`.
+`ProfileMain` zeigt genau eine Karte (`Basisdaten`: Geschlecht, Alter, Größe, Gewicht, Zielgewicht) und danach die Navigationsgruppen aus `mobile/src/modules/profile/profileHubGroups.ts` in fester Reihenfolge (leere Gruppen werden nicht gerendert). Der Tab `Profil` liefert den Screen-Kontext; ein zusätzlicher Seitentitel wird nicht wiederholt. `Alltag & Training`, `Ziel` und `Tagesziele` liegen nicht im Hub, sondern in `ProfileDetails`.
 
 ```
-Profil
+Profil (Tab)
 ┌ Basisdaten ───────────────┐
 │ Geschlecht / Alter /      │
 │ Größe / Gewicht /         │
@@ -79,7 +79,7 @@ RECHTLICHES
 
 #### Hub-Zustände
 
-Titel sowie die Gruppen `Bibliothek`, `Integrationen` und `Rechtliches` werden in jedem Zustand gerendert; `Impressum` und `Datenschutzerklärung` sind daher auch bei Lade- oder Profilfehler im Profil-Tab erreichbar. Nur der Platz der Karte `Basisdaten` und die Gruppe `Persönliche Daten` hängen vom Profilzustand ab:
+Die Gruppen `Bibliothek`, `Integrationen` und `Rechtliches` werden in jedem Zustand gerendert; `Impressum` und `Datenschutzerklärung` sind daher auch bei Lade- oder Profilfehler im Profil-Tab erreichbar. Nur der Platz der Karte `Basisdaten` und die Gruppe `Persönliche Daten` hängen vom Profilzustand ab:
 
 | Zustand | Kartenplatz | `Persönliche Daten` |
 |---|---|---|

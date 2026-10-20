@@ -213,6 +213,34 @@ describe('RecipeListScreen', () => {
     expect(mocks.recipeApi.listCommunity).not.toHaveBeenCalled();
   });
 
+  it('offers recipe creation inline with the first owner-list heading', async () => {
+    const recipe = makeRecipe('Linsenbowl', 'private');
+    recipe.lastUsedAt = '2026-10-15T12:00:00.000Z';
+    mocks.recipeApi.list.mockResolvedValue({ recipes: [recipe] });
+    const { renderer, navigation } = await renderList();
+
+    const createButton = findOne(
+      renderer,
+      (node) => node.type === 'TouchableOpacity' && node.props.accessibilityLabel === 'Rezept erstellen',
+      'inline recipe creation action',
+    );
+    expect(createButton.props.style).toMatchObject({ width: 48, height: 48 });
+    expect((createButton.props.style as { position?: string }).position).toBeUndefined();
+
+    await press(renderer, 'Rezept erstellen');
+    expect(navigation.navigate).toHaveBeenCalledWith('RecipeWizard');
+  });
+
+  it('offers a labeled recipe creation action in the empty state', async () => {
+    const { renderer, navigation } = await renderList();
+
+    expect(visibleText(renderer)).toContain('Noch keine Rezepte');
+    expect(visibleText(renderer)).toContain('Rezept erstellen');
+    await press(renderer, 'Rezept erstellen');
+
+    expect(navigation.navigate).toHaveBeenCalledWith('RecipeWizard');
+  });
+
   it('loads paginated community recipes, opens foreign details as community, and routes own items to owner detail', async () => {
     const foreignRecipe = makeCommunityRecipe('Fremdes Rezept');
     const ownRecipe = makeCommunityRecipe('Eigenes veröffentlichtes Rezept', true);

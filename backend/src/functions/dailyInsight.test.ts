@@ -158,6 +158,8 @@ function makeResponse(overrides: Partial<InsightResponse> = {}): InsightResponse
 function makeGenerationResult(overrides: Partial<GenerateInsightResult> = {}): GenerateInsightResult {
   return {
     response: {
+      greeting: 'Hallo, Testperson! 👋',
+      shortInsight: 'Dein längerfristiger Verlauf bewegt sich in Richtung deines Ziels.',
       title: 'Dein Fokus heute',
       summary: 'Dein Tag entwickelt sich in die richtige Richtung.',
     },
@@ -399,14 +401,16 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     expect(generateDailyInsight).toHaveBeenCalledTimes(1);
   });
 
-  it('invalidates an old Daily cache entry before returning a fresh v18 response', async () => {
+  it('invalidates a v28 Daily cache entry before returning a fresh v29 response', async () => {
     const context = makeInputContext();
     const cached = makeDaily(context, {
-      promptVersion: 'v9',
+      promptVersion: 'v28',
       intent: undefined,
       promptSnapshot: undefined,
-      inputHash: 'old-v9-hash',
-      response: makeResponse({ title: 'Alte v9 Analyse' }),
+      inputHash: 'old-v28-hash',
+      response: makeResponse({
+        title: 'Alte v28 Analyse',
+      }),
     });
     await getInsightRepository().upsert(cached);
 
@@ -422,7 +426,9 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
       feedbackAvailable: true,
     });
-    expect((response.jsonBody as InsightResponse).title).not.toBe('Alte v9 Analyse');
+    expect((response.jsonBody as InsightResponse).title).not.toBe('Alte v28 Analyse');
+    expect(response.jsonBody).not.toHaveProperty('cta');
+    expect(response.jsonBody).not.toHaveProperty('ctaTarget');
     expect(generateDailyInsight).toHaveBeenCalledTimes(1);
     await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toMatchObject({
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
@@ -431,7 +437,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     });
   });
 
-  it.each([false, true])('preserves an unexpired v14 same-date cache for Admin=%s', async (isAdmin) => {
+  it.each([false, true])('normally invalidates an unexpired v14 same-date cache under v20 for Admin=%s', async (isAdmin) => {
     const context = makeInputContext();
     const v14 = makeV14Cache(context);
     await getInsightRepository().upsert(v14);
@@ -443,14 +449,13 @@ describe('GET /api/ai/daily-insight handler contract', () => {
 
     expect(response.status).toBe(200);
     expect(response.jsonBody).toMatchObject({
-      title: 'Gespeicherte v14 Analyse',
-      promptVersion: 'v14',
-      status: 'cached',
+      title: 'Dein Fokus heute',
+      promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
+      status: 'fresh',
     });
-    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toEqual(v14);
-    expect(generateDailyInsight).not.toHaveBeenCalled();
-    expect(quotaCheckMock).not.toHaveBeenCalled();
-    expect(trackUsageMock).not.toHaveBeenCalled();
+    expect(generateDailyInsight).toHaveBeenCalledTimes(1);
+    expect(trackUsageMock).toHaveBeenCalledTimes(1);
+    expect(quotaCheckMock).toHaveBeenCalledTimes(isAdmin ? 0 : 1);
   });
 
   it('regenerates an unexpired v14 cache that has incomplete provenance', async () => {
@@ -471,7 +476,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     });
   });
 
-  it('generates and stores v18 after a same-date v14 cache expires', async () => {
+  it('generates and stores v19 after a same-date v14 cache expires', async () => {
     const context = makeInputContext();
     await getInsightRepository().upsert(makeV14Cache(context, {
       expiresAt: '2026-08-20T11:59:59.000Z',
@@ -563,6 +568,38 @@ describe('GET /api/ai/daily-insight handler contract', () => {
     expect(response.jsonBody).toMatchObject({ status: 'cached', feedbackAvailable: true });
     expect(generateDailyInsight).not.toHaveBeenCalled();
     expect(quotaCheckMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['both', 'greeting', 'shortInsight'] as const)('does not regenerate solely for missing %s compact fields', async (missing) => {
+    const cachedResponse = makeResponse({ greeting: 'Hallo, Testperson! 👋', shortInsight: 'Dein Tag bleibt offen.' });
+    if (missing === 'both' || missing === 'greeting') delete cachedResponse.greeting;
+    if (missing === 'both' || missing === 'shortInsight') delete cachedResponse.shortInsight;
+    const document = makeDaily(makeInputContext(), { response: cachedResponse });
+    await getInsightRepository().upsert(document);
+    const result = await dailyInsightHandler(await makeDailyRequest(), makeContext());
+    expect(result.jsonBody).toMatchObject({ ...cachedResponse, status: 'cached' });
+    expect(generateDailyInsight).not.toHaveBeenCalled();
+    expect(trackUsageMock).not.toHaveBeenCalled();
+    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toEqual(document);
+  });
+
+  it.each([
+    'invalid schema',
+    'greeting must greet the context name',
+    'shortInsight must be one complete plain sentence',
+    'Daily insight treats a planned or unknown activity as completed',
+    'Daily insight recommends additional protein after the protein target is nearly complete',
+    'Daily insight judges an open day as completed',
+    'Daily insight compares historical macro intake with the current range',
+  ])('returns unavailable without compact fields or side effects after %s', async (message) => {
+    generateDailyInsightMock.mockRejectedValue(new DailyInsightValidationError(message));
+    const result = await dailyInsightHandler(await makeDailyRequest(), makeContext());
+    expect(result.status).toBe(200);
+    expect(result.jsonBody).toMatchObject({ status: 'unavailable', feedbackAvailable: false });
+    expect(result.jsonBody).not.toHaveProperty('greeting');
+    expect(result.jsonBody).not.toHaveProperty('shortInsight');
+    expect(trackUsageMock).not.toHaveBeenCalled();
+    await expect(getInsightRepository().get(TEST_USER_ID, DATE)).resolves.toBeNull();
   });
 
   it('returns HTTP 200 unavailable when context construction fails without quota or persistence side effects', async () => {
@@ -718,6 +755,8 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       intent: 'phase_progress',
       inputContext: makeInputContext(),
       response: {
+        greeting: 'Hallo, Testperson! 👋',
+        shortInsight: 'Dein längerfristiger Verlauf bewegt sich in Richtung deines Ziels.',
         title: 'Dein Fokus heute',
         summary: 'Dein Tag entwickelt sich in die richtige Richtung.',
         generatedAt: '2026-08-20T12:00:00.000Z',

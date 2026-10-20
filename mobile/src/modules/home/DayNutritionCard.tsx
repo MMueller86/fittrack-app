@@ -46,8 +46,11 @@ const WEIGHT_TREND_WINDOW_DAYS = 14;
 const MINIMUM_TREND_MEASUREMENTS = 7;
 const WEEKLY_TREND_NEUTRAL_THRESHOLD_KG_PER_WEEK = 0.05;
 const SPARKLINE_WIDTH = 104;
+const WIDE_SPARKLINE_WIDTH = 96;
 const SPARKLINE_HEIGHT = 40;
 const SPARKLINE_INSET = 3;
+const CALORIE_PANEL_FLEX = 2.1;
+const WEIGHT_PANEL_FLEX = 1;
 const POUNDS_PER_KILOGRAM = 2.20462;
 const weightFormatter = new Intl.NumberFormat('de-DE', {
   minimumFractionDigits: 2,
@@ -89,7 +92,7 @@ function DonutRing({ pct, isOver }: { pct: number; isOver: boolean }) {
   const center = RING_SIZE / 2;
 
   return (
-    <Svg width={RING_SIZE} height={RING_SIZE}>
+    <Svg width={RING_SIZE} height={RING_SIZE} testID="calorie-ring">
       {/* Hintergrund-Ring */}
       <Circle
         cx={center}
@@ -141,10 +144,12 @@ function WeightTrendSparkline({
   series,
   referenceDate,
   showRegressionLine,
+  width,
 }: {
   series: WeightTrendSeries;
   referenceDate: string;
   showRegressionLine: boolean;
+  width: number;
 }) {
   if (series.measurements.length < 2) return null;
 
@@ -158,7 +163,7 @@ function WeightTrendSparkline({
   const xForDate = (date: string) => {
     const dayOffset = differenceInLocalDays(date, windowStart);
     return SPARKLINE_INSET
-      + (dayOffset / (WEIGHT_TREND_WINDOW_DAYS - 1)) * (SPARKLINE_WIDTH - SPARKLINE_INSET * 2);
+      + (dayOffset / (WEIGHT_TREND_WINDOW_DAYS - 1)) * (width - SPARKLINE_INSET * 2);
   };
   const yForWeight = (weightKg: number) => (
     SPARKLINE_HEIGHT - SPARKLINE_INSET
@@ -181,7 +186,7 @@ function WeightTrendSparkline({
 
   return (
     <Svg
-      width={SPARKLINE_WIDTH}
+      width={width}
       height={SPARKLINE_HEIGHT}
       testID="weight-sparkline"
       accessible={false}
@@ -193,19 +198,9 @@ function WeightTrendSparkline({
           testID="weight-actual-line"
           points={toSvgPoints(actualPoints)}
           fill="none"
-          stroke={colors.chart.average}
-          strokeWidth={1.5}
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      )}
-      {regressionPoints.length === 2 && (
-        <Polyline
-          testID="weight-regression-line"
-          points={toSvgPoints(regressionPoints)}
-          fill="none"
-          stroke={colors.textSecondary}
-          strokeWidth={2}
+          stroke={colors.textMuted}
+          strokeOpacity={0.45}
+          strokeWidth={1}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -216,10 +211,22 @@ function WeightTrendSparkline({
           testID={`weight-measurement-${index}`}
           cx={point.x}
           cy={point.y}
-          r={1.75}
-          fill={colors.chart.average}
+          r={1.25}
+          fill={colors.textMuted}
+          fillOpacity={0.6}
         />
       ))}
+      {regressionPoints.length === 2 && (
+        <Polyline
+          testID="weight-regression-line"
+          points={toSvgPoints(regressionPoints)}
+          fill="none"
+          stroke={colors.text}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      )}
     </Svg>
   );
 }
@@ -281,6 +288,7 @@ function WeightTrendSummary({
           series={series}
           referenceDate={referenceDate}
           showRegressionLine={hasTrend}
+          width={compact ? SPARKLINE_WIDTH : WIDE_SPARKLINE_WIDTH}
         />
       </View>
     </View>
@@ -303,8 +311,16 @@ function CalorieWeightOverview({
       style={[styles.overview, compact && styles.overviewCompact]}
       testID="calorie-weight-overview"
     >
-      <View style={styles.caloriePanel}>{children}</View>
-      <View style={compact ? styles.horizontalSeparator : styles.verticalSeparator} />
+      <View
+        style={[styles.caloriePanel, compact && styles.caloriePanelCompact]}
+        testID="calorie-panel"
+      >
+        {children}
+      </View>
+      <View
+        style={compact ? styles.horizontalSeparator : styles.verticalSeparator}
+        testID="calorie-weight-separator"
+      />
       <WeightTrendSummary entries={entries} referenceDate={referenceDate} compact={compact} />
     </View>
   );
@@ -376,13 +392,18 @@ function MacroTrack({
 
 function MacroRow({ label, value, target, color, showTargetFlag = false }: MacroRowProps) {
   const geometry = getMacroTrackGeometry(value, target);
-  const targetLabel = formatMacroTargetValue(target);
-  const accessibilityTarget = target == null
+  const hasTargetFlag = showTargetFlag && geometry.referencePosition != null;
+  const displayValue = formatMacroAmount(Math.round(value));
+  const displayTarget = target == null ? null : typeof target === 'number'
+    ? Math.round(target)
+    : { minG: Math.round(target.minG), maxG: Math.round(target.maxG) };
+  const targetLabel = formatMacroTargetValue(displayTarget);
+  const accessibilityTarget = displayTarget == null
     ? 'Ziel nicht verfügbar'
-    : typeof target === 'number'
-      ? `Ziel ${formatMacroAmount(target)} g`
-      : `Zielbereich ${formatMacroAmount(target.minG)} bis ${formatMacroAmount(target.maxG)} g`;
-  const accessibilityLabel = `${label}: ${formatMacroAmount(value)} g; ${accessibilityTarget}`;
+    : typeof displayTarget === 'number'
+      ? `Ziel ${formatMacroAmount(displayTarget)} g`
+      : `Zielbereich ${formatMacroAmount(displayTarget.minG)} bis ${formatMacroAmount(displayTarget.maxG)} g`;
+  const accessibilityLabel = `${label}: ${displayValue} g; ${accessibilityTarget}`;
 
   return (
     <View
@@ -391,22 +412,38 @@ function MacroRow({ label, value, target, color, showTargetFlag = false }: Macro
       accessibilityRole="text"
       accessibilityLabel={accessibilityLabel}
     >
-      <View style={rowStyles.infoRow}>
+      <View style={[rowStyles.infoRow, hasTargetFlag && rowStyles.flaggedInfoRow]} testID={`macro-info-${label}`}>
         <Text style={rowStyles.label}>{label}</Text>
-        <View style={rowStyles.valueGroup} testID={`macro-values-${label}`}>
-          {showTargetFlag && geometry.referencePosition != null && (
-            <View
-              style={rowStyles.targetFlag}
-              testID="macro-target-flag"
-              pointerEvents="none"
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
-            >
-              <Icon lib="mci" name="flag-checkered" size="sm" color={colors.textSecondary} />
-            </View>
-          )}
-          <Text style={[rowStyles.valueText, rowStyles.macroValueText]}>
-            <Text style={{ color }}>{formatMacroAmount(value)}</Text>
+        {hasTargetFlag && (
+          <View
+            style={[
+              rowStyles.targetFlag,
+              { left: `${geometry.referencePosition! * 100}%` },
+            ]}
+            testID="macro-target-flag"
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Icon lib="mci" name="flag-checkered" size="sm" color={colors.textSecondary} />
+          </View>
+        )}
+        <View
+          style={[
+            rowStyles.valueGroup,
+            hasTargetFlag && {
+              ...rowStyles.flaggedValueGroup,
+              width: `${(1 - geometry.referencePosition!) * 100}%`,
+            },
+          ]}
+          testID={`macro-values-${label}`}
+        >
+          <Text
+            style={[rowStyles.valueText, rowStyles.macroValueText]}
+            numberOfLines={hasTargetFlag ? 1 : undefined}
+            adjustsFontSizeToFit={hasTargetFlag}
+          >
+            <Text style={{ color }}>{displayValue}</Text>
             {targetLabel == null ? (
               <Text style={rowStyles.targetText}> g</Text>
             ) : (
@@ -473,6 +510,9 @@ const rowStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
+  flaggedInfoRow: {
+    minHeight: spacing.md,
+  },
   label: {
     ...typography.caption,
     color: colors.textMuted,
@@ -508,7 +548,16 @@ const rowStyles = StyleSheet.create({
     flex: 0,
     marginLeft: 0,
   },
+  flaggedValueGroup: {
+    flex: 0,
+    marginLeft: 'auto',
+    paddingLeft: spacing.md / 2 + spacing.xs,
+  },
   targetFlag: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -spacing.md / 2,
+    marginLeft: -spacing.md / 2,
     width: spacing.md,
     height: spacing.md,
     flexShrink: 0,
@@ -541,18 +590,20 @@ const rowStyles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     bottom: 0,
+    opacity: 0.4,
     borderWidth: 1,
     borderRadius: radius.sm,
     overflow: 'hidden',
   },
   rangeTint: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.18,
+    opacity: 0.12,
   },
   rangeStart: {
     position: 'absolute',
     top: spacing.xs,
     bottom: spacing.xs,
+    opacity: 0.4,
     width: 1,
   },
   referenceMarker: {
@@ -576,6 +627,7 @@ interface Props {
   activityBonus?: number;
   entries: WeightEntry[];
   referenceDate: string;
+  hasFoodEntries: boolean;
 }
 
 export function DayNutritionCard({
@@ -585,13 +637,14 @@ export function DayNutritionCard({
   activityBonus,
   entries,
   referenceDate,
+  hasFoodEntries,
 }: Props) {
   const { width: screenWidth } = useWindowDimensions();
   const compact = screenWidth < 380;
 
   if (!target) return null;
 
-  const isEmpty = !summary || summary.calories === 0;
+  const isEmpty = !hasFoodEntries;
   const bonus = activityBonus ?? 0;
   const calConsumed = Math.round(summary?.calories ?? 0);
   const activityBonusValues = bonus > 0
@@ -602,15 +655,11 @@ export function DayNutritionCard({
     return (
       <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
         <CalorieWeightOverview entries={entries} referenceDate={referenceDate} compact={compact}>
-          <View style={styles.emptyRow}>
-            {/* Leerer Ring */}
-            <DonutRing pct={0} isOver={false} />
-            <View style={styles.emptyText}>
-              <Text style={styles.emptyTitle}>Noch kein Eintrag.</Text>
-              <TouchableOpacity style={styles.ctaBtn} onPress={onPress} activeOpacity={0.75}>
-                <Text style={styles.ctaBtnText}>➕  Essen hinzufügen</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.emptyState} testID="empty-state">
+            <Text style={styles.emptyLabel}>Ernährung heute</Text>
+            <Text style={styles.emptyMessage}>
+              Deine Übersicht erscheint hier, sobald du etwas einträgst.
+            </Text>
           </View>
         </CalorieWeightOverview>
         {activityBonusValues && <ActivityBonusRow values={activityBonusValues} />}
@@ -700,9 +749,12 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
   },
   caloriePanel: {
-    flex: 1,
+    flex: CALORIE_PANEL_FLEX,
     minWidth: 0,
     justifyContent: 'center',
+  },
+  caloriePanelCompact: {
+    flex: 0,
   },
   verticalSeparator: {
     width: 1,
@@ -713,11 +765,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
   weightSummary: {
-    width: 112,
-    flexShrink: 0,
+    flex: WEIGHT_PANEL_FLEX,
+    minWidth: 0,
     justifyContent: 'center',
   },
   weightSummaryCompact: {
+    flex: 0,
     width: '100%',
   },
   weightVisuals: {
@@ -808,29 +861,18 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   // Empty State
-  emptyRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+  emptyState: {
+    alignItems: 'flex-start',
+    gap: spacing.xs,
   },
-  emptyText: {
-    flex: 1,
-    gap: spacing.sm,
+  emptyLabel: {
+    ...typography.caption,
+    color: colors.textMuted,
+    letterSpacing: 0,
   },
-  emptyTitle: {
+  emptyMessage: {
     ...typography.body2,
     color: colors.textSecondary,
-  },
-  ctaBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.full,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    alignSelf: 'flex-start',
-  },
-  ctaBtnText: {
-    ...typography.caption,
-    color: colors.background,
-    fontWeight: '600' as const,
+    letterSpacing: 0,
   },
 });

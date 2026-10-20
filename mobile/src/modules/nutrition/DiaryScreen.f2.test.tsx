@@ -476,16 +476,27 @@ afterEach(() => {
 });
 
 describe('DiaryScreen F2 bulk actions', () => {
-  it('opens search, AI and barcode with the selected date and aligned sheet inset', async () => {
+  it('puts date navigation below the Home search row and uses the same sheet inset', async () => {
     mocks.safeAreaTop = 24;
     const renderer = await renderScreen([makeDay([])]);
-    const headerRows = renderer.root.findAll((node) => node.props.testID === 'diary-header-row');
-    if (headerRows.length !== 1) throw new Error(`Expected one diary header row, found ${headerRows.length}`);
-    const headerRow = headerRows[0]!;
-    const onLayout = headerRow.props.onLayout as (
-      event: { nativeEvent: { layout: { height: number } } },
-    ) => void;
-    await act(async () => onLayout({ nativeEvent: { layout: { height: 36 } } }));
+    const orderedHeaderText = renderer.root.findAll((node) => (
+      node.type === 'Text'
+      && (node.props.children === 'Lebensmittel hinzufügen' || node.props.testID === 'diary-date-label')
+    ));
+    expect(orderedHeaderText).toHaveLength(2);
+    expect(orderedHeaderText[0]!.props.children).toBe('Lebensmittel hinzufügen');
+    expect(orderedHeaderText[1]!.props.testID).toBe('diary-date-label');
+
+    const dateControls = renderer.root.findAll((node) => (
+      node.type === 'Text' && node.props.testID === 'diary-date-label'
+      || node.type === 'TouchableOpacity' && (
+        node.props.accessibilityLabel === 'Vorheriger Tag'
+        || node.props.accessibilityLabel === 'Nächster Tag'
+      )
+    ));
+    expect(dateControls.map((node) => node.props.testID ?? node.props.accessibilityLabel)).toEqual([
+      'diary-date-label', 'Vorheriger Tag', 'Nächster Tag',
+    ]);
 
     expect(renderer.root.findAll((node) => node.props.children === 'Lebensmittel hinzufügen')).toHaveLength(1);
     expect(renderer.root.findAll((node) => node.props.children === 'KI')).toHaveLength(1);
@@ -498,7 +509,7 @@ describe('DiaryScreen F2 bulk actions', () => {
     await press(getByLabel(renderer, 'Lebensmittel hinzufügen'));
     expect(mocks.openFoodEntryHub).toHaveBeenLastCalledWith(expect.objectContaining({
       date: DATE,
-      topInset: 60,
+      topInset: 24,
       onSuccess: expect.any(Function),
     }));
 
@@ -508,7 +519,7 @@ describe('DiaryScreen F2 bulk actions', () => {
       date: DATE,
       initialSubflow: 'ai',
       autoCloseOnSave: true,
-      topInset: 60,
+      topInset: 24,
     }));
 
     mocks.openFoodEntryHub.mockClear();
@@ -517,7 +528,7 @@ describe('DiaryScreen F2 bulk actions', () => {
       date: DATE,
       initialSubflow: 'barcode',
       autoCloseOnSave: true,
-      topInset: 60,
+      topInset: 24,
     }));
   });
 
@@ -678,18 +689,27 @@ describe('DiaryScreen F2 bulk actions', () => {
     const sourceItem = makeItem('item-source', 'Haferflocken');
     const existingTargetItem = makeItem('item-existing', 'Apfel');
     const movedItem = makeItem('item-moved', 'Haferflocken');
+    const restoredItem = makeItem('item-restored', 'Haferflocken');
     const sourceBefore = makeMeal('meal-breakfast', 'breakfast', 'Frühstück', [sourceItem]);
     const targetBefore = makeMeal('meal-dinner', 'dinner', 'Abendessen', [existingTargetItem]);
     const targetAfter = makeMeal('meal-dinner', 'dinner', 'Abendessen', [existingTargetItem, movedItem]);
+    const sourceAfterUndo = makeMeal('meal-breakfast', 'breakfast', 'Frühstück', [restoredItem]);
     const before = makeDay([sourceBefore, targetBefore]);
     const after = makeDay([makeMeal('meal-breakfast', 'breakfast', 'Frühstück', []), targetAfter]);
-    mocks.apiBulkMoveItems.mockResolvedValue({
-      movedCount: 1,
-      removedItemIds: ['item-source'],
-      targetMeal: targetAfter,
-    });
+    const afterUndo = makeDay([sourceAfterUndo, targetBefore]);
+    mocks.apiBulkMoveItems
+      .mockResolvedValueOnce({
+        movedCount: 1,
+        removedItemIds: ['item-source'],
+        targetMeal: targetAfter,
+      })
+      .mockResolvedValueOnce({
+        movedCount: 1,
+        removedItemIds: ['item-moved'],
+        targetMeal: sourceAfterUndo,
+      });
 
-    const renderer = await renderScreen([before, after]);
+    const renderer = await renderScreen([before, after, afterUndo]);
     await press(getByLabel(renderer, 'edit:Haferflocken'));
     await press(getByLabel(renderer, 'open-single-move:item-source'));
     await press(getMoveTargetButton(renderer, 'Abendessen'));
@@ -706,6 +726,66 @@ describe('DiaryScreen F2 bulk actions', () => {
     expect(mocks.apiGetDay).toHaveBeenCalledTimes(2);
     expect(mocks.syncNutritionDelete).toHaveBeenCalledWith('item-source');
     expect(mocks.syncNutritionUpsert).toHaveBeenCalledWith(targetAfter, ['item-moved']);
+
+    const moveSnackbar = mocks.showSnackbar.mock.calls
+      .map(([config]) => config)
+      .find((config) => config.message === '1 Eintrag nach Abendessen verschoben.');
+    expect(moveSnackbar).toMatchObject({ undoLabel: 'Rückgängig', durationMs: 5000 });
+    expect(moveSnackbar?.onUndo).toEqual(expect.any(Function));
+    await act(async () => { await moveSnackbar?.onUndo?.(); });
+
+    expect(mocks.apiBulkMoveItems).toHaveBeenNthCalledWith(2, {
+      sourceDate: DATE,
+      items: [{ mealId: 'meal-dinner', itemId: 'item-moved' }],
+      target: { mealId: 'meal-breakfast' },
+    });
+    expect(mocks.apiGetDay).toHaveBeenCalledTimes(3);
+    expect(mocks.syncNutritionDelete).toHaveBeenCalledWith('item-moved');
+    expect(mocks.syncNutritionUpsert).toHaveBeenCalledWith(sourceAfterUndo, ['item-restored']);
+  });
+
+  it('undoes a move into a new meal and deletes that meal only after it is empty', async () => {
+    const sourceItem = makeItem('item-source', 'Haferflocken');
+    const movedItem = makeItem('item-moved', 'Haferflocken');
+    const restoredItem = makeItem('item-restored', 'Haferflocken');
+    const sourceBefore = makeMeal('meal-breakfast', 'breakfast', 'Frühstück', [sourceItem]);
+    const sourceEmpty = makeMeal('meal-breakfast', 'breakfast', 'Frühstück', []);
+    const createdTarget = makeMeal('meal-lunch', 'lunch', 'Mittagessen', [movedItem]);
+    const emptyTarget = makeMeal('meal-lunch', 'lunch', 'Mittagessen', []);
+    const sourceAfterUndo = makeMeal('meal-breakfast', 'breakfast', 'Frühstück', [restoredItem]);
+    const before = makeDay([sourceBefore]);
+    const afterMove = makeDay([sourceEmpty, createdTarget]);
+    const afterUndo = makeDay([sourceAfterUndo, emptyTarget]);
+    mocks.apiBulkMoveItems
+      .mockResolvedValueOnce({
+        movedCount: 1,
+        removedItemIds: ['item-source'],
+        targetMeal: createdTarget,
+      })
+      .mockResolvedValueOnce({
+        movedCount: 1,
+        removedItemIds: ['item-moved'],
+        targetMeal: sourceAfterUndo,
+      });
+
+    const renderer = await renderScreen([before, afterMove, afterUndo, afterUndo]);
+    await press(getByLabel(renderer, 'edit:Haferflocken'));
+    await press(getByLabel(renderer, 'open-single-move:item-source'));
+    await press(getMoveTargetButton(renderer, 'Mittagessen'));
+
+    const moveSnackbar = mocks.showSnackbar.mock.calls
+      .map(([config]) => config)
+      .find((config) => config.message === '1 Eintrag nach Mittagessen verschoben.');
+    expect(moveSnackbar?.onUndo).toEqual(expect.any(Function));
+    await act(async () => { await moveSnackbar?.onUndo?.(); });
+
+    expect(mocks.apiBulkMoveItems).toHaveBeenNthCalledWith(2, {
+      sourceDate: DATE,
+      items: [{ mealId: 'meal-lunch', itemId: 'item-moved' }],
+      target: { mealId: 'meal-breakfast' },
+    });
+    expect(mocks.apiDeleteMeal).toHaveBeenCalledWith('meal-lunch');
+    expect(mocks.syncNutritionDeleteMeal).toHaveBeenCalledWith(emptyTarget);
   });
 
   it('moves the complete selection once, reloads, resets selection, and syncs only affected IDs', async () => {

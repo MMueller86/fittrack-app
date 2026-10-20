@@ -42,8 +42,7 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
     },
     currentHourLocal: null,
     specialActivity: null,
-    activityCompletionStatus: null,
-    activityStatusSource: null,
+    dailyActivityStatus: null,
     ...overrides,
   };
 }
@@ -59,14 +58,11 @@ function withSignal(type: PrimarySignalType): Partial<InsightInputContext> {
 }
 
 describe('selectInsightIntent', () => {
-  it('uses activity focus for every present activity status', () => {
-    for (const status of ['planned', 'likely_completed', 'unknown'] as const) {
-      expect(selectInsightIntent(makeContext({
-        specialActivity: {} as InsightInputContext['specialActivity'],
-        activityCompletionStatus: status,
-        activityStatusSource: status === 'unknown' ? 'unavailable' : 'local_time_heuristic',
-      }))).toBe('activity_focus');
-    }
+  it.each(['completed', 'unknown'] as const)('uses activity focus for a present activity with %s status', (status) => {
+    expect(selectInsightIntent(makeContext({
+      specialActivity: {} as InsightInputContext['specialActivity'],
+      dailyActivityStatus: status,
+    }))).toBe('activity_focus');
   });
 
   it.each([
@@ -105,12 +101,14 @@ describe('selectInsightIntent', () => {
         targets: { calories: 2000, proteinG: 140, carbsG: 220, fatG: 70, fiberG: 30 },
         remainingCalories: 800,
         remainingProteinG: 60,
+        dailyInsightProteinStatus: 'below_range',
+        mealAdviceAllowed: true,
         last3Days: [],
       },
     }))).toBe('nutrition_guidance');
   });
 
-  it('uses the explicit priority and is deterministic', () => {
+  it('uses the explicit priority deterministically', () => {
     const context = makeContext({ currentHourLocal: 9, ...withSignal('milestone_reached') });
     expect(selectInsightIntent(context)).toBe('weight_signal');
     expect(selectInsightIntent(context)).toBe('weight_signal');

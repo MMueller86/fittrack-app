@@ -109,8 +109,6 @@ function makeDaily(overrides: Partial<InsightDocument> = {}): InsightDocument {
     title: 'Dein Fokus heute',
     summary: 'Dein Tag entwickelt sich in die richtige Richtung.',
     recommendation: 'Plane deine nächste Mahlzeit bewusst.',
-    cta: 'Ernährung öffnen',
-    ctaTarget: 'Nutrition',
     generatedAt: GENERATED_AT,
     promptVersion: 'v14',
     status: 'fresh',
@@ -297,7 +295,11 @@ describe('POST /api/ai/daily-insight/feedback', () => {
   });
 
   it('creates a trimmed negative feedback snapshot and only returns its id', async () => {
-    const insight = await seedDaily();
+    const insight = await seedDaily({ response: {
+      ...makeDaily().response,
+      greeting: 'Hallo, Testperson! 👋',
+      shortInsight: 'Dein Tag bleibt offen.',
+    } });
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-08-20T12:00:00.000Z'));
 

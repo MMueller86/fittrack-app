@@ -237,7 +237,10 @@ export function RootNavigator() {
         <Tab.Screen
           name="Recipes"
           component={RecipeStackNavigator}
-          options={{ tabBarIcon: ({ color, size }) => <RecipesIcon color={color} size={size} /> }}
+          options={{
+            tabBarLabel: 'Rezepte',
+            tabBarIcon: ({ color, size }) => <RecipesIcon color={color} size={size} />,
+          }}
         />
         <Tab.Screen
           name="Weight"

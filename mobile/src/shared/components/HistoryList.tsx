@@ -10,15 +10,18 @@
 
 import React, { useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { WeightEntry, WeightUnit } from '@fittrack/shared';
+import type { WeightEntry } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { addLocalDays, getLocalIsoDate } from '../date/localDate';
+import { Icon } from './Icon';
+import { SwipeableRow } from './SwipeableRow';
+import { formatKilograms } from '../weightFormatting';
+import { buildCompletedWeekGroups, buildLast7DaysItems } from '../weightHistory';
 
 export interface HistoryListProps {
   entries: WeightEntry[];
-  unit: WeightUnit;
   onDelete: (entry: WeightEntry) => void;
-  /** Set of entry IDs currently being deleted (disables their delete button). */
+  onEdit?: (entry: WeightEntry) => void;
+  /** Set of entry IDs currently being deleted (disables row editing). */
   deleting?: Set<string>;
 }
 
@@ -34,7 +37,7 @@ function parseDate(iso: string): Date {
 }
 
 function formatEntryDate(iso: string): string {
-  return parseDate(iso).toLocaleDateString(undefined, {
+  return parseDate(iso).toLocaleDateString('de-DE', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
@@ -49,73 +52,9 @@ function buildAllItems(entries: WeightEntry[]): HistoryItem[] {
   });
 }
 
-/** Rolling last-7-days window (today inclusive, going 6 days back). */
-function buildLast7DaysItems(allItems: HistoryItem[]): HistoryItem[] {
-  const today = getLocalIsoDate();
-  const cutoff = addLocalDays(today, -6);
-  return allItems.filter((item) => item.entry.date >= cutoff && item.entry.date <= today);
-}
-
-function getMondayOf(iso: string): string {
-  const d = parseDate(iso);
-  const day = d.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  return addLocalDays(iso, diff);
-}
-
-function formatWeekRange(mondayIso: string): string {
-  const monday = parseDate(mondayIso);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const fmt = (dt: Date) =>
-    `${String(dt.getDate()).padStart(2, '0')}.${String(dt.getMonth() + 1).padStart(2, '0')}.`;
-  return `${fmt(monday)} – ${fmt(sunday)}`;
-}
-
-interface WeekGroup {
-  key: string;
-  label: string;
-  avgValue: number;
-  unit: string;
-  count: number;
-  items: HistoryItem[];
-}
-
-/**
- * Groups all items into completed Mon–Sun calendar weeks.
- * A week is "completed" when its Sunday is strictly before today.
- * Items from the last-7-days window may also appear here — intentional overlap.
- */
-function buildCompletedWeekGroups(allItems: HistoryItem[]): WeekGroup[] {
-  const today = getLocalIsoDate();
-
-  const map = new Map<string, HistoryItem[]>();
-  for (const item of allItems) {
-    const monday = getMondayOf(item.entry.date);
-    const sundayDate = addLocalDays(monday, 6);
-    // Only include closed weeks (Sunday < today)
-    if (sundayDate < today) {
-      const bucket = map.get(monday) ?? [];
-      bucket.push(item);
-      map.set(monday, bucket);
-    }
-  }
-
-  return Array.from(map.entries())
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([key, weekItems]) => ({
-      key,
-      label: formatWeekRange(key),
-      avgValue: weekItems.reduce((s, i) => s + i.entry.value, 0) / weekItems.length,
-      unit: weekItems[0]?.entry.unit ?? 'kg',
-      count: weekItems.length,
-      items: weekItems,
-    }));
-}
-
 const LAST7_KEY = '__last7__';
 
-export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
+export function HistoryList({ entries, onDelete, onEdit, deleting }: HistoryListProps) {
   const allItems = useMemo(() => buildAllItems(entries), [entries]);
   const last7Items = useMemo(() => buildLast7DaysItems(allItems), [allItems]);
   const completedWeekGroups = useMemo(() => buildCompletedWeekGroups(allItems), [allItems]);
@@ -126,7 +65,7 @@ export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
     return (
       <View style={styles.empty}>
         <Text style={styles.emptyText}>
-          Noch keine Einträge. Trage deine erste Messung ein.
+          Deine Messungen erscheinen hier.
         </Text>
       </View>
     );
@@ -142,46 +81,40 @@ export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
 
   const renderRow = (entry: WeightEntry, delta: number | null, isLast: boolean) => {
     const isDown = delta !== null && delta < 0;
-    const isUp = delta !== null && delta > 0;
-    const isNeutral = delta !== null && parseFloat(Math.abs(delta).toFixed(2)) === 0;
-    const deltaColor = isNeutral
-      ? colors.textMuted
-      : isDown
-      ? colors.positive
-      : isUp
-      ? colors.negative
-      : colors.textMuted;
+    const isNeutral = delta !== null && Number(Math.abs(delta).toFixed(1)) === 0;
     const deltaStr =
       delta === null
         ? null
         : isNeutral
         ? '─'
-        : `${isDown ? '↓' : '↑'} ${Math.abs(delta).toFixed(2)}`;
+        : `${isDown ? '↓' : '↑'} ${formatKilograms(Math.abs(delta))}`;
     return (
-      <View key={entry.id} style={[styles.row, !isLast && styles.rowBorder]}>
-        <View style={styles.dotWrap}>
-          <View style={styles.dot} />
-        </View>
-        <Text style={styles.dateText}>{formatEntryDate(entry.date)}</Text>
-        <Text style={styles.valueText}>
-          {entry.value.toFixed(2)}{' '}
-          <Text style={styles.unitText}>{entry.unit}</Text>
-        </Text>
-        {deltaStr ? (
-          <Text style={[styles.deltaText, { color: deltaColor }]}>{deltaStr}</Text>
-        ) : (
-          <View style={styles.deltaPlaceholder} />
-        )}
+      <SwipeableRow key={entry.id} onDelete={() => onDelete(entry)}>
         <TouchableOpacity
-          onPress={() => onDelete(entry)}
-          hitSlop={{ top: 8, bottom: 8, left: 12, right: 8 }}
-          disabled={deleting?.has(entry.id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Eintrag vom ${entry.date} löschen`}
+          style={[styles.row, !isLast && styles.rowBorder]}
+          onPress={onEdit ? () => onEdit(entry) : undefined}
+          activeOpacity={onEdit ? 0.7 : 1}
+          disabled={!onEdit || deleting?.has(entry.id)}
+          accessibilityRole={onEdit ? 'button' : undefined}
+          accessibilityLabel={onEdit
+            ? `Gewicht vom ${entry.date}, ${formatKilograms(entry.value)} ${entry.unit} bearbeiten`
+            : undefined}
         >
-          <Text style={styles.deleteText}>✕</Text>
+          <View style={styles.dotWrap}>
+            <View style={styles.dot} />
+          </View>
+          <Text style={styles.dateText}>{formatEntryDate(entry.date)}</Text>
+          <Text style={styles.valueText}>
+            {formatKilograms(entry.value)}{' '}
+            <Text style={styles.unitText}>{entry.unit}</Text>
+          </Text>
+          {deltaStr ? (
+            <Text style={styles.deltaText}>{deltaStr}</Text>
+          ) : (
+            <View style={styles.deltaPlaceholder} />
+          )}
         </TouchableOpacity>
-      </View>
+      </SwipeableRow>
     );
   };
 
@@ -189,9 +122,8 @@ export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
   const last7Avg = last7Items.length > 0
     ? last7Items.reduce((s, i) => s + i.entry.value, 0) / last7Items.length
     : 0;
-  const last7Unit = last7Items[0]?.entry.unit ?? 'kg';
 
-  const renderSection = (key: string, label: string, avg: number, unit: string, count: number, items: HistoryItem[], isLast: boolean) => {
+  const renderSection = (key: string, label: string, avg: number, count: number, items: HistoryItem[], isLast: boolean) => {
     const isExpanded = expandedWeeks.has(key);
     return (
       <View key={key}>
@@ -204,11 +136,16 @@ export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
           <View style={styles.weekHeaderLeft}>
             <Text style={styles.weekLabel}>{label}</Text>
             <Text style={styles.weekMeta}>
-              Ø {avg.toFixed(2)} {unit} · {count}{' '}
+              Ø {formatKilograms(avg)} kg · {count}{' '}
               {count === 1 ? 'Messung' : 'Messungen'}
             </Text>
           </View>
-          <Text style={styles.chevron}>{isExpanded ? '▲' : '▼'}</Text>
+          <Icon
+            lib="feather"
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size="md"
+            color={colors.textMuted}
+          />
         </TouchableOpacity>
         {isExpanded &&
           items.map(({ entry, delta }, idx) =>
@@ -231,7 +168,6 @@ export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
               LAST7_KEY,
               'Die letzten 7 Tage',
               last7Avg,
-              last7Unit,
               last7Items.length,
               last7Items,
               totalSections === 1,
@@ -248,7 +184,6 @@ export function HistoryList({ entries, onDelete, deleting }: HistoryListProps) {
                 wg.key,
                 wg.label,
                 wg.avgValue,
-                wg.unit,
                 wg.count,
                 wg.items,
                 wi === completedWeekGroups.length - 1,
@@ -288,6 +223,7 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
@@ -310,7 +246,9 @@ const styles = StyleSheet.create({
   dateText: {
     ...typography.body2,
     color: colors.textSecondary,
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 64,
+    minWidth: 0,
   },
   valueText: {
     ...typography.body1,
@@ -324,17 +262,13 @@ const styles = StyleSheet.create({
   },
   deltaText: {
     ...typography.caption,
+    color: colors.textMuted,
     fontWeight: '700',
     width: 52,
     textAlign: 'right',
   },
   deltaPlaceholder: {
     width: 52,
-  },
-  deleteText: {
-    ...typography.caption,
-    color: colors.textDisabled,
-    paddingLeft: spacing.sm,
   },
   weekHeader: {
     flexDirection: 'row',
@@ -355,9 +289,5 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textMuted,
     marginTop: 2,
-  },
-  chevron: {
-    fontSize: 10,
-    color: colors.textMuted,
   },
 });

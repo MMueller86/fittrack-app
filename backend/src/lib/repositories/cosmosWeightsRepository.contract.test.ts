@@ -128,6 +128,30 @@ describe('CosmosWeightsRepository (contract)', () => {
     expect(list[0].value).toBe(81.7);
   });
 
+  it('updateValue changes only value on the user-partitioned document', async () => {
+    const entry = await repo.add(makeEntry({
+      id: 'value-only-update',
+      date: '2026-04-29',
+      value: 80,
+      unit: 'lbs',
+      createdAt: '2026-04-29T08:00:00.000Z',
+    }));
+
+    const updated = await repo.updateValue(USER_A, entry.id, 82.5);
+    const { resource: stored } = await ctx.database.container('weights').item(entry.id, USER_A).read<WeightEntry>();
+
+    expect(updated).toMatchObject({ ...entry, value: 82.5 });
+    expect(stored).toMatchObject({ ...entry, value: 82.5 });
+  });
+
+  it('updateValue returns null for a missing or foreign-partition ID', async () => {
+    const entry = await repo.add(makeEntry({ id: 'owned-by-a', value: 80 }));
+
+    expect(await repo.updateValue(USER_B, entry.id, 90)).toBeNull();
+    expect(await repo.updateValue(USER_A, 'missing-entry', 90)).toBeNull();
+    expect(await repo.list(USER_A)).toEqual([entry]);
+  });
+
   it('delete removes an existing entry and returns true', async () => {
     const entry = await repo.add(makeEntry({ id: 'to-delete' }));
     const deleted = await repo.delete(USER_A, entry.id);

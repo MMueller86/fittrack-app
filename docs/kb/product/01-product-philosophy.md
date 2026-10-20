@@ -73,6 +73,8 @@ Das Tagesdetail-Overlay zeigt Wochentag sowie Verbrauch, Zielerreichung und effe
 
 Das Tages-Overlay enthält eine kompakte Kalorienvisualisierung gegen das effektive Kalorienziel oder den gelieferten Zielprozentsatz. Es bewahrt die vorhandene Aktivitäts- und Bonussemantik und hält absolute Makrowerte (einschließlich `0 g`) von der Kalorienbewertung getrennt, ohne historische Makroziele zu erfinden. Bei einem Refresh-Fehler bleibt ein vorhandener Wochenrückblick sichtbar und zeigt dezent `Aktualisierung fehlgeschlagen` mit dem bestehenden `Erneut versuchen`; ohne vorhandenen Rückblick bleibt der bestehende Fehlerzustand erhalten.
 
+**Aktueller Implementierungsstand (2026-10-15):** Das Wochenraster zeigt oberhalb der sieben Balken nur die jeweilige Zielerreichung; Tages-kcal bleiben im Tagesdetail verfügbar. Die schmalen Balken sind `16 dp` breit und `72 dp` hoch. Fehlende Werte verwenden eine kleine neutrale Schraffur von `8 x 8 dp` ohne vollflächige Hintergrundschiene. Die gemeinsame Markerzeile wird nur bei mindestens einem Marker in der Woche gezeigt und behält dann stabile Zellen für alle sieben Tage. Diese kompakte Darstellung ersetzt frühere Angaben zur sichtbaren Tages-kcal-Zeile und zu stets reservierten Markerplätzen.
+
 ## MVP Milestones (Internal Reference)
 
 - **M1** — Core infrastructure, profile, diary, weight tracking (complete)

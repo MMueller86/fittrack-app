@@ -194,11 +194,34 @@ records those separate results; documentation PASS cannot waive feature gates.
 
 ### Daily Insight Prompt and Cache Checks
 
+The authoritative Daily Insight behavioral boundaries are in the
+[central rulebook](../domain/09-daily-insight.md). US-03's live gate covers the
+affected Daily suite only; Weekly Insight diagnostics are separate and are not
+part of this story's acceptance gate. A fresh 10-run Daily series is required
+after any prompt-, schema-, validator-, fixture-, or eval-relevant change.
+Current candidate release v30 / prompt v29 / assembly v13 binds
+`sha256:827de73de0186f5320ad02e23c2896cd82a2e85a4d20a08040cdaefc688037eb`.
+The fresh 10-run evaluation for this candidate is pending; the prior evidence
+below predates the CTA removal. Prior offline baseline (2026-10-20): 71 Backend
+test files, typechecks, and the release guard passed. Eval fixtures include `protein-above-range-no-warning` and
+`protein-high-with-calories-over-target`, and a prompt test pins the protein
+above-range guidance for every intent. The Daily validator tests (`dailyInsightValidation.test.ts`) cover schema
+and length limits, greeting/short-insight structure, and calorie
+numbers that were not supplied; wording is intentionally not tested. The Daily
+live eval (`dailyInsight.eval.test.ts`) asserts only structure and supplied
+numbers; its former `forbiddenPhrases`/`requiredPhraseGroups` and the
+wording-based rubric tests were removed, and wording is reviewed manually from
+the saved `backend/output/daily-insight-*.json` artifacts. Ten consecutive
+Daily-only live runs passed. This is a weaker gate than the earlier planned
+rubric; a broader test strategy (replay set, quality rubric, smoke gate) is a
+separate follow-up scope. The Weekly diagnostic is a separate feature
+check and is excluded from US-03 acceptance.
+
 The active Daily prompt is tested through
 `backend/src/lib/prompts/dailyInsightPrompt.ts`, which is the sole runtime
 composition root. Unit tests cover all six intent snapshots, deterministic
-canonical-bundle fingerprinting, the append-only manifest with retained v14/v15
-v16 and active v17 entries, and the context-dependent system-prompt hashes. The
+canonical-bundle fingerprinting, the append-only manifest preserving v14-v29
+and locking active v30, and the context-dependent system-prompt hashes. The
 offline release check
 `npm run verify:daily-insight-prompt --workspace=backend` verifies the active
 release fingerprint, historical manifest entries, and provider-visible prompt
@@ -209,9 +232,9 @@ and `git diff --check`.
 
 Repository and handler tests cover the complete cache identity:
 `promptVersion`, `promptFingerprint`, `systemPromptHash`, selected intent,
-prompt snapshot, and input hash. They also cover the semantic boundaries
-`remainingCalories = -0.01`, `0`, `0.01` and `remainingProteinG = 19.99`,
-`20`, `20.01`, with `null` and non-finite values treated as `unknown`.
+prompt snapshot, and input hash. They also cover the semantic boundary
+`remainingCalories = -0.01`, `0`, `0.01`, with `null` and non-finite values
+treated as `unknown`.
 Missing or changed provenance must regenerate before rate limits are applied;
 an unchanged complete identity remains a cache hit. Daily and Feedback
 roundtrips verify the server-owned provenance, exact feedback binding, and
@@ -219,29 +242,27 @@ legacy documents without optional identity fields. Legacy documents remain
 readable without a backfill; the Class 0 change is verified by compatibility
 tests rather than a migration.
 
-The current semantic validation tests cover historical comparisons against the
-resolved target for that date, missing or ambiguous evidence, contradictory
-comparison direction, unsupported nutrition claims on unlogged prior days,
-and morning intent/source constraints. Context fixtures keep the historical
-2,250 kcal snapshot distinct from the current 2,000 kcal target. Handler tests
-also prove that a complete unexpired same-date v14 cache entry is returned
-unchanged until expiry, while the repository status-operation test constrains
-the read projection to status metadata and the patch to `/processingStatus`.
+Handler tests also prove that a complete unexpired same-date v14 cache entry is
+returned unchanged until expiry, while the repository status-operation test
+constrains the read projection to status metadata and the patch to
+`/processingStatus`.
 
-Q-21's separate Daily regression uses the real `stale-weight` fixture's open
-`phase_progress` context and rejects all four completed-day phrases with the
-unchanged validator error. Prompt tests reproduce/remove contradictory
-below-target instructions; no validation relaxation or expected-failure bypass
-is added. Attempt 2 also uses exact unknown-activity inputs (activity_focus,
-unknown local hour, 500 calories remaining, 40 g protein gap) to check the final
-activity open-day guard and unchanged strict rejection of all four phrases.
-Conditional fueling/liquids/recovery and stale-weight regressions remain.
-Offline tests are not a successful new live G execution.
+For this US-03 task only, emulator persistence is **UNVERIFIED / vom User aus
+Prüfauftrag ausgenommen**, never PASS. No contract command, installation,
+remote Cosmos write test or deployment is authorized. Offline handler and
+Daily/Feedback repository regressions remain mandatory and are included in
+the unit run; they do not prove actual Cosmos serialization, partition
+isolation or TTL. This excluded emulator boundary alone does not block B-1,
+F-1 or completion after independent Q-1. All other required gate failures or
+missing evidence still block completion. This is not a general change to CI
+or other features' contract-test requirements.
 
 Prompt evals remain explicit live checks for the tested release. They are not
 part of the normal CI job because they require Azure credentials and incur
 provider cost; unavailable credentials are reported as `UNVERIFIED`, not as a
-silent pass.
+silent pass. The Daily Insight eval makes one live generation per fixture and
+uses deterministic local assertions for explicit safety contracts; model-based
+judge verdicts are not part of its pass criteria.
 
 ## Coverage Target
 

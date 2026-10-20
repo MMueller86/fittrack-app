@@ -11,11 +11,11 @@ import { DAILY_INSIGHT_MORNING_MODULE } from './promptMorning';
 import { DAILY_INSIGHT_NUTRITION_MODULE } from './promptNutrition';
 import { DAILY_INSIGHT_WEIGHT_MODULE } from './promptWeight';
 
-export const DAILY_INSIGHT_PROMPT_VERSION = 'v18' as const;
-const DAILY_INSIGHT_ACTIVE_MACRO_GUARD = `## Abschließende Regel für Makro-Einordnungen
-Beurteile aktuelle Protein- und Kohlenhydrataufnahmen ausschließlich anhand von nutrition.targets.macroRanges. Verwende für Protein die serverseitige nutrition.proteinCoachingBand und die Lücke nutrition.remainingProteinG unverändert; leite Status oder Empfehlungen niemals aus den alten Einzelzielen proteinG oder carbsG ab. Fehlen aktuelle Aufnahme oder Bereiche, ist die Einordnung unbekannt und darf nicht rekonstruiert werden. Bei "below_range" verwende ausschließlich "unterhalb des Proteinbereichs" oder "unter der Protein-Untergrenze". Sage niemals "unter deinem Zielbereich" oder "unter deinem Ziel" und fordere den Nutzer nie auf, unterhalb des Proteinbereichs zu bleiben. Der Kohlenhydratbereich ist Orientierung: Werte außerhalb davon sind weder zu niedrig noch zu hoch und begründen keine Korrektur. Makros in last3Days sind ausschließlich historische Aufnahmewerte; erwähne sie nicht in einer Makro-Einordnung und vergleiche oder bewerte sie niemals anhand der heutigen Bereiche.`;
+export const DAILY_INSIGHT_PROMPT_VERSION = 'v29' as const;
+const DAILY_INSIGHT_ACTIVE_MACRO_GUARD = `## Abschließende Regel für heutige Makro-Einordnungen
+Beurteile heutige Makros nur anhand der gelieferten nutrition.dailyInsightProteinStatus und nutrition.targets.macroRanges. Der serverseitige Proteinstatus ist maßgeblich; leite ihn nicht aus Grammwerten, Einzelzielen oder dem Text selbst her. Bei unknown bleibt die Proteineinordnung unbekannt. Der Kohlenhydratbereich ist Orientierung und begründet allein keine Korrektur. Bei in_range liegt die Proteinzufuhr im Ziel. Bei above_range (über 2,0 und unter 2,5 g/kg) gibt es keine besondere Proteinwarnung und kein Problem. Nur bei at_or_above_2_5_g_per_kg darfst du optional und nicht alarmistisch erwähnen, dass die Proteinzufuhr vermutlich über dem benötigten Maß liegt und die Kalorien auch aus anderen Lebensmitteln gewählt werden können, falls diese besser schmecken oder zufriedener machen; Protein ist dadurch nicht automatisch ein Problem. Liegt zugleich die Aufnahme über dem Kalorienziel, darfst du beides verbinden und eine künftige Anpassung der Lebensmittelauswahl anregen, ohne für heute eine Mahlzeit zu empfehlen.`;
 
-export const DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION = 'v2' as const;
+export const DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION = 'v13' as const;
 
 export interface DailyInsightPromptSnapshot {
   system: string;
@@ -34,27 +34,26 @@ export const DAILY_INSIGHT_PROMPT_MODULES: Readonly<Record<InsightIntent, string
 export const DAILY_INSIGHT_PROMPT_GUARD_POLICY = {
   openCalorieBudget: { operator: '>', threshold: 0 },
   negativeCalorieBudget: { operator: '<', threshold: 0 },
-  materialProteinGap: { operator: '>', threshold: 20 },
-  nearlyCompleteProtein: { operator: '<=', threshold: 20 },
   staleWeight: { operator: '>', thresholdDays: 14 },
   openDayPhaseProgress: { operator: '>', threshold: 0 },
   effectiveActivityTargetSource: 'special_activity_snapshot',
-  morningHistoricalSource: '## Verbindliche serverseitige Zuordnung historischer Morgenwerte\nDer folgende Datenblock benennt den passenden Eintrag für gestern und dessen zulässige Einordnung. Folge dieser Zuordnung exakt. Verwende keine anderen Ziele oder Rohfelder als Ersatz.',
 } as const;
 
 export const DAILY_INSIGHT_PROMPT_GUARD_TEXTS = {
-  activityOpenDay: '## Abschließender Schutz für activity_focus am offenen Tag\nremainingCalories ist positiv. Dieser Schutz gilt im gesamten JSON unabhängig von der Proteinlücke und der unbekannten oder vorhandenen Ortszeit. Nenne weder die bisherige Aufnahme noch den Restbetrag; bewerte die Aufnahme nicht als zu niedrig oder den Tag als abgeschlossen. Verwende nicht "zu wenig gegessen", "unter deinem Ziel", "unter dem Ziel" oder "dein Kalorienverbrauch liegt unter", auch nicht für historische Tage. Ordne nur ein, dass das Tagesziel die eingetragene Aktivität berücksichtigt. Der Aktivitätsabschluss richtet sich allein nach activityCompletionStatus: unknown bleibt neutral, planned geplant und likely_completed unsicher. Fueling, Flüssigkeit und Erholung bleiben konditional bei planned oder unknown; diese Hinweise sind keine Bewertung einer abgeschlossenen Tagesaufnahme. Behalte die vorhandenen Protein- und Budget-Sperren bei.',
-  finalNegativeBudget: `## Abschließende Sperre bei negativem Kalorienbudget
-remainingCalories ist negativ. Diese Budget-Sperre hat Vorrang vor jedem Protein-Gap und allen Mahlzeitenregeln, auch wenn remainingProteinG größer als 20 ist. Empfiehl für heute keine Mahlzeit, keinen Snack und keine zusätzliche Proteinquelle. Setze recommendation, cta und ctaTarget exakt auf null: {"recommendation": null, "cta": null, "ctaTarget": null}. Eine Empfehlung oder ein CTA für eine proteinreiche nächste Mahlzeit ist ebenfalls verboten.`,
-  openBudgetWithProteinGap: '## Zwingender Vertrag für Proteinlücke bei offenem Kalorienbudget\nremainingCalories ist positiv und remainingProteinG ist größer als 20. Der Tag ist noch offen und die materielle Proteinlücke ist ein vorausschauendes Signal für die nächste Mahlzeit, keine abgeschlossene Tagesbewertung. Formuliere im gesamten JSON ausschließlich offen und vorausschauend: Bewerte die bisherige Kalorienaufnahme nicht als zu gering und stelle den Tag nicht als abgeschlossen dar. Verwende insbesondere nicht "zu wenig gegessen", "unter deinem Ziel", "unter dem Ziel" oder "dein Kalorienverbrauch liegt unter". Gib eine konkrete proteinreiche nächste Mahlzeit als einzigen Ernährungshinweis; widersprüchliche Aussagen wie "Proteinziel ist erreicht" oder "fast optimal" sind unzulässig.',
-  openDay: '## Zwingender Schutz für den offenen Tag\nremainingCalories ist positiv: Der Tag ist noch offen. Verwende keine abgeschlossene Bewertung und keine Sprache, die den offenen Tag als abgeschlossen darstellt. Formuliere ausschließlich offen und vorausschauend. Gib in diesem Kontext keine Handlungsempfehlung und keinen CTA aus: recommendation, cta und ctaTarget müssen exakt null sein.',
-  phaseProgressOpenDay: '## Schutz für phase_progress an einem offenen Tag\nremainingCalories ist positiv. Es ist nur der noch offene Abstand zwischen dem heutigen Ziel und den bisher protokollierten Kalorien; es ist kein erreichtes Energiedefizit oder ein vollständiges Tagesergebnis. Leite daraus weder einen erreichten Defizit-/Überschuss noch eine Erklärung des längerfristigen Gewichtsverlaufs ab. Bewerte phase_progress ausschließlich anhand der Gewichtssignale und ordne die heutige Aufnahme nicht als zu niedrig oder abgeschlossen ein. Empfiehl nicht, die Kalorienzufuhr zu erhöhen oder restliche Kalorien durch Essen auszuschöpfen; ein positiver Rest allein ist kein Grund für zusätzliche Kalorien oder eine zusätzliche Mahlzeit. Stelle verbleibende Kalorien nicht als verfügbares Essensbudget dar und beschreibe sie nicht als Möglichkeit, flexibel weitere Nahrung zu wählen oder das Tagesziel durch eine Mahlzeit zu erreichen. Gib weder eine Empfehlung noch einen CTA, der verbleibende Kalorien nutzt, auffüllt oder ausschöpft. Wenn das Restbudget der einzige Grund für recommendation oder cta wäre, setze recommendation, cta und ctaTarget auf null. Eine davon unabhängige, sachlich begründete nicht-ernährungsbezogene Empfehlung bleibt möglich.',
-  negativeBudget: `## Zwingender Budget-Schutz
-remainingCalories ist negativ: Die protokollierte Aufnahme liegt damit über dem effektiven Kalorienziel. Das ist nur eine Zielrelation und belegt keinen tatsächlich erreichten Energieüberschuss oder eine Energiebilanz. Nenne höchstens die Aufnahme im Verhältnis zum Ziel; behaupte keinen physiologischen Defizit- oder Überschusszustand. Empfehle heute weder Essen noch Protein; recommendation und cta müssen null sein, sofern keine nicht-ernährungsbezogene Aktion zwingend ist.`,
-  unknownProtein: '## Zwingender Protein-Daten-Schutz\nremainingProteinG ist null. Der Proteinstatus ist unbekannt, nicht null und nicht automatisch eine Lücke. Berechne keinen Gap aus today.protein oder targets.proteinG und gib keine Protein-Empfehlung aus. Wenn keine nicht-ernährungsbezogene Aktion zwingend ist, müssen die JSON-Felder recommendation, cta und ctaTarget wörtlich null sein. Jede andere Belegung dieser Felder wäre ungültig.',
-  nearlyCompleteProtein: '## Zwingender Protein-Schutz\nremainingProteinG ist höchstens 20. Das Proteinziel ist nahezu erreicht. Empfehle heute weder zusätzliches Protein noch irgendeine weitere Mahlzeit oder einen Snack nur zum Ausschöpfen des verbleibenden Kalorienbudgets; der vorhandene Kalorienspielraum hebt diese Sperre nicht auf. Wenn keine nicht-ernährungsbezogene Aktion zwingend ist, müssen die JSON-Felder recommendation, cta und ctaTarget wörtlich null sein: {"recommendation": null, "cta": null, "ctaTarget": null}. Jede andere Belegung dieser Felder wäre ungültig.',
-  effectiveActivityBudget: `## Verbindlicher Vertrag für das aktuelle effektive Aktivitätsziel\nDie Aktivität und ihr serverseitig berechnetes effektives Tagesziel sind für diesen Output verbindlich. Nenne in title oder summary mindestens einen natürlichen Begriff für dieses Ziel: "Kalorienziel", "Tagesziel", "Energiebedarf" oder eindeutig bezogen "Ziel". Eine reine Aktivitätsbeschreibung ohne diese Zielvokabel ist ungültig. Beurteile die gegessenen Kalorien niemals isoliert, sondern nur im Verhältnis zum effektiven Ziel mit Aktivitätsbonus.\nWenn remainingProteinG höchstens 20 ist, ist der Protein-Lock aktiv: Liefere keine zusätzliche Proteinquelle, proteinreiche Mahlzeit, Mahlzeit, Snack oder sonstige protein- oder mahlzeitenbezogene Aktion. Ein möglicher recommendation- oder cta-Inhalt darf dann nur einen nicht-ernährungsbezogenen Aktivitäts-, Flüssigkeits- oder Erholungshinweis enthalten.`,
-  finalOutput: `## Letzte Ausgabekontrolle für diesen konkreten Fall\nDer verbindliche Intent ist nutrition_guidance, remainingCalories ist positiv und remainingProteinG ist höchstens 20. Das Proteinziel ist damit nahezu erreicht. Setze in deinem JSON recommendation, cta und ctaTarget exakt auf null. Gib keine allgemeine Empfehlung und keinen CTA aus. Schreibe auch in title oder summary keine Handlung zum zusätzlichen Essen oder Protein; insbesondere sind "proteinreiche Mahlzeit", "proteinreich essen", Proteinshake, Magerquark, Skyr und Hüttenkäse im gesamten JSON verboten. Eine neutrale Einordnung wie "Das Proteinziel ist fast erreicht" ist erlaubt. Diese Sperre gilt trotz verbleibender Kalorien.`,
+  currentMomentOnly: '## Nur der heutige Moment\nBeschreibe ausschließlich die heutige Ernährung und Aktivität. Erwähne oder vergleiche keine Einträge, Ziele oder Aktivitäten früherer Tage. Verwende dafür nur die heutigen Kontextfelder. Gelieferte aktuelle Gewichts- und Progress-Signale dürfen als heutiger Stand eingeordnet werden.',
+  noCalorieSurplusTerm: '## Verbotene Energiebilanz-Bezeichnung\nVerwende niemals "Kalorienüberschuss". Eine Aufnahme über dem heutigen Kalorienziel darf nur als "über dem Kalorienziel" beschrieben werden und belegt keinen physiologischen Energieüberschuss.',
+  claimGrounding: '## Konkrete serverseitige Aussagegrenzen\nDer JSON-Block grounding ordnet Fakten verbindlich ihren Quellen zu. mealAdviceAllowed false sperrt konkrete Mahlzeiten- und Essensempfehlungen in allen Textfeldern; bei true bleibt eine Empfehlung optional und muss zum Fokus passen. actionFields null bedeutet recommendation null. measurementRelation lower bedeutet kleiner, nicht stabil; higher bedeutet größer; equal allein bedeutet gleich. dailyActivityStatus completed erlaubt eine klare Abschlussaussage; unknown erlaubt keine Behauptung, die Aktivität sei abgeschlossen; sie darf als eingetragen, geplant oder anstehend beschrieben werden.',
+  sourceBoundClaims: '## Verbindliche Quellenbindung jeder Aussage\nEin Ziel allein belegt keinen heutigen Spielraum. Wenn Aufnahme oder Rest null ist, behaupte keine verfügbaren Kalorien oder Möglichkeiten für restliche Mahlzeiten. weight.weeklyTrend30d ist die gelieferte Trendrichtung. Sind latestKg und previousKg verschieden, behaupte nicht, das Gewicht sei stabil oder unverändert; erfinde keine Schwelle. Bei dailyActivityStatus unknown behaupte keinen Abschluss; Planung oder Anstehen darf genannt werden; Tageszeit, Eintrag und Aktivitätsdetails sind kein zusätzlicher Beleg. Bei mealAdviceAllowed false gib keine Essens- oder Mahlzeitenempfehlung aus. Prüfe jeden Satz getrennt.',
+  finalActivityFocus: '## Abschließender Vorrang des Aktivitätsfokus\nDie besondere Aktivität priorisiert das Thema, unterdrückt aber keine anderen relevanten gelieferten Signale. Bei langer oder intensiver Ausdauerbelastung müssen Kohlenhydrate oder Energie, Flüssigkeit und Regeneration oder Erholung im selben Output vorkommen; nenne in summary oder recommendation alle drei Punkte ausdrücklich, ohne einen davon ist die Antwort unvollständig, auch wenn weitere Signale wie Protein oder Gewicht erwähnt werden. Ordne die Aktivität bei vorhandenem Ziel natürlich zum effektiven Kalorien- oder Tagesziel ein. dailyActivityStatus unknown erlaubt keine Aussage über einen Abschluss; completed erlaubt klare Abschlussformulierungen. mealAdviceAllowed bleibt für konkrete Mahlzeitenhinweise maßgeblich. Erfinde weder Aktivitätsverbrauch noch Daten und addiere den Bonus nicht erneut.',
+  finalWeightFocus: '## Abschließender Vorrang des Gewichtsfokus\nDer Intent priorisiert Gewicht, schließt aber weitere relevante gelieferte Signale nicht aus. Ordne Gewicht im Zusammenhang mit dem Nutzerziel ein und ergänze andere Signale, wenn sie die heutige Einordnung oder eine sichere Empfehlung beeinflussen. Bei mehr als 14 Tagen seit der letzten Messung fehlen aktuelle Gewichtsdaten: Beschreibe diese Unsicherheit und den Nutzen einer neuen Messung, ohne aktuelle Phase oder aktuellen Trend zu behaupten. Verwende niemals "positive Entwicklung", "positive Fortschrittsphase" oder "Regressionsphase erkannt"; lobe keinen Einzelwert als Fortschrittsbeweis.',
+  activityOpenDay: '## Schutz für activity_focus am offenen Tag\nremainingCalories ist positiv. Aufnahme, effektives Tagesziel und Rest sind ein aktueller Zwischenstand. Verwende gelieferte Werte exakt; nutrition.targets.calories enthält den Aktivitätsbonus bereits. Addiere den Bonus nicht erneut und rekonstruiere keine fehlenden Werte. Stelle den Rest nicht als abgeschlossenes Tagesergebnis oder physiologisches Energiedefizit dar. dailyActivityStatus unknown erlaubt keine Aussage über einen Abschluss. Konkrete Mahlzeitenhinweise sind nur erlaubt, wenn mealAdviceAllowed true ist und sie zum Fokus passen.',
+  activityCalorieValueAttribution: '## Feste Zuordnung aktueller Kalorienwerte\nOrdne jede Kalorienzahl ausschließlich ihrem Feld zu: nutrition.targets.calories ist das effektive Tagesziel, nutrition.today.calories die protokollierte Aufnahme, nutrition.remainingCalories ausschließlich der Restbetrag und specialActivity.activityBonus ausschließlich der benannte Bonus. Verwende den Zielwert niemals als Restbetrag oder die Aufnahme als Ziel. Der Bonus ist im effektiven Ziel enthalten und wird nicht erneut addiert.',
+  finalNegativeBudget: '## Abschließende Sperre bei negativem Kalorienbudget\nremainingCalories ist negativ. Empfiehl für heute keine Mahlzeit und keinen Snack. Setze recommendation exakt auf null.',
+  inconsistentNegativeBudget: '## Widersprüchliche aktuelle Kalorienwerte\nDer gelieferte negative Rest passt rechnerisch nicht zu Aufnahme und effektivem Ziel. Nenne keine aktuellen Kalorienzahlen und keine Aufnahme-Ziel-Rechnung; behaupte auch ohne Zahlen keine Überschreitung. Rekonstruiere oder korrigiere keinen Eingangswert. Die heutigen Kalorienangaben widersprechen sich. Die negative Budgetsperre bleibt aktiv. Die Relation bleibt unbekannt und erlaubt keine physiologische Bilanz. Behandle die Abweichung als Datenunsicherheit, ohne daraus eine Tagesbewertung abzuleiten.',
+  phaseProgressOpenDay: '## Schutz für phase_progress an einem offenen Tag\nremainingCalories ist nur der Abstand zwischen dem heutigen Ziel und der protokollierten Aufnahme, kein erreichtes Energiedefizit oder vollständiges Tagesergebnis. Leite daraus keine physiologische Bilanz oder Erklärung des längerfristigen Gewichtsverlaufs ab. Der Gewichtsfokus bleibt vorrangig, schließt relevante Ernährungssignale aber nicht aus. Ein positiver Rest allein ist kein Grund für zusätzliche Kalorien oder eine Mahlzeitenempfehlung; konkrete Mahlzeitenhinweise richten sich nach mealAdviceAllowed.',
+  negativeBudget: '## Zwingender Budget-Schutz\nremainingCalories ist negativ. Nur wenn Aufnahme, Ziel und Rest rechnerisch übereinstimmen, darfst du die Aufnahme als über dem effektiven Kalorienziel einordnen. Bei Widerspruch ist die Relation unbekannt, nicht überschritten. Eine konsistente Differenz ist nur eine Zielrelation und belegt keinen tatsächlich erreichten Energieüberschuss. Empfiehl heute keine Mahlzeit oder keinen Snack; recommendation muss null sein.',
+  mealAdviceDenied: '## Serverseitige Mahlzeitenfreigabe\nmealAdviceAllowed ist false. Gib keine konkrete Mahlzeiten-, Snack- oder Essensempfehlung in einem Textfeld aus. Verwechsle diese Sperre nicht mit einem Proteinstatus.',
+  effectiveActivityBudget: '## Verbindlicher Vertrag für das aktuelle effektive Aktivitätsziel\nDie Aktivität und ihr serverseitig berechnetes effektives Tagesziel sind für diesen Output verbindlich. Nenne in title oder summary mindestens einen natürlichen Begriff für dieses Ziel: "Kalorienziel", "Tagesziel", "Energiebedarf" oder eindeutig bezogen "Ziel". Eine Aktivitätsbeschreibung ohne diese Einordnung ist unvollständig. Beurteile Kalorien nur relativ zum effektiven Ziel; der Aktivitätsbonus ist bereits enthalten.',
 } as const;
 
 export interface DailyInsightPromptBundle {
@@ -115,65 +114,79 @@ function isPositiveFiniteTarget(value: number | null | undefined): value is numb
   return value != null && Number.isFinite(value) && value > 0;
 }
 
-function buildMorningHistoricalSourceGuard(context: InsightInputContext): string {
-  const currentDate = /^\d{4}-\d{2}-\d{2}$/.test(context.date)
-    ? new Date(`${context.date}T00:00:00.000Z`)
-    : null;
-  if (currentDate == null || !Number.isFinite(currentDate.getTime())) {
-    return 'Die gestrige Quelle ist nicht eindeutig. Behaupte keine gestrige Aufnahme oder Zielrelation.';
-  }
-
-  currentDate.setUTCDate(currentDate.getUTCDate() - 1);
-  const yesterday = currentDate.toISOString().slice(0, 10);
-  const day = context.nutrition?.last3Days?.find((entry) => entry.date === yesterday);
-  if (!day) {
-    return 'Für gestern gibt es keinen passenden last3Days-Eintrag. Behaupte keine gestrige Aufnahme oder Zielrelation und ersetze den Eintrag nicht durch einen älteren Tag.';
-  }
-  if (day.hasMealItem === false || day.calories == null || !Number.isFinite(day.calories)) {
-    return `Der Eintrag für gestern (${yesterday}) hat keine protokollierte Aufnahme; calories=${day.calories ?? 'null'}, hasMealItem=${day.hasMealItem ?? 'unknown'}. Die Aufnahme ist unbekannt, nicht null oder 0 kcal. Behaupte keine Menge, Makros oder Zielrelation für gestern.`;
-  }
-
-  const target = day.effectiveTargetCalories;
-  const baseTarget = day.baseTargetCalories;
-  const sourceIsReliable = day.targetSource === 'day_target_snapshot'
-    || (
-      day.targetSource === 'special_activity_snapshot'
-      && isPositiveFiniteTarget(day.specialActivity?.dailyCalorieTarget)
-    );
-  if (!isPositiveFiniteTarget(baseTarget) || !isPositiveFiniteTarget(target) || !sourceIsReliable) {
-    return `Der Eintrag für gestern (${yesterday}) hat ${day.calories} kcal, aber kein eindeutig nutzbares historisches Ziel (targetSource=${day.targetSource ?? 'unknown'}). Verwende weder das aktuelle Profilziel noch ein Aktivitäts-Rohfeld; stelle keine numerische oder richtungsbezogene Zielrelation her. Lasse den Vergleich weg oder sage, dass kein verlässlicher historischer Zielvergleich möglich ist.`;
-  }
-
-  const relation = day.calories < target ? 'unter' : day.calories > target ? 'über' : 'genau auf';
-  const operator = relation === 'unter' ? '<' : relation === 'über' ? '>' : '=';
-  return `Der Eintrag für gestern (${yesterday}) hat ${day.calories} kcal; sein maßgebliches ${day.targetSource} beträgt ${target} kcal. Die einzige zulässige Zielrelation ist ${relation} (${day.calories} ${operator} ${target}). Ersetze diesen Wert nicht durch nutrition.targets oder specialActivity.dailyCalorieTarget.`;
-}
-
 function buildPromptInputContext(
   intent: InsightIntent,
   context: InsightInputContext,
  ) {
   const nutrition = context.nutrition;
   if (nutrition == null) return context;
+  if (hasInconsistentNegativeBudget(context)) {
+    return { ...context, nutrition: { budgetStatus: 'inconsistent' } };
+  }
+  const { last3Days: _last3Days, ...providerNutrition } = nutrition;
 
   const projectedTargets = nutrition.targets == null
     ? nutrition.targets
-    : (({ proteinG: _proteinG, carbsG: _carbsG, ...targets }) => targets)(nutrition.targets);
-  const historicalDays = nutrition.last3Days;
+    : (() => {
+      const { proteinG: _proteinG, carbsG: _carbsG, ...targets } = nutrition.targets!;
+      return targets;
+    })();
+  const projectedToday = nutrition.today == null
+    ? nutrition.today
+    : (({ protein: _protein, ...today }) => today)(nutrition.today);
+  const projectedSpecialActivity = context.specialActivity != null
+    ? {
+        type: context.specialActivity.type,
+        movementTimeMinutes: context.specialActivity.movementTimeMinutes,
+        distanceKm: context.specialActivity.distanceKm,
+        elevationGainM: context.specialActivity.elevationGainM,
+        bodyWeightKg: context.specialActivity.bodyWeightKg,
+        dailyCalorieTarget: context.specialActivity.dailyCalorieTarget,
+        calculatedAt: context.specialActivity.calculatedAt,
+        activityBonus: context.specialActivity.activityBonus,
+        ...(context.specialActivity.type === 'hiking'
+          ? {
+              terrainType: context.specialActivity.terrainType,
+              packCategory: context.specialActivity.packCategory,
+            }
+          : {}),
+      }
+    : context.specialActivity;
 
   return {
     ...context,
+    specialActivity: projectedSpecialActivity,
     nutrition: {
-      ...nutrition,
+      ...providerNutrition,
+      today: projectedToday,
       targets: projectedTargets,
-      ...(intent === 'morning_orientation' && historicalDays != null
-        ? {
-            last3Days: historicalDays.map((day) => day.targetSource === 'profile_fallback'
-              ? { ...day, baseTargetCalories: null, effectiveTargetCalories: null }
-              : day),
-          }
-        : {}),
     },
+  };
+}
+
+function hasInconsistentNegativeBudget(context: InsightInputContext): boolean {
+  const nutrition = context.nutrition;
+  return nutrition?.remainingCalories != null && nutrition.remainingCalories < 0
+    && nutrition.today != null && nutrition.targets != null
+    && Math.round(nutrition.targets.calories - nutrition.today.calories) !== Math.round(nutrition.remainingCalories);
+}
+
+function buildClaimGrounding(intent: InsightIntent, context: InsightInputContext) {
+  const nutrition = context.nutrition;
+  if (nutrition == null) return undefined;
+  const inconsistent = hasInconsistentNegativeBudget(context);
+  const mealAdviceAllowed = nutrition.mealAdviceAllowed;
+  const weight = context.weight;
+  return {
+    focus: inconsistent ? 'budget_uncertainty_only' : 'combined',
+    mealAdviceAllowed,
+    actionFields: inconsistent ? 'null' : 'intent_scoped',
+    weight: {
+      measurementRelation: weight?.latestKg == null || weight.previousKg == null ? 'unknown'
+        : weight.latestKg < weight.previousKg ? 'lower' : weight.latestKg > weight.previousKg ? 'higher' : 'equal',
+      weeklyTrend30d: weight?.weeklyTrend30d ?? null,
+    },
+    dailyActivityStatus: context.dailyActivityStatus,
   };
 }
 
@@ -194,30 +207,14 @@ export function buildDailyInsightPrompt(
   context: InsightInputContext,
 ): DailyInsightPromptSnapshot {
   const remainingCalories = context.nutrition?.remainingCalories;
-  const remainingProteinG = context.nutrition?.remainingProteinG;
   const targets = context.nutrition?.targets;
   const contextGuards = [
-    intent === 'nutrition_guidance'
-    && remainingCalories != null
-    && remainingCalories > DAILY_INSIGHT_PROMPT_GUARD_POLICY.openCalorieBudget.threshold
-    && remainingProteinG != null
-    && remainingProteinG > DAILY_INSIGHT_PROMPT_GUARD_POLICY.materialProteinGap.threshold
-      ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.openBudgetWithProteinGap
-      : null,
-    remainingCalories != null
-    && remainingCalories > DAILY_INSIGHT_PROMPT_GUARD_POLICY.openCalorieBudget.threshold
-    && remainingProteinG != null
-    && remainingProteinG <= DAILY_INSIGHT_PROMPT_GUARD_POLICY.nearlyCompleteProtein.threshold
-      ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.openDay
+    context.nutrition?.mealAdviceAllowed === false
+      ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.mealAdviceDenied
       : null,
     context.nutrition?.remainingCalories != null
     && context.nutrition.remainingCalories < DAILY_INSIGHT_PROMPT_GUARD_POLICY.negativeCalorieBudget.threshold
       ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.negativeBudget
-      : null,
-    remainingProteinG == null
-      ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.unknownProtein
-      : remainingProteinG <= DAILY_INSIGHT_PROMPT_GUARD_POLICY.nearlyCompleteProtein.threshold
-      ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.nearlyCompleteProtein
       : null,
   ].filter((guard) => guard !== null);
   const phaseProgressOpenDayGuard =
@@ -226,12 +223,6 @@ export function buildDailyInsightPrompt(
     && remainingCalories > DAILY_INSIGHT_PROMPT_GUARD_POLICY.openDayPhaseProgress.threshold
       ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.phaseProgressOpenDay
       : null;
-  const morningHistoricalGuard = intent === 'morning_orientation'
-    ? [
-      DAILY_INSIGHT_PROMPT_GUARD_POLICY.morningHistoricalSource,
-      buildMorningHistoricalSourceGuard(context),
-    ].join('\n')
-    : null;
   const effectiveActivityBudgetGuard =
     intent === 'activity_focus'
     && context.specialActivity != null
@@ -241,14 +232,6 @@ export function buildDailyInsightPrompt(
     && targets.baseCalories != null
     && targets.activityBonusCalories != null
       ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.effectiveActivityBudget
-      : null;
-  const finalOutputGuard =
-    intent === 'nutrition_guidance'
-    && remainingCalories != null
-    && remainingCalories > DAILY_INSIGHT_PROMPT_GUARD_POLICY.openCalorieBudget.threshold
-    && remainingProteinG != null
-    && remainingProteinG <= DAILY_INSIGHT_PROMPT_GUARD_POLICY.nearlyCompleteProtein.threshold
-      ? DAILY_INSIGHT_PROMPT_GUARD_TEXTS.finalOutput
       : null;
   const finalNegativeBudgetGuard =
     intent === 'nutrition_guidance'
@@ -260,19 +243,31 @@ export function buildDailyInsightPrompt(
     DAILY_INSIGHT_SHARED_TONE,
     `## Verbindlicher Intent\n${intent}`,
     DAILY_INSIGHT_PROMPT_MODULES[intent],
-    ...(morningHistoricalGuard === null ? [] : [morningHistoricalGuard]),
+    DAILY_INSIGHT_PROMPT_GUARD_TEXTS.currentMomentOnly,
+    DAILY_INSIGHT_PROMPT_GUARD_TEXTS.noCalorieSurplusTerm,
     DAILY_INSIGHT_OUTPUT_CONTRACT,
+    DAILY_INSIGHT_ACTIVE_MACRO_GUARD,
     ...(phaseProgressOpenDayGuard === null ? [] : [phaseProgressOpenDayGuard]),
     ...contextGuards,
-    ...(effectiveActivityBudgetGuard === null ? [] : [effectiveActivityBudgetGuard]),
-    ...(finalOutputGuard === null ? [] : [finalOutputGuard]),
+    ...(effectiveActivityBudgetGuard === null
+      ? []
+      : [effectiveActivityBudgetGuard, DAILY_INSIGHT_PROMPT_GUARD_TEXTS.activityCalorieValueAttribution]),
     ...(finalNegativeBudgetGuard === null ? [] : [finalNegativeBudgetGuard]),
+    ...(remainingCalories != null && remainingCalories < 0
+      && context.nutrition.today != null && targets != null
+      && Math.round(targets.calories - context.nutrition.today.calories) !== Math.round(remainingCalories)
+      ? [DAILY_INSIGHT_PROMPT_GUARD_TEXTS.inconsistentNegativeBudget] : []),
     ...(intent === 'activity_focus'
       && remainingCalories != null
       && remainingCalories > DAILY_INSIGHT_PROMPT_GUARD_POLICY.openCalorieBudget.threshold
       ? [DAILY_INSIGHT_PROMPT_GUARD_TEXTS.activityOpenDay] : []),
-    DAILY_INSIGHT_ACTIVE_MACRO_GUARD,
+    ...(intent === 'activity_focus'
+      ? [DAILY_INSIGHT_PROMPT_GUARD_TEXTS.finalActivityFocus] : []),
+    DAILY_INSIGHT_PROMPT_GUARD_TEXTS.sourceBoundClaims,
+    DAILY_INSIGHT_PROMPT_GUARD_TEXTS.claimGrounding,
+    ...(intent === 'weight_signal' || intent === 'phase_progress'
+      ? [DAILY_INSIGHT_PROMPT_GUARD_TEXTS.finalWeightFocus] : []),
   ].join('\n\n');
-  const user = JSON.stringify({ intent, context: buildPromptInputContext(intent, context) });
+  const user = JSON.stringify({ intent, context: buildPromptInputContext(intent, context), grounding: buildClaimGrounding(intent, context) });
   return { system, user };
 }

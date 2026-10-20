@@ -39,8 +39,7 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
     workoutType: 'gym',
     currentHourLocal: 10,
     specialActivity: null,
-    activityCompletionStatus: null,
-    activityStatusSource: null,
+    dailyActivityStatus: null,
     weight: {
       latestKg: 83.0,
       previousKg: 83.2,
@@ -69,8 +68,8 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
         targetSource: 'profile_fallback',
       },
       remainingCalories: 500,
-      remainingProteinG: 40,
-      proteinCoachingBand: 'in_range',
+      dailyInsightProteinStatus: 'in_range',
+      mealAdviceAllowed: true,
       last3Days: [
         {
           date: '2026-06-29',
@@ -214,6 +213,23 @@ describe('computeInputHash', () => {
     expect(computeInputHash(ctx, 'v4')).toBe(computeInputHash(ctx, 'v4'));
   });
 
+  it('includes Daily Insight protein, meal-advice, and activity facts in the hash', () => {
+    const context = makeContext({
+      nutrition: { ...makeContext().nutrition, mealAdviceAllowed: false },
+    });
+    const withProteinStatus = makeContext({
+      nutrition: { ...context.nutrition, dailyInsightProteinStatus: 'at_or_above_2_5_g_per_kg' },
+    });
+    const withMealAdvice = makeContext({
+      nutrition: { ...context.nutrition, mealAdviceAllowed: true },
+    });
+    const withActivityStatus = makeContext({ dailyActivityStatus: 'completed' });
+
+    expect(computeInputHash(context, 'v4')).not.toBe(computeInputHash(withProteinStatus, 'v4'));
+    expect(computeInputHash(context, 'v4')).not.toBe(computeInputHash(withMealAdvice, 'v4'));
+    expect(computeInputHash(context, 'v4')).not.toBe(computeInputHash(withActivityStatus, 'v4'));
+  });
+
   it('returns same hash when calories differ by < 50 kcal (same rounding bucket)', () => {
     const a = makeContext({ nutrition: { ...makeContext().nutrition, today: { calories: 1600, protein: 120, carbs: 160, fat: 55, fiber: 22 } } });
     // +40 kcal — same bucket (both round to 16)
@@ -321,7 +337,7 @@ describe('computeInputHash', () => {
     expect(base).not.toBe(computeInputHash(ctx, 'v14', 'general', 'sha256:fingerprint-a', 'sha256:system-b'));
   });
 
-  it('includes exact macro-range boundaries and protein coaching state, not legacy scalar targets', () => {
+  it('includes exact macro-range boundaries and Daily Insight protein state, not legacy scalar targets', () => {
     const base = makeContext();
     const targets = base.nutrition.targets!;
     const changedRange = makeContext({
@@ -336,8 +352,8 @@ describe('computeInputHash', () => {
         },
       },
     });
-    const changedCoachingBand = makeContext({
-      nutrition: { ...base.nutrition, proteinCoachingBand: 'above_range' },
+    const changedProteinStatus = makeContext({
+      nutrition: { ...base.nutrition, dailyInsightProteinStatus: 'above_range' },
     });
     const changedLegacyScalars = makeContext({
       nutrition: {
@@ -347,7 +363,7 @@ describe('computeInputHash', () => {
     });
 
     expect(computeInputHash(base, 'v18')).not.toBe(computeInputHash(changedRange, 'v18'));
-    expect(computeInputHash(base, 'v18')).not.toBe(computeInputHash(changedCoachingBand, 'v18'));
+    expect(computeInputHash(base, 'v18')).not.toBe(computeInputHash(changedProteinStatus, 'v18'));
     expect(computeInputHash(base, 'v18')).toBe(computeInputHash(changedLegacyScalars, 'v18'));
   });
 
@@ -366,13 +382,13 @@ describe('computeInputHash', () => {
       nutrition: { ...base.nutrition, remainingCalories: null },
     });
     const belowProteinBoundary = makeContext({
-      nutrition: { ...base.nutrition, remainingProteinG: 19.99 },
+      nutrition: { ...base.nutrition, dailyInsightProteinStatus: 'below_range' },
     });
-    const nearlyCompleteProtein = makeContext({
-      nutrition: { ...base.nutrition, remainingProteinG: 20 },
+    const inProteinRange = makeContext({
+      nutrition: { ...base.nutrition, dailyInsightProteinStatus: 'in_range' },
     });
-    const proteinGap = makeContext({
-      nutrition: { ...base.nutrition, remainingProteinG: 20.01 },
+    const aboveProteinRange = makeContext({
+      nutrition: { ...base.nutrition, dailyInsightProteinStatus: 'above_range' },
     });
 
     const overBudgetHash = computeInputHash(justOverBudget, 'v14');
@@ -383,25 +399,22 @@ describe('computeInputHash', () => {
     expect(computeInputHash(unknownBudget, 'v14')).not.toBe(atBudgetHash);
 
     const belowProteinHash = computeInputHash(belowProteinBoundary, 'v14');
-    const atProteinHash = computeInputHash(nearlyCompleteProtein, 'v14');
-    const gapProteinHash = computeInputHash(proteinGap, 'v14');
-    expect(belowProteinHash).not.toBe(atProteinHash);
-    expect(atProteinHash).not.toBe(gapProteinHash);
-    expect(computeInputHash(makeContext({ nutrition: { ...base.nutrition, remainingProteinG: null } }), 'v14'))
-      .not.toBe(atProteinHash);
+    const inProteinRangeHash = computeInputHash(inProteinRange, 'v14');
+    const aboveProteinRangeHash = computeInputHash(aboveProteinRange, 'v14');
+    expect(belowProteinHash).not.toBe(inProteinRangeHash);
+    expect(inProteinRangeHash).not.toBe(aboveProteinRangeHash);
   });
 
-  it('includes the selected intent and activity status bucket in the hash', () => {
+  it('includes the selected intent and Daily Insight activity status in the hash', () => {
     const ctx = makeContext({
       specialActivity: {} as InsightInputContext['specialActivity'],
-      activityCompletionStatus: 'planned',
-      activityStatusSource: 'local_time_heuristic',
+      dailyActivityStatus: 'unknown',
     });
-    const planned = computeInputHash(ctx, 'v10', 'activity_focus');
-    const unknown = computeInputHash({ ...ctx, activityCompletionStatus: 'unknown', activityStatusSource: 'unavailable' }, 'v10', 'activity_focus');
+    const unknown = computeInputHash(ctx, 'v10', 'activity_focus');
+    const completed = computeInputHash({ ...ctx, dailyActivityStatus: 'completed' }, 'v10', 'activity_focus');
     const otherIntent = computeInputHash(ctx, 'v10', 'general');
-    expect(planned).not.toBe(unknown);
-    expect(planned).not.toBe(otherIntent);
+    expect(unknown).not.toBe(completed);
+    expect(unknown).not.toBe(otherIntent);
   });
 
   it('does not hash an unvalidated offset value', () => {
@@ -580,7 +593,7 @@ describe('shouldRegenerate', () => {
     expect(shouldRegenerate(incompleteV10, baseHash, now, false, 'v10')).toBe(true);
   });
 
-  it.each(['v15', 'v18'] as const)('preserves an unexpired v14 Daily until expiry when %s becomes active', (activePromptVersion) => {
+  it.each(['v15', 'v16', 'v17', 'v18'] as const)('preserves an unexpired v14 Daily until expiry when %s becomes active', (activePromptVersion) => {
     const v14 = makeDocument({
       promptVersion: 'v14',
       promptFingerprint: 'sha256:v14-fingerprint',
@@ -621,6 +634,20 @@ describe('shouldRegenerate', () => {
       activePrompt.intent,
       activePrompt.promptSnapshot,
     )).toBe(true);
+  });
+
+  it('does not extend the v14 preservation exception to v19', () => {
+    const document = makeDocument({
+      promptVersion: 'v14',
+      promptFingerprint: 'sha256:v14',
+      systemPromptHash: 'sha256:v14-system',
+      intent: 'general',
+      promptSnapshot: { system: 'v14 system', user: 'v14 user' },
+      expiresAt: new Date(now.getTime() + 60_000).toISOString(),
+      lastGeneratedAt: now.toISOString(),
+      dailyGenerations: MAX_DAILY_GENERATIONS,
+    });
+    expect(shouldRegenerate(document, baseHash, now, false, 'v19')).toBe(true);
   });
 
   it('serves a complete current prompt instance when its hash is unchanged', () => {
@@ -738,6 +765,18 @@ describe('InMemoryInsightRepository', () => {
     await repo.upsert(doc);
     const retrieved = await repo.get('user1', '2026-06-30');
     expect(retrieved).toEqual(doc);
+    expect(retrieved?.response.greeting).toBeUndefined();
+    expect(retrieved?.response.shortInsight).toBeUndefined();
+  });
+
+  it('preserves the compact pair without changing Daily metadata', async () => {
+    const document = makeDocument({ response: {
+      ...makeResponse(),
+      greeting: 'Hallo, Sportler! 👋',
+      shortInsight: 'Dein Tag ist noch offen.',
+    } });
+    await repo.upsert(document);
+    await expect(repo.get(document.userId, document.date)).resolves.toEqual(document);
   });
 
   it('replaces document on second upsert (same user + date)', async () => {
@@ -865,6 +904,9 @@ describe('InMemoryInsightRepository feedback documents', () => {
       id: legacy.id,
       processingStatus: 'Open',
     });
+    const stored = await repo.getFeedbackBySubmissionId('user1', legacy.submissionId);
+    expect(stored?.response.greeting).toBeUndefined();
+    expect(stored?.response.shortInsight).toBeUndefined();
   });
 
   it('isolates feedback lookups by user and discriminator', async () => {

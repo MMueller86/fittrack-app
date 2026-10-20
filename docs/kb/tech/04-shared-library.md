@@ -158,9 +158,9 @@ pair and any supplied ETag precondition, and computes the persisted fingerprint.
 
 ### `insight.ts`
 - `InsightStatus` — `'fresh' | 'cached' | 'quota_exceeded' | 'unavailable'`
-- `InsightResponse` — daily AI briefing payload
+- `InsightResponse` — daily AI briefing payload; additive optional `greeting?: string` (max 120 JavaScript string units) and `shortInsight?: string` (max 240). New generations require both (introduced in v19, active prompt v28 / release v29); summary is non-empty, has no word-count minimum, and is limited to 5,000 characters. Old stored Daily/Feedback responses may omit the compact pair. Absence does not itself trigger regeneration. The Home consumer uses the static greeting without short text/detail action unless a successful Insight has a valid complete pair.
 - `InsightWeightContext` — weight data sent to the AI; includes `latestKg`, `previousKg`, `targetKg`, the 30-day regression direction projected per week as `weeklyTrend30d`, `last7Values`, `isOutlierPrevious`, `isOutlierLatest`, `daysSinceLastMeasurement`, `lastMeasurementDate: string | null` (ISO date of last measurement)
-- `InsightNutritionContext` — current intake, effective calorie target, optional profile-day `macroRanges`, `remainingProteinG`, and `proteinCoachingBand`; legacy scalar targets remain in the server context for compatibility
+- `InsightNutritionContext` — current intake, effective calorie target, optional profile-day `macroRanges`, server-derived `dailyInsightProteinStatus`, and `mealAdviceAllowed`; current Daily Insight does not receive a protein-gap threshold or infer meal permission from protein status
 - `InsightNutritionDay`, `InsightInputContext` — historical nutrition and complete server-owned AI input context
 
 ### `aiMealEstimate.ts`

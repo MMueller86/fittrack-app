@@ -4,13 +4,14 @@ import type { WeeklyReviewDayMarker, WeeklyReviewDayViewModel } from './weeklyRe
 
 export const WEEKLY_REVIEW_DAY_COUNT = 7;
 export const WEEKLY_REVIEW_MIN_TOUCH_HEIGHT = spacing.xxl;
-export const WEEKLY_REVIEW_VALUE_SLOT_HEIGHT = typography.body2.fontSize + typography.caption.fontSize + spacing.xs;
-export const WEEKLY_REVIEW_BAR_SLOT_HEIGHT = spacing.xxl * 3;
+export const WEEKLY_REVIEW_VALUE_SLOT_HEIGHT = typography.body2.fontSize;
+export const WEEKLY_REVIEW_BAR_SLOT_HEIGHT = spacing.xxl * 1.5;
+export const WEEKLY_REVIEW_BAR_WIDTH = spacing.md;
 export const WEEKLY_REVIEW_WEEKDAY_SLOT_HEIGHT = typography.caption.fontSize;
-export const WEEKLY_REVIEW_MARKER_SLOT_HEIGHT = spacing.lg;
+export const WEEKLY_REVIEW_MARKER_SLOT_HEIGHT = spacing.md;
 export const WEEKLY_REVIEW_BAR_SLOT_TOP_MARGIN = spacing.xs;
-export const WEEKLY_REVIEW_WEEKDAY_SLOT_TOP_MARGIN = spacing.sm;
-export const WEEKLY_REVIEW_MARKER_SLOT_TOP_MARGIN = spacing.xs;
+export const WEEKLY_REVIEW_WEEKDAY_SLOT_TOP_MARGIN = spacing.xs;
+export const WEEKLY_REVIEW_MARKER_SLOT_TOP_MARGIN = spacing.xs / 2;
 
 export interface WeeklyReviewDaySlot {
   top: number;
@@ -21,11 +22,11 @@ export interface WeeklyReviewDaySlotLayout {
   value: WeeklyReviewDaySlot;
   bar: WeeklyReviewDaySlot;
   weekday: WeeklyReviewDaySlot;
-  marker: WeeklyReviewDaySlot;
+  marker: WeeklyReviewDaySlot | null;
   totalHeight: number;
 }
 
-export function getWeeklyReviewDaySlotLayout(): WeeklyReviewDaySlotLayout {
+export function getWeeklyReviewDaySlotLayout(showMarkerSlot = true): WeeklyReviewDaySlotLayout {
   const value = { top: 0, height: WEEKLY_REVIEW_VALUE_SLOT_HEIGHT };
   const bar = {
     top: value.top + value.height + WEEKLY_REVIEW_BAR_SLOT_TOP_MARGIN,
@@ -35,17 +36,19 @@ export function getWeeklyReviewDaySlotLayout(): WeeklyReviewDaySlotLayout {
     top: bar.top + bar.height + WEEKLY_REVIEW_WEEKDAY_SLOT_TOP_MARGIN,
     height: WEEKLY_REVIEW_WEEKDAY_SLOT_HEIGHT,
   };
-  const marker = {
-    top: weekday.top + weekday.height + WEEKLY_REVIEW_MARKER_SLOT_TOP_MARGIN,
-    height: WEEKLY_REVIEW_MARKER_SLOT_HEIGHT,
-  };
+  const marker = showMarkerSlot
+    ? {
+        top: weekday.top + weekday.height + WEEKLY_REVIEW_MARKER_SLOT_TOP_MARGIN,
+        height: WEEKLY_REVIEW_MARKER_SLOT_HEIGHT,
+      }
+    : null;
 
   return {
     value,
     bar,
     weekday,
     marker,
-    totalHeight: marker.top + marker.height,
+    totalHeight: marker ? marker.top + marker.height : weekday.top + weekday.height,
   };
 }
 
@@ -84,6 +87,16 @@ export function getWeeklyReviewTargetBandColor(targetBand: WeeklyTargetBand | nu
   return colors.neutral;
 }
 
+export function getWeeklyReviewDayChartState(
+  day: Pick<WeeklyReviewDayViewModel, 'hasNutrition' | 'hasTarget' | 'percentLabel'>,
+) {
+  const hasBarData = day.hasNutrition && day.hasTarget;
+  return {
+    hasBarData,
+    percentLabel: hasBarData ? day.percentLabel : null,
+  };
+}
+
 export function getWeeklyReviewVisibleWeekdayLabel(
   day: Pick<WeeklyReviewDayViewModel, 'weekdayLabel'>,
 ): string {
@@ -93,6 +106,10 @@ export function getWeeklyReviewVisibleWeekdayLabel(
 export interface WeeklyReviewMarkerCell {
   date: string;
   markers: readonly WeeklyReviewDayMarker[];
+}
+
+export function hasWeeklyReviewDayMarkers(cells: readonly WeeklyReviewMarkerCell[]): boolean {
+  return cells.some((cell) => cell.markers.length > 0);
 }
 
 export function getWeeklyReviewMarkerCells(

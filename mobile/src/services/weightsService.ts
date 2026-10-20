@@ -29,6 +29,11 @@ export async function addWeight(input: AddWeightInput): Promise<WeightEntry> {
   return data;
 }
 
+export async function updateWeight(id: string, value: number): Promise<WeightEntry> {
+  const { data } = await apiClient.put<WeightEntry>(`/weights/${encodeURIComponent(id)}`, { value });
+  return data;
+}
+
 export async function deleteWeight(id: string): Promise<void> {
   await apiClient.delete(`/weights/${encodeURIComponent(id)}`);
 }

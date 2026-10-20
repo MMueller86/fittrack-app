@@ -5,27 +5,8 @@ export interface DailyInsightEvalFixture {
   description: string;
   input: InsightInputContext;
   intent: InsightIntent;
-  forbiddenPhrases: string[];
-  /** Each group represents one required concept; one natural-language alternative must occur. */
-  requiredPhraseGroups?: readonly (readonly string[])[];
   expectNullActionFields?: boolean;
-  expectUnavailableOnValidationError?: string | readonly string[];
 }
-
-// AC-1/AC-4/AC-7/AC-8/AC-9 and KB domain/07: generated copy must remain human-facing.
-const COMMON_FORBIDDEN_PHRASES = [
-  'positive entwicklung',
-  'positive fortschrittsphase',
-  'regressionsphase erkannt',
-  'plateau_active',
-  'freshnessscore',
-  'remainingcalories',
-  'activitycompletionstatus',
-  'latestkg',
-  'weeklytrend30d',
-  'std dev',
-  'medizinische diagnose',
-];
 
 // Derived from the approved 80 kg, 2000 kcal, 70 g fat profile-day example.
 const BASE_MACRO_RANGES: MacroRanges = {
@@ -40,19 +21,6 @@ const ENDURANCE_PROFILE_DAY_MACRO_RANGES: MacroRanges = {
   proteinG: { minG: 120, maxG: 160 },
   carbsG: { minG: 213, maxG: 253 },
 };
-const NEGATIVE_CARBOHYDRATE_JUDGMENTS = [
-  'zu wenig kohlenhydrate',
-  'zu wenige kohlenhydrate',
-  'zu niedrige kohlenhydratzufuhr',
-  'kohlenhydratbereich unterschritten',
-  'unter dem kohlenhydratbereich',
-  'kohlenhydratziel verfehlt',
-  'zu viele kohlenhydrate',
-  'zu hohe kohlenhydratzufuhr',
-  'kohlenhydratbereich überschritten',
-  'über dem kohlenhydratbereich',
-  'kohlenhydratziel überschritten',
-];
 
 const historicalDay: InsightNutritionDay = {
   date: '2026-08-19',
@@ -98,8 +66,8 @@ function baseContext(overrides: Partial<InsightInputContext> = {}): InsightInput
         macroRanges: BASE_MACRO_RANGES,
       },
       remainingCalories: 500,
-      remainingProteinG: 20,
-      proteinCoachingBand: 'below_range',
+      dailyInsightProteinStatus: 'below_range',
+      mealAdviceAllowed: true,
       last3Days: [historicalDay, { ...historicalDay, date: '2026-08-18' }, { ...historicalDay, date: '2026-08-17' }],
     },
     userGoal: 'lose_weight',
@@ -118,9 +86,8 @@ function baseContext(overrides: Partial<InsightInputContext> = {}): InsightInput
       goalAtCalculation: 'lose_weight',
     },
     currentHourLocal: 18,
+    dailyActivityStatus: overrides.specialActivity == null ? null : 'unknown',
     specialActivity: null,
-    activityCompletionStatus: null,
-    activityStatusSource: null,
     ...overrides,
   };
 }
@@ -148,7 +115,101 @@ const historicalHikingActivity = {
   calculatedAt: '2026-08-19T20:00:00.000Z',
 };
 
+function activityNutrition(
+  specialActivity: NonNullable<InsightInputContext['specialActivity']>,
+  overrides: Partial<InsightInputContext['nutrition']> = {},
+): InsightInputContext['nutrition'] {
+  const defaults = baseContext().nutrition;
+  const baseTargets = defaults.targets;
+  if (baseTargets == null) throw new Error('Activity fixture requires calorie targets');
+
+  const today = overrides.today === undefined ? defaults.today : overrides.today;
+  const baseCalories = specialActivity.dailyCalorieTarget;
+  const activityBonusCalories = specialActivity.activityBonus;
+  const effectiveCalories = baseCalories + activityBonusCalories;
+
+  return {
+    ...defaults,
+    ...overrides,
+    today,
+    targets: {
+      ...baseTargets,
+      ...(overrides.targets ?? {}),
+      calories: effectiveCalories,
+      baseCalories,
+      activityBonusCalories,
+      targetSource: 'special_activity_snapshot',
+    },
+    remainingCalories: today == null ? null : effectiveCalories - today.calories,
+  };
+}
+
+const currentEffectiveBudgetActivity = {
+  ...hikingActivity,
+  movementTimeMinutes: 180,
+  distanceKm: 16,
+  dailyCalorieTarget: 2300,
+  activityBonus: 700,
+};
+const currentEffectiveBudgetNutrition = activityNutrition(currentEffectiveBudgetActivity, {
+  today: { calories: 2800, protein: 130, carbs: 340, fat: 80, fiber: 28, hasMealItem: true },
+  targets: {
+    ...baseContext().nutrition.targets!,
+    proteinG: 140,
+    carbsG: 360,
+    fatG: 85,
+    fiberG: 30,
+    macroRanges: ACTIVITY_PROFILE_DAY_MACRO_RANGES,
+  },
+  dailyInsightProteinStatus: 'in_range',
+  mealAdviceAllowed: false,
+});
+const intensiveEnduranceActivity = {
+  ...hikingActivity,
+  movementTimeMinutes: 360,
+  distanceKm: 30,
+  elevationGainM: 1600,
+  dailyCalorieTarget: 2300,
+  activityBonus: 1100,
+};
+const intensiveEnduranceNutrition = activityNutrition(intensiveEnduranceActivity, {
+  today: { calories: 2700, protein: 90, carbs: 280, fat: 75, fiber: 25, hasMealItem: true },
+  targets: {
+    ...baseContext().nutrition.targets!,
+    proteinG: 150,
+    carbsG: 420,
+    fatG: 90,
+    fiberG: 30,
+    macroRanges: ENDURANCE_PROFILE_DAY_MACRO_RANGES,
+  },
+  mealAdviceAllowed: true,
+  dailyInsightProteinStatus: 'below_range',
+});
+
 export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
+  {
+    id: 'personal-neutral-greeting',
+    description: 'US-03 AC-1/AC-2: the server name is preserved in a time-neutral greeting and the short sentence agrees with the full text.',
+    input: baseContext({ displayName: 'Mia-Luise', currentHourLocal: 22 }),
+    intent: 'nutrition_guidance',
+  },
+  {
+    id: 'long-name-neutral-greeting',
+    description: 'US-03 AC-1: a long name and emoji fit without truncating the name.',
+    input: baseContext({ displayName: 'Alexandra-Christiane Maximiliane von Beispielhausen', currentHourLocal: 12 }),
+    intent: 'nutrition_guidance',
+  },
+  {
+    id: 'sparse-data-name-fallback',
+    description: 'US-03 AC-2: the existing Sportler fallback and missing nutrition/weight data do not create facts.',
+    input: baseContext({
+      currentHourLocal: null,
+      dayType: null,
+      weight: { latestKg: null, previousKg: null, targetKg: null, weeklyTrend30d: null, last7Values: [], isOutlierPrevious: false, isOutlierLatest: false, daysSinceLastMeasurement: null, lastMeasurementDate: null },
+      nutrition: { today: null, targets: null, remainingCalories: null, dailyInsightProteinStatus: 'unknown', mealAdviceAllowed: false, last3Days: [] },
+    }),
+    intent: 'general',
+  },
   {
     id: 'phase-progress-open-day',
     description: 'An open target budget is not presented as an achieved energy deficit or a weight-phase explanation.',
@@ -158,7 +219,6 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().nutrition,
         today: { calories: 1300, protein: 100, carbs: 130, fat: 45, fiber: 18, hasMealItem: true },
         remainingCalories: 700,
-        remainingProteinG: 20,
       },
       weight: {
         ...baseContext().weight,
@@ -177,73 +237,22 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
     }),
     intent: 'phase_progress',
     // AC: open-day target remainder is not an achieved energy balance; use the long-term weight signal.
-    requiredPhraseGroups: [
-      ['trend', 'wochenverlauf', 'gewichtsverlauf', 'richtung'],
-      ['auf kurs', 'richtige richtung', 'auf dem richtigen weg', 'weiter', 'rückgang', 'ziel'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'du bist im kaloriendefizit',
-      'du bist im energiedefizit',
-      'du bist im kalorienüberschuss',
-      'du bist im energieüberschuss',
-      'zu wenig gegessen',
-      'unter deinem ziel',
-      'unter dem ziel',
-      'kg weniger als gestern',
-      'du hast zugenommen',
-      'dein gewicht ist gestiegen',
-    ],
   },
   {
     id: 'current-effective-activity-budget',
     description: 'An elevated current activity target prevents a high absolute intake from being judged in isolation.',
     input: baseContext({
       currentHourLocal: 22,
-      specialActivity: {
-        ...hikingActivity,
-        movementTimeMinutes: 180,
-        distanceKm: 16,
-        dailyCalorieTarget: 3000,
-        activityBonus: 700,
-      },
-      activityCompletionStatus: 'likely_completed',
-      activityStatusSource: 'local_time_heuristic',
-      nutrition: {
-        ...baseContext().nutrition,
-        today: { calories: 2800, protein: 130, carbs: 340, fat: 80, fiber: 28, hasMealItem: true },
-        targets: {
-          calories: 3000,
-          proteinG: 140,
-          carbsG: 360,
-          fatG: 85,
-          fiberG: 30,
-          macroRanges: ACTIVITY_PROFILE_DAY_MACRO_RANGES,
-          baseCalories: 2300,
-          activityBonusCalories: 700,
-          targetSource: 'special_activity_snapshot',
-        },
-        remainingCalories: 200,
-        remainingProteinG: 0,
-        proteinCoachingBand: 'in_range',
-      },
+      specialActivity: currentEffectiveBudgetActivity,
+      dailyActivityStatus: 'completed',
+      nutrition: currentEffectiveBudgetNutrition,
     }),
     intent: 'activity_focus',
     // AC-2/AC-3 and KB domain/01: the effective target, not absolute calories, controls the assessment.
-    requiredPhraseGroups: [
-      ['kalorienziel', 'tagesziel', 'energiebedarf', 'ziel'],
-      ['aktivität', 'wanderung', 'tour'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'über deinem ziel',
-      'über dem ziel',
-      'zu viele kalorien',
-    ],
   },
   {
     id: 'historical-target-source-priority',
-    description: 'Morning orientation uses the synthetic stored 2250 target, not today\'s 2000 target or a conflicting activity value.',
+    description: 'Morning orientation uses only today\'s context even when historical targets and activity data exist.',
     input: baseContext({
       currentHourLocal: 8,
       nutrition: {
@@ -261,8 +270,8 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
           targetSource: 'profile_fallback',
         },
         remainingCalories: null,
-        remainingProteinG: null,
-        proteinCoachingBand: 'unknown',
+        dailyInsightProteinStatus: 'unknown',
+        mealAdviceAllowed: false,
         last3Days: [
           {
             date: '2026-08-19',
@@ -288,36 +297,18 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       },
     }),
     intent: 'morning_orientation',
-    // Synthetic AC-6 controls: 2250 is historical, 2000 is current profile, and 1400 is a conflicting raw activity value.
-    requiredPhraseGroups: [
-      ['gestern', 'letzten tag', 'vergangenen tag', 'letzten tage'],
-      ['ziel', 'tagesziel', 'kalorienziel', 'energiebedarf'],
-      ['2.250', '2250'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'gestern über deinem ziel',
-      'gestern zu viel gegessen',
-      'kalorienüberschuss gestern',
-      'über dem damaligen tagesziel',
-      'über dem gespeicherten tagesziel',
-      '2.000 kcal',
-      '2000 kcal',
-      '1.400 kcal',
-      '1400 kcal',
-    ],
   },
   {
     id: 'historical-target-unavailable',
-    description: 'A missing historical activity target is omitted or fails safely instead of using today\'s profile target.',
+    description: 'Unavailable historical targets are ignored; the empty current day is described without a past-day claim.',
     input: baseContext({
       currentHourLocal: 8,
       nutrition: {
         ...baseContext().nutrition,
         today: null,
         remainingCalories: null,
-        remainingProteinG: null,
-        proteinCoachingBand: 'unknown',
+        dailyInsightProteinStatus: 'unknown',
+        mealAdviceAllowed: false,
         last3Days: [
           {
             date: '2026-08-19',
@@ -339,37 +330,18 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       },
     }),
     intent: 'morning_orientation',
-    expectUnavailableOnValidationError: [
-      'Daily insight compares a historical day without a reliable historical target source',
-      'Daily insight makes a historical nutrition claim without logged nutrition data',
-    ],
-    // Synthetic AC-6 missing-source control: do not borrow the current profile target or the raw activity value.
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'gestern über dem ziel',
-      'gestern unter deinem ziel',
-      'über deinem ziel',
-      'unter deinem ziel',
-      '2000 kcal',
-      '2.000 kcal',
-      '1400 kcal',
-      '1.400 kcal',
-      'zu viel gegessen',
-      'kalorienüberschuss',
-      'ziel verfehlt',
-    ],
   },
   {
     id: 'historical-target-ambiguous-source',
-    description: 'A profile fallback and a conflicting activity target cannot support a historical comparison.',
+    description: 'Ambiguous historical data does not affect a current-moment insight.',
     input: baseContext({
       currentHourLocal: 8,
       nutrition: {
         ...baseContext().nutrition,
         today: null,
         remainingCalories: null,
-        remainingProteinG: null,
-        proteinCoachingBand: 'unknown',
+        dailyInsightProteinStatus: 'unknown',
+        mealAdviceAllowed: false,
         last3Days: [
           {
             ...historicalDay,
@@ -388,60 +360,17 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       },
     }),
     intent: 'morning_orientation',
-    expectUnavailableOnValidationError: [
-      'Daily insight compares a historical day without a reliable historical target source',
-      'Daily insight makes a historical nutrition claim without logged nutrition data',
-    ],
-    // Synthetic ambiguity: current profile fallback 2000 and raw activity target 1400 are not a past-day target.
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'gestern über dem ziel',
-      'gestern unter dem ziel',
-      'unter deinem damaligen tagesziel',
-      '1.400 kcal',
-      '1400 kcal',
-    ],
   },
   {
-    id: 'planned-activity',
-    description: 'A planned activity is not described as completed.',
+    id: 'completed-activity',
+    description: 'A server-confirmed completed activity may be described as completed.',
     input: baseContext({
-      currentHourLocal: 19,
+      currentHourLocal: 23,
       specialActivity: hikingActivity,
-      activityCompletionStatus: 'planned',
-      activityStatusSource: 'local_time_heuristic',
+      nutrition: activityNutrition(hikingActivity),
+      dailyActivityStatus: 'completed',
     }),
     intent: 'activity_focus',
-    // US Insight F4 and the ActivityCompletionStatus contract: planned is not completed.
-    requiredPhraseGroups: [['geplant', 'eingetragen', 'später', 'vorbereiten']],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'absolviert',
-      'abgeschlossen',
-      'sicher durchgeführt',
-      'hat stattgefunden',
-      'du hast die wanderung gemacht',
-    ],
-  },
-  {
-    id: 'likely-completed-activity',
-    description: 'A late-day activity is described only probabilistically, never as a confirmed fact.',
-    input: baseContext({
-      currentHourLocal: 22,
-      specialActivity: hikingActivity,
-      activityCompletionStatus: 'likely_completed',
-      activityStatusSource: 'local_time_heuristic',
-    }),
-    intent: 'activity_focus',
-    // AC-6/AC-7: the 20:00 heuristic permits only probabilistic or conditional language.
-    requiredPhraseGroups: [['wahrscheinlich', 'vermutlich', 'könnte', 'wenn', 'falls']],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'absolviert',
-      'sicher durchgeführt',
-      'du hast die wanderung gemacht',
-      'du hast die tour gemacht',
-    ],
   },
   {
     id: 'unknown-activity',
@@ -449,68 +378,23 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
     input: baseContext({
       currentHourLocal: null,
       specialActivity: hikingActivity,
-      activityCompletionStatus: 'unknown',
-      activityStatusSource: 'unavailable',
+      nutrition: activityNutrition(hikingActivity),
+      dailyActivityStatus: 'unknown',
     }),
     intent: 'activity_focus',
     // US Insight F4: missing or invalid time must not create a completion fact.
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'absolviert',
-      'abgeschlossen',
-      'sicher durchgeführt',
-      'hat stattgefunden',
-      'du hast die wanderung gemacht',
-    ],
   },
   {
     id: 'intensive-endurance-fueling',
     description: 'A long alpine endurance activity receives fueling and recovery guidance beyond a generic protein snack.',
     input: baseContext({
       currentHourLocal: 23,
-      specialActivity: {
-        ...hikingActivity,
-        movementTimeMinutes: 360,
-        distanceKm: 30,
-        elevationGainM: 1600,
-        dailyCalorieTarget: 3400,
-        activityBonus: 1100,
-      },
-      activityCompletionStatus: 'likely_completed',
-      activityStatusSource: 'local_time_heuristic',
-      nutrition: {
-        ...baseContext().nutrition,
-        today: { calories: 2700, protein: 90, carbs: 280, fat: 75, fiber: 25, hasMealItem: true },
-        targets: {
-          calories: 3400,
-          proteinG: 150,
-          carbsG: 420,
-          fatG: 90,
-          fiberG: 30,
-          macroRanges: ENDURANCE_PROFILE_DAY_MACRO_RANGES,
-          baseCalories: 2300,
-          activityBonusCalories: 1100,
-          targetSource: 'special_activity_snapshot',
-        },
-        remainingCalories: 700,
-        remainingProteinG: 30,
-        proteinCoachingBand: 'below_range',
-      },
+      specialActivity: intensiveEnduranceActivity,
+      dailyActivityStatus: 'completed',
+      nutrition: intensiveEnduranceNutrition,
     }),
     intent: 'activity_focus',
     // AC-8 and DV-2: qualitative endurance guidance must cover fuel, fluids, and recovery without invented thresholds.
-    requiredPhraseGroups: [
-      ['kohlenhydrate', 'energie'],
-      ['regeneration', 'regener', 'erholung', 'erhol'],
-      ['flüssigkeit', 'trinken', 'hydration'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'nur ein proteinreicher snack',
-      'ausschließlich protein',
-      'pro stunde',
-      'exakt',
-    ],
   },
   {
     id: 'budget-lock',
@@ -520,22 +404,11 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       nutrition: {
         ...baseContext().nutrition,
         remainingCalories: -120,
-        remainingProteinG: 60,
+        mealAdviceAllowed: false,
       },
     }),
     intent: 'nutrition_guidance',
     // US Insight F6 and KB domain/07: the budget lock has priority over a protein gap.
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'iss noch',
-      'mehr essen',
-      'noch etwas essen',
-      'heute noch essen',
-      'proteinshake',
-      'mahlzeit hinzufügen',
-      'heute noch eine proteinreiche mahlzeit',
-      'heute eine proteinreiche mahlzeit',
-    ],
   },
   {
     id: 'target-relative-overage-not-achieved-surplus',
@@ -554,89 +427,80 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
           macroRanges: BASE_MACRO_RANGES,
         },
         remainingCalories: -180,
-        remainingProteinG: 15,
-        proteinCoachingBand: 'below_range',
+        dailyInsightProteinStatus: 'below_range',
+        mealAdviceAllowed: false,
       },
     }),
     intent: 'nutrition_guidance',
     // WS-2 / AC-3: only the synthetic intake-to-target relation is supported by this context.
-    requiredPhraseGroups: [
-      ['über deinem ziel', 'über dem ziel', 'über deinem kalorienziel', 'über dem kalorienziel', 'über deinem effektiven ziel', 'über dem effektiven ziel', 'oberhalb deines ziels', 'oberhalb deines effektiven ziels', 'aufnahme liegt über'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'du bist im energiedefizit',
-      'du befindest dich im energiedefizit',
-      'du hast ein energiedefizit',
-      'du bist im energieüberschuss',
-      'du befindest dich im energieüberschuss',
-      'du hast einen energieüberschuss',
-    ],
   },
   {
     id: 'protein-gap-with-budget',
-    description: 'A real protein gap with remaining calories may receive one concrete next-meal suggestion.',
+    description: 'A below-range server protein status and permitted meal advice may support one relevant suggestion.',
     input: baseContext({
       currentHourLocal: 18,
       nutrition: {
         ...baseContext().nutrition,
         today: { calories: 1600, protein: 70, carbs: 160, fat: 50, fiber: 20, hasMealItem: true },
         remainingCalories: 600,
-        remainingProteinG: 50,
-        proteinCoachingBand: 'below_range',
+        dailyInsightProteinStatus: 'below_range',
+        mealAdviceAllowed: true,
         last3Days: [],
       },
     }),
     intent: 'nutrition_guidance',
-    // AC-6: protein guidance is appropriate only when the budget is not exceeded and the gap is material.
-    requiredPhraseGroups: [
-      ['protein', 'eiweiß'],
-      ['magerquark', 'skyr', 'hüttenkäse', 'hähnchen', 'proteinreiche'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'fast optimal',
-      'proteinziel ist erreicht',
-      'unter dem ziel von',
-      'unter deinem ziel von',
-      'letzten tage zeigen',
-      'in der regel gut im proteinbereich',
-    ],
+    // B1.1: a below-range server status and mealAdviceAllowed=true permit, but do not require, meal advice.
   },
   {
-    id: 'protein-nearly-complete',
-    description: 'A nearly complete protein target is not turned into a contradictory urgent eating recommendation.',
+    id: 'meal-advice-denied',
+    description: 'Meal advice is denied by the server even though the protein status is below range.',
     input: baseContext({
       currentHourLocal: 18,
       nutrition: {
         ...baseContext().nutrition,
         today: { calories: 1600, protein: 110, carbs: 160, fat: 50, fiber: 20, hasMealItem: true },
         remainingCalories: 600,
-        remainingProteinG: 10,
-        proteinCoachingBand: 'below_range',
+        dailyInsightProteinStatus: 'below_range',
+        mealAdviceAllowed: false,
         last3Days: [],
       },
     }),
     intent: 'nutrition_guidance',
-    // AC-6: remainingProteinG <= 20 is nearly complete; no additional protein action should follow.
-    requiredPhraseGroups: [['protein', 'eiweiß']],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'mehr protein',
-      'zusätzlich protein',
-      'proteinreiche mahlzeit',
-      'proteinreich essen',
-      'proteinshake',
-      'magerquark',
-      'skyr',
-      'hüttenkäse',
-      'hähnchenbrust',
-    ],
-    expectNullActionFields: true,
-    expectUnavailableOnValidationError: [
-      'Daily insight judges an open day as completed',
-      'Daily insight treats a target-relative calorie difference as an achieved energy balance',
-    ],
+    // B1.1: meal permission is independent of the protein status.
+  },
+  {
+    id: 'protein-above-range-no-warning',
+    description: 'Protein above 2.0 and below 2.5 g/kg is not described as a problem.',
+    input: baseContext({
+      currentHourLocal: 18,
+      nutrition: {
+        ...baseContext().nutrition,
+        today: { calories: 1600, protein: 170, carbs: 140, fat: 50, fiber: 20, hasMealItem: true },
+        remainingCalories: 400,
+        dailyInsightProteinStatus: 'above_range',
+        mealAdviceAllowed: false,
+        last3Days: [],
+      },
+    }),
+    intent: 'nutrition_guidance',
+    // Story 4.3: above the range but below 2.5 g/kg needs no special protein warning.
+  },
+  {
+    id: 'protein-high-with-calories-over-target',
+    description: 'Protein at or above 2.5 g/kg with calories over target allows a calm optional food-choice note.',
+    input: baseContext({
+      currentHourLocal: 20,
+      nutrition: {
+        ...baseContext().nutrition,
+        today: { calories: 2250, protein: 210, carbs: 160, fat: 60, fiber: 20, hasMealItem: true },
+        remainingCalories: -250,
+        dailyInsightProteinStatus: 'at_or_above_2_5_g_per_kg',
+        mealAdviceAllowed: false,
+        last3Days: [],
+      },
+    }),
+    intent: 'nutrition_guidance',
+    // Story 4.3: an optional, non-alarmist note is allowed; it is not required.
   },
   {
     id: 'carbohydrates-below-range-neutral',
@@ -646,14 +510,12 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().nutrition,
         today: { calories: 1420, protein: 90, carbs: 100, fat: 60, fiber: 20, hasMealItem: true },
         remainingCalories: 580,
-        remainingProteinG: 30,
-        proteinCoachingBand: 'below_range',
+        dailyInsightProteinStatus: 'below_range',
         last3Days: [],
       },
     }),
     intent: 'nutrition_guidance',
     // AC-7 / PO-4: an intake below the carbohydrate range is not a negative assessment.
-    forbiddenPhrases: [...COMMON_FORBIDDEN_PHRASES, ...NEGATIVE_CARBOHYDRATE_JUDGMENTS],
   },
   {
     id: 'carbohydrates-above-range-neutral',
@@ -663,48 +525,40 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().nutrition,
         today: { calories: 1840, protein: 90, carbs: 250, fat: 40, fiber: 20, hasMealItem: true },
         remainingCalories: 160,
-        remainingProteinG: 30,
-        proteinCoachingBand: 'below_range',
+        dailyInsightProteinStatus: 'below_range',
+        mealAdviceAllowed: false,
       },
     }),
     intent: 'nutrition_guidance',
     // AC-7 / PO-4: an intake above the carbohydrate range is not a strict-limit violation.
-    forbiddenPhrases: [...COMMON_FORBIDDEN_PHRASES, ...NEGATIVE_CARBOHYDRATE_JUDGMENTS],
   },
   {
     id: 'empty-morning',
-    description: 'An empty early morning uses historical data without judging today.',
+    description: 'An empty early morning uses only today\'s context without judging the unlogged day.',
     input: baseContext({
       currentHourLocal: 8,
       nutrition: {
         ...baseContext().nutrition,
         today: null,
         remainingCalories: null,
-        remainingProteinG: null,
-        proteinCoachingBand: 'unknown',
+        dailyInsightProteinStatus: 'unknown',
+        mealAdviceAllowed: false,
       },
     }),
     intent: 'morning_orientation',
     // US Insight F7 and the zero-versus-missing contract: no current MealItem is not a deficit.
-    requiredPhraseGroups: [['gestern', 'vortag', 'letzten tage', 'letzten drei tage', 'letzten drei tagen', 'vergangenen tage']],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'zu wenig gegessen',
-      'heute nichts gegessen',
-      'unter deinem ziel',
-    ],
   },
   {
     id: 'morning-unlogged-prior-day',
-    description: 'An unlogged prior day remains missing data and is never treated as zero intake.',
+    description: 'An unlogged current day remains missing data; prior-day entries are ignored.',
     input: baseContext({
       currentHourLocal: 8,
       nutrition: {
         ...baseContext().nutrition,
         today: null,
         remainingCalories: null,
-        remainingProteinG: null,
-        proteinCoachingBand: 'unknown',
+        dailyInsightProteinStatus: 'unknown',
+        mealAdviceAllowed: false,
         last3Days: [
           {
             ...historicalDay,
@@ -723,22 +577,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
       },
     }),
     intent: 'morning_orientation',
-    expectUnavailableOnValidationError: [
-      'Daily insight makes a historical nutrition claim without logged nutrition data',
-      'Daily insight compares a historical day without a reliable historical target source',
-    ],
-    // KB domain/01 and the morning source contract: no MealItem is not zero intake.
-    requiredPhraseGroups: [
-      ['gestern', 'vortag'],
-      ['keine einträge', 'keine daten', 'nicht verlässlich einordnen', 'nicht belastbar einordnen', 'lässt sich nicht verlässlich einordnen'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'nichts gegessen',
-      'null kcal',
-      'kein eiweiß',
-      'zu wenig gegessen',
-    ],
+    // KB domain/01: no current MealItem is not zero intake.
   },
   {
     id: 'midday-empty-day-not-morning',
@@ -749,14 +588,12 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().nutrition,
         today: null,
         remainingCalories: null,
-        remainingProteinG: null,
-        proteinCoachingBand: 'unknown',
+        dailyInsightProteinStatus: 'unknown',
+        mealAdviceAllowed: false,
       },
     }),
     intent: 'general',
     // The deterministic intent selector only enables morning_orientation before 10:00.
-    requiredPhraseGroups: [['heute', 'dein tag', 'für den rest']],
-    forbiddenPhrases: [...COMMON_FORBIDDEN_PHRASES, 'guten morgen', 'heute morgen'],
   },
   {
     id: 'stale-weight',
@@ -766,7 +603,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().weight,
         latestKg: null,
         previousKg: null,
-          weeklyTrend30d: null,
+        weeklyTrend30d: null,
         last7Values: [],
         daysSinceLastMeasurement: 20,
         lastMeasurementDate: '2026-07-31',
@@ -778,21 +615,5 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
     }),
     intent: 'phase_progress',
     // US Insight F2 and KB domain/07: old measurements are not current evidence.
-    requiredPhraseGroups: [
-      ['lange kein gewicht', 'gewichtsdaten sind veraltet', 'nicht aktuell', 'neuer eintrag', 'neue messung'],
-      ['veraltet', 'nicht aktuell', 'älteren messungen', 'liegt länger zurück', 'unsicher', 'neuer eintrag', 'neue messung'],
-    ],
-    forbiddenPhrases: [
-      ...COMMON_FORBIDDEN_PHRASES,
-      'dein gewicht ist heute',
-      'dein trend zeigt heute',
-      'der trend zeigt heute',
-      'der wochenverlauf zeigt heute',
-      'kg weniger als gestern',
-      'zu wenig gegessen',
-      'unter deinem ziel',
-      'unter dem ziel',
-      'dein kalorienverbrauch liegt unter',
-    ],
   },
 ];

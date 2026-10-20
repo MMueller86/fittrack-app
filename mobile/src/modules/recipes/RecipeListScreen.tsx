@@ -1,4 +1,4 @@
-// RecipeListScreen — Recipe overview with "Zuletzt verwendet" + all recipes, FAB → create
+// RecipeListScreen — Recipe overview with "Zuletzt verwendet" + all recipes
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -223,6 +223,9 @@ export default function RecipeListScreen({ navigation }: Props) {
   const requestRevisionRef = useRef(0);
   const requestControllerRef = useRef<AbortController | null>(null);
   const continuationTokenRef = useRef<string | undefined>(undefined);
+  const handleCreateRecipe = useCallback(() => {
+    navigation.navigate('RecipeWizard');
+  }, [navigation]);
 
   const load = useCallback(async (options: { append?: boolean; refresh?: boolean } = {}) => {
     const append = options.append ?? false;
@@ -380,7 +383,6 @@ export default function RecipeListScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <Text style={styles.screenTitle}>Rezepte</Text>
       <View style={styles.segmentedControl}>
         <TouchableOpacity
           style={[styles.segment, section === 'mine' && styles.segmentSelected]}
@@ -427,7 +429,10 @@ export default function RecipeListScreen({ navigation }: Props) {
           <>
             {recent.length > 0 && (
               <>
-                <Text style={styles.sectionHeader}>Zuletzt verwendet</Text>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeaderRowText}>Zuletzt verwendet</Text>
+                  <CreateRecipeIconButton onPress={handleCreateRecipe} />
+                </View>
                 {recent.map((recipe) => (
                   <RecipeCard
                     key={`recent-${recipe.id}`}
@@ -442,7 +447,10 @@ export default function RecipeListScreen({ navigation }: Props) {
             )}
             {recipes.length > 0 && (
               <>
-                <Text style={styles.sectionHeader}>Alle Rezepte</Text>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeaderRowText}>Alle Rezepte</Text>
+                  {recent.length === 0 && <CreateRecipeIconButton onPress={handleCreateRecipe} />}
+                </View>
                 {recipes.map((recipe) => (
                   <RecipeCard
                     key={`all-${recipe.id}`}
@@ -458,7 +466,16 @@ export default function RecipeListScreen({ navigation }: Props) {
             {recipes.length === 0 && !loading && !loadError && (
               <View style={styles.empty}>
                 <Text style={styles.emptyTitle}>Noch keine Rezepte</Text>
-                <Text style={styles.emptySubtitle}>Tippe auf + um dein erstes Rezept zu erstellen.</Text>
+                <TouchableOpacity
+                  style={styles.emptyCreateButton}
+                  onPress={handleCreateRecipe}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel="Rezept erstellen"
+                >
+                  <Icon lib="ion" name="add" size="md" color={colors.background} />
+                  <Text style={styles.emptyCreateButtonText}>Rezept erstellen</Text>
+                </TouchableOpacity>
               </View>
             )}
           </>
@@ -535,18 +552,6 @@ export default function RecipeListScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {section === 'mine' && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate('RecipeWizard')}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Rezept erstellen"
-        >
-          <Text style={styles.fabLabel}>+</Text>
-        </TouchableOpacity>
-      )}
-
       <InfoOverlay
         visible={errorNotice != null}
         title={errorNotice?.title ?? 'Fehler'}
@@ -566,30 +571,46 @@ function getResponseStatus(error: unknown): number | null {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  scroll: { padding: spacing.md, paddingBottom: spacing.xxl + spacing.xl },
-  screenTitle: { ...typography.h1, color: colors.text, marginHorizontal: spacing.md, marginTop: spacing.md, marginBottom: spacing.md },
+  scroll: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.xl },
   segmentedControl: {
     flexDirection: 'row',
-    gap: spacing.xs,
     marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    padding: spacing.xs,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
+    marginTop: spacing.md,
+    borderBottomWidth: 1,
     borderColor: colors.border,
   },
   segment: {
     flex: 1,
-    minHeight: 44,
+    minHeight: 48,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: radius.sm,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
     paddingHorizontal: spacing.xs,
   },
-  segmentSelected: { backgroundColor: colors.surfaceMuted },
+  segmentSelected: { borderBottomColor: colors.primaryBright },
   segmentText: { ...typography.body2, color: colors.textMuted, textAlign: 'center', flexShrink: 1 },
-  segmentTextSelected: { color: colors.text, fontWeight: '600' },
+  segmentTextSelected: { color: colors.primaryBright, fontWeight: '600' },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  sectionHeaderRowText: {
+    ...typography.overline,
+    color: colors.textMuted,
+    flex: 1,
+    flexShrink: 1,
+  },
+  createRecipeIconButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.xs,
+    flexShrink: 0,
+  },
   sectionHeader: {
     ...typography.overline,
     color: colors.textMuted,
@@ -599,7 +620,17 @@ const styles = StyleSheet.create({
   },
   empty: { alignItems: 'center', marginTop: spacing.xxl },
   emptyTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
-  emptySubtitle: { ...typography.body2, color: colors.textMuted, textAlign: 'center' },
+  emptyCreateButton: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+  },
+  emptyCreateButtonText: { ...typography.button, color: colors.background },
   loadingState: { paddingVertical: spacing.xxl, alignItems: 'center' },
   errorState: {
     alignItems: 'center',
@@ -642,21 +673,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
   },
   loadMoreText: { ...typography.button, color: colors.primary },
-  fab: {
-    position: 'absolute',
-    right: spacing.lg,
-    bottom: spacing.xl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  fabLabel: { fontSize: 30, color: colors.white, lineHeight: 32, fontWeight: '600' },
 });
+
+function CreateRecipeIconButton({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      style={styles.createRecipeIconButton}
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel="Rezept erstellen"
+    >
+      <Icon lib="ion" name="add-circle-outline" size="md" color={colors.primaryBright} />
+    </TouchableOpacity>
+  );
+}

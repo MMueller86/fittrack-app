@@ -15,6 +15,7 @@ import { CosmosWeightsRepository } from './cosmosWeightsRepository';
 export interface WeightsRepository {
   list(userId: string): Promise<WeightEntry[]>;
   add(entry: WeightEntry): Promise<WeightEntry>;
+  updateValue(userId: string, id: string, value: number): Promise<WeightEntry | null>;
   delete(userId: string, id: string): Promise<boolean>;
 }
 
@@ -34,6 +35,13 @@ class InMemoryWeightsRepository implements WeightsRepository {
     const list = this.entriesByUser.get(entry.userId) ?? [];
     list.push(entry);
     this.entriesByUser.set(entry.userId, list);
+    return entry;
+  }
+
+  async updateValue(userId: string, id: string, value: number): Promise<WeightEntry | null> {
+    const entry = this.entriesByUser.get(userId)?.find((candidate) => candidate.id === id);
+    if (!entry) return null;
+    entry.value = value;
     return entry;
   }
 

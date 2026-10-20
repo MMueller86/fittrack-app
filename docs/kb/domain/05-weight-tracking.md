@@ -19,7 +19,9 @@ One entry per measurement. Multiple entries per day are allowed (no deduplicatio
 
 ## Units
 
-The unit `'kg' | 'lbs'` is stored per entry. `WeightChart` plots each `WeightEntry.value` as stored and computes its moving average from those raw values; it does not normalize entries to kg. A series containing both units therefore mixes their numeric scales in the chart. The Progress trend row and Daily Insight use the separate shared regression described below.
+The shared unit contract stores `'kg' | 'lbs'` per entry. The current product data is kg-only. `WeightChart` plots each `WeightEntry.value` as stored and computes its moving average from those raw values; it does not normalize entries to kg. A series containing both units would mix their numeric scales in the chart. Progress' weekly comparison uses arithmetic means; its fallback uses the explicit seven-calendar-day regression described below. Daily Insight retains its separate 30-day regression contract.
+
+The mobile Progress screen accepts new entries and edits in kg only and sends `unit: 'kg'` for new entries. It does not convert non-kg measurements; if one is returned, Progress blocks editing it. The shared `WeightEntry` and API contracts still permit `'lbs'`; removing that support requires a separate cross-layer change. The current product data has no lbs values.
 
 ## Weight Chart
 
@@ -31,9 +33,9 @@ Visual elements:
 1. Gradient fill under the actual weight line
 2. Solid 3px bright-green polyline (actual weights)
 3. 3px dots at each measurement point
-4. Dashed 2px overlay line (7-day moving average)
+4. Dashed overlay line (Progress: rolling calendar average for the selected 7T/30T/90T range; `Alle` uses a 90-day window)
 5. Horizontal dashed grid lines
-6. Legend: "Actual" (solid) + "7-day avg" (dashed)
+6. Legend: "Gewicht" (solid) + selected rolling-average period (dashed)
 
 Data processing:
 - Sorted chronologically by date, then keeps the last `windowDays` measurements (default 30); this is a measurement-count window, not a calendar-day filter
@@ -41,9 +43,11 @@ Data processing:
 - Y-axis bounds: extrema include raw measurements, trailing averages, and the optional target. `computeChartBounds` selects steps documented as 0.5, 1, or 2 kg for numeric ranges ≤2, >2 and ≤10, or >10, respectively; it floors the minimum to a step boundary and subtracts one step, then ceils the maximum and adds one step. The chart passes raw values, so these numeric steps are applied without unit conversion. There is no 10% padding or 0.4 kg minimum-range rule.
 - X-axis: first, middle, last entry dates (deduplicated)
 
-### Seven-Measurement Moving Average
+### Progress Windows and Moving Average
 
-Trailing window: for each index `i`, average of values at `max(0, i-6)..i`. The initial values use a partial window until seven measurements are available. This is a measurement-count average, not an average over seven calendar days, despite the chart legend's "7-day avg" label.
+The mobile Progress screen initially selects `7T`, with `30T`, `90T` and `Alle` also available. Its chart-header shows only the selected local-calendar-window mean as a kg value at the right of the period controls; the accessible label identifies the window. It includes today and excludes future entries; `Alle` displays the mean of all non-future entries. The dashed blue line is a trailing calendar-day average matching 7T, 30T or 90T; `Alle` uses a 90-day average and the legend calls it `Gleitender Ø 90T`. It may use earlier history outside the visible chart window to provide complete context for the first plotted points. When a goal weight is available, Progress passes it to `WeightChart` in every period; the chart includes it in the y-axis bounds and displays its dashed target line, value badge, and `Ziel` legend entry. Other `WeightChart` callers that do not provide a calendar-average window retain the trailing seven-measurement moving average, with partial averages until seven measurements exist.
+
+The weekly comparison shows the arithmetic mean for today minus six days through today against the most recently completed Monday–Sunday calendar week. Both averages and measurement counts match their corresponding `HistoryList` sections; windows may overlap and multiple measurements on a date count individually. The comparison is displayed once as `Letzte 7 Tage`, `Letzte Woche`, and their neutral change. If either mean is unavailable, Progress falls back to `calculateWeightTrendRegressionSeries(entries, 7)`, when measurements span at least two distinct dates. Missing comparisons are not replaced with older calendar weeks. The latest non-future weight appears once with relative date labels `Heute`, `Vor 1 Tag`, or `Vor 2 Tagen`, then a neutral absolute date. The full history remains visible while creating or editing. The API and data model still allow multiple measurements per day, but Progress has no add-another action and updates an existing selected-day entry by exact ID.
 
 ### Explicit-Window Regression Series
 
@@ -88,7 +92,7 @@ The daily insight weight context includes:
 - `isOutlierPrevious` — previous weight is a statistical spike (> 1.5× std dev of 7-day window)
 - `isOutlierLatest` — latest weight is a spike
 
-[Rule] The Progress trend row and Daily Insight share `calculateWeightTrendPerWeek` from `shared/lib/weightTrend.ts`: a linear regression over the last 30 calendar days, projected to a weekly change and exposed in the Daily context as `weeklyTrend30d`. `WeightChart` does not use this regression; its dashed overlay is the seven-measurement moving average described above. The explicit-window series helper does not replace or change this 30-day contract. When `isOutlierPrevious` is true, the AI must not use it for short-term progress comparisons; this 30-day regression is the authoritative direction signal.
+[Rule] Daily Insight uses `calculateWeightTrendPerWeek` from `shared/lib/weightTrend.ts`: a linear regression over the last 30 calendar days, projected to a weekly change and exposed in the Daily context as `weeklyTrend30d`. Progress uses arithmetic weekly means for its primary comparison and `calculateWeightTrendRegressionSeries` over seven calendar days only as a fallback. The explicit-window helper does not replace or change the Daily Insight 30-day contract. When `isOutlierPrevious` is true, the AI must not use it for short-term progress comparisons; this 30-day regression remains the authoritative Daily Insight direction signal.
 
 Existing Daily and durable feedback snapshots are updated by the explicit,
 idempotent migration described in [tech/07-infrastructure.md](../tech/07-infrastructure.md).
@@ -108,4 +112,5 @@ Needed because "weight going down = progress" is only true for weight loss goals
 
 - `GET /api/weights` — `{ entries: WeightEntry[] }`
 - `POST /api/weights` — `{ value, unit?, date }`; `date` is a required real `YYYY-MM-DD` calendar date
+- `PUT /api/weights/{id}` — accepts `{ value }` and changes only the value on the authenticated user's entry; returns the updated `WeightEntry`, or 404 when the ID is not owned by that user
 - `DELETE /api/weights/{id}` — optimistic delete on mobile

@@ -331,6 +331,12 @@ function getCalorieProgressPercent(
   return (day.consumedCalories / day.effectiveTargetCalories) * 100;
 }
 
+export function getWeeklyReviewDayCalorieSummaryFallback(consumedLabel: string | null): string {
+  return consumedLabel
+    ? `Gegessen: ${consumedLabel}. Zielvergleich nicht verfügbar.`
+    : 'Kalorienvergleich nicht verfügbar';
+}
+
 export function formatWeeklyReviewDayCalorieSummary(day: WeeklyNutritionDay): WeeklyReviewDayCalorieSummary {
   const hasTarget = day.effectiveTargetCalories != null && day.effectiveTargetCalories > 0;
   const hasNutrition = day.consumedCalories != null && day.hasMealItem;
@@ -352,7 +358,7 @@ export function formatWeeklyReviewDayCalorieSummary(day: WeeklyNutritionDay): We
     targetBand,
     accessibilityLabel: isAvailable
       ? `Kalorien: ${consumedLabel} von ${targetLabel}, Zielerreichung ${percentLabel}`
-      : 'Kalorienvergleich nicht verfügbar',
+      : getWeeklyReviewDayCalorieSummaryFallback(consumedLabel),
   };
 }
 

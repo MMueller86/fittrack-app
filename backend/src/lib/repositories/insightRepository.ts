@@ -170,8 +170,6 @@ export function getLocalHourBucket(hour: number | null): string | null {
 }
 
 export type RemainingCaloriesBucket = 'unknown' | 'negative' | 'zero' | 'positive';
-export type RemainingProteinBucket = 'unknown' | 'nearly_complete_below' | 'nearly_complete_at' | 'gap';
-
 /** Preserve the semantic zero boundary that numeric rounding would otherwise erase. */
 export function getRemainingCaloriesBucket(value: number | null | undefined): RemainingCaloriesBucket {
   if (value == null || !Number.isFinite(value)) return 'unknown';
@@ -181,13 +179,6 @@ export function getRemainingCaloriesBucket(value: number | null | undefined): Re
 }
 
 /** Preserve the prompt's 20 g protein boundary while retaining null as unknown. */
-export function getRemainingProteinBucket(value: number | null | undefined): RemainingProteinBucket {
-  if (value == null || !Number.isFinite(value)) return 'unknown';
-  if (value < 20) return 'nearly_complete_below';
-  if (value === 20) return 'nearly_complete_at';
-  return 'gap';
-}
-
 /**
  * Compute a stable hash of the insight input context.
  * Uses rounded values so minor fluctuations (< 100 kcal, < 10g protein,
@@ -222,9 +213,7 @@ export function computeInputHash(
     currentHourLocal: ctx.currentHourLocal,
     localHourBucket: getLocalHourBucket(ctx.currentHourLocal),
     specialActivity: ctx.specialActivity ?? null,
-    activityCompletionStatus: ctx.activityCompletionStatus ?? null,
-    activityStatusSource: ctx.activityStatusSource ?? null,
-    activityStatusBucket: ctx.activityCompletionStatus ?? 'none',
+    dailyActivityStatus: ctx.dailyActivityStatus,
     userGoal: ctx.userGoal,
     userGoalIntensity: ctx.userGoalIntensity,
     displayName: ctx.displayName,
@@ -273,10 +262,9 @@ export function computeInputHash(
           }
         : null,
       remainingCalories: roundCalories(ctx.nutrition.remainingCalories),
-      remainingProteinG: roundMacro(ctx.nutrition.remainingProteinG),
-      proteinCoachingBand: ctx.nutrition.proteinCoachingBand ?? null,
+      dailyInsightProteinStatus: ctx.nutrition.dailyInsightProteinStatus ?? null,
+      mealAdviceAllowed: ctx.nutrition.mealAdviceAllowed ?? null,
       remainingCaloriesBucket: getRemainingCaloriesBucket(ctx.nutrition.remainingCalories),
-      remainingProteinBucket: getRemainingProteinBucket(ctx.nutrition.remainingProteinG),
       last3Days: ctx.nutrition.last3Days.map((day) => ({
         date: day.date,
         calories: roundCalories(day.calories),

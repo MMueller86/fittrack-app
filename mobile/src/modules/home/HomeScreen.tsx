@@ -2,12 +2,11 @@
 // Beantwortet: "Wie läuft mein heutiger Tag?"
 //
 // Struktur (top → bottom):
-//   1. BrandHeader: FitTrack-Logo + Name
-//   2. CoachingHeroCard: kompakte Begrüßung + Tagesart-Auswahl
+//   1. FoodEntrySearchRow: schneller Einstieg zur Ernährungserfassung
+//   2. CoachingHeroCard: Begrüßung (KI oder statisch) + Kurz-Insight + Tagesart-Auswahl
 //   3. DayNutritionCard: Donut-Ring + Gewichtstrend + Makro-Balken
 //   4. WeeklyReviewCard: sieben abgeschlossene Tage + KI-Wochenbewertung
 //   5. ActivityCard / ActivityCtaCard: besondere Aktivität
-//   6. InsightCard: KI-Tagesanalyse (async, non-blocking)
 
 import React, { useCallback, useRef, useState } from 'react';
 import {
@@ -32,12 +31,12 @@ import { syncLogger } from '../../services/health/syncLogger';
 import { useDayTypeStore } from '../nutrition/useDayTypeStore';
 import WorkoutTypePicker from './WorkoutTypePicker';
 import { Icon } from '../../shared/components/Icon';
-import { FOOD_ENTRY_HEADER_HEIGHT, FoodEntrySearchRow } from '../../shared/components/FoodEntrySearchRow';
+import { ErrorBanner } from '../../shared/components/ErrorBanner';
+import { FoodEntrySearchRow } from '../../shared/components/FoodEntrySearchRow';
 import { CoachingHeroCard } from './CoachingHeroCard';
 import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { DayNutritionCard } from './DayNutritionCard';
 import { WeeklyReviewCard } from './WeeklyReviewCard';
-import { InsightCard } from './InsightCard';
 import { getInsight, type DailyInsightResponse } from '../../services/insightService';
 import { aiApi } from '../../shared/api/aiApi';
 import { getLocalDateContext, getLocalIsoDate } from '../../shared/date/localDate';
@@ -54,15 +53,13 @@ import { ActivityBonusSheet } from '../nutrition/components/ActivityBonusSheet';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import { getHomeActionDate } from './homeDate';
+import { loadHomeData } from './homeDataLoader';
 
-// Shown when the insight could not be loaded (network error, backend unavailable, etc.)
-const INSIGHT_UNAVAILABLE: DailyInsightResponse = {
-  title: 'Analyse nicht verfügbar',
-  summary: 'Sobald wieder eine Verbindung besteht, aktualisiere ich deine persönliche Analyse automatisch.',
-  generatedAt: new Date().toISOString(),
-  promptVersion: 'v1',
-  status: 'unavailable',
-};
+function logHomeLoadFailure(source: string, error: unknown): void {
+  const detail = error instanceof Error ? error.message : String(error);
+  console.error(`[HomeScreen] ${source} load failed:`, error);
+  syncLogger.error('HomeScreen', `${source} load failed`, detail);
+}
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'HomeMain'>;
 
@@ -76,18 +73,20 @@ function getGreeting(): string {
 export default function HomeScreen({ navigation }: Props) {
   const openHub = useFoodEntryHubStore((s) => s.open);
   const insets = useSafeAreaInsets();
-  const [brandHeaderHeight, setBrandHeaderHeight] = useState(0);
   const [entries, setEntries] = useState<WeightEntry[]>([]);
   const [todayDiary, setTodayDiary] = useState<DiaryDayResponse | null>(null);
+  const [todayDiaryLoadError, setTodayDiaryLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [targetWeightKg, setTargetWeightKg] = useState<number | undefined>(undefined);
   const [displayName, setDisplayName] = useState<string | undefined>(undefined);
-  // Insight — null = loading (shows skeleton), InsightResponse = content arrived
+  // Insight — null = not loaded or unavailable; the coaching card then keeps its static greeting
   const [insight, setInsight] = useState<DailyInsightResponse | null>(null);
   const [insightDate, setInsightDate] = useState<string | null>(null);
+  const insightDateRef = useRef<string | null>(null);
   const [weeklyReview, setWeeklyReview] = useState<WeeklyNutritionReviewResponse | null>(null);
   const [weeklyError, setWeeklyError] = useState(false);
+  const homeDataRequestId = useRef(0);
   const weeklyRequestId = useRef(0);
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
@@ -158,34 +157,54 @@ export default function HomeScreen({ navigation }: Props) {
     }
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<number> => {
+    const requestId = ++homeDataRequestId.current;
     const { currentLocalDate: currentDate } = getLocalDateContext();
-    try {
-      const [weightData, profileData, diaryData] = await Promise.all([
-        listWeights(),
-        profileApi.getMe(),
-        diaryApi.getDay(currentDate),
-      ]);
-      setEntries(weightData);
-      if (profileData.targets) setTargets(profileData.targets);
-      if (profileData.profile?.targetWeightKg) setTargetWeightKg(profileData.profile.targetWeightKg);
-      if (profileData.profile?.displayName) setDisplayName(profileData.profile.displayName);
-      setTodayDiary(diaryData);
-      if (diaryData.dayType != null) {
-        hydrateDayType(diaryData.dayType, currentDate, diaryData.workoutType ?? null);
-      }
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      console.error('[HomeScreen] load failed:', err);
-      syncLogger.error('HomeScreen', 'load failed', detail);
-      setEntries([]);
+    const { weights, profile, diary } = await loadHomeData({
+      weights: listWeights(),
+      profile: profileApi.getMe(),
+      diary: diaryApi.getDay(currentDate),
+    });
+    if (requestId !== homeDataRequestId.current) return requestId;
+
+    if (weights.status === 'fulfilled') {
+      setEntries(weights.value);
+    } else {
+      logHomeLoadFailure('weights', weights.reason);
     }
-    // Insight runs independently — does NOT block the screen from rendering
+
+    if (profile.status === 'fulfilled') {
+      if (profile.value.targets) setTargets(profile.value.targets);
+      if (profile.value.profile?.targetWeightKg) setTargetWeightKg(profile.value.profile.targetWeightKg);
+      if (profile.value.profile?.displayName) setDisplayName(profile.value.profile.displayName);
+    } else {
+      logHomeLoadFailure('profile', profile.reason);
+    }
+
+    if (diary.status === 'fulfilled') {
+      setTodayDiary(diary.value);
+      setTodayDiaryLoadError(false);
+      if (diary.value.dayType != null) {
+        hydrateDayType(diary.value.dayType, currentDate, diary.value.workoutType ?? null);
+      }
+    } else {
+      setTodayDiaryLoadError(true);
+      logHomeLoadFailure('diary', diary.reason);
+    }
+
+    // Insight runs independently — does NOT block the screen from rendering.
+    // A same-day refresh keeps the previous response visible until the new one arrives.
+    if (insightDateRef.current !== currentDate) setInsight(null);
+    insightDateRef.current = currentDate;
     setInsightDate(currentDate);
-    setInsight(null);
     getInsight(currentDate)
-      .then((result) => setInsight(result ?? INSIGHT_UNAVAILABLE))
-      .catch(() => setInsight(INSIGHT_UNAVAILABLE));
+      .then((result) => {
+        if (requestId === homeDataRequestId.current) setInsight(result);
+      })
+      .catch(() => {
+        if (requestId === homeDataRequestId.current) setInsight(null);
+      });
+    return requestId;
   }, [setTargets, hydrateDayType]);
 
   useFocusEffect(
@@ -194,11 +213,12 @@ export default function HomeScreen({ navigation }: Props) {
       void loadWeeklyReview();
       (async () => {
         setLoading(true);
-        await load();
-        if (!cancelled) setLoading(false);
+        const requestId = await load();
+        if (!cancelled && requestId === homeDataRequestId.current) setLoading(false);
       })();
       return () => {
         cancelled = true;
+        homeDataRequestId.current += 1;
         weeklyRequestId.current += 1;
       };
     }, [load, loadWeeklyReview]),
@@ -207,8 +227,11 @@ export default function HomeScreen({ navigation }: Props) {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     void loadWeeklyReview();
-    await load();
-    setRefreshing(false);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
   }, [load, loadWeeklyReview]);
 
   const currentLocalDate = getLocalIsoDate();
@@ -242,19 +265,12 @@ export default function HomeScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      {/* Sticky Header: Brand + Search Bar */}
+      {/* Sticky primary action; the tab bar already identifies Home. */}
       <View style={styles.stickyHeader}>
-        <View style={styles.brandHeader} onLayout={(e) => setBrandHeaderHeight(e.nativeEvent.layout.height)}>
-          <Text style={styles.brandLogo}>
-            Fit<Text style={styles.brandAccent}>Track</Text>
-          </Text>
-          <Text style={styles.brandName}>{displayName ?? 'Willkommen'}</Text>
-        </View>
-        {/* Search Row — identisches Layout wie im Food Hub */}
         <FoodEntrySearchRow
-          onSearch={() => openHub({ date: getHomeActionDate(), onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
-          onAi={() => openHub({ date: getHomeActionDate(), initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
-          onBarcode={() => openHub({ date: getHomeActionDate(), initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top + brandHeaderHeight })}
+          onSearch={() => openHub({ date: getHomeActionDate(), onSuccess: onRefresh, topInset: insets.top })}
+          onAi={() => openHub({ date: getHomeActionDate(), initialSubflow: 'ai', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top })}
+          onBarcode={() => openHub({ date: getHomeActionDate(), initialSubflow: 'barcode', autoCloseOnSave: true, onSuccess: onRefresh, topInset: insets.top })}
         />
       </View>
 
@@ -271,17 +287,30 @@ export default function HomeScreen({ navigation }: Props) {
           dayType={selectedDayType}
           workoutType={selectedWorkoutType}
           onTrainingPress={() => setWorkoutPickerVisible(true)}
+          insight={insight}
+          insightDate={insightDate}
+          onFeedbackSuccess={() => showSnackbar({ message: 'Feedback gesendet' })}
         />
 
+        {todayDiaryLoadError && (
+          <ErrorBanner
+            error="Die Ernährungsdaten konnten nicht aktualisiert werden."
+            onRetry={onRefresh}
+          />
+        )}
+
         {/* ── Tages-Nutrition Card ── */}
-        <DayNutritionCard
-          summary={todayDiary?.summary ?? null}
-          target={todayTargets}
-          onPress={() => navToTab('Nutrition')}
-          activityBonus={todayDiary?.activityBonus ?? 0}
-          entries={entries}
-          referenceDate={currentLocalDate}
-        />
+        {(!todayDiaryLoadError || todayDiary !== null) && (
+          <DayNutritionCard
+            summary={todayDiary?.summary ?? null}
+            target={todayTargets}
+            onPress={() => navToTab('Nutrition')}
+            activityBonus={todayDiary?.activityBonus ?? 0}
+            entries={entries}
+            referenceDate={currentLocalDate}
+            hasFoodEntries={todayDiary?.meals.some((meal) => meal.items.length > 0) ?? false}
+          />
+        )}
 
         <WeeklyReviewCard
           review={weeklyReview}
@@ -292,32 +321,23 @@ export default function HomeScreen({ navigation }: Props) {
 
         {/* ── Besondere Aktivität ── */}
         {todayDiary && (
-          todayDiary.specialActivity ? (
-            <ActivityCard
-              activity={todayDiary.specialActivity}
-              onShowBreakdown={() => setActivityBonusSheetVisible(true)}
-              onEdit={handleEditActivity}
-              onDelete={handleDeleteActivity}
-              consumedCalories={todayDiary.summary?.calories ?? 0}
-            />
-          ) : (
-            <ActivityCtaCard
-              dynamic={todayDiary.previousDayHasActivity ?? false}
-              onAdd={() => setActivityPickerVisible(true)}
-            />
-          )
+          <View style={styles.activitySection}>
+            {todayDiary.specialActivity ? (
+              <ActivityCard
+                activity={todayDiary.specialActivity}
+                onShowBreakdown={() => setActivityBonusSheetVisible(true)}
+                onEdit={handleEditActivity}
+                onDelete={handleDeleteActivity}
+                consumedCalories={todayDiary.summary?.calories ?? 0}
+              />
+            ) : (
+              <ActivityCtaCard
+                dynamic={todayDiary.previousDayHasActivity ?? false}
+                onAdd={() => setActivityPickerVisible(true)}
+              />
+            )}
+          </View>
         )}
-
-        {/* ── FitTrack Insight — async, non-blocking ── */}
-        <InsightCard
-          insight={insight}
-          date={insightDate}
-          onFeedbackSuccess={() => showSnackbar({ message: 'Feedback gesendet' })}
-          onCtaPress={(target) => {
-            if (target === 'Nutrition') navToTab('Nutrition');
-            else if (target === 'Weight') navToTab('Weight');
-          }}
-        />
 
         <View style={{ height: spacing.xl }} />
       </ScrollView>
@@ -369,34 +389,16 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     gap: spacing.md,
   },
+  activitySection: {
+    marginHorizontal: spacing.md,
+  },
 
-  // Sticky Header
+  // Sticky food-entry action
   stickyHeader: {
     backgroundColor: colors.background,
+    paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  brandHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: FOOD_ENTRY_HEADER_HEIGHT,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  brandLogo: {
-    fontSize: 22,
-    fontWeight: '900' as const,
-    color: colors.text,
-    letterSpacing: -0.5,
-  },
-  brandAccent: {
-    color: colors.primary,
-  },
-  brandName: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
-
 });

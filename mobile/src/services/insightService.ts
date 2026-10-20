@@ -6,6 +6,20 @@ import { aiApi, type DailyInsightResponse } from '../shared/api/aiApi';
 
 export type { DailyInsightResponse } from '../shared/api/aiApi';
 
+export function hasCompactInsight(insight: DailyInsightResponse | null): insight is DailyInsightResponse & {
+  greeting: string;
+  shortInsight: string;
+} {
+  return insight !== null
+    && (insight.status === 'fresh' || insight.status === 'cached')
+    && typeof insight.greeting === 'string'
+    && insight.greeting.trim().length > 0
+    && insight.greeting.length <= 120
+    && typeof insight.shortInsight === 'string'
+    && insight.shortInsight.trim().length > 0
+    && insight.shortInsight.length <= 240;
+}
+
 /**
  * Fetch or generate the daily AI insight for the given date.
  * Returns the InsightResponse (may be fresh, cached, quota_exceeded, or unavailable).

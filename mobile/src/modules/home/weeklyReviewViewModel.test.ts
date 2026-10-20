@@ -276,6 +276,14 @@ describe('createWeeklyReviewViewModel', () => {
       missingState: 'missing_target',
     });
     expect(viewModel.days[2]?.overlayDetails.detailGroups).toEqual([]);
+    expect(viewModel.days[2]?.calorieSummary).toMatchObject({
+      isAvailable: false,
+      consumedLabel: '1.800 kcal',
+      accessibilityLabel: 'Gegessen: 1.800 kcal. Zielvergleich nicht verfügbar.',
+    });
+    expect(viewModel.days[2]?.accessibilityLabel).toContain(
+      'Gegessen: 1.800 kcal. Zielvergleich nicht verfügbar.',
+    );
     expect(viewModel.days[2]?.overlayDetails.detailGroups).not.toContainEqual(
       { label: 'Tagestyp', value: 'Ruhetag' },
     );

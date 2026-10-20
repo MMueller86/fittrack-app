@@ -5,10 +5,11 @@ import type {
   Meal,
   SpecialActivity,
   UserProfile,
+  WeightEntry,
 } from '@fittrack/shared';
 import {
   buildDailyInsightContext,
-  resolveActivityCompletionStatus,
+  resolveDailyInsightActivityStatus,
 } from './dailyInsightContext';
 import { calculateMacroRanges } from '../../../shared/lib/macroRanges';
 
@@ -32,12 +33,12 @@ function activity(overrides: Partial<SpecialActivity> = {}): SpecialActivity {
   } as SpecialActivity;
 }
 
-function meal(calories: number): Meal {
+function meal(calories: number, type: Meal['type'] = 'dinner', protein = calories === 0 ? 0 : 20): Meal {
   return {
     id: `meal-${calories}`,
     userId: USER_ID,
     date: REFERENCE_DATE,
-    type: 'dinner',
+    type,
     name: 'Test meal',
     createdAt: '2026-08-13T18:00:00.000Z',
     items: [{
@@ -46,7 +47,7 @@ function meal(calories: number): Meal {
       sourceType: 'manual',
       quantity: 1,
       unit: 'serving',
-      macros: { calories, protein: calories === 0 ? 0 : 20, carbs: 30, fat: 10, fiber: 3 },
+      macros: { calories, protein, carbs: 30, fat: 10, fiber: 3 },
     }],
   };
 }
@@ -127,6 +128,8 @@ function meta(date: string, overrides: Partial<DayMeta> = {}): DayMeta {
 function makeRepositories(options: {
   days?: Record<string, DiaryDayResponse>;
   metas?: Record<string, DayMeta>;
+  weights?: WeightEntry[];
+  profile?: UserProfile | null;
   historicalErrorDate?: string;
 }) {
   const days = options.days ?? {};
@@ -142,44 +145,10 @@ function makeRepositories(options: {
       get: vi.fn(async (_userId: string, date: string) => metas[date] ?? null),
     },
     insight: { listRecent: vi.fn(async () => []) },
-    profile: { get: vi.fn(async () => profile()) },
-    weights: { list: vi.fn(async () => []) },
+    profile: { get: vi.fn(async () => options.profile === undefined ? profile() : options.profile) },
+    weights: { list: vi.fn(async () => options.weights ?? []) },
   };
 }
-
-describe('resolveActivityCompletionStatus', () => {
-  const storedActivity = activity();
-
-  it.each([
-    [0, 'planned'],
-    [19, 'planned'],
-    [20, 'likely_completed'],
-    [23, 'likely_completed'],
-  ] as const)('maps local hour %s to %s', (localHour, expected) => {
-    expect(resolveActivityCompletionStatus(storedActivity, localHour, true)).toEqual({
-      status: expected,
-      source: 'local_time_heuristic',
-    });
-  });
-
-  it.each([null, -1, 24, 20.5])('returns unknown for an invalid or missing hour (%s)', (localHour) => {
-    expect(resolveActivityCompletionStatus(storedActivity, localHour, true)).toEqual({
-      status: 'unknown',
-      source: 'unavailable',
-    });
-  });
-
-  it('does not expose a status when no activity exists', () => {
-    expect(resolveActivityCompletionStatus(null, 23, true)).toEqual({ status: null, source: null });
-  });
-
-  it('does not infer historical completion from the current local hour', () => {
-    expect(resolveActivityCompletionStatus(storedActivity, 23, false)).toEqual({
-      status: 'unknown',
-      source: 'unavailable',
-    });
-  });
-});
 
 describe('local-day activity status', () => {
   it('uses the valid offset to identify the current local day near a UTC boundary', async () => {
@@ -198,8 +167,7 @@ describe('local-day activity status', () => {
     });
 
     expect(context.timezoneOffsetMinutes).toBe(120);
-    expect(context.activityCompletionStatus).toBe('likely_completed');
-    expect(context.activityStatusSource).toBe('local_time_heuristic');
+    expect(context.dailyActivityStatus).toBe('completed');
   });
 
   it.each([
@@ -220,8 +188,7 @@ describe('local-day activity status', () => {
     });
 
     expect(context.timezoneOffsetMinutes).toBeNull();
-    expect(context.activityCompletionStatus).toBe('unknown');
-    expect(context.activityStatusSource).toBe('unavailable');
+    expect(context.dailyActivityStatus).toBe('unknown');
   });
 
   it('does not apply a valid local hour retrospectively to a past or future date', async () => {
@@ -242,13 +209,125 @@ describe('local-day activity status', () => {
         repositories,
       });
 
-      expect(context.activityCompletionStatus).toBe('unknown');
-      expect(context.activityStatusSource).toBe('unavailable');
+      expect(context.dailyActivityStatus).toBe(date < '2026-08-21' ? 'completed' : 'unknown');
     }
   });
 });
 
+describe('resolveDailyInsightActivityStatus', () => {
+  it('uses only completed or unknown for a logged activity', () => {
+    expect(resolveDailyInsightActivityStatus(activity(), REFERENCE_DATE, REFERENCE_DATE, 21, true)).toBe('unknown');
+    expect(resolveDailyInsightActivityStatus(activity(), REFERENCE_DATE, REFERENCE_DATE, 22, true)).toBe('completed');
+    expect(resolveDailyInsightActivityStatus(activity(), '2026-08-13', REFERENCE_DATE, 8, false)).toBe('completed');
+    expect(resolveDailyInsightActivityStatus(activity(), '2026-08-15', REFERENCE_DATE, 23, false)).toBe('unknown');
+    expect(resolveDailyInsightActivityStatus(null, REFERENCE_DATE, REFERENCE_DATE, 23, true)).toBeNull();
+  });
+});
+
 describe('buildDailyInsightContext', () => {
+  async function buildForMeals(
+    meals: Meal[],
+    repositoryOptions: { weights?: WeightEntry[]; profile?: UserProfile | null } = {},
+  ) {
+    const repositories = makeRepositories({
+      ...repositoryOptions,
+      days: { [REFERENCE_DATE]: diary(REFERENCE_DATE, meals) },
+    });
+    return buildDailyInsightContext({
+      userId: USER_ID,
+      date: REFERENCE_DATE,
+      localHour: 12,
+      timezoneOffsetMinutes: 0,
+      isCurrentDay: true,
+      now: new Date(`${REFERENCE_DATE}T12:00:00.000Z`),
+      repositories,
+    });
+  }
+
+  it.each([
+    [104, 'below_range'],
+    [105, 'in_range'],
+    [140, 'in_range'],
+    [141, 'above_range'],
+    [175, 'at_or_above_2_5_g_per_kg'],
+  ] as const)('classifies %s g protein for a 70 kg profile as %s', async (protein, expected) => {
+    const context = await buildForMeals([meal(0, 'dinner', protein)]);
+    expect(context.nutrition.dailyInsightProteinStatus).toBe(expected);
+  });
+
+  it('returns unknown protein status when weight is unavailable or stale', async () => {
+    const mealWithProtein = [meal(0, 'dinner', 140)];
+    const withoutProfile = await buildForMeals(mealWithProtein, { profile: null });
+    const withStaleWeight = await buildForMeals(mealWithProtein, {
+      weights: [{ id: 'old', userId: USER_ID, date: '2026-07-30', value: 70, unit: 'kg' }],
+    });
+
+    expect(withoutProfile.nutrition.dailyInsightProteinStatus).toBe('unknown');
+    expect(withStaleWeight.nutrition.dailyInsightProteinStatus).toBe('unknown');
+  });
+
+  it('allows meal advice at 300 kcal remaining only when breakfast, lunch, and dinner have items', async () => {
+    const exactly300Remaining = await buildForMeals([
+      meal(500, 'breakfast'),
+      meal(500, 'lunch'),
+      meal(700, 'dinner'),
+    ]);
+    const below300Remaining = await buildForMeals([
+      meal(500, 'breakfast'),
+      meal(500, 'lunch'),
+      meal(701, 'dinner'),
+    ]);
+    const snackInsteadOfDinner = await buildForMeals([
+      meal(500, 'breakfast'),
+      meal(500, 'lunch'),
+      meal(700, 'snack'),
+    ]);
+    const emptyDinner = await buildForMeals([
+      meal(500, 'breakfast'),
+      meal(500, 'lunch'),
+      { ...meal(700, 'dinner'), items: [] },
+    ]);
+
+    expect(exactly300Remaining.nutrition.remainingCalories).toBe(300);
+    expect(exactly300Remaining.nutrition.mealAdviceAllowed).toBe(true);
+    expect(below300Remaining.nutrition.remainingCalories).toBe(299);
+    expect(below300Remaining.nutrition.mealAdviceAllowed).toBe(false);
+    expect(snackInsteadOfDinner.nutrition.mealAdviceAllowed).toBe(false);
+    expect(emptyDinner.nutrition.mealAdviceAllowed).toBe(false);
+  });
+
+  it('uses the selected training-day snapshot for a normal training day without a special activity', async () => {
+    const repositories = makeRepositories({
+      days: { [REFERENCE_DATE]: diary(REFERENCE_DATE, [meal(900)]) },
+      metas: {
+        [REFERENCE_DATE]: meta(REFERENCE_DATE, {
+          dayType: 'training',
+          workoutType: 'gym',
+          calorieTargetSnapshot: {
+            calories: 2400,
+            capturedAt: '2026-08-14T08:00:00.000Z',
+            source: 'profile',
+          },
+        }),
+      },
+    });
+
+    const context = await buildDailyInsightContext({
+      userId: USER_ID,
+      date: REFERENCE_DATE,
+      localHour: 18,
+      repositories,
+    });
+
+    expect(context.nutrition.targets).toMatchObject({
+      calories: 2400,
+      baseCalories: 2400,
+      activityBonusCalories: 0,
+      targetSource: 'day_target_snapshot',
+    });
+    expect(context.nutrition.remainingCalories).toBe(1500);
+  });
+
   it('uses selected profile-day ranges unchanged by a special-activity calorie bonus', async () => {
     const selectedTargets = profile().targets.trainingDay;
     const repositories = makeRepositories({
@@ -281,8 +360,7 @@ describe('buildDailyInsightContext', () => {
       activityBonusCalories: 400,
       macroRanges: selectedTargets.macroRanges,
     });
-    expect(context.nutrition.remainingProteinG).toBe(85);
-    expect(context.nutrition.proteinCoachingBand).toBe('below_range');
+    expect(context.nutrition.dailyInsightProteinStatus).toBe('below_range');
   });
 
   it('builds current and three historical days with zero-kcal and target-source semantics', async () => {
@@ -322,13 +400,13 @@ describe('buildDailyInsightContext', () => {
       localHour: 19,
       timezoneOffsetMinutes: 0,
       isCurrentDay: true,
+      now: new Date(`${REFERENCE_DATE}T19:00:00.000Z`),
       repositories,
     });
 
     expect(context.nutrition.today).toMatchObject({ calories: 0, protein: 0, hasMealItem: true });
     expect(context.nutrition.remainingCalories).toBe(2600);
-    expect(context.activityCompletionStatus).toBe('planned');
-    expect(context.activityStatusSource).toBe('local_time_heuristic');
+    expect(context.dailyActivityStatus).toBe('unknown');
     expect(context.nutrition.last3Days).toMatchObject([
       {
         date: historicalDates[0],

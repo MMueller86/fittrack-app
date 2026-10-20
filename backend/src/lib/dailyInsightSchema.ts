@@ -1,5 +1,6 @@
 import {
-  DAILY_INSIGHT_CTA_MAX_LENGTH,
+  DAILY_INSIGHT_GREETING_MAX_LENGTH,
+  DAILY_INSIGHT_SHORT_INSIGHT_MAX_LENGTH,
   DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH,
   DAILY_INSIGHT_SUMMARY_MAX_LENGTH,
   DAILY_INSIGHT_TITLE_MAX_LENGTH,
@@ -8,6 +9,16 @@ import {
 export const DAILY_INSIGHT_SCHEMA = {
   type: 'object' as const,
   properties: {
+    greeting: {
+      type: 'string' as const,
+      minLength: 1,
+      maxLength: DAILY_INSIGHT_GREETING_MAX_LENGTH,
+    },
+    shortInsight: {
+      type: 'string' as const,
+      minLength: 1,
+      maxLength: DAILY_INSIGHT_SHORT_INSIGHT_MAX_LENGTH,
+    },
     title: {
       type: 'string' as const,
       minLength: 1,
@@ -23,16 +34,7 @@ export const DAILY_INSIGHT_SCHEMA = {
       minLength: 1,
       maxLength: DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH,
     },
-    cta: {
-      type: ['string', 'null'] as const,
-      minLength: 1,
-      maxLength: DAILY_INSIGHT_CTA_MAX_LENGTH,
-    },
-    ctaTarget: {
-      type: ['string', 'null'] as const,
-      enum: ['Nutrition', 'Weight', 'Training', 'Recipe', null] as const,
-    },
   },
-  required: ['title', 'summary', 'recommendation', 'cta', 'ctaTarget'],
+  required: ['greeting', 'shortInsight', 'title', 'summary', 'recommendation'],
   additionalProperties: false,
 } as const;

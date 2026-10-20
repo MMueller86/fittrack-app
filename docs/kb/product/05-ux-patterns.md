@@ -42,6 +42,14 @@ An information overlay must:
 
 [Rule] Standard Android alerts must never be used for FitTrack product UI. In particular, do not use `Alert.alert` for information, instructions, confirmations, or action choices. Use `InfoOverlay`, `ConfirmSheet`, or the appropriate bottom-sheet pattern instead.
 
+## Home Insight Detail (US-03 F-1)
+
+The combined greeting card uses only the returned complete `greeting`/`shortInsight` pair for available responses; otherwise it retains the existing static greeting without a short sentence or detail action. No AI error card, legacy presentation, shortened full text, missing-field regeneration or extra request is introduced. The day-type selector stays on the right and does not refresh the Insight.
+
+`Mehr lesen` opens the full, exact displayed Insight as a local response/date snapshot in the shared `InfoOverlay`. Its single bounded content scroll contains title, summary and optional recommendation; the dismissal footer stays outside that scroll. Daily Insight has no action or navigation CTA. Refresh does not swap the open snapshot. Close, backdrop and platform-back handlers close the overlay. The feedback icon closes detail and opens the existing sheet with the captured date/generatedAt; cancel or successful submission returns to Home, success retains the snackbar. Feedback capability/provenance checks, retained comments on failure, stable submission IDs for retries and conflict handling remain unchanged.
+
+[Partial] Component tests exercise the callbacks, retry and snapshot rules, not native modality or accessibility. Physical-device screenshots at 320/360 dp and font scales 1.0/1.3, Android Back, TalkBack, safe-area and modal-to-feedback-sheet behavior are **UNVERIFIED** and remain required before acceptance. B-1 content defects remain open and are not repaired in the client. See the [F-1 handoff](../../User%20Stories/startpage/F-1_US-03_Frontend_Handoff_2026-10-16.md).
+
 ## Recipe Scale Preview
 
 The recipe detail view presents the saved `Portionen` and the temporary `Nachkochen für` value separately. The target uses a one-step `−`/`+` control within the shared `1–50` bounds. A separate information trigger opens an `InfoOverlay` with the title `Für wie viele kochst du?` and explains that ingredients and preparation are adapted temporarily while the original recipe remains unchanged.
@@ -75,6 +83,7 @@ Lightweight bottom sheets for editing existing items without leaving the current
 
 Pattern:
 - Slide up over current content
+- Enter with a short timing transition without spring overshoot; gesture-release feedback may still use a spring
 - Shows current values pre-filled
 - "Speichern" (confirm) + close gesture (dismiss)
 - No navigation — returns to same screen after save
@@ -130,7 +139,9 @@ Standard format:
 Rules:
 - Auto-dismiss: 5s
 - Progress bar shows remaining time
-- "Rückgängig" performs the inverse action (DELETE)
+- "Rückgängig" performs the inverse operation (for example, DELETE or moving an item back)
+- For diary moves, undo moves the exact moved item IDs back to their original meals; remove a newly created destination only after verifying it is empty
+- On tab-root screens, position relative to the screen content viewport and keep the snackbar just above the tab bar; do not count the tab-bar height twice
 - "Weiteres" resets to search state with keyboard focused
 - No "Fertig" button
 - Undo disabled if item ID cannot be safely determined
@@ -420,6 +431,10 @@ When a list is empty (before first use or after filtering):
 - Quota exceeded (429): show reset date in user-friendly format (e.g., "Morgen wieder verfügbar")
 - Auth errors (401): silent refresh attempted first; logout only on repeated failure
 - AI unavailable: graceful fallback (especially for daily insight — never shows an error card)
+- AI unavailable: graceful fallback (especially for daily insight — never shows an error card)
+
+Daily Insight compact-pair fallback and snapshot detail behavior are defined in
+the [central Daily Insight rulebook](../domain/09-daily-insight.md).
 
 ---
 
@@ -436,6 +451,8 @@ Das Overlay zeigt, sofern vorhanden, die vorab geladenen absoluten Makros Protei
 Das Tages-Overlay hält Kalorienvergleich und absolute Makrowerte als getrennte deutsche Accessibility-Ziele. Die Kalorienziel-Leiste verwendet das effektive Ziel oder den gelieferten Zielprozentsatz; fehlende Vergleichsdaten bleiben neutral, während `0 kcal` und `0 g` gültige Werte bleiben. Vorhandene Special-Activity- und Bonusdetails erscheinen in den vier kompakten Gruppen `Basisziel`, `Aktivitätsbonus`, `Effektives Ziel` und `Sonderaktivität`; `Tagestyp`, `Workout-Typ` und `Datenstatus` werden vollständig entfernt. Der Kalorienvergleich bleibt in seiner Kachelvisualisierung verfügbar, auch wenn der erläuternde Body leer ist.
 
 **Aktueller Implementierungsstand (2026-08-19):** Links im Header steht `Letzte 7 Tage`; rechts oben steht einzeilig `Zielerreichung: <Wert>`. Darunter folgt rechtsbündig nur `<Gegessen> / <Ziel> kcal` ohne sichtbares Ziel-Label. Die beiden unteren Bilanzzeilen entfallen. Über jedem Balken stehen Prozentwert und Tages-kcal ohne wiederholte `kcal`-Einheit; die Einheit bleibt im Header und in den Accessibility-Beschreibungen erhalten. Diese Regel ersetzt die frühere Beschreibung von zwei Bilanzzeilen unter dem Diagramm.
+
+**Aktueller Implementierungsstand (2026-10-15):** Das Wochenraster zeigt pro Tag nur den Zielprozentsatz über einem schmalen `16 dp` breiten, `72 dp` hohen Balken; Tages-kcal und weitere Tagesdetails bleiben über das bestehende Info-Overlay erreichbar. Fehlende Werte erscheinen als kleine neutrale Schraffur ohne vollflächige Spur. Die Markerzeile wird nur bei vorhandenen Wochenmarkern gerendert und bleibt dann über alle sieben Tage ausgerichtet. Damit ist die frühere sichtbare Tages-kcal-Zeile und stets reservierte Markerfläche ersetzt.
 
 ## Profil-Makroziele im Tagebuch
 

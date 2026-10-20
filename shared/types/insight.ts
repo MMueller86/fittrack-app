@@ -18,18 +18,21 @@ export type InsightIntent =
   | 'nutrition_guidance'
   | 'general';
 
-/** Activity completion is inferred only when a local-time heuristic is available. */
-export type ActivityCompletionStatus = 'planned' | 'likely_completed' | 'unknown';
+/** Daily Insight uses only an explicit completed/unknown activity distinction. */
+export type DailyInsightActivityStatus = 'completed' | 'unknown';
 
-export type ActivityStatusSource = 'local_time_heuristic' | 'unavailable';
+/** Product-facing protein interpretation, separate from shared coaching hints. */
+export type DailyInsightProteinStatus =
+  | 'below_range'
+  | 'in_range'
+  | 'above_range'
+  | 'at_or_above_2_5_g_per_kg'
+  | 'unknown';
 
 export interface InsightPromptSnapshot {
   system: string;
   user: string;
 }
-
-/** Which tab/screen the CTA button should navigate to. */
-export type InsightCtaTarget = 'Nutrition' | 'Weight' | 'Training' | 'Recipe' | null;
 
 /**
  * The insight payload returned to the mobile client.
@@ -37,16 +40,14 @@ export type InsightCtaTarget = 'Nutrition' | 'Weight' | 'Training' | 'Recipe' | 
  * so the AI can omit them when not applicable.
  */
 export interface InsightResponse {
+  greeting?: string;
+  shortInsight?: string;
   /** Short headline, max ~40 chars, no emoji */
   title: string;
-  /** 60–120 words, friendly tone, interpretation not facts */
+  /** Non-empty, at most 5,000 characters; concise interpretation grounded in supplied facts. */
   summary: string;
   /** Optional single-sentence action hint */
   recommendation?: string;
-  /** Optional CTA button label, e.g. "Mahlzeit hinzufügen" */
-  cta?: string;
-  /** Navigation target for the CTA */
-  ctaTarget?: InsightCtaTarget;
   /** ISO timestamp of generation */
   generatedAt: string;
   /** Prompt version used, e.g. "v1" */
@@ -157,9 +158,10 @@ export interface InsightNutritionContext {
    * Forward-looking: use to recommend next steps, not to judge past behaviour.
    */
   remainingCalories: number | null;
-  remainingProteinG: number | null;
-  /** Classification based on today's protein, selected range, and current weight when available. */
-  proteinCoachingBand?: ProteinCoachingBand;
+  /** Daily Insight classification from today's protein, body weight, and the 1.5-2.0 g/kg range. */
+  dailyInsightProteinStatus: DailyInsightProteinStatus;
+  /** True only when breakfast, lunch, and dinner have items and at least 300 kcal remain. */
+  mealAdviceAllowed: boolean;
   /** Last 3 completed diary days for trend context */
   last3Days: InsightNutritionDay[];
 }
@@ -189,9 +191,8 @@ export interface InsightInputContext {
   timezoneOffsetMinutes?: number | null;
   /** Special activity logged for this day (e.g. hiking), or null when absent. */
   specialActivity?: SpecialActivity | null;
-  /** Server-owned status derived from the local-time heuristic. */
-  activityCompletionStatus: ActivityCompletionStatus | null;
-  activityStatusSource: ActivityStatusSource | null;
+  /** Server-owned completion status: past activities or today's activity from 22:00, otherwise unknown. */
+  dailyActivityStatus: DailyInsightActivityStatus | null;
 }
 
 // ---------------------------------------------------------------------------

@@ -145,6 +145,149 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-124 | US-02 weight tracking Knowledge Base accuracy, plan sections 3/16 | Blocking | Documentation (correction routed to Backend) | Closed |
 | FT-QA-2026-125 | US-02 single measurement renders isolated marker, AC-8 | Blocking | Frontend | Closed |
 | FT-QA-2026-126 | US-02 positive trend label adds unapproved plus sign, AC-5 | Blocking | Frontend | Closed |
+| FT-QA-2026-127 | US-01 weight day editor state, AC-1/AC-2/AC-6 | Blocking | Frontend | Closed |
+| FT-QA-2026-128 | US-01 future dates remain selectable, AC-3 | Blocking | Frontend | Closed |
+| FT-QA-2026-129 | US-01 duplicate measurement accessibility labels, AC-6/AC-9 | Blocking | Frontend | Closed |
+| FT-QA-2026-130 | US-01 same-day sibling update regression test, AC-5 | Blocking | Backend | Closed |
+| FT-QA-2026-131 | US-01 failed update preservation test, AC-8 | Blocking | Frontend | Closed |
+| FT-QA-2026-132 | US-01 weight-domain unit guidance is stale, AC-9 | Non-blocking | Documentation | In progress |
+| FT-QA-2026-133 | US-01 re-review: unrelated Daily Insight hash mismatch blocks Backend suite gate | Blocking | Backend | In progress |
+| FT-QA-2026-134 | US-01 ProgressScreen tests use retired HistoryList label, AC-4/AC-8 | Blocking | Frontend | In progress |
+| FT-QA-2026-135 | US-03 accepted protein-lock and weight-focus violations, AC-2/8 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-136 | US-03 invented budget and weight claims with missing diary, AC-2/8 | Blocking | Backend | Closed |
+| FT-QA-2026-137 | US-03 unconfirmed activity accepted as completed, AC-2/8 | Blocking | Backend | Closed |
+| FT-QA-2026-138 | US-03 inconsistent-budget generation, AC-2/8 | Blocking | Backend | Closed |
+| FT-QA-2026-139 | US-03 compound calorie clause false rejection, AC-2/8 | Blocking | Backend | Closed |
+| FT-QA-2026-140 | US-03 required Mobile typecheck, pre-existing errors, AC-8 | Blocking | Frontend | Closed |
+| FT-QA-2026-141 | US-03 obsolete planned Home and prompt provenance KB, AC-8 | Non-blocking | Documentation | Awaiting decision |
+| FT-QA-2026-142 | US-03 historical equality/source accepted, AC-2/8 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-143 | US-03 eval current/yesterday attribution, AC-8 | Blocking | Backend | Awaiting decision |
+
+## US-03 Current Review And Verification Notes
+
+- Independent [US-03 QA report](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md): FAIL, 2026-10-16, v23/assembly v5. Backend 1899, Mobile 912 and Shared 466 unit assertions pass. Full live suite: 67 passed / 3 failed; its numeric shell exit was not retained, and QA explicitly records this metadata limit rather than inventing an exit code.
+- Physical-device layout, screenshots, Android Back, TalkBack, Safe Area and native feedback transitions: MANUAL VALIDATION REQUIRED / UNVERIFIED. No actionable defect inferred from unavailable device tooling.
+- Emulator persistence: UNVERIFIED / vom User aus Pruefauftrag ausgenommen. No emulator installation, contract execution or remote Cosmos substitute authorized; this exclusion alone is not a blocker.
+- Backend correction attempt 1 after independent Q-1 is authorized by the existing FAIL correction workflow. FT-140 predates this implementation and awaits authorization for the two otherwise unrelated test fixes. FT-141 awaits the user's fix/accept/defer decision; automatic plan approval is not treated as acceptance or deferral of a finding.
+- Independent R1 verifies correction attempt 1 on v23/assembly v6: Backend1925/Shared466 and unchanged Mobile912 units pass; current source-bound live68/8 exits1. All eight old originals now reject. FT-139 numeric-clause repair is independently confirmed and closed; FT-135..138 remain open because new unsafe accepted content or failed generation persists. FT-142/143 are new structured R1 findings. Backend correction attempt2 is the final automatic attempt; no further automatic loop after it.
+- Latest independent R2 (2026-10-16): FAIL on v23/assembly v7. Backend1942/Shared466 full gates are source-bound; QA independently executes focused465, local rubric27, full Mobile912, Mobile typecheck and non-incremental typecheck (both exit0), build and release guard. Current full live78/3 exits1: target-relative-overage-not-achieved-surplus protein advice; midday-empty-day-not-morning historical fallback equality; Weekly special-activity-under-effective-target diagnostic UNVERIFIED instead of CORRECT. Weekly diagnostic cause remains unestablished, not a new asserted Weekly product defect.
+- R2 independently confirms FT-136..138 within exact regressions/current sample, retains FT-139 and confirms the external Mobile changes clear FT-140. Close those scoped findings on verification, not risk acceptance. FT-135,142,143 remain Blocking; FT-141 remains Non-blocking and awaits disposition. Backend retry count2/2 exhausted; no third automatic correction, live reroll or deployment. Physical checks and excluded Cosmos effects remain separate verification limits.
+
+### FT-QA-2026-142
+
+- **Finding key:** Q1-US03-R1-08.
+- **Plan reference:** US-03 dynamic greeting plan; AC-2, AC-8.
+- **Description:** A formally passing personal greeting says recent-day intake1980 equals target2100 without historical-source qualification. Runtime and helper accept; all supplied historical target sources are profile_fallback. This is distinct from missing current diary data.
+- **Severity / Criticality:** High / Blocking.
+- **Owner:** Backend.
+- **Evidence:** [R1-08 exact original, hashes, source locations and replay](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#r1-08-new-accepted-historical-equality-and-provenance-gap).
+- **Recommendation:** Regress the exact accepted output; enforce truthful historical relations and source qualifications across recent-days prose without inventing thresholds or changing fixtures.
+- **Status:** Awaiting decision.
+- **History:** 2026-10-16 - Registered from independent R1 FAIL; route with final Backend correction attempt2. No accepted approximate equality or stored historical target inferred.
+- **History:** 2026-10-16 - Independent R2 confirms the exact accepted original is now rejected, but new midday generation repeats historical1980/profile-fallback equality and safely rejects. Generation/live completion remains missing; no continuing acceptance of the old original claimed. Two corrections exhausted; await explicit direction, no automatic retry.
+
+### FT-QA-2026-143
+
+- **Finding key:** Q1-US03-R1-09.
+- **Plan reference:** US-03 dynamic greeting plan; AC-8.
+- **Description:** Eval helper misattributes explicitly yesterday1980 in `Heute ist noch offen, und du hast gestern 1980 kcal aufgenommen.` as invented current intake. Runtime accepts; current diary/remainder are null and historical1980 exists. This is a temporal attribution false positive, not a fabricated current value or full semantic approval.
+- **Severity / Criticality:** Medium / Blocking.
+- **Owner:** Backend.
+- **Evidence:** [R1-09 exact artifact, helper locations and replay](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#r1-09-new-eval-currentyesterday-attribution-false-positive).
+- **Recommendation:** Add the exact positive temporal control and fix claim-local day attribution while retaining genuine invented-current-intake negatives. No skip, waiver, fixture mutation or reroll.
+- **Status:** Awaiting decision.
+- **History:** 2026-10-16 - Registered from independent R1 FAIL; route with final Backend correction attempt2.
+- **History:** 2026-10-16 - Independent R2 confirms explicit-yesterday positive and fabricated-current negatives, but recent-days wording remains falsely attributed to current intake. Isolated truthful historical clause passes Runtime and fails the actual helper. Two corrections exhausted; await explicit direction, no automatic retry.
+
+### FT-QA-2026-135
+
+- **Finding key:** Q1-US03-01.
+- **Plan reference:** US-03 dynamic greeting plan, latest API-dependency addendum; AC-2, AC-8.
+- **Description:** Exact original phase and stale-weight outputs recommend increasing/reaching protein at remainingProteinG=20 and describe meal space under weight-only focus. Runtime accepts both; the local eval policy helper returns no violation. A nearby correct short sentence or null CTA does not validate full-summary advice.
+- **Severity / Criticality:** High / Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q1-01 report and exact original artifacts](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#q1-01-accepted-protein-lock-and-weight-focus-violations); dailyInsightValidation.ts proteinAction, prompt weight-focus guard and eval helper. Replaying unchanged original contexts accepts the unsafe text.
+- **Recommendation:** Add exact-original regressions and bounded generation/validation/eval coverage for increasing/reaching protein and nutrition side topics under weight focus. Preserve the threshold and safety rules; no client workaround or historical evidence relabeling.
+- **Status:** Awaiting decision.
+- **History:** 2026-10-16 - Registered from independent Q-1 FAIL; Backend correction attempt 1 routed under approved workflow. No acceptance or deployment.
+- **History:** 2026-10-16 - Independent R2 on v23/v7 still accepts generic eating/planning advice under the lock and nutrition side topics under weight focus in four exact current originals. Earlier exact action originals reject, but the residual remains Blocking. Backend corrections2/2 exhausted; no third automatic correction. Await explicit user direction.
+
+### FT-QA-2026-136
+
+- **Finding key:** Q1-US03-02.
+- **Plan reference:** US-03 dynamic greeting plan; AC-2, AC-8.
+- **Description:** Midday output invents remaining meal space from a target while today and remainingCalories are null, and claims stable weight despite 80 versus 80.2 and a losing trend. Runtime accepts; the live missing-budget assertion correctly fails.
+- **Severity / Criticality:** High / Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q1-02 original, replay and locations](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#q1-02-missing-current-diary-data-becomes-an-invented-budget-and-weight-claim).
+- **Recommendation:** Preserve null-as-unknown and authoritative weight signals throughout short/full generation and validation; regress the exact accepted original. Do not derive current room from target alone or suppress the correct assertion.
+- **Status:** Closed.
+- **History:** 2026-10-16 - Registered from independent Q-1 FAIL; Backend correction attempt 1. Existing contexts and failed originals retained.
+- **History:** 2026-10-16 - Independent R2 confirms exact null-budget/stable-weight original rejects and current midday/carbohydrate-below weight claims no longer reproduce that contradiction. Closed within reported cases/current sample; separate historical provenance and live failures remain open. No universal semantic guarantee.
+
+### FT-QA-2026-137
+
+- **Finding key:** Q1-US03-03.
+- **Plan reference:** US-03 dynamic greeting plan; AC-2, AC-8.
+- **Description:** Intensive-endurance full text asserts completed 360 minutes/30 km despite only likely_completed; another historical output asserts hiking participation from a stored activity. Runtime and live helper accept both. Probabilistic short text does not qualify a separate definitive full-text claim.
+- **Severity / Criticality:** High / Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q1-03 original artifacts, replay and matcher locations](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#q1-03-unconfirmed-activity-is-accepted-as-completed).
+- **Recommendation:** Regress exact originals and enforce recorded/planned/probable/confirmed distinctions at the actual claim boundary across short/full and current/historical narratives; preserve existing uncertainty requirements.
+- **Status:** Closed.
+- **History:** 2026-10-16 - Registered from independent Q-1 FAIL; Backend correction attempt 1.
+- **History:** 2026-10-16 - Independent R2 confirms exact performed/participated originals reject, historical projection is registrationOnly/unknown and current priority/likely/intensive/unknown/planned samples do not repeat unsupported completion. Scoped correction verified and closed; no future generation guarantee.
+
+### FT-QA-2026-138
+
+- **Finding key:** Q1-US03-04.
+- **Plan reference:** US-03 dynamic greeting plan and B-1 budget-lock residual; AC-2, AC-8.
+- **Description:** Intentionally inconsistent fixture intake1500/target2000/remainder-120 generates false exceeded-target arithmetic despite the uncertainty guard. Runtime correctly rejects it and prevents persistence/usage; generation and required live gate still fail. This is not evidence of unsafe Home display or normal production context arithmetic.
+- **Severity / Criticality:** Medium / Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q1-04 original artifacts, exact rejection and guard locations](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#q1-04-inconsistent-negative-budget-fixture-still-generates-false-arithmetic).
+- **Recommendation:** Correct bounded generation with the unchanged fixture and demonstrate required gates. Preserve correct validation and null actions; no fixture alteration, retries or production-context semantic changes.
+- **Status:** Closed.
+- **History:** 2026-10-16 - Registered from independent Q-1 FAIL; Backend correction attempt 1. Existing safe fallback is not successful generation.
+- **History:** 2026-10-16 - Independent R2 confirms both exact wrong-arithmetic originals reject; unchanged inconsistent fixture is projected as budget uncertainty and current generation avoids numbers/overage/protein/advice. Scoped correction verified and closed; other fixtures and arbitrary arithmetic not universally approved.
+
+### FT-QA-2026-139
+
+- **Finding key:** Q1-US03-05.
+- **Plan reference:** US-03 dynamic greeting plan; AC-2, AC-8.
+- **Description:** Reverse remainder regex spans an intake clause and its following conjunction, assigning 1500 from consumed intake to the 2000 remainder. Neutral exact-number compound control fails while replacing only the conjunction with a sentence stop passes. Eval helper duplicates the same heuristic; original activity semantics are a separate issue.
+- **Severity / Criticality:** Medium / Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Q1-05 original, deterministic clause counterexample and matcher locations](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#q1-05-compound-calorie-sentence-is-falsely-read-as-a-wrong-remainder).
+- **Recommendation:** Correct claim/number boundaries in runtime and eval coverage; add positive compound and negative swapped-target/intake/remainder controls. Do not broadly disable attribution validation.
+- **Status:** Closed.
+- **History:** 2026-10-16 - Registered from independent Q-1 FAIL; Backend correction attempt 1.
+- **History:** 2026-10-16 - Independent R1 verifies neutral compound/separated3500/1500/2000 controls accepted and swapped remainder rejected by runtime/helper. Exact reported numeric attribution defect closed; separate activity/planning semantics and other findings remain open. No overall acceptance.
+
+### FT-QA-2026-140
+
+- **Finding key:** Q1-US03-06.
+- **Plan reference:** US-03 dynamic greeting plan; AC-8.
+- **Description:** Required Mobile typecheck fails on two pre-existing test diagnostics outside F-1 changes: ProgressHeroCard.test.ts:456 unknown not assignable to string; WeightChart.test.ts:116 children absent on ReactTestInstance. Passing Vitest does not clear the package type gate. These are not attributed as US-03 regressions.
+- **Severity / Criticality:** Medium / Blocking.
+- **Owner:** Frontend.
+- **Evidence:** [Q1-06 exact files, diagnostics and command](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#q1-06-required-mobile-typecheck-remains-red-on-existing-test-errors); aggregate typecheck exits1, Mobile child exits2.
+- **Recommendation:** Obtain authorization for the minimal unrelated test-type corrections, route to Frontend and repeat full required typecheck. Do not silently waive the gate or clean up adjacent code.
+- **Status:** Closed.
+- **History:** 2026-10-16 - Registered from independent Q-1 FAIL. No unrelated fixes started.
+- **History:** 2026-10-16 - External concurrent changes to ProgressHeroCard.test.ts, WeightChart.test.ts and WeightChart.tsx were not authored/reverted by this workflow. Independent R2 reran all912 Mobile tests, normal typecheck and non-incremental typecheck successfully (exit0). The reported type defect no longer reproduces; close on independent verification, not acceptance/deferral or a waived gate. Original failure history preserved.
+
+### FT-QA-2026-141
+
+- **Finding key:** Q1-US03-07.
+- **Plan reference:** US-03 dynamic greeting plan; AC-8.
+- **Description:** API/domain KB still marks implemented Home fallback Planned F-1; API feedback provenance says new generations currently use v20 although current source and manifest use v23/v5. These are current-state contradictions, not historical results.
+- **Severity / Criticality:** Low / Non-blocking.
+- **Owner:** Documentation; proposed implementation-adjacent routing: Backend.
+- **Evidence:** [Q1-07 exact KB locations and source comparison](reports/PLAN_US-03_Dynamische-KI-Begruessung-mit-FitTrack-Insight.md#q1-07-kb-still-marks-implemented-home-behavior-planned-and-misstates-prompt-provenance).
+- **Recommendation:** Remove obsolete planned markers and correct current provenance while retaining historical evidence, open Backend defects and verification limits.
+- **Status:** Awaiting decision.
+- **History:** 2026-10-16 - Registered from independent Q-1 FAIL. User fix/accept/defer decision outstanding; no correction inferred from automatic plan approval.
 
 ## Current Recipe Sharing Acceptance
 
@@ -196,7 +339,7 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Owner:** Backend.
 - **Evidence:** [Q-21 report](reports/PLAN_US-10_Recipe-Export-Preparation_Vereinfachung_2026-10-09-v21.md), F/R/G records, fixture synthetic-saved-oven-seven-steps, savedSource6 versus final outputs; each HTTP200/usage1.
 - **Recommendation:** Scope-bounded fidelity correction, independent new source/export comparison and documented human review. No cooking-criterion or renderer-limit relaxation, no automatic oven semantic-PASS claim.
-- **Status:** Resolved
+- **Status:** Closed
 - **Decision:** User requested correction on 2026-10-14; Backend reports the fixture now satisfies the current `InsightInputContext` type without an unsafe cast. Independent targeted QA is required before closure.
 - **History:** 2026-10-10 - Registered from validated Q-21 FAIL; historical reports/findings preserved. Human culinary approval remains a separate manual validation limit.
 - **History:** 2026-10-14 - Backend reports the focused prompt tests pass and the supplemental test TypeScript check has no remaining diagnostic in `dailyInsightPrompt.test.ts`; 46 diagnostics remain in other test sources. Awaiting independent targeted QA verification.
@@ -1943,6 +2086,124 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Decision:** Frontend removed the unapproved leading plus sign while preserving negative formatting and raw regression predictions; independent QA verified the correction.
 - **History:** 2026-10-14 - Registered from the fresh US-02 QA FAIL report. No implementation change was made by QA.
 - **History:** 2026-10-14 - Routed to Frontend under correction attempt 1. [Final QA report](reports/PLAN_US-02_Kompakte-Begruessungskarte-und-Gewichtstrend.md) verified positive/negative threshold formatting and unchanged regression lines; closed on PASS.
+
+### FT-QA-2026-127
+
+- **Finding key:** US01-F01
+- **Plan reference:** `docs/User Stories/Progress/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md`
+- **Acceptance criterion:** AC-1, AC-2, AC-6
+- **Description:** `ProgressHeroCard` renders the input/action row unconditionally. After a successful POST, `ProgressScreen` clears the input and editing ID, but the row remains beside the day's measurements. There is no explicit `Weitere Messung` action to enter add mode, and the empty-day action is labeled `Hinzufügen` instead of the approved `Speichern`. Existing entries are still individually listed and are not silently chosen as the update target.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); `mobile/src/shared/components/ProgressHeroCard.tsx`; `mobile/src/modules/progress/ProgressScreen.tsx`; `docs/kb/product/03-design-system.md`.
+- **Recommendation:** Hide the input when the selected day already has entries and no entry is being edited. Expose a separate `Weitere Messung` action that explicitly opens add mode, keep the selected-ID edit path, and align tests and the design-system documentation with the approved states.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-10-14 - Registered from the validated US-01 QA FAIL report and routed to Frontend under correction attempt 1. Frontend corrected the editor states, CTA labels, tests, and design-system documentation. The independent QA re-review verified AC-1, AC-2, and AC-6; closed on the [re-review report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md).
+
+### FT-QA-2026-128
+
+- **Finding key:** US01-F02
+- **Plan reference:** `docs/User Stories/Progress/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md`
+- **Acceptance criterion:** AC-3
+- **Description:** Calendar cells always call `onSelectDate`, with no comparison to `today` or disabled state. The next-month control is also always active. A future date can therefore become `selectedDate` and be sent to `POST /api/weights`.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); `mobile/src/modules/progress/ProgressCalendar.tsx`; `mobile/src/modules/progress/ProgressScreen.tsx`; `mobile/src/modules/progress/ProgressCalendar.test.tsx`.
+- **Recommendation:** Disable dates after today, prevent navigation into future months, and guard the save path against a future selected date.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-10-14 - Registered from the validated US-01 QA FAIL report and routed to Frontend under correction attempt 1. Frontend disabled future dates/months, added the pre-POST date guard, and regression tests. The independent QA re-review verified AC-3; closed on the [re-review report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md).
+
+### FT-QA-2026-129
+
+- **Finding key:** US01-F03
+- **Plan reference:** `docs/User Stories/Progress/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md`
+- **Acceptance criterion:** AC-6, AC-9
+- **Description:** Each edit button's explicit accessibility label contains only the selected date and a time formatted to the minute; it omits the measurement value and any ordinal/disambiguator. Two entries from the same day and minute therefore expose identical labels even though they have different IDs, making the intended record ambiguous to a screen-reader user.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); `mobile/src/shared/components/ProgressHeroCard.tsx`; `mobile/src/shared/components/ProgressHeroCard.test.ts`.
+- **Recommendation:** Add a stable, user-understandable disambiguator to each row's accessible name (and, where needed, visible presentation), then add a duplicate-value/same-minute accessibility-label regression test. Complete the device screen-reader check in Verification Notes.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-10-14 - Registered from the validated US-01 QA FAIL report and routed to Frontend under correction attempt 1. Frontend added visible/accessibility ordinals and same-minute duplicate regression coverage; device screen-reader verification remains separate.
+- **History:** 2026-10-14 - Re-review verified the day-editor correction but found that separate HistoryList edit controls still use date-only accessibility labels. Routed to Frontend under correction attempt 2; see the [re-review report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md).
+- **History:** 2026-10-14 - Frontend added a date/value/ordinal accessible label for each HistoryList edit action and a regression test for same-day duplicate timestamps; focused Mobile tests and typecheck passed. Independent QA verified the HistoryList labels and exact-entry callbacks; closed on the [final QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md). The follow-up stale screen-test selectors are tracked separately as FT-QA-2026-134.
+
+### FT-QA-2026-130
+
+- **Finding key:** US01-F04
+- **Plan reference:** `docs/User Stories/Progress/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md`
+- **Acceptance criterion:** AC-5
+- **Description:** The plan requires an in-memory test with two entries on the same date proving that updating one ID leaves the sibling unchanged. The current in-memory test verifies ownership using the same ID in two different users, while the handler and Cosmos contract tests update a single entry; none exercises same-user same-day siblings. The implementation code selects by ID and Cosmos patches only `/value`, but the specified regression coverage is absent.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); `backend/src/lib/repositories/weightsRepository.test.ts`; `backend/src/functions/weights.test.ts`; `backend/src/lib/repositories/cosmosWeightsRepository.contract.test.ts`.
+- **Recommendation:** Add an in-memory repository test with two distinct IDs for one user/date; update one and assert the other complete entry remains unchanged. Keep the Cosmos round-trip in the emulator-only contract suite.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-10-14 - Registered from the validated US-01 QA FAIL report and routed to Backend under correction attempt 1. Backend added the same-user, same-date sibling regression. The independent QA re-review verified the test and AC-5; closed on the [re-review report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md).
+
+### FT-QA-2026-131
+
+- **Finding key:** US01-F05
+- **Plan reference:** `docs/User Stories/Progress/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md`
+- **Acceptance criterion:** AC-8
+- **Description:** The plan requires a failed PUT to leave the prior value editable and avoid a Health Connect upsert. `ProgressScreen.test.tsx` covers successful updates only; no test rejects `updateWeight` and asserts the selected ID, input, and history remain unchanged. The catch path appears to preserve state by inspection, but the acceptance behavior is not regression-tested.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** [QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); `mobile/src/modules/progress/ProgressScreen.test.tsx`; `mobile/src/modules/progress/ProgressScreen.tsx`.
+- **Recommendation:** Add a test that rejects `updateWeight`, confirms the old value and edit input remain available, shows the error, and verifies `syncWeightUpsert` is not called.
+- **Status:** Closed
+- **Decision:** Correction loop started automatically after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** 2026-10-14 - Registered from the validated US-01 QA FAIL report and routed to Frontend under correction attempt 1. Frontend added rejected-PUT UI coverage for preserved value/edit state, error display, and no Health Connect sync. The independent QA re-review verified AC-8; closed on the [re-review report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md).
+
+### FT-QA-2026-132
+
+- **Finding key:** US01-F06
+- **Plan reference:** `docs/User Stories/Progress/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md`
+- **Acceptance criterion:** AC-9
+- **Description:** The weight-domain Knowledge Base says Progress does not convert stored measurements and that current data uses kg, while the implemented edit flow supports stored `lbs` entries by converting to kg for editing and converting back before PUT. The mobile Knowledge Base documents the newer behavior, leaving the two domain documents inconsistent.
+- **Criticality:** Non-blocking
+- **Owner:** Documentation
+- **Evidence:** [QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); `docs/kb/domain/05-weight-tracking.md`; `docs/kb/tech/03-mobile.md`.
+- **Recommendation:** Update the weight-domain unit guidance to distinguish kg-only new entries from the kg editor's round-trip conversion for existing `lbs` entries, while stating that the stored unit and metadata are preserved.
+- **Status:** In progress
+- **Decision:** User requested correction as part of the Frontend Progress-screen cleanup; domain documentation update is included in that task.
+- **History:** 2026-10-14 - Registered from the validated US-01 QA FAIL report; awaiting user decision on this non-blocking documentation finding.
+- **History:** 2026-10-16 - User requested correction; routed to Frontend with the Progress UI cleanup. Awaiting independent QA verification.
+
+### FT-QA-2026-133
+
+- **Finding key:** US01-RR-TEST-01
+- **Plan reference:** N/A (unrelated package-wide test failure during US-01 re-review)
+- **Acceptance criterion:** N/A
+- **Description:** The current required full Backend suite exits 1 on the Daily Insight test that pins the original r10/r11 fixture digest. The assertion expected `4de395fb7fe066936ffc43c5b32276e79f68230444e3ebdc638cad40a94e5bf2` and received `6b830be6adb5ebe30c79bbba2591fc1f4a69fd5d0c00b0ba86363e7c6f52ce04`. The failure is outside US-01 and is not attributed to the weight changes, but the current package-wide test gate is red.
+- **Criticality:** Blocking
+- **Owner:** Backend
+- **Evidence:** [US-01 QA re-review](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); full Backend suite exited 1 with 1,853/1,854 tests passing; `backend/src/lib/openai.daily.test.ts` contains the failing digest assertion. Daily Insight files are outside the US-01 plan scope.
+- **Recommendation:** Reconcile the pinned fixture digest with the intended Daily Insight changes in their owning work item, then rerun the complete Backend unit suite.
+- **Status:** In progress
+- **Decision:** User reports parallel work is underway for this unrelated Daily Insight test-gate failure. The Orchestrator will not duplicate or modify that work during the US-01 cleanup.
+- **History:** 2026-10-14 - Registered from the validated US-01 QA re-review report. The issue was explicitly attributed to unrelated Daily Insight changes, not to the weight feature.
+- **History:** 2026-10-14 - Final US-01 QA re-review still reports the full Backend suite failing 1,852/1,854 on two Daily Insight fingerprints in `openai.daily.test.ts` and `dailyInsightPromptManifest.test.ts`; remains outside US-01 pending user direction.
+- **History:** 2026-10-16 - User noted parallel work is addressing this finding; left with that work and not included in the Frontend correction scope.
+
+### FT-QA-2026-134
+
+- **Finding key:** US01-RR-MOBILE-01
+- **Plan reference:** `docs/User Stories/Progress/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md`
+- **Acceptance criterion:** AC-4, AC-8
+- **Description:** Three ProgressScreen integration tests still look up the retired date-only HistoryList label `Eintrag vom 2026-10-12 bearbeiten`. HistoryList now exposes labels containing ordinal, value, and unit, so the tests fail with `Touchable not found` before exercising selected-ID update success, lbs round-trip, or failed-update state retention. The isolated HistoryList regression passes and confirms unique labels and exact original-entry callbacks; this finding is the stale screen-test selector, not a demonstrated runtime defect.
+- **Criticality:** Blocking
+- **Owner:** Frontend
+- **Evidence:** [Final QA report](reports/PLAN_US-01_Gewichtsmessungen-bearbeiten-und-nachtragen.md); focused Mobile command exits 1 with 82/85 tests passed, and full Mobile suite exits 1 with 883/886 passed; selector is in `mobile/src/modules/progress/ProgressScreen.test.tsx`.
+- **Recommendation:** Update the affected ProgressScreen tests to select the current accessible name or a stable test identifier, then rerun the focused and complete Mobile suites.
+- **Status:** In progress
+- **Decision:** User explicitly requested correction and authorized another Frontend cleanup pass after the prior two attempts.
+- **History:** 2026-10-14 - Registered from the final US-01 QA re-review. This is a test selector mismatch introduced by the HistoryList accessible-label correction; two Frontend correction attempts have been used, so no third retry is started automatically.
+- **History:** 2026-10-16 - User explicitly requested FT-QA-2026-134 be fixed and asked Frontend to clean up the Progress UI before a fresh Orchestrator QA review.
 
 ## Verification Notes (Not Findings)
 

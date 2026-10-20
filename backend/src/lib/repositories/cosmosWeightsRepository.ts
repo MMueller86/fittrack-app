@@ -34,6 +34,21 @@ export class CosmosWeightsRepository implements WeightsRepository {
     return resource ?? entry;
   }
 
+  async updateValue(userId: string, id: string, value: number): Promise<WeightEntry | null> {
+    const { containers } = await getCosmos();
+    try {
+      const { resource } = await containers.weights.item(id, userId).patch<WeightEntry>([
+        { op: 'set', path: '/value', value },
+      ]);
+      return resource ?? null;
+    } catch (e) {
+      if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: number }).code === 404) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
   async delete(userId: string, id: string): Promise<boolean> {
     const { containers } = await getCosmos();
     try {

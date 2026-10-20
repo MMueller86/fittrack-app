@@ -2,7 +2,7 @@
 
 ## Principle
 
-All AI calls are backend-only. No AI keys or direct AI calls in the mobile app. Mobile calls FitTrack backend APIs; the backend orchestrates AI.
+- All AI calls are backend-only. No AI keys or direct AI calls in the mobile app. Mobile calls FitTrack backend APIs; the backend orchestrates AI.
 
 ## Azure Services
 
@@ -559,6 +559,25 @@ After a user creates a reusable item, the backend enriches it asynchronously by 
 A timer trigger (`reusableItemsEnrichScheduler.ts`) processes pending enrichments in batch.
 
 ### 8. Daily Insight (`GET /api/ai/daily-insight`)
+[Current] The active candidate is release v30 / prompt v29 / assembly v13,
+fingerprint `sha256:827de73de0186f5320ad02e23c2896cd82a2e85a4d20a08040cdaefc688037eb`.
+The summary contract is 5,000 characters. Earlier prompt v28 added a shared-tone
+rule that the `title` omits weight, trend, and kg when the last measurement is
+more than 14 days old, plus shared macro-guard guidance for protein above the
+range (no warning up to 2.5 g/kg, an optional calm food-choice note at or above
+2.5 g/kg). Prompt v29 removes CTA/navigation fields. The runtime validator
+checks only the strict schema, the greeting/short-insight structure, and that
+calorie numbers were supplied; the
+keyword semantic rules and the validator-keyed correction/fallback branches in
+`generateDailyInsight` were removed on 2026-10-20 (one generic correction retry
+remains for a rejected response). Ten consecutive Daily-only live runs passed
+for the previous v29/prompt-v28 candidate; the eval asserts structure and
+supplied numbers only. The user accepted that prior state as the B-1 basis on
+2026-10-20. The v30/prompt-v29 evaluation remains pending. Weekly Insight is independent and its
+diagnostic is excluded from the US-03 gate. See the
+[central rulebook](../domain/09-daily-insight.md) for product behavior and the
+[current B-1 handoff](../../User%20Stories/startpage/B-1_US-03_Backend_Handoff_2026-10-16.md)
+for gate evidence.
 
 The Daily Insight is a once-per-day AI-generated personal briefing. The
 endpoint keeps the user-facing failure contract at HTTP `200`: quota and
@@ -580,9 +599,9 @@ Daily quota.
 	context, cache, quota, or AI work; the handler never substitutes a backend
 	UTC date, UTC hour, or UTC expiry.
 - With a valid offset, current-day detection compares the requested date with
-	the offset-adjusted local date. This controls whether the validated
-	`localHour` may produce `planned` or `likely_completed`; otherwise an
-	activity remains `unknown`. A newly persisted Daily insight expires at the
+the offset-adjusted local date. A past requested local date yields
+`dailyActivityStatus: completed`; a current-day activity is `completed` only
+for local hours `22..23`. All other present activities are `unknown`. A newly persisted Daily insight expires at the
 	next local midnight represented as UTC, with Cosmos `ttl` set to the ceiling
 	of the remaining seconds. The normalized offset is included in the input
 	hash, so a changed normalized offset follows the normal cache regeneration
@@ -609,106 +628,60 @@ Daily quota.
 	`phase_context`; `morning_orientation` before 10:00 with no current
 	MealItem; `nutrition_guidance` with current nutrition and targets; otherwise
 	`general`. The AI cannot change the selected intent.
-- With an activity, `activityCompletionStatus` is `planned` for local hours
-	`0..19`, `likely_completed` for `20..23`, and `unknown` for missing/invalid
-	hours or a non-current requested date. Without an activity the status and
-	source are `null`. `likely_completed` is probabilistic, never a confirmed
-	completion fact; the persisted `SpecialActivity` type is unchanged.
-- **Current macro-range contract (v18):** the current context selects the
-	stored profile-day ranges (`trainingDay` only for an explicit training day,
-	otherwise `restDay`). A special-activity bonus changes the effective calorie
-	target only; it does not change protein or carbohydrate ranges. The context
-	carries `remainingProteinG` to the rounded protein lower bound and the
-	server-computed `proteinCoachingBand`. With usable weight, bands use actual
-	g/kg: `<1.5` below range, `1.5–2.0` inclusive in range, `(2.0,2.2]` above
-	range without the high-protein coaching hint, and `>2.2` above the coaching
-	threshold. Without usable weight the rounded bounds are used; missing range
-	or intake is unknown. The provider projection removes legacy scalar
-	`proteinG` and `carbsG`; the active prompt evaluates only ranges and the
-	server-computed signals. Carbohydrate values outside their range are not
-	negative judgments. Weekly Insight remains calorie-based and receives no
-	personal macro ranges. This is internal context only: public response,
-	Structured Output, and quota contracts are unchanged.
-
-**v18 prompt and validation contract:**
-- `DAILY_INSIGHT_PROMPT_VERSION` is `'v18'`. The selected intent module is
-	combined with the shared German tone/output contract and the exact system
-	prompt plus serialized user message are persisted as `promptSnapshot`.
-- The active composition root is
-	`backend/src/lib/prompts/dailyInsightPrompt.ts`; its append-only release
-	history is in `backend/src/lib/prompts/dailyInsightPromptManifest.ts`.
-	The append-only manifest preserves v14 fingerprint
-	`sha256:5e03af4f2175a24d71db49910185ed4384a46eeb4932ff1527c544fb854cbe1a`
-	and historical v15 fingerprint
-	`sha256:cc443460df1cac7b4475c56d469ec0bebcf3bbb8a2669505147fc50f45694264`
-	unchanged. The historical v16 fingerprint remains
-	`sha256:3e68d4dd0b6e49003936a278f3e65d693645ebfb41ee5ced3ea7daa3efa70893`
-	and the historical v17 fingerprint is
-	`sha256:0373462c2f0e3b3050c51b4cfe468c6aca238ce3c0b15cf80c5be2b8847e4386`
-	with assembly version `v2`; the active v18 fingerprint is
-	`sha256:853697f9be7a8234443ff6ac89470485bb5e45a528539425a48b0f0e54f2ddae`
-	with assembly version `v2`.
-	`promptVersion` plus `promptFingerprint` form the release identity.
+- With an activity, `dailyActivityStatus` is `completed` for a past local date
+or a current-day local hour of `22..23`; otherwise it is `unknown`. Without
+an activity the status is `null`. The provider must not infer planned or
+likely-completed states; the persisted `SpecialActivity` type is unchanged.
+- The active composition root is `backend/src/lib/prompts/dailyInsightPrompt.ts`;
+	its append-only release history is in
+	`backend/src/lib/prompts/dailyInsightPromptManifest.ts`. The active release is
+	v30 (`DAILY_INSIGHT_PROMPT_VERSION = 'v29'`, assembly v13) with fingerprint
+	`sha256:827de73de0186f5320ad02e23c2896cd82a2e85a4d20a08040cdaefc688037eb`;
+	earlier fingerprints and contract history are in the
+	[Daily Insight history archive](../archive/daily-insight-history-2026-10.md).
+	`promptVersion` plus `promptFingerprint` form the release identity, and
 	`systemPromptHash` additionally hashes the exact context-dependent
-	`promptSnapshot.system` sent for the selected intent.
+	`promptSnapshot.system` sent for the selected intent. The exact system prompt
+	plus serialized user message are persisted as `promptSnapshot`.
 - Azure OpenAI uses Strict Structured Outputs with `json_schema`,
 	`strict: true`, all properties required, nullable optional values, and
 	`additionalProperties: false`. The server additionally validates the
 	response and rejects provider truncation/content filtering, empty or invalid
-	JSON, CTA/target mismatches, budget/protein contradictions, definitive
-	activity claims, stale-as-current weight claims, unsupported historical target
-	comparisons, unsupported nutrition claims for unlogged historical days, invalid
-	morning-source use, and forbidden technical wording.
-- The public response contains `title` (maximum 40 characters), `summary`
-	(maximum 600 characters), optional `recommendation` (maximum 240), optional
-	`cta` (maximum 80), optional `ctaTarget`, `generatedAt`, `promptVersion`, and
-	`status`. The provider schema uses nullable optional fields; the public
-	response omits optional fields whose value is `null`.
-- The stale-weight contract introduced in v15 remains global: the shared tone guard is included
-	in every selected intent, including `activity_focus`, `nutrition_guidance`,
-	`morning_orientation`, and `general`, not only the weight-focused modules.
-	For `daysSinceLastMeasurement > 14`, weight or trend data is stale; day 14
-	remains current and day 15 is stale. A stale reference may be omitted or
-	must use an explicit marker such as `veraltet` or `nicht aktuell`. A current
-	claim such as `Dein Gewicht ist heute klar gesunken.` is rejected, while an
-	explicit stale notice such as `Der Trend deines Gewichts ist nicht aktuell.`
-	is accepted.
-- The runtime root cause was corrected in v11 and remains active in v18: stale-weight rules had been
-	present only in `promptWeight`, while deterministic `nutrition_guidance`
-	routing selected `promptNutrition`. The shared guard now covers that path
-	and all other intents; server-side validation remains strict and was not
-	weakened.
-- A positive or negative current-day `remainingCalories` is only the difference
-	between logged intake and the effective target, not a measured energy balance.
-	The shared prompt contract permits only target-relative wording. Deterministic
-	validation rejects affirmative achieved deficit/surplus claims in title,
-	summary, recommendation, and CTA while allowing explicit denials. A positive
-	value is an open target budget; `activity_focus` mentions the target only as
-	activity context without comparing it with logged intake. The `phase_progress` guard leaves assessment
-	to weight signals, never presents the remainder as an eating budget, and does
-	not base an eating recommendation or CTA on using it. Independent
-	non-nutrition guidance remains possible. Historical comparisons use the
-	date's resolved effective target,
-	require logged nutrition and a reliable source, and reject a direction that
-	contradicts that target. A read-only `profile_fallback` cannot be called the
-	target stored for that past day. `morning_orientation` requires local hour
-	`0..9` and no current MealItem; a missing prior-day item is not zero intake.
-- The following Q-21/CORR1 results are historical v17 evaluation evidence, not
-	the current v18 gate result. The WP-B2 handoff records passing focused tests
-	and live evaluations for v18; earlier v17 results remain historical.
-- Q-21's separate Daily v16 fix removes the shared-tone instruction to use
-	below-target wording when the current day is open, without weakening the
-	strict open-day validator. Regression uses the actual `stale-weight`
-	`phase_progress` source (500 kcal open, 20-day-old weight), not an invented
-	raw provider transcript. New live G remains pending independent QA.
-- CORR1 stale-weight passes, but unknown-activity fails the strict open-day
-	validator. Final correction v17 removes shared-tone rest-budget wording for
-	activity_focus and appends its existing open-day rule after the output
-	contract for positive remainingCalories, regardless of protein gap/local
-	hour. Unknown completion stays neutral and endurance advice conditional.
-	Exact fixture composition and strict negatives are offline-tested. Raw
-	Daily text is unavailable: exact phrase/causal attribution is unverified.
-	Validator/provider/schema stay unchanged; Weekly has no sharedTone consumer.
+	JSON, an invalid greeting or short-insight structure, and
+	calorie numbers that were not supplied in the context. Wording is not validated
+	at runtime (since 2026-10-20).
+- In the same single provider call as the full text, v19 requires non-empty
+	`greeting` (maximum 120 JavaScript string units) and `shortInsight` (maximum
+	240). Greeting is exactly `Hallo, <context.displayName>! <one emoji>` with
+	the existing server fallback `Sportler`, never time-dependent. Zod checks
+	trimmed lengths; runtime checks the exact name/prefix and one emoji sequence.
+	The short sentence must have a sentence terminator, no extra sentence,
+	ellipsis, list, Markdown or newline; common German abbreviations and decimal
+	points do not count as sentence boundaries. These are structural heuristics,
+	not a proof of grammatical completeness or semantic fidelity. The prompt
+	asks for a complete German sentence grounded only in server context,
+	consistent with the full text and without new advice/facts. The generator uses
+	temperature `0`, one Strict Structured Output call, and the unchanged 400-token
+	budget, with one generic correction retry for a rejected response. The live eval
+	asserts structure and supplied numbers only; wording is reviewed manually.
+- Invalid/missing/partial new provider fields fail before persistence and usage
+	tracking; no client-side summary or repair is generated.
+- The public response contains the compact greeting/short-insight pair, `title`
+	(maximum 40 characters), `summary` (maximum 5,000 characters), optional
+	`recommendation` (maximum 240), `generatedAt`, `promptVersion`, and `status`.
+	The provider schema uses nullable optional fields; the public response omits
+	optional fields whose value is `null`. Daily Insight has no CTA/navigation
+	fields.
+- Prompt rules (not runtime-validated since 2026-10-20): with
+	`daysSinceLastMeasurement > 14` weight and trend are stale (day 14 remains
+	current) and are omitted or marked (`veraltet`, `nicht aktuell`), and the `title`
+	does not mention weight, trend, or kg. `remainingCalories` is only the
+	target-relative difference between logged intake and the effective target, never
+	a measured deficit/surplus. `activity_focus` may state exact intake, effective
+	target, remainder, and the named bonus (included once, never activity
+	expenditure). `phase_progress` leaves the assessment to weight signals.
+	Historical days use their own resolved target, and `morning_orientation`
+	requires local hour `0..9` with no current MealItem.
 - A context read failure, provider failure, truncation/content-filter result,
 	or server validation failure returns HTTP `200` with `status: 'unavailable'`.
 	The failed result is not persisted and does not consume or track Daily quota.
@@ -722,16 +695,12 @@ Daily quota.
 - The hash includes the active prompt version, selected intent, local-hour
 	bucket, activity/status data, current and historical nutrition/target data,
 	weight/progress signals, and other prompt inputs, as well as the global
-	`promptFingerprint`, the concrete `systemPromptHash`, and semantic
-	`remainingCalories`/`remainingProteinG` buckets. Current profile-day
-	`macroRanges` are included with exact bounds, together with
-	`proteinCoachingBand`; the protein gap is represented by its rounded value
-	and semantic bucket. The calorie buckets are
-	`unknown`, `negative`, `zero`, and `positive`; the protein buckets are
-	`unknown`, `nearly_complete_below`, `nearly_complete_at`, and `gap`, with
-	the protein boundary at 20 g. Non-finite values are `unknown`. This keeps
-	`-0.01`/`0`/`0.01` and `19.99`/`20`/`20.01` distinct despite numeric
-	rounding elsewhere in the cache key.
+	`promptFingerprint`, the concrete `systemPromptHash`, and the semantic
+	`remainingCalories` bucket. Current profile-day `macroRanges` are included with
+	exact bounds, together with `dailyInsightProteinStatus` and `mealAdviceAllowed`.
+	The calorie buckets are `unknown`, `negative`, `zero`, and `positive`;
+	non-finite values are `unknown`. This keeps `-0.01`/`0`/`0.01` distinct despite
+	numeric rounding elsewhere in the cache key.
 - The active handler passes all current identities to `shouldRegenerate()`.
 	Missing or mismatched `promptVersion`, `promptFingerprint`,
 	`systemPromptHash`, `intent`, or `promptSnapshot` is a hard invalidation
@@ -739,12 +708,22 @@ Daily quota.
 	hit therefore requires matching provenance and an unchanged full input
 	hash; a changed prompt cannot remain a cache hit because a manual version
 	was left unchanged.
-- A complete, unexpired v14 same-date Daily is returned unchanged until its
-	existing expiry and is not overwritten by v18 early, retaining the v15-v17 rule.
-	After expiry, that key can receive a new v18 document. A v14 document without complete provenance
-	does not qualify for this preservation rule. Daily documents retain their
+- The existing complete, unexpired v14 same-date preservation exception is
+	unchanged and applies only when v15, v16, v17 or v18 is active. It is NOT
+	extended to v19, v20, or v21: all follow normal prompt-identity invalidation, including
+	before interval/day-limit checks. Missing compact fields alone are not a
+	regeneration trigger, and no extra legacy UX or compatibility matrix exists.
+	Daily documents retain their
 	existing per-document TTL/expires-at behaviour. Feedback documents are
 	separate and have no TTL; see the API and domain contracts below.
+- The compact pair is stored unchanged in `InsightDocument.response` and
+	copied into exact-instance Feedback response snapshots. These are optional
+	Class 0 fields in `aiInsights` with `/userId`; no new container, index,
+	migration, backfill, deletion or data rewrite. Old Daily/Feedback responses
+	remain readable. Quota/unavailable responses do not include compact fields.
+	F-1 must use the static greeting without short text or detail action for an
+	unavailable/quota/error result or incomplete/invalid pair. This backend change
+	does not implement the planned Home UI or add any refresh trigger.
 - These provenance fields are additive Class 0/read-compatible changes in the
 	existing `aiInsights` container. `promptFingerprint` and
 	`systemPromptHash` remain optional legacy-compatible fields on both Daily
@@ -854,7 +833,7 @@ Located in `backend/src/lib/prompts/`:
 - `foodEstimate.ts` — system prompt for food estimation
 - `mealEstimate.ts` — system prompt for meal image estimation
 - `recipeAnalyze.ts` — system prompt for recipe text analysis
-- `dailyInsightPrompt.ts` (active v18 composition root), `dailyInsightPromptManifest.ts` (preserved v14-v17 history and active v18 release lock), and `../dailyInsightSchema.ts` (shared Strict Structured Output schema), plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight prompt (versioned). The root is the only active composition path; it builds the exact snapshot used by the provider.
+- `dailyInsightPrompt.ts` (active v21 composition root), `dailyInsightPromptManifest.ts` (preserved v14-v20 history and active v21 release lock), and `../dailyInsightSchema.ts` (shared Strict Structured Output schema), plus the intent modules `sharedTone.ts`, `promptWeight.ts`, `promptActivity.ts`, `promptNutrition.ts`, `promptMorning.ts`, and `promptGeneral.ts` — current daily insight prompt (versioned). The root is the only active composition path; it builds the exact snapshot used by the provider.
 - `dailyInsight.eval.test.ts` and `dailyInsight.eval.fixtures.ts` — live Daily Insight prompt evaluations
 - `weeklyInsightV2.ts` — weekly insight system prompt and sanitized context contract (versioned)
 

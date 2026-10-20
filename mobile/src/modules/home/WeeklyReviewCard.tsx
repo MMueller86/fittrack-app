@@ -3,8 +3,6 @@ import { StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'r
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Svg, { Path, Rect } from 'react-native-svg';
 import {
-  WEEKLY_TARGET_MAX_PERCENT,
-  WEEKLY_TARGET_MIN_PERCENT,
   type WeeklyTargetBand,
   type WeeklyNutritionReviewResponse,
 } from '@fittrack/shared';
@@ -14,6 +12,7 @@ import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { isValidDateOnly } from '../../shared/date/localDate';
 import {
   createWeeklyReviewViewModel,
+  getWeeklyReviewDayCalorieSummaryFallback,
   type WeeklyReviewDayCalorieSummary,
   type WeeklyReviewDayDetailGroup,
   type WeeklyReviewDayMacroSummary,
@@ -30,15 +29,17 @@ import {
   type WeeklyReviewEvaluationResetInputs,
 } from './weeklyReviewEvaluationState';
 import {
+  getWeeklyReviewDayChartState,
   getWeeklyReviewMarkerCells,
-  getWeeklyReviewMarkerLegend,
   getWeeklyReviewMarkerColor,
   getWeeklyReviewMetricDisplayValue,
   getWeeklyReviewTargetBandColor,
   getWeeklyReviewVisibleWeekdayLabel,
   getWeeklyReviewMissingLegendMarkerGeometry,
+  hasWeeklyReviewDayMarkers,
   WEEKLY_REVIEW_BAR_SLOT_HEIGHT,
   WEEKLY_REVIEW_BAR_SLOT_TOP_MARGIN,
+  WEEKLY_REVIEW_BAR_WIDTH,
   WEEKLY_REVIEW_MARKER_SLOT_HEIGHT,
   WEEKLY_REVIEW_MARKER_SLOT_TOP_MARGIN,
   WEEKLY_REVIEW_VALUE_SLOT_HEIGHT,
@@ -70,7 +71,6 @@ function WeeklyReviewSkeleton() {
       accessibilityLabel="Wochenrückblick wird geladen"
     >
       <View style={styles.skeletonHeader}>
-        <View style={styles.skeletonIcon} />
         <View style={styles.skeletonCopy}>
           <SkeletonLine width="58%" />
           <SkeletonLine width="34%" />
@@ -195,31 +195,26 @@ function WeeklyTargetSummary({
 
 function DayValues({ day }: { day: WeeklyReviewDayViewModel }) {
   const valueColor = getWeeklyReviewTargetBandColor(day.targetBand);
+  const { percentLabel } = getWeeklyReviewDayChartState(day);
 
   return (
     <View style={styles.valueColumn}>
-      <Text
-        style={[styles.percentText, { color: valueColor }]}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-      >
-        {day.percentLabel ?? '—'}
-      </Text>
-      <Text
-        style={styles.calorieText}
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.7}
-      >
-        {getWeeklyReviewMetricDisplayValue(day.consumedLabel, { omitUnit: true })}
-      </Text>
+      {percentLabel != null && (
+        <Text
+          style={[styles.percentText, { color: valueColor }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+        >
+          {percentLabel}
+        </Text>
+      )}
     </View>
   );
 }
 
 function MissingPatternBar() {
-  const patternSize = spacing.md;
+  const patternSize = spacing.xs;
   const path = [
     `M 0 ${patternSize} L ${patternSize} 0`,
     `M 0 ${patternSize * 2} L ${patternSize * 2} 0`,
@@ -235,7 +230,7 @@ function MissingPatternBar() {
         preserveAspectRatio="none"
       >
         <Rect width="100%" height="100%" fill={colors.surfaceMuted} />
-        <Path d={path} stroke={colors.textMuted} strokeWidth={spacing.xs / 2} opacity={0.6} />
+        <Path d={path} stroke={colors.textMuted} strokeWidth={spacing.xs / 4} opacity={0.45} />
       </Svg>
     </View>
   );
@@ -275,45 +270,9 @@ function DayMarkers({ markers }: { markers: readonly WeeklyReviewDayMarker[] }) 
         >
           <Icon
             {...marker.icon}
-            size={spacing.sm + spacing.xs / 2}
+            size={spacing.sm + spacing.xs}
             color={getWeeklyReviewMarkerColor(marker)}
           />
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function MarkerLegend({ markers }: { markers: WeeklyReviewDayMarker[] }) {
-  if (markers.length === 0) return null;
-
-  return (
-    <View style={styles.markerLegendRow}>
-      {markers.map((marker) => (
-        <View
-          key={`${marker.kind}:${marker.label}`}
-          style={styles.markerLegendItem}
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={marker.label}
-        >
-          <View
-            style={styles.markerBadge}
-            pointerEvents="none"
-            accessible={false}
-          >
-            <Icon
-              {...marker.icon}
-              size={spacing.sm + spacing.xs / 2}
-              color={colors.chart.specialActivityOutline}
-            />
-          </View>
-          <Text
-            style={[styles.markerLegendText, { color: colors.chart.specialActivityOutline }]}
-            numberOfLines={2}
-          >
-            {marker.label}
-          </Text>
         </View>
       ))}
     </View>
@@ -329,7 +288,7 @@ function DayBar({
   scaleMaxPercent: number;
   onPress: () => void;
 }) {
-  const hasBarData = day.hasNutrition && day.hasTarget;
+  const { hasBarData } = getWeeklyReviewDayChartState(day);
 
   return (
     <TouchableOpacity
@@ -345,7 +304,7 @@ function DayBar({
         {hasBarData ? (
           <View style={[styles.bar, { height: getBarHeight(day, scaleMaxPercent), backgroundColor: getBarColor(day) }]} />
         ) : <MissingPatternBar />}
-        {day.hasTarget ? (
+        {hasBarData ? (
           <View
             style={[styles.targetMarker, { bottom: `${(100 / scaleMaxPercent) * 100}%` }]}
           />
@@ -368,26 +327,30 @@ function DayColumn({
   markers,
   scaleMaxPercent,
   onPress,
+  showMarkerRow,
 }: {
   day: WeeklyReviewDayViewModel;
   markers: readonly WeeklyReviewDayMarker[];
   scaleMaxPercent: number;
   onPress: () => void;
+  showMarkerRow: boolean;
 }) {
   return (
     <View style={styles.dayColumn}>
       <DayValues day={day} />
       <DayBar day={day} scaleMaxPercent={scaleMaxPercent} onPress={onPress} />
       <DayMeta day={day} />
-      <View
-        style={styles.markerCell}
-        pointerEvents="none"
-        accessible={false}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        <DayMarkers markers={markers} />
-      </View>
+      {showMarkerRow ? (
+        <View
+          style={styles.markerCell}
+          pointerEvents="none"
+          accessible={false}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
+          <DayMarkers markers={markers} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -446,7 +409,7 @@ function EvaluationSection({
   return (
     <View style={styles.evaluationSection}>
       <View style={styles.evaluationHeader}>
-        <Icon lib="feather" name="zap" size="md" color={colors.primaryBright} />
+        <Icon lib="feather" name="zap" size="sm" color={colors.primaryBright} />
         <Text style={styles.evaluationTitle}>Deine Wochenbewertung</Text>
       </View>
       <View
@@ -606,7 +569,9 @@ function WeeklyDayCalorieSummary({ summary }: { summary: WeeklyReviewDayCalorieS
           </View>
         </>
       ) : (
-        <Text style={styles.macroMissingText}>Kalorienvergleich nicht verfügbar.</Text>
+        <Text style={styles.macroMissingText}>
+          {getWeeklyReviewDayCalorieSummaryFallback(summary.consumedLabel)}.
+        </Text>
       )}
     </View>
   );
@@ -660,9 +625,9 @@ function WeeklyReviewContent({
   const viewModel = createWeeklyReviewViewModel(review);
   const [selectedDay, setSelectedDay] = useState<WeeklyReviewDayViewModel | null>(null);
   const diaryNavigationLock = useRef(false);
-  const markerLegend = getWeeklyReviewMarkerLegend(viewModel.days);
   const markerCells = getWeeklyReviewMarkerCells(viewModel.days);
   const chartDays = viewModel.days.slice(0, markerCells.length);
+  const showMarkerRow = hasWeeklyReviewDayMarkers(markerCells);
 
   useEffect(() => {
     setSelectedDay(null);
@@ -686,9 +651,6 @@ function WeeklyReviewContent({
   return (
     <Animated.View entering={FadeIn} style={styles.card}>
       <View style={styles.headerRow}>
-        <View style={styles.headerIcon}>
-          <Icon lib="feather" name="bar-chart-2" size="md" color={colors.primaryBright} />
-        </View>
         <View style={styles.headerCopy}>
           <Text style={styles.title} numberOfLines={2}>Letzte 7 Tage</Text>
           <Text style={styles.period}>{viewModel.periodLabel}</Text>
@@ -732,20 +694,19 @@ function WeeklyReviewContent({
             markers={markerCells[index]?.markers ?? []}
             scaleMaxPercent={viewModel.chartScaleMaxPercent}
             onPress={() => handleDayPress(day)}
+            showMarkerRow={showMarkerRow}
           />
         ))}
       </View>
 
-      <MarkerLegend markers={markerLegend} />
-
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />
-          <Text style={styles.legendText}>{`Im Ziel (${WEEKLY_TARGET_MIN_PERCENT}\u2013${WEEKLY_TARGET_MAX_PERCENT} %)`}</Text>
+          <Text style={styles.legendText}>Im Ziel</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
-          <Text style={styles.legendText}>Nicht im Ziel</Text>
+          <Text style={styles.legendText}>Außerhalb</Text>
         </View>
         <View style={styles.legendItem}>
           <MissingLegendMarker />
@@ -817,14 +778,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
-  },
-  headerIcon: {
-    width: spacing.xl,
-    height: spacing.xl,
-    borderRadius: radius.full,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   headerCopy: {
     flex: 1,
@@ -899,7 +852,7 @@ const styles = StyleSheet.create({
   dayGrid: {
     flexDirection: 'row',
     gap: spacing.xs,
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     alignItems: 'stretch',
   },
   dayColumn: {
@@ -916,19 +869,12 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.xs,
   },
   percentText: {
     ...typography.body2,
     fontWeight: '700' as const,
     textAlign: 'center',
     lineHeight: typography.body2.fontSize,
-  },
-  calorieText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: typography.caption.fontSize,
   },
   barColumn: {
     width: '100%',
@@ -939,12 +885,11 @@ const styles = StyleSheet.create({
     marginTop: WEEKLY_REVIEW_BAR_SLOT_TOP_MARGIN,
   },
   barTrack: {
-    width: '100%',
+    width: WEEKLY_REVIEW_BAR_WIDTH,
     height: '100%',
     justifyContent: 'flex-end',
     alignItems: 'center',
     position: 'relative',
-    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.sm,
     overflow: 'hidden',
   },
@@ -964,24 +909,19 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     flexDirection: 'row',
-    flexWrap: 'wrap',
     alignItems: 'center',
-    alignContent: 'center',
     justifyContent: 'center',
-    columnGap: spacing.xs / 2,
-    rowGap: 0,
   },
   markerBadge: {
-    width: spacing.sm + spacing.xs,
-    height: spacing.sm + spacing.xs,
-    borderRadius: radius.full,
-    backgroundColor: colors.surfaceElevated,
+    width: spacing.md,
+    height: spacing.md,
+    flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
   missingBar: {
-    width: '100%',
-    height: '100%',
+    width: spacing.sm,
+    height: spacing.sm,
     borderRadius: radius.sm,
     overflow: 'hidden',
   },
@@ -1024,8 +964,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.sm,
-    marginTop: spacing.md,
-    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -1106,8 +1046,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   evaluationTitle: {
-    ...typography.h3,
-    color: colors.text,
+    ...typography.body2,
+    color: colors.textSecondary,
+    fontWeight: '600' as const,
   },
   evaluationText: {
     ...typography.body2,

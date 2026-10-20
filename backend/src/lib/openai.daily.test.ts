@@ -37,7 +37,8 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
         },
       },
       remainingCalories: 500,
-      remainingProteinG: 40,
+      dailyInsightProteinStatus: 'below_range',
+      mealAdviceAllowed: false,
       last3Days: [],
     },
     userGoal: 'maintain',
@@ -57,18 +58,17 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
     },
     currentHourLocal: 18,
     specialActivity: null,
-    activityCompletionStatus: null,
-    activityStatusSource: null,
+    dailyActivityStatus: null,
     ...overrides,
   };
 }
 
 const validResponse = {
+  greeting: 'Hallo, Sportler! 👋',
+  shortInsight: 'Dein Tag ist noch offen und du kannst ihn ruhig gestalten.',
   title: 'Dein Tagesfokus',
   summary: 'Heute hast du eine gute Basis gelegt und kannst den restlichen Tag ruhig und passend zu deinem Ziel gestalten.',
   recommendation: null,
-  cta: null,
-  ctaTarget: null,
 };
 
 function mockClient(content: string, finishReason = 'stop') {
@@ -111,14 +111,27 @@ describe('generateDailyInsight', () => {
       type: 'json_schema',
       json_schema: { name: 'daily_insight', strict: true, schema: DAILY_INSIGHT_SCHEMA },
     });
+    expect(DAILY_INSIGHT_SCHEMA.properties).not.toHaveProperty('cta');
+    expect(DAILY_INSIGHT_SCHEMA.properties).not.toHaveProperty('ctaTarget');
+    expect(DAILY_INSIGHT_SCHEMA.properties.summary.maxLength).toBe(5_000);
     expect(request.messages[0]?.content).toBe(result.promptSnapshot.system);
     expect(request.messages[1]?.content).toBe(result.promptSnapshot.user);
-    expect(JSON.parse(result.promptSnapshot.user)).toEqual({
+    const promptInput = JSON.parse(result.promptSnapshot.user);
+    expect(promptInput).toMatchObject({
       intent: 'nutrition_guidance',
+      grounding: { focus: 'combined', mealAdviceAllowed: false, actionFields: 'intent_scoped' },
       context: {
-        ...context,
+        dailyActivityStatus: null,
         nutrition: {
-          ...context.nutrition!,
+          dailyInsightProteinStatus: 'below_range',
+          mealAdviceAllowed: false,
+        },
+      },
+    });
+    expect(promptInput).toMatchObject({
+      context: {
+        nutrition: {
+          today: { calories: 1500, hasMealItem: true },
           targets: {
             calories: 2000,
             fatG: 70,
@@ -131,6 +144,10 @@ describe('generateDailyInsight', () => {
         },
       },
     });
+    expect(promptInput.context.dailyActivityStatus).toBeNull();
+    expect(promptInput.context.nutrition.today).not.toHaveProperty('protein');
+    expect(promptInput.context.nutrition).not.toHaveProperty('remainingProteinG');
+    expect(promptInput.context.nutrition).not.toHaveProperty('proteinCoachingBand');
   });
 
   it('uses a server-provided prompt snapshot verbatim', async () => {
@@ -155,59 +172,45 @@ describe('generateDailyInsight', () => {
     await expect(generateDailyInsight(makeContext())).rejects.toThrow(error);
   });
 
-  it('rejects parse, schema and semantic failures', async () => {
+  it('rejects parse and schema failures', async () => {
     mockClient('{"title":');
     await expect(generateDailyInsight(makeContext())).rejects.toThrow('Invalid JSON');
 
     mockClient(JSON.stringify({ ...validResponse, extra: true }));
     await expect(generateDailyInsight(makeContext())).rejects.toThrow('invalid schema');
 
-    mockClient(JSON.stringify({
-      ...validResponse,
-      recommendation: 'Iss heute noch einen Snack.',
-      cta: 'Mahlzeit hinzufügen',
-      ctaTarget: 'Nutrition',
-    }));
-    await expect(generateDailyInsight(makeContext({
-      nutrition: { ...makeContext().nutrition, remainingCalories: -50 },
-    }))).rejects.toThrow('calorie budget');
+    mockClient(JSON.stringify({ ...validResponse, cta: 'Ernährung öffnen', ctaTarget: 'Nutrition' }));
+    await expect(generateDailyInsight(makeContext())).rejects.toThrow('invalid schema');
   });
 
-  it('validates stale weight semantics across structured provider responses', async () => {
-    const baseContext = makeContext();
-    const staleContext = {
-      ...baseContext,
-      weight: {
-        ...baseContext.weight,
-        latestKg: 80,
-        previousKg: 80.2,
-        weeklyTrend30d: 'losing' as const,
-        last7Values: [80, 80.2, 80.4],
-        daysSinceLastMeasurement: 15,
-        lastMeasurementDate: '2026-08-05',
-      },
-    };
-    const staleAsCurrent = {
-      ...validResponse,
-      title: 'Gewicht heute',
-      summary: 'Dein Gewicht ist heute klar gesunken.',
-    };
-    mockClient(JSON.stringify(staleAsCurrent));
-
-    await expect(generateDailyInsight(staleContext, 'nutrition_guidance'))
-      .rejects.toThrow('stale weight');
-
-    const staleMarked = {
-      ...validResponse,
-      summary: 'Der Trend deines Gewichts ist nicht aktuell.',
-    };
-    mockClient(JSON.stringify(staleMarked));
-
-    await expect(generateDailyInsight(staleContext, 'nutrition_guidance'))
-      .resolves.toMatchObject({
-        response: { title: staleMarked.title, summary: staleMarked.summary },
-        intent: 'nutrition_guidance',
+  it('corrects an unsupported calorie value once without echoing the rejected draft', async () => {
+    const rejectedDraft = { ...validResponse, summary: 'Du hast noch 777 Kalorien offen.' };
+    const correctedDraft = { ...validResponse, summary: 'Du hast noch 500 Kalorien offen.' };
+    const create = vi.fn()
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify(rejectedDraft) }, finish_reason: 'stop' }],
+        usage: { total_tokens: 42 },
+      })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify(correctedDraft) }, finish_reason: 'stop' }],
+        usage: { total_tokens: 37 },
       });
+    __setOpenAiClientForTests({ chat: { completions: { create } } } as never);
+
+    const result = await generateDailyInsight(makeContext(), 'nutrition_guidance');
+
+    expect(result.response.summary).toBe(correctedDraft.summary);
+    expect(result.tokensUsed).toBe(79);
+    expect(create).toHaveBeenCalledTimes(2);
+    const correctionPayload = String(create.mock.calls[1]?.[0].messages[1]?.content);
+    expect(correctionPayload).toContain('calorie value that was not supplied');
+    expect(correctionPayload).not.toContain(JSON.stringify(rejectedDraft));
+  });
+
+  it('fails after the single correction when the calorie value is still unsupported', async () => {
+    const create = mockClient(JSON.stringify({ ...validResponse, summary: 'Du hast noch 777 Kalorien offen.' }));
+    await expect(generateDailyInsight(makeContext())).rejects.toThrow('calorie value that was not supplied');
+    expect(create).toHaveBeenCalledTimes(2);
   });
 
   it('returns nullable fields as optional public response fields', async () => {

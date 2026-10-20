@@ -87,6 +87,24 @@ describe('CosmosDiaryRepository (contract)', () => {
     expect(day.meals[0].date).toBe('2026-05-04');
   });
 
+  it('getDay excludes DayMeta documents while retaining legacy meals without a discriminator', async () => {
+    const date = '2026-05-04';
+    const meal = await repo.createMeal(makeMealInput({ date, type: 'lunch', name: 'Lunch' }));
+    await ctx!.database.container('nutritionDiaryMeals').items.create({
+      id: `day:${date}`,
+      userId: USER_A,
+      date,
+      dayType: 'training',
+      updatedAt: '2026-05-04T12:00:00.000Z',
+      _docType: 'dayMeta',
+    });
+
+    const day = await repo.getDay(USER_A, date);
+
+    expect(day.meals.map(({ id }) => id)).toEqual([meal.id]);
+    expect(day.meals[0]?.type).toBe('lunch');
+  });
+
   it('addItem appends item and persists it', async () => {
     const meal = await repo.createMeal(makeMealInput());
     const updated = await repo.addItem(USER_A, meal.id, {

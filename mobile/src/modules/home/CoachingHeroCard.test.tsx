@@ -2,6 +2,7 @@ import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CoachingHeroCard } from './CoachingHeroCard';
+import type { DailyInsightResponse } from '../../services/insightService';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -13,6 +14,8 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
+vi.mock('./InsightCard', () => ({ InsightCard: 'InsightDetail' }));
+vi.mock('../../shared/api/aiApi', () => ({ aiApi: { getDailyInsight: vi.fn() } }));
 
 type TestInstanceWithChildren = ReactTestInstance & {
   children: Array<string | ReactTestInstance>;
@@ -34,9 +37,28 @@ function getByTestId(renderer: ReactTestRenderer, testID: string): ReactTestInst
   return matches[0]!;
 }
 
+function getDetail(renderer: ReactTestRenderer) {
+  return renderer.root.findAll((node) => node.type === 'InsightDetail')[0]!;
+}
+
+function invoke(callback: unknown) {
+  if (typeof callback !== 'function') throw new Error('Expected callback');
+  act(() => callback());
+}
+
 const activeRenderers: ReactTestRenderer[] = [];
 
-function renderCard(onTrainingPress: () => void = vi.fn()): ReactTestRenderer {
+const INSIGHT: DailyInsightResponse = {
+  greeting: 'Hallo, Alex! 👋',
+  shortInsight: 'Dein Gewichtsverlauf bleibt stabil.',
+  title: 'Dein Verlauf',
+  summary: 'Der vollständige unveränderte Insight.',
+  generatedAt: '2026-10-16T10:00:00.000Z',
+  promptVersion: 'v23',
+  status: 'fresh',
+};
+
+function renderCard(onTrainingPress: () => void = vi.fn(), insight: DailyInsightResponse | null = null): ReactTestRenderer {
   let renderer!: ReactTestRenderer;
   act(() => {
     renderer = create(
@@ -46,6 +68,8 @@ function renderCard(onTrainingPress: () => void = vi.fn()): ReactTestRenderer {
         dayType="training"
         workoutType="gym"
         onTrainingPress={onTrainingPress}
+        insight={insight}
+        insightDate="2026-10-16"
       />,
     );
   });
@@ -88,5 +112,53 @@ describe('CoachingHeroCard', () => {
     act(() => (onPress as () => void)());
 
     expect(onTrainingPress).toHaveBeenCalledOnce();
+  });
+
+  it.each(['fresh', 'cached'] as const)('renders the supplied %s pair without shortening or generating copy', (status) => {
+    const insight = { ...INSIGHT, status, greeting: 'a'.repeat(120), shortInsight: `${'b'.repeat(239)}.` };
+    const renderer = renderCard(vi.fn(), insight);
+    const texts = renderer.root.findAll((node) => node.type === 'Text').map(getTextContent);
+    expect(texts).toContain(insight.greeting);
+    expect(texts).toContain(insight.shortInsight);
+    expect(getByTestId(renderer, 'short-insight').props.numberOfLines).toBeUndefined();
+    const toggle = renderer.root.findAll((node) => node.props.accessibilityLabel === 'Mehr anzeigen')[0]!;
+    expect(toggle.props.style).toMatchObject({ minHeight: 48 });
+    expect(getByTestId(renderer, 'training-selector').props.style).toMatchObject({ minHeight: 48 });
+  });
+
+  it.each([
+    null,
+    { ...INSIGHT, status: 'unavailable' as const },
+    { ...INSIGHT, status: 'quota_exceeded' as const },
+    { ...INSIGHT, greeting: undefined },
+    { ...INSIGHT, shortInsight: undefined },
+    { ...INSIGHT, greeting: ' ' },
+    { ...INSIGHT, shortInsight: '' },
+    { ...INSIGHT, greeting: 'a'.repeat(121) },
+    { ...INSIGHT, shortInsight: 'a'.repeat(241) },
+  ])('uses only the existing static greeting for unavailable or incomplete content %#', (insight) => {
+    const renderer = renderCard(vi.fn(), insight);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Mehr anzeigen')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'short-insight')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.type === 'Text').map(getTextContent)).toContain('Guten Morgen, Alex  👋');
+  });
+
+  it('expands the full insight inline and allows it to collapse again', () => {
+    const renderer = renderCard(vi.fn(), INSIGHT);
+    expect(renderer.root.findAll((node) => node.type === 'InsightDetail')).toHaveLength(0);
+    const expand = renderer.root.findAll((node) => node.props.accessibilityLabel === 'Mehr anzeigen')[0]!;
+    expect(expand.props.accessibilityState).toEqual({ expanded: false });
+    invoke(expand.props.onPress);
+
+    const detail = getDetail(renderer);
+    expect(detail.props.insight).toBe(INSIGHT);
+    expect(detail.props.date).toBe('2026-10-16');
+    expect(detail.props.inlineDetail).toBe(true);
+    expect(detail.props.detail).toBeUndefined();
+    const collapse = renderer.root.findAll((node) => node.props.accessibilityLabel === 'Weniger anzeigen')[0]!;
+    expect(collapse.props.accessibilityState).toEqual({ expanded: true });
+    invoke(collapse.props.onPress);
+    expect(renderer.root.findAll((node) => node.type === 'InsightDetail')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Mehr anzeigen')).toHaveLength(1);
   });
 });

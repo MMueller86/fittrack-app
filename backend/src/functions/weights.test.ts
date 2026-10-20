@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest';
 
-import { addWeightHandler, deleteWeightHandler, listWeightsHandler } from './weights';
-import { __resetWeightsRepositoryForTests } from '../lib/repositories/weightsRepository';
+import { addWeightHandler, deleteWeightHandler, listWeightsHandler, updateWeightHandler } from './weights';
+import { __resetWeightsRepositoryForTests, getWeightsRepository } from '../lib/repositories/weightsRepository';
 import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, teardownTestAuth, TEST_USER_ID } from '../test-utils/http';
 
 // HTTP-handler unit tests for the weight-tracking endpoints.
@@ -147,6 +147,99 @@ describe('POST /api/weights', () => {
   });
 });
 
+describe('PUT /api/weights/:id', () => {
+  it('updates only the value of the authenticated user entry', async () => {
+    const created = (await addWeightHandler(
+      await makeAuthRequest({ body: { value: 80, unit: 'lbs', date: '2026-04-30' } }),
+      makeContext(),
+    )).jsonBody as {
+      id: string;
+      userId: string;
+      date: string;
+      value: number;
+      unit: string;
+      createdAt: string;
+    };
+
+    const res = await updateWeightHandler(
+      await makeAuthRequest({ params: { id: created.id }, body: { value: '84.2' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toEqual({ ...created, value: 84.2 });
+    expect(await getWeightsRepository().list(TEST_USER_ID)).toEqual([{ ...created, value: 84.2 }]);
+  });
+
+  it('returns 404 for unknown and other-user IDs without changing the other user entry', async () => {
+    await getWeightsRepository().add({
+      id: 'foreign-entry',
+      userId: 'other-user',
+      date: '2026-04-30',
+      value: 70,
+      unit: 'kg',
+      createdAt: '2026-04-30T08:00:00.000Z',
+    });
+
+    for (const id of ['does-not-exist', 'foreign-entry']) {
+      const res = await updateWeightHandler(
+        await makeAuthRequest({ params: { id }, body: { value: 90 } }),
+        makeContext(),
+      );
+      expect(res.status).toBe(404);
+      expect(res.jsonBody).toEqual({ error: 'Entry not found' });
+    }
+
+    expect(await getWeightsRepository().list('other-user')).toEqual([{
+      id: 'foreign-entry',
+      userId: 'other-user',
+      date: '2026-04-30',
+      value: 70,
+      unit: 'kg',
+      createdAt: '2026-04-30T08:00:00.000Z',
+    }]);
+  });
+
+  it.each([
+    ['negative value', { value: -1 }],
+    ['zero value', { value: 0 }],
+    ['value above max', { value: 1001 }],
+    ['non-numeric value', { value: 'abc' }],
+    ['missing value', {}],
+  ])('returns 400 for %s', async (_label, body) => {
+    const res = await updateWeightHandler(
+      await makeAuthRequest({ params: { id: 'unused' }, body }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('value') });
+  });
+
+  it('rejects fields other than value and leaves the entry unchanged', async () => {
+    const created = (await addWeightHandler(
+      await makeAuthRequest({ body: { value: 80, unit: 'kg', date: '2026-04-30' } }),
+      makeContext(),
+    )).jsonBody as { id: string; value: number };
+
+    const res = await updateWeightHandler(
+      await makeAuthRequest({ params: { id: created.id }, body: { value: 90, date: '2026-05-01' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await getWeightsRepository().list(TEST_USER_ID)).toMatchObject([{ value: 80 }]);
+  });
+
+  it('returns 400 when id is missing', async () => {
+    const res = await updateWeightHandler(
+      await makeAuthRequest({ params: {}, body: { value: 80 } }),
+      makeContext(),
+    );
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Missing id' });
+  });
+});
+
 describe('DELETE /api/weights/:id', () => {
   it('returns 204 when the entry exists', async () => {
     const created = (await addWeightHandler(
@@ -208,6 +301,7 @@ describe('auth enforcement', () => {
     ['listWeightsHandler', (req: Parameters<typeof listWeightsHandler>[0]) => listWeightsHandler(req, makeContext())],
     ['addWeightHandler', (req: Parameters<typeof addWeightHandler>[0]) => addWeightHandler(req, makeContext())],
     ['deleteWeightHandler', (req: Parameters<typeof deleteWeightHandler>[0]) => deleteWeightHandler(req, makeContext())],
+    ['updateWeightHandler', (req: Parameters<typeof updateWeightHandler>[0]) => updateWeightHandler(req, makeContext())],
   ] as const)('%s returns 401 when Authorization header is missing', async (_name, invoke) => {
     const res = await invoke(makeRequest());
     expect(res.status).toBe(401);
@@ -218,6 +312,7 @@ describe('auth enforcement', () => {
     ['listWeightsHandler', (req: Parameters<typeof listWeightsHandler>[0]) => listWeightsHandler(req, makeContext())],
     ['addWeightHandler', (req: Parameters<typeof addWeightHandler>[0]) => addWeightHandler(req, makeContext())],
     ['deleteWeightHandler', (req: Parameters<typeof deleteWeightHandler>[0]) => deleteWeightHandler(req, makeContext())],
+    ['updateWeightHandler', (req: Parameters<typeof updateWeightHandler>[0]) => updateWeightHandler(req, makeContext())],
   ] as const)('%s returns 401 when Bearer token is invalid', async (_name, invoke) => {
     const res = await invoke(makeRequest({ headers: { authorization: 'Bearer not.a.valid.jwt' } }));
     expect(res.status).toBe(401);

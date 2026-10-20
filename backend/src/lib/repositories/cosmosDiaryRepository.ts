@@ -59,7 +59,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
     const { resources } = await containers.nutritionDiaryMeals.items
       .query<Meal>(
         {
-          query: 'SELECT * FROM c WHERE c.userId = @userId AND c.date = @date',
+          query: "SELECT * FROM c WHERE c.userId = @userId AND c.date = @date AND (NOT IS_DEFINED(c._docType) OR c._docType = 'meal')",
           parameters: [
             { name: '@userId', value: userId },
             { name: '@date', value: date },

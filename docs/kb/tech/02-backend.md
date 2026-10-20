@@ -14,7 +14,7 @@ Located in `backend/src/functions/`. Each file owns one domain.
 |---|---|---|---|
 | `profile.ts` | GET/POST/PUT /profile/me, POST /profile/calculate-preview | Yes | Full implementation |
 | `nutritionTargets.ts` | nutrition targets endpoints | Yes | |
-| `weights.ts` | GET/POST/DELETE /weights, /weights/{id} | Yes | |
+| `weights.ts` | GET/POST /weights, PUT/DELETE /weights/{id} | Yes | |
 | `diary.ts` | GET/POST /diary/day/{date}, meal CRUD | Yes | |
 | `reusableItems.ts` | CRUD /reusable-items | Yes | |
 | `reusableItemsEnrich.ts` | POST /reusable-items/{id}/enrich | Yes | AI enrichment |
@@ -113,6 +113,12 @@ Available repositories:
 - `profileRepository`, `recipesRepository`, `reusableItemsRepository`
 - `weightsRepository`, `dayMetaRepository`, `hintStateRepository`
 - `insightRepository`, `userFoodRelationRepository`
+
+`WeightsRepository.updateValue(userId, id, value)` uses `userId` as the Cosmos
+partition key and patches only `/value`. The entry's ID, owner, date, unit,
+and creation timestamp remain unchanged; a missing or foreign-partition ID
+returns `null` for the handler to expose as 404. No document migration is
+required.
 
 `ProfileRepository.get()` resolves missing legacy `macroRanges` in memory from
 the profile weight and each day's stored calorie and fat targets. This read
@@ -546,7 +552,7 @@ Local values are in `backend/local.settings.json` (gitignored) — this is the *
 
 The backend runtime dependencies contain the renderer packages at the verified
 POC ranges: `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static
-~1.46.0`, `@tabler/icons ~3.46.0`, and `sharp ^0.34.5`. `pixelmatch
+~1.46.0`, `@tabler/icons ~3.46.0`, and `sharp ^0.35.5`. `pixelmatch
 ~7.2.0`, TypeScript, Vitest, and type packages remain backend development or
 test dependencies and are not part of `_deploy_staging`.
 

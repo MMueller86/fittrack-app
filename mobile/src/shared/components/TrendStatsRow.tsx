@@ -1,29 +1,18 @@
-// TrendStatsRow — Three compact statistics displayed below the Progress chart.
+// TrendStatsRow — Three compact statistics for the Progress overview.
 //
-// Calculates Ø 7-day average, Ø 30-day average, and weekly change via
-// linear regression over the last 30 days. All memoised — no API calls.
+// Calculates exact local-calendar averages and weekly change without API calls.
 
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { WeightEntry, WeightUnit } from '@fittrack/shared';
-import {
-  calculateWeightTrendPerWeek,
-  classifyWeightTrend,
-  getWeightEntriesInLastDays,
-} from '@fittrack/shared';
+import type { WeightEntry } from '@fittrack/shared';
+import { calculateWeightTrendPerWeek } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { addLocalDays, getLocalIsoDate } from '../date/localDate';
+import { formatKilograms } from '../weightFormatting';
 
 interface TrendStatsRowProps {
   entries: WeightEntry[];
-  unit: WeightUnit;
-}
-
-function toKg(e: WeightEntry): number {
-  return e.unit === 'lbs' ? e.value / 2.20462 : e.value;
-}
-
-function toUnit(kg: number, unit: WeightUnit): number {
-  return unit === 'lbs' ? kg * 2.20462 : kg;
+  embedded?: boolean;
 }
 
 interface Stats {
@@ -32,87 +21,96 @@ interface Stats {
   weeklyChange: number | null;
 }
 
-function computeStats(entries: WeightEntry[], unit: WeightUnit): Stats {
+function computeStats(entries: WeightEntry[]): Stats {
   if (entries.length === 0) return { avg7: null, avg30: null, weeklyChange: null };
 
   const now = new Date();
+  const today = getLocalIsoDate(now);
+  const last7Start = addLocalDays(today, -6);
+  const last30Start = addLocalDays(today, -29);
 
-  const last7 = getWeightEntriesInLastDays(entries, 7, now);
-  const last30 = getWeightEntriesInLastDays(entries, 30, now);
+  const last7 = entries.filter((entry) => entry.date >= last7Start && entry.date <= today);
+  const last30 = entries.filter((entry) => entry.date >= last30Start && entry.date <= today);
 
   const avg = (arr: WeightEntry[]): number | null =>
     arr.length === 0
       ? null
-      : toUnit(arr.reduce((s, e) => s + toKg(e), 0) / arr.length, unit);
+      : arr.reduce((sum, entry) => sum + entry.value, 0) / arr.length;
 
-  const weeklyChange = calculateWeightTrendPerWeek(entries, unit, now);
+  const weeklyChange = calculateWeightTrendPerWeek(last30, 'kg', now);
 
   return { avg7: avg(last7), avg30: avg(last30), weeklyChange };
 }
 
 function Stat({
+  compact,
   label,
   sublabel,
   value,
   suffix,
-  valueColor = colors.text,
 }: {
+  compact: boolean;
   label: string;
   sublabel?: string;
   value: string;
   suffix: string;
-  valueColor?: string;
 }) {
   return (
-    <View style={styles.stat}>
-      <Text style={[styles.statValue, { color: valueColor }]}>
+    <View
+      style={[styles.stat, compact && styles.compactStat]}
+      accessible
+      accessibilityLabel={`${label}: ${value}${suffix ? ` ${suffix}` : ''}${sublabel ? `. ${sublabel}` : ''}`}
+    >
+      <Text style={styles.statValue}>
         {value}
         {suffix ? <Text style={styles.statSuffix}> {suffix}</Text> : null}
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
-      {sublabel ? <Text style={styles.statSublabel}>{sublabel}</Text> : null}
+      {sublabel && !compact ? <Text style={styles.statSublabel}>{sublabel}</Text> : null}
     </View>
   );
 }
 
-export function TrendStatsRow({ entries, unit }: TrendStatsRowProps) {
-  const stats = useMemo(() => computeStats(entries, unit), [entries, unit]);
+export function TrendStatsRow({ entries, embedded = false }: TrendStatsRowProps) {
+  const stats = useMemo(() => computeStats(entries), [entries]);
 
-  if (stats.avg7 === null && stats.avg30 === null) return null;
+  if (stats.avg7 === null && stats.avg30 === null) {
+    return embedded
+      ? <Text style={styles.emptyText}>Keine Messungen in den letzten 30 Tagen.</Text>
+      : null;
+  }
 
-  const trendDirection = classifyWeightTrend(stats.weeklyChange);
-  const changeColor =
-    trendDirection === 'losing'
-      ? colors.positive
-      : trendDirection === 'gaining'
-      ? colors.negative
-      : colors.textSecondary;
-
-  const changeStr =
-    stats.weeklyChange !== null
-      ? (stats.weeklyChange > 0 ? '+' : '') + stats.weeklyChange.toFixed(2)
-      : '—';
+  const roundedWeeklyChange = stats.weeklyChange === null
+    ? null
+    : Number(stats.weeklyChange.toFixed(2));
+  const changeStr = roundedWeeklyChange === null
+    ? '—'
+    : roundedWeeklyChange < 0
+    ? `−${formatKilograms(Math.abs(roundedWeeklyChange), 2)}`
+    : `${roundedWeeklyChange > 0 ? '+' : ''}${formatKilograms(roundedWeeklyChange, 2)}`;
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, embedded && styles.embeddedRow]}>
       <Stat
+        compact={embedded}
         label="Ø 7 Tage"
-        value={stats.avg7 !== null ? stats.avg7.toFixed(1) : '—'}
-        suffix={stats.avg7 !== null ? unit : ''}
+        value={stats.avg7 !== null ? formatKilograms(stats.avg7) : '—'}
+        suffix={stats.avg7 !== null ? 'kg' : ''}
       />
-      <View style={styles.divider} />
+      <View style={[styles.divider, embedded && styles.compactDivider]} />
       <Stat
+        compact={embedded}
         label="Ø 30 Tage"
-        value={stats.avg30 !== null ? stats.avg30.toFixed(1) : '—'}
-        suffix={stats.avg30 !== null ? unit : ''}
+        value={stats.avg30 !== null ? formatKilograms(stats.avg30) : '—'}
+        suffix={stats.avg30 !== null ? 'kg' : ''}
       />
-      <View style={styles.divider} />
+      <View style={[styles.divider, embedded && styles.compactDivider]} />
       <Stat
+        compact={embedded}
         label="Trend / Woche"
-        sublabel="BASIS: 30 TAGE"
+        sublabel="Basis: 30 Tage"
         value={changeStr}
-        suffix={stats.weeklyChange !== null ? unit : ''}
-        valueColor={changeColor}
+        suffix={stats.weeklyChange !== null ? 'kg' : ''}
       />
     </View>
   );
@@ -129,16 +127,32 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     overflow: 'hidden',
   },
+  embeddedRow: {
+    backgroundColor: colors.surface,
+    borderRadius: 0,
+    borderWidth: 0,
+    marginTop: 0,
+    marginBottom: 0,
+  },
+  emptyText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+  },
   stat: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xs,
+  },
+  compactStat: {
+    paddingVertical: spacing.sm,
   },
   statValue: {
     ...typography.h3,
     color: colors.text,
     lineHeight: 24,
+    textAlign: 'center',
   },
   statSuffix: {
     ...typography.caption,
@@ -146,17 +160,23 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     ...typography.caption,
-    color: colors.textMuted,
+    color: colors.textSecondary,
+    letterSpacing: 0,
     marginTop: 2,
+    textAlign: 'center',
   },
   statSublabel: {
-    ...typography.overline,
-    color: colors.textDisabled,
+    ...typography.caption,
+    color: colors.textMuted,
     marginTop: 1,
+    textAlign: 'center',
   },
   divider: {
     width: 1,
     backgroundColor: colors.border,
     marginVertical: spacing.md,
+  },
+  compactDivider: {
+    marginVertical: spacing.sm,
   },
 });

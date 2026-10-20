@@ -6,9 +6,10 @@ import {
   type DiaryDayResponse,
   type WeightEntry,
 } from '@fittrack/shared';
-import { colors } from '../../app/theme';
+import { colors, spacing } from '../../app/theme';
 import type { MacroTarget } from '../../shared/components/MacroSummaryCard';
 import { DayNutritionCard } from './DayNutritionCard';
+import { MACRO_TRACK_REFERENCE_POSITION } from './dayNutritionTrackGeometry';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -156,6 +157,8 @@ function renderCard(
   activityBonus = 0,
   entries: WeightEntry[] = [],
   screenWidth = 390,
+  hasFoodEntries = summary !== null && summary.calories > 0,
+  target: MacroTarget = TARGET,
 ): ReactTestRenderer {
   setWindowWidth(screenWidth);
   let renderer!: ReactTestRenderer;
@@ -163,11 +166,12 @@ function renderCard(
     renderer = create(
       <DayNutritionCard
         summary={summary}
-        target={TARGET}
+        target={target}
         onPress={vi.fn()}
         activityBonus={activityBonus}
         entries={entries}
         referenceDate={REFERENCE_DATE}
+        hasFoodEntries={hasFoodEntries}
       />,
     );
   });
@@ -181,6 +185,43 @@ afterEach(() => {
     act(() => renderer.unmount());
   }
   setWindowWidth(390);
+});
+
+describe('DayNutritionCard empty state', () => {
+  it('shows a compact nutrition status without a duplicate add action or empty ring', () => {
+    const renderer = renderCard(EMPTY_SUMMARY);
+
+    expect(renderer.root.findAll((node) => (
+      node.type === 'Text' && getTextContent(node) === 'Ernährung heute'
+    ))).toHaveLength(1);
+    expect(renderer.root.findAll((node) => (
+      node.type === 'Text'
+      && getTextContent(node) === 'Deine Übersicht erscheint hier, sobald du etwas einträgst.'
+    ))).toHaveLength(1);
+    expect(renderer.root.findAll((node) => node.props.testID === 'empty-state-add-food'))
+      .toHaveLength(0);
+    expect(renderer.root.findAll((node) => (
+      node.type === 'Text' && getTextContent(node) === 'Essen hinzufügen'
+    ))).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'calorie-ring')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => (
+      typeof node.props.testID === 'string' && node.props.testID.startsWith('macro-track-')
+    ))).toHaveLength(0);
+    expect(getByTestId(renderer, 'weight-trend-summary')).toBeDefined();
+    expect(flattenStyle(getByTestId(renderer, 'empty-state').props.style).alignItems)
+      .toBe('flex-start');
+  });
+
+  it('treats a real zero-calorie food entry as populated data', () => {
+    const renderer = renderCard({ ...EMPTY_SUMMARY, protein: 12 }, 0, [], 390, true);
+
+    expect(renderer.root.findAll((node) => node.props.testID === 'empty-state')).toHaveLength(0);
+    expect(renderer.root.findAll((node) => node.props.testID === 'calorie-ring')).toHaveLength(1);
+    expect(getByTestId(renderer, 'macro-track-Protein')).toBeDefined();
+    expect(renderer.root.findAll((node) => (
+      node.props.accessibilityLabel === 'Protein: 12 g; Zielbereich 120 bis 160 g'
+    ))).toHaveLength(1);
+  });
 });
 
 describe('DayNutritionCard weight trend', () => {
@@ -242,9 +283,9 @@ describe('DayNutritionCard weight trend', () => {
     ))).toHaveLength(7);
     expect(actualCoordinates).toHaveLength(7);
     expect(actualCoordinates[0]?.[0]).toBe(3);
-    expect(actualCoordinates[actualCoordinates.length - 1]?.[0]).toBe(101);
+    expect(actualCoordinates[actualCoordinates.length - 1]?.[0]).toBe(93);
     expect(actualCoordinates[1]?.[0]! - actualCoordinates[0]?.[0]!)
-      .toBeCloseTo(2 / 13 * 98);
+      .toBeCloseTo(2 / 13 * 90);
     expect(regressionCoordinates).toHaveLength(2);
     expect(regressionCoordinates[0]?.[0]).toBe(actualCoordinates[0]?.[0]);
     expect(regressionCoordinates[1]?.[0]).toBe(actualCoordinates[actualCoordinates.length - 1]?.[0]);
@@ -253,8 +294,15 @@ describe('DayNutritionCard weight trend', () => {
       minimumFractionDigits: 1,
       maximumFractionDigits: 1,
     }).format(series.slopeKgPerWeek!) + ' kg/Woche');
-    expect(actualLine.props.stroke).toBe(colors.chart.average);
-    expect(regressionLine.props.stroke).toBe(colors.textSecondary);
+    expect(actualLine.props.stroke).toBe(colors.textMuted);
+    expect(actualLine.props.strokeOpacity).toBe(0.45);
+    expect(actualLine.props.strokeWidth).toBe(1);
+    expect(regressionLine.props.stroke).toBe(colors.text);
+    expect(regressionLine.props.strokeWidth).toBe(2.5);
+    const measurement = getByTestId(renderer, 'weight-measurement-0');
+    expect(measurement.props).toMatchObject({ r: 1.25, fill: colors.textMuted, fillOpacity: 0.6 });
+    const sparkline = getByTestId(renderer, 'weight-sparkline');
+    expect((sparkline as TestInstanceWithChildren).children.at(-1)).toBe(regressionLine);
     expect(getByTestId(renderer, 'weight-sparkline').props.importantForAccessibility)
       .toBe('no-hide-descendants');
   });
@@ -329,33 +377,51 @@ describe('DayNutritionCard weight trend', () => {
   });
 
   it.each([
-    { screenWidth: 320, direction: 'column' },
-    { screenWidth: 360, direction: 'column' },
-    { screenWidth: 390, direction: 'row' },
+    { screenWidth: 320, direction: 'column', sparklineWidth: 104 },
+    { screenWidth: 360, direction: 'column', sparklineWidth: 104 },
+    { screenWidth: 380, direction: 'row', sparklineWidth: 96 },
+    { screenWidth: 390, direction: 'row', sparklineWidth: 96 },
   ])('uses a readable overview layout at $screenWidth dp and keeps macros below it', ({
     screenWidth,
     direction,
+    sparklineWidth,
   }) => {
     const renderer = renderCard(SUMMARY, 0, TREND_ENTRIES, screenWidth);
     const overview = getByTestId(renderer, 'calorie-weight-overview');
     const overviewStyle = flattenStyle(overview.props.style);
+    const caloriePanelStyle = flattenStyle(getByTestId(renderer, 'calorie-panel').props.style);
+    const weightPanelStyle = flattenStyle(getByTestId(renderer, 'weight-trend-summary').props.style);
+    const separatorStyle = flattenStyle(getByTestId(renderer, 'calorie-weight-separator').props.style);
     const testIDs = renderer.root.findAll((node) => typeof node.props.testID === 'string')
       .map((node) => String(node.props.testID));
 
     expect(overviewStyle.flexDirection).toBe(direction);
+    expect(getByTestId(renderer, 'weight-sparkline').props.width).toBe(sparklineWidth);
+    if (direction === 'row') {
+      const contentWidth = screenWidth - spacing.md * 4 - 2;
+      const gap = Number(overviewStyle.gap);
+      const flexibleWidth = contentWidth - gap * 2 - Number(separatorStyle.width);
+      const calorieWidth = flexibleWidth
+        * Number(caloriePanelStyle.flex)
+        / (Number(caloriePanelStyle.flex) + Number(weightPanelStyle.flex));
+      const dividerCenter = calorieWidth + gap + Number(separatorStyle.width) / 2;
+      const macroReference = contentWidth * MACRO_TRACK_REFERENCE_POSITION;
+
+      expect(Math.abs(dividerCenter - macroReference)).toBeLessThan(1);
+    }
     expect(testIDs.indexOf('calorie-weight-overview')).toBeLessThan(testIDs.indexOf('nutrition-divider'));
     expect(testIDs.indexOf('nutrition-divider')).toBeLessThan(testIDs.indexOf('macro-track-Protein'));
   });
 });
 
 describe('DayNutritionCard macro tracks', () => {
-  it('renders four stable rows with exact accessible values and one shared 100% reference', () => {
+  it('renders four stable rows with whole-gram values and one shared 100% reference', () => {
     const renderer = renderCard();
     const labels = [
-      'Protein: 150,5 g; Zielbereich 120 bis 160 g',
-      'Kohlenhydrate: 245,25 g; Zielbereich 200 bis 300 g',
-      'Fett: 42,75 g; Ziel 70 g',
-      'Ballaststoffe: 22,5 g; Ziel 25 g',
+      'Protein: 151 g; Zielbereich 120 bis 160 g',
+      'Kohlenhydrate: 245 g; Zielbereich 200 bis 300 g',
+      'Fett: 43 g; Ziel 70 g',
+      'Ballaststoffe: 23 g; Ziel 25 g',
     ];
 
     for (const label of labels) {
@@ -388,6 +454,11 @@ describe('DayNutritionCard macro tracks', () => {
     expect(parseFloat(String(carbsBand.width))).toBeCloseTo(200 / 9);
     expect(proteinBand.borderColor).toBe(colors.macro.protein);
     expect(carbsBand.borderColor).toBe(colors.macro.carbohydrates);
+    expect(proteinBand.opacity).toBe(0.4);
+    expect(carbsBand.opacity).toBe(0.4);
+    const tint = (getByTestId(renderer, 'macro-track-Protein-range') as TestInstanceWithChildren).children[0];
+    expect(typeof tint).not.toBe('string');
+    expect(flattenStyle((tint as ReactTestInstance).props.style).opacity).toBe(0.12);
 
     for (const testID of macroTrackIds) {
       const marker = flattenStyle(getByTestId(renderer, `${testID}-reference`).props.style);
@@ -403,23 +474,75 @@ describe('DayNutritionCard macro tracks', () => {
         && labels.includes(node.props.accessibilityLabel),
     );
     const macroText = macroRows.map(getTextContent).join(' ');
-    expect(macroText).toContain('150,5 / 120–160 g');
+    expect(macroText).toContain('151 / 120–160 g');
     expect(macroText).not.toMatch(/%|noch|Rest|Status/i);
   });
 
-  it.each([120, 150.5, 999])('keeps a translucent flag beside the full three-digit protein value %s', (protein) => {
-    const renderer = renderCard({ ...SUMMARY, protein });
+  it.each([
+    { protein: 120, screenWidth: 320 },
+    { protein: 150.5, screenWidth: 390 },
+    { protein: 999, screenWidth: 430 },
+  ])('anchors the flag over the 100% marker at $protein g and $screenWidth dp', ({ protein, screenWidth }) => {
+    const renderer = renderCard({ ...SUMMARY, protein }, 0, [], screenWidth);
     const group = getByTestId(renderer, 'macro-values-Protein');
     const flag = getByTestId(renderer, 'macro-target-flag');
+    const track = getByTestId(renderer, 'macro-track-Protein');
+    const info = getByTestId(renderer, 'macro-info-Protein');
+    const reference = getByTestId(renderer, 'macro-track-Protein-reference');
+    const flagStyle = flattenStyle(flag.props.style);
 
-    expect((group as TestInstanceWithChildren).children[0]).toBe(flag);
+    expect((info as TestInstanceWithChildren).children).toContain(flag);
+    expect((info as TestInstanceWithChildren).children).toContain(group);
+    expect(group.findAll((node) => node.props.testID === 'macro-target-flag')).toHaveLength(0);
+    expect(flagStyle.left).toBe(flattenStyle(reference.props.style).left);
+    expect(flagStyle).toMatchObject({
+      position: 'absolute',
+      top: '50%',
+      marginTop: -spacing.md / 2,
+      marginLeft: -spacing.md / 2,
+      width: spacing.md,
+      height: spacing.md,
+    });
+    expect(flattenStyle(track.props.style).marginTop).toBeUndefined();
+    expect(flattenStyle(info.props.style)).toMatchObject({ flexDirection: 'row', minHeight: spacing.md });
+    expect(flattenStyle(group.props.style)).toMatchObject({
+      flex: 0,
+      marginLeft: 'auto',
+      paddingLeft: spacing.md / 2 + spacing.xs,
+    });
+    expect(parseFloat(String(flattenStyle(group.props.style).width))).toBeCloseTo(100 / 3);
+    const valueText = group.findAll((node) => node.type === 'Text' && node.props.numberOfLines === 1);
+    expect(valueText).toHaveLength(1);
+    expect(valueText[0]?.props.adjustsFontSizeToFit).toBe(true);
     expect(flattenStyle(group.props.style)).toMatchObject({ flexDirection: 'row', justifyContent: 'flex-end' });
     expect(flattenStyle(flag.props.style)).toMatchObject({ opacity: 0.5, flexShrink: 0 });
     expect(flag.props.importantForAccessibility).toBe('no-hide-descendants');
-    expect(getTextContent(group)).toBe(`${String(protein).replace('.', ',')} / 120–160 g`);
+    expect(getTextContent(group)).toBe(`${Math.round(protein)} / 120–160 g`);
     const icons = renderer.root.findAll((node) => node.type === 'Icon');
     expect(icons).toHaveLength(1);
     expect(icons[0]?.props).toMatchObject({ lib: 'mci', name: 'flag-checkered', size: 'sm' });
+  });
+
+  it('rounds fractional targets only for display and preserves precise fill and range geometry', () => {
+    const target: MacroTarget = {
+      ...TARGET,
+      fatG: 70.6,
+      macroRanges: { ...TARGET.macroRanges!, proteinG: { minG: 120.4, maxG: 160.6 } },
+    };
+    const summary = Object.freeze({ ...SUMMARY });
+    const renderer = renderCard(summary, 0, [], 390, true, target);
+
+    expect(getTextContent(getByTestId(renderer, 'macro-values-Protein'))).toBe('151 / 120–161 g');
+    expect(getTextContent(getByTestId(renderer, 'macro-values-Fett'))).toBe('43 / 71 g');
+    expect(renderer.root.findAll((node) => (
+      node.props.accessibilityLabel === 'Protein: 151 g; Zielbereich 120 bis 161 g'
+    ))).toHaveLength(1);
+    const fill = flattenStyle(getByTestId(renderer, 'macro-track-Protein-fill').props.style);
+    const range = flattenStyle(getByTestId(renderer, 'macro-track-Protein-range').props.style);
+    expect(parseFloat(String(fill.width))).toBeCloseTo(150.5 / 160.6 / 1.5 * 100, 10);
+    expect(parseFloat(String(range.left))).toBeCloseTo(120.4 / 160.6 / 1.5 * 100, 10);
+    expect(summary.protein).toBe(150.5);
+    expect(target.macroRanges?.proteinG).toEqual({ minG: 120.4, maxG: 160.6 });
   });
 
   it.each([0, 60, 120, 150, 160, 200, 260])('keeps range boundaries visible at %s g', (protein) => {
@@ -430,6 +553,7 @@ describe('DayNutritionCard macro tracks', () => {
     const fill = getByTestId(renderer, 'macro-track-Protein-fill');
 
     expect(flattenStyle(start.props.style).left).toBe('50%');
+    expect(flattenStyle(start.props.style).opacity).toBe(0.4);
     expect(flattenStyle(reference.props.style).left).toBe('66.66666666666666%');
     expect(parseFloat(String(flattenStyle(fill.props.style).width)))
       .toBeCloseTo(Math.min(protein / 240, 1) * 100);
@@ -486,8 +610,8 @@ describe('DayNutritionCard macro tracks', () => {
       'macro-track-Protein', 'macro-track-Kohlenhydrate', 'macro-track-Fett', 'macro-track-Ballaststoffe',
     ].includes(node.props.testID))).toHaveLength(4);
     expect(renderer.root.findAll((node) => (
-      node.props.accessibilityLabel === 'Protein: 150,5 g; Zielbereich 120 bis 160 g'
-      || node.props.accessibilityLabel === 'Kohlenhydrate: 245,25 g; Zielbereich 200 bis 300 g'
+      node.props.accessibilityLabel === 'Protein: 151 g; Zielbereich 120 bis 160 g'
+      || node.props.accessibilityLabel === 'Kohlenhydrate: 245 g; Zielbereich 200 bis 300 g'
     ))).toHaveLength(2);
     expect(flattenStyle(bonusLabel?.props.style).width).toBe(104);
     expect(flattenStyle(bonusValue?.props.style)).toMatchObject({ flex: 1, flexShrink: 1 });
@@ -525,8 +649,8 @@ describe('DayNutritionCard macro tracks', () => {
     expect(visibleText).toContain('250');
     expect(visibleText).toContain('250 / 500 kcal');
     expect(renderer.root.findAll((node) => (
-      node.props.accessibilityLabel === 'Protein: 150,5 g; Zielbereich 120 bis 160 g'
-      || node.props.accessibilityLabel === 'Kohlenhydrate: 245,25 g; Zielbereich 200 bis 300 g'
+      node.props.accessibilityLabel === 'Protein: 151 g; Zielbereich 120 bis 160 g'
+      || node.props.accessibilityLabel === 'Kohlenhydrate: 245 g; Zielbereich 200 bis 300 g'
     ))).toHaveLength(2);
 
     const ring = renderer.root.findAll((node) => (

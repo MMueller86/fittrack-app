@@ -34,7 +34,15 @@ and targets when no profile exists.
 |---|---|---|---|
 | GET | `/api/weights` | Yes | `{ entries: WeightEntry[] }` |
 | POST | `/api/weights` | Yes | `{ value, unit?, date }`; `date` is a required real `YYYY-MM-DD` calendar date |
+| PUT | `/api/weights/{id}` | Yes | Update the value of one entry owned by the authenticated user |
 | DELETE | `/api/weights/{id}` | Yes | |
+
+`PUT /api/weights/{id}` accepts the strict body `{ "value": 82.5 }`. The value
+must be finite, greater than `0`, and at most `1000`; numeric strings are
+coerced to numbers. Unknown fields are rejected with `400`. Success (`200`)
+returns the updated `WeightEntry`. Only its `value` is changed; `date`, `unit`,
+`createdAt`, ID, and ownership are preserved. An unknown or other-user ID
+returns `404 { "error": "Entry not found" }`.
 
 ## Diary
 
@@ -873,6 +881,9 @@ contracts available with HTTP `200`:
 
 ### GET /api/ai/daily-insight
 
+Daily Insight product rules and compact/detail display behavior are maintained
+in the [central rulebook](../domain/09-daily-insight.md).
+
 The endpoint requires a valid Bearer token and normally returns HTTP `200`,
 including when the Daily quota or the AI/context build is unavailable. The
 current handler uses the following query parameters:
@@ -896,31 +907,60 @@ Cosmos `ttl` is the ceiling of the remaining seconds. The normalized offset is
 included in the input hash, so a changed normalized offset follows the normal
 cache regeneration rules.
 
-This request-boundary validation does not change the current Daily prompt, the
-Structured Output or public AI response contract, or the existing quota and
-failure semantics. For valid requests, quota is still checked before Azure
-OpenAI, successful usage is tracked only after persistence, and context/provider
-failures plus quota exhaustion remain friendly HTTP `200` responses.
+This request-boundary validation does not change the date/timezone request
+contract or the existing quota and failure semantics. The current v30
+Structured Output and public response contract allow summaries up to 5,000
+characters. For valid requests, quota is still checked before Azure
+OpenAI, successful usage is tracked after valid generation and an attempted
+cache write, and context/provider failures plus quota exhaustion remain
+friendly HTTP `200` responses. A failed cache write still consumes usage for
+the valid generation and returns it with `feedbackAvailable: false`.
 
 **Response body (200):**
 
 ```json
 {
+	"greeting": "Hallo, Sportler! 👋",
+	"shortInsight": "Dein Tag ist noch offen und du kannst ihn ruhig gestalten.",
 	"title": "Dein Tagesfokus",
 	"summary": "Eine kurze, serverseitig validierte Tagesanalyse.",
 	"recommendation": "Eine optionale nächste Handlung.",
-	"cta": "Ernährung öffnen",
-	"ctaTarget": "Nutrition",
 	"generatedAt": "2026-08-20T08:30:00.000Z",
-	"promptVersion": "v18",
+	"promptVersion": "v29",
 	"status": "fresh",
 	"feedbackAvailable": true
 }
 ```
+`title` is limited to 40 characters and `summary` to 5,000 characters.
+New generations (introduced in v19, active prompt v29 / release v30) require both `greeting` (1-120 JavaScript string units)
+and `shortInsight` (1-240). Greeting is time-neutral `Hallo, <server name>!`
+followed by one friendly context-appropriate emoji; a missing profile name
+uses the existing `Sportler` fallback. Short insight is one complete plain
+German sentence, grounded only in server context and consistent with the full
+text. The server validates only the strict schema, the greeting
+and short-insight structure, and that calorie numbers were supplied (no wording
+rules since 2026-10-20). Provider/schema/validation failures
+remain HTTP `200 unavailable`, without persistence or usage tracking.
+The two fields are optional in Shared/API storage reads (Class 0); historical
+Daily/Feedback responses remain readable without them. Missing fields alone
+never force regeneration. `unavailable` and `quota_exceeded` omit both fields.
+[Current Mobile behavior] The Home consumer uses its static greeting without
+short text or detail action for errors, quota, or a missing/invalid complete
+pair. The full detail uses the same response snapshot without an extra request,
+and its content is scrollable up to the API summary limit. This adds no
+endpoint, refresh trigger, or special legacy view.
+[Previous B-1 status] The v28 API/provider contract is unchanged apart from the
+summary maximum of 5,000 characters. Ten consecutive Daily-only live runs passed
+on the reduced criteria (structure and supplied numbers), and the user accepted
+this state as the B-1 basis on 2026-10-20 so F-1 may start.
+The current v29 prompt removes CTA/navigation fields; its live evaluation and
+QA acceptance remain pending.
+Weekly Insight diagnostics are separate and excluded from US-03 acceptance.
+The current report and candidate binding are in the
+[B-1 handoff](../../User%20Stories/startpage/B-1_US-03_Backend_Handoff_2026-10-16.md).
 
-`title` is limited to 40 characters and `summary` to 600 characters.
-`recommendation`, `cta`, and `ctaTarget` are optional and are omitted when the
-server-side structured response contains `null`. `status` is `fresh`,
+`recommendation` is optional plain text. CTA/navigation fields are not part of
+the Structured Output or public response. `status` is `fresh`,
 `cached`, `quota_exceeded`, or `unavailable`. The Daily response emits the
 server-owned boolean `feedbackAvailable`. It is `true` only when the
 stored Daily instance contains complete feedback provenance and `false` for a
@@ -935,25 +975,34 @@ context and provider input; it does not add macro fields to the public
 calorie-based contract and does not receive these personal macro ranges.
 
 Daily documents are stored as `_docType: "dailyInsight"` under the existing
-`aiInsights` container with `id = ${userId}:${date}`. The selected v18 intent,
+`aiInsights` container with `id = ${userId}:${date}` and partition `/userId`.
+The optional compact fields live inside `response` and are copied unchanged
+into the exact server-owned Feedback snapshot; no migration, backfill,
+deletion, new container/index or infrastructure change is involved.
+The selected intent,
 input context, input hash, exact system/user prompt snapshot, model, token
 usage, and intelligence version are server-owned persistence fields. Daily
 quota is checked before Azure OpenAI and tracked only after a valid response;
 quota exhaustion remains a friendly HTTP `200` response and is not tracked.
-The active v18 prompt and server validator apply the stale-weight guard to all
-intents: day 14 remains current, day 15 is stale, stale-as-current wording is
-rejected, and explicit markers such as `veraltet` or `nicht aktuell` are
-accepted. Context, provider, truncation/content-filter, or validation failures
+The active prompt applies the stale-weight rule to all intents: day 14 remains
+current and day 15 is stale; stale weight is omitted or marked and the `title`
+does not mention weight (prompt rule; not runtime-validated). Context, provider,
+truncation/content-filter, or validation failures
 return HTTP `200` with `status: "unavailable"`; the failed result is not
 persisted and does not consume or track Daily quota.
 
 Daily v18 retains the removal of contradictory below-target guidance and
 adds the existing activity open-day rule as a final context guard independently
 of protein gap/local hour; unknown completion and fueling stay conditional.
-The v18 prompt also enforces the range-only macro semantics; public fields,
-Structured Output, quota, and failure contract remain unchanged. The append-only
-release manifest retains v14-v17 history; the existing complete, unexpired
-same-date v14 cache exception remains effective under v18.
+The v19 prompt retains range-only macro semantics and adds only the compact
+pair to Structured Output/public data. Quota, interval/day-limit/admin gates,
+hash inputs and local-midnight TTL remain unchanged. The append-only release
+manifest retains v14-v18 history. The existing complete unexpired v14 cache
+exception remains only for active v15-v18; it is not extended to v19. The new
+v30 identity follows ordinary hard invalidation before rate-limit checks.
+Historical v20 tightened internal prompt projection and historical/current wording;
+the public shape and optional storage fields introduced in v19 are unchanged.
+The v14 exception is not extended to any active v19-or-later release, including v30.
 
 The server-owned `inputContext.weight.weeklyTrend30d` is not exposed in the
 public response. It is the `gaining | losing | stable | null` direction
@@ -1024,7 +1073,7 @@ TTL/expiry.
 | `response` | Complete server-generated/displayed Daily response |
 | `promptSnapshot.system` | Exact system prompt stored for this Daily instance and sent to Azure OpenAI |
 | `promptSnapshot.user` | Exact serialized user message sent to Azure OpenAI |
-| `promptVersion` | Stored Daily prompt version, currently `v18` for new generations |
+| `promptVersion` | Stored Daily prompt version, currently `v26` for new generations |
 | `intent` | Deterministic server-selected `InsightIntent` |
 | `inputContext` | Complete server-built `InsightInputContext` used for generation |
 | `inputHash` | Server-computed hash for the Daily input and active prompt |

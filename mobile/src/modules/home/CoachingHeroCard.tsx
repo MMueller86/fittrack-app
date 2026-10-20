@@ -1,11 +1,13 @@
 // CoachingHeroCard — kompakter Begrüßungsbereich des HomeScreens.
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import type { WorkoutType } from '@fittrack/shared';
 import { Icon } from '../../shared/components/Icon';
 import { HOME_TRAINING_PRESENTATION } from './homeTrainingPresentation';
+import { hasCompactInsight, type DailyInsightResponse } from '../../services/insightService';
+import { InsightCard } from './InsightCard';
 
 interface Props {
   displayName: string;
@@ -13,6 +15,9 @@ interface Props {
   dayType: 'rest' | 'training' | null;
   workoutType: WorkoutType | null;
   onTrainingPress: () => void;
+  insight?: DailyInsightResponse | null;
+  insightDate?: string | null;
+  onFeedbackSuccess?: () => void;
 }
 
 export function CoachingHeroCard({
@@ -21,7 +26,15 @@ export function CoachingHeroCard({
   dayType,
   workoutType,
   onTrainingPress,
+  insight = null,
+  insightDate = null,
+  onFeedbackSuccess,
 }: Props) {
+  const [isInsightExpanded, setIsInsightExpanded] = useState(false);
+  useEffect(() => {
+    setIsInsightExpanded(false);
+  }, [insight?.generatedAt, insightDate]);
+  const compactAvailable = hasCompactInsight(insight);
   const trainingPresentation =
     dayType === 'rest'
       ? HOME_TRAINING_PRESENTATION.rest
@@ -32,12 +45,13 @@ export function CoachingHeroCard({
   const selectorLabel = trainingPresentation?.label ?? 'Training';
 
   return (
+    <>
     <View style={styles.card} testID="coaching-hero-card">
       <View style={styles.row} testID="coaching-hero-row">
         <Text style={styles.greeting}>
-          {greeting},{' '}
+          {compactAvailable ? insight.greeting : <>{greeting},{' '}
           <Text style={styles.name}>{displayName}</Text>
-          {'  👋'}
+          {'  👋'}</>}
         </Text>
         <TouchableOpacity
           style={styles.trainingChip}
@@ -63,7 +77,42 @@ export function CoachingHeroCard({
           <Text style={styles.trainingChipChevron}>▾</Text>
         </TouchableOpacity>
       </View>
+      {compactAvailable ? (
+        <>
+          <Text style={styles.shortInsight} testID="short-insight">{insight.shortInsight}</Text>
+          {isInsightExpanded ? (
+            <InsightCard
+              key={`${insightDate}:${insight.generatedAt}`}
+              insight={insight}
+              date={insightDate}
+              inlineDetail
+              onFeedbackSuccess={onFeedbackSuccess}
+            />
+          ) : null}
+          <TouchableOpacity
+            style={styles.insightToggle}
+            accessibilityRole="button"
+            accessibilityLabel={isInsightExpanded ? 'Weniger anzeigen' : 'Mehr anzeigen'}
+            accessibilityHint={isInsightExpanded
+              ? 'Blendet die vollständige Analyse wieder aus.'
+              : 'Zeigt die vollständige Analyse an.'}
+            accessibilityState={{ expanded: isInsightExpanded }}
+            onPress={() => setIsInsightExpanded((expanded) => !expanded)}
+          >
+            <Text style={styles.insightToggleText}>
+              {isInsightExpanded ? 'Weniger anzeigen' : 'Mehr anzeigen'}
+            </Text>
+            <Icon
+              lib="feather"
+              name={isInsightExpanded ? 'chevron-up' : 'chevron-down'}
+              size="sm"
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        </>
+      ) : null}
     </View>
+    </>
   );
 }
 
@@ -101,6 +150,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
     flexShrink: 1,
     maxWidth: '58%',
+    minHeight: spacing.xxl,
     gap: spacing.xs,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.full,
@@ -116,5 +166,22 @@ const styles = StyleSheet.create({
   trainingChipChevron: {
     ...typography.caption,
     color: colors.textMuted,
+  },
+  shortInsight: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+  },
+  insightToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    minHeight: spacing.xxl,
+    gap: spacing.xs,
+  },
+  insightToggleText: {
+    ...typography.button,
+    color: colors.primary,
+    flexShrink: 1,
   },
 });

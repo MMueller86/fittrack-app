@@ -10,6 +10,7 @@ import type { WeightEntry } from '@fittrack/shared';
 
 // GET    /api/weights     — list entries for current user (newest first)
 // POST   /api/weights     — add weight entry for current user
+// PUT    /api/weights/:id — update the value of an entry owned by current user
 // DELETE /api/weights/:id — delete entry owned by current user
 //
 // Handlers are exported as named functions so they can be unit-tested
@@ -58,6 +59,8 @@ const AddWeightBodySchema = z.object({
   date: isoDate,
 });
 
+const UpdateWeightBodySchema = z.object({ value: positiveWeight }).strict();
+
 export const listWeightsHandler = withHandler(
   'weights.list',
   async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
@@ -99,6 +102,33 @@ export const addWeightHandler = withHandler(
   },
 );
 
+export const updateWeightHandler = withHandler(
+  'weights.update',
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const id = request.params.id;
+    if (!id) {
+      return { status: 400, jsonBody: { error: 'Missing id' } };
+    }
+
+    const parsed = await parseBody(request, UpdateWeightBodySchema);
+    if (!parsed.ok) return parsed.response;
+
+    const repo = getWeightsRepository();
+    const updated = await repo.updateValue(userId, id, parsed.data.value);
+    if (!updated) {
+      return { status: 404, jsonBody: { error: 'Entry not found' } };
+    }
+
+    logEvent(ctx, 'info', 'weight.updated', {
+      handler: 'weights.update',
+      userId,
+      entryId: id,
+    });
+    return { status: 200, jsonBody: updated };
+  },
+);
+
 export const deleteWeightHandler = withHandler(
   'weights.delete',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
@@ -133,6 +163,13 @@ app.http('weights-add', {
   authLevel: 'anonymous',
   route: 'weights',
   handler: addWeightHandler,
+});
+
+app.http('weights-update', {
+  methods: ['PUT'],
+  authLevel: 'anonymous',
+  route: 'weights/{id}',
+  handler: updateWeightHandler,
 });
 
 app.http('weights-delete', {
