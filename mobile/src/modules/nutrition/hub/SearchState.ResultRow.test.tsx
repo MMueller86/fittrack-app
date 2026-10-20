@@ -2,13 +2,14 @@ import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FoodSearchResult } from '@fittrack/shared';
-import { ResultRow, type ResultRowProps } from './SearchState';
+import { ResultRow, SearchState, type ResultRowProps } from './SearchState';
 import { FOOD_THUMBNAIL_SIZE } from '../../../shared/components/foodProductSummaryUtils';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
   favoritesApi: { addFavorite: vi.fn(), removeFavorite: vi.fn() },
+  foodApi: { search: vi.fn() },
 }));
 
 vi.mock('react-native', () => ({
@@ -23,7 +24,7 @@ vi.mock('react-native', () => ({
 vi.mock('@gorhom/bottom-sheet', () => ({ BottomSheetFlatList: 'BottomSheetFlatList' }));
 vi.mock('expo-haptics', () => ({ impactAsync: vi.fn(), ImpactFeedbackStyle: { Light: 'light' } }));
 vi.mock('../../../shared/api/favoritesApi', () => ({ favoritesApi: mocks.favoritesApi }));
-vi.mock('../../../shared/api/foodApi', () => ({ foodApi: { search: vi.fn() } }));
+vi.mock('../../../shared/api/foodApi', () => ({ foodApi: mocks.foodApi }));
 vi.mock('../../../shared/components/Icon', () => ({ Icon: 'Icon' }));
 vi.mock('../../../shared/components/ErrorBanner', () => ({ ErrorBanner: 'ErrorBanner' }));
 vi.mock('./RelationRow', () => ({ RelationRow: 'RelationRow' }));
@@ -48,6 +49,15 @@ function renderRow(result: FoodSearchResult, props: Partial<ResultRowProps> = {}
   let renderer!: ReactTestRenderer;
   act(() => {
     renderer = create(<ResultRow item={result} onPress={vi.fn()} {...props} />);
+  });
+  renderers.push(renderer);
+  return renderer;
+}
+
+function renderSearch(props: React.ComponentProps<typeof SearchState>) {
+  let renderer!: ReactTestRenderer;
+  act(() => {
+    renderer = create(<SearchState {...props} />);
   });
   renderers.push(renderer);
   return renderer;
@@ -82,6 +92,48 @@ afterEach(() => {
     const renderer = renderers.pop()!;
     act(() => renderer.unmount());
   }
+  vi.useRealTimers();
+});
+
+describe('SearchState cached results', () => {
+  it('reuses cached results without searching again for the same query', () => {
+    const cachedResult = item({});
+
+    const renderer = renderSearch({
+      query: 'hafer',
+      recents: [],
+      initialResults: [cachedResult],
+      initialResultsQuery: 'hafer',
+      onSelect: vi.fn(),
+      onSelectRelation: vi.fn(),
+      onOpenSubflow: vi.fn(),
+    });
+
+    expect(mocks.foodApi.search).not.toHaveBeenCalled();
+    const list = renderer.root.findAll((node: ReactTestInstance) => (node.type as unknown) === 'BottomSheetFlatList')[0]!;
+    expect(list.props.data).toEqual([cachedResult]);
+  });
+
+  it('starts a new search when the cached query does not match', async () => {
+    vi.useFakeTimers();
+    mocks.foodApi.search.mockResolvedValue({ results: [item({})] });
+
+    renderSearch({
+      query: 'hafermilch',
+      recents: [],
+      initialResults: [item({})],
+      initialResultsQuery: 'hafer',
+      onSelect: vi.fn(),
+      onSelectRelation: vi.fn(),
+      onOpenSubflow: vi.fn(),
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(mocks.foodApi.search).toHaveBeenCalledWith('hafermilch');
+  });
 });
 
 describe('SearchState.ResultRow favorite toggle', () => {

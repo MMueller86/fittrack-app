@@ -51,15 +51,17 @@ endpoint, data source, container, migration, or deployment in this feature.
 ## Trusted Signals and Composition
 
 The server computes and supplies the effective calorie target, logged current-day
-nutrition, calorie remainder, protein status, meal-advice permission, weight
-freshness and 30-day trend, goal, progress signals, and special-activity facts.
-The model must not recompute these values from raw data.
+nutrition, calorie remainder, protein status, meal-advice permission, the latest
+weight and Home-compatible 14-day trend, the user goal, milestone facts, and
+special-activity facts. The model must not recompute these values from raw data.
+Other weight-derived phase, plateau, monthly, and long-term progress signals are
+not included in the provider prompt.
 
 Daily nutrition and activity claims describe only the requested current moment;
 prior-day diary values, targets, and activities are not evidence for today's
-briefing. Missing values remain unknown rather than zero. Current weight and
-supported progress signals may still inform the briefing. The selected intent
-sets a focus but does not suppress other relevant supplied signals.
+briefing. Missing values remain unknown rather than zero. The Home-compatible
+weight trend and an available milestone may inform the briefing. The selected
+intent uses a milestone as the only weight-derived focus signal.
 
 ## Nutrition Rules
 
@@ -102,10 +104,13 @@ sets a focus but does not suppress other relevant supplied signals.
   fluids, and recovery or rest to be named in the same output for this case.
   This guidance does not make meal advice eligible when the meal-advice guard
   is false.
-- Weight direction uses the server-computed 30-day trend. Comparing two recent
-  measurements alone does not establish a long-term trend. Measurements older
-  than 14 days are stale and cannot be presented as current; the specific
-  protein classification is also unknown when weight is stale.
+- Weight direction uses the same series as Home: a linear regression over 14
+  local calendar days, excluding future measurements, requiring at least 7
+  measurements, and treating absolute slopes below 0.05 kg/week as neutral.
+  The prompt receives only that direction, not a latest-versus-previous
+  comparison or the internal 30-day trend. A missing Home trend remains unknown.
+  Measurements older than 14 days are stale and cannot be presented as current;
+  the specific protein classification is also unknown when weight is stale.
 
 ## Mobile Behavior
 
@@ -120,10 +125,11 @@ provenance is preserved.
 
 ## Verification and Scope
 
-The current candidate is release v30, prompt v29, assembly v13, fingerprint
-`sha256:827de73de0186f5320ad02e23c2896cd82a2e85a4d20a08040cdaefc688037eb`.
-Prompt v29 removes CTA/navigation fields from the strict provider schema and API
-response. Its live evaluation and QA acceptance are pending. Release v29 / prompt
+The current candidate is release v31, prompt v30, assembly v14,
+fingerprint `sha256:e23c5274df5afabbd3812c53a773ab88b31ee7239785bcf8e0065ff63184ea2a`.
+Prompt v30 aligns the model's weight direction with Home and preserves milestone facts while
+excluding other weight-derived progress signals from the provider input. Its
+live evaluation and QA acceptance are pending. Release v29 / prompt
 v28 remains unchanged as the previously accepted B-1 basis. Prompt v28 added a shared-tone rule: with
 more than 14 days since the last weight measurement, the `title` must not mention
 weight, trend, or kg; the stale marker belongs in `shortInsight`. v29 adds prompt

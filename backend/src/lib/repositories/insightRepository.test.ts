@@ -44,6 +44,7 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
       latestKg: 83.0,
       previousKg: 83.2,
       targetKg: 80.0,
+      homeTrend14d: 'losing',
       weeklyTrend30d: 'losing',
       last7Values: [83.0, 83.2, 83.5, 83.4, 83.6, 83.7, 83.8],
       isOutlierPrevious: false,
@@ -320,6 +321,35 @@ describe('computeInputHash', () => {
     expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
   });
 
+  it('uses the Home trend and ignores hidden weight signals in the cache key', () => {
+    const context = makeContext();
+    const changedHomeTrend = makeContext({
+      weight: { ...context.weight, homeTrend14d: 'gaining' },
+    });
+    const changedHiddenSignals = makeContext({
+      weight: {
+        ...context.weight,
+        previousKg: 84,
+        targetKg: 75,
+        weeklyTrend30d: 'gaining',
+        last7Values: [83, 84, 82],
+        isOutlierPrevious: true,
+        isOutlierLatest: true,
+      },
+    });
+    const changedHiddenProgress = makeContext({
+      progressIntelligence: {
+        ...context.progressIntelligence,
+        primarySignal: { ...context.progressIntelligence.primarySignal, type: 'phase_context' },
+        phase: { type: 'progressing' },
+      },
+    });
+
+    expect(computeInputHash(context, 'v4')).not.toBe(computeInputHash(changedHomeTrend, 'v4'));
+    expect(computeInputHash(context, 'v4')).toBe(computeInputHash(changedHiddenSignals, 'v4'));
+    expect(computeInputHash(context, 'v4')).toBe(computeInputHash(changedHiddenProgress, 'v4'));
+  });
+
   it('handles null nutrition gracefully', () => {
     const ctx = makeContext({ nutrition: { ...makeContext().nutrition, today: null } });
     expect(() => computeInputHash(ctx, 'v4')).not.toThrow();
@@ -446,14 +476,20 @@ describe('computeInputHash', () => {
         today: { ...base.nutrition.today!, carbs: 190, fat: 70, fiber: 28 },
       },
     });
-    const progressChanged = makeContext({
+    const milestoneChanged = makeContext({
       progressIntelligence: {
         ...base.progressIntelligence,
-        primarySignal: { ...base.progressIntelligence.primarySignal, type: 'phase_context' },
+        milestone: {
+          value: 80,
+          unit: 'kg',
+          reachedAt: '2026-08-20',
+          confirmed: true,
+          movingAvgAtThreshold: 79.9,
+        },
       },
     });
     expect(computeInputHash(base, 'v10', 'general')).not.toBe(computeInputHash(nutritionChanged, 'v10', 'general'));
-    expect(computeInputHash(base, 'v10', 'general')).not.toBe(computeInputHash(progressChanged, 'v10', 'general'));
+    expect(computeInputHash(base, 'v10', 'general')).not.toBe(computeInputHash(milestoneChanged, 'v10', 'general'));
   });
 });
 

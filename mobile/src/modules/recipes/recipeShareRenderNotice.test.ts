@@ -22,6 +22,16 @@ describe('recipeShareRenderNotice', () => {
     expect(notice.actionLabel).toBeUndefined();
   });
 
+  it('explains an overflowing recipe title without offering an ineffective retry', () => {
+    const notice = getRecipeShareRenderNotice(makeAxiosError('TITLE_OVERFLOW'), 'initial');
+
+    expect(notice).toEqual({
+      kind: 'render',
+      title: 'Rezeptname zu lang',
+      body: 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.',
+    });
+  });
+
   it('treats a stale export response as a retryable render error', () => {
     expect(getRecipeShareRenderNotice(makeAxiosError('STALE_EXPORT_VIEW'), 'initial')).toMatchObject({
       kind: 'render',

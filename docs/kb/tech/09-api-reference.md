@@ -700,7 +700,8 @@ The direct Blob download is bounded by the existing 8 MB recipe-image limit.
 	expected renderer input/layout error. Controlled renderer failures include a
 	stable `code`, such as `NO_RECIPE_IMAGE`, `IMAGE_BLOB_INVALID`,
 	`IMAGE_TOO_LARGE`, `INVALID_RECIPE_META`, `TITLE_OVERFLOW`,
-	`TOO_MANY_TAGS`, or `TAG_ROW_OVERFLOW`.
+	`TOO_MANY_TAGS`, or `TAG_ROW_OVERFLOW`. `TITLE_OVERFLOW` returns
+	`{ "error": "Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.", "code": "TITLE_OVERFLOW" }`.
 - `500` — unexpected storage, native renderer, missing-asset, or other backend
 	failure. The external response is generic; internal causes and asset details
 	are logged but never returned.
@@ -822,7 +823,8 @@ partial image pair. A request draft is not persisted.
 	download, renderer call, or recipe write occurs for this response.
 - `422` — missing stored view and omitted draft (`MISSING_EXPORT_VIEW`), no renderable image,
 	invalid stored image metadata, image over 8 MB, unreadable image, or a
-	controlled renderer/layout failure.
+	controlled renderer/layout failure. A title that does not fit returns
+	`{ "error": "Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.", "code": "TITLE_OVERFLOW" }`.
 - `500` — unexpected storage, native renderer, missing-asset, or other backend
 	failure. Errors never include one rendered image as a partial response.
 

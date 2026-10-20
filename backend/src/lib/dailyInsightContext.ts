@@ -14,6 +14,7 @@ import {
 } from '../../../shared/lib/weeklyReviewCalculator';
 import {
   calculateWeightTrendPerWeek,
+  calculateWeightTrendRegressionSeries,
   classifyWeightTrend,
 } from '../../../shared/lib/weightTrend';
 import { PROTEIN_MAX_G_PER_KG, PROTEIN_MIN_G_PER_KG } from '../../../shared/lib/macroRanges';
@@ -50,6 +51,9 @@ export interface BuildDailyInsightContextInput {
 }
 
 export const DAILY_INSIGHT_PROTEIN_HIGH_THRESHOLD_G_PER_KG = 2.5;
+const HOME_WEIGHT_TREND_WINDOW_DAYS = 14;
+const HOME_WEIGHT_TREND_MIN_MEASUREMENTS = 7;
+const HOME_WEIGHT_TREND_NEUTRAL_THRESHOLD_KG_PER_WEEK = 0.05;
 
 const REQUIRED_MEAL_TYPES = ['breakfast', 'lunch', 'dinner'] as const;
 
@@ -97,6 +101,10 @@ export function hasMealItem(meals: readonly Meal[]): boolean {
 
 function countMealItems(meals: readonly Meal[]): number {
   return meals.reduce((count, meal) => count + (meal.items ?? []).length, 0);
+}
+
+function weightInKg(entry: { value: number; unit: 'kg' | 'lbs' }): number {
+  return entry.unit === 'lbs' ? entry.value / 2.20462 : entry.value;
 }
 
 function getPreviousDate(date: string, daysAgo: number): string {
@@ -202,6 +210,18 @@ export async function buildDailyInsightContext(
     'kg',
     trendReferenceDate,
   ));
+  const homeTrendSeries = calculateWeightTrendRegressionSeries(
+    weightEntries,
+    HOME_WEIGHT_TREND_WINDOW_DAYS,
+    new Date(`${input.date}T12:00:00`),
+  );
+  const homeTrendSlope = homeTrendSeries.slopeKgPerWeek;
+  const homeTrend14d = homeTrendSeries.measurements.length < HOME_WEIGHT_TREND_MIN_MEASUREMENTS
+    || homeTrendSlope == null
+    ? null
+    : Math.abs(homeTrendSlope) < HOME_WEIGHT_TREND_NEUTRAL_THRESHOLD_KG_PER_WEEK
+      ? 'stable'
+      : homeTrendSlope > 0 ? 'gaining' : 'losing';
   const lastWeightDate = weightEntries[0]?.date ?? null;
   const daysSinceLastMeasurement = lastWeightDate == null
     ? null
@@ -264,9 +284,10 @@ export async function buildDailyInsightContext(
     dayType: dayMeta?.dayType ?? null,
     workoutType: dayMeta?.workoutType ?? null,
     weight: {
-      latestKg: isWeightStale ? null : (last7Values[0] ?? null),
+      latestKg: isWeightStale || weightEntries[0] == null ? null : weightInKg(weightEntries[0]),
       previousKg: isWeightStale ? null : (last7Values[1] ?? null),
       targetKg: profile?.targetWeightKg ?? null,
+      homeTrend14d,
       weeklyTrend30d: isWeightStale ? null : weeklyTrend30d,
       last7Values: isWeightStale ? [] : last7Values,
       isOutlierPrevious: isWeightStale || last7Values[1] == null

@@ -37,8 +37,8 @@ describe('daily insight prompt release manifest', () => {
     });
   });
 
-  it('preserves v15 through v29 and appends v30 as the active release', () => {
-    expect(DAILY_INSIGHT_PROMPT_RELEASES).toHaveLength(17);
+  it('preserves v15 through v30 and appends v31 as the active release', () => {
+    expect(DAILY_INSIGHT_PROMPT_RELEASES).toHaveLength(18);
     expect(DAILY_INSIGHT_PROMPT_RELEASES[1]).toEqual({
       releaseId: 'v15',
       promptVersion: 'v15',
@@ -94,9 +94,12 @@ describe('daily insight prompt release manifest', () => {
       releaseId: 'v29', promptVersion: 'v28', assemblyVersion: 'v13', providerInputCompatibility: 'changed',
       promptFingerprint: 'sha256:822dc1b0485bbfe0bb29024e8475f4d321224c830ddb1f0a4c078881e4a93c28',
     });
-    expect(DAILY_INSIGHT_ACTIVE_PROMPT_RELEASE).toMatchObject({
+    expect(DAILY_INSIGHT_PROMPT_RELEASES[16]).toEqual({
       releaseId: 'v30', promptVersion: 'v29', assemblyVersion: 'v13', providerInputCompatibility: 'changed',
       promptFingerprint: 'sha256:827de73de0186f5320ad02e23c2896cd82a2e85a4d20a08040cdaefc688037eb',
+    });
+    expect(DAILY_INSIGHT_ACTIVE_PROMPT_RELEASE).toMatchObject({
+      releaseId: 'v31', promptVersion: 'v30', assemblyVersion: 'v14', providerInputCompatibility: 'changed',
     });
     expect(DAILY_INSIGHT_PROMPT_RELEASES[12]).toMatchObject({
       releaseId: 'v26', promptVersion: 'v25', assemblyVersion: 'v10', providerInputCompatibility: 'changed',

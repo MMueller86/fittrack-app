@@ -11,11 +11,11 @@ import { DAILY_INSIGHT_MORNING_MODULE } from './promptMorning';
 import { DAILY_INSIGHT_NUTRITION_MODULE } from './promptNutrition';
 import { DAILY_INSIGHT_WEIGHT_MODULE } from './promptWeight';
 
-export const DAILY_INSIGHT_PROMPT_VERSION = 'v29' as const;
+export const DAILY_INSIGHT_PROMPT_VERSION = 'v30' as const;
 const DAILY_INSIGHT_ACTIVE_MACRO_GUARD = `## Abschließende Regel für heutige Makro-Einordnungen
 Beurteile heutige Makros nur anhand der gelieferten nutrition.dailyInsightProteinStatus und nutrition.targets.macroRanges. Der serverseitige Proteinstatus ist maßgeblich; leite ihn nicht aus Grammwerten, Einzelzielen oder dem Text selbst her. Bei unknown bleibt die Proteineinordnung unbekannt. Der Kohlenhydratbereich ist Orientierung und begründet allein keine Korrektur. Bei in_range liegt die Proteinzufuhr im Ziel. Bei above_range (über 2,0 und unter 2,5 g/kg) gibt es keine besondere Proteinwarnung und kein Problem. Nur bei at_or_above_2_5_g_per_kg darfst du optional und nicht alarmistisch erwähnen, dass die Proteinzufuhr vermutlich über dem benötigten Maß liegt und die Kalorien auch aus anderen Lebensmitteln gewählt werden können, falls diese besser schmecken oder zufriedener machen; Protein ist dadurch nicht automatisch ein Problem. Liegt zugleich die Aufnahme über dem Kalorienziel, darfst du beides verbinden und eine künftige Anpassung der Lebensmittelauswahl anregen, ohne für heute eine Mahlzeit zu empfehlen.`;
 
-export const DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION = 'v13' as const;
+export const DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION = 'v14' as const;
 
 export interface DailyInsightPromptSnapshot {
   system: string;
@@ -42,8 +42,8 @@ export const DAILY_INSIGHT_PROMPT_GUARD_POLICY = {
 export const DAILY_INSIGHT_PROMPT_GUARD_TEXTS = {
   currentMomentOnly: '## Nur der heutige Moment\nBeschreibe ausschließlich die heutige Ernährung und Aktivität. Erwähne oder vergleiche keine Einträge, Ziele oder Aktivitäten früherer Tage. Verwende dafür nur die heutigen Kontextfelder. Gelieferte aktuelle Gewichts- und Progress-Signale dürfen als heutiger Stand eingeordnet werden.',
   noCalorieSurplusTerm: '## Verbotene Energiebilanz-Bezeichnung\nVerwende niemals "Kalorienüberschuss". Eine Aufnahme über dem heutigen Kalorienziel darf nur als "über dem Kalorienziel" beschrieben werden und belegt keinen physiologischen Energieüberschuss.',
-  claimGrounding: '## Konkrete serverseitige Aussagegrenzen\nDer JSON-Block grounding ordnet Fakten verbindlich ihren Quellen zu. mealAdviceAllowed false sperrt konkrete Mahlzeiten- und Essensempfehlungen in allen Textfeldern; bei true bleibt eine Empfehlung optional und muss zum Fokus passen. actionFields null bedeutet recommendation null. measurementRelation lower bedeutet kleiner, nicht stabil; higher bedeutet größer; equal allein bedeutet gleich. dailyActivityStatus completed erlaubt eine klare Abschlussaussage; unknown erlaubt keine Behauptung, die Aktivität sei abgeschlossen; sie darf als eingetragen, geplant oder anstehend beschrieben werden.',
-  sourceBoundClaims: '## Verbindliche Quellenbindung jeder Aussage\nEin Ziel allein belegt keinen heutigen Spielraum. Wenn Aufnahme oder Rest null ist, behaupte keine verfügbaren Kalorien oder Möglichkeiten für restliche Mahlzeiten. weight.weeklyTrend30d ist die gelieferte Trendrichtung. Sind latestKg und previousKg verschieden, behaupte nicht, das Gewicht sei stabil oder unverändert; erfinde keine Schwelle. Bei dailyActivityStatus unknown behaupte keinen Abschluss; Planung oder Anstehen darf genannt werden; Tageszeit, Eintrag und Aktivitätsdetails sind kein zusätzlicher Beleg. Bei mealAdviceAllowed false gib keine Essens- oder Mahlzeitenempfehlung aus. Prüfe jeden Satz getrennt.',
+  claimGrounding: '## Konkrete serverseitige Aussagegrenzen\nDer JSON-Block grounding ordnet Fakten verbindlich ihren Quellen zu. mealAdviceAllowed false sperrt konkrete Mahlzeiten- und Essensempfehlungen in allen Textfeldern; bei true bleibt eine Empfehlung optional und muss zum Fokus passen. actionFields null bedeutet recommendation null. homeTrend14d ist die einzige gelieferte Quelle für die absolute Gewichtsrichtung; null bedeutet, dass Home keinen Trend anzeigt. dailyActivityStatus completed erlaubt eine klare Abschlussaussage; unknown erlaubt keine Behauptung, die Aktivität sei abgeschlossen; sie darf als eingetragen, geplant oder anstehend beschrieben werden.',
+  sourceBoundClaims: '## Verbindliche Quellenbindung jeder Aussage\nEin Ziel allein belegt keinen heutigen Spielraum. Wenn Aufnahme oder Rest null ist, behaupte keine verfügbaren Kalorien oder Möglichkeiten für restliche Mahlzeiten. Behaupte eine Gewichtsrichtung ausschließlich, wenn weight.homeTrend14d gaining, losing oder stable enthält. Leite keine Trendrichtung aus Einzelmessungen, Ziel oder anderen Progress-Signalen ab. Bei dailyActivityStatus unknown behaupte keinen Abschluss; Planung oder Anstehen darf genannt werden; Tageszeit, Eintrag und Aktivitätsdetails sind kein zusätzlicher Beleg. Bei mealAdviceAllowed false gib keine Essens- oder Mahlzeitenempfehlung aus. Prüfe jeden Satz getrennt.',
   finalActivityFocus: '## Abschließender Vorrang des Aktivitätsfokus\nDie besondere Aktivität priorisiert das Thema, unterdrückt aber keine anderen relevanten gelieferten Signale. Bei langer oder intensiver Ausdauerbelastung müssen Kohlenhydrate oder Energie, Flüssigkeit und Regeneration oder Erholung im selben Output vorkommen; nenne in summary oder recommendation alle drei Punkte ausdrücklich, ohne einen davon ist die Antwort unvollständig, auch wenn weitere Signale wie Protein oder Gewicht erwähnt werden. Ordne die Aktivität bei vorhandenem Ziel natürlich zum effektiven Kalorien- oder Tagesziel ein. dailyActivityStatus unknown erlaubt keine Aussage über einen Abschluss; completed erlaubt klare Abschlussformulierungen. mealAdviceAllowed bleibt für konkrete Mahlzeitenhinweise maßgeblich. Erfinde weder Aktivitätsverbrauch noch Daten und addiere den Bonus nicht erneut.',
   finalWeightFocus: '## Abschließender Vorrang des Gewichtsfokus\nDer Intent priorisiert Gewicht, schließt aber weitere relevante gelieferte Signale nicht aus. Ordne Gewicht im Zusammenhang mit dem Nutzerziel ein und ergänze andere Signale, wenn sie die heutige Einordnung oder eine sichere Empfehlung beeinflussen. Bei mehr als 14 Tagen seit der letzten Messung fehlen aktuelle Gewichtsdaten: Beschreibe diese Unsicherheit und den Nutzen einer neuen Messung, ohne aktuelle Phase oder aktuellen Trend zu behaupten. Verwende niemals "positive Entwicklung", "positive Fortschrittsphase" oder "Regressionsphase erkannt"; lobe keinen Einzelwert als Fortschrittsbeweis.',
   activityOpenDay: '## Schutz für activity_focus am offenen Tag\nremainingCalories ist positiv. Aufnahme, effektives Tagesziel und Rest sind ein aktueller Zwischenstand. Verwende gelieferte Werte exakt; nutrition.targets.calories enthält den Aktivitätsbonus bereits. Addiere den Bonus nicht erneut und rekonstruiere keine fehlenden Werte. Stelle den Rest nicht als abgeschlossenes Tagesergebnis oder physiologisches Energiedefizit dar. dailyActivityStatus unknown erlaubt keine Aussage über einen Abschluss. Konkrete Mahlzeitenhinweise sind nur erlaubt, wenn mealAdviceAllowed true ist und sie zum Fokus passen.',
@@ -118,10 +118,22 @@ function buildPromptInputContext(
   intent: InsightIntent,
   context: InsightInputContext,
  ) {
+  const providerContext = {
+    ...context,
+    weight: context.weight == null ? context.weight : {
+      latestKg: context.weight.latestKg,
+      homeTrend14d: context.weight.homeTrend14d ?? null,
+      daysSinceLastMeasurement: context.weight.daysSinceLastMeasurement,
+      lastMeasurementDate: context.weight.lastMeasurementDate,
+    },
+    progressIntelligence: context.progressIntelligence == null
+      ? context.progressIntelligence
+      : { milestone: context.progressIntelligence.milestone ?? null },
+  };
   const nutrition = context.nutrition;
-  if (nutrition == null) return context;
+  if (nutrition == null) return providerContext;
   if (hasInconsistentNegativeBudget(context)) {
-    return { ...context, nutrition: { budgetStatus: 'inconsistent' } };
+    return { ...providerContext, nutrition: { budgetStatus: 'inconsistent' } };
   }
   const { last3Days: _last3Days, ...providerNutrition } = nutrition;
 
@@ -154,7 +166,7 @@ function buildPromptInputContext(
     : context.specialActivity;
 
   return {
-    ...context,
+    ...providerContext,
     specialActivity: projectedSpecialActivity,
     nutrition: {
       ...providerNutrition,
@@ -181,11 +193,7 @@ function buildClaimGrounding(intent: InsightIntent, context: InsightInputContext
     focus: inconsistent ? 'budget_uncertainty_only' : 'combined',
     mealAdviceAllowed,
     actionFields: inconsistent ? 'null' : 'intent_scoped',
-    weight: {
-      measurementRelation: weight?.latestKg == null || weight.previousKg == null ? 'unknown'
-        : weight.latestKg < weight.previousKg ? 'lower' : weight.latestKg > weight.previousKg ? 'higher' : 'equal',
-      weeklyTrend30d: weight?.weeklyTrend30d ?? null,
-    },
+    weight: { homeTrend14d: weight?.homeTrend14d ?? null },
     dailyActivityStatus: context.dailyActivityStatus,
   };
 }

@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import type { Font, SatoriNode } from "satori";
 
-import { compose } from "./compose";
+import { compose, type RecipeTitleLayout } from "./compose";
 import {
   CANVAS_HEIGHT,
   CANVAS_WIDTH,
@@ -13,6 +13,7 @@ import {
   TAG_ROW_MAX_COUNT,
   TAG_ROW_MAX_WIDTH,
   TITLE_MAX_WIDTH,
+  TITLE_WRAPPED_MAX_HEIGHT,
 } from "./layout";
 import type { PhotoAsset } from "./photo";
 import {
@@ -53,6 +54,7 @@ import type {
   RecipeDetailsGeneratedTextProbeResult,
   RecipeDetailsGeneratedTextProbeDiagnostic,
   RecipeDetailsGeneratedTextProbeTechnicalCode,
+  RenderFail,
   RenderInput,
   RenderResult,
 } from "./types";
@@ -463,21 +465,34 @@ function getNodeMarker(node: SatoriNode): string | undefined {
 
 function validateMeasuredLayout(
   titleWidth: number | undefined,
+  titleHeight: number | undefined,
+  titleLayout: RecipeTitleLayout,
   tagWidths: number[],
   tagCount: number,
   recipeMetaWidth: number | undefined,
   hasRecipeMeta: boolean,
-): RenderResult | undefined {
+): RenderFail | undefined {
   if (titleWidth === undefined) {
     throw new Error("Satori did not report the title measurement node.");
   }
-  if (titleWidth > TITLE_MAX_WIDTH) {
+  const titleMaxHeight =
+    titleLayout === "wrapped" ? TITLE_WRAPPED_MAX_HEIGHT : undefined;
+  if (
+    titleWidth > TITLE_MAX_WIDTH ||
+    (titleMaxHeight !== undefined && titleHeight !== undefined && titleHeight > titleMaxHeight + 0.5)
+  ) {
     return {
       ok: false,
       error: {
         code: "TITLE_OVERFLOW",
-        message: "Recipe title exceeds the fixed title width.",
-        measured: { width: titleWidth, max: TITLE_MAX_WIDTH },
+        message: "Recipe title exceeds the supported title layout.",
+        measured: {
+          width: titleWidth,
+          max: TITLE_MAX_WIDTH,
+          ...(titleMaxHeight !== undefined && titleHeight !== undefined && titleHeight > titleMaxHeight + 0.5
+            ? { height: titleHeight, maxHeight: titleMaxHeight }
+            : {}),
+        },
       },
     };
   }
@@ -556,45 +571,64 @@ async function render(input: RenderInput): Promise<RenderResult> {
     getRendererAssets(),
   ]);
 
-  let titleWidth: number | undefined;
-  const tagWidths: number[] = [];
-  let recipeMetaWidth: number | undefined;
-  const svg = await runtime.satori(
-    compose(normalizedInput, {
-      photo,
-      nutritionHighlights: assets.nutritionHighlights,
-      recipeMetaIcons: assets.recipeMetaIcons,
-      barbell: assets.barbell,
-      wordmark: assets.wordmark,
-      wordmarkMimeType: assets.wordmarkMimeType,
-    }) as unknown as Parameters<SatoriRenderer>[0],
-    {
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
-      fonts: assets.fonts,
-      embedFont: true,
-      onNodeDetected: (node) => {
-        const marker = getNodeMarker(node);
-        if (marker === "title") {
-          titleWidth = node.width;
-        } else if (marker === "tag-chip") {
-          tagWidths.push(node.width);
-        } else if (marker === "recipe-meta-content") {
-          recipeMetaWidth = node.width;
-        }
+  const composeAssets = {
+    photo,
+    nutritionHighlights: assets.nutritionHighlights,
+    recipeMetaIcons: assets.recipeMetaIcons,
+    barbell: assets.barbell,
+    wordmark: assets.wordmark,
+    wordmarkMimeType: assets.wordmarkMimeType,
+  };
+  const titleLayouts: RecipeTitleLayout[] = ["default", "scaled", "wrapped"];
+  let svg: string | undefined;
+  let lastTitleError: RenderResult | undefined;
+  for (const titleLayout of titleLayouts) {
+    let titleWidth: number | undefined;
+    let titleHeight: number | undefined;
+    const tagWidths: number[] = [];
+    let recipeMetaWidth: number | undefined;
+    const candidateSvg = await runtime.satori(
+      compose(normalizedInput, composeAssets, titleLayout) as unknown as Parameters<SatoriRenderer>[0],
+      {
+        width: CANVAS_WIDTH,
+        height: CANVAS_HEIGHT,
+        fonts: assets.fonts,
+        embedFont: true,
+        onNodeDetected: (node) => {
+          const marker = getNodeMarker(node);
+          if (marker === "title") {
+            titleWidth = node.width;
+            titleHeight = node.height;
+          } else if (marker === "tag-chip") {
+            tagWidths.push(node.width);
+          } else if (marker === "recipe-meta-content") {
+            recipeMetaWidth = node.width;
+          }
+        },
       },
-    },
-  );
+    );
 
-  const layoutError = validateMeasuredLayout(
-    titleWidth,
-    tagWidths,
-    input.tags.length,
-    recipeMetaWidth,
-    normalizedInput.recipeMeta !== undefined,
-  );
-  if (layoutError) {
-    return layoutError;
+    const layoutError = validateMeasuredLayout(
+      titleWidth,
+      titleHeight,
+      titleLayout,
+      tagWidths,
+      input.tags.length,
+      recipeMetaWidth,
+      normalizedInput.recipeMeta !== undefined,
+    );
+    if (!layoutError) {
+      svg = candidateSvg;
+      break;
+    }
+    if (layoutError.error.code !== "TITLE_OVERFLOW" || titleLayout === "wrapped") {
+      return layoutError;
+    }
+    lastTitleError = layoutError;
+  }
+
+  if (svg === undefined) {
+    return lastTitleError ?? toInternalError(new Error("No supported title layout was rendered."));
   }
 
   const rendered = new runtime.Resvg(svg, {

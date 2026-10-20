@@ -50,7 +50,7 @@ export async function addRecipeDiarySnapshot(
     name: recipe.name,
     ...snapshot,
     quantity: portions,
-    unit: portions === 1 ? 'Portion' : 'Portionen',
+    unit: 'portion',
     sourceType: 'recipe',
     recipeId: recipe.id,
     recipePortions: portions,

@@ -58,8 +58,13 @@ import {
   TITLE_FONT_SIZE,
   TITLE_LINE_HEIGHT,
   TITLE_MAX_WIDTH,
+  TITLE_SCALED_FONT_SIZE,
   TITLE_X,
   TITLE_Y,
+  TITLE_WRAPPED_FONT_SIZE,
+  TITLE_WRAPPED_LINE_HEIGHT,
+  TITLE_WRAPPED_MAX_HEIGHT,
+  TITLE_WRAPPED_Y,
   WORDMARK_CENTER_X,
   WORDMARK_HEIGHT,
   WORDMARK_WIDTH,
@@ -93,6 +98,8 @@ export type ComposeAssets = {
   wordmark: string;
   wordmarkMimeType?: "image/png" | "image/svg+xml";
 };
+
+export type RecipeTitleLayout = "default" | "scaled" | "wrapped";
 
 function element(
   type: string,
@@ -222,29 +229,40 @@ function createTagRow(tags: RenderInput["tags"]): SatoriElement | undefined {
   );
 }
 
-function createTitle(title: string): SatoriElement {
+function createTitle(title: string, titleLayout: RecipeTitleLayout): SatoriElement {
+  const wrapped = titleLayout === "wrapped";
+  const fontSize = wrapped
+    ? TITLE_WRAPPED_FONT_SIZE
+    : titleLayout === "scaled"
+      ? TITLE_SCALED_FONT_SIZE
+      : TITLE_FONT_SIZE;
+  const lineHeight = wrapped ? TITLE_WRAPPED_LINE_HEIGHT : TITLE_LINE_HEIGHT;
   return element(
     "div",
     {
       position: "absolute",
       left: TITLE_X,
-      top: TITLE_Y,
+      top: wrapped ? TITLE_WRAPPED_Y : TITLE_Y,
       width: TITLE_MAX_WIDTH,
-      height: TITLE_FONT_SIZE * TITLE_LINE_HEIGHT,
+      height: wrapped ? TITLE_WRAPPED_MAX_HEIGHT : fontSize * lineHeight,
       display: "flex",
+      flexDirection: "column",
+      alignItems: "flex-start",
+      justifyContent: wrapped ? "flex-end" : "flex-start",
       color: COLOR_PRIMARY_TEXT,
       fontFamily: "InterDisplay",
-      fontSize: TITLE_FONT_SIZE,
+      fontSize,
       fontWeight: 700,
-      lineHeight: TITLE_LINE_HEIGHT,
-      whiteSpace: "nowrap",
+      lineHeight,
+      whiteSpace: wrapped ? "normal" : "nowrap",
       overflow: "hidden",
     },
     element(
-      "span",
+      wrapped ? "div" : "span",
       {
-        whiteSpace: "nowrap",
-        flexShrink: 0,
+        ...(wrapped
+          ? { width: TITLE_MAX_WIDTH, whiteSpace: "normal", wordBreak: "normal", flexShrink: 0 }
+          : { whiteSpace: "nowrap", flexShrink: 0 }),
       },
       title,
       { "data-render-node": "title" },
@@ -538,7 +556,11 @@ function createWordmark(assets: ComposeAssets): SatoriElement {
   );
 }
 
-export function compose(input: RenderInput, assets: ComposeAssets): SatoriElement {
+export function compose(
+  input: RenderInput,
+  assets: ComposeAssets,
+  titleLayout: RecipeTitleLayout = "default",
+): SatoriElement {
   const tagRow = createTagRow(input.tags);
   const children: SatoriChild[] = [
     createAmbientLayer(),
@@ -556,7 +578,7 @@ export function compose(input: RenderInput, assets: ComposeAssets): SatoriElemen
     children.push(createHighlightLayer(input.nutritionHighlight, assets));
   }
 
-  children.push(createTitle(input.title));
+  children.push(createTitle(input.title, titleLayout));
   if (tagRow) {
     children.push(tagRow);
   }

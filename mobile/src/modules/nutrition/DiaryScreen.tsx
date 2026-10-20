@@ -44,6 +44,7 @@ import Animated, {
 import { runOnJS } from 'react-native-reanimated';
 import { SwipeableRow } from '../../shared/components/SwipeableRow';
 import { DiaryItemRow } from '../../shared/components/DiaryItemRow';
+import { formatDiaryItemAmount } from './diaryItemUtils';
 import { useDayTypeStore } from './useDayTypeStore';
 import EditItemSheet from './EditItemSheet';
 import MoveItemSheet from './MoveItemSheet';
@@ -285,9 +286,7 @@ function MealCard({
         const itemRow = (
           <DiaryItemRow
             name={item.name}
-            amountLabel={item.unit === 'portion'
-              ? `${item.quantity} Portion${item.quantity !== 1 ? 'en' : ''}`
-              : `${Math.round(item.quantity)} g`}
+            amountLabel={formatDiaryItemAmount(item)}
             kcal={item.macros.calories}
             protein={item.macros.protein}
             aiBadgeLabel={item.sourceType === 'ai-meal-estimate'

@@ -5,7 +5,7 @@ import { __setOpenAiClientForTests, generateDailyInsight } from '../openai';
 import { DAILY_INSIGHT_PROMPT_FINGERPRINT, DAILY_INSIGHT_PROMPT_VERSION } from './dailyInsightPrompt';
 import { DAILY_INSIGHT_EVAL_FIXTURES } from './dailyInsight.eval.fixtures';
 
-const TESTED_PROMPT_VERSION = 'v29';
+const TESTED_PROMPT_VERSION = 'v30';
 
 it('daily insight prompt version matches fixture expectations', () => {
   expect(DAILY_INSIGHT_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);

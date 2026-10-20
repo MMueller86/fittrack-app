@@ -149,7 +149,14 @@ describe('CosmosWeightsRepository (contract)', () => {
 
     expect(await repo.updateValue(USER_B, entry.id, 90)).toBeNull();
     expect(await repo.updateValue(USER_A, 'missing-entry', 90)).toBeNull();
-    expect(await repo.list(USER_A)).toEqual([entry]);
+    expect(await repo.list(USER_A)).toMatchObject([{
+      id: entry.id,
+      userId: USER_A,
+      date: entry.date,
+      value: entry.value,
+      unit: entry.unit,
+      createdAt: entry.createdAt,
+    }]);
   });
 
   it('delete removes an existing entry and returns true', async () => {

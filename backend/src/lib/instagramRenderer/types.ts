@@ -61,7 +61,11 @@ export type RenderError =
       message: string;
       measured: { width: number; max: number };
     }
-  | { code: "TITLE_OVERFLOW"; message: string; measured: { width: number; max: number } }
+  | {
+      code: "TITLE_OVERFLOW";
+      message: string;
+      measured: { width: number; max: number; height?: number; maxHeight?: number };
+    }
   | { code: "TOO_MANY_TAGS"; message: string; count: number; max: 4 }
   | { code: "TAG_ROW_OVERFLOW"; message: string; measured: { width: number; max: number } }
   | { code: "INVALID_ZOOM"; message: string; value: number }

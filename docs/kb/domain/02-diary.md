@@ -27,6 +27,7 @@ Key fields:
 - `recipeId?` — source recipe ID when `sourceType: 'recipe'`
 - `recipePortions?` — logged recipe portion count, including fractional portions
 - `amountGrams` — effective amount used for calculation
+- `quantity` and `unit` — diary amount and its unit. Portion-based entries use the canonical `unit: 'portion'`; Mobile formats singular/plural from `quantity`. Legacy `Portion` and `Portionen` values remain readable.
 - `isAiEstimate` — true for AI-estimated items
 - `confidence` — AI confidence (0–1), null for non-AI items
 - `warnings` — AI-generated warnings (e.g., "unusual calorie density")

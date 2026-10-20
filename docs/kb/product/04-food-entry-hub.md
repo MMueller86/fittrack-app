@@ -135,8 +135,9 @@ In `recipeIngredient` context, recipe references are omitted from favorites and 
 
 Shows when mode = `search`:
 - Results `FlatList` using `ResultRow` component
-- Search results cached in `FoodEntryHub.tsx` (`cachedResults` state)
-  - Prevents 300ms blank flash when navigating back from `QuantityView`
+- Search results cached in `FoodEntryHub.tsx` by normalized query
+  - Returning from `QuantityView` restores results without another request when the query is unchanged
+  - A changed query does not reuse results from the previous search
 - **Bottom fallback section** (always visible as `ListFooterComponent`):
   - 0 results: "Kein Treffer für '…' — Wir haben ein paar andere Ideen:"
   - ≥1 results: "Nicht das passende dabei?"

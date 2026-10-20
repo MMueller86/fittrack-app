@@ -53,6 +53,24 @@ describe("Instagram recipe renderer validation", () => {
     );
   });
 
+  it("fits the reported Chicken title by reducing its font size slightly", async () => {
+    const result = await renderInstagramRecipe(
+      createInput({ title: "Chicken mit Nudeln und Gemüse" }),
+    );
+
+    expect(result.ok, result.ok ? undefined : JSON.stringify(result.error)).toBe(true);
+  });
+
+  it("renders a longer title using the wrapped fallback", async () => {
+    const result = await renderInstagramRecipe(
+      createInput({
+        title: "Herzhafte Quarkbrötchen mit Dinkelmehl und Haferflocken",
+      }),
+    );
+
+    expect(result.ok, result.ok ? undefined : JSON.stringify(result.error)).toBe(true);
+  });
+
   it("rejects more than four tags", async () => {
     await expectError(
       createInput({

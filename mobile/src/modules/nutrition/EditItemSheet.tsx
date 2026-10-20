@@ -30,6 +30,7 @@ import { colors, radius, spacing, typography } from '../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
 import { ConfirmSheet } from '../../shared/components/ConfirmSheet';
 import { useSourceProduct } from './useSourceProduct';
+import { isDiaryItemPortionBased } from './diaryItemUtils';
 
 function getStep(amount: number, isPortion: boolean): number {
   if (isPortion) return 0.5;
@@ -74,7 +75,7 @@ export default function EditItemSheet({
   onSaved, onDeleted, onClose, onMoveRequest, onCopyRequest,
 }: Props) {
   const insets = useSafeAreaInsets();
-  const isPortion = item.unit === 'portion';
+  const isPortion = isDiaryItemPortionBased(item);
 
   const [inputMode, setInputMode] = useState<'grams' | 'portion'>(isPortion ? 'portion' : 'grams');
   const [amount, setAmount] = useState(item.quantity);
@@ -89,12 +90,12 @@ export default function EditItemSheet({
   const portionWeightGrams = sourceProduct?.portion?.weightGrams;
 
   useEffect(() => {
-    const mode = item.unit === 'portion' ? 'portion' : 'grams';
+    const mode = isDiaryItemPortionBased(item) ? 'portion' : 'grams';
     setInputMode(mode);
     setAmount(item.quantity);
     setAmountText(formatAmount(item.quantity, mode === 'portion'));
     setIsTyping(false);
-  }, [item.id, item.quantity, item.unit]);
+  }, [item.id, item.quantity, item.unit, item.sourceType]);
 
   const per100g = useMemo(() => derivePer100g(item), [item]);
 

@@ -11,6 +11,7 @@ function makeContext(overrides: Partial<InsightInputContext> = {}): InsightInput
       latestKg: null,
       previousKg: null,
       targetKg: null,
+      homeTrend14d: null,
       weeklyTrend30d: null,
       last7Values: [],
       isOutlierPrevious: false,
@@ -65,16 +66,37 @@ describe('selectInsightIntent', () => {
     }))).toBe('activity_focus');
   });
 
-  it.each([
-    'plateau_broken',
-    'milestone_reached',
-    'bad_phase_recovered',
-  ] as const)('routes %s to weight_signal', (type) => {
-    expect(selectInsightIntent(makeContext(withSignal(type)))).toBe('weight_signal');
+  it('routes an available milestone to weight_signal', () => {
+    const context = makeContext();
+    context.progressIntelligence.milestone = {
+      value: 80,
+      unit: 'kg',
+      reachedAt: '2026-08-20',
+      confirmed: true,
+      movingAvgAtThreshold: 79.9,
+    };
+
+    expect(selectInsightIntent(context)).toBe('weight_signal');
   });
 
-  it('routes phase context to phase progress', () => {
-    expect(selectInsightIntent(makeContext(withSignal('phase_context')))).toBe('phase_progress');
+  it.each(['plateau_broken', 'bad_phase_recovered', 'phase_context'] as const)(
+    'does not select a weight focus from the hidden %s signal',
+    (type) => {
+      expect(selectInsightIntent(makeContext(withSignal(type)))).toBe('general');
+    },
+  );
+
+  it('keeps a milestone eligible when it is not the primary internal signal', () => {
+    const context = makeContext({ currentHourLocal: 9, ...withSignal('phase_context') });
+    context.progressIntelligence.milestone = {
+      value: 80,
+      unit: 'kg',
+      reachedAt: '2026-08-20',
+      confirmed: false,
+      movingAvgAtThreshold: null,
+    };
+
+    expect(selectInsightIntent(context)).toBe('weight_signal');
   });
 
   it('routes an empty early morning to morning orientation', () => {
@@ -109,7 +131,14 @@ describe('selectInsightIntent', () => {
   });
 
   it('uses the explicit priority deterministically', () => {
-    const context = makeContext({ currentHourLocal: 9, ...withSignal('milestone_reached') });
+    const context = makeContext({ currentHourLocal: 9 });
+    context.progressIntelligence.milestone = {
+      value: 80,
+      unit: 'kg',
+      reachedAt: '2026-08-20',
+      confirmed: true,
+      movingAvgAtThreshold: 79.9,
+    };
     expect(selectInsightIntent(context)).toBe('weight_signal');
     expect(selectInsightIntent(context)).toBe('weight_signal');
   });

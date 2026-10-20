@@ -26,7 +26,7 @@ const intents: InsightIntent[] = [
   'general',
 ];
 
-describe('daily insight v29 prompts', () => {
+describe('daily insight v30 prompts', () => {
   it('uses the B1.1 protein, meal-advice, and activity facts in provider context', () => {
     const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'protein-gap-with-budget')!;
     const inputContext: InsightInputContext = {
@@ -69,10 +69,39 @@ describe('daily insight v29 prompts', () => {
     expect(fixture.input).toEqual(before);
   });
 
-  it.each(['midday-empty-day-not-morning', 'carbohydrates-below-range-neutral'])('C2 supplies exact weight direction without a new stability threshold: %s', (fixtureId) => {
+  it.each(['midday-empty-day-not-morning', 'carbohydrates-below-range-neutral'])('uses only the Home weight trend for direction: %s', (fixtureId) => {
     const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === fixtureId)!;
     const input = JSON.parse(buildDailyInsightPrompt(fixture.intent, fixture.input).user);
-    expect(input.grounding.weight).toMatchObject({ measurementRelation: 'lower', weeklyTrend30d: 'losing' });
+    expect(input.grounding.weight).toEqual({ homeTrend14d: fixture.input.weight.homeTrend14d ?? null });
+    expect(input.context.weight).not.toHaveProperty('weeklyTrend30d');
+    expect(input.context.weight).not.toHaveProperty('previousKg');
+    expect(input.context.weight).not.toHaveProperty('last7Values');
+    expect(input.context.progressIntelligence).toEqual({ milestone: fixture.input.progressIntelligence.milestone });
+  });
+
+  it('keeps milestone facts while excluding other weight-derived prompt inputs', () => {
+    const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'midday-empty-day-not-morning')!;
+    const inputContext = structuredClone(fixture.input);
+    const milestone = {
+      value: 80,
+      unit: 'kg' as const,
+      reachedAt: '2026-08-19',
+      confirmed: true,
+      movingAvgAtThreshold: 79.9,
+    };
+    inputContext.weight.homeTrend14d = 'gaining';
+    inputContext.progressIntelligence.milestone = milestone;
+
+    const projected = JSON.parse(buildDailyInsightPrompt(fixture.intent, inputContext).user);
+
+    expect(projected.context.weight).toEqual({
+      latestKg: inputContext.weight.latestKg,
+      homeTrend14d: 'gaining',
+      daysSinceLastMeasurement: inputContext.weight.daysSinceLastMeasurement,
+      lastMeasurementDate: inputContext.weight.lastMeasurementDate,
+    });
+    expect(projected.context.progressIntelligence).toEqual({ milestone });
+    expect(projected.grounding.weight).toEqual({ homeTrend14d: 'gaining' });
   });
 
   it('keeps prior diary days out of the current-moment insight prompt', () => {
@@ -96,8 +125,8 @@ describe('daily insight v29 prompts', () => {
   it('requires stale-weight markers separately in shortInsight and full text', () => {
     const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'stale-weight')!;
     const { system } = buildDailyInsightPrompt(fixture.intent, fixture.input);
-    expect(system).toContain('Wenn shortInsight Gewicht erwähnt, muss der Marker dort stehen');
-    expect(system).toContain('wenn der Langtext Gewicht erwähnt, muss er dort ebenfalls stehen');
+    expect(system).toContain('Die Felder shortInsight und der Langtext (title, summary, recommendation zusammen) werden getrennt geprüft');
+    expect(system).toContain('Erwähnt eines von beiden Gewicht, braucht es dort selbst den Marker');
   });
 
   it('does not project historical activities or target relations to the provider', () => {
@@ -166,7 +195,7 @@ describe('daily insight v29 prompts', () => {
     const { system } = buildDailyInsightPrompt(fixture.intent, fixture.input);
     expect(system).toContain('dailyActivityStatus unknown');
     expect(system).toContain('Ein Ziel allein belegt keinen heutigen Spielraum');
-    expect(system).toContain('latestKg und previousKg verschieden');
+    expect(system).toContain('Leite keine Trendrichtung aus Einzelmessungen, Ziel oder anderen Progress-Signalen ab');
   });
 
   it('keeps the contradictory budget fixture unchanged and forbids invented arithmetic', () => {
@@ -190,7 +219,7 @@ describe('daily insight v29 prompts', () => {
 
   it('repeats the existing abstract-phrase prohibition in the final weight guard', () => {
     const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'phase-progress-open-day')!;
-    const { system } = buildDailyInsightPrompt(fixture.intent, fixture.input);
+    const { system } = buildDailyInsightPrompt('weight_signal', fixture.input);
     expect(system.slice(system.lastIndexOf('## Abschließender Vorrang des Gewichtsfokus')))
       .toContain('Verwende niemals "positive Entwicklung"');
   });
@@ -306,20 +335,25 @@ describe('daily insight v29 prompts', () => {
     expect(system).toContain('Bei langer oder intensiver Ausdauerbelastung ist ein Fueling-Hinweis verpflichtend');
   });
 
-  it('Q21 gives the actual stale-weight phase context no contradictory below-target instruction', () => {
+  it('does not route stale weight from hidden phase context or expose hidden progress signals', () => {
     const fixture = DAILY_INSIGHT_EVAL_FIXTURES.find((candidate) => candidate.id === 'stale-weight')!;
-    expect(fixture.intent).toBe('phase_progress');
+    expect(fixture.intent).toBe('nutrition_guidance');
     expect(fixture.input.nutrition.remainingCalories).toBe(500);
+    expect(fixture.input.progressIntelligence.primarySignal?.type).toBe('phase_context');
     const before = structuredClone(fixture.input);
     const snapshot = buildDailyInsightPrompt(fixture.intent, fixture.input);
-    expect(snapshot.system).not.toContain('Formuliere die Differenz nur als Aufnahme über oder unter dem Ziel');
-    expect(snapshot.system).toContain('remainingCalories ist nur der Abstand zwischen dem heutigen Ziel');
-    expect(snapshot.system).toContain('konkrete Mahlzeitenhinweise richten sich nach mealAdviceAllowed');
-    expect(snapshot.system).toContain('Schutz für phase_progress an einem offenen Tag');
+    expect(snapshot.system).toContain('Bei mehr als 14 Tagen sind Gewichtsdaten veraltet');
+    expect(snapshot.system).not.toContain('Schutz für phase_progress an einem offenen Tag');
     const projected = JSON.parse(snapshot.user);
     expect(projected.intent).toBe(fixture.intent);
     expect(projected.context.nutrition).toBeDefined();
-    expect(projected.grounding.focus).toBe('combined');
+    expect(projected.context.progressIntelligence).toEqual({ milestone: null });
+    expect(projected.context.weight).toEqual({
+      latestKg: null,
+      homeTrend14d: null,
+      daysSinceLastMeasurement: 20,
+      lastMeasurementDate: '2026-07-31',
+    });
     expect(fixture.input).toEqual(before);
   });
 
@@ -356,8 +390,8 @@ describe('daily insight v29 prompts', () => {
       .toBeGreaterThan(system.lastIndexOf('## Abschließende Regel für Makro-Einordnungen'));
   });
 
-  it('uses the v29 version and has one module for every intent', () => {
-    expect(DAILY_INSIGHT_PROMPT_VERSION).toBe('v29');
+  it('uses the v30 version and has one module for every intent', () => {
+    expect(DAILY_INSIGHT_PROMPT_VERSION).toBe('v30');
     for (const intent of intents) {
       expect(DAILY_INSIGHT_PROMPT_MODULES[intent].length).toBeGreaterThan(0);
     }
@@ -417,13 +451,13 @@ describe('daily insight v29 prompts', () => {
     expect(snapshot.system).toContain('Setze recommendation exakt auf null');
   });
 
-  it('keeps phase progress concrete when describing an outlier context', () => {
+  it('does not expose hidden phase wording when Home trend is authoritative', () => {
     const weightModule = DAILY_INSIGHT_PROMPT_MODULES.phase_progress;
 
-    expect(weightModule).toContain('positive Entwicklung');
-    expect(weightModule).toContain('positive Fortschrittsphase');
-    expect(weightModule).toContain('Der Wochenverlauf zeigt weiter in die richtige Richtung');
-    expect(weightModule).toContain('Du bist auf Kurs');
+    expect(weightModule).toContain('homeTrend14d');
+    expect(weightModule).toContain('Weitere Phasen-, Plateau-, Monats- oder Langzeitverlaufssignale stehen dem Modell nicht zur Verfügung');
+    expect(weightModule).not.toContain('Der Wochenverlauf zeigt weiter in die richtige Richtung');
+    expect(weightModule).not.toContain('Du bist auf Kurs');
   });
 
   it('makes qualitative endurance signals require an explicit fueling hint', () => {
@@ -640,8 +674,8 @@ describe('daily insight v29 prompts', () => {
     }
   });
 
-  it('computes a stable fingerprint for the complete v29 bundle', () => {
-    expect(DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION).toBe('v13');
+  it('computes a stable fingerprint for the complete v30 bundle', () => {
+    expect(DAILY_INSIGHT_PROMPT_ASSEMBLY_VERSION).toBe('v14');
     expect(DAILY_INSIGHT_PROMPT_FINGERPRINT).toMatch(/^sha256:[0-9a-f]{64}$/);
     expect(computeDailyInsightPromptFingerprint(DAILY_INSIGHT_PROMPT_BUNDLE))
       .toBe(DAILY_INSIGHT_PROMPT_FINGERPRINT);

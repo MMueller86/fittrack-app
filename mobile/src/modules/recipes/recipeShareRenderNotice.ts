@@ -57,6 +57,13 @@ export function getRecipeShareRenderNotice(
         actionLabel: 'Erneut vorbereiten',
       };
     }
+    if (code === 'TITLE_OVERFLOW') {
+      return {
+        kind: 'render',
+        title: 'Rezeptname zu lang',
+        body: 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.',
+      };
+    }
   }
 
   return {

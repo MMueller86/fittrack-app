@@ -205,6 +205,7 @@ function renderFailureResponse(
   ctx: InvocationContext,
   eventPrefix: RenderFailureEventPrefix = 'recipes.instagramRender',
   imageId?: string,
+  recipeTitle?: string,
 ): HttpResponseInit {
   if (UNRENDERABLE_ERROR_CODES.has(error.code)) {
     logEvent(ctx, 'warn', `${eventPrefix}.unrenderable`, {
@@ -212,11 +213,19 @@ function renderFailureResponse(
       recipeId,
       image_id: imageId,
       failure_stage: 'instagram_render',
+      ...(error.code === 'TITLE_OVERFLOW' && recipeTitle !== undefined
+        ? { recipe_title: recipeTitle }
+        : {}),
       ...rendererErrorLogFields(error),
     });
     return {
       status: 422,
-      jsonBody: { error: 'Recipe cannot be rendered', code: error.code },
+      jsonBody: {
+        error: error.code === 'TITLE_OVERFLOW'
+          ? 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.'
+          : 'Recipe cannot be rendered',
+        code: error.code,
+      },
     };
   }
 
@@ -327,7 +336,15 @@ export const instagramRecipeHandler = withHandler(
       }),
     );
     if (!renderResult.ok) {
-      return renderFailureResponse(renderResult.error, userId, recipeId, ctx, 'recipes.instagramRender', image.id);
+      return renderFailureResponse(
+        renderResult.error,
+        userId,
+        recipeId,
+        ctx,
+        'recipes.instagramRender',
+        image.id,
+        recipe.name,
+      );
     }
 
     logEvent(ctx, 'info', 'recipes.instagramRender.completed', {
@@ -463,6 +480,7 @@ export const shareBundleHandler = withHandler(
         ctx,
         'recipes.shareBundle.instagramRender',
         image.id,
+        recipe.name,
       );
     }
 

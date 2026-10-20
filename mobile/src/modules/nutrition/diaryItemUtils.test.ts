@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   applyAddMeal,
+  formatDiaryItemAmount,
   getDiaryItemSelectionKey,
   getDiaryMealSelectionState,
+  isDiaryItemPortionBased,
   normalizeDiaryItemSelection,
   toggleDiaryItemSelection,
   toggleDiaryMealSelection,
@@ -50,6 +52,29 @@ function makeSelectionMeal(id: string, itemIds: string[]): Meal {
     items: itemIds.map((itemId) => ({ id: itemId } as MealItem)),
   } as Meal;
 }
+
+describe('diary item amount formatting', () => {
+  it.each(['portion', 'Portion', 'Portionen', 'portions'])(
+    'formats %s as a portion unit',
+    (unit) => {
+      expect(formatDiaryItemAmount({ sourceType: 'manual', quantity: 1, unit })).toBe('1 Portion');
+    },
+  );
+
+  it('formats recipes as portions even if their stored unit is inconsistent', () => {
+    const item = { sourceType: 'recipe', quantity: 2, unit: 'g' } as MealItem;
+
+    expect(formatDiaryItemAmount(item)).toBe('2 Portionen');
+    expect(isDiaryItemPortionBased(item)).toBe(true);
+  });
+
+  it('keeps gram-based items in grams', () => {
+    const item = { sourceType: 'manual', quantity: 100, unit: 'g' } as MealItem;
+
+    expect(formatDiaryItemAmount(item)).toBe('100 g');
+    expect(isDiaryItemPortionBased(item)).toBe(false);
+  });
+});
 
 describe('diary item selection', () => {
   it('keeps item references unique across meals', () => {

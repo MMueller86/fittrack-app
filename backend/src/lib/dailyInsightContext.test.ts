@@ -244,6 +244,16 @@ describe('buildDailyInsightContext', () => {
     });
   }
 
+  async function buildForWeights(weights: WeightEntry[]) {
+    const repositories = makeRepositories({ weights });
+    return buildDailyInsightContext({
+      userId: USER_ID,
+      date: REFERENCE_DATE,
+      now: new Date(`${REFERENCE_DATE}T12:00:00.000Z`),
+      repositories,
+    });
+  }
+
   it.each([
     [104, 'below_range'],
     [105, 'in_range'],
@@ -533,5 +543,67 @@ describe('buildDailyInsightContext', () => {
       localHour: 12,
       repositories,
     })).rejects.toThrow('historical diary read failed');
+  });
+
+  it('uses the Home 14-day trend when it differs from the 30-day direction', async () => {
+    const recentWeights = Array.from({ length: 7 }, (_, index): WeightEntry => {
+      const date = new Date(`${REFERENCE_DATE}T12:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() - index * 2);
+      return {
+        id: `recent-${index}`,
+        userId: USER_ID,
+        date: date.toISOString().slice(0, 10),
+        value: 79.6 - index * 0.1,
+        unit: 'kg',
+      };
+    });
+    const olderWeights: WeightEntry[] = [20, 27].map((daysAgo, index) => {
+      const date = new Date(`${REFERENCE_DATE}T12:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() - daysAgo);
+      return {
+        id: `older-${index}`,
+        userId: USER_ID,
+        date: date.toISOString().slice(0, 10),
+        value: 82 + index,
+        unit: 'kg',
+      };
+    });
+    const context = await buildForWeights([...recentWeights, ...olderWeights]);
+
+    expect(context.weight.weeklyTrend30d).toBe('losing');
+    expect(context.weight.homeTrend14d).toBe('gaining');
+  });
+
+  it('matches Home minimum-measurement and neutral trend rules', async () => {
+    const makeRecentWeights = (count: number, valueStep: number): WeightEntry[] =>
+      Array.from({ length: count }, (_, index) => {
+        const date = new Date(`${REFERENCE_DATE}T12:00:00.000Z`);
+        date.setUTCDate(date.getUTCDate() - index * 2);
+        return {
+          id: `weight-${count}-${index}`,
+          userId: USER_ID,
+          date: date.toISOString().slice(0, 10),
+          value: 80 + (count - 1 - index) * valueStep,
+          unit: 'kg',
+        };
+      });
+
+    const insufficientContext = await buildForWeights(makeRecentWeights(6, 0.1));
+    const neutralContext = await buildForWeights(makeRecentWeights(7, 0.01));
+
+    expect(insufficientContext.weight.homeTrend14d).toBeNull();
+    expect(neutralContext.weight.homeTrend14d).toBe('stable');
+  });
+
+  it('normalizes the current Home weight value to kilograms', async () => {
+    const context = await buildForWeights([{
+      id: 'pounds',
+      userId: USER_ID,
+      date: REFERENCE_DATE,
+      value: 176.37,
+      unit: 'lbs',
+    }]);
+
+    expect(context.weight.latestKg).toBeCloseTo(80, 1);
   });
 });

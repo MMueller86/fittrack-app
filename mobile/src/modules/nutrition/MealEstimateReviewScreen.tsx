@@ -204,8 +204,8 @@ export default function MealEstimateReviewScreen({
     try {
       await diaryApi.addItem(mealId, {
         productName: estimate.mealName,
-        inputMode: 'grams',
-        inputAmount: 100,
+        inputMode: 'portion',
+        inputAmount: 1,
         amountGrams: 100,
         calculatedNutrition: {
           calories: pCalories,
@@ -214,7 +214,6 @@ export default function MealEstimateReviewScreen({
           fat: pFat,
           fiber: pFiber,
         },
-        unit: 'Portion',
         sourceType: 'ai-meal-estimate',
         isAiEstimate: true,
         aiMealEstimateComponents: estimate.components,

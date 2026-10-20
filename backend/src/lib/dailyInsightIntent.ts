@@ -1,12 +1,6 @@
-import type { InsightInputContext, InsightIntent, PrimarySignalType } from '@fittrack/shared';
+import type { InsightInputContext, InsightIntent } from '@fittrack/shared';
 
 export type { InsightIntent } from '@fittrack/shared';
-
-const WEIGHT_SIGNAL_TYPES: ReadonlySet<PrimarySignalType> = new Set([
-  'plateau_broken',
-  'milestone_reached',
-  'bad_phase_recovered',
-]);
 
 function hasCurrentMealItem(context: InsightInputContext): boolean {
   return context.nutrition.today?.hasMealItem ?? context.nutrition.today !== null;
@@ -15,9 +9,7 @@ function hasCurrentMealItem(context: InsightInputContext): boolean {
 export function selectInsightIntent(context: InsightInputContext): InsightIntent {
   if (context.specialActivity != null) return 'activity_focus';
 
-  const primarySignal = context.progressIntelligence.primarySignal.type;
-  if (WEIGHT_SIGNAL_TYPES.has(primarySignal)) return 'weight_signal';
-  if (primarySignal === 'phase_context') return 'phase_progress';
+  if (context.progressIntelligence.milestone != null) return 'weight_signal';
 
   if (context.currentHourLocal != null && context.currentHourLocal < 10 && !hasCurrentMealItem(context)) {
     return 'morning_orientation';

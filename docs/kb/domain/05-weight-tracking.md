@@ -74,7 +74,7 @@ Output: `PlateauIntelligence` signal — one of: `active`, `broken`, `insufficie
 
 ## Progress Intelligence
 
-`backend/src/lib/progressIntelligence.ts` — computes behavioural signals from raw weight data. Input to the daily AI insight.
+`backend/src/lib/progressIntelligence.ts` — computes behavioural signals from raw weight data. The full result remains in the internal Daily context; only an available milestone is sent to the provider prompt and used as a weight-specific intent.
 
 Key signals:
 - **Phase:** `gaining | losing | stable` over `PHASE_WINDOW_DAYS` (14 days), min 3 measurements
@@ -92,13 +92,16 @@ The daily insight weight context includes:
 - `isOutlierPrevious` — previous weight is a statistical spike (> 1.5× std dev of 7-day window)
 - `isOutlierLatest` — latest weight is a spike
 
-[Rule] Daily Insight uses `calculateWeightTrendPerWeek` from `shared/lib/weightTrend.ts`: a linear regression over the last 30 calendar days, projected to a weekly change and exposed in the Daily context as `weeklyTrend30d`. Progress uses arithmetic weekly means for its primary comparison and `calculateWeightTrendRegressionSeries` over seven calendar days only as a fallback. The explicit-window helper does not replace or change the Daily Insight 30-day contract. When `isOutlierPrevious` is true, the AI must not use it for short-term progress comparisons; this 30-day regression remains the authoritative Daily Insight direction signal.
+These remain internal snapshot fields and are not included in the provider prompt.
+
+[Rule] The Daily Insight provider prompt uses the Home-compatible weight direction: `calculateWeightTrendRegressionSeries` over 14 local calendar dates, excluding future measurements, with at least 7 measurements and a neutral threshold of 0.05 kg/week. It receives the latest weight and this direction, but not point-to-point comparisons, the internal `weeklyTrend30d`, or phase/plateau/monthly progress signals. A milestone remains available as a separate, non-directional fact. Progress screen comparisons and the backend's internal progress calculations retain their own contracts.
 
 Existing Daily and durable feedback snapshots are updated by the explicit,
 idempotent migration described in [tech/07-infrastructure.md](../tech/07-infrastructure.md).
 This is a one-off persistence migration, not a runtime compatibility contract:
-normal reads and writes use `weeklyTrend30d` only, while calculation,
-stale-weight, and outlier behavior remain unchanged.
+`weeklyTrend30d` remains in internal snapshots for compatibility, while the
+provider prompt uses `homeTrend14d`; calculation, stale-weight, and outlier
+behavior remain unchanged.
 
 ## Goal Context
 

@@ -184,6 +184,11 @@ die Share-Vorschau und zeigt `Rezeptfoto fehlt` mit
 wirkungsloser Render-Retry wird nicht angeboten; auch der Teilen-Einstieg wird
 ausgeblendet, bis wieder ein gespeichertes Foto geladen wird.
 
+Bei `TITLE_OVERFLOW` zeigt die Share-Vorschau `Rezeptname zu lang` und den
+Hinweis `Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte
+kürze den Rezeptnamen.`. Ein Render-Retry wird nicht angeboten, weil er den
+gespeicherten Rezeptnamen nicht ändert.
+
 Der lokale Rezept-Share-Flow bleibt als flüchtiger Share-Draft in der
 Rezeptdetailansicht. Ein Tap auf `Teilen` startet eine gegen Doppeltaps
 abgesicherte Exportvorbereitung und öffnet danach die gemeinsame Vorschau mit

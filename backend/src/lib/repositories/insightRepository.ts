@@ -219,12 +219,7 @@ export function computeInputHash(
     displayName: ctx.displayName,
     weight: {
       latestKg: roundWeight(ctx.weight.latestKg),
-      previousKg: roundWeight(ctx.weight.previousKg),
-      targetKg: roundWeight(ctx.weight.targetKg),
-      weeklyTrend30d: ctx.weight.weeklyTrend30d,
-      last7Values: ctx.weight.last7Values.map(roundWeight),
-      isOutlierPrevious: ctx.weight.isOutlierPrevious,
-      isOutlierLatest: ctx.weight.isOutlierLatest,
+      homeTrend14d: ctx.weight.homeTrend14d ?? null,
       daysSinceLastMeasurement: ctx.weight.daysSinceLastMeasurement,
       lastMeasurementDate: ctx.weight.lastMeasurementDate,
     },
@@ -282,7 +277,7 @@ export function computeInputHash(
         specialActivity: day.specialActivity ?? null,
       })),
     },
-    progressIntelligence: ctx.progressIntelligence,
+    progressIntelligence: { milestone: ctx.progressIntelligence.milestone },
     weightStaleness: ctx.weight.daysSinceLastMeasurement === null
       ? 'none'
       : ctx.weight.daysSinceLastMeasurement > 14

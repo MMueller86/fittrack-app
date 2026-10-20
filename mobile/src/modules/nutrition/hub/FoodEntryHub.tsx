@@ -121,7 +121,10 @@ export function FoodEntryHub() {
   const sessionOrderRef = useRef<UserFoodRelation[] | null>(null);
   const [recents, setRecents] = useState<UserFoodRelation[]>([]);
   // Gecachte Suchergebnisse — erhalten beim Übergang in Quantity-Modus und zurück
-  const [cachedResults, setCachedResults] = useState<FoodSearchResult[]>([]);
+  const [cachedSearch, setCachedSearch] = useState<{ query: string; results: FoodSearchResult[] }>({ query: '', results: [] });
+  const handleSearchResultsChange = useCallback((results: FoodSearchResult[], query: string) => {
+    setCachedSearch({ query, results });
+  }, []);
   const sheetRef = useRef<BottomSheetModal>(null);
   const recipeRequestIdRef = useRef(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,7 +244,7 @@ export function FoodEntryHub() {
       setSearchActive(false);
       setAddedItem(null);
       setActiveFilter('fuerDich');
-      setCachedResults([]);
+      setCachedSearch({ query: '', results: [] });
       favoritesApi.listRecent(20).then(setRecents).catch(() => setRecents([]));
       void loadFavorites();
 
@@ -932,9 +935,9 @@ export function FoodEntryHub() {
                   onBlur={handleSearchBlur}
                   returnKeyType="search"
                   keyboardType="default"
-                  autoCorrect={false}
+                  autoCorrect={true}
                   autoCapitalize="none"
-                  spellCheck={false}
+                  spellCheck={true}
                   clearButtonMode={Platform.OS === 'ios' ? 'while-editing' : 'never'}
                   accessibilityLabel="Lebensmittel suchen"
                 />
@@ -1122,12 +1125,13 @@ export function FoodEntryHub() {
               <SearchState
                 query={searchQuery}
                 recents={selectableRecents}
-                initialResults={cachedResults}
+                initialResults={cachedSearch.results}
+                initialResultsQuery={cachedSearch.query}
                 onSelect={handleSelectProduct}
                 onSelectRelation={(relation) => void handleSelectRelation(relation)}
                 onOpenSubflow={handleOpenSubflow}
                 allowedSubflows={allowedSubflows}
-                onResultsChange={setCachedResults}
+                onResultsChange={handleSearchResultsChange}
                 quickAcceptLabel={prefillAmount ? `+ ${prefillAmount.amount} ${prefillAmount.mode === 'grams' ? 'g' : 'Stk.'}` : undefined}
                 onQuickAccept={onSelectIngredient && prefillAmount ? (product) => { onSelectIngredient(product, prefillAmount.mode, prefillAmount.amount); close(); } : undefined}
               />

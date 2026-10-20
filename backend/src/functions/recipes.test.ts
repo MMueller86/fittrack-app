@@ -1909,7 +1909,7 @@ describe('POST /recipes/:id/log — logRecipe', () => {
     expect(item['recipeId']).toBe(created['id']);
     expect(item['recipePortions']).toBe(portions);
     expect(item['quantity']).toBe(portions);
-    expect(item['unit']).toBe(portions === 1 ? 'Portion' : 'Portionen');
+    expect(item['unit']).toBe('portion');
     const perPortion = created['nutritionPerPortion'] as Record<string, number>;
     const macros = item['macros'] as Record<string, number>;
     for (const nutrient of ['calories', 'protein', 'carbs', 'fat', 'fiber']) {
@@ -1973,7 +1973,14 @@ describe('POST /recipes/:id/log — logRecipe', () => {
     );
     expect(response.status).toBe(200);
     const loggedItem = (response.jsonBody as { items: Array<Record<string, unknown>> }).items[0]!;
-    expect(loggedItem).toMatchObject({ name: 'Sauerteigbrot', sourceType: 'recipe', recipeId, recipePortions: 2 });
+    expect(loggedItem).toMatchObject({
+      name: 'Sauerteigbrot',
+      sourceType: 'recipe',
+      recipeId,
+      recipePortions: 2,
+      quantity: 2,
+      unit: 'portion',
+    });
     const expectedCalories = (created['nutritionPerPortion'] as Record<string, number>).calories * 2;
     expect((loggedItem['macros'] as Record<string, number>).calories).toBeCloseTo(expectedCalories, 0);
 

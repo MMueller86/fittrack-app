@@ -60,6 +60,8 @@ import {
   TAG_CHIP_HEIGHT,
   TAG_ROW_Y,
   TITLE_Y,
+  TITLE_WRAPPED_MAX_HEIGHT,
+  TITLE_WRAPPED_Y,
   WORDMARK_BOTTOM_CLEARANCE,
   WORDMARK_CENTER_X,
   WORDMARK_HEIGHT,
@@ -641,6 +643,29 @@ describe("Instagram recipe renderer nutrition layout", () => {
     expect(styleOf(titleLayer).top).toBe(TITLE_Y);
     expect(styleOf(tagRow).top).toBe(TAG_ROW_Y);
     expect(styleOf(tagRow).height).toBe(TAG_CHIP_HEIGHT);
+
+    const wrappedTree = compose(
+      { ...quarkbroetchenFixture, title: "Herzhafte Quarkbrötchen mit Dinkelmehl und Haferflocken" },
+      createComposeAssets(),
+      "wrapped",
+    );
+    const wrappedChildren = childElements(wrappedTree);
+    const wrappedTitle = wrappedChildren.find((child) =>
+      childElements(child).some((nested) => nested.props["data-render-node"] === "title"),
+    );
+    const wrappedTagRow = wrappedChildren.find((child) =>
+      styleOf(child).top === TAG_ROW_Y && styleOf(child).height === TAG_CHIP_HEIGHT,
+    );
+    expect(wrappedTitle).toBeDefined();
+    expect(wrappedTagRow).toBeDefined();
+    if (!wrappedTitle || !wrappedTagRow) return;
+    expect(styleOf(wrappedTitle)).toMatchObject({
+      top: TITLE_WRAPPED_Y,
+      height: TITLE_WRAPPED_MAX_HEIGHT,
+      justifyContent: "flex-end",
+    });
+    expect(styleOf(wrappedTagRow).top - (TITLE_WRAPPED_Y + TITLE_WRAPPED_MAX_HEIGHT)).toBe(19);
+
     expect(styleOf(highlightLayer).left).toBe(
       CANVAS_WIDTH - HIGHLIGHT_BADGE_RIGHT - HIGHLIGHT_BADGE_SIZE,
     );

@@ -30,6 +30,12 @@ export const TITLE_Y = 853;
 export const TITLE_MAX_WIDTH = CONTENT_WIDTH;
 export const TITLE_FONT_SIZE = 62;
 export const TITLE_LINE_HEIGHT = 1.15;
+export const TITLE_SCALED_FONT_SIZE = 58;
+export const TITLE_WRAPPED_FONT_SIZE = 50;
+export const TITLE_WRAPPED_LINE_HEIGHT = 1.1;
+export const TITLE_WRAPPED_Y = 752;
+export const TITLE_WRAPPED_MAX_HEIGHT =
+	TITLE_WRAPPED_FONT_SIZE * TITLE_WRAPPED_LINE_HEIGHT * 3;
 
 export const TAG_ROW_X = CONTENT_LEFT;
 export const TAG_ROW_Y = 936;

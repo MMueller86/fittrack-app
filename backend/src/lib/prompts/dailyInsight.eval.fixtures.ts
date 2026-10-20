@@ -48,6 +48,7 @@ function baseContext(overrides: Partial<InsightInputContext> = {}): InsightInput
       latestKg: 80,
       previousKg: 80.2,
       targetKg: 78,
+      homeTrend14d: 'losing',
       weeklyTrend30d: 'losing',
       last7Values: [80, 80.2, 80.4],
       isOutlierPrevious: false,
@@ -205,7 +206,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
     input: baseContext({
       currentHourLocal: null,
       dayType: null,
-      weight: { latestKg: null, previousKg: null, targetKg: null, weeklyTrend30d: null, last7Values: [], isOutlierPrevious: false, isOutlierLatest: false, daysSinceLastMeasurement: null, lastMeasurementDate: null },
+      weight: { latestKg: null, previousKg: null, targetKg: null, homeTrend14d: null, weeklyTrend30d: null, last7Values: [], isOutlierPrevious: false, isOutlierLatest: false, daysSinceLastMeasurement: null, lastMeasurementDate: null },
       nutrition: { today: null, targets: null, remainingCalories: null, dailyInsightProteinStatus: 'unknown', mealAdviceAllowed: false, last3Days: [] },
     }),
     intent: 'general',
@@ -235,8 +236,8 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         phase: { type: 'progressing' },
       },
     }),
-    intent: 'phase_progress',
-    // AC: open-day target remainder is not an achieved energy balance; use the long-term weight signal.
+    intent: 'nutrition_guidance',
+    // Open-day remainder and hidden phase context do not select a weight-focused intent.
   },
   {
     id: 'current-effective-activity-budget',
@@ -603,6 +604,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         ...baseContext().weight,
         latestKg: null,
         previousKg: null,
+        homeTrend14d: null,
         weeklyTrend30d: null,
         last7Values: [],
         daysSinceLastMeasurement: 20,
@@ -613,7 +615,7 @@ export const DAILY_INSIGHT_EVAL_FIXTURES: DailyInsightEvalFixture[] = [
         primarySignal: { type: 'phase_context', confidence: 0.6, freshnessScore: 0 },
       },
     }),
-    intent: 'phase_progress',
-    // US Insight F2 and KB domain/07: old measurements are not current evidence.
+    intent: 'nutrition_guidance',
+    // Stale weight and hidden phase context do not select a weight-focused intent.
   },
 ];

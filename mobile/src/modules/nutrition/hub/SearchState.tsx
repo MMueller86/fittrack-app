@@ -30,12 +30,13 @@ interface Props {
   recents: UserFoodRelation[];
   /** Gecachte Ergebnisse aus FoodEntryHub -- verhindert Leerzeile beim Zurueck aus QuantityView */
   initialResults?: FoodSearchResult[];
+  initialResultsQuery?: string;
   onSelect: (item: FoodSearchResult) => void;
   onSelectRelation: (relation: UserFoodRelation) => void;
   onOpenSubflow: (flow: 'barcode' | 'ai' | 'label' | 'manual') => void;
   allowedSubflows?: ReadonlyArray<'barcode' | 'ai' | 'label' | 'manual'>;
   /** Callback wenn neue Ergebnisse geladen -- fuer Cache-Update in FoodEntryHub */
-  onResultsChange?: (results: FoodSearchResult[]) => void;
+  onResultsChange?: (results: FoodSearchResult[], query: string) => void;
   /** Recipe mode: label for the quick-accept pill on each ResultRow */
   quickAcceptLabel?: string;
   /** Recipe mode: called when user taps the quick-accept pill */
@@ -242,15 +243,17 @@ function relativeUsage(isoDate: string): string {
   return `Vor ${Math.floor(days / 7)} Wochen verwendet`;
 }
 
-export function SearchState({ query, recents, initialResults, onSelect, onSelectRelation, onOpenSubflow, allowedSubflows = ['barcode', 'ai', 'label', 'manual'], onResultsChange, quickAcceptLabel, onQuickAccept }: Props) {
-  const [results, setResults] = useState<FoodSearchResult[]>(initialResults ?? []);
+export function SearchState({ query, recents, initialResults, initialResultsQuery, onSelect, onSelectRelation, onOpenSubflow, allowedSubflows = ['barcode', 'ai', 'label', 'manual'], onResultsChange, quickAcceptLabel, onQuickAccept }: Props) {
+  const hasMatchingCache = initialResultsQuery === query.trim();
+  const [results, setResults] = useState<FoodSearchResult[]>(hasMatchingCache ? initialResults ?? [] : []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchedQuery, setSearchedQuery] = useState('');
+  const [searchedQuery, setSearchedQuery] = useState(hasMatchingCache ? query.trim() : '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const doSearch = useCallback(async (q: string) => {
-    if (q.trim().length === 0) {
+    const normalizedQuery = q.trim();
+    if (normalizedQuery.length === 0) {
       setResults([]);
       setError(null);
       setSearchedQuery('');
@@ -259,26 +262,34 @@ export function SearchState({ query, recents, initialResults, onSelect, onSelect
     setLoading(true);
     setError(null);
     try {
-      const { results: r } = await foodApi.search(q.trim());
+      const { results: r } = await foodApi.search(normalizedQuery);
       setResults(r);
-      setSearchedQuery(q.trim());
-      onResultsChange?.(r);
+      setSearchedQuery(normalizedQuery);
+      onResultsChange?.(r, normalizedQuery);
     } catch (e: unknown) {
       setError(formatApiError(e, 'Suche fehlgeschlagen'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onResultsChange]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    const normalizedQuery = query.trim();
+    if (initialResultsQuery === normalizedQuery) {
+      setResults(initialResults ?? []);
+      setSearchedQuery(normalizedQuery);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     debounceRef.current = setTimeout(() => {
       void doSearch(query);
     }, DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, doSearch]);
+  }, [query, doSearch, initialResults, initialResultsQuery]);
 
   const hasQuery = query.trim().length > 0;
   const hasResults = results.length > 0;

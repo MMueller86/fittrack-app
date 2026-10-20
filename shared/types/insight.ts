@@ -80,7 +80,9 @@ export interface InsightWeightContext {
   latestKg: number | null;
   previousKg: number | null;
   targetKg: number | null;
-  /** 30-day linear-regression direction projected to a weekly change. */
+  /** Home's 14-calendar-day regression direction; absent in legacy stored contexts. */
+  homeTrend14d?: 'gaining' | 'losing' | 'stable' | null;
+  /** Legacy/internal 30-day direction. The provider prompt does not receive it. */
   weeklyTrend30d: 'gaining' | 'losing' | 'stable' | null;
   /** Up to 7 most recent values, newest first */
   last7Values: number[];

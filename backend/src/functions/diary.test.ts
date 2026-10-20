@@ -951,6 +951,30 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
     expect(body.meal.items[0]!.unit).toBe('portion');
   });
 
+  it('stores an AI meal estimate as one portion', async () => {
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productName: 'KI-Mahlzeit',
+          inputMode: 'portion',
+          inputAmount: 1,
+          amountGrams: 100,
+          calculatedNutrition: { calories: 520, protein: 24, carbs: 48, fat: 22, fiber: 6 },
+          sourceType: 'ai-meal-estimate',
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    const body = res.jsonBody as {
+      meal: { items: { quantity: number; unit: string; sourceType: string }[] };
+    };
+    expect(body.meal.items[0]).toMatchObject({ quantity: 1, unit: 'portion', sourceType: 'ai-meal-estimate' });
+  });
+
   it('stores amountGrams as quantity when inputMode is grams', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(

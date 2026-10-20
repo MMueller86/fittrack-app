@@ -752,7 +752,7 @@ describe('GET /api/ai/daily-insight handler contract', () => {
       promptVersion: DAILY_INSIGHT_PROMPT_VERSION,
       promptFingerprint: DAILY_INSIGHT_PROMPT_FINGERPRINT,
       systemPromptHash: expect.any(String),
-      intent: 'phase_progress',
+      intent: 'nutrition_guidance',
       inputContext: makeInputContext(),
       response: {
         greeting: 'Hallo, Testperson! 👋',

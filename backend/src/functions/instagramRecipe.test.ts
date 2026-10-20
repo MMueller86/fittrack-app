@@ -440,8 +440,43 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     const response = await instagramRecipeHandler(await renderRequest(recipe.id), ctx);
 
     expect(response.status).toBe(422);
-    expect(response.jsonBody).toEqual({ error: 'Recipe cannot be rendered', code: 'TITLE_OVERFLOW' });
+    expect(response.jsonBody).toEqual({
+      error: 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.',
+      code: 'TITLE_OVERFLOW',
+    });
     expect(JSON.stringify(response.jsonBody)).not.toContain('private measured detail');
+  });
+
+  it('returns an actionable title overflow message and logs the exact bundle title', async () => {
+    const { repo, recipe } = await createCurrentBundleRecipe();
+    const title = 'Chicken mit Nudeln und Gemüse';
+    await repo.update(TEST_USER_ID, recipe.id, { name: title });
+    const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+    renderInstagramRecipeMock.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: 'TITLE_OVERFLOW',
+        message: 'Recipe title exceeds the fixed title width.',
+        measured: { width: 935, max: 904 },
+      },
+    });
+
+    try {
+      const response = await shareBundleHandler(await renderRequest(recipe.id), ctx);
+
+      expect(response.status).toBe(422);
+      expect(response.jsonBody).toEqual({
+        error: 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.',
+        code: 'TITLE_OVERFLOW',
+      });
+      const serializedWarningLogs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(serializedWarningLogs).toContain('"event":"recipes.shareBundle.instagramRender.unrenderable"');
+      expect(serializedWarningLogs).toContain(`"recipe_title":"${title}"`);
+      expect(serializedWarningLogs).toContain('"measured_width":935');
+      expect(serializedWarningLogs).toContain('"max_width":904');
+    } finally {
+      warningLogs.mockRestore();
+    }
   });
 
   it('maps missing assets and storage failures to generic 500 responses', async () => {

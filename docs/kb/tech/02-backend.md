@@ -209,6 +209,14 @@ oriented dimensions; the stored Blob is not replaced. The resulting
 an additional landscape rotation, so normal portrait and landscape sources
 remain upright and EXIF orientation is handled exactly once.
 
+The nutrition image keeps the existing 62 px, single-line title layout when its
+measured width fits. On overflow, rendering retries at 58 px and then at 50 px
+with up to three lines anchored to the bottom of a fixed title region; the tag
+row retains its original vertical position. The short-title composition is
+unchanged. The detail image independently adapts title size and wrapping above
+the teaser; both images are validated against their measured text bounds before
+PNG output is returned.
+
 The render path calls `downloadRecipeImage()` with only the server-read
 `RecipeImage.blobName`. Storage downloads the Blob directly with
 `downloadToBuffer()` and enforces the 8 MB limit before the buffer reaches the
@@ -439,6 +447,9 @@ requests can be distinguished from ordinary edits.
 
 Render failures include the render stage, selected image ID, error code,
 bounded single-line message/cause, and available field or layout measurements.
+For `TITLE_OVERFLOW` only, the renderer warning also includes the exact
+`recipe_title` that was measured; successful logs and unrelated failures never
+include the title.
 Detail-template failures retain `item_index` and `item_field` but never log
 `item_value`. For `recipes.shareBundle.unrenderableDetail` with a measured
 step overflow, targeted recipe-text diagnostics additionally include the exact

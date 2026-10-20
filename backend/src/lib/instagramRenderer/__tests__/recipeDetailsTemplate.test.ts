@@ -151,6 +151,21 @@ const probeTitles = ["Brötchen", "Herzhafte Quarkbrötchen", "Herzhafte Quarkbr
 const denseProbeTeaser = "Goldbraune Quarkbrötchen mit Dinkelmehl und knackigen Körnern für ein sättigendes Frühstück.";
 
 describe("B-1 generated detail text production probe", () => {
+  it("keeps a longer saved title inside the detail image title and teaser bounds", async () => {
+    const title = "Herzhafte Quarkbrötchen mit Dinkelmehl und Haferflocken";
+    const input = { ...quarkbroetchenDetailsFixture, title };
+    const full = await renderInstagramRecipeDetailsTemplate(input);
+    const probe = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: title,
+      teaser: input.description!,
+      steps: input.steps,
+    });
+
+  expect(getRecipeDetailsTitleLayout(title).fontSize).toBe(40);
+    expect(full.ok, full.ok ? undefined : JSON.stringify(full.error)).toBe(true);
+    expect(probe).toMatchObject({ ok: true, status: "success" });
+  }, 20000);
+
   it.each([1, 2, 3, 4, 5].flatMap((count) => probeTitles.map((title) => ({ count, title }))))(
     "matches full-render node geometry and teaser decisions for $count steps / $title",
     async ({ count, title }) => {

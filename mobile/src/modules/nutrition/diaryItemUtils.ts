@@ -1,6 +1,22 @@
 // diaryItemUtils — helpers for diary-item selection and meal creation.
 
-import type { DiaryDayResponse, Meal, MealType } from '@fittrack/shared';
+import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
+
+type DiaryItemQuantity = Pick<MealItem, 'quantity' | 'sourceType' | 'unit'>;
+
+const PORTION_UNITS = new Set(['portion', 'portions', 'portionen']);
+
+export function isDiaryItemPortionBased(item: Pick<DiaryItemQuantity, 'sourceType' | 'unit'>): boolean {
+  return item.sourceType === 'recipe' || PORTION_UNITS.has(item.unit.trim().toLowerCase());
+}
+
+export function formatDiaryItemAmount(item: DiaryItemQuantity): string {
+  if (isDiaryItemPortionBased(item)) {
+    return `${item.quantity} Portion${item.quantity === 1 ? '' : 'en'}`;
+  }
+
+  return `${Math.round(item.quantity)} g`;
+}
 
 export interface DiaryItemReference {
   mealId: string;
