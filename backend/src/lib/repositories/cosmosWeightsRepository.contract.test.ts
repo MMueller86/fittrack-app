@@ -140,8 +140,17 @@ describe('CosmosWeightsRepository (contract)', () => {
     const updated = await repo.updateValue(USER_A, entry.id, 82.5);
     const { resource: stored } = await ctx.database.container('weights').item(entry.id, USER_A).read<WeightEntry>();
 
-    expect(updated).toMatchObject({ ...entry, value: 82.5 });
-    expect(stored).toMatchObject({ ...entry, value: 82.5 });
+    const expected = {
+      id: entry.id,
+      userId: USER_A,
+      date: entry.date,
+      value: 82.5,
+      unit: entry.unit,
+      createdAt: entry.createdAt,
+    };
+
+    expect(updated).toMatchObject(expected);
+    expect(stored).toMatchObject(expected);
   });
 
   it('updateValue returns null for a missing or foreign-partition ID', async () => {
