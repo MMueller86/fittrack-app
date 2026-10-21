@@ -147,7 +147,12 @@ export type RecipeDetailsGeneratedTextProbeDiagnostic = {
       fontSize: number;
     }
   | { status: "invalid-text"; code: "INVALID_TEXT" | "INVALID_STEP_COUNT" }
-  | { status: "technical-failure"; code: RecipeDetailsGeneratedTextProbeTechnicalCode }
+  | {
+      status: "technical-failure";
+      code: RecipeDetailsGeneratedTextProbeTechnicalCode;
+      fontSize?: number;
+      measured?: { width: number; maxWidth: number; height?: number; maxHeight?: number };
+    }
 );
 
 export type RecipeDetailsGeneratedTextProbeResult = {

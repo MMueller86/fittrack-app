@@ -166,6 +166,52 @@ describe("B-1 generated detail text production probe", () => {
     expect(probe).toMatchObject({ ok: true, status: "success" });
   }, 20000);
 
+  it("fits the Alpha Chicken title in the detail template and production probe", async () => {
+    const title = "Chicken mit Nudeln und Gemüse";
+    const steps = Array.from({ length: 5 }, () => "Zutaten vermengen und garen.");
+    const input = { ...quarkbroetchenDetailsFixture, title, steps };
+    const full = await renderInstagramRecipeDetailsTemplate(input);
+    const probe = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: title,
+      teaser: input.description!,
+      steps,
+    });
+
+    expect(full.ok, full.ok ? undefined : JSON.stringify(full.error)).toBe(true);
+    expect(probe).toMatchObject({ ok: true, status: "success" });
+  }, 20000);
+
+  it("fits Pulled Chicken mit Nudeln und Gemüse aus dem Ofen in the detail template", async () => {
+    const title = "Pulled Chicken mit Nudeln und Gemüse aus dem Ofen";
+    const steps = Array.from({ length: 5 }, () => "Zutaten vermengen und garen.");
+    const input = { ...quarkbroetchenDetailsFixture, title, steps };
+    const full = await renderInstagramRecipeDetailsTemplate(input);
+    const probe = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: title,
+      teaser: input.description!,
+      steps,
+    });
+
+    expect(full.ok, full.ok ? undefined : JSON.stringify(full.error)).toBe(true);
+    expect(probe).toMatchObject({ ok: true, status: "success" });
+  }, 20000);
+
+  it("uses measured layout for a title longer than 60 characters", async () => {
+    const title = "Pulled Chicken mit Nudeln und Gemüse aus dem Ofen mit Dill und";
+    const steps = Array.from({ length: 5 }, () => "Zutaten vermengen und garen.");
+    const input = { ...quarkbroetchenDetailsFixture, title, steps };
+    const full = await renderInstagramRecipeDetailsTemplate(input);
+    const probe = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: title,
+      teaser: input.description!,
+      steps,
+    });
+
+    expect(title).toHaveLength(62);
+    expect(full, full.ok ? undefined : JSON.stringify(full.error)).toMatchObject({ ok: true });
+    expect(probe).toMatchObject({ ok: true, status: "success" });
+  }, 20000);
+
   it.each([1, 2, 3, 4, 5].flatMap((count) => probeTitles.map((title) => ({ count, title }))))(
     "matches full-render node geometry and teaser decisions for $count steps / $title",
     async ({ count, title }) => {
@@ -327,6 +373,21 @@ describe("B-1 generated detail text production probe", () => {
   it.each(["", "Titel\nZeile", "W".repeat(60)])("never makes the saved title %j AI-correctable", async (savedTitle) => {
     const result = await probeInstagramRecipeDetailsGeneratedText({ savedTitle, teaser: "Frisch gebacken.", steps: ["Backe Brötchen."] });
     expect(result).toMatchObject({ ok: false, status: "technical-failure" });
+  });
+
+  it("includes measured width bounds when the saved title cannot fit", async () => {
+    const result = await probeInstagramRecipeDetailsGeneratedText({
+      savedTitle: "W".repeat(60), teaser: "Frisch gebacken.", steps: ["Backe Brötchen."],
+    });
+    const titleDiagnostic = result.diagnostics.find((diagnostic) => diagnostic.field === "title");
+
+    expect(result).toMatchObject({
+      ok: false, status: "technical-failure", error: { code: "TITLE_LAYOUT_FAILED" },
+    });
+    expect(titleDiagnostic).toMatchObject({
+      status: "technical-failure", code: "TITLE_LAYOUT_FAILED", fontSize: expect.any(Number),
+      measured: { width: expect.any(Number), maxWidth: expect.any(Number) },
+    });
   });
 
   it.each([22, 21, 20, 19, 18])("retains identical font-attempt selection through %ipx", async (selectedSize) => {

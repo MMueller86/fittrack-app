@@ -767,13 +767,29 @@ describe('POST /api/ai/recipe-analyze', () => {
 
   it('returns 429 before provider work and does not track usage', async () => {
     const create = mockRecipeAnalyzeClient(VALID_RECIPE_RAW);
-    const quotaResponse = { status: 429, jsonBody: { error: 'quota_exceeded', feature: 'recipe-analyze' } };
+    const quotaResponse = {
+      status: 429,
+      jsonBody: {
+        error: 'quota_exceeded',
+        feature: 'recipe-analyze',
+        used: 30,
+        limit: 30,
+        resetsAt: '2026-11-01T00:00:00.000Z',
+      },
+    };
     vi.mocked(enforceQuota).mockResolvedValueOnce(quotaResponse);
     const response = await recipeAnalyzeHandler(
       await makeAuthRequest({ body: { text: 'Synthetischer Import mit Quotalimit' } }),
       makeContext(),
     );
-    expect(response).toEqual(quotaResponse);
+    expect(response).toMatchObject({
+      status: 429,
+      jsonBody: {
+        code: 'QUOTA_EXCEEDED',
+        category: 'quota',
+        quota: { feature: 'recipe-analyze' },
+      },
+    });
     expect(create).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
@@ -920,7 +936,7 @@ describe('POST /api/ai/recipe-analyze', () => {
     );
 
     expect(res.status).toBe(422);
-    expect((res.jsonBody as { details: string[] }).details.join(' ')).toContain('analysisKey');
+    expect((res.jsonBody as { code: string }).code).toBe('AI_OUTPUT_INVALID');
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
@@ -933,7 +949,7 @@ describe('POST /api/ai/recipe-analyze', () => {
     );
 
     expect(res.status).toBe(422);
-    expect((res.jsonBody as { details: string[] }).details.join(' ')).toContain('3 nummerierte Anweisungen');
+    expect((res.jsonBody as { code: string }).code).toBe('AI_OUTPUT_INVALID');
     expect(create).toHaveBeenCalledTimes(3);
     expect(trackUsage).not.toHaveBeenCalled();
   });
@@ -981,6 +997,7 @@ describe('POST /api/ai/recipe-analyze', () => {
     );
 
     expect(res.status).toBe(422);
+    expect(res.jsonBody).toMatchObject({ code: 'AI_OUTPUT_INVALID', category: 'validation', retryable: false });
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
@@ -1244,7 +1261,8 @@ describe('POST /api/ai/recipe-analyze — food/seasoning routing', () => {
     );
 
     expect(res.status).toBe(502);
-    expect((res.jsonBody as { error: string }).error).toContain('AI recipe analysis failed');
+    expect((res.jsonBody as { code: string }).code).toBe('UPSTREAM_UNAVAILABLE');
+    expect(JSON.stringify(res.jsonBody)).not.toContain('provider unavailable');
   });
 
   it('routes food items through catalog and constructs seasoning items directly', async () => {
@@ -1579,7 +1597,7 @@ describe('POST /api/ai/recipe-scale/preview', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(response.jsonBody).toMatchObject({ code: 'RECIPE_NOT_FOUND', category: 'not_found' });
     expect(create).not.toHaveBeenCalled();
     expect(enforceQuota).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
@@ -1707,7 +1725,7 @@ describe('POST /api/ai/recipe-scale/preview', () => {
     );
 
     expect(res.status).toBe(429);
-    expect((res.jsonBody as Record<string, unknown>).feature).toBe('recipe-scale');
+    expect((res.jsonBody as { quota: { feature: string } }).quota.feature).toBe('recipe-scale');
     expect(create).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });
@@ -1761,6 +1779,7 @@ describe('POST /api/ai/recipe-scale/preview', () => {
     );
 
     expect(res.status).toBe(422);
+    expect(res.jsonBody).toMatchObject({ code: 'AI_OUTPUT_INVALID', category: 'validation', retryable: false });
     expect(trackUsage).not.toHaveBeenCalled();
   });
 

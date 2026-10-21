@@ -252,7 +252,10 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
     try {
       const result = await requestV2Preparation(String(recipe['id']));
-      expect(result).toMatchObject({ status: 422, jsonBody: { details: ['schema:unrecognized_keys@steps[0]'] } });
+      expect(result).toMatchObject({
+        status: 422,
+        jsonBody: { code: 'AI_OUTPUT_INVALID', fieldErrors: [{ path: 'steps[0]', code: 'unrecognized_keys' }] },
+      });
       expect(prepareRecipeExport).toHaveBeenCalledTimes(3);
       expect(enforceQuota).toHaveBeenCalledTimes(1);
       expect(trackUsage).not.toHaveBeenCalled();
@@ -289,7 +292,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
     try {
       const result = await prepareRecipeExportViewHandler(await makeAuthRequest({ params: { id: String(recipe['id']) }, body: { contractVersion: 2 } }), ctx);
-      expect(result).toMatchObject({ status: 500, jsonBody: { error: 'Internal server error' } });
+      expect(result).toMatchObject({ status: 500, jsonBody: { code: 'INTERNAL_ERROR', category: 'internal' } });
       expect(prepareRecipeExport).not.toHaveBeenCalled();
       expect(trackUsage).not.toHaveBeenCalled();
       expect(JSON.stringify(logs.map((log) => log.mock.calls))).not.toContain('PRIVATE_BACKEND_DETAIL_SENTINEL');
@@ -365,7 +368,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
     try {
       const result = await requestV2Preparation(String(recipe['id']));
-      expect(result).toMatchObject({ status: 502, jsonBody: { error: 'AI recipe analysis failed' } });
+      expect(result).toMatchObject({ status: 502, jsonBody: { code: 'UPSTREAM_UNAVAILABLE', category: 'dependency' } });
       expect(prepareRecipeExport).toHaveBeenCalledTimes(completed + 1);
       expect(trackUsage).not.toHaveBeenCalled();
       const captured = JSON.stringify(logs.map((log) => log.mock.calls));
@@ -383,13 +386,59 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     });
     const logs = ['log', 'warn', 'error'].map((method) => vi.spyOn(ctx, method as 'log' | 'warn' | 'error').mockImplementation(() => {}));
     try {
-      expect(await requestV2Preparation(String(recipe['id']))).toMatchObject({ status: 500, jsonBody: { error: 'Internal server error' } });
+      expect(await requestV2Preparation(String(recipe['id']))).toMatchObject({ status: 500, jsonBody: { code: 'INTERNAL_ERROR', category: 'internal' } });
       expect(prepareRecipeExport).toHaveBeenCalledTimes(1);
       expect(trackUsage).not.toHaveBeenCalled();
       const captured = JSON.stringify(logs.map((log) => log.mock.calls));
       expect(captured).not.toContain('PRIVATE_FONT_PAYLOAD');
       expect(captured).not.toContain('correctionsExhausted');
     } finally { probe.mockRestore(); logs.forEach((log) => log.mockRestore()); }
+  });
+
+  it('returns the title error and logs measured layout bounds only for TITLE_LAYOUT_FAILED', async () => {
+    const recipe = await createTestRecipe();
+    const recipeId = String(recipe['id']);
+    const recipeTitle = 'Chicken mit Nudeln und Gemüse';
+    await getRecipesRepository().update(TEST_USER_ID, recipeId, { name: recipeTitle });
+    setValidPreparationAnalysis();
+    const probe = vi.spyOn(renderer, 'probeInstagramRecipeDetailsGeneratedText').mockResolvedValue({
+      ok: false,
+      status: 'technical-failure',
+      diagnostics: [{
+        field: 'title', status: 'technical-failure', code: 'TITLE_LAYOUT_FAILED', fontSize: 40,
+        measured: { width: 610, height: 104, maxWidth: 580, maxHeight: 96 },
+      }],
+      teaserFontSize: 22,
+      error: { code: 'TITLE_LAYOUT_FAILED', message: 'Private title layout diagnostic.' },
+    });
+    const errorSpy = vi.spyOn(ctx, 'error').mockImplementation(() => {});
+
+    try {
+      const response = await requestV2Preparation(recipeId);
+
+      expect(response).toMatchObject({
+        status: 422,
+        jsonBody: { code: 'TITLE_OVERFLOW', category: 'validation', retryable: false },
+      });
+      expect(trackUsage).not.toHaveBeenCalled();
+      const loggedLine = errorSpy.mock.calls.map(([line]) => String(line))
+        .find((line) => line.includes('"event":"recipes.prepareExportView.analysisFailed"'));
+      expect(loggedLine).toContain('"failure_code":"TITLE_LAYOUT_FAILED"');
+      expect(loggedLine).toContain(`"recipeId":"${recipeId}"`);
+      expect(loggedLine).toContain(`"recipe_title":"${recipeTitle}"`);
+      expect(loggedLine).toContain('"title_probe_step_count":');
+      expect(loggedLine).toContain('"title_probe_layout":"large"');
+      expect(loggedLine).toContain('"title_font_size":40');
+      expect(loggedLine).toContain('"title_measured_width":610');
+      expect(loggedLine).toContain('"title_max_width":580');
+      expect(loggedLine).toContain('"title_measured_height":104');
+      expect(loggedLine).toContain('"title_max_height":96');
+      expect(loggedLine).not.toContain('Private title layout diagnostic.');
+      expect(JSON.stringify(response.jsonBody)).not.toContain(recipeTitle);
+    } finally {
+      probe.mockRestore();
+      errorSpy.mockRestore();
+    }
   });
 
   it('B-2 checks final deadline immediately before booking without starting it', async () => {
@@ -554,7 +603,11 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     );
 
     expect(response.status).toBe(400);
-    expect(response.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    expect(response.jsonBody).toMatchObject({
+      code: 'INVALID_EXPORT_PREPARATION_REQUEST',
+      category: 'validation',
+      retryable: false,
+    });
     expect(enforceQuota).not.toHaveBeenCalled();
     expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
@@ -632,11 +685,13 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     expect(extraField.status).toBe(400);
     expect(invalidVersion.status).toBe(400);
     expect(extraV2Field.status).toBe(400);
-    expect(missingBody.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
-    expect(legacyBody.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
-    expect(extraField.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
-    expect(invalidVersion.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
-    expect(extraV2Field.jsonBody).toEqual({ error: 'invalid_export_preparation_request' });
+    for (const response of [missingBody, legacyBody, extraField, invalidVersion, extraV2Field]) {
+      expect(response.jsonBody).toMatchObject({
+        code: 'INVALID_EXPORT_PREPARATION_REQUEST',
+        category: 'validation',
+        retryable: false,
+      });
+    }
     expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(enforceQuota).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
@@ -676,7 +731,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     );
 
     expect(response.status).toBe(412);
-    expect(response.jsonBody).toEqual({ error: 'recipe_revision_conflict' });
+    expect(response.jsonBody).toMatchObject({ code: 'RECIPE_CONFLICT', category: 'conflict' });
     expect(enforceQuota).not.toHaveBeenCalled();
     expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
@@ -800,13 +855,16 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const etag = await getRecipeEtag(recipeId);
     const quotaResponse = {
       status: 429,
-      jsonBody: { error: 'quota_exceeded', feature: 'recipe-analyze' },
+      jsonBody: {
+        error: 'quota_exceeded', feature: 'recipe-analyze', used: 30, limit: 30,
+        resetsAt: '2026-11-01T00:00:00.000Z',
+      },
     };
     vi.mocked(enforceQuota).mockResolvedValue(quotaResponse);
 
     const response = await requestV2Preparation(recipeId, etag);
 
-    expect(response).toEqual(quotaResponse);
+    expect(response).toMatchObject({ status: 429, jsonBody: { code: 'QUOTA_EXCEEDED', quota: { feature: 'recipe-analyze' } } });
     expect(enforceQuota).toHaveBeenCalledWith(expect.objectContaining({ userId: TEST_USER_ID }), 'recipe-analyze');
     expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
@@ -923,10 +981,12 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
       const response = await requestV2Preparation(recipeId);
 
       expect(response.status).toBe(422);
-      expect(response.jsonBody).toEqual({
-        error: 'Recipe export preparation failed server-side validation',
-        details: ['semantic:unknown_source_step_reference@steps[0].sourceStepOrders',
-          'template:INVALID_TEXT@steps[0].description'],
+      expect(response.jsonBody).toMatchObject({
+        code: 'AI_OUTPUT_INVALID',
+        fieldErrors: [
+          { code: 'unknown_source_step_reference', path: 'steps[0].sourceStepOrders' },
+          { code: 'INVALID_TEXT', path: 'steps[0].description' },
+        ],
       });
       expect(prepareRecipeExport).toHaveBeenCalledTimes(3);
       expect(enforceQuota).toHaveBeenCalledTimes(1);
@@ -1060,7 +1120,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const etag = await getRecipeEtag(String(recipe['id']));
     const response = await requestV2Preparation(String(recipe['id']), etag);
 
-    expect(response).toEqual(quotaResponse);
+    expect(response).toMatchObject({ status: 429, jsonBody: { code: 'QUOTA_EXCEEDED', quota: { feature: 'recipe-analyze', used: 10, limit: 10 } } });
     expect(enforceQuota).toHaveBeenCalledTimes(1);
     expect(prepareRecipeExport).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
@@ -1151,7 +1211,7 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
     const response = await requestV2Preparation(String(recipe['id']));
 
     expect(response.status).toBe(422);
-    expect(response.jsonBody).toMatchObject({ details: expect.any(Array) });
+    expect(response.jsonBody).toMatchObject({ code: 'AI_OUTPUT_INVALID', fieldErrors: expect.any(Array) });
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
@@ -1256,7 +1316,7 @@ describe('PUT /recipes/:id/visibility', () => {
       ctx,
     );
     expect(staleWrite.status).toBe(412);
-    expect(staleWrite.jsonBody).toEqual({ error: 'recipe_revision_conflict' });
+    expect(staleWrite.jsonBody).toMatchObject({ code: 'RECIPE_CONFLICT' });
 
     const unpublished = await setRecipeVisibilityHandler(
       await makeAuthRequest({ params: { id: recipeId }, body: { visibility: 'private' } }),
@@ -1296,7 +1356,7 @@ describe('PUT /recipes/:id/visibility', () => {
     expect(unauthenticated.status).toBe(401);
     expect(foreignWrite.status).toBe(404);
     expect(injectedCreate.status).toBe(400);
-    expect(injectedCreate.jsonBody).toEqual({ error: 'recipe_visibility_requires_dedicated_endpoint' });
+    expect(injectedCreate.jsonBody).toMatchObject({ code: 'RECIPE_VISIBILITY_REQUIRES_DEDICATED_ENDPOINT' });
     expect(injectedUpdate.status).toBe(400);
     expect((await getRecipesRepository().get(TEST_USER_ID, recipeId))?.visibility).toBe('private');
   });
@@ -1392,7 +1452,7 @@ describe('POST /recipes — createRecipe', () => {
       },
     }), ctx);
     expect(withUnknownIngredient.status).toBe(400);
-    expect(withUnknownIngredient.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+    expect(withUnknownIngredient.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_INGREDIENT' });
 
     const withDuplicateSourceId = await createRecipeHandler(await makeAuthRequest({
       body: {
@@ -1406,7 +1466,7 @@ describe('POST /recipes — createRecipe', () => {
       },
     }), ctx);
     expect(withDuplicateSourceId.status).toBe(400);
-    expect(withDuplicateSourceId.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+    expect(withDuplicateSourceId.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_INGREDIENT' });
 
     const withDuplicateSelection = await createRecipeHandler(await makeAuthRequest({
       body: {
@@ -1423,7 +1483,7 @@ describe('POST /recipes — createRecipe', () => {
       },
     }), ctx);
     expect(withDuplicateSelection.status).toBe(400);
-    expect(withDuplicateSelection.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+    expect(withDuplicateSelection.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_INGREDIENT' });
   });
 
   it('requires the export view and confirmation action as a pair', async () => {
@@ -1442,9 +1502,9 @@ describe('POST /recipes — createRecipe', () => {
     }), ctx);
 
     expect(missingAction.status).toBe(400);
-    expect(missingAction.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
+    expect(missingAction.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_CONFIRMATION' });
     expect(missingView.status).toBe(400);
-    expect(missingView.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
+    expect(missingView.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_CONFIRMATION' });
   });
 
   it('does not expose a missing export status as a persisted field', async () => {
@@ -1697,9 +1757,9 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     }), ctx);
 
     expect(missingId.status).toBe(400);
-    expect(missingId.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+    expect(missingId.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_INGREDIENT' });
     expect(duplicateId.status).toBe(400);
-    expect(duplicateId.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+    expect(duplicateId.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_INGREDIENT' });
 
     const unchangedRecipe = await getRecipeHandler(
       await makeAuthRequest({ params: { id: recipeId } }),
@@ -1724,7 +1784,7 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     }), ctx);
 
     expect(res.status).toBe(412);
-    expect(res.jsonBody).toEqual({ error: 'recipe_revision_conflict' });
+    expect(res.jsonBody).toMatchObject({ code: 'RECIPE_CONFLICT' });
     expect(compareAndReplace).toHaveBeenCalledWith(
       TEST_USER_ID,
       recipeId,
@@ -1772,7 +1832,7 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     expect(ordinaryUpdate.status).toBe(200);
     expect(currentEtag).not.toBe(staleEtag);
     expect(staleConfirmation.status).toBe(412);
-    expect(staleConfirmation.jsonBody).toMatchObject({ error: 'recipe_revision_conflict' });
+    expect(staleConfirmation.jsonBody).toMatchObject({ code: 'RECIPE_CONFLICT' });
 
     const fetched = await getRecipeHandler(
       await makeAuthRequest({ params: { id: String(created['id']) } }),
@@ -1797,9 +1857,9 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     }), ctx);
 
     expect(missingAction.status).toBe(400);
-    expect(missingAction.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
+    expect(missingAction.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_CONFIRMATION' });
     expect(missingView.status).toBe(400);
-    expect(missingView.jsonBody).toMatchObject({ error: 'invalid_export_view_confirmation' });
+    expect(missingView.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_CONFIRMATION' });
   });
 
   it('returns 404 for unknown id', async () => {
@@ -2048,9 +2108,9 @@ describe('POST /recipes/:id/log — logRecipe', () => {
     );
 
     expect(foreignMealResponse.status).toBe(404);
-    expect(foreignMealResponse.jsonBody).toEqual({ error: 'Meal not found' });
+    expect(foreignMealResponse.jsonBody).toMatchObject({ code: 'MEAL_NOT_FOUND', category: 'not_found' });
     expect(privateRecipeResponse.status).toBe(404);
-    expect(privateRecipeResponse.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(privateRecipeResponse.jsonBody).toMatchObject({ code: 'RECIPE_NOT_FOUND', category: 'not_found' });
     expect((await diary.getMealById('reader-user', readerMeal.id))?.items).toHaveLength(0);
   });
 });
@@ -2170,6 +2230,10 @@ describe('POST /recipes/:id/images — uploadImage', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_HERO_CROP',
+      fieldErrors: [{ path: 'heroCrop', code: 'invalid_value' }],
+    });
   });
 
   it('keeps the legacy heroCrop default when an image is read without metadata', async () => {
@@ -2229,16 +2293,32 @@ describe('POST /recipes/:id/images — uploadImage', () => {
     const req = await makeAuthRequest({ params: { id: String(created['id']) }, formData: emptyFd });
     const res = await uploadImageHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'MISSING_IMAGE_FILE',
+      fieldErrors: [{ path: 'image', code: 'required' }],
+    });
   });
 
-  it('returns 400 for unsupported MIME type', async () => {
+  it('returns 413 with a stable error code when the image exceeds 8 MB', async () => {
+    const created = await createTestRecipe();
+    const req = await makeAuthRequest({
+      params: { id: String(created['id']) },
+      formData: makeImageFormData('image/jpeg', 8 * 1024 * 1024 + 1),
+    });
+    const res = await uploadImageHandler(req, ctx);
+    expect(res.status).toBe(413);
+    expect(res.jsonBody).toMatchObject({ code: 'IMAGE_TOO_LARGE', category: 'validation' });
+  });
+
+  it('returns 415 for unsupported MIME type with a stable error code', async () => {
     const created = await createTestRecipe();
     const req = await makeAuthRequest({
       params: { id: String(created['id']) },
       formData: makeImageFormData('image/gif'),
     });
     const res = await uploadImageHandler(req, ctx);
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(415);
+    expect((res.jsonBody as { code: string }).code).toBe('UNSUPPORTED_MEDIA_TYPE');
   });
 
   it('returns 404 for unknown recipe id', async () => {

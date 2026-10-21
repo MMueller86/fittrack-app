@@ -440,7 +440,7 @@ export function getRecipeDetailsTitleLayout(title: string): {
   if (titleLength <= 16) {
     return { fontSize: 64, teaserTop: 286 };
   }
-  if (titleLength <= 34) {
+  if (titleLength <= 28) {
     return { fontSize: hasLongWord ? 54 : 58, teaserTop: 320 };
   }
   return { fontSize: titleLength > 50 || hasLongWord ? 40 : 46, teaserTop: 350 };

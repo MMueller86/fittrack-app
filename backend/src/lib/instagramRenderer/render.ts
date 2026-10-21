@@ -718,8 +718,8 @@ function createDetailsTextOverrides(
   };
 }
 
-function isInvalidDetailsText(text: string, maxLength: number): boolean {
-  return text.trim().length === 0 || text.trim().length > maxLength || /[\r\n\u2028\u2029]/u.test(text);
+function isInvalidDetailsText(text: string, maxLength?: number): boolean {
+  return text.trim().length === 0 || (maxLength !== undefined && text.trim().length > maxLength) || /[\r\n\u2028\u2029]/u.test(text);
 }
 
 function getDetailsMeasurement(
@@ -746,7 +746,7 @@ export async function probeInstagramRecipeDetailsGeneratedText(
   });
   if (
     !candidate || typeof candidate.savedTitle !== "string" ||
-    isInvalidDetailsText(candidate.savedTitle, 60) ||
+    isInvalidDetailsText(candidate.savedTitle) ||
     typeof candidate.teaser !== "string" || !Array.isArray(candidate.steps) ||
     candidate.steps.some((step) => typeof step !== "string")
   ) {
@@ -800,7 +800,11 @@ export async function probeInstagramRecipeDetailsGeneratedText(
         if (!layout.ok) {
           textById.set(field.id, "");
           if (field.field === "title") {
-            diagnostics.push({ ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED" });
+            diagnostics.push({
+              ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED",
+              fontSize: field.style.fontSize,
+              measured: { width: layout.error.measuredWidth, maxWidth: layout.error.maxWidth },
+            });
           } else {
             diagnostics.push({
               ...identity, status: "width-overflow", fontSize: field.style.fontSize,
@@ -835,7 +839,11 @@ export async function probeInstagramRecipeDetailsGeneratedText(
             code: measured ? "NON_FINITE_MEASUREMENT" : "MISSING_MEASUREMENT",
           });
         } else if (field.field === "title" && exceedsDetailsBounds(measured, field.maxWidth, field.maxHeight)) {
-          diagnostics.push({ ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED" });
+          diagnostics.push({
+            ...identity, status: "technical-failure", code: "TITLE_LAYOUT_FAILED",
+            fontSize: field.style.fontSize,
+            measured: { ...measured, maxWidth: field.maxWidth, maxHeight: field.maxHeight },
+          });
         } else {
           diagnostics.push({
             ...identity,
@@ -1060,11 +1068,11 @@ function validateRecipeDetailsTemplate(
   input: RecipeDetailsTemplateInput,
 ): RecipeDetailsTemplateRenderResult | undefined {
   if (
-    isInvalidDetailsText(input.title, 60)
+    isInvalidDetailsText(input.title)
   ) {
     return invalidTemplateInput(
       "title",
-      "title must be a visible single-line string with at most 60 characters.",
+      "title must be a visible single-line string.",
     );
   }
   if (

@@ -17,6 +17,7 @@ import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRep
 import { getRecipesRepository } from '../lib/repositories/recipesRepository';
 import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
+import { parseRecipeBody, RecipeDependencyError, withRecipeHandler } from '../lib/recipeHttp';
 import { enforceQuota, trackUsage } from '../lib/quota';
 import { rankByQuery } from '../lib/searchRanking';
 import type {
@@ -517,20 +518,17 @@ const RecipeAnalyzeBodySchema = z.object({
   text: z.string().min(10, 'Bitte beschreibe das Rezept mit mindestens 10 Zeichen.').max(5000, 'Text darf maximal 5000 Zeichen lang sein.'),
 });
 
-export const recipeAnalyzeHandler = withHandler(
+export const recipeAnalyzeHandler = withRecipeHandler(
   'ai.recipe-analyze',
-  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const userContext = await requireUser(request);
     const { userId } = userContext;
 
     const quotaBlock = await enforceQuota(userContext, 'recipe-analyze');
     if (quotaBlock) return quotaBlock;
 
-    const body = await request.json();
-    const parsed = RecipeAnalyzeBodySchema.safeParse(body);
-    if (!parsed.success) {
-      return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
-    }
+    const parsed = await parseRecipeBody(request, RecipeAnalyzeBodySchema, ctx);
+    if (!parsed.ok) return parsed.response;
 
     const { text } = parsed.data;
 
@@ -542,8 +540,7 @@ export const recipeAnalyzeHandler = withHandler(
       if (e instanceof RecipeAnalysisContractError) {
         return { status: 422, jsonBody: { error: e.message, details: e.details } };
       }
-      const msg = e instanceof Error ? e.message : String(e);
-      return { status: 502, jsonBody: { error: `AI recipe analysis failed: ${msg}` } };
+      throw new RecipeDependencyError('azure_openai_analysis', e);
     }
 
     const validation = validateRecipeAnalyzeOutput(recipeRaw);
@@ -707,11 +704,11 @@ export function validateRecipeScaleResponse(
   };
 }
 
-export const recipeScalePreviewHandler = withHandler(
+export const recipeScalePreviewHandler = withRecipeHandler(
   'ai.recipe-scale.preview',
-  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const userContext = await requireUser(request);
-    const parsed = await parseBody(request, RecipeScaleBodySchema);
+    const parsed = await parseRecipeBody(request, RecipeScaleBodySchema, ctx);
     if (!parsed.ok) return parsed.response;
 
     const { userId } = userContext;
@@ -726,8 +723,8 @@ export const recipeScalePreviewHandler = withHandler(
     let rawResponse: unknown;
     try {
       rawResponse = await scaleRecipeText(buildRecipeScaleInput(recipe, targetPortions));
-    } catch {
-      return { status: 502, jsonBody: { error: 'KI-Rezeptskalierung ist derzeit nicht verfügbar' } };
+    } catch (error) {
+      throw new RecipeDependencyError('azure_openai_scale', error);
     }
 
     const preview = validateRecipeScaleResponse(
@@ -737,7 +734,7 @@ export const recipeScalePreviewHandler = withHandler(
       targetPortions,
     );
     if (!preview) {
-      return { status: 422, jsonBody: { error: 'KI-Antwort für die Rezeptskalierung ist ungültig' } };
+      return { status: 422, jsonBody: { error: 'KI-Antwort für die Rezeptskalierung ist ungültig', code: 'AI_OUTPUT_INVALID' } };
     }
 
     await trackUsage(userContext, 'recipe-scale');

@@ -373,7 +373,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       ctx,
     );
     expect(missingImage.status).toBe(404);
-    expect(missingImage.jsonBody).toEqual({ error: 'Image not found' });
+    expect(missingImage.jsonBody).toMatchObject({ code: 'RECIPE_IMAGE_NOT_FOUND', category: 'not_found' });
   });
 
   it('does not render a published recipe owned by another user', async () => {
@@ -397,7 +397,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(response.jsonBody).toMatchObject({ code: 'RECIPE_NOT_FOUND', category: 'not_found' });
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
   });
@@ -406,10 +406,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     const noImageRecipe = await createRecipe();
     const noImage = await instagramRecipeHandler(await renderRequest(noImageRecipe.id), ctx);
     expect(noImage.status).toBe(422);
-    expect(noImage.jsonBody).toEqual({
-      error: 'Bitte lade zuerst ein Rezeptfoto hoch, bevor du das Rezept teilst.',
-      code: 'NO_RECIPE_IMAGE',
-    });
+    expect(noImage.jsonBody).toMatchObject({ code: 'NO_RECIPE_IMAGE', category: 'validation', retryable: false });
 
     const invalidMetadataRecipe = await createRecipe([{ id: 'image-1', blobName: ' ', order: 1 }]);
     const invalidMetadata = await instagramRecipeHandler(
@@ -417,13 +414,13 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       ctx,
     );
     expect(invalidMetadata.status).toBe(422);
-    expect(invalidMetadata.jsonBody).toEqual({ error: 'Recipe image cannot be rendered', code: 'IMAGE_BLOB_INVALID' });
+    expect(invalidMetadata.jsonBody).toMatchObject({ code: 'IMAGE_BLOB_INVALID', category: 'validation' });
 
     const oversizedRecipe = await createRecipe([{ id: 'image-1', blobName: 'server/large.png', order: 1 }]);
     downloadRecipeImageMock.mockRejectedValueOnce(new RecipeImageTooLargeError());
     const oversized = await instagramRecipeHandler(await renderRequest(oversizedRecipe.id), ctx);
     expect(oversized.status).toBe(422);
-    expect(oversized.jsonBody).toEqual({ error: 'Recipe image exceeds the 8 MB limit', code: 'IMAGE_TOO_LARGE' });
+    expect(oversized.jsonBody).toMatchObject({ code: 'IMAGE_TOO_LARGE', category: 'validation' });
   });
 
   it('maps renderer input failures to 422 and hides internal details', async () => {
@@ -440,10 +437,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     const response = await instagramRecipeHandler(await renderRequest(recipe.id), ctx);
 
     expect(response.status).toBe(422);
-    expect(response.jsonBody).toEqual({
-      error: 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.',
-      code: 'TITLE_OVERFLOW',
-    });
+    expect(response.jsonBody).toMatchObject({ code: 'TITLE_OVERFLOW', retryable: false });
     expect(JSON.stringify(response.jsonBody)).not.toContain('private measured detail');
   });
 
@@ -465,10 +459,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       const response = await shareBundleHandler(await renderRequest(recipe.id), ctx);
 
       expect(response.status).toBe(422);
-      expect(response.jsonBody).toEqual({
-        error: 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.',
-        code: 'TITLE_OVERFLOW',
-      });
+      expect(response.jsonBody).toMatchObject({ code: 'TITLE_OVERFLOW', retryable: false });
       const serializedWarningLogs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
       expect(serializedWarningLogs).toContain('"event":"recipes.shareBundle.instagramRender.unrenderable"');
       expect(serializedWarningLogs).toContain(`"recipe_title":"${title}"`);
@@ -488,13 +479,13 @@ describe('POST /api/recipes/:id/instagram-render', () => {
 
     const missingAsset = await instagramRecipeHandler(await renderRequest(recipe.id), ctx);
     expect(missingAsset.status).toBe(500);
-    expect(missingAsset.jsonBody).toEqual({ error: 'Internal server error' });
+    expect(missingAsset.jsonBody).toMatchObject({ code: 'INTERNAL_ERROR', category: 'internal' });
     expect(JSON.stringify(missingAsset.jsonBody)).not.toContain('private-font.ttf');
 
     downloadRecipeImageMock.mockRejectedValueOnce(new Error('storage connection secret'));
     const storageFailure = await instagramRecipeHandler(await renderRequest(recipe.id), ctx);
     expect(storageFailure.status).toBe(500);
-    expect(storageFailure.jsonBody).toEqual({ error: 'Internal server error' });
+    expect(storageFailure.jsonBody).toMatchObject({ code: 'INTERNAL_ERROR', category: 'internal' });
   });
 
   it('requires authentication for the share bundle', async () => {
@@ -521,10 +512,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     );
 
     expect(response.status).toBe(422);
-    expect(response.jsonBody).toEqual({
-      error: 'Bitte lade zuerst ein Rezeptfoto hoch, bevor du das Rezept teilst.',
-      code: 'NO_RECIPE_IMAGE',
-    });
+    expect(response.jsonBody).toMatchObject({ code: 'NO_RECIPE_IMAGE', retryable: false });
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeDetailsTemplateMock).not.toHaveBeenCalled();
@@ -546,7 +534,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(response.jsonBody).toMatchObject({ code: 'RECIPE_NOT_FOUND' });
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
   });
@@ -572,7 +560,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(response.jsonBody).toMatchObject({ code: 'RECIPE_NOT_FOUND' });
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeDetailsTemplateMock).not.toHaveBeenCalled();
@@ -698,7 +686,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
         ctx,
       );
       expect(response.status).toBe(400);
-      expect(response.jsonBody).toEqual({ error: 'invalid_export_view_ingredient' });
+      expect(response.jsonBody).toMatchObject({ code: 'INVALID_EXPORT_VIEW_INGREDIENT' });
     }
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
   });
@@ -801,10 +789,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
     );
 
     expect(response.status).toBe(422);
-    expect(response.jsonBody).toEqual({
-      error: 'Recipe export view is required for sharing',
-      code: 'MISSING_EXPORT_VIEW',
-    });
+    expect(response.jsonBody).toMatchObject({ code: 'MISSING_EXPORT_VIEW', retryable: false });
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeMock).not.toHaveBeenCalled();
     expect(renderInstagramRecipeDetailsTemplateMock).not.toHaveBeenCalled();
@@ -897,12 +882,12 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       );
 
       expect(response.status).toBe(500);
-      expect(response.jsonBody).toEqual({ error: 'Internal server error' });
+      expect(response.jsonBody).toMatchObject({ code: 'INTERNAL_ERROR', category: 'internal' });
       const serializedErrorLogs = errorLogs.mock.calls.map(([line]) => String(line)).join('\n');
       expect(serializedErrorLogs).toContain('"event":"recipes.shareBundle.instagramRender.failed"');
       expect(serializedErrorLogs).toContain('"failure_stage":"instagram_render"');
-      expect(serializedErrorLogs).toContain('"error_message":"Instagram recipe rendering failed."');
-      expect(serializedErrorLogs).toContain('"error_cause":"Sharp could not decode the source image."');
+      expect(serializedErrorLogs).not.toContain('Instagram recipe rendering failed.');
+      expect(serializedErrorLogs).not.toContain('Sharp could not decode the source image.');
     } finally {
       errorLogs.mockRestore();
     }
@@ -931,15 +916,45 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       );
 
       expect(response.status).toBe(500);
-      expect(response.jsonBody).toEqual({ error: 'Internal server error' });
+      expect(response.jsonBody).toMatchObject({ code: 'INTERNAL_ERROR', category: 'internal' });
       expect(response.jsonBody).not.toHaveProperty('instagram');
       expect(response.jsonBody).not.toHaveProperty('detail');
       expect((await repo.get(TEST_USER_ID, recipe.id))?.exportView).toEqual(storedExportView);
       const serializedErrorLogs = errorLogs.mock.calls.map(([line]) => String(line)).join('\n');
       expect(serializedErrorLogs).toContain('"failure_stage":"detail_render"');
       expect(serializedErrorLogs).toContain('"export_view_source":"request_draft"');
-      expect(serializedErrorLogs).toContain('"error_message":"Instagram recipe details template rendering failed."');
-      expect(serializedErrorLogs).toContain('"error_cause":"Satori font parsing failed."');
+      expect(serializedErrorLogs).not.toContain('Instagram recipe details template rendering failed.');
+      expect(serializedErrorLogs).not.toContain('Satori font parsing failed.');
+    } finally {
+      errorLogs.mockRestore();
+    }
+  });
+
+  it('returns a generic internal error when the detail-template probe fails technically', async () => {
+    const { recipe } = await createCurrentBundleRecipe();
+    const errorLogs = vi.spyOn(ctx, 'error').mockImplementation(() => {});
+    renderInstagramRecipeDetailsTemplateMock.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: 'TEMPLATE_PROBE_FAILED',
+        message: 'private font or geometry failure',
+        field: 'steps',
+        itemIndex: 0,
+        itemField: 'text',
+      },
+    });
+
+    try {
+      const response = await shareBundleHandler(
+        await makeAuthRequest({ params: { id: recipe.id }, body: {} }), ctx,
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.jsonBody).toMatchObject({ code: 'INTERNAL_ERROR', category: 'internal' });
+      expect(JSON.stringify(response.jsonBody)).not.toContain('private font');
+      const logs = errorLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(logs).toContain('recipes.shareBundle.detailFailed');
+      expect(logs).not.toContain('private font or geometry failure');
     } finally {
       errorLogs.mockRestore();
     }
@@ -1012,10 +1027,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       );
 
       expect(response.status).toBe(422);
-      expect(response.jsonBody).toEqual({
-        error: 'Recipe detail image cannot be rendered',
-        code: 'INVALID_TEMPLATE_INPUT',
-      });
+      expect(response.jsonBody).toMatchObject({ code: 'INVALID_TEMPLATE_INPUT', retryable: false });
       const serializedWarningLogs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
       expect(serializedWarningLogs).toContain('"failure_stage":"detail_render"');
       expect(serializedWarningLogs).toContain('"item_index":0');

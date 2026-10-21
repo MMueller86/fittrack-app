@@ -254,6 +254,74 @@ Cycling intermediates (`speedMet`, `uphillBonusMet`, `terrainBonusMet`, `effecti
 | POST | `/api/recipes/{id}/instagram-render` | Yes | Renders the server-owned recipe as a direct `1080 x 1350` PNG; no render result is persisted |
 | POST | `/api/recipes/{id}/share-bundle` | Yes | Atomically renders Instagram and recipe-detail PNGs from an optional request draft or confirmed stored view, including stale snapshots; no result is persisted |
 
+### Recipe Error Contract and Frontend Actions
+
+All returned errors (`4xx`/`5xx`) from the owner recipe routes, the two share
+routes, authenticated community recipe routes, and `/api/ai/recipe-analyze` plus
+`/api/ai/recipe-scale/preview` use this envelope. The HTTP status is preserved;
+the old free-form `error` property is not part of the new contract. Successful
+JSON responses and successful binary/PNG responses are unchanged.
+
+```json
+{
+	"code": "TITLE_OVERFLOW",
+	"message": "Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.",
+	"category": "validation",
+	"retryable": false,
+	"correlationId": "invocation-id",
+	"fieldErrors": [{ "path": "name", "code": "TITLE_OVERFLOW" }]
+}
+```
+
+`fieldErrors` is optional and contains safe `{ path, code }` values only, never
+submitted values. `quota` is optional and, when supplied, contains
+`{ feature, used, limit, resetsAt }`. Branch on `code` and `fieldErrors`, not
+localized `message` text. Show `message` as the user-facing explanation;
+include `correlationId` in support diagnostics. Automatic retry is appropriate
+only when `retryable` is true, using bounded backoff.
+
+| Code | Status / category | Frontend action |
+|---|---|---|
+| `AUTHENTICATION_REQUIRED` | 401 / authentication | Renew the session or ask the user to sign in again. |
+| `FORBIDDEN` | 403 / authorization | Explain that the action is not permitted; do not retry. No current Recipe route intentionally emits this code. |
+| `INVALID_JSON`, `INVALID_REQUEST` | 400 / validation | Treat as a client/request validation issue; use `fieldErrors` where present and correct the request. |
+| `MISSING_RECIPE_ID`, `MISSING_RESOURCE_ID` | 400 / validation | Restore the route/resource selection, then reload. |
+| `MISSING_IMAGE_FILE` | 400 / validation | Ask the user to select an image. |
+| `INVALID_HERO_CROP` | 400 / validation | Reset or correct the crop values. |
+| `INVALID_SELECTED_TAGS` | 400 / validation | Reload the recipe's current tags and let the user choose again. |
+| `INVALID_EXPORT_VIEW_CONFIRMATION` | 400 / validation | Send the export view and its confirmation action together. |
+| `INVALID_EXPORT_VIEW_INGREDIENT` | 400 / validation | Reload ingredients and reselect valid, unique, non-seasoning ingredients. |
+| `INVALID_EXPORT_PREPARATION_REQUEST` | 400 / validation | Correct the request to `{ "contractVersion": 2 }`; do not repeat the same payload. |
+| `RECIPE_VISIBILITY_REQUIRES_DEDICATED_ENDPOINT` | 400 / validation | Use `PUT /api/recipes/{id}/visibility` instead of ordinary create/update. |
+| `INVALID_RECIPE_PORTIONS` | 400 / validation | Ask for a valid positive portion count. |
+| `INVALID_COMMUNITY_LIMIT` | 400 / validation | Restart community pagination with a supported page size. |
+| `INVALID_COMMUNITY_CONTINUATION_TOKEN` | 400 / validation | Restart pagination without the invalid token. |
+| `INVALID_IMAGE_ORDER` | 400 / validation | Reload the image list and submit every image ID exactly once. |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 / validation | Ask for a JPEG or PNG image. |
+| `IMAGE_TOO_LARGE` | 413 or 422 / validation | Ask for an image no larger than 8 MB; retry after replacing it. |
+| `RECIPE_NOT_FOUND`, `RECIPE_IMAGE_NOT_FOUND`, `MEAL_NOT_FOUND`, `RESOURCE_NOT_FOUND` | 404 / not_found | Refresh the affected recipe, image, meal, or resource; explain that it may have been removed or access revoked. |
+| `RECIPE_CONFLICT` | 409 or 412 / conflict | Reload and let the user review current values; never auto-replay a stale edit. |
+| `INVALID_RECIPE_META` | 422 / validation | Correct the time/difficulty metadata using `fieldErrors`. |
+| `RECIPE_META_OVERFLOW` | 422 / validation | Shorten the time or difficulty text. |
+| `TITLE_OVERFLOW` | 422 / validation | Shorten the saved recipe name, then render again. |
+| `TOO_MANY_TAGS`, `TAG_ROW_OVERFLOW` | 422 / validation | Select at most four tags; if they still overflow, choose shorter tags. |
+| `INVALID_ZOOM`, `INVALID_FOCUS` | 422 / validation | Reset the image crop/zoom and try again. |
+| `IMAGE_UNREADABLE`, `IMAGE_BLOB_INVALID` | 422 / validation | Ask the user to choose or upload a readable replacement image. |
+| `NO_RECIPE_IMAGE` | 422 / validation | Ask the user to upload a recipe image before sharing. |
+| `MISSING_EXPORT_VIEW` | 422 / validation | Prepare or confirm an export view before sharing. |
+| `INVALID_TEMPLATE_INPUT` | 422 / validation | Correct the path identified by `fieldErrors`; reload if the invalid value is stored rather than editable. |
+| `TEMPLATE_FIELD_OVERFLOW` | 422 / validation | Shorten the field identified by `fieldErrors`, then retry the render. |
+| `RECIPE_UNPROCESSABLE`, `AI_OUTPUT_INVALID` | 422 / validation | Do not auto-retry. Ask the user to review/correct the recipe source and allow a deliberate retry. |
+| `QUOTA_EXCEEDED` | 429 / quota | Show the quota limit and reset time from `quota` when present; retry after reset or quota availability. |
+| `UPSTREAM_UNAVAILABLE` | 502 / dependency | Show a temporary-service message and retry with bounded backoff. |
+| `INTERNAL_ERROR` | 500 / internal | Do not auto-retry. Show a generic failure and provide `correlationId` to support. |
+
+`TEMPLATE_PROBE_FAILED` and other technical renderer failures are deliberately
+returned as `500 INTERNAL_ERROR`; they are not user-correctable overflow errors.
+The title-only Preparation failure remains `422 TITLE_OVERFLOW` and does not
+consume quota. Quota responses preserve their existing HTTP status and quota
+values inside the envelope.
+
 ### Visibility and authorization
 
 Recipe list, detail, create, update, delete, image-management, export, and scale
@@ -294,10 +362,11 @@ retains normal owner access.
 
 The route returns the updated owner `Recipe` and ETag. `If-Match` is optional;
 when supplied it must exactly match the current ETag. The repository also uses
-compare-and-replace, so a stale precondition or write race returns `412` with
-`{ "error": "recipe_revision_conflict" }`. Visibility/publication fields are
-not accepted through ordinary recipe create/update bodies; those return
-`400 { "error": "recipe_visibility_requires_dedicated_endpoint" }`.
+compare-and-replace, so a stale precondition or write race returns `412`
+`RECIPE_CONFLICT`. Visibility/publication fields are not accepted through
+ordinary recipe create/update bodies; those return `400`
+`RECIPE_VISIBILITY_REQUIRES_DEDICATED_ENDPOINT`. Both use the Recipe error
+envelope above.
 
 ### Authenticated community recipe routes
 
@@ -307,10 +376,10 @@ not accepted through ordinary recipe create/update bodies; those return
 | GET | `/api/community-recipes/{id}` | Yes | One current community recipe; private, deleted, or unknown IDs return 404 |
 | GET | `/api/community-recipes/{id}/images/{imageId}` | Yes | Protected JPEG/PNG bytes; visibility is rechecked on every request; never returns a SAS URL |
 
-An invalid limit returns `400 { "error": "invalid_community_limit" }`; an
-empty or invalid continuation token returns
-`400 { "error": "invalid_community_continuation_token" }`. The continuation
-token is opaque and is passed back unchanged.
+An invalid limit returns `400` with code `INVALID_COMMUNITY_LIMIT`; an empty or
+invalid continuation token returns `400` with code
+`INVALID_COMMUNITY_CONTINUATION_TOKEN`. Both use the Recipe error envelope
+above. The continuation token is opaque and is passed back unchanged.
 
 `CommunityRecipe` is a safe read projection containing the recipe's name,
 description, portions, ingredients, steps, nutrition, tags, image metadata,
@@ -327,9 +396,11 @@ Each community image's `url` is a relative authenticated API path of the form
 returns the bytes with the stored JPEG/PNG content type,
 `Cache-Control: no-store`, and `X-Content-Type-Options: nosniff`; it returns 404
 when the recipe is no longer currently published or the image is unavailable,
-415 for an unsupported image type, and 422 when the image exceeds the 8 MB
-limit. Owner recipe endpoints continue to use their existing short-lived
-read-only SAS URLs; the protected community route is a separate contract.
+415 (`UNSUPPORTED_MEDIA_TYPE`) for an unsupported image type, and 422
+(`IMAGE_TOO_LARGE`) when the image exceeds the 8 MB limit. Error responses use
+the Recipe error envelope; successful image bytes are unchanged. Owner recipe
+endpoints continue to use their existing short-lived read-only SAS URLs; the
+protected community route is a separate contract.
 
 ### Recipe logging and snapshots
 
@@ -352,7 +423,7 @@ its original snapshot.
 
 ### Recipe create/update body
 
-`POST /api/recipes` accepts the complete recipe body. `PUT /api/recipes/{id}` accepts a partial recipe body with any subset of `name`, `description`, `portions`, `ingredients`, `steps`, `tags`, and the confirmed `exportView` fields; omitted fields keep their stored values. When `ingredients` or `portions` are supplied, nutrition is recalculated server-side from the stored/supplied combination. Both endpoints validate `ingredients` with the same Zod contract and return `400` with an `error` field when validation fails.
+`POST /api/recipes` accepts the complete recipe body. `PUT /api/recipes/{id}` accepts a partial recipe body with any subset of `name`, `description`, `portions`, `ingredients`, `steps`, `tags`, and the confirmed `exportView` fields; omitted fields keep their stored values. When `ingredients` or `portions` are supplied, nutrition is recalculated server-side from the stored/supplied combination. Both endpoints validate `ingredients` with the same Zod contract and return `400 INVALID_REQUEST` with safe `fieldErrors` when validation fails; the response uses the Recipe error envelope.
 
 The update endpoint always writes recalculated `nutritionTotal` and `nutritionPerPortion` using the effective ingredient list and portion count. This also covers updates that only change metadata: stored nutrition is normalized from the current recipe ingredients/portions before the response is returned.
 
@@ -415,13 +486,14 @@ the revision it read, independently of the client header.
 
 **Confirmation errors:**
 
-- `400` — incomplete `exportView` / `exportViewAction` pair;
-	`{ "error": "invalid_export_view_confirmation" }`
-- `400` — an included ingredient ID is unknown, refers to a seasoning, occurs
-  more than once in the recipe, or is repeated in `includedIngredientIds`;
-  `{ "error": "invalid_export_view_ingredient" }`
-- `412` — supplied stale ETag or internal write race;
-	`{ "error": "recipe_revision_conflict" }`
+- `400 INVALID_EXPORT_VIEW_CONFIRMATION` — incomplete `exportView` /
+	`exportViewAction` pair
+- `400 INVALID_EXPORT_VIEW_INGREDIENT` — included ingredient ID is unknown,
+	refers to a seasoning, occurs more than once in the recipe, or is repeated
+	in `includedIngredientIds`
+- `412 RECIPE_CONFLICT` — supplied stale ETag or internal write race
+
+All responses use the Recipe error envelope.
 
 ### POST /api/recipes/{id}/export-view/prepare
 
@@ -451,9 +523,9 @@ quota, and validation failures do not track usage.
 
 **Request:** exactly `{ "contractVersion": 2 }`. Missing or invalid JSON,
 `{}`, unknown fields, and unsupported versions return
-`400 { "error": "invalid_export_preparation_request" }`. No client `If-Match`
-header is required. If one is supplied, a stale or non-exact ETag returns
-`412 recipe_revision_conflict` before quota or provider work.
+`400 INVALID_EXPORT_PREPARATION_REQUEST` in the Recipe error envelope. No
+client `If-Match` header is required. If one is supplied, a stale or non-exact
+ETag returns `412 RECIPE_CONFLICT` before quota/provider work.
 
 **Success response (200):** The suggestion contains only export text fields and
 plain steps. `sourceEtag` identifies the loaded revision for compatibility;
@@ -463,6 +535,15 @@ ingredient-resolution results. `totalTimeMinutes` and `difficulty` may be
 `null`. Preparation is transient: it does not update the recipe or its
 confirmed `exportView`; saving still uses the separate explicit confirmation
 flow above.
+
+If the template title-layout probe cannot fit the saved recipe name, the route
+returns `422 TITLE_OVERFLOW` with field path `name` in the Recipe error
+envelope.
+The mobile share flow shows its actionable title-shortening notice without
+retrying. The response contains neither the saved name nor probe measurements;
+the `TITLE_LAYOUT_FAILED` server event records the recipe ID/title and, when
+available, measured title dimensions, allowed bounds, font size, and step
+layout for diagnosis. This failure does not book usage.
 
 `validateRecipeExportPreparationOutput(output, recipe.steps)` uses the separate
 loaded source: positive, unique, ascending orders, not necessarily contiguous.
@@ -556,14 +637,14 @@ open. This is no private/Alpha replay or Share-success claim. See
 
 **Errors:**
 
-- `400` — missing recipe id, or invalid preparation body (`invalid_export_preparation_request`)
+- `400 MISSING_RECIPE_ID` or `INVALID_EXPORT_PREPARATION_REQUEST` — invalid route/body
 - `401` — missing or invalid Bearer token
-- `404` — recipe not found for the authenticated user
-- `412` — a supplied `If-Match` does not exactly match the loaded recipe revision; rejected before quota/provider work
-- `422` — invalid/missing saved cooking source before quota/provider, or three completed parsed drafts exhaust content corrections; existing validation envelope with bounded `details`, no raw text/bounds
-- `429` — existing `QuotaExceededResponse` for `recipe-analyze`
-- `502` — terminal provider/refusal/incomplete/empty/invalid response or timeout; generic `AI recipe analysis failed`, no further correction or usage
-- `500` — technical probe/font/measurement, lookup/quota-backend or usage-booking failure; generic `Internal server error`, no private Error.message echo
+- `404 RECIPE_NOT_FOUND` — recipe unavailable to the authenticated user
+- `412 RECIPE_CONFLICT` — supplied ETag does not match; rejected before quota/provider work
+- `422 AI_OUTPUT_INVALID` — invalid saved source or exhausted content corrections; safe `fieldErrors` only, no raw text/bounds
+- `429 QUOTA_EXCEEDED` — `quota` metadata is preserved when supplied
+- `502 UPSTREAM_UNAVAILABLE` — terminal provider failure or timeout; no further correction or usage
+- `500 INTERNAL_ERROR` — technical probe/font/measurement, lookup/quota-backend, or usage-booking failure; no private exception text
 
 ### Recipe steps
 
@@ -582,6 +663,7 @@ and is not accepted as a runtime frame. The renderer output remains exactly
 `1080 x 1350` PNG.
 
 `POST /api/recipes/{id}/images` accepts multipart field `image`, only `image/jpeg` and `image/png`, up to 8 MB, plus the optional `heroCrop` JSON string. The new image is appended at `max existing order + 1`. When omitted, the field remains absent in Cosmos; repository reads and response objects expose the deterministic effective legacy default. When supplied, it must match the strict `RecipeImageHeroCrop` contract; invalid JSON or metadata returns `400` before the blob is uploaded. The crop is metadata only: upload never creates a second or cropped blob. `DELETE /api/recipes/{id}/images/{imageId}` deletes the blob and renumbers remaining images from 1.
+`POST /api/recipes/{id}/images` accepts multipart field `image`, only `image/jpeg` and `image/png`, up to 8 MB, plus the optional `heroCrop` JSON string. The new image is appended at `max existing order + 1`. When omitted, the field remains absent in Cosmos; repository reads and response objects expose the deterministic effective legacy default. When supplied, it must match the strict `RecipeImageHeroCrop` contract; invalid JSON or metadata returns `400` before the blob is uploaded. A missing file returns `400 MISSING_IMAGE_FILE`, an oversized upload returns `413 IMAGE_TOO_LARGE`, and an unsupported format returns `415 UNSUPPORTED_MEDIA_TYPE`; errors use the Recipe envelope. The crop is metadata only: upload never creates a second or cropped blob. `DELETE /api/recipes/{id}/images/{imageId}` deletes the blob and renumbers remaining images from 1.
 
 ### PUT /api/recipes/{id}/images/{imageId}/hero-crop
 
@@ -689,22 +771,17 @@ The direct Blob download is bounded by the existing 8 MB recipe-image limit.
 
 **Errors:**
 
-- `400` — missing route id, invalid JSON, unknown request fields, invalid
-	`imageId`/presentation/selectedTags/nutritionHighlight values, or incomplete
-	`recipeMeta`; the response uses the existing `{ error: string }` shape.
+- `400 MISSING_RECIPE_ID`, `INVALID_JSON`, or `INVALID_REQUEST` — invalid route/body;
+  safe field paths are returned in `fieldErrors` where available.
 - `401` — missing or invalid Bearer token.
-- `404` — recipe not found for the authenticated user, or an explicitly
-	requested `imageId` is not part of that recipe.
-- `422` — no renderable recipe image, invalid stored image metadata, image over
-	8 MB, unreadable image, invalid stored portions for requested meta, or an
-	expected renderer input/layout error. Controlled renderer failures include a
-	stable `code`, such as `NO_RECIPE_IMAGE`, `IMAGE_BLOB_INVALID`,
-	`IMAGE_TOO_LARGE`, `INVALID_RECIPE_META`, `TITLE_OVERFLOW`,
-	`TOO_MANY_TAGS`, or `TAG_ROW_OVERFLOW`. `TITLE_OVERFLOW` returns
-	`{ "error": "Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.", "code": "TITLE_OVERFLOW" }`.
-- `500` — unexpected storage, native renderer, missing-asset, or other backend
-	failure. The external response is generic; internal causes and asset details
-	are logged but never returned.
+- `404 RECIPE_NOT_FOUND` or `RECIPE_IMAGE_NOT_FOUND` — recipe or requested image unavailable.
+- `422` — controlled renderer/input failures use codes such as `NO_RECIPE_IMAGE`,
+  `IMAGE_BLOB_INVALID`, `IMAGE_TOO_LARGE`, `INVALID_RECIPE_META`,
+  `RECIPE_META_OVERFLOW`, `TITLE_OVERFLOW`, `TOO_MANY_TAGS`,
+  `TAG_ROW_OVERFLOW`, `INVALID_ZOOM`, `INVALID_FOCUS`, and `IMAGE_UNREADABLE`.
+- `500 INTERNAL_ERROR` — unexpected storage, native renderer, missing-asset,
+  or other technical failure. Internal causes and asset details are logged but
+  never returned. All errors use the Recipe error envelope.
 
 ### POST /api/recipes/{id}/share-bundle
 
@@ -757,13 +834,12 @@ and trimmed 1-90 character descriptions), and `includedIngredientIds` (at most
 20 unique non-empty IDs). `sourceFingerprint` and all other unknown properties
 are rejected. Each included ID must identify exactly one non-seasoning
 ingredient in the authenticated recipe; invalid references return
-`400 { "error": "invalid_export_view_ingredient" }`.
+`400 INVALID_EXPORT_VIEW_INGREDIENT` in the Recipe error envelope.
 
 When `exportViewDraft` is omitted, existing callers retain the stored-view
 contract: a present confirmed view is used whether current or stale; when both
 the request draft and stored view are absent, the endpoint returns
-`422 { "error": "Recipe export view is required for sharing",
-"code": "MISSING_EXPORT_VIEW" }`. Image selection, presentation
+`422 MISSING_EXPORT_VIEW` in the Recipe error envelope. Image selection, presentation
 defaults/overrides, selected-tag validation, and highlight values follow
 `POST /api/recipes/{id}/instagram-render`. Recipe title, portions, nutrition,
 and current ingredient values come from the authenticated server-side recipe.
@@ -801,32 +877,24 @@ partial image pair. A request draft is not persisted.
 
 **Errors:**
 
-- `400` — missing route id, invalid JSON, unknown fields (including
-	`recipeMeta`), invalid draft shape or ingredient IDs, invalid
-	`imageId`/presentation/selectedTags/nutritionHighlight.
+- `400 MISSING_RECIPE_ID`, `INVALID_JSON`, `INVALID_REQUEST`, or
+  `INVALID_EXPORT_VIEW_INGREDIENT` — invalid route/body/reference; safe field
+  paths are returned in `fieldErrors` where available.
 - `401` — missing or invalid Bearer token.
-- `404` — recipe not found for the authenticated user, or an explicitly
-	requested `imageId` is not part of that recipe.
+- `404 RECIPE_NOT_FOUND` or `RECIPE_IMAGE_NOT_FOUND` — recipe or requested image unavailable.
 - When the recipe has no stored image and no explicit `imageId` was requested,
-	both image-export endpoints return HTTP `422` with this user-actionable body:
-
-	```json
-	{
-		"error": "Bitte lade zuerst ein Rezeptfoto hoch, bevor du das Rezept teilst.",
-		"code": "NO_RECIPE_IMAGE"
-	}
-	```
-
-	Clients should branch on `code`, not the message text, and may display `error`
-	to the user. This is a missing prerequisite, not a transient render failure;
+	both image-export endpoints return HTTP `422 NO_RECIPE_IMAGE` in the Recipe
+	error envelope. The localized `message` asks for an uploaded recipe photo.
+	Clients should branch on `code`, not the message text. This is a missing prerequisite, not a transient render failure;
 	retrying without uploading a recipe photo will not resolve it. No Blob
 	download, renderer call, or recipe write occurs for this response.
-- `422` — missing stored view and omitted draft (`MISSING_EXPORT_VIEW`), no renderable image,
-	invalid stored image metadata, image over 8 MB, unreadable image, or a
-	controlled renderer/layout failure. A title that does not fit returns
-	`{ "error": "Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.", "code": "TITLE_OVERFLOW" }`.
-- `500` — unexpected storage, native renderer, missing-asset, or other backend
-	failure. Errors never include one rendered image as a partial response.
+- `422` — `MISSING_EXPORT_VIEW`, `IMAGE_BLOB_INVALID`, `IMAGE_TOO_LARGE`,
+	`IMAGE_UNREADABLE`, `INVALID_TEMPLATE_INPUT`, `TEMPLATE_FIELD_OVERFLOW`,
+	or another controlled renderer/input failure. `TITLE_OVERFLOW` includes the
+	`name` field path. Technical template-probe failures return `500 INTERNAL_ERROR`.
+- `500 INTERNAL_ERROR` — unexpected storage, native renderer, missing-asset,
+	or other backend failure. Errors never include one rendered image as a partial
+	response. All errors use the Recipe error envelope.
 
 ## Food Search
 

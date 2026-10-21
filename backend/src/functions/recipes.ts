@@ -22,7 +22,13 @@ import { RECIPE_PREPARATION_PROMPT_VERSION } from '../lib/prompts/recipeAnalyze'
 import {
   validateRecipePreparationSource,
 } from '../lib/recipeAnalyzeValidation';
-import { parseBody, withHandler } from '../lib/http';
+import {
+  parseRecipeBody,
+  recipeApiError,
+  recipeExceptionLogFields,
+  validateRecipeValue,
+  withRecipeHandler,
+} from '../lib/recipeHttp';
 import {
   logEvent,
   type LogFields,
@@ -202,7 +208,7 @@ async function attachSasUrls(images: RecipeImage[]): Promise<RecipeImage[]> {
 // GET /recipes
 // ---------------------------------------------------------------------------
 
-export const listRecipesHandler = withHandler(
+export const listRecipesHandler = withRecipeHandler(
   'recipes.list',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -229,19 +235,24 @@ export const listRecipesHandler = withHandler(
 // POST /recipes
 // ---------------------------------------------------------------------------
 
-export const createRecipeHandler = withHandler(
+export const createRecipeHandler = withRecipeHandler(
   'recipes.create',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return recipeApiError(ctx, 400, 'INVALID_JSON', {
+        fieldErrors: [{ path: 'body', code: 'invalid_json' }],
+      });
+    }
     if (containsRecipePublicationFields(body)) {
-      return { status: 400, jsonBody: { error: 'recipe_visibility_requires_dedicated_endpoint' } };
+      return recipeApiError(ctx, 400, 'RECIPE_VISIBILITY_REQUIRES_DEDICATED_ENDPOINT');
     }
-    const parsed = CreateRecipeSchema.safeParse(body);
-    if (!parsed.success) {
-      return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
-    }
+    const parsed = validateRecipeValue(body, CreateRecipeSchema, ctx);
+    if (!parsed.ok) return parsed.response;
 
     const {
       name,
@@ -254,7 +265,7 @@ export const createRecipeHandler = withHandler(
       exportViewAction,
     } = parsed.data;
     if ((exportViewInput !== undefined) !== (exportViewAction !== undefined)) {
-      return { status: 400, jsonBody: { error: 'invalid_export_view_confirmation' } };
+      return recipeApiError(ctx, 400, 'INVALID_EXPORT_VIEW_CONFIRMATION');
     }
 
     const { nutritionTotal, nutritionPerPortion } = calculateRecipeNutrition(ingredients, portions);
@@ -262,7 +273,7 @@ export const createRecipeHandler = withHandler(
     if (exportViewInput) {
       const exportIngredientError = validateRecipeExportIngredients(exportViewInput, ingredients);
       if (exportIngredientError) {
-        return { status: 400, jsonBody: { error: 'invalid_export_view_ingredient' } };
+        return recipeApiError(ctx, 400, 'INVALID_EXPORT_VIEW_INGREDIENT');
       }
     }
 
@@ -305,7 +316,7 @@ export const createRecipeHandler = withHandler(
 // GET /recipes/:id
 // ---------------------------------------------------------------------------
 
-export const getRecipeHandler = withHandler(
+export const getRecipeHandler = withRecipeHandler(
   'recipes.get',
   async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -326,14 +337,14 @@ export const getRecipeHandler = withHandler(
   },
 );
 
-export const setRecipeVisibilityHandler = withHandler(
+export const setRecipeVisibilityHandler = withRecipeHandler(
   'recipes.setVisibility',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const id = request.params['id'];
     if (!id) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
 
-    const parsed = await parseBody(request, SetRecipeVisibilityBodySchema);
+    const parsed = await parseRecipeBody(request, SetRecipeVisibilityBodySchema, ctx);
     if (!parsed.ok) return parsed.response;
 
     const repo = getRecipesRepository();
@@ -363,21 +374,26 @@ export const setRecipeVisibilityHandler = withHandler(
 // PUT /recipes/:id
 // ---------------------------------------------------------------------------
 
-export const updateRecipeHandler = withHandler(
+export const updateRecipeHandler = withRecipeHandler(
   'recipes.update',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const id = request.params['id'];
     if (!id) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
 
-    const body = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return recipeApiError(ctx, 400, 'INVALID_JSON', {
+        fieldErrors: [{ path: 'body', code: 'invalid_json' }],
+      });
+    }
     if (containsRecipePublicationFields(body)) {
-      return { status: 400, jsonBody: { error: 'recipe_visibility_requires_dedicated_endpoint' } };
+      return recipeApiError(ctx, 400, 'RECIPE_VISIBILITY_REQUIRES_DEDICATED_ENDPOINT');
     }
-    const parsed = UpdateRecipeSchema.safeParse(body);
-    if (!parsed.success) {
-      return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
-    }
+    const parsed = validateRecipeValue(body, UpdateRecipeSchema, ctx);
+    if (!parsed.ok) return parsed.response;
 
     const {
       exportView: exportViewInput,
@@ -385,7 +401,7 @@ export const updateRecipeHandler = withHandler(
       ...recipeFields
     } = parsed.data;
     if ((exportViewInput !== undefined) !== (exportViewAction !== undefined)) {
-      return { status: 400, jsonBody: { error: 'invalid_export_view_confirmation' } };
+      return recipeApiError(ctx, 400, 'INVALID_EXPORT_VIEW_CONFIRMATION');
     }
 
     const ifMatch = request.headers.get('if-match');
@@ -405,7 +421,7 @@ export const updateRecipeHandler = withHandler(
     if (exportViewInput) {
       const exportIngredientError = validateRecipeExportIngredients(exportViewInput, ingredients);
       if (exportIngredientError) {
-        return { status: 400, jsonBody: { error: 'invalid_export_view_ingredient' } };
+        return recipeApiError(ctx, 400, 'INVALID_EXPORT_VIEW_INGREDIENT');
       }
     }
 
@@ -442,7 +458,7 @@ export const updateRecipeHandler = withHandler(
 // DELETE /recipes/:id
 // ---------------------------------------------------------------------------
 
-export const deleteRecipeHandler = withHandler(
+export const deleteRecipeHandler = withRecipeHandler(
   'recipes.delete',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -467,7 +483,7 @@ export const deleteRecipeHandler = withHandler(
 // POST /recipes/:id/images — multipart upload
 // ---------------------------------------------------------------------------
 
-export const uploadImageHandler = withHandler(
+export const uploadImageHandler = withRecipeHandler(
   'recipes.uploadImage',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -481,22 +497,31 @@ export const uploadImageHandler = withHandler(
     const formData = await request.formData();
     const imageFile = formData.get('image');
     if (!imageFile || typeof imageFile === 'string') {
-      return { status: 400, jsonBody: { error: 'Missing image file' } };
+      return recipeApiError(ctx, 400, 'MISSING_IMAGE_FILE', {
+        fieldErrors: [{ path: 'image', code: 'required' }],
+      });
     }
 
     const parsedHeroCrop = parseMultipartHeroCrop(formData.get('heroCrop'));
     if (parsedHeroCrop.error) {
-      return { status: 400, jsonBody: { error: parsedHeroCrop.error } };
+      const invalidJson = parsedHeroCrop.error === 'heroCrop must be valid JSON';
+      return recipeApiError(ctx, 400, invalidJson ? 'INVALID_JSON' : 'INVALID_HERO_CROP', {
+        fieldErrors: [{ path: 'heroCrop', code: invalidJson ? 'invalid_json' : 'invalid_value' }],
+      });
     }
 
     const mimeType = imageFile.type as AllowedMimeType;
     if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
-      return { status: 400, jsonBody: { error: 'Image must be image/jpeg or image/png' } };
+      return recipeApiError(ctx, 415, 'UNSUPPORTED_MEDIA_TYPE', {
+        fieldErrors: [{ path: 'image', code: 'unsupported_media_type' }],
+      });
     }
 
     const buffer = Buffer.from(await imageFile.arrayBuffer());
     if (buffer.byteLength > IMAGE_MAX_BYTES) {
-      return { status: 400, jsonBody: { error: 'Image exceeds 8 MB limit' } };
+      return recipeApiError(ctx, 413, 'IMAGE_TOO_LARGE', {
+        fieldErrors: [{ path: 'image', code: 'too_large' }],
+      });
     }
 
     const { blobName, imageId } = await uploadRecipeImage(userId, id, buffer, mimeType);
@@ -526,7 +551,7 @@ export const uploadImageHandler = withHandler(
 // DELETE /recipes/:id/images/:imageId
 // ---------------------------------------------------------------------------
 
-export const deleteImageHandler = withHandler(
+export const deleteImageHandler = withRecipeHandler(
   'recipes.deleteImage',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -556,18 +581,15 @@ export const deleteImageHandler = withHandler(
 // PUT /recipes/:id/images/order
 // ---------------------------------------------------------------------------
 
-export const reorderImagesHandler = withHandler(
+export const reorderImagesHandler = withRecipeHandler(
   'recipes.reorderImages',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const recipeId = request.params['id'];
     if (!recipeId) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
 
-    const body = await request.json();
-    const parsed = ReorderImagesSchema.safeParse(body);
-    if (!parsed.success) {
-      return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
-    }
+    const parsed = await parseRecipeBody(request, ReorderImagesSchema, ctx);
+    if (!parsed.ok) return parsed.response;
 
     const repo = getRecipesRepository();
     const recipe = await repo.get(userId, recipeId);
@@ -582,7 +604,7 @@ export const reorderImagesHandler = withHandler(
       imageIds.every((imageId) => existingById.has(imageId));
 
     if (!isCompletePermutation) {
-      return { status: 400, jsonBody: { error: 'imageIds must contain each recipe image exactly once' } };
+      return recipeApiError(ctx, 400, 'INVALID_IMAGE_ORDER');
     }
 
     const updatedImages = imageIds.map((imageId, index) => ({
@@ -600,7 +622,7 @@ export const reorderImagesHandler = withHandler(
 // PUT /recipes/:id/images/:imageId/hero-crop
 // ---------------------------------------------------------------------------
 
-export const updateImageHeroCropHandler = withHandler(
+export const updateImageHeroCropHandler = withRecipeHandler(
   'recipes.updateImageHeroCrop',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -608,7 +630,7 @@ export const updateImageHeroCropHandler = withHandler(
     const imageId = request.params['imageId'];
     if (!recipeId || !imageId) return { status: 400, jsonBody: { error: 'Missing id' } };
 
-    const parsed = await parseBody(request, UpdateRecipeImageHeroCropSchema);
+    const parsed = await parseRecipeBody(request, UpdateRecipeImageHeroCropSchema, ctx);
     if (!parsed.ok) return parsed.response;
 
     const repo = getRecipesRepository();
@@ -637,18 +659,15 @@ export const updateImageHeroCropHandler = withHandler(
 // POST /recipes/:id/log — snapshot portion into diary
 // ---------------------------------------------------------------------------
 
-export const logRecipeHandler = withHandler(
+export const logRecipeHandler = withRecipeHandler(
   'recipes.log',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
     const id = request.params['id'];
     if (!id) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
 
-    const body = await request.json();
-    const parsed = LogRecipeSchema.safeParse(body);
-    if (!parsed.success) {
-      return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Invalid request' } };
-    }
+    const parsed = await parseRecipeBody(request, LogRecipeSchema, ctx);
+    if (!parsed.ok) return parsed.response;
 
     const { portions, mealId } = parsed.data;
 
@@ -658,7 +677,7 @@ export const logRecipeHandler = withHandler(
     });
     if (!result.ok) {
       if (result.reason === 'invalid_portions') {
-        return { status: 400, jsonBody: { error: 'invalid_recipe_portions' } };
+        return recipeApiError(ctx, 400, 'INVALID_RECIPE_PORTIONS');
       }
       return {
         status: 404,
@@ -719,7 +738,7 @@ function buildRecipePreparationContext(recipe: Recipe) {
   };
 }
 
-export const prepareRecipeExportViewHandler = withHandler(
+export const prepareRecipeExportViewHandler = withRecipeHandler(
   'recipes.prepareExportView',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const userContext = await requireUser(request);
@@ -733,7 +752,7 @@ export const prepareRecipeExportViewHandler = withHandler(
       return { status: 400, jsonBody: { error: 'Missing recipe id' } };
     }
 
-    const parsedBody = await parseBody(request, PrepareRecipeExportViewBodySchema);
+    const parsedBody = await parseRecipeBody(request, PrepareRecipeExportViewBodySchema, ctx);
     if (!parsedBody.ok) {
       logEvent(ctx, 'warn', 'recipes.prepareExportView.requestValidationFailed', {
         failure_stage: 'request_validation',
@@ -748,9 +767,10 @@ export const prepareRecipeExportViewHandler = withHandler(
     let versionedRecipe: Awaited<ReturnType<typeof repo.getVersioned>>;
     try {
       versionedRecipe = await repo.getVersioned(userId, recipeId);
-    } catch {
+    } catch (error) {
       logEvent(ctx, 'error', 'recipes.prepareExportView.recipeLookupFailed', {
         failure_stage: 'recipe_lookup', failure_code: 'RECIPE_LOOKUP_FAILED',
+        ...recipeExceptionLogFields(error),
       });
       return { status: 500, jsonBody: { error: 'Internal server error' } };
     }
@@ -786,9 +806,10 @@ export const prepareRecipeExportViewHandler = withHandler(
     let quotaBlock: Awaited<ReturnType<typeof enforceQuota>>;
     try {
       quotaBlock = await enforceQuota(userContext, 'recipe-analyze');
-    } catch {
+    } catch (error) {
       logEvent(ctx, 'error', 'recipes.prepareExportView.quotaBlocked', {
         failure_stage: 'quota_enforcement', failure_code: 'QUOTA_CHECK_FAILED',
+        ...recipeExceptionLogFields(error),
       });
       return { status: 500, jsonBody: { error: 'Internal server error' } };
     }
@@ -805,13 +826,39 @@ export const prepareRecipeExportViewHandler = withHandler(
     const result = await prepareValidatedRecipeExport(preparationContext);
     if (result.status === 'terminal') {
       const technical = result.kind === 'technical';
+      const titleLayoutFailed = technical && result.code === 'TITLE_LAYOUT_FAILED';
+      const titleProbe = titleLayoutFailed ? result.titleProbe : undefined;
       logEvent(ctx, 'error', 'recipes.prepareExportView.analysisFailed', {
         failure_stage: technical ? 'template_probe' : 'azure_openai_analysis',
         failure_code: result.code,
         duration_ms: result.elapsedMs,
         logical_calls: result.logicalCalls,
+        ...(titleLayoutFailed ? {
+          recipeId,
+          recipe_title: recipe.name,
+          ...(titleProbe ? {
+            title_probe_step_count: titleProbe.stepCount,
+            title_probe_layout: titleProbe.layout,
+            ...(titleProbe.fontSize !== undefined ? { title_font_size: titleProbe.fontSize } : {}),
+            ...(titleProbe.measured ? {
+              title_measured_width: titleProbe.measured.width,
+              title_max_width: titleProbe.measured.maxWidth,
+              ...(titleProbe.measured.height !== undefined ? { title_measured_height: titleProbe.measured.height } : {}),
+              ...(titleProbe.measured.maxHeight !== undefined ? { title_max_height: titleProbe.measured.maxHeight } : {}),
+            } : {}),
+          } : {}),
+        } : {}),
         ...(!technical ? providerFailureLogFields(result.error) : {}),
       });
+      if (titleLayoutFailed) {
+        return {
+          status: 422,
+          jsonBody: {
+            error: 'Der Titel ist leider zu lang, um ihn in das Template zu bringen. Bitte kürze den Rezeptnamen.',
+            code: 'TITLE_OVERFLOW',
+          },
+        };
+      }
       return { status: technical ? 500 : 502, jsonBody: { error: technical ? 'Internal server error' : 'AI recipe analysis failed' } };
     }
 
@@ -852,7 +899,7 @@ export const prepareRecipeExportViewHandler = withHandler(
       await trackUsage(userContext, 'recipe-analyze');
     } catch (error) {
       logEvent(ctx, 'error', 'recipes.prepareExportView.usageBookingFailed', {
-        failure_stage: 'usage_booking', failure_code: 'USAGE_BOOKING_FAILED', ...providerFailureLogFields(error),
+        failure_stage: 'usage_booking', failure_code: 'USAGE_BOOKING_FAILED', ...recipeExceptionLogFields(error),
       });
       return { status: 500, jsonBody: { error: 'Internal server error' } };
     }

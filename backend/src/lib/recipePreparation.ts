@@ -23,7 +23,15 @@ interface AttemptMetadata {
 export type RecipePreparationResult = AttemptMetadata & (
   | { status: 'success'; data: RecipeExportPreparationOutput; deadlineAt: number }
   | { status: 'exhausted'; latestDraft: unknown; diagnostics: RecipeExportPreparationDiagnostic[] }
-  | { status: 'terminal'; kind: 'source' | 'provider' | 'timeout' | 'technical'; code: string; error?: unknown }
+  | {
+      status: 'terminal'; kind: 'source' | 'provider' | 'timeout' | 'technical'; code: string; error?: unknown;
+      titleProbe?: {
+        stepCount: number;
+        layout: 'large' | 'compact';
+        fontSize?: number;
+        measured?: { width: number; maxWidth: number; height?: number; maxHeight?: number };
+      };
+    }
 );
 
 class PreparationTimeout extends Error {}
@@ -121,7 +129,21 @@ export async function prepareValidatedRecipeExport(original: RecipePreparationCo
       if (input) {
         const probe = await bounded(() => { remaining(); return dependencies.probe(input); }, remaining());
         if (probe.status === 'technical-failure' || probe.diagnostics.some((entry) => entry.status === 'technical-failure')) {
-          return { status: 'terminal', kind: 'technical', code: probe.status === 'technical-failure' ? probe.error.code : 'PROBE_FAILED', ...metadata() };
+          const code = probe.status === 'technical-failure' ? probe.error.code : 'PROBE_FAILED';
+          const titleDiagnostic = probe.diagnostics.find((entry) =>
+            entry.field === 'title' && entry.status === 'technical-failure',
+          );
+          const titleProbe = code === 'TITLE_LAYOUT_FAILED' ? {
+            stepCount: input.steps.length,
+            layout: input.steps.length === 5 ? 'compact' as const : 'large' as const,
+            ...(titleDiagnostic && 'fontSize' in titleDiagnostic ? { fontSize: titleDiagnostic.fontSize } : {}),
+            ...(titleDiagnostic && 'measured' in titleDiagnostic ? { measured: titleDiagnostic.measured } : {}),
+          } : undefined;
+          return {
+            status: 'terminal', kind: 'technical', code,
+            ...(titleProbe ? { titleProbe } : {}),
+            ...metadata(),
+          };
         }
         const measured = probe.diagnostics.filter((entry) => entry.field !== 'title');
         const fieldKeys = measured.map((entry) => entry.field === 'teaser' ? 'teaser' : `steps[${entry.itemIndex}]`);

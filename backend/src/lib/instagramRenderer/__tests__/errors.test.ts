@@ -61,6 +61,18 @@ describe("Instagram recipe renderer validation", () => {
     expect(result.ok, result.ok ? undefined : JSON.stringify(result.error)).toBe(true);
   });
 
+  it("fits the measured 97-character Pulled Chicken title but overflows after the next word", async () => {
+    const fittingTitle = "Pulled Chicken mit Nudeln und Gemüse aus dem Ofen mit Dill und frischen Kräutern sowie gerösteten";
+    const overflowingTitle = `${fittingTitle} Tomaten`;
+    const fitting = await renderInstagramRecipe(createInput({ title: fittingTitle }));
+    const overflowing = await renderInstagramRecipe(createInput({ title: overflowingTitle }));
+
+    expect(fittingTitle).toHaveLength(97);
+    expect(fitting.ok, fitting.ok ? undefined : JSON.stringify(fitting.error)).toBe(true);
+    expect(overflowingTitle).toHaveLength(105);
+    expect(overflowing).toMatchObject({ ok: false, error: { code: "TITLE_OVERFLOW" } });
+  });
+
   it("renders a longer title using the wrapped fallback", async () => {
     const result = await renderInstagramRecipe(
       createInput({

@@ -167,17 +167,18 @@ ETag is not a JSON field or a client fingerprint; `sourceFingerprint` is
 server-owned. Every PUT uses atomic compare-and-replace against the revision it
 read, independently of the optional client precondition.
 
-An incomplete `exportView` / `exportViewAction` pair returns `400` with
-`error: 'invalid_export_view_confirmation'`. A supplied stale ETag or an
-internal write race returns `412` with `error: 'recipe_revision_conflict'`;
+An incomplete `exportView` / `exportViewAction` pair returns `400`
+`INVALID_EXPORT_VIEW_CONFIRMATION`. A supplied stale ETag or an internal write
+race returns `412 RECIPE_CONFLICT`;
 the client should reload and review rather than retrying the confirmation
 automatically. The server does not merge a stale client draft or retry a failed
 compare-and-replace.
 
 On create or confirmation update, every `includedIngredientIds` entry must
 identify exactly one non-seasoning ingredient in the effective recipe. Unknown,
-duplicate, or seasoning IDs return `400` with
-`error: 'invalid_export_view_ingredient'`.
+duplicate, or seasoning IDs return `400 INVALID_EXPORT_VIEW_INGREDIENT`.
+All Recipe errors use the envelope and frontend-action contract in
+[tech/09-api-reference.md](../tech/09-api-reference.md#recipe-error-contract-and-frontend-actions).
 
 ### Transient Export-View Preparation
 
@@ -220,9 +221,9 @@ is fully validated and measured again. The original recipe is never rewritten.
 The route does not persist recipe data and accepts only the strict
 `{ "contractVersion": 2 }` request; `{}`, missing or
 invalid JSON, unknown fields, and unsupported versions return
-`400 invalid_export_preparation_request`. No client ETag is required. If
+`400 INVALID_EXPORT_PREPARATION_REQUEST`. No client ETag is required. If
 `If-Match` is supplied, a stale or non-exact ETag returns
-`412 recipe_revision_conflict` before quota enforcement or provider work;
+`412 RECIPE_CONFLICT` before quota enforcement or provider work;
 omission does not return `428`.
 
 On success, the response retains `sourceEtag` as compatibility metadata and
@@ -401,6 +402,13 @@ height. If no legal layout fits, detail rendering fails with an error
 identifying the affected field or item instead of returning clipped or
 overflowing text. The bundle
 still returns neither image unless both renders succeed.
+The detail title uses its large font tier only through 28 characters; longer
+titles use a smaller font tier and a lower teaser anchor before the same
+measured geometry check.
+The detail renderer and production probe do not impose a separate character
+limit on saved titles: after single-line validation, fit is decided by measured
+production geometry. Recipe create and update requests cap saved names at 200
+characters.
 
 ### Mobile Share-Review Lifecycle
 

@@ -4,7 +4,7 @@ import type { RecipeImage } from '@fittrack/shared';
 import { RECIPE_EXPORT_MAX_STEPS } from '../../../shared/types/recipeExport';
 
 import { requireUser } from '../lib/auth';
-import { withHandler, parseBody } from '../lib/http';
+import { parseRecipeBody, withRecipeHandler } from '../lib/recipeHttp';
 import {
   logEvent,
   type LogFields,
@@ -88,7 +88,6 @@ const UNRENDERABLE_ERROR_CODES = new Set<RenderError['code']>([
 const UNRENDERABLE_DETAIL_ERROR_CODES = new Set([
   'INVALID_TEMPLATE_INPUT',
   'TEMPLATE_FIELD_OVERFLOW',
-  'TEMPLATE_PROBE_FAILED',
 ]);
 
 type RendererDiagnosticError = RenderError | RecipeDetailsTemplateRenderError;
@@ -140,19 +139,10 @@ function storageFailureLogFields(error: unknown): LogFields {
   return fields;
 }
 
-function boundedLogText(value: string): string {
-  return value.replace(/[\r\n\u2028\u2029]+/gu, ' ').slice(0, 1000);
-}
-
 function rendererErrorLogFields(error: RendererDiagnosticError): LogFields {
   const fields: LogFields = {
     code: error.code,
-    error_message: boundedLogText(error.message),
   };
-
-  if ('cause' in error && typeof error.cause === 'string') {
-    fields['error_cause'] = boundedLogText(error.cause);
-  }
   if ('field' in error) fields['field'] = error.field;
   if ('itemIndex' in error && error.itemIndex !== undefined) fields['item_index'] = error.itemIndex;
   if ('itemField' in error && error.itemField !== undefined) fields['item_field'] = error.itemField;
@@ -239,7 +229,7 @@ function renderFailureResponse(
   return { status: 500, jsonBody: { error: 'Internal server error' } };
 }
 
-export const instagramRecipeHandler = withHandler(
+export const instagramRecipeHandler = withRecipeHandler(
   'recipes.instagramRender',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -249,7 +239,7 @@ export const instagramRecipeHandler = withHandler(
       return { status: 400, jsonBody: { error: 'Missing recipe id' } };
     }
 
-    const parsed = await parseBody(request, InstagramRecipeRenderRequestSchema);
+    const parsed = await parseRecipeBody(request, InstagramRecipeRenderRequestSchema, ctx);
     if (!parsed.ok) {
       logSharePreconditionFailure(
         ctx,
@@ -366,7 +356,7 @@ export const instagramRecipeHandler = withHandler(
   },
 );
 
-export const shareBundleHandler = withHandler(
+export const shareBundleHandler = withRecipeHandler(
   'recipes.shareBundle',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const { userId } = await requireUser(request);
@@ -376,7 +366,7 @@ export const shareBundleHandler = withHandler(
       return { status: 400, jsonBody: { error: 'Missing recipe id' } };
     }
 
-    const parsed = await parseBody(request, ShareBundleRequestSchema);
+    const parsed = await parseRecipeBody(request, ShareBundleRequestSchema, ctx);
     if (!parsed.ok) {
       logSharePreconditionFailure(
         ctx,

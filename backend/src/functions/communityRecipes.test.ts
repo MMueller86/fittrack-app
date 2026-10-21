@@ -102,17 +102,34 @@ describe('GET /api/community-recipes', () => {
   });
 
   it('rejects invalid limits and continuation tokens', async () => {
-    for (const limit of ['0', '51', '1.5', 'abc']) {
-      const response = await listCommunityRecipesHandler(await requestAs('reader', { query: { limit } }), ctx);
-      expect(response.status).toBe(400);
-      expect(response.jsonBody).toEqual({ error: 'invalid_community_limit' });
+    const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+    try {
+      for (const limit of ['0', '51', '1.5', 'abc']) {
+        const response = await listCommunityRecipesHandler(await requestAs('reader', { query: { limit } }), ctx);
+        expect(response.status).toBe(400);
+        expect(response.jsonBody).toMatchObject({ code: 'INVALID_COMMUNITY_LIMIT', category: 'validation' });
+      }
+      const invalidToken = await listCommunityRecipesHandler(
+        await requestAs('reader', { query: { continuationToken: 'not-a-token' } }),
+        ctx,
+      );
+      expect(invalidToken.status).toBe(400);
+      expect(invalidToken.jsonBody).toMatchObject({ code: 'INVALID_COMMUNITY_CONTINUATION_TOKEN', category: 'validation' });
+      const emptyToken = await listCommunityRecipesHandler(
+        await requestAs('reader', { query: { continuationToken: '' } }),
+        ctx,
+      );
+      expect(emptyToken.status).toBe(400);
+
+      const logs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(logs).toContain('communityRecipes.requestValidationFailed');
+      expect(logs).toContain('communityRecipes.invalidContinuationToken');
+      expect(logs).toContain('"failure_stage":"community_list"');
+      expect(logs).toContain('"rejection_source":"repository"');
+      expect(logs).not.toContain('not-a-token');
+    } finally {
+      warningLogs.mockRestore();
     }
-    const invalidToken = await listCommunityRecipesHandler(
-      await requestAs('reader', { query: { continuationToken: 'not-a-token' } }),
-      ctx,
-    );
-    expect(invalidToken.status).toBe(400);
-    expect(invalidToken.jsonBody).toEqual({ error: 'invalid_community_continuation_token' });
   });
 });
 
@@ -143,7 +160,7 @@ describe('GET /api/community-recipes/{id}', () => {
 
     expect(unauthenticated.status).toBe(401);
     expect(privateResponse.status).toBe(404);
-    expect(privateResponse.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(privateResponse.jsonBody).toMatchObject({ code: 'RECIPE_NOT_FOUND', category: 'not_found' });
     expect(missingResponse.status).toBe(404);
     expect(missingResponse.jsonBody).toEqual(privateResponse.jsonBody);
     expect(publicResponse.status).toBe(200);
@@ -204,32 +221,75 @@ describe('GET /api/community-recipes/{id}/images/{imageId}', () => {
     );
 
     expect(response.status).toBe(404);
-    expect(response.jsonBody).toEqual({ error: 'Recipe image not found' });
+    expect(response.jsonBody).toMatchObject({ code: 'RECIPE_IMAGE_NOT_FOUND', category: 'not_found' });
     expect(downloadRecipeImageMock).not.toHaveBeenCalled();
   });
 
   it('rejects missing images, oversized blobs and unsupported stored content types', async () => {
     const publicId = await createRecipe('publisher', true);
-    const missing = await getCommunityRecipeImageHandler(
-      await requestAs('reader', { params: { id: publicId, imageId: 'missing' } }),
-      ctx,
-    );
-    expect(missing.status).toBe(404);
+    const warningLogs = vi.spyOn(ctx, 'warn').mockImplementation(() => {});
+    try {
+      const missing = await getCommunityRecipeImageHandler(
+        await requestAs('reader', { params: { id: publicId, imageId: 'missing' } }),
+        ctx,
+      );
+      expect(missing.status).toBe(404);
 
-    downloadRecipeImageMock.mockRejectedValueOnce(new RecipeImageTooLargeError());
-    const tooLarge = await getCommunityRecipeImageHandler(
-      await requestAs('reader', { params: { id: publicId, imageId: 'image-1' } }),
-      ctx,
-    );
-    expect(tooLarge.status).toBe(422);
-    expect(tooLarge.jsonBody).toEqual({ error: 'IMAGE_TOO_LARGE' });
+      downloadRecipeImageMock.mockRejectedValueOnce(new RecipeImageTooLargeError());
+      const tooLarge = await getCommunityRecipeImageHandler(
+        await requestAs('reader', { params: { id: publicId, imageId: 'image-1' } }),
+        ctx,
+      );
+      expect(tooLarge.status).toBe(422);
+      expect(tooLarge.jsonBody).toMatchObject({ code: 'IMAGE_TOO_LARGE', category: 'validation' });
 
-    downloadRecipeImageMock.mockRejectedValueOnce(new RecipeImageUnsupportedContentTypeError());
-    const unsupported = await getCommunityRecipeImageHandler(
-      await requestAs('reader', { params: { id: publicId, imageId: 'image-1' } }),
-      ctx,
-    );
-    expect(unsupported.status).toBe(415);
-    expect(unsupported.jsonBody).toEqual({ error: 'unsupported_recipe_image_type' });
+      downloadRecipeImageMock.mockRejectedValueOnce(new RecipeImageUnsupportedContentTypeError());
+      const unsupported = await getCommunityRecipeImageHandler(
+        await requestAs('reader', { params: { id: publicId, imageId: 'image-1' } }),
+        ctx,
+      );
+      expect(unsupported.status).toBe(415);
+      expect(unsupported.jsonBody).toMatchObject({ code: 'UNSUPPORTED_MEDIA_TYPE', category: 'validation' });
+
+      const logs = warningLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(logs).toContain('communityRecipes.imageDownloadRejected');
+      expect(logs).toContain(`"recipe_id":"${publicId}"`);
+      expect(logs).toContain('"image_id":"image-1"');
+      expect(logs).toContain('"max_bytes":8388608');
+      expect(logs).toContain('"allowed_content_types":"image/jpeg,image/png"');
+      expect(logs).not.toContain('community-image');
+    } finally {
+      warningLogs.mockRestore();
+    }
+  });
+
+  it('logs safe storage metadata with recipe and image IDs on unexpected download failure', async () => {
+    const publicId = await createRecipe('publisher', true);
+    const errorLogs = vi.spyOn(ctx, 'error').mockImplementation(() => {});
+    downloadRecipeImageMock.mockRejectedValueOnce(Object.assign(
+      new Error('secret storage payload'),
+      { code: 'ServiceUnavailable', statusCode: 503, requestId: 'blob-request-123' },
+    ));
+
+    try {
+      const response = await getCommunityRecipeImageHandler(
+        await requestAs('reader', { params: { id: publicId, imageId: 'image-1' } }),
+        ctx,
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.jsonBody).toMatchObject({ code: 'INTERNAL_ERROR', category: 'internal' });
+      const logs = errorLogs.mock.calls.map(([line]) => String(line)).join('\n');
+      expect(logs).toContain('communityRecipes.imageDownloadFailed');
+      expect(logs).toContain(`"recipe_id":"${publicId}"`);
+      expect(logs).toContain('"image_id":"image-1"');
+      expect(logs).toContain('"failure_stage":"image_download"');
+      expect(logs).toContain('"storage_error_code":"ServiceUnavailable"');
+      expect(logs).toContain('"storage_status_code":503');
+      expect(logs).toContain('"storage_request_id":"blob-request-123"');
+      expect(logs).not.toContain('secret storage payload');
+    } finally {
+      errorLogs.mockRestore();
+    }
   });
 });

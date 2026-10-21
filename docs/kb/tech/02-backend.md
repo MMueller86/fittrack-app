@@ -82,6 +82,22 @@ export const myHandler = withHandler('domain.action', async (request, ctx) => {
 });
 ```
 
+Recipe HTTP routes use `withRecipeHandler()` around the same handler boundary.
+It preserves successful and binary responses and normalizes every returned
+4xx/5xx response to the Recipe error envelope documented in
+[`tech/09-api-reference.md`](09-api-reference.md#recipe-error-contract-and-frontend-actions).
+Unexpected exceptions return a generic `INTERNAL_ERROR`; classified upstream
+failures return `UPSTREAM_UNAVAILABLE`. Logs contain stable codes, stages,
+correlation IDs, route recipe/image IDs when present, quota counters and
+allowlisted diagnostic metadata, never exception messages, stacks, or
+unbounded request/provider values.
+
+Community recipe handlers emit targeted events for rejected list inputs,
+invalid continuation tokens, unavailable recipe/image IDs, and image download
+rejections or failures. Image events include recipe/image IDs and safe stage,
+reason, size/type, or allowlisted storage error metadata. Continuation token
+values, exception messages, and image contents are not logged.
+
 ### `parseBody<T>(request, ZodSchema)`
 
 Parses and validates JSON request body. Returns `ParseSuccess<T> | ParseFailure`. On failure, returns a 400 response with the first failing field name.
@@ -426,10 +442,17 @@ text/length and up to eight safe diagnoses with a truncation flag. The summary
 is bounded to eight phase/code/path entries; structured diagnoses retain
 constraints, reference values and available measured bounds/font/layout.
 Exact affected text is not truncated; diagnostic limits do not imply a blanket
-provider-payload size bound. This exception does not extend to terminal provider,
-technical, timeout or booking failures, success logs, other flows or HTTP.
-Provider/timeout errors return generic 502, technical probe/lookup/quota-backend/
-booking errors generic 500, and exhausted invalid drafts the existing 422
+provider-payload size bound. This correction-exhaustion exception does not
+extend to terminal provider, technical, timeout or booking failures, success
+logs, other flows or HTTP. Separately, a
+`recipes.prepareExportView.analysisFailed` event with
+`failure_code=TITLE_LAYOUT_FAILED` records `recipeId`, the saved `recipe_title`,
+probe step count/layout, font size, and measured title width/height with their
+allowed bounds when available. It does not log generated teaser/step text or
+expose title or measurements over HTTP. This title-layout failure returns the
+actionable 422 `TITLE_OVERFLOW` response. Provider/timeout
+errors return generic 502, other technical probe/lookup/quota-backend/booking
+errors generic 500, and exhausted invalid drafts the existing 422
 validation envelope with bounded phase/code/path details, never raw text,
 measurements or private Error.message. Booking is once after validation and
 deadline check, with no automatic save or late-timeout booking.

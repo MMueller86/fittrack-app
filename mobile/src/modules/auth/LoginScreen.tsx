@@ -37,6 +37,8 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       scopes: authConfig.scopes,
       redirectUri,
       usePKCE: true,
+      // Skips the Entra sign-in page and goes straight to Google.
+      extraParams: { domain_hint: 'google' },
     },
     discovery,
   );
