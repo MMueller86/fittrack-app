@@ -11,7 +11,7 @@
 //   - Read-after-write consistency (create → get roundtrip).
 //   - Cross-user isolation (user A cannot see user B's recipes).
 
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   type EmulatorContext,

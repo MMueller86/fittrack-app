@@ -73,7 +73,8 @@ describe('CosmosProfileDeletionRepository (contract)', () => {
 
     await new CosmosProfileDeletionRepository().deleteUserData(USER_A);
 
-    await expect(database.container('users').item(USER_A, USER_A).read()).rejects.toMatchObject({ code: 404 });
+    const deletedUserResponse = await database.container('users').item(USER_A, USER_A).read();
+    expect(deletedUserResponse.statusCode).toBe(404);
     for (const name of USER_CONTAINERS) {
       const { resources } = await database.container(name).items.query<{ id: string }>(
         { query: 'SELECT c.id FROM c WHERE c.userId = @userId', parameters: [{ name: '@userId', value: USER_A }] },
@@ -98,7 +99,8 @@ describe('CosmosProfileDeletionRepository (contract)', () => {
 
     await new CosmosRecipesRepository().deleteOwnerlessCommunityRecipe('owned-community-copy');
 
-    await expect(container.item('owned-community-copy', 'owned-community-copy').read()).rejects.toMatchObject({ code: 404 });
+    const deletedRecipeResponse = await container.item('owned-community-copy', 'owned-community-copy').read();
+    expect(deletedRecipeResponse.statusCode).toBe(404);
     await expect(container.item('unrelated-community-copy', 'unrelated-community-copy').read())
       .resolves.toMatchObject({ resource: { visibility: 'community' } });
   });
