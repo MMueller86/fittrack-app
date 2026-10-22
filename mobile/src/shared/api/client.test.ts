@@ -205,6 +205,46 @@ describe('apiClient — cold-start retry interceptor', () => {
     expect(callCount).toBe(2);
   });
 
+  it('DELETE /profile 401 with failed refresh preserves tokens and auth state', async () => {
+    const auth = await import('../../services/authService');
+    const { authEvents } = await import('./client');
+    vi.mocked(auth.authService.refreshAccessToken).mockResolvedValue(null);
+    const logoutListener = vi.fn();
+    const unsubscribe = authEvents.on('logout', logoutListener);
+    apiClient.defaults.adapter = vi.fn().mockImplementation(
+      async (config: InternalAxiosRequestConfig) => {
+        throw makeHttpError(401, config);
+      },
+    );
+
+    await expect(apiClient.delete('/profile', {
+      data: { confirmation: 'DELETE', deleteCommunityRecipes: false },
+    })).rejects.toThrow();
+
+    expect(auth.authService.clearTokens).not.toHaveBeenCalled();
+    expect(logoutListener).not.toHaveBeenCalled();
+    unsubscribe();
+  });
+
+  it('GET 401 with failed refresh still clears tokens and emits logout', async () => {
+    const auth = await import('../../services/authService');
+    const { authEvents } = await import('./client');
+    vi.mocked(auth.authService.refreshAccessToken).mockResolvedValue(null);
+    const logoutListener = vi.fn();
+    const unsubscribe = authEvents.on('logout', logoutListener);
+    apiClient.defaults.adapter = vi.fn().mockImplementation(
+      async (config: InternalAxiosRequestConfig) => {
+        throw makeHttpError(401, config);
+      },
+    );
+
+    await expect(apiClient.get('/profile/me')).rejects.toThrow();
+
+    expect(auth.authService.clearTokens).toHaveBeenCalledTimes(1);
+    expect(logoutListener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+  });
+
   // -------------------------------------------------------------------------
   // AC10 — 429 quota errors must not be retried and quota info must be attached
   // -------------------------------------------------------------------------

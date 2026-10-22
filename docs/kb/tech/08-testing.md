@@ -38,6 +38,20 @@ Examples:
 - `cosmosWeightsRepository.contract.test.ts`
 - `cosmosAiUsageRepository.contract.test.ts`
 - `cosmosFoodProductRepository.contract.test.ts`
+- `cosmosRecipesRepository.contract.test.ts` — owner-backed compatibility and ownerless `/id` community documents
+- `profileDeletionRepository.contract.test.ts` — user/legacy partition sweep, lock exclusion, and shared-data isolation
+
+Profile deletion unit coverage is colocated in `profileDeletion.test.ts`,
+`profileDeletionRepository.test.ts`, `functions/profile.test.ts`,
+`functions/reusableItems.test.ts`, `functions/reusableItemsEnrich.test.ts`,
+`functions/reusableItemsEnrichScheduler.test.ts`, and `recipeHttp.test.ts`.
+It covers strict request validation, authenticated request rejection during
+the lease, queue-worker rejection at start, scheduler skipping locked users,
+cleanup without waiting for pre-lock work, repeated personal-blob inventory
+until empty, and selected ownerless community cleanup. It intentionally does
+not claim that pre-lock work cannot write after `204`; that residual is part of
+the contract. The Cosmos contract requires the local emulator; without it, the
+persistence boundary is `UNVERIFIED`, not a pass.
 
 ### Registration Test
 

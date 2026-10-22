@@ -56,4 +56,18 @@ describe('Snackbar positioning', () => {
 
     expect(positionStyle?.bottom).toBe(expectedBottom);
   });
+
+  it('allows a transient notice to render without truncating its full message', () => {
+    let renderer!: ReactTestRenderer;
+    const ref = React.createRef<SnackbarHandle>();
+    act(() => {
+      renderer = create(<Snackbar ref={ref} />);
+    });
+    renderers.push(renderer);
+    act(() => ref.current?.show({ message: 'Vollständiger Hinweis', numberOfLines: null }));
+
+    const message = renderer.root.findAll((node) => node.type === 'Text')[0]!;
+    expect(message.props.numberOfLines).toBeUndefined();
+    expect(message.props.children).toBe('Vollständiger Hinweis');
+  });
 });

@@ -33,7 +33,13 @@ console.error = (...args: unknown[]) => {
 
 
 export default function App() {
-  const { isAuthenticated, initialize, login } = useAuthStore();
+  const {
+    isAuthenticated,
+    initialize,
+    login,
+    accountDeletionCleanupNotice,
+    dismissAccountDeletionCleanupNotice,
+  } = useAuthStore();
 
   useEffect(() => {
     initialize();
@@ -41,13 +47,13 @@ export default function App() {
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
+      if (state === 'active' && isAuthenticated) {
         void healthSyncService.drainPendingQueue();
         void nutritionSyncService.drainPendingQueue();
       }
     });
     return () => sub.remove();
-  }, []);
+  }, [isAuthenticated]);
 
   let content: React.ReactNode;
 
@@ -64,7 +70,11 @@ export default function App() {
     content = (
       <>
         <StatusBar style="light" />
-        <LoginScreen onLoginSuccess={login} />
+        <LoginScreen
+          onLoginSuccess={login}
+          accountDeletionCleanupNotice={accountDeletionCleanupNotice}
+          onAccountDeletionCleanupNoticeShown={dismissAccountDeletionCleanupNotice}
+        />
       </>
     );
   } else {

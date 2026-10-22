@@ -24,6 +24,8 @@ If the Task Package is **incomplete**, **technically invalid**, or the declared 
 
 For small, isolated changes (single component, single bug fix) delivered outside the Orchestrator workflow, a Task Package is not required — work from the explicit request.
 
+When the Task Package lists `privacy-impact-review`, load it and report in the handoff any permissions, on-device storage, or user data shown to other users. Do not add such handling beyond what the plan declares.
+
 See [`docs/kb/agents/02-agent-boundaries.md`](../docs/kb/agents/02-agent-boundaries.md) for agent roles.
 
 ---

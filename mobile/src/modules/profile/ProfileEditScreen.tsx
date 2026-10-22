@@ -2,19 +2,23 @@
 // Wird aus ProfileScreen via Navigation aufgerufen und erhält das aktuelle Profil als Parameter.
 // Speichert via PUT /api/profile (updateProfile).
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import axios from 'axios';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type {
   Gender,
@@ -24,7 +28,9 @@ import type {
   ActivityLevel,
   UserProfile,
 } from '@fittrack/shared';
-import { profileApi } from '../../shared/api/profileApi';
+import { profileApi, type ProfileDeletionRequest } from '../../shared/api/profileApi';
+import { recipeApi } from '../../shared/api/recipeApi';
+import { completeAccountDeletionLocally } from '../../services/accountDeletionService';
 import { listWeights } from '../../services/weightsService';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
@@ -33,6 +39,27 @@ import { ProfileGroup, ProfileRow } from './ProfileGroup';
 import type { ProfileStackParamList } from '../../app/navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileEdit'>;
+type CommunityRecipeCheck = 'loading' | 'failed' | 'available' | 'none';
+
+function getDeletionErrorMessage(error: unknown): string {
+  if (axios.isAxiosError<{ error?: unknown }>(error)) {
+    switch (error.response?.data?.error) {
+      case 'profile_deletion_in_progress':
+        return 'Die Löschung konnte nicht durchgeführt werden. Bitte versuche es erneut.';
+      case 'profile_deletion_unavailable':
+        return 'Der Löschdienst ist vorübergehend nicht verfügbar. Bitte versuche es erneut.';
+      case 'profile_deletion_failed':
+        return 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.';
+      case 'invalid_profile_deletion_request':
+        return 'Die Löschanfrage ist ungültig. Bitte prüfe die Bestätigung und versuche es erneut.';
+      case 'authentication_required':
+        return 'Deine Anmeldung konnte nicht bestätigt werden. Bitte versuche es erneut.';
+      default:
+        return 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.';
+    }
+  }
+  return 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.';
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -211,7 +238,89 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
   const [form, setForm] = useState<FormState>(() => profileToForm(existing));
   const [loading, setLoading] = useState(false);
   const [saveErrorVisible, setSaveErrorVisible] = useState(false);
+  const [deleteOverlayVisible, setDeleteOverlayVisible] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteCommunityRecipes, setDeleteCommunityRecipes] = useState(false);
+  const [communityRecipeCheck, setCommunityRecipeCheck] = useState<CommunityRecipeCheck>('loading');
+  const [pendingDeletionRequest, setPendingDeletionRequest] = useState<ProfileDeletionRequest | null>(null);
+  const [deletionError, setDeletionError] = useState<string | null>(null);
+  const [deletionInProgress, setDeletionInProgress] = useState(false);
+  const deletionInProgressRef = useRef(false);
+  const recipeCheckSequence = useRef(0);
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
+
+  async function checkCommunityRecipes() {
+    const sequence = ++recipeCheckSequence.current;
+    setCommunityRecipeCheck('loading');
+    try {
+      const { recipes } = await recipeApi.list();
+      if (sequence !== recipeCheckSequence.current) return;
+      setCommunityRecipeCheck(
+        recipes.some((recipe) => recipe.visibility === 'community' && recipe.communityPublication != null)
+          ? 'available'
+          : 'none',
+      );
+    } catch {
+      if (sequence === recipeCheckSequence.current) setCommunityRecipeCheck('failed');
+    }
+  }
+
+  function openDeletionOverlay() {
+    setDeleteConfirmation('');
+    setDeleteCommunityRecipes(false);
+    setPendingDeletionRequest(null);
+    setDeletionError(null);
+    setDeleteOverlayVisible(true);
+    void checkCommunityRecipes();
+  }
+
+  function closeDeletionOverlay() {
+    if (deletionInProgressRef.current) return;
+    recipeCheckSequence.current++;
+    setDeleteOverlayVisible(false);
+    setDeleteConfirmation('');
+    setDeleteCommunityRecipes(false);
+    setPendingDeletionRequest(null);
+    setDeletionError(null);
+  }
+
+  async function submitDeletion(request: ProfileDeletionRequest) {
+    if (deletionInProgressRef.current) return;
+    deletionInProgressRef.current = true;
+    setDeletionInProgress(true);
+    setDeletionError(null);
+    try {
+      try {
+        await profileApi.deleteProfile(request);
+      } catch (error) {
+        setDeletionError(getDeletionErrorMessage(error));
+        return;
+      }
+      setDeleteOverlayVisible(false);
+      try {
+        await completeAccountDeletionLocally();
+      } catch {
+        // A local cleanup failure must not change the confirmed server result.
+      }
+    } finally {
+      deletionInProgressRef.current = false;
+      setDeletionInProgress(false);
+    }
+  }
+
+  function startDeletion() {
+    if (
+      deleteConfirmation !== 'DELETE' ||
+      (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none') ||
+      deletionInProgressRef.current
+    ) return;
+    const request: ProfileDeletionRequest = {
+      confirmation: 'DELETE',
+      deleteCommunityRecipes,
+    };
+    setPendingDeletionRequest(request);
+    void submitDeletion(request);
+  }
 
   // Pre-fill current weight from diary when creating a new profile
   useEffect(() => {
@@ -492,10 +601,14 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
             }
           </TouchableOpacity>
 
-          {/* Konto — Platzhalter ohne Aktion; Löschfunktion folgt später */}
           {!isNew && (
             <ProfileGroup title="Konto">
-              <ProfileRow label="Konto löschen" detail="Wird später verfügbar" iconName="trash-2" disabled />
+              <ProfileRow
+                label="Konto löschen"
+                detail="Profil und persönliche Daten endgültig löschen"
+                iconName="trash-2"
+                onPress={openDeletionOverlay}
+              />
             </ProfileGroup>
           )}
 
@@ -507,6 +620,157 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
         body="Das Profil konnte nicht gespeichert werden. Bitte versuche es erneut."
         onClose={() => setSaveErrorVisible(false)}
       />
+      {deleteOverlayVisible ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={closeDeletionOverlay}
+        >
+          <View style={styles.deleteOverlayRoot}>
+            <Pressable
+              style={[StyleSheet.absoluteFillObject, styles.deleteBackdrop]}
+              onPress={closeDeletionOverlay}
+              disabled={deletionInProgress}
+              accessibilityRole="button"
+              accessibilityLabel="Bestätigung schließen"
+            />
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.deleteKeyboard}
+            >
+              <View style={styles.deleteDialog}>
+                <ScrollView
+                  contentContainerStyle={styles.deleteDialogContent}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  <Text style={styles.deleteTitle} accessibilityRole="header">
+                    Profil endgültig löschen?
+                  </Text>
+                  <Text style={styles.deleteBody}>
+                    Dein FitTrack-Profil und deine persönlichen FitTrack-Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.{ '\n\n' }Gib zur Bestätigung DELETE ein.
+                  </Text>
+                  <Text style={styles.deleteSecondaryNotice}>
+                    Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen. Wenn das auf deinem Gerät nicht klappt, zeigt FitTrack dir einen Hinweis. Bereits in Health Connect gespeicherte Einträge und Berechtigungen bleiben davon unberührt.
+                  </Text>
+
+                  {communityRecipeCheck === 'loading' ? (
+                    <View style={styles.deleteCheckStatus}>
+                      <ActivityIndicator color={colors.primary} size="small" />
+                      <Text style={styles.deleteStatusText}>Community-Rezepte werden geprüft …</Text>
+                    </View>
+                  ) : null}
+                  {communityRecipeCheck === 'failed' ? (
+                    <View style={styles.deleteCheckError}>
+                      <Text style={styles.deleteErrorText}>
+                        Deine Community-Rezepte konnten nicht geprüft werden. Bitte versuche es erneut.
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.deleteRetryCheck}
+                        onPress={() => void checkCommunityRecipes()}
+                        disabled={deletionInProgress}
+                        accessibilityRole="button"
+                        accessibilityLabel="Erneut prüfen"
+                      >
+                        <Text style={styles.deleteRetryCheckText}>Erneut prüfen</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                  {communityRecipeCheck === 'available' ? (
+                    <>
+                      <View style={styles.deleteSwitchRow}>
+                        <Text style={styles.deleteSwitchLabel}>Auch meine Community Rezepte löschen</Text>
+                        <View style={styles.deleteSwitchControl}>
+                          <Text style={styles.deleteSwitchValue}>{deleteCommunityRecipes ? 'Ja' : 'Nein'}</Text>
+                          <Switch
+                            value={deleteCommunityRecipes}
+                            onValueChange={setDeleteCommunityRecipes}
+                            disabled={deletionInProgress || pendingDeletionRequest !== null}
+                            accessibilityLabel="Auch meine Community Rezepte löschen"
+                            accessibilityState={{
+                              checked: deleteCommunityRecipes,
+                              disabled: deletionInProgress || pendingDeletionRequest !== null,
+                            }}
+                          />
+                        </View>
+                      </View>
+                      <Text style={styles.deleteSecondaryNotice}>
+                        Deine Community-Rezepte bleiben ohne deine persönliche Namensanzeige erhalten, sofern du sie nicht ebenfalls löschst.
+                      </Text>
+                    </>
+                  ) : null}
+
+                  <TextInput
+                    style={styles.deleteInput}
+                    value={deleteConfirmation}
+                    onChangeText={setDeleteConfirmation}
+                    placeholder="DELETE"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={20}
+                    editable={!deletionInProgress && pendingDeletionRequest === null}
+                    accessibilityLabel="Löschbestätigung"
+                    accessibilityHint="Gib DELETE in Großbuchstaben ein."
+                  />
+
+                  {deletionInProgress ? (
+                    <View style={styles.deleteCheckStatus} accessibilityLiveRegion="polite">
+                      <ActivityIndicator color={colors.primary} size="small" />
+                      <Text style={styles.deleteStatusText}>Dein Profil wird gelöscht …</Text>
+                    </View>
+                  ) : null}
+                  {deletionError ? (
+                    <Text style={styles.deleteErrorText} accessibilityLiveRegion="polite">
+                      {deletionError}
+                    </Text>
+                  ) : null}
+
+                  <View style={styles.deleteActions}>
+                    <TouchableOpacity
+                      style={styles.deleteCancelButton}
+                      onPress={closeDeletionOverlay}
+                      disabled={deletionInProgress}
+                      accessibilityRole="button"
+                      accessibilityLabel="Abbrechen"
+                      accessibilityState={{ disabled: deletionInProgress }}
+                    >
+                      <Text style={styles.deleteCancelText}>Abbrechen</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.deleteConfirmButton, (
+                        deletionInProgress || (deletionError === null && (
+                          deleteConfirmation !== 'DELETE' ||
+                          (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none')
+                        ))
+                      ) && styles.deleteConfirmButtonDisabled]}
+                      onPress={deletionError && pendingDeletionRequest
+                        ? () => void submitDeletion(pendingDeletionRequest)
+                        : startDeletion}
+                      disabled={deletionInProgress || (deletionError === null && (
+                        deleteConfirmation !== 'DELETE' ||
+                        (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none')
+                      ))}
+                      accessibilityRole="button"
+                      accessibilityLabel={deletionError && pendingDeletionRequest ? 'Erneut versuchen' : 'Endgültig löschen'}
+                      accessibilityState={{
+                        disabled: deletionInProgress || (deletionError === null && (
+                          deleteConfirmation !== 'DELETE' ||
+                          (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none')
+                        )),
+                      }}
+                    >
+                      <Text style={styles.deleteConfirmText}>
+                        {deletionError && pendingDeletionRequest ? 'Erneut versuchen' : 'Endgültig löschen'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
+      ) : null}
       <Snackbar ref={snackbarRef} />
     </SafeAreaView>
   );
@@ -618,4 +882,65 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: { opacity: 0.4 },
   saveButtonText: { ...typography.button, color: colors.background },
+
+  deleteOverlayRoot: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  deleteBackdrop: { backgroundColor: colors.overlay },
+  deleteKeyboard: { flex: 1, justifyContent: 'center', padding: spacing.md },
+  deleteDialog: {
+    maxHeight: '94%',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    overflow: 'hidden',
+  },
+  deleteDialogContent: { padding: spacing.lg, gap: spacing.md },
+  deleteTitle: { ...typography.h3, color: colors.text },
+  deleteBody: { ...typography.body2, color: colors.text },
+  deleteSecondaryNotice: { ...typography.body2, color: colors.textSecondary },
+  deleteCheckStatus: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  deleteStatusText: { ...typography.body2, color: colors.textSecondary, flexShrink: 1 },
+  deleteCheckError: { gap: spacing.xs },
+  deleteErrorText: { ...typography.body2, color: colors.negative },
+  deleteRetryCheck: { minHeight: spacing.xxl, justifyContent: 'center', alignSelf: 'flex-start' },
+  deleteRetryCheckText: { ...typography.button, color: colors.primaryBright },
+  deleteSwitchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  deleteSwitchLabel: { ...typography.body2, color: colors.text, flex: 1, flexShrink: 1 },
+  deleteSwitchControl: { alignItems: 'center', minWidth: spacing.xxl * 2 },
+  deleteSwitchValue: { ...typography.caption, color: colors.textSecondary },
+  deleteInput: {
+    ...typography.body1,
+    color: colors.text,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    minHeight: spacing.xxl,
+    paddingHorizontal: spacing.md,
+  },
+  deleteActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  deleteCancelButton: {
+    flex: 1,
+    minHeight: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  deleteCancelText: { ...typography.button, color: colors.textSecondary },
+  deleteConfirmButton: {
+    flex: 1,
+    minHeight: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: colors.negative,
+    paddingHorizontal: spacing.sm,
+  },
+  deleteConfirmButtonDisabled: { opacity: 0.4 },
+  deleteConfirmText: { ...typography.button, color: colors.background, textAlign: 'center' },
 });

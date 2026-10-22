@@ -98,6 +98,20 @@ export async function deleteRecipeImage(blobName: string): Promise<void> {
   await blockBlobClient.deleteIfExists();
 }
 
+async function listPersonalBlobs(containerName: string, userId: string): Promise<string[]> {
+  const prefix = `${userId}/`;
+  const containerClient = getClient().getContainerClient(containerName);
+  const blobNames: string[] = [];
+  for await (const blob of containerClient.listBlobsFlat({ prefix })) {
+    blobNames.push(blob.name);
+  }
+  return blobNames;
+}
+
+export async function listPersonalRecipeImageBlobNames(userId: string): Promise<string[]> {
+  return listPersonalBlobs(CONTAINER_NAME, userId);
+}
+
 /**
  * Download an authorized recipe image without going through a SAS URL.
  * The bounded download protects the Function from oversized blobs even when
@@ -147,6 +161,36 @@ export async function downloadRecipeImageWithContentType(
   }
 
   return { buffer, contentType };
+}
+
+export function communityRecipeImageBlobName(
+  recipeId: string,
+  imageId: string,
+  contentType: 'image/jpeg' | 'image/png',
+): string {
+  const extension = contentType === 'image/png' ? 'png' : 'jpg';
+  return `community/${encodeURIComponent(recipeId)}/${encodeURIComponent(imageId)}.${extension}`;
+}
+
+/** Copy an image into its stable, owner-neutral community path. */
+export async function copyRecipeImageToCommunity(
+  blobName: string,
+  recipeId: string,
+  imageId: string,
+): Promise<string> {
+  const targetNames = [
+    communityRecipeImageBlobName(recipeId, imageId, 'image/jpeg'),
+    communityRecipeImageBlobName(recipeId, imageId, 'image/png'),
+  ];
+  if (targetNames.includes(blobName)) return blobName;
+
+  const { buffer, contentType } = await downloadRecipeImageWithContentType(blobName);
+  const targetBlobName = communityRecipeImageBlobName(recipeId, imageId, contentType);
+  const containerClient = getClient().getContainerClient(CONTAINER_NAME);
+  await containerClient.getBlockBlobClient(targetBlobName).uploadData(buffer, {
+    blobHTTPHeaders: { blobContentType: contentType },
+  });
+  return targetBlobName;
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +275,10 @@ export async function deleteProductImage(blobName: string): Promise<void> {
   const containerClient = client.getContainerClient(PRODUCT_IMAGES_CONTAINER);
   const blockBlobClient = containerClient.getBlockBlobClient(blobName);
   await blockBlobClient.deleteIfExists();
+}
+
+export async function listPersonalProductImageBlobNames(userId: string): Promise<string[]> {
+  return listPersonalBlobs(PRODUCT_IMAGES_CONTAINER, userId);
 }
 
 /**

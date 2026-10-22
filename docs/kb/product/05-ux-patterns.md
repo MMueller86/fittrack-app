@@ -60,6 +60,18 @@ Changing the target projects ingredients immediately and leaves them visible dur
 
 Multi-phase flows use the shared `ConfirmSheet` for both the in-screen back action and the Android hardware back action. Returning from the initial input phase leaves the wizard immediately; back is blocked while an analysis is running. In later phases, the sheet explains that unsaved progress would be lost and offers one destructive `Zurück` action plus the standard dismissal. Both back entry points use the same phase transition, so the user receives identical navigation semantics.
 
+## Account Deletion Confirmation
+
+The profile deletion dialog is titled `Profil endgültig löschen?` and uses this exact body:
+
+> Dein FitTrack-Profil und deine persönlichen FitTrack-Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.
+>
+> Gib zur Bestätigung DELETE ein.
+
+The confirmation input is case-sensitive and accepts only uppercase `DELETE`. Opening the dialog does not submit a deletion request. Cancel, backdrop, and Android Back dismiss it without deleting. When the user has published Community recipes, show `Auch meine Community Rezepte löschen`, default it to `Nein` on every open, and include: `Deine Community-Rezepte bleiben ohne deine persönliche Namensanzeige erhalten, sofern du sie nicht ebenfalls löschst.` Hide this choice and helper when there are no published recipes.
+
+While deletion is in progress, lock the controls and show progress. On server failure, retain the entered confirmation and retry the same payload without exposing internal request timing or a deletion race. A successful `204` is completion: attempt one best-effort cleanup of the wizard preference, both Health Connect queues, sync log, and both SecureStore tokens, reset in-memory sync state, log out, and route to Login. A local failure cannot reverse server success or trigger another `DELETE /api/profile`; there is no durable cleanup marker, startup gate, or local retry. Show this transient notice once in the running deletion session if any local step fails: `Einige private App-Daten von FitTrack konnten auf diesem Gerät nicht gelöscht werden. Du kannst die App-Daten in den Android-Einstellungen entfernen.` It contains no Health Connect or Entra details and makes no uninstall guarantee. After force-close, a surviving token may reauthenticate; a surviving queue may drain to Health Connect on app activation. Neither residual is recovered by a durable marker or local retry. The in-app privacy note states: `Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen. Wenn das auf deinem Gerät nicht klappt, zeigt FitTrack dir einen Hinweis. Bereits in Health Connect gespeicherte Einträge und Berechtigungen bleiben davon unberührt.` Health Connect records already exported and Health Connect permissions remain untouched. Any Entra identity follow-up is internal Product Owner responsibility, not a user instruction. This flow does not promise immediate physical Azure purge.
+
 ## Sticky Wizard Actions
 
 Wizard phases with a primary action keep the scrollable content and the action footer as sibling areas inside the keyboard-avoiding layout. The primary button is rendered only inside that footer, with no content-level bottom CTA or inherited top margin. On screens whose footer owns the bottom action area, the outer `SafeAreaView` uses the top edge only; applying a bottom edge there introduces a visible gap below the footer on devices with a bottom safe-area inset.

@@ -86,6 +86,8 @@ Do not make silent assumptions. If information needed to complete a task is abse
 
 **Review every change for accidental secret exposure** before completing a task.
 
+**Privacy.** Any change that collects, stores, logs, shares, or sends user data (including to AI services) must be checked against [`docs/legal/datenschutzerklaerung-alpha.md`](../docs/legal/datenschutzerklaerung-alpha.md) using the `privacy-impact-review` skill. State when the policy needs updating; do not edit it without explicit user approval.
+
 ---
 
 ## Testing

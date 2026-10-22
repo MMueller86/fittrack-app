@@ -57,8 +57,10 @@ export async function addRecipeDiarySnapshot(
   });
 
   const recipes = getRecipesRepository();
-  void recipes.incrementUsage(resolved.ownerUserId, recipe.id).catch(() => {});
-  void getUserFoodRelationRepository().recordUsage(userId, {
+  if (resolved.ownerUserId !== undefined) {
+    await recipes.incrementUsage(resolved.ownerUserId, recipe.id).catch(() => {});
+  }
+  await getUserFoodRelationRepository().recordUsage(userId, {
     foodRef: recipe.id,
     foodRefType: 'recipe',
     displayName: recipe.name,

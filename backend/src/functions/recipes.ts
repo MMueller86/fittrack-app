@@ -471,7 +471,9 @@ export const deleteRecipeHandler = withRecipeHandler(
 
     // Delete all blobs first — if Cosmos delete fails, blobs are still gone
     // (no dangling blob reference in Cosmos since doc is deleted next)
-    await Promise.all(recipe.images.map((img) => deleteRecipeImage(img.blobName)));
+    for (const image of recipe.images) {
+      await deleteRecipeImage(image.blobName);
+    }
     await repo.delete(userId, id);
 
     logEvent(ctx, 'info', 'recipe.deleted', { userId, recipeId: id, blobsDeleted: recipe.images.length });
@@ -534,7 +536,17 @@ export const uploadImageHandler = withRecipeHandler(
     };
 
     const updatedImages = [...recipe.images, storedImage];
-    await repo.update(userId, id, { images: updatedImages });
+    let updatedRecipe;
+    try {
+      updatedRecipe = await repo.update(userId, id, { images: updatedImages });
+    } catch (error) {
+      await deleteRecipeImage(blobName).catch(() => {});
+      throw error;
+    }
+    if (!updatedRecipe) {
+      await deleteRecipeImage(blobName).catch(() => {});
+      return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    }
 
     const sasUrl = await generateRecipeImageSasUrl(blobName);
     const responseImage: RecipeImage = {

@@ -18,6 +18,7 @@ export interface SnackbarConfig {
   undoLabel?: string;
   onUndo?: () => void;
   durationMs?: number;
+  numberOfLines?: number | null;
 }
 
 export interface SnackbarHandle {
@@ -91,7 +92,12 @@ export const Snackbar = React.forwardRef<SnackbarHandle, SnackbarProps>(({ botto
       pointerEvents="box-none"
     >
       <View style={styles.snackbar}>
-        <Text style={styles.message} numberOfLines={2}>{config.message}</Text>
+        <Text
+          style={styles.message}
+          numberOfLines={config.numberOfLines === null ? undefined : config.numberOfLines ?? 2}
+        >
+          {config.message}
+        </Text>
         {hasUndo && (
           <TouchableOpacity
             onPress={() => {

@@ -110,6 +110,13 @@ class HealthSyncService {
     await this.load();
   }
 
+  async resetForAccountDeletion(): Promise<void> {
+    this.state = { ...DEFAULT_STATE, pendingOperations: [] };
+    this.loaded = true;
+    this.sessionCountIncremented = false;
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  }
+
   async enableSync(allEntries: WeightEntry[]): Promise<'success' | 'permission_denied'> {
     await this.load();
     syncLogger.info('enableSync', `Requesting permissions, ${allEntries.length} entries queued`);

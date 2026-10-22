@@ -28,6 +28,7 @@ import { projectCommunityRecipe, projectRecipeReferenceAccess, resolveRecipeForR
 import { getReusableItemsRepository, __resetReusableItemsRepositoryForTests } from './reusableItemsRepository';
 import { _resetFoodProductRepository } from './foodProductRepository';
 import { getProfileRepository, __resetProfileRepositoryForTests } from './profileRepository';
+import { toOwnerlessCommunityRecipe } from './recipesRepository';
 
 let ctx: EmulatorContext | undefined;
 let repo: CosmosRecipesRepository;
@@ -59,11 +60,18 @@ async function clearRecipes(userIds: string[]): Promise<void> {
   }
 }
 
+async function clearOwnerlessCommunityRecipes(): Promise<void> {
+  const container = ctx!.database.container('communityRecipes');
+  const { resources } = await container.items.query<{ id: string }>({ query: 'SELECT c.id FROM c' }).fetchAll();
+  for (const recipe of resources) await container.item(recipe.id, recipe.id).delete();
+}
+
 const USER_A = 'contract-recipes-a';
 const USER_B = 'contract-recipes-b';
 
 beforeEach(async () => {
   await clearRecipes([USER_A, USER_B]);
+  await clearOwnerlessCommunityRecipes();
   __resetReusableItemsRepositoryForTests();
   _resetFoodProductRepository();
   __resetProfileRepositoryForTests();
@@ -137,7 +145,7 @@ describe('CosmosRecipesRepository (contract)', () => {
 
   it('paginates explicit community recipes across two partitions, ordered by updatedAt', async () => {
     const expected: string[] = [];
-    for (let index = 0; index < 5; index += 1) {
+    for (let index = 0; index < 6; index += 1) {
       const owner = index % 2 === 0 ? USER_A : USER_B;
       const created = await repo.createVersioned(owner, makeInput({ name: `Published ${index}` }));
       await repo.setVisibility(owner, created.recipe.id, created.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: false });
@@ -145,16 +153,22 @@ describe('CosmosRecipesRepository (contract)', () => {
       const { resource } = await container.item(created.recipe.id, owner).read<Record<string, unknown>>();
       resource!.updatedAt = `2026-10-0${index + 1}T12:00:00.000Z`;
       await container.item(created.recipe.id, owner).replace(resource!);
+      if (index === 1 || index === 4) {
+        const published = await repo.get(owner, created.recipe.id);
+        await repo.saveOwnerlessCommunityRecipe(toOwnerlessCommunityRecipe(published!));
+      }
       expected.unshift(created.recipe.id);
     }
     await repo.create(USER_A, makeInput({ name: 'Private A' }));
     await repo.create(USER_B, makeInput({ name: 'Private B' }));
     const ids: string[] = [];
+    let ownerlessFromList = false;
     let continuationToken: string | undefined;
     let pages = 0;
     do {
       const page = await repo.listCommunity({ limit: 2, continuationToken });
       expect(page.recipes.length).toBeLessThanOrEqual(2);
+      ownerlessFromList ||= page.recipes.some((recipe) => recipe.id === expected[1] && !('ownerUserId' in recipe));
       ids.push(...page.recipes.map((recipe) => recipe.id));
       continuationToken = page.continuationToken;
       pages += 1;
@@ -162,8 +176,11 @@ describe('CosmosRecipesRepository (contract)', () => {
     } while (continuationToken);
     expect(ids).toEqual(expected);
     expect(pages).toBeGreaterThan(1);
-    expect(await repo.get(USER_B, expected[0])).toBeNull();
-    expect((await repo.getCommunityById(expected[0]))?.ownerUserId).toBe(USER_A);
+    expect(ownerlessFromList).toBe(true);
+    expect(await repo.get(USER_A, expected[0])).toBeNull();
+    const firstCommunityRecipe = await repo.getCommunityById(expected[0]);
+    expect(firstCommunityRecipe && 'ownerUserId' in firstCommunityRecipe ? firstCommunityRecipe.ownerUserId : undefined).toBe(USER_B);
+    expect(await repo.getCommunityById(expected[1])).not.toHaveProperty('ownerUserId');
   });
 
   it('rejects foreign/stale publication writes and preserves publication on content, image and usage writes', async () => {
@@ -214,6 +231,50 @@ describe('CosmosRecipesRepository (contract)', () => {
     await container.item(created.recipe.id, USER_A).replace(resource!);
     const legacy = await repo.getCommunityById(created.recipe.id);
     expect((await projectCommunityRecipe(legacy!, USER_B, imagePath, getProfileRepository())).authorDisplayName).toBe('Anonymous');
+  });
+
+  it('roundtrips ownerless community documents and prefers them over the owner copy', async () => {
+    const imagePath = (recipeId: string, imageId: string) => `/api/test-recipes/${recipeId}/images/${imageId}`;
+    const created = await repo.createVersioned(USER_A, makeInput({
+      ingredients: [{ ...baseIngredient, linkedReusableItemId: 'personal-library-id' }],
+    }));
+    await repo.update(USER_A, created.recipe.id, {
+      images: [{ id: 'image-1', blobName: 'community/recipe-1/image-1.jpg', order: 1 }],
+    });
+    const current = await repo.getVersioned(USER_A, created.recipe.id);
+    const published = await repo.setVisibility(USER_A, created.recipe.id, current!.etag, {
+      visibility: 'community', contentConfirmed: true, displayNameConsent: true,
+    });
+    const ownerless = toOwnerlessCommunityRecipe(published!.recipe);
+
+    await repo.saveOwnerlessCommunityRecipe(ownerless);
+    await repo.saveOwnerlessCommunityRecipe(ownerless);
+
+    const raw = await ctx!.database.container('communityRecipes')
+      .item(created.recipe.id, created.recipe.id)
+      .read<Record<string, unknown>>();
+    expect(raw.resource).not.toHaveProperty('userId');
+    expect(raw.resource).not.toHaveProperty('ownerUserId');
+    expect(raw.resource).not.toHaveProperty('sharedWithUserIds');
+    expect(raw.resource).not.toHaveProperty('communityPublication');
+    expect(raw.resource).not.toHaveProperty('usageCount');
+    expect(raw.resource).not.toHaveProperty('lastUsedAt');
+    expect((raw.resource?.['ingredients'] as Array<Record<string, unknown>>)[0])
+      .not.toHaveProperty('linkedReusableItemId');
+
+    const community = await repo.getCommunityById(created.recipe.id);
+    expect(community).toEqual(ownerless);
+    const resolved = await resolveRecipeForRead(USER_B, created.recipe.id, repo);
+    expect(resolved.access).toBe('community');
+    expect(resolved).not.toHaveProperty('ownerUserId');
+    expect((await repo.get(USER_A, created.recipe.id))?.ownerUserId).toBe(USER_A);
+    expect((await repo.listCommunity()).recipes.map(({ id }) => id)).toEqual([created.recipe.id]);
+
+    const profiles = { get: vi.fn(async () => null) };
+    const projected = await projectCommunityRecipe(community!, USER_B, imagePath, profiles);
+    expect(projected.authorDisplayName).toBe('Anonymous');
+    expect(projected.isOwnRecipe).toBe(false);
+    expect(profiles.get).not.toHaveBeenCalled();
   });
 
   it('snapshots provenance from owner-only library, retains legacy unknown and rejects new contradictions', async () => {

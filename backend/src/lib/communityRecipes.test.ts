@@ -4,6 +4,7 @@ import { projectCommunityRecipe, projectRecipeReferenceAccess, resolveRecipeForR
 import { __resetRecipesRepositoryForTests, getRecipesRepository } from './repositories/recipesRepository';
 import { effectiveRecipeVisibility } from './repositories/recipePublication';
 import { resolveRecipeIngredientProvenance } from './repositories/recipeIngredientProvenance';
+import { toOwnerlessCommunityRecipe } from './repositories/recipesRepository';
 
 const nutrition = { calories: 10, protein: 1, carbs: 1, fat: 0, fiber: 0 };
 const ingredient: RecipeIngredient = {
@@ -94,6 +95,25 @@ describe('community access and projection', () => {
     expect((await projectCommunityRecipe(recipe, 'other', imagePath, profiles)).authorDisplayName).toBe('Anonymous');
     profiles.get.mockRejectedValue(new Error('profile infrastructure failure'));
     await expect(projectCommunityRecipe(recipe, 'other', imagePath, profiles)).rejects.toThrow('profile infrastructure failure');
+  });
+
+  it('projects ownerless community recipes as anonymous without reading a profile', async () => {
+    const ownerRecipe = { ...(await getRecipesRepository().create('owner', input)), visibility: 'community' as const };
+    ownerRecipe.communityPublication = { contentConfirmedAt: new Date().toISOString(), displayNameConsent: true };
+    ownerRecipe.ingredients[0].linkedReusableItemId = 'personal-library-id';
+    const ownerless = toOwnerlessCommunityRecipe(ownerRecipe);
+    const profiles = { get: vi.fn(async () => ({ displayName: 'Personal name' } as UserProfile)) };
+
+    const projected = await projectCommunityRecipe(ownerless, 'owner', imagePath, profiles);
+
+    expect(projected.authorDisplayName).toBe('Anonymous');
+    expect(projected.isOwnRecipe).toBe(false);
+    expect(profiles.get).not.toHaveBeenCalled();
+    expect(projected.ingredients[0]).not.toHaveProperty('linkedReusableItemId');
+    expect(await resolveRecipeForRead('reader', ownerless.id, {
+      get: vi.fn(async () => null),
+      getCommunityById: vi.fn(async () => ownerless),
+    })).toEqual({ access: 'community', recipe: ownerless });
   });
 
   it('allowlists ingredients, images and steps and preserves positive legacy AI evidence', async () => {

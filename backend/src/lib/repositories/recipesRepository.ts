@@ -68,8 +68,98 @@ export interface ListCommunityRecipesOptions {
 }
 
 export interface CommunityRecipeRepositoryPage {
-  recipes: Recipe[];
+  recipes: CommunityRecipeRecord[];
   continuationToken?: string;
+}
+
+export type OwnerlessCommunityRecipeIngredient = Omit<RecipeIngredient, 'linkedReusableItemId'> & {
+  linkedReusableItemId?: never;
+};
+
+export type OwnerlessCommunityRecipe = Omit<
+  Recipe,
+  'ownerUserId' | 'communityPublication' | 'sharedWithUserIds' | 'usageCount' | 'lastUsedAt' | 'exportViewStatus' | 'ingredients'
+> & {
+  visibility: 'community';
+  ingredients: OwnerlessCommunityRecipeIngredient[];
+};
+
+export type CommunityRecipeRecord = Recipe | OwnerlessCommunityRecipe;
+
+export function toOwnerlessCommunityRecipe(recipe: Recipe): OwnerlessCommunityRecipe {
+  if (recipe.visibility !== 'community') throw new Error('Only published recipes can be preserved');
+
+  const ingredients = recipe.ingredients.map((ingredient) => {
+    const ownerless = structuredClone(ingredient);
+    Reflect.deleteProperty(ownerless, 'linkedReusableItemId');
+    return ownerless as unknown as OwnerlessCommunityRecipeIngredient;
+  });
+
+  return {
+    id: recipe.id,
+    name: recipe.name,
+    ...(recipe.description !== undefined ? { description: recipe.description } : {}),
+    portions: recipe.portions,
+    ingredients,
+    steps: structuredClone(recipe.steps),
+    images: recipe.images.map(({ id, blobName, order, heroCrop }) => ({
+      id,
+      blobName,
+      order,
+      ...(heroCrop !== undefined ? { heroCrop: structuredClone(heroCrop) } : {}),
+    })),
+    nutritionTotal: structuredClone(recipe.nutritionTotal),
+    nutritionPerPortion: structuredClone(recipe.nutritionPerPortion),
+    ...(recipe.exportView !== undefined ? { exportView: structuredClone(recipe.exportView) } : {}),
+    visibility: 'community',
+    tags: [...recipe.tags],
+    createdAt: recipe.createdAt,
+    updatedAt: recipe.updatedAt,
+  };
+}
+
+export function sanitizeOwnerlessCommunityRecipe(recipe: OwnerlessCommunityRecipe): OwnerlessCommunityRecipe {
+  return {
+    id: recipe.id,
+    name: recipe.name,
+    ...(recipe.description !== undefined ? { description: recipe.description } : {}),
+    portions: recipe.portions,
+    ingredients: recipe.ingredients.map((ingredient) => ({
+      id: ingredient.id,
+      displayName: ingredient.displayName,
+      inputMode: ingredient.inputMode,
+      inputAmount: ingredient.inputAmount,
+      amountGrams: ingredient.amountGrams,
+      unit: ingredient.unit,
+      ...(ingredient.amountLabel !== undefined ? { amountLabel: ingredient.amountLabel } : {}),
+      linkedProductId: ingredient.linkedProductId,
+      isAiEstimate: ingredient.isAiEstimate,
+      ...(ingredient.nutritionSource !== undefined ? { nutritionSource: ingredient.nutritionSource } : {}),
+      ...(ingredient.category !== undefined ? { category: ingredient.category } : {}),
+      ...(ingredient.portionWeightGrams !== undefined ? { portionWeightGrams: ingredient.portionWeightGrams } : {}),
+      ...(ingredient.portionLabel !== undefined ? { portionLabel: ingredient.portionLabel } : {}),
+      nutritionPer100g: structuredClone(ingredient.nutritionPer100g),
+      nutritionContribution: structuredClone(ingredient.nutritionContribution),
+    })),
+    steps: recipe.steps.map(({ order, title, description }) => ({
+      order,
+      ...(title !== undefined ? { title } : {}),
+      description,
+    })),
+    images: recipe.images.map(({ id, blobName, order, heroCrop }) => ({
+      id,
+      blobName,
+      order,
+      ...(heroCrop !== undefined ? { heroCrop: structuredClone(heroCrop) } : {}),
+    })),
+    nutritionTotal: structuredClone(recipe.nutritionTotal),
+    nutritionPerPortion: structuredClone(recipe.nutritionPerPortion),
+    ...(recipe.exportView !== undefined ? { exportView: structuredClone(recipe.exportView) } : {}),
+    visibility: 'community',
+    tags: [...recipe.tags],
+    createdAt: recipe.createdAt,
+    updatedAt: recipe.updatedAt,
+  };
 }
 
 function withEffectiveRecipeProjection(recipe: Recipe): Recipe {
@@ -91,7 +181,9 @@ function withEffectiveRecipeProjection(recipe: Recipe): Recipe {
 export interface RecipesRepository {
   list(userId: string, opts?: ListRecipesOptions): Promise<Recipe[]>;
   listCommunity(opts?: ListCommunityRecipesOptions): Promise<CommunityRecipeRepositoryPage>;
-  getCommunityById(id: string): Promise<Recipe | null>;
+  getCommunityById(id: string): Promise<CommunityRecipeRecord | null>;
+  saveOwnerlessCommunityRecipe(recipe: OwnerlessCommunityRecipe): Promise<void>;
+  deleteOwnerlessCommunityRecipe(id: string): Promise<void>;
   setVisibility(userId: string, id: string, expectedEtag: string, input: RecipeVisibilityInput): Promise<VersionedRecipe | null>;
   get(userId: string, id: string): Promise<Recipe | null>;
   getVersioned(userId: string, id: string): Promise<VersionedRecipe | null>;
@@ -115,12 +207,15 @@ export interface RecipesRepository {
 
 class InMemoryRecipesRepository implements RecipesRepository {
   private readonly store = new Map<string, { recipe: Recipe; etag: string }>();
+  private readonly ownerlessCommunityRecipes = new Map<string, OwnerlessCommunityRecipe>();
 
   private key(userId: string, id: string): string {
     return `${userId}:${id}`;
   }
 
-  async getCommunityById(id: string): Promise<Recipe | null> {
+  async getCommunityById(id: string): Promise<CommunityRecipeRecord | null> {
+    const ownerless = this.ownerlessCommunityRecipes.get(id);
+    if (ownerless) return structuredClone(ownerless);
     const matches = [...this.store.values()].filter(({ recipe }) => recipe.id === id);
     return matches.length === 1 && matches[0].recipe.visibility === 'community'
       ? withEffectiveRecipeProjection(matches[0].recipe) : null;
@@ -132,14 +227,27 @@ class InMemoryRecipesRepository implements RecipesRepository {
     if (!Number.isSafeInteger(offset) || offset < 0 || (opts.continuationToken !== undefined && String(offset) !== opts.continuationToken)) {
       throw new Error('Invalid community continuation token');
     }
-    const all = [...this.store.values()].map(({ recipe }) => recipe)
+    const ownerRecipes = [...this.store.values()].map(({ recipe }) => recipe)
       .filter((recipe) => recipe.visibility === 'community')
       .filter((recipe) => [...this.store.values()].filter((record) => record.recipe.id === recipe.id).length === 1)
-      .sort((first, second) => second.updatedAt.localeCompare(first.updatedAt));
+      .filter((recipe) => !this.ownerlessCommunityRecipes.has(recipe.id));
+    const all: CommunityRecipeRecord[] = [
+      ...ownerRecipes,
+      ...[...this.ownerlessCommunityRecipes.values()].map((recipe) => structuredClone(recipe)),
+    ].sort((first, second) => second.updatedAt.localeCompare(first.updatedAt) || first.id.localeCompare(second.id));
     return {
-      recipes: all.slice(offset, offset + limit).map(withEffectiveRecipeProjection),
+      recipes: all.slice(offset, offset + limit).map((recipe) =>
+        'ownerUserId' in recipe ? withEffectiveRecipeProjection(recipe) : structuredClone(recipe)),
       ...(offset + limit < all.length ? { continuationToken: String(offset + limit) } : {}),
     };
+  }
+
+  async saveOwnerlessCommunityRecipe(recipe: OwnerlessCommunityRecipe): Promise<void> {
+    this.ownerlessCommunityRecipes.set(recipe.id, sanitizeOwnerlessCommunityRecipe(recipe));
+  }
+
+  async deleteOwnerlessCommunityRecipe(id: string): Promise<void> {
+    this.ownerlessCommunityRecipes.delete(id);
   }
 
   async setVisibility(userId: string, id: string, expectedEtag: string, input: RecipeVisibilityInput): Promise<VersionedRecipe | null> {

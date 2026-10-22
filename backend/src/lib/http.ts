@@ -20,7 +20,11 @@ import type {
 } from '@azure/functions';
 import { z, type ZodSchema } from 'zod';
 
-import { UnauthorizedError } from './auth';
+import {
+  UnauthorizedError,
+  UserWriteBlockedDuringProfileDeletionError,
+} from './auth';
+import { ProfileDeletionInProgressError } from './repositories/profileDeletionRepository';
 import { logEvent, type ValidationDiagnostic } from './log';
 
 export type Handler = (
@@ -101,6 +105,12 @@ export function withHandler(name: string, fn: Handler): Handler {
         return {
           status: 401,
           jsonBody: { error: err.message },
+        };
+      }
+      if (err instanceof UserWriteBlockedDuringProfileDeletionError || err instanceof ProfileDeletionInProgressError) {
+        return {
+          status: 409,
+          jsonBody: { error: 'profile_deletion_in_progress', retryable: true },
         };
       }
       const message = err instanceof Error ? err.message : String(err);

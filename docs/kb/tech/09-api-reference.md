@@ -16,6 +16,7 @@ All endpoints are prefixed with `/api`. Auth level is `anonymous` on the Azure F
 | POST | `/api/profile` | Yes | Create/replace profile + recalculate targets |
 | PUT | `/api/profile` | Yes | Update profile + recalculate targets |
 | POST | `/api/profile/calculate-preview` | Yes | Calculate targets without saving |
+| DELETE | `/api/profile` | Yes | Idempotently delete FitTrack user data; requires community-recipe choice |
 
 Request body for POST/PUT: `ProfileInput` — validated with Zod.
 
@@ -27,6 +28,87 @@ from their weight and each profile day's stored calories/fat; the read does not
 write or backfill the document. Existing numeric `proteinG`/`carbsG` fields and
 the `ProfileInput` request shape are unchanged. GET still returns null profile
 and targets when no profile exists.
+
+### DELETE /api/profile
+
+The endpoint performs authenticated, idempotent FitTrack data deletion. A
+renewable five-minute per-user TTL lease is stored in `aiInsights` as
+`_docType: 'profileDeletionLock'`. It rejects new protected operations while
+active, but does not drain or coordinate work admitted before lock acquisition;
+it stores no deletion journal or resume state.
+
+The strict request body is exactly one of:
+
+```json
+{ "confirmation": "DELETE", "deleteCommunityRecipes": false }
+```
+
+Both fields are required. `confirmation` must be the exact, case-sensitive
+literal `DELETE`; `deleteCommunityRecipes` must be a boolean. Unknown fields
+are rejected, including the obsolete `deletePublishedCommunityRecipes` name.
+The UI should also require the user to type `DELETE` before sending this
+request.
+
+`true` deletes the user's published community recipes and their neutral
+community image copies, making them unavailable through community list, detail,
+and image routes. `false` retains published recipes by first copying them to
+ownerless documents and neutral community image paths
+(`community/{recipeId}/{imageId}.{jpg|png}`); their author is `Anonymous`, and
+personal images under the verified user's prefix in `recipe-images` and
+`product-images` are still deleted. In both cases,
+the user's profiles (including legacy `nutritionProfiles`), weights, diary and
+day metadata, reusable-item library and personal images, recipes and personal
+images, AI usage and insights, favorites, and food-relation history are
+deleted. The legacy `users` document keyed by the verified user ID is also
+removed. Foreign favorites and already-saved diary snapshots are unchanged;
+friendships are out of scope. The target user ID comes only from the verified
+Bearer token. Cleanup attempts the legacy `nutritionProfiles` container and
+exact-ID `users` document if present; this is not an assertion that those
+legacy records exist in a deployed account. Their contents are unknown; no
+remote inventory was performed. User-data cleanup removes records from Cosmos
+DB and blobs from Blob Storage. The handler emits operational Application
+Insights events. It does not call Microsoft Graph or send deletion data to
+Azure OpenAI or Document Intelligence, delete data already exported to Health
+Connect, or alter backups.
+
+The handler returns `204` with no body after this request's selected recipe,
+storage, and Cosmos cleanup steps complete and the lease is released. The
+client treats `204` as success and resets local FitTrack state only then. The
+handler does not wait for, cancel, or drain operations admitted before the
+lease was acquired. Such an operation may write after `204` or after lock
+release; this is an accepted internal technical residual. Invalid or
+malformed JSON, a missing or incorrect field, or any unknown field returns
+`400 { "error": "invalid_profile_deletion_request", "message": "Die Löschanfrage ist ungültig. Bitte prüfe die Bestätigung." }`.
+Authentication failure returns
+`401 { "error": "authentication_required", "message": "Bitte melde dich erneut an." }`.
+A concurrent deletion returns
+`409 { "error": "profile_deletion_in_progress", "message": "Eine Löschung läuft bereits. Bitte versuche es erneut.", "retryable": true }`.
+Storage configuration failure returns
+`503 { "error": "profile_deletion_unavailable", "message": "Der Löschdienst ist vorübergehend nicht verfügbar. Bitte versuche es erneut.", "retryable": true }`;
+any partial execution or lease-renewal failure returns
+`503 { "error": "profile_deletion_failed", "message": "Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.", "retryable": true }`.
+
+Unexpected uncaught backend or authentication-provider failures use the generic
+handler response `500 { "error": "Internal server error" }`; this has no
+deletion-specific stable code or `retryable` flag.
+
+For retryable `409` or `503`, retry the complete idempotent request from the
+beginning with the existing session. The server stores no phase, progress,
+recipe choice, or resume state; there is no persistent job or resume journal.
+The short-lived TTL lease prevents parallel deletion runs and expires after a
+process failure. Other authenticated API operations return
+`409 profile_deletion_in_progress` while the lease is active. On errors, the
+client retains its session and local data. The client signs out and clears
+local FitTrack state only after `204`. The endpoint does not delete the
+Microsoft Entra identity; any required follow-up is an internal manual Product
+Owner task, not an end-user action.
+
+Application Insights telemetry is not targeted and follows the configured
+30-day Log Analytics retention. Cosmos/Storage backups are not targeted or
+changed. Blob Soft Delete is unchanged; platform-retained copies may remain
+for up to seven days, so `204` confirms the selected application-level steps,
+not immediate physical irrecoverability or completion of work admitted before
+the deletion lease.
 
 ## Weights
 
@@ -390,6 +472,12 @@ Ingredient source-link IDs are omitted. Ingredient provenance is projected as
 unknown history is not presented as a verified source. The DTO does not expose
 `ownerUserId`, `userId`, `sharedWithUserIds`, `communityPublication`, or
 `usageCount`.
+
+Community reads support both existing owner-backed published documents and
+ownerless snapshots in `communityRecipes`; the latter take precedence during
+preservation and always return `authorDisplayName: "Anonymous"` without a
+profile read. This storage compatibility does not change the `CommunityRecipe`
+response shape or the authenticated routes.
 
 Each community image's `url` is a relative authenticated API path of the form
 `/api/community-recipes/{id}/images/{imageId}`, not a SAS URL. The image route

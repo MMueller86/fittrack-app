@@ -150,6 +150,17 @@ Do not duplicate guidance already contained in the skill. Reference Section 4 (c
 
 ---
 
+## Privacy Impact Assessment
+
+When a requirement collects, derives, stores, retains, logs, exports, shares, or transmits user data (including AI/OCR requests, Health Connect, telemetry, visibility changes, new permissions):
+
+- Include a mandatory **Privacy Impact** section in the plan, using the format defined in the `privacy-impact-review` skill.
+- Include `privacy-impact-review` in `Required Skills` for the Backend/Frontend work packages that implement the change and for the QA work package.
+- If the policy needs an update, include proposed German wording in the plan. Policy changes under `docs/legal/` require explicit user approval and a dedicated subtask.
+- Do not invent legal bases, retention periods, or providers. Mark them `Open question`.
+
+---
+
 ## Infrastructure and Release Assessment
 
 When a requirement involves Bicep changes, new Cosmos containers, an Azure Functions deployment, or an EAS build:

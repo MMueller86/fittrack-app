@@ -53,12 +53,55 @@ to use their existing access rules and image contract. Existing diary logs are
 snapshots of the server's current recipe name, logged portions, and scaled
 nutrition; later edits, privacy changes, or deletion do not rewrite them.
 
-These publication and provenance fields use the existing `recipes` document
-and container. No new container, partition-key change, global backfill,
-migration, or Bicep change is part of this feature. The Cosmos-emulator
-repository contract gate remains `UNVERIFIED`; this documentation is not a
-QA-acceptance or release claim. See [tech/09-api-reference.md](../tech/09-api-reference.md)
-for request/response shapes and the owner/community route matrix.
+Owner recipes and their publication metadata continue to use the existing
+`recipes` container partitioned by `/userId`. The separate `communityRecipes`
+container uses `/id` and stores an ownerless copy for published community
+content retained during the implemented account-deletion flow. The ownerless document retains recipe
+content and community image references, while omitting `userId`,
+`ownerUserId`, author/profile consent data, `sharedWithUserIds`, usage counters,
+and personal `linkedReusableItemId` associations. No owner name is stored;
+ownerless community reads project the author as `Anonymous` without a profile
+lookup. Existing owner-backed community documents remain readable, and no
+global backfill is performed. Listing merges and deduplicates both forms; each
+source query is ordered by `updatedAt DESC, id ASC` and reads at most
+`offset + pageSize + 1` documents. Both Cosmos containers need that composite
+index for deterministic bounded paging.
+
+`preservePublishedCommunityRecipe()` copies images to stable
+`community/{recipeId}/{imageId}.{jpg|png}` paths before upserting the sanitized
+document. It is safe to repeat and leaves the source recipe and images intact;
+`DELETE /api/profile` invokes it before deleting personal records when the
+request sets `confirmation: "DELETE"` and `deleteCommunityRecipes: false`, then removes the
+owner-path images with normal application blob deletes. When the choice is
+`true`, the endpoint deletes only ownerless community copies for the user's
+recipe IDs and their neutral community image paths. Personal owner recipes and
+personal library links are removed in both cases. Blob Soft Delete is
+unchanged. See
+[tech/09-api-reference.md](../tech/09-api-reference.md#delete-apiprofile) for the
+strict request and response contract and the owner/community route matrix.
+
+The account-deletion target is only the verified JWT `sub`. Retained ownerless
+recipes contain no user/owner/name mapping or personal library link, remain
+usable through community routes, and project `Anonymous` without a profile
+lookup. Foreign favorites and saved diary snapshots are not deleted; a
+favorite whose recipe was deleted remains stored but cannot open it.
+Friendships are out of scope. Deletion retries restart the complete idempotent
+request; there is no persistent progress or resume journal. Entra identity
+deletion is manual and separate. The deletion flow does not call Microsoft
+Graph or send deletion data to Azure OpenAI or Document Intelligence.
+Application Insights entries and Cosmos/Storage backups are not targeted, and
+Health Connect exports are unchanged. Log Analytics retention is 30 days;
+Blob Soft Delete may retain recovery copies for up to seven days. No remote
+inventory was performed for legacy `users` or `nutritionProfiles` records;
+their existence and contents are unknown. Any Microsoft Entra identity
+follow-up is outside this endpoint and is an internal manual Product Owner
+task, not an end-user action.
+
+The deletion lease gates new operations only. Recipe operations admitted
+before lock acquisition are not cancelled, drained, or checked again and may
+write after `204` or after lock release. This is an accepted internal technical
+residual. `204` confirms this request's selected steps, not that earlier work
+cannot write later or that deleted data is immediately irrecoverable.
 
 ### Nutrition Provenance Compatibility
 

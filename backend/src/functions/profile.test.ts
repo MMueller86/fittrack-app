@@ -1,14 +1,25 @@
-import { describe, it, expect, beforeEach, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest';
+
+vi.mock('../lib/profileDeletion', async () => {
+  const actual = await vi.importActual<typeof import('../lib/profileDeletion')>('../lib/profileDeletion');
+  return { ...actual, deleteUserProfileData: vi.fn() };
+});
 
 import {
   getProfileHandler,
   createProfileHandler,
   updateProfileHandler,
   calculatePreviewHandler,
+  deleteProfileHandler,
 } from './profile';
 import { __resetProfileRepositoryForTests } from '../lib/repositories/profileRepository';
 import { getProfileRepository } from '../lib/repositories/profileRepository';
 import { calculateMacroRanges } from '../../../shared/lib/macroRanges';
+import { deleteUserProfileData, ProfileDeletionFailedError } from '../lib/profileDeletion';
+import {
+  ProfileDeletionInProgressError,
+  ProfileDeletionStorageUnavailableError,
+} from '../lib/repositories/profileDeletionRepository';
 import {
   makeContext,
   makeAuthRequest,
@@ -27,6 +38,10 @@ beforeAll(async () => {
 
 afterAll(() => {
   teardownTestAuth();
+});
+
+afterEach(() => {
+  vi.mocked(deleteUserProfileData).mockReset();
 });
 
 beforeEach(() => {
@@ -351,5 +366,120 @@ describe('POST /api/profile/calculate-preview', () => {
       makeContext(),
     );
     expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DELETE /api/profile
+// ---------------------------------------------------------------------------
+
+describe('DELETE /api/profile', () => {
+  it('requires the exact confirmation and community-recipe choice', async () => {
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE' },
+    }), makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: 'invalid_profile_deletion_request',
+      message: 'Die Löschanfrage ist ungültig. Bitte prüfe die Bestätigung.',
+    });
+  });
+
+  it('requires the case-sensitive DELETE confirmation', async () => {
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'delete', deleteCommunityRecipes: false },
+    }), makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual(expect.objectContaining({ error: 'invalid_profile_deletion_request' }));
+    expect(deleteUserProfileData).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown request fields', async () => {
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE', deleteCommunityRecipes: false, extra: true },
+    }), makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: 'invalid_profile_deletion_request',
+      message: 'Die Löschanfrage ist ungültig. Bitte prüfe die Bestätigung.',
+    });
+    expect(deleteUserProfileData).not.toHaveBeenCalled();
+  });
+
+  it('rejects the legacy community-recipe field name', async () => {
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE', deletePublishedCommunityRecipes: false },
+    }), makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual(expect.objectContaining({ error: 'invalid_profile_deletion_request' }));
+    expect(deleteUserProfileData).not.toHaveBeenCalled();
+  });
+
+  it('requires a valid authenticated session and returns a stable 401 code', async () => {
+    const res = await deleteProfileHandler(await makeRequest({
+      body: { confirmation: 'DELETE', deleteCommunityRecipes: false },
+    }), makeContext());
+
+    expect(res.status).toBe(401);
+    expect(res.jsonBody).toEqual({
+      error: 'authentication_required',
+      message: 'Bitte melde dich erneut an.',
+    });
+  });
+
+  it('returns 204 only after the full service resolves', async () => {
+    vi.mocked(deleteUserProfileData).mockResolvedValue(undefined);
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE', deleteCommunityRecipes: false },
+    }), makeContext());
+
+    expect(res.status).toBe(204);
+    expect(deleteUserProfileData).toHaveBeenCalledWith(TEST_USER_ID, false);
+  });
+
+  it('returns retryable conflict while another deletion owns the lease', async () => {
+    vi.mocked(deleteUserProfileData).mockRejectedValue(new ProfileDeletionInProgressError());
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE', deleteCommunityRecipes: true },
+    }), makeContext());
+
+    expect(res.status).toBe(409);
+    expect(res.jsonBody).toEqual({
+      error: 'profile_deletion_in_progress',
+      message: 'Eine Löschung läuft bereits. Bitte versuche es erneut.',
+      retryable: true,
+    });
+  });
+
+  it('returns a retryable stable error when storage is unavailable', async () => {
+    vi.mocked(deleteUserProfileData).mockRejectedValue(new ProfileDeletionStorageUnavailableError());
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE', deleteCommunityRecipes: false },
+    }), makeContext());
+
+    expect(res.status).toBe(503);
+    expect(res.jsonBody).toEqual({
+      error: 'profile_deletion_unavailable',
+      message: 'Der Löschdienst ist vorübergehend nicht verfügbar. Bitte versuche es erneut.',
+      retryable: true,
+    });
+  });
+
+  it('returns a retryable stable error after a partial failure', async () => {
+    vi.mocked(deleteUserProfileData).mockRejectedValue(new ProfileDeletionFailedError('delete-user-documents', 'Error'));
+    const res = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE', deleteCommunityRecipes: true },
+    }), makeContext());
+
+    expect(res.status).toBe(503);
+    expect(res.jsonBody).toEqual({
+      error: 'profile_deletion_failed',
+      message: 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.',
+      retryable: true,
+    });
   });
 });

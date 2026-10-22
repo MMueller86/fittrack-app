@@ -75,6 +75,8 @@ Never call the Cosmos SDK directly from function handlers. All data access goes 
 
 **When a task adds a document field, introduces a new entity type, adds a container, or requires migration logic:** load the `cosmos-data-model-and-migration` skill before writing any code. It contains the schema evolution classification, backward-compatibility invariants, infrastructure coordination checklist, and testing requirements. Do not make Cosmos persistence decisions without it.
 
+**When the Task Package lists `privacy-impact-review`:** load it before writing code and report the actual data handling (stored, sent, logged, retention) in the handoff. Do not process, store, log, or transmit user data beyond what the plan declares.
+
 ## API Contract Changes
 
 When changing a request or response shape, HTTP method, or route:

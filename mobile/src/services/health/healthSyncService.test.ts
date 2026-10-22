@@ -12,6 +12,7 @@ const {
   mockUpdateHealthSync,
   mockAsyncStorageGetItem,
   mockAsyncStorageSetItem,
+  mockAsyncStorageRemoveItem,
 } = vi.hoisted(() => ({
   mockUpsertRecord: vi.fn(),
   mockDeleteRecord: vi.fn(),
@@ -20,12 +21,14 @@ const {
   mockUpdateHealthSync: vi.fn().mockResolvedValue(undefined),
   mockAsyncStorageGetItem: vi.fn().mockResolvedValue(null),
   mockAsyncStorageSetItem: vi.fn().mockResolvedValue(undefined),
+  mockAsyncStorageRemoveItem: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: mockAsyncStorageGetItem,
     setItem: mockAsyncStorageSetItem,
+    removeItem: mockAsyncStorageRemoveItem,
   },
 }));
 
@@ -87,7 +90,30 @@ describe('healthSyncService', () => {
     mockInitialize.mockResolvedValue(true);
     mockAsyncStorageGetItem.mockResolvedValue(null);
     mockAsyncStorageSetItem.mockResolvedValue(undefined);
+    mockAsyncStorageRemoveItem.mockResolvedValue(undefined);
     service = makeFreshService();
+  });
+
+  it('clears persisted and in-memory sync state after account deletion without touching Health Connect', async () => {
+    mockAsyncStorageGetItem.mockResolvedValueOnce(JSON.stringify({
+      enabled: true,
+      permissionRevoked: false,
+      lastFullExportAt: '2026-10-20T10:00:00.000Z',
+      pendingOperations: [{ entryId: 'weight-1', type: 'delete', retryCount: 2, sessionCount: 1 }],
+    }));
+    await service.loadState();
+
+    await service.resetForAccountDeletion();
+
+    expect(mockAsyncStorageRemoveItem).toHaveBeenCalledWith('hc:weight:sync');
+    expect(service.getSyncStatus()).toMatchObject({
+      enabled: false,
+      permissionRevoked: false,
+      permanentFailures: [],
+      temporaryFailures: [],
+    });
+    expect(mockDeleteRecord).not.toHaveBeenCalled();
+    expect(mockUpsertRecord).not.toHaveBeenCalled();
   });
 
   describe('enableSync', () => {

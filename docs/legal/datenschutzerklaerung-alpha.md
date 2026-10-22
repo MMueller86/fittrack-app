@@ -1,6 +1,6 @@
 # Datenschutzerklärung
 
-Stand: 2026-10-12
+Stand: 2026-10-22
 
 ## Wer ist verantwortlich?
 
@@ -50,12 +50,11 @@ Wenn du Feedback zu einem Insight sendest, werden dein Kommentar, die Insight-An
 
 ## Speicherdauer und Löschen
 
-- Deine Daten bleiben gespeichert, bis dein Konto gelöscht wird.
-- **Konto löschen ist in der Alpha noch nicht verfügbar.** Aktuell gibt es keinen anderen Weg, Daten zu löschen.
+Wenn du die Kontolöschung bestätigst, löschen wir deine aktiven persönlichen FitTrack-Daten. Veröffentlichte Community-Rezepte, die du behalten möchtest, bleiben ohne aktive Zuordnung zu deinem Konto erhalten; ihr Autor wird als „Anonymous“ angezeigt. Betriebs- und Fehlerprotokolle werden nicht einzeln gelöscht und gemäß der konfigurierten Aufbewahrungszeit gespeichert (derzeit 30 Tage). Bestehende Backups werden nicht verändert. Gelöschte Bilder können gemäß der bestehenden Azure-Blob-Soft-Delete-Konfiguration noch bis zu sieben Tage als Plattform-Wiederherstellungskopie vorhanden sein.
+
+Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen. Wenn das auf deinem Gerät nicht klappt, zeigt FitTrack dir einen Hinweis. Bereits in Health Connect gespeicherte Einträge und Berechtigungen bleiben davon unberührt.
+
 - Daily- und Weekly-Insights laufen automatisch ab.
-- Auf deinem Gerät:
-  - Die Health-Connect-Wiederholungswarteschlange bleibt bis zur Deinstallation der App.
-  - Das Diagnoseprotokoll (max. 150 Einträge) kannst du in der Health-Connect-Ansicht manuell löschen.
 
 ## Fragen?
 

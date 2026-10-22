@@ -10,6 +10,10 @@
 import type { HttpRequest } from '@azure/functions';
 import { createRemoteJWKSet, jwtVerify, errors as joseErrors } from 'jose';
 import type { JWTPayload } from 'jose';
+import {
+  assertProfileDeletionNotActive,
+  ProfileDeletionInProgressError,
+} from './repositories/profileDeletionRepository';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -159,7 +163,25 @@ async function getUserContext(request: HttpRequest): Promise<UserContext> {
  * Returns UserContext on success, throws UnauthorizedError on failure.
  */
 export async function requireUser(request: HttpRequest): Promise<UserContext> {
-  return getUserContext(request);
+  return requireUserWithOptions(request);
+}
+
+export async function requireUserWithOptions(
+  request: HttpRequest,
+  options: { allowDuringProfileDeletion?: boolean } = {},
+): Promise<UserContext> {
+  const user = await getUserContext(request);
+  if (!options.allowDuringProfileDeletion) {
+    try {
+      await assertProfileDeletionNotActive(user.userId);
+    } catch (error) {
+      if (error instanceof ProfileDeletionInProgressError) {
+        throw new UserWriteBlockedDuringProfileDeletionError();
+      }
+      throw error;
+    }
+  }
+  return user;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,6 +193,15 @@ export class UnauthorizedError extends Error {
   constructor(message = 'Unauthorized') {
     super(message);
     this.name = 'UnauthorizedError';
+  }
+}
+
+export class UserWriteBlockedDuringProfileDeletionError extends Error {
+  public readonly statusCode = 409;
+  public readonly retryable = true;
+  constructor() {
+    super('Profile deletion is in progress');
+    this.name = 'UserWriteBlockedDuringProfileDeletionError';
   }
 }
 

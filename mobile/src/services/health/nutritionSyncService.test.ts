@@ -13,6 +13,7 @@ const {
   mockListAllMeals,
   mockAsyncStorageGetItem,
   mockAsyncStorageSetItem,
+  mockAsyncStorageRemoveItem,
 } = vi.hoisted(() => ({
   mockUpsertRecord: vi.fn(),
   mockDeleteRecord: vi.fn(),
@@ -21,12 +22,14 @@ const {
   mockListAllMeals: vi.fn(),
   mockAsyncStorageGetItem: vi.fn().mockResolvedValue(null),
   mockAsyncStorageSetItem: vi.fn().mockResolvedValue(undefined),
+  mockAsyncStorageRemoveItem: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {
     getItem: mockAsyncStorageGetItem,
     setItem: mockAsyncStorageSetItem,
+    removeItem: mockAsyncStorageRemoveItem,
   },
 }));
 
@@ -100,8 +103,32 @@ describe('nutritionSyncService', () => {
     mockInitialize.mockResolvedValue(true);
     mockAsyncStorageGetItem.mockResolvedValue(null);
     mockAsyncStorageSetItem.mockResolvedValue(undefined);
+    mockAsyncStorageRemoveItem.mockResolvedValue(undefined);
     mockListAllMeals.mockResolvedValue({ meals: [], cursor: undefined });
     service = makeFreshService();
+  });
+
+  it('clears persisted and in-memory sync state after account deletion without touching Health Connect', async () => {
+    mockAsyncStorageGetItem.mockResolvedValueOnce(JSON.stringify({
+      enabled: true,
+      permissionRevoked: false,
+      lastFullExportAt: '2026-10-20T10:00:00.000Z',
+      exportCursor: 'next-page',
+      pendingOperations: [{ entryId: 'meal-item-1', type: 'delete', retryCount: 2, sessionCount: 1 }],
+    }));
+    await service.loadState();
+
+    await service.resetForAccountDeletion();
+
+    expect(mockAsyncStorageRemoveItem).toHaveBeenCalledWith('hc:nutrition:sync');
+    expect(service.getSyncStatus()).toMatchObject({
+      enabled: false,
+      permissionRevoked: false,
+      permanentFailures: [],
+      temporaryFailures: [],
+    });
+    expect(mockDeleteRecord).not.toHaveBeenCalled();
+    expect(mockUpsertRecord).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------

@@ -1,9 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 import LoginScreen from './LoginScreen';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const mocks = vi.hoisted(() => ({ showSnackbar: vi.fn() }));
+
+vi.mock('../../shared/components/Snackbar', () => ({
+  Snackbar: 'Snackbar',
+  useSnackbar: () => ({ ref: { current: null }, show: mocks.showSnackbar }),
+}));
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
@@ -53,7 +60,42 @@ function pressByLabel(renderer: ReactTestRenderer, label: string) {
   act(() => (node.props.onPress as () => void)());
 }
 
+function CleanupNoticeHarness({ onNoticeShown }: { onNoticeShown: () => void }) {
+  const [noticeVisible, setNoticeVisible] = useState(true);
+  return (
+    <LoginScreen
+      onLoginSuccess={vi.fn()}
+      accountDeletionCleanupNotice={noticeVisible}
+      onAccountDeletionCleanupNoticeShown={() => {
+        onNoticeShown();
+        setNoticeVisible(false);
+      }}
+    />
+  );
+}
+
 describe('LoginScreen', () => {
+  it('shows the transient cleanup warning once without blocking login or offering retry', () => {
+    mocks.showSnackbar.mockClear();
+    const onAccountDeletionCleanupNoticeShown = vi.fn();
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<CleanupNoticeHarness onNoticeShown={onAccountDeletionCleanupNoticeShown} />);
+    });
+
+    expect(mocks.showSnackbar).toHaveBeenCalledTimes(1);
+    expect(mocks.showSnackbar).toHaveBeenCalledWith({
+      message: 'Einige private App-Daten von FitTrack konnten auf diesem Gerät nicht gelöscht werden. Du kannst die App-Daten in den Android-Einstellungen entfernen.',
+      durationMs: 6000,
+      numberOfLines: null,
+    });
+    expect(onAccountDeletionCleanupNoticeShown).toHaveBeenCalledTimes(1);
+    expect(renderer.root.findAll((node: ReactTestInstance) => node.type === 'Pressable')[0]!.props.disabled).toBe(false);
+    expect(texts(renderer)).not.toContain('Erneut versuchen');
+
+    expect(mocks.showSnackbar).toHaveBeenCalledTimes(1);
+  });
+
   it('opens the Datenschutz text in-app without authentication and returns to login', () => {
     let renderer!: ReactTestRenderer;
     act(() => {

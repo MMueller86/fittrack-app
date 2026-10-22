@@ -1,7 +1,8 @@
 import type { HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { type ZodSchema } from 'zod';
 
-import { UnauthorizedError } from './auth';
+import { UnauthorizedError, UserWriteBlockedDuringProfileDeletionError } from './auth';
+import { ProfileDeletionInProgressError } from './repositories/profileDeletionRepository';
 import { withHandler, type Handler } from './http';
 import { logEvent, type ValidationDiagnostic } from './log';
 
@@ -79,6 +80,7 @@ const LEGACY_CODES: Record<string, string> = {
 
 const ERROR_MESSAGES: Record<string, string> = {
   AUTHENTICATION_REQUIRED: 'Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.',
+  PROFILE_DELETION_IN_PROGRESS: 'Dein Konto wird gerade gelöscht. Bitte warte und versuche es danach erneut.',
   FORBIDDEN: 'Du hast keine Berechtigung für diese Aktion.',
   INVALID_JSON: 'Die Anfrage enthält kein gültiges JSON.',
   INVALID_REQUEST: 'Die Anfrage ist ungültig. Bitte prüfe deine Eingaben.',
@@ -337,6 +339,12 @@ export function withRecipeHandler(name: string, handler: Handler): Handler {
           ...recipeRequestLogFields(request),
         });
         return recipeApiError(ctx, 401, 'AUTHENTICATION_REQUIRED');
+      }
+      if (error instanceof UserWriteBlockedDuringProfileDeletionError || error instanceof ProfileDeletionInProgressError) {
+        return recipeApiError(ctx, 409, 'PROFILE_DELETION_IN_PROGRESS', {
+          category: 'conflict',
+          retryable: true,
+        });
       }
 
       const dependencyFailure = error instanceof RecipeDependencyError;

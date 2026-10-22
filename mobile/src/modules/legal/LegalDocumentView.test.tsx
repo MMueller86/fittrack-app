@@ -58,7 +58,7 @@ describe('LegalDocumentView', () => {
 
     expect(all[0]).toBe('Datenschutzerklärung');
     expect(all).toContain('Speicherdauer und Löschen');
-    expect(all.some((t) => t.includes('Konto löschen ist in der Alpha noch nicht verfügbar.'))).toBe(true);
+    expect(all.some((t) => t.includes('Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen.'))).toBe(true);
     expect(all).toContain('Das ist eine Alpha-Version. Dieser Text kann sich ändern.');
 
     const headers = texts(renderer, 'header');

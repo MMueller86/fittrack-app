@@ -1,13 +1,22 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+
+const deletionMocks = vi.hoisted(() => ({ assertNotActive: vi.fn(async () => {}) }));
+vi.mock('./repositories/profileDeletionRepository', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./repositories/profileDeletionRepository')>()),
+  assertProfileDeletionNotActive: deletionMocks.assertNotActive,
+}));
 import type { HttpRequest } from '@azure/functions';
 import { generateKeyPair, SignJWT } from 'jose';
 
 import {
   requireUser,
+  requireUserWithOptions,
   parseBearer,
   UnauthorizedError,
+  UserWriteBlockedDuringProfileDeletionError,
   _setJwksForTesting,
 } from './auth';
+import { ProfileDeletionInProgressError } from './repositories/profileDeletionRepository';
 
 function makeRequest(token?: string): HttpRequest {
   const headers = new Map<string, string>();
@@ -19,6 +28,8 @@ describe('auth', () => {
   const TEST_ISSUER = 'https://test-tenant.ciamlogin.com/test-tenant/v2.0';
   const TEST_AUDIENCE = 'api://test-app-id';
   let privateKey: CryptoKey;
+
+  beforeEach(() => deletionMocks.assertNotActive.mockClear());
 
   beforeAll(async () => {
     const keys = await generateKeyPair('RS256');
@@ -52,6 +63,22 @@ describe('auth', () => {
     const ctx = await requireUser(makeRequest(token));
     expect(ctx.userId).toBe('abc-def-123');
     expect(ctx.tier).toBe('free');
+  });
+
+  it('blocks authenticated operations while the profile deletion lease is active', async () => {
+    deletionMocks.assertNotActive.mockRejectedValueOnce(new ProfileDeletionInProgressError());
+    const token = await signToken();
+
+    await expect(requireUser(makeRequest(token)))
+      .rejects.toBeInstanceOf(UserWriteBlockedDuringProfileDeletionError);
+  });
+
+  it('allows only the explicit profile-deletion route opt-out through an active lease', async () => {
+    const token = await signToken();
+
+    await expect(requireUserWithOptions(makeRequest(token), { allowDuringProfileDeletion: true }))
+      .resolves.toMatchObject({ userId: 'user-123' });
+    expect(deletionMocks.assertNotActive).not.toHaveBeenCalled();
   });
 
   it('missing Authorization header throws UnauthorizedError', async () => {

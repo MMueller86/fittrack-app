@@ -63,6 +63,25 @@ function renderSearch(props: React.ComponentProps<typeof SearchState>) {
   return renderer;
 }
 
+function renderSearchWithQuery(
+  initialQuery: string,
+  props: Omit<React.ComponentProps<typeof SearchState>, 'query'>,
+) {
+  let updateQuery!: (query: string) => void;
+  function SearchHarness() {
+    const [query, setQuery] = React.useState(initialQuery);
+    updateQuery = setQuery;
+    return <SearchState {...props} query={query} />;
+  }
+
+  let renderer!: ReactTestRenderer;
+  act(() => {
+    renderer = create(<SearchHarness />);
+  });
+  renderers.push(renderer);
+  return { renderer, updateQuery };
+}
+
 function heart(renderer: ReactTestRenderer): ReactTestInstance {
   return renderer.root.findAll(
     (n: ReactTestInstance) =>
@@ -129,10 +148,78 @@ describe('SearchState cached results', () => {
     });
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(300);
+      await vi.advanceTimersByTimeAsync(500);
     });
 
     expect(mocks.foodApi.search).toHaveBeenCalledWith('hafermilch');
+  });
+
+  it('waits 500 ms after the latest change and searches only the final query', async () => {
+    vi.useFakeTimers();
+    mocks.foodApi.search.mockResolvedValue({ results: [] });
+    const props = {
+      recents: [],
+      onSelect: vi.fn(),
+      onSelectRelation: vi.fn(),
+      onOpenSubflow: vi.fn(),
+    };
+    const { renderer, updateQuery } = renderSearchWithQuery('schok', props);
+
+    act(() => updateQuery('schoko'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(499);
+    });
+    expect(mocks.foodApi.search).not.toHaveBeenCalled();
+
+    act(() => updateQuery('schokoladenkränze'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(499);
+    });
+    expect(mocks.foodApi.search).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(mocks.foodApi.search).toHaveBeenCalledTimes(1);
+    expect(mocks.foodApi.search).toHaveBeenCalledWith('schokoladenkränze');
+  });
+
+  it('ignores results from an older request that resolves after the latest query', async () => {
+    vi.useFakeTimers();
+    let resolveOlder!: (value: { results: FoodSearchResult[] }) => void;
+    let resolveLatest!: (value: { results: FoodSearchResult[] }) => void;
+    mocks.foodApi.search.mockImplementation((query: string) => new Promise((resolve) => {
+      if (query === 'schoko') resolveOlder = resolve;
+      else resolveLatest = resolve;
+    }));
+    const props = {
+      recents: [],
+      onSelect: vi.fn(),
+      onSelectRelation: vi.fn(),
+      onOpenSubflow: vi.fn(),
+    };
+    const { renderer, updateQuery } = renderSearchWithQuery('schoko', props);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+    act(() => updateQuery('schokoladenkränze'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    const latestResult = item({ id: 'latest', name: 'Schokoladenkränze' });
+    await act(async () => {
+      resolveLatest({ results: [latestResult] });
+      await Promise.resolve();
+    });
+    await act(async () => {
+      resolveOlder({ results: [item({ id: 'older', name: 'Schokolade' })] });
+      await Promise.resolve();
+    });
+
+    const list = renderer.root.findAll((node: ReactTestInstance) => (node.type as unknown) === 'BottomSheetFlatList')[0]!;
+    expect(list.props.data).toEqual([latestResult]);
   });
 });
 

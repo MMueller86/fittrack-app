@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Recipe } from '@fittrack/shared';
 import type { CreateRecipeInput, UpdateRecipeInput } from './recipesRepository';
-import { __resetRecipesRepositoryForTests, getRecipesRepository } from './recipesRepository';
+import { __resetRecipesRepositoryForTests, getRecipesRepository, toOwnerlessCommunityRecipe } from './recipesRepository';
 
 const zeroNutrition = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
 
@@ -75,7 +75,9 @@ describe('in-memory recipe revisions', () => {
     await repo.setVisibility('user-2', second.recipe.id, second.etag, { visibility: 'community', contentConfirmed: true, displayNameConsent: false });
     await repo.update('user-1', first.recipe.id, { name: 'Updated', images: [] });
     await repo.incrementUsage('user-1', first.recipe.id);
-    expect((await repo.getCommunityById(first.recipe.id))?.communityPublication).toEqual(published?.recipe.communityPublication);
+    expect(await repo.getCommunityById(first.recipe.id)).toMatchObject({
+      communityPublication: published?.recipe.communityPublication,
+    });
     const page = await repo.listCommunity({ limit: 1 });
     expect(page.recipes).toHaveLength(1);
     const next = await repo.listCommunity({ limit: 1, continuationToken: page.continuationToken });
@@ -87,6 +89,46 @@ describe('in-memory recipe revisions', () => {
     const revoked = await repo.setVisibility('user-1', first.recipe.id, current!.etag, { visibility: 'private' });
     expect(revoked?.recipe.communityPublication).toBeUndefined();
     expect(await repo.getCommunityById(first.recipe.id)).toBeNull();
+  });
+
+  it('stores ownerless community copies without owner or personal-library associations', async () => {
+    const repo = getRecipesRepository();
+    const created = await repo.createVersioned('user-1', {
+      ...input,
+      ingredients: [{
+        id: 'ingredient-1', displayName: 'Food', inputMode: 'grams', inputAmount: 100,
+        amountGrams: 100, unit: 'g', linkedProductId: null, linkedReusableItemId: 'library-item',
+        isAiEstimate: false, nutritionPer100g: zeroNutrition, nutritionContribution: zeroNutrition,
+      }],
+    });
+    const published = await repo.setVisibility('user-1', created.recipe.id, created.etag, {
+      visibility: 'community', contentConfirmed: true, displayNameConsent: false,
+    });
+    const ownerless = toOwnerlessCommunityRecipe(published!.recipe);
+
+    await repo.saveOwnerlessCommunityRecipe(ownerless);
+    await repo.saveOwnerlessCommunityRecipe(ownerless);
+
+    const stored = await repo.getCommunityById(created.recipe.id);
+    expect(stored).toEqual(ownerless);
+    expect(stored).not.toHaveProperty('ownerUserId');
+    expect(stored).not.toHaveProperty('sharedWithUserIds');
+    expect(stored).not.toHaveProperty('communityPublication');
+    expect(stored).not.toHaveProperty('usageCount');
+    expect(stored?.ingredients[0]).not.toHaveProperty('linkedReusableItemId');
+    expect((await repo.listCommunity()).recipes.map(({ id }) => id)).toEqual([created.recipe.id]);
+    expect((await repo.get('user-1', created.recipe.id))?.ownerUserId).toBe('user-1');
+
+    await repo.saveOwnerlessCommunityRecipe({
+      ...ownerless,
+      authorDisplayName: 'Personal name',
+    } as typeof ownerless);
+    expect(await repo.getCommunityById(created.recipe.id)).not.toHaveProperty('authorDisplayName');
+  });
+
+  it('does not create an ownerless copy from a private recipe', async () => {
+    const recipe = await getRecipesRepository().create('user-1', input);
+    expect(() => toOwnerlessCommunityRecipe(recipe)).toThrow('Only published recipes can be preserved');
   });
 
   it('compares and replaces atomically, rejecting stale revisions without partial writes', async () => {

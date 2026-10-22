@@ -5,6 +5,15 @@ vi.mock('../lib/queueClient', () => ({
   enqueueEnrichment: vi.fn().mockResolvedValue(undefined),
 }));
 
+const deletionMocks = vi.hoisted(() => ({
+  assertNotActive: vi.fn(async () => {}),
+}));
+
+vi.mock('../lib/repositories/profileDeletionRepository', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/repositories/profileDeletionRepository')>()),
+  assertProfileDeletionNotActive: deletionMocks.assertNotActive,
+}));
+
 import {
   createReusableItemHandler,
   searchReusableItemsHandler,
@@ -12,6 +21,7 @@ import {
   deleteReusableItemHandler,
 } from './reusableItems';
 import { enqueueEnrichment } from '../lib/queueClient';
+import { ProfileDeletionInProgressError } from '../lib/repositories/profileDeletionRepository';
 import { __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
 import {
@@ -36,6 +46,7 @@ beforeEach(() => {
   __resetDiaryRepositoryForTests();
   __resetUserFoodRelationRepositoryForTests();
   vi.mocked(enqueueEnrichment).mockClear();
+  deletionMocks.assertNotActive.mockReset().mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------
@@ -649,6 +660,21 @@ describe('enqueueEnrichment — called after create and update', () => {
     // rejection would go unnoticed — the await ensures failures propagate).
     expect(enqueueEnrichment).toHaveBeenCalledOnce();
     expect(enqueueEnrichment).toHaveBeenCalledWith(TEST_USER_ID, item.id, ctx);
+  });
+
+  it('rejects create at admission while the deletion lease is active', async () => {
+    deletionMocks.assertNotActive.mockRejectedValueOnce(new ProfileDeletionInProgressError());
+
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: { name: 'Haferflocken', calories: 370, protein: 13, carbs: 60, fat: 7, fiber: 10 },
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(409);
+    expect(deletionMocks.assertNotActive).toHaveBeenCalledOnce();
+    expect(enqueueEnrichment).not.toHaveBeenCalled();
   });
 
   it('calls enqueueEnrichment with correct itemId after PATCH update', async () => {

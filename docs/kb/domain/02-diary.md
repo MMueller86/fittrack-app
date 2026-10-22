@@ -64,6 +64,17 @@ entry remains readable from its saved snapshot. See
 for the route request contract.
 
 ## Day Meta
+### Account deletion and diary snapshots
+
+Account deletion sweeps every Diary meal and its embedded snapshots in the
+deleting user's partition. It does not search or rewrite another user's diary:
+foreign favorites and already-saved diary snapshots that reference a deleted
+recipe remain stored. A foreign favorite no longer resolves to an available
+recipe after that recipe is deleted. Work admitted before the deletion lease is
+not drained and may write after `204`; this accepted late-write residual means
+the response does not guarantee older Diary operations cannot recreate data.
+
+## Day Meta
 
 `DayMeta` — per-day metadata stored as `_docType: 'dayMeta'` in the existing `nutritionDiaryMeals` Cosmos container.
 

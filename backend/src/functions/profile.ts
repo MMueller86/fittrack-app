@@ -1,10 +1,15 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
 import { z } from 'zod';
 
-import { requireUser } from '../lib/auth';
+import { requireUser, requireUserWithOptions, UnauthorizedError } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getProfileRepository } from '../lib/repositories/profileRepository';
+import {
+  ProfileDeletionInProgressError,
+  ProfileDeletionStorageUnavailableError,
+} from '../lib/repositories/profileDeletionRepository';
+import { deleteUserProfileData, ProfileDeletionFailedError } from '../lib/profileDeletion';
 import { calculateProfileTargets } from '../../../shared/lib/profileCalculator';
 import type { UserProfile, ProfileInput } from '@fittrack/shared';
 
@@ -39,6 +44,11 @@ const ProfileInputSchema = z.object({
   (d) => d.stepsPerDay != null || d.activityLevel != null,
   { message: 'Either stepsPerDay or activityLevel must be provided', path: ['stepsPerDay'] },
 );
+
+const ProfileDeletionSchema = z.object({
+  confirmation: z.literal('DELETE'),
+  deleteCommunityRecipes: z.boolean(),
+}).strict();
 
 // ---------------------------------------------------------------------------
 // Shared helper: build and upsert a profile document
@@ -200,11 +210,73 @@ app.http('profile-calculate-preview', {
 export const deleteProfileHandler = withHandler(
   'profile.delete',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    const { userId } = await requireUser(request);
-    const repo = getProfileRepository();
-    await repo.delete(userId);
-    logEvent(ctx, 'info', 'profile.deleted', {});
-    return { status: 204 };
+    let userId: string;
+    try {
+      ({ userId } = await requireUserWithOptions(request, { allowDuringProfileDeletion: true }));
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return {
+          status: 401,
+          jsonBody: { error: 'authentication_required', message: 'Bitte melde dich erneut an.' },
+        };
+      }
+      throw error;
+    }
+    const parsed = await parseBody(request, ProfileDeletionSchema);
+    if (!parsed.ok) {
+      return {
+        status: 400,
+        jsonBody: {
+          error: 'invalid_profile_deletion_request',
+          message: 'Die Löschanfrage ist ungültig. Bitte prüfe die Bestätigung.',
+        },
+      };
+    }
+    try {
+      await deleteUserProfileData(userId, parsed.data.deleteCommunityRecipes);
+      logEvent(ctx, 'info', 'profile.deleted', {});
+      return { status: 204 };
+    } catch (error) {
+      if (error instanceof ProfileDeletionInProgressError) {
+        return {
+          status: 409,
+          jsonBody: {
+            error: 'profile_deletion_in_progress',
+            message: 'Eine Löschung läuft bereits. Bitte versuche es erneut.',
+            retryable: true,
+          },
+        };
+      }
+      if (error instanceof ProfileDeletionStorageUnavailableError) {
+        return {
+          status: 503,
+          jsonBody: {
+            error: 'profile_deletion_unavailable',
+            message: 'Der Löschdienst ist vorübergehend nicht verfügbar. Bitte versuche es erneut.',
+            retryable: true,
+          },
+        };
+      }
+      if (error instanceof ProfileDeletionFailedError) {
+        logEvent(ctx, 'error', 'profile.deletion.failed', {
+          stage: error.stage,
+          cause_type: error.causeType,
+        });
+      } else {
+        logEvent(ctx, 'error', 'profile.deletion.failed', {
+          stage: 'acquire-or-release-lock',
+          cause_type: error instanceof Error ? error.name : typeof error,
+        });
+      }
+      return {
+        status: 503,
+        jsonBody: {
+          error: 'profile_deletion_failed',
+          message: 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.',
+          retryable: true,
+        },
+      };
+    }
   },
 );
 

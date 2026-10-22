@@ -40,10 +40,13 @@ export const authService = {
   },
 
   async clearTokens(): Promise<void> {
-    await Promise.all([
+    const results = await Promise.allSettled([
       SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
       SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
     ]);
+    if (results.some((result) => result.status === 'rejected')) {
+      throw new Error('Authentication tokens could not be cleared.');
+    }
   },
 
   /**

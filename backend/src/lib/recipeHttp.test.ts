@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 import { makeContext, makeRequest } from '../test-utils/http';
-import { UnauthorizedError } from './auth';
+import { UnauthorizedError, UserWriteBlockedDuringProfileDeletionError } from './auth';
 import { parseRecipeBody, recipeExceptionLogFields, withRecipeHandler } from './recipeHttp';
 
 describe('recipe API errors', () => {
@@ -155,6 +155,21 @@ describe('recipe API errors', () => {
     const unauthorized = warnSpy.mock.calls.map(([line]) => String(line))
       .find((line) => line.includes('"event":"recipes.request.unauthorized"'));
     expect(unauthorized).toContain('"recipe_id":"recipe-123"');
+  });
+
+  it('returns a retryable conflict while profile deletion blocks recipe operations', async () => {
+    const handler = withRecipeHandler('recipes.update', async () => {
+      throw new UserWriteBlockedDuringProfileDeletionError();
+    });
+
+    const response = await handler(makeRequest(), makeContext());
+
+    expect(response.status).toBe(409);
+    expect(response.jsonBody).toMatchObject({
+      code: 'PROFILE_DELETION_IN_PROGRESS',
+      category: 'conflict',
+      retryable: true,
+    });
   });
 
   it('logs quota counters and reset time without logging response text', async () => {

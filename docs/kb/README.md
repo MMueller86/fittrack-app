@@ -75,14 +75,7 @@ Every document is intentionally focused. Cross-references are used instead of du
 → Full runtime environment breakdown: [tech/01-system-overview.md](tech/01-system-overview.md#runtime-environments)
 
 ---
-
-## Notation Conventions
-
-| Marker | Meaning |
-|---|---|
-| *(no marker)* | Implemented and working |
-| `[Partial]` | Partially implemented — specific gaps noted inline |
-| `[Planned]` | Designed or decided, but not yet implemented |
+- **Account deletion:** `DELETE /api/profile` targets only the verified JWT `sub`; the community-recipe choice, active-data scope, and `204` boundary are documented in [tech/09-api-reference.md](tech/09-api-reference.md#delete-apiprofile) and [domain/06-recipes.md](domain/06-recipes.md#account-deletion). User-facing retention wording is in the [German privacy policy](../legal/datenschutzerklaerung-alpha.md#speicherdauer-und-löschen).
 | `[Deprecated]` | To be removed — reason and action documented inline |
 | `[Open]` | Intent unclear or decision not yet made |
 | `[Rule]` | Architectural or coding rule that must not be violated |

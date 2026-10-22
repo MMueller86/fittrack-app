@@ -30,6 +30,11 @@ export const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+function isProfileDeletionRequest(config: InternalAxiosRequestConfig | undefined): boolean {
+  const path = config?.url?.split('?')[0]?.replace(/^\/+|\/+$/g, '');
+  return config?.method?.toUpperCase() === 'DELETE' && path === 'profile';
+}
+
 // Request interceptor — attach Bearer access_token.
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
   let token = await authService.getAccessToken();
@@ -68,9 +73,11 @@ apiClient.interceptors.response.use(
         error.config.headers.set('Authorization', `Bearer ${newToken}`);
         return apiClient(error.config);
       }
-      // Refresh failed — clear tokens, emit event for auth gate to catch
-      await authService.clearTokens();
-      authEvents.emit('logout');
+      // A deletion failure must not sign the user out before server success.
+      if (!isProfileDeletionRequest(error.config)) {
+        await authService.clearTokens();
+        authEvents.emit('logout');
+      }
     }
 
     // 429 — AI quota exceeded

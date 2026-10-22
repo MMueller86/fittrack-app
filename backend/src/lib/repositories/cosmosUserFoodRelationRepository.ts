@@ -287,7 +287,9 @@ export class CosmosUserFoodRelationRepository implements UserFoodRelationReposit
     const relations = await this.listByFoodRef(userId, foodRef);
     for (const relation of relations) {
       const updated = applyDisplayFields(relation, fields);
-      if (updated) await containers.userFoodRelations.items.upsert(updated);
+      if (updated) {
+        await containers.userFoodRelations.items.upsert(updated);
+      }
     }
   }
 }

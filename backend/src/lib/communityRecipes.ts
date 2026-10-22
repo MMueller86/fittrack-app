@@ -1,12 +1,17 @@
 import type { CommunityRecipe, CommunityRecipeIngredient, MealItem, Recipe, RecipeAccess, RecipeNutrition, UserFoodRelation } from '@fittrack/shared';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../shared/types/recipeImageHeroCrop';
 import { effectiveIngredientNutritionSource } from './repositories/recipeIngredientProvenance';
-import { getRecipesRepository, type RecipesRepository } from './repositories/recipesRepository';
+import {
+  getRecipesRepository,
+  type CommunityRecipeRecord,
+  type RecipesRepository,
+} from './repositories/recipesRepository';
 import { getProfileRepository, type ProfileRepository } from './repositories/profileRepository';
 import { stripRecipeRelationCache } from './repositories/userFoodRelationRepository';
 
 export type ResolvedRecipeRead =
-  | { access: 'owner' | 'community'; recipe: Recipe; ownerUserId: string }
+  | { access: 'owner'; recipe: Recipe; ownerUserId: string }
+  | { access: 'community'; recipe: CommunityRecipeRecord; ownerUserId?: string }
   | { access: 'unavailable'; recipe: null };
 
 export async function resolveRecipeForRead(
@@ -18,7 +23,11 @@ export async function resolveRecipeForRead(
   if (own && own.ownerUserId === userId) return { access: 'owner', recipe: own, ownerUserId: userId };
   const published = await recipes.getCommunityById(id);
   if (published?.visibility === 'community') {
-    return { access: 'community', recipe: published, ownerUserId: published.ownerUserId };
+    return {
+      access: 'community',
+      recipe: published,
+      ...('ownerUserId' in published ? { ownerUserId: published.ownerUserId } : {}),
+    };
   }
   return { access: 'unavailable', recipe: null };
 }
@@ -28,17 +37,19 @@ function projectNutrition(nutrition: RecipeNutrition): RecipeNutrition {
 }
 
 export async function projectCommunityRecipe(
-  recipe: Recipe,
+  recipe: CommunityRecipeRecord,
   viewerUserId: string,
   imageApiPath: (recipeId: string, imageId: string) => string,
   profiles: Pick<ProfileRepository, 'get'> = getProfileRepository(),
 ): Promise<CommunityRecipe> {
   if (recipe.visibility !== 'community') throw new Error('Recipe is not published');
+  const ownerUserId = 'ownerUserId' in recipe ? recipe.ownerUserId : undefined;
+    const publication = 'communityPublication' in recipe ? recipe.communityPublication : undefined;
   let authorDisplayName = 'Anonymous';
-  if (recipe.communityPublication?.displayNameConsent === true &&
-      typeof recipe.communityPublication.contentConfirmedAt === 'string' &&
-      Number.isFinite(Date.parse(recipe.communityPublication.contentConfirmedAt))) {
-    const profile = await profiles.get(recipe.ownerUserId);
+    if (ownerUserId !== undefined && publication?.displayNameConsent === true &&
+      typeof publication.contentConfirmedAt === 'string' &&
+      Number.isFinite(Date.parse(publication.contentConfirmedAt))) {
+    const profile = await profiles.get(ownerUserId);
     authorDisplayName = profile?.displayName?.trim() || 'Anonymous';
   }
   const ingredients: CommunityRecipeIngredient[] = recipe.ingredients.map((ingredient) => ({
@@ -76,7 +87,7 @@ export async function projectCommunityRecipe(
     createdAt: recipe.createdAt,
     updatedAt: recipe.updatedAt,
     authorDisplayName,
-    isOwnRecipe: recipe.ownerUserId === viewerUserId,
+    isOwnRecipe: ownerUserId !== undefined && ownerUserId === viewerUserId,
     ingredientNotices: {
       containsAiEstimates: ingredients.some((ingredient) => ingredient.isAiEstimate),
       containsManualIngredients: ingredients.some((ingredient) => ingredient.nutritionSource === 'manual'),

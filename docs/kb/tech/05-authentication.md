@@ -155,3 +155,41 @@ This is the only "simplified" auth path — it exists exclusively for automated 
 | `mobile/src/services/authService.ts` | Token storage, refresh, expiry |
 | `mobile/src/shared/api/client.ts` | Axios interceptors for auth + 429 |
 | `backend/src/lib/auth.ts` | JWT validation, `requireUser()` |
+
+## Profile Deletion Guard
+
+After validating the JWT, `requireUser()` checks the short-lived per-user
+deletion lease for the verified `sub`. New protected HTTP requests are rejected
+with retryable `409 profile_deletion_in_progress` while the lease is active.
+Only `DELETE /api/profile` bypasses that admission check so it can acquire the
+lease or report a concurrent deletion. The lease in `aiInsights` is only
+admission/concurrency state; the HTTP wrapper does not register or renew
+operation tokens, and repositories do not re-check the lease after a request
+has been admitted.
+
+Work admitted before lease acquisition is not cancelled, drained, or awaited.
+It may finish a write after `204` and after lock release; this late-write risk
+is an accepted limitation, not a completion guarantee. The enrichment
+scheduler checks the lease before enqueueing each user's item. The queue worker
+checks at start and rejects locked work before loading the library item or
+calling AI; it does not coordinate work already admitted before the lock.
+The five-minute TTL lease contains no operation list, phase, progress, choice,
+journal, or recovery state. A failed deletion request can be retried with the
+same usable session and complete request body.
+
+Successful FitTrack data deletion does not call Microsoft Graph and does not
+delete, disable, or revoke the Entra External ID identity. Any required identity
+follow-up is an internal manual Product Owner task, not an end-user action.
+
+### Mobile cleanup after `204`
+
+After the backend returns `204`, Mobile makes one best-effort attempt to remove
+the wizard marker, both Health Connect sync queues, the local sync log, and both
+SecureStore tokens, then logs out even if cleanup partially fails. A partial
+failure displays a transient, one-time notice. Local cleanup is not durably
+retried and does not repeat `DELETE /api/profile`; force-closing the app can
+leave local token or queue state. Health Connect data already written and
+permissions are unchanged.
+
+See [`tech/02-backend.md`](02-backend.md#profile-deletion) for the deletion
+scope and the accepted pre-lock late-write residual.

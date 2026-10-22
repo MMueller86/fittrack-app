@@ -11,6 +11,7 @@ Do not invent skill names. If no existing skill covers the need, leave `Required
 |---|---|---|
 | `azure-openai-feature-integration` | Planner, Backend, QA | Adding or modifying an AI endpoint, prompt, JSON schema, Structured Output, quota enforcement, plausibility validation, or AI classification logic; deciding AI vs. deterministic; reviewing any AI feature change |
 | `cosmos-data-model-and-migration` | Planner, Backend, QA | Adding or modifying a Cosmos document field, introducing a new entity type, deciding whether a new container is justified, choosing a partition key, classifying a schema change (no migration / read compatibility / lazy / explicit), planning backward-compatible document evolution, coordinating `cosmos.bicep` and `cosmos.ts` for new containers, or planning Dev vs Alpha rollout of persistence changes |
+| `privacy-impact-review` | Planner, Backend, Frontend, QA | Collecting, storing, retaining, logging, exporting, sharing, or sending user data (incl. AI/OCR, Health Connect, telemetry); adding permissions; changing data visibility; or when the privacy policy may no longer match actual behaviour |
 
 ---
 

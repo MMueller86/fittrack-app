@@ -11,7 +11,9 @@ export class RecipeProvenanceError extends Error {
 
 const sources = new Set<RecipeNutritionSource>(['openFoodFacts', 'manual', 'ai', 'label-scan', 'unknown']);
 
-export function effectiveIngredientNutritionSource(ingredient: RecipeIngredient): RecipeNutritionSource {
+export function effectiveIngredientNutritionSource(
+  ingredient: Pick<RecipeIngredient, 'isAiEstimate' | 'nutritionSource'>,
+): RecipeNutritionSource {
   if (ingredient.isAiEstimate === true) return 'ai';
   return sources.has(ingredient.nutritionSource!) ? ingredient.nutritionSource! : 'unknown';
 }

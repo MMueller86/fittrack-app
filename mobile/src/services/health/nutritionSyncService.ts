@@ -143,6 +143,13 @@ class NutritionSyncService {
     await this.load();
   }
 
+  async resetForAccountDeletion(): Promise<void> {
+    this.state = { ...DEFAULT_STATE, pendingOperations: [] };
+    this.loaded = true;
+    this.sessionCountIncremented = false;
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  }
+
   async enableSync(): Promise<'success' | 'permission_denied'> {
     await this.load();
     syncLogger.info('NutritionSync/enableSync', 'Requesting permissions');

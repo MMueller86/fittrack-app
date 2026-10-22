@@ -9,14 +9,17 @@ import type { Recipe, RecipeImage, RecipeStep, RecipeVisibilityInput } from '@fi
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { getCosmos } from '../cosmos';
 import type {
+  CommunityRecipeRecord,
   CreateRecipeInput,
   CommunityRecipeRepositoryPage,
   ListCommunityRecipesOptions,
   ListRecipesOptions,
+  OwnerlessCommunityRecipe,
   RecipesRepository,
   UpdateRecipeInput,
   VersionedRecipe,
 } from './recipesRepository';
+import { sanitizeOwnerlessCommunityRecipe } from './recipesRepository';
 import { withRecipeExportViewStatus } from './recipeExport';
 import { applyRecipeVisibility, communityPageSize, effectiveRecipeVisibility } from './recipePublication';
 import { resolveRecipeIngredientProvenance } from './recipeIngredientProvenance';
@@ -30,6 +33,13 @@ type CosmosRecipeDoc = Omit<Recipe, 'images' | 'exportViewStatus'> & { images: S
 
 function isCosmosRecipeDoc(resource: CosmosRecipeDoc | undefined): resource is CosmosRecipeDoc {
   return Boolean(resource?.id && resource.ownerUserId && resource.userId && resource.name);
+}
+
+function isOwnerlessCommunityRecipe(resource: OwnerlessCommunityRecipe | undefined): resource is OwnerlessCommunityRecipe {
+  if (!resource?.id || !resource.name || resource.visibility !== 'community' || !Array.isArray(resource.ingredients)) return false;
+  if ('ownerUserId' in resource || 'userId' in resource || 'sharedWithUserIds' in resource ||
+      'communityPublication' in resource || 'usageCount' in resource || 'lastUsedAt' in resource) return false;
+  return resource.ingredients.every((ingredient) => !('linkedReusableItemId' in ingredient));
 }
 
 function cosmosPageResources<T>(page: { resources?: unknown } | null | undefined): T[] {
@@ -90,6 +100,16 @@ function toRecipe(doc: CosmosRecipeDoc): Recipe {
   return withRecipeExportViewStatus(recipe);
 }
 
+function toOwnerlessRecipe(doc: OwnerlessCommunityRecipe): OwnerlessCommunityRecipe {
+  return {
+    ...sanitizeOwnerlessCommunityRecipe(doc),
+    images: doc.images.map((image) => ({
+      ...image,
+      heroCrop: image.heroCrop ?? DEFAULT_RECIPE_IMAGE_HERO_CROP,
+    })),
+  };
+}
+
 function toStoredRecipe(recipe: Recipe, userId: string): CosmosRecipeDoc {
   const doc: CosmosRecipeDoc = {
     id: recipe.id,
@@ -127,9 +147,23 @@ function isPreconditionFailed(error: unknown): boolean {
   return details.code === 412 || details.statusCode === 412 || details.code === 'PreconditionFailed';
 }
 
+function isNotFound(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const details = error as { code?: unknown; statusCode?: unknown };
+  return details.code === 404 || details.statusCode === 404;
+}
+
 export class CosmosRecipesRepository implements RecipesRepository {
-  async getCommunityById(id: string): Promise<Recipe | null> {
+  async getCommunityById(id: string): Promise<CommunityRecipeRecord | null> {
     const { containers } = await getCosmos();
+    const ownerlessPage = await containers.communityRecipes.items.query<OwnerlessCommunityRecipe>(
+      { query: 'SELECT * FROM c WHERE c.id = @id', parameters: [{ name: '@id', value: id }] },
+      { partitionKey: id },
+    ).fetchAll();
+    const ownerless = cosmosPageResources<OwnerlessCommunityRecipe>(ownerlessPage);
+    if (ownerless.length === 1 && isOwnerlessCommunityRecipe(ownerless[0])) return toOwnerlessRecipe(ownerless[0]);
+    if (ownerless.length > 0) return null;
+
     const published = containers.recipes.items.query<CosmosRecipeDoc>({
       query: "SELECT * FROM c WHERE c.visibility = 'community' AND c.id = @id",
       parameters: [{ name: '@id', value: id }],
@@ -160,23 +194,53 @@ export class CosmosRecipesRepository implements RecipesRepository {
     const { containers } = await getCosmos();
     const limit = communityPageSize(opts.limit);
     const offset = communityOffset(opts.continuationToken);
-    const page = await containers.recipes.items.query<CosmosRecipeDoc>({
-      query: "SELECT * FROM c WHERE c.visibility = 'community' ORDER BY c.updatedAt DESC OFFSET @offset LIMIT @limit",
-      parameters: [
-        { name: '@offset', value: offset },
-        { name: '@limit', value: limit },
-      ],
-    }).fetchAll();
-    const resources = cosmosPageResources<CosmosRecipeDoc>(page);
-    const recipes: Recipe[] = [];
-    for (const doc of resources) {
+    const take = offset + limit + 1;
+    if (!Number.isSafeInteger(take)) throw new Error('Invalid community continuation token');
+    const [ownerPage, ownerlessPage] = await Promise.all([
+      containers.recipes.items.query<CosmosRecipeDoc>({
+        query: "SELECT TOP @take * FROM c WHERE c.visibility = 'community' ORDER BY c.updatedAt DESC, c.id ASC",
+        parameters: [{ name: '@take', value: take }],
+      }).fetchAll(),
+      containers.communityRecipes.items.query<OwnerlessCommunityRecipe>({
+        query: "SELECT TOP @take * FROM c WHERE c.visibility = 'community' ORDER BY c.updatedAt DESC, c.id ASC",
+        parameters: [{ name: '@take', value: take }],
+      }).fetchAll(),
+    ]);
+    const ownerless = cosmosPageResources<OwnerlessCommunityRecipe>(ownerlessPage)
+      .filter(isOwnerlessCommunityRecipe);
+    const ownerlessById = new Map(ownerless.map((recipe) => [recipe.id, toOwnerlessRecipe(recipe)]));
+    const ownerRecipes = cosmosPageResources<CosmosRecipeDoc>(ownerPage);
+    const communityById = new Map<string, CommunityRecipeRecord>(ownerlessById);
+    for (const doc of ownerRecipes) {
+      if (communityById.has(doc.id)) continue;
       const recipe = await this.getCommunityById(doc.id);
-      if (recipe) recipes.push(recipe);
+      if (recipe) communityById.set(doc.id, recipe);
     }
+    const all = [...communityById.values()].sort((first, second) =>
+      second.updatedAt.localeCompare(first.updatedAt) || first.id.localeCompare(second.id));
+    const recipes = all.slice(offset, offset + limit);
     return {
       recipes,
-      ...(resources.length === limit ? { continuationToken: String(offset + limit) } : {}),
+      ...(offset + limit < all.length ? { continuationToken: String(offset + limit) } : {}),
     };
+  }
+
+  async saveOwnerlessCommunityRecipe(recipe: OwnerlessCommunityRecipe): Promise<void> {
+    if (!isOwnerlessCommunityRecipe(recipe)) throw new Error('Invalid ownerless community recipe');
+    const { containers } = await getCosmos();
+    const { resource } = await containers.communityRecipes.items.upsert<OwnerlessCommunityRecipe>(
+      sanitizeOwnerlessCommunityRecipe(recipe),
+    );
+    if (!isOwnerlessCommunityRecipe(resource)) throw new Error('Cosmos did not return the ownerless community recipe');
+  }
+
+  async deleteOwnerlessCommunityRecipe(id: string): Promise<void> {
+    const { containers } = await getCosmos();
+    try {
+      await containers.communityRecipes.item(id, id).delete();
+    } catch (error) {
+      if (!isNotFound(error)) throw error;
+    }
   }
 
   async setVisibility(userId: string, id: string, expectedEtag: string, input: RecipeVisibilityInput): Promise<VersionedRecipe | null> {

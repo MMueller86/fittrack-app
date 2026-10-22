@@ -12,7 +12,7 @@ Located in `backend/src/functions/`. Each file owns one domain.
 
 | File | Routes | Auth Required | Notes |
 |---|---|---|---|
-| `profile.ts` | GET/POST/PUT /profile/me, POST /profile/calculate-preview | Yes | Full implementation |
+| `profile.ts` | GET/POST/PUT /profile/me, POST /profile/calculate-preview, DELETE /profile | Yes | Authenticated full FitTrack data deletion |
 | `nutritionTargets.ts` | nutrition targets endpoints | Yes | |
 | `weights.ts` | GET/POST /weights, PUT/DELETE /weights/{id} | Yes | |
 | `diary.ts` | GET/POST /diary/day/{date}, meal CRUD | Yes | |
@@ -129,6 +129,7 @@ Available repositories:
 - `profileRepository`, `recipesRepository`, `reusableItemsRepository`
 - `weightsRepository`, `dayMetaRepository`, `hintStateRepository`
 - `insightRepository`, `userFoodRelationRepository`
+- `profileDeletionRepository` — TTL concurrency lease and full Cosmos user-partition sweep
 
 `WeightsRepository.updateValue(userId, id, value)` uses `userId` as the Cosmos
 partition key and patches only `/value`. The entry's ID, owner, date, unit,
@@ -191,6 +192,95 @@ finite and at least `1`. Unknown fields and invalid JSON are rejected with
 route is user-scoped and changes only recipe metadata. Upload accepts only
 JPEG/PNG images up to 8 MB; delete removes the blob, and reorder preserves
 each image's crop metadata while normalizing order.
+
+### Ownerless community recipe preservation
+
+Owner recipes remain in `recipes` partitioned by `/userId`; owner CRUD is
+unchanged. `communityRecipes` is a separate `/id`-partitioned container for
+ownerless copies retained when a user keeps published recipes during the
+implemented account-deletion workflow. Its
+document keeps recipe content and neutral community image paths, but has no
+`userId`, `ownerUserId`, author-consent/profile mapping, `sharedWithUserIds`,
+usage counters, or personal `linkedReusableItemId` ingredient references.
+The repository serializes an allowlist of fields before every upsert.
+
+`preservePublishedCommunityRecipe()` copies each bounded JPEG/PNG image to the
+stable `community/{recipeId}/{imageId}.{jpg|png}` path and only then upserts the
+ownerless document under its recipe ID. Repeating the operation overwrites the
+same blob names and upserts the same document ID; a partial image-copy failure
+does not publish the document and is safe to retry. The helper does not delete
+the owner-path images or owner recipe. Account deletion must call it before
+removing those personal records, then use the normal recipe/blob delete
+operations. The authenticated profile-deletion flow performs this transfer;
+Blob Soft Delete configuration is unchanged.
+
+Community reads prefer the ownerless copy when present and otherwise retain
+the existing owner-backed publication read path. Community listing merges and
+deduplicates both forms. Each source query is ordered by `updatedAt DESC, id
+ASC` and capped at `offset + pageSize + 1` before the merged page is sliced.
+Both `recipes` and `communityRecipes` therefore require that composite index.
+Ownerless projections return `Anonymous`, do not read a profile, and do not
+increment an absent owner's recipe usage counter.
+
+### Profile deletion
+
+`DELETE /api/profile` deletes active FitTrack data for the verified JWT `sub`
+only. Its strict request is exactly:
+
+```json
+{
+  "confirmation": "DELETE",
+  "deleteCommunityRecipes": false
+}
+```
+
+Both fields are required, confirmation is case-sensitive, and unknown fields
+are rejected. The five-minute renewable per-user TTL lease is stored in
+`aiInsights` as `_docType: 'profileDeletionLock'`; its lock token, expiry, and
+TTL are concurrency metadata only, with no journal, progress, or resume state.
+The verified JWT `sub` is the only deletion target and scopes the Cosmos user
+partition and exact legacy `users` ID. The Bearer token is used for
+authentication only; it is not persisted or forwarded. The lease stores the
+`sub` as `userId`, a random lock token, expiry, and TTL. Deletion-specific
+success logs contain no user fields; failure events contain only stage and
+error class, not the user ID or token.
+New protected HTTP requests receive retryable `409` while the lease is active.
+The scheduler checks before enqueueing, and the queue worker checks before
+processing. Work admitted before lock acquisition is not cancelled, drained,
+awaited, or rechecked and may write after `204` or lock release. `204` confirms
+only this request's selected cleanup steps; this late-write possibility is
+accepted.
+
+The Cosmos sweep is scoped to the verified user's partition in `profiles`,
+`weights`, `nutritionDiaryMeals` (including DayMeta and HintState),
+`reusableMealItems`, `recipes`, `aiUsage`, `aiInsights`, and
+`userFoodRelations`. It also attempts the exact `/id` legacy `users` document
+and the legacy `nutritionProfiles` user partition if present; this does not
+assert that those records exist in a deployed account. Their contents are
+unknown; no remote inventory was performed. It does not touch `foodProducts`,
+friendship data, or another user's data.
+
+With `deleteCommunityRecipes: false`, published recipes selected for retention
+are copied to ownerless `communityRecipes` documents and stable
+`community/{recipeId}/{imageId}.{jpg|png}` image paths before personal records
+are removed. They remain usable through community routes and display author
+`Anonymous`. With `true`, only ownerless copies for this user's recipe IDs and
+their community image blobs are removed. Both choices remove the user's
+personal images under their prefix in `recipe-images` and `product-images`;
+the personal prefixes are re-inventoried until empty.
+
+The user-data cleanup removes Cosmos documents and Blob Storage images; the
+handler also emits operational Application Insights events. It does not call
+Microsoft Graph or send deletion data to Azure OpenAI or Document Intelligence.
+Foreign favorites, saved diary snapshots, friendships, and Health Connect
+exports are unchanged. Application Insights entries and Cosmos/Storage backups
+are not targeted; logs use the configured 30-day retention and Blob Soft Delete
+may retain recovery copies for up to seven days. Retries repeat the complete
+idempotent request from the beginning. See the full
+[DELETE API contract](09-api-reference.md#delete-apiprofile) and
+[recipe retention behavior](../domain/06-recipes.md#account-deletion).
+Any Microsoft Entra identity follow-up is outside the endpoint and is an
+internal manual Product Owner task, not an end-user action.
 
 ### Instagram recipe rendering
 

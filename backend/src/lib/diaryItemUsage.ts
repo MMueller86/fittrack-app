@@ -37,8 +37,9 @@ async function recordCopiedItemUsage(userId: string, item: MealItem, targetMeal:
 
     try {
       const resolved = await resolveRecipeForRead(userId, recipeId);
-      if (resolved.recipe) {
-        await bestEffort(() => getRecipesRepository().incrementUsage(resolved.ownerUserId, recipeId));
+      if (resolved.access !== 'unavailable' && resolved.ownerUserId !== undefined) {
+        const ownerUserId = resolved.ownerUserId;
+        await bestEffort(() => getRecipesRepository().incrementUsage(ownerUserId, recipeId));
       }
     } catch {}
     return;

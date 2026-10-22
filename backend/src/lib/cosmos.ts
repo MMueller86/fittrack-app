@@ -5,7 +5,7 @@
 // to in-memory implementations so the app still runs locally without Azure.
 //
 // Database + container names follow docs/data_model.md.
-// Containers are partitioned by /userId (except `users` which uses /id).
+// User-data containers use /userId; users, foodProducts and communityRecipes use /id.
 
 import { CosmosClient, Container, Database } from '@azure/cosmos';
 
@@ -21,12 +21,13 @@ const CONTAINER_DEFS = [
   { id: 'nutritionDiaryMeals', partitionKey: '/userId' },
   { id: 'reusableMealItems', partitionKey: '/userId' },
   { id: 'recipes', partitionKey: '/userId' },
+  { id: 'communityRecipes', partitionKey: '/id' },
   // Internal food product catalog — partition key is /id (product id = barcode-based)
   { id: 'foodProducts', partitionKey: '/id' },
   // AI usage counters — one document per user/feature/period
   { id: 'aiUsage', partitionKey: '/userId' },
   // Daily AI-generated insights — one document per user per calendar day
-  { id: 'aiInsights', partitionKey: '/userId' },
+  { id: 'aiInsights', partitionKey: '/userId', defaultTtl: -1 },
   // User-food relations — favorites, usage history (lastUsedAt, usageCount) per user
   { id: 'userFoodRelations', partitionKey: '/userId' },
 ] as const;
@@ -73,6 +74,7 @@ export async function getCosmos(): Promise<CosmosContext> {
       const { container } = await database.containers.createIfNotExists({
         id: def.id,
         partitionKey: { paths: [def.partitionKey] },
+        ...('defaultTtl' in def ? { defaultTtl: def.defaultTtl } : {}),
       });
       containers[def.id] = container;
     }

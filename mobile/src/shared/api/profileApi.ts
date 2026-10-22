@@ -27,6 +27,11 @@ export interface CalculatePreviewResponse {
   calculationMeta: CalculationMeta;
 }
 
+export interface ProfileDeletionRequest {
+  confirmation: 'DELETE';
+  deleteCommunityRecipes: boolean;
+}
+
 export const profileApi = {
   getMe(): Promise<ProfileResponse> {
     return apiClient.get<ProfileResponse>('/profile/me').then((r) => r.data);
@@ -50,8 +55,11 @@ export const profileApi = {
       .then((r) => r.data);
   },
 
-  deleteProfile(): Promise<void> {
-    return apiClient.delete('/profile').then(() => undefined);
+  async deleteProfile(request: ProfileDeletionRequest): Promise<void> {
+    const response = await apiClient.delete('/profile', { data: request });
+    if (response.status !== 204) {
+      throw new Error('Profile deletion did not complete successfully.');
+    }
   },
 
   /** Persists healthSyncEnabled without requiring the caller to pass the full profile. */

@@ -232,7 +232,7 @@ export const updateReusableItemHandler = withHandler(
 
     // Fire-and-forget: sync denormalized nutrition in all UserFoodRelations for this item
     if (item.nutritionPer100g !== undefined) {
-      void (async () => {
+      await (async () => {
         try {
           const ufRepo = getUserFoodRelationRepository();
           await ufRepo.updateNutritionDenormalized(
@@ -250,7 +250,7 @@ export const updateReusableItemHandler = withHandler(
     // Fire-and-forget: sync denormalized name/brand in existing UserFoodRelations.
     // PATCH brand:null is a no-op for the item, and empty values never clear the relation brand.
     if (fields.name !== undefined || fields.brand !== undefined) {
-      void (async () => {
+      await (async () => {
         try {
           await getUserFoodRelationRepository().updateDisplayDenormalized(userId, item.id, {
             displayName: fields.name !== undefined ? item.name : undefined,
@@ -352,13 +352,21 @@ export const uploadProductImageHandler = withHandler(
 
     const buffer = Buffer.from(arrayBuffer);
     const blobName = await uploadProductImage(userId, id, buffer, mimeType as 'image/jpeg' | 'image/png');
+    let updated;
+    try {
+      updated = await repo.update(userId, id, { imageUrl: blobName } as Parameters<typeof repo.update>[2]);
+    } catch (error) {
+      await deleteProductImage(blobName).catch(() => {});
+      throw error;
+    }
+    if (!updated) {
+      await deleteProductImage(blobName).catch(() => {});
+      return { status: 404, jsonBody: { error: 'Item not found' } };
+    }
 
-    // Delete old image if present (one image per product)
     if (item.imageUrl && item.imageUrl !== blobName) {
       await deleteProductImage(item.imageUrl).catch(() => {});
     }
-
-    await repo.update(userId, id, { imageUrl: blobName } as Parameters<typeof repo.update>[2]);
     logEvent(ctx, 'info', 'reusableItems.image.uploaded', { userId, itemId: id });
     return { status: 201, jsonBody: { imageUrl: blobName } };
   },

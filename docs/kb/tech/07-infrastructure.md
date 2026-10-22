@@ -25,7 +25,7 @@ infra/
 
 | Resource | Module | Notes |
 |---|---|---|
-| Cosmos DB Account + DB | `cosmos.bicep` | Serverless, 7 containers |
+| Cosmos DB Account + DB | `cosmos.bicep` | Serverless, 12 containers |
 | Storage Account | `storage.bicep` | Blob for recipe images |
 | Log Analytics Workspace | `appinsights.bicep` | |
 | Application Insights | `appinsights.bicep` | |
@@ -37,6 +37,21 @@ infra/
 - Azure OpenAI resource — pre-existing shared resource
 - Resource group — must already exist (`rg-Michael-Mueller`)
 
+## Deletion-Relevant Retention
+
+`appinsights.bicep` configures the Log Analytics workspace for 30-day
+retention. `storage.bicep` enables Blob Soft Delete for seven days; normal
+application deletes can therefore leave platform recovery copies during that
+period. Profile deletion does not target Application Insights entries or
+Cosmos/Storage backups, and it does not change either retention configuration.
+This Bicep module does not declare a Cosmos backup retention period, so none is
+asserted here.
+
+The backend also uses a `product-images` Blob container and deletes personal
+image blobs under `{verifiedSub}/` during profile deletion. That container is
+not declared in the supplied `storage.bicep`; this documentation records the
+backend behavior without implying that this module provisions it.
+
 ## Cosmos DB Containers
 
 All user-data containers use `/userId` as partition key.
@@ -46,22 +61,37 @@ All user-data containers use `/userId` as partition key.
 | `users` | `/id` | User account documents |
 | `nutritionProfiles` | `/userId` | Retained container; the current profile repository uses `profiles` |
 | `profiles` | `/userId` | Current user profile document |
-| `nutritionDiaryMeals` | `/userId` | Diary meal documents |
+| `nutritionDiaryMeals` | `/userId` | Diary meals, DayMeta, and HintState documents |
 | `reusableMealItems` | `/userId` | Personal food library |
-| `recipes` | `/userId` | User recipes |
+| `recipes` | `/userId` | User recipes; community listing requires composite index `/updatedAt DESC, /id ASC` |
+| `communityRecipes` | `/id` | Ownerless community recipe copies; community listing requires composite index `/updatedAt DESC, /id ASC`; I1 is applied and verified in Dev, not applied in Alpha |
 | `weights` | `/userId` | Weight entries |
 | `aiUsage` | `/userId` | AI quota usage counters |
 | `foodProducts` | `/id` | Open Food Facts catalog (partition key = id) |
-| `dayMeta` | `/userId` | Per-day metadata (dayType, workoutType) |
-| `hintState` | `/userId` | Hint cooldown tracking |
 | `aiInsights` | `/userId` | Heterogeneous AI documents: Daily cache, Weekly cache, and durable feedback snapshots |
 | `userFoodRelations` | `/userId` | Favorites + recents tracking |
+
+As of 2026-10-21, the B1 ownerless community model and its `/id` container and
+composite index are implemented; the I1 infrastructure change is deployed and
+verified in Dev only. Alpha has not been applied and must receive the
+infrastructure change before deploying backend code that depends on the
+container. The B1 focused suite (34 tests) and build were reported passing;
+Cosmos Emulator contract tests remain **UNVERIFIED** because no emulator was
+available. No remote inventory was performed for legacy `users` or
+`nutritionProfiles` records, so their existence and contents are unknown.
 
 `aiInsights` is the existing `/userId`-partitioned container for Daily Insight
 documents (`_docType: 'dailyInsight'`), Weekly Insight documents
 (`_docType: 'weeklyInsight'`), and durable negative-feedback snapshots
 (`_docType: 'insightFeedback'`). Repository reads filter these discriminators;
 the container is not a separate feedback API surface.
+
+Profile deletion stores its renewable concurrency lease in this same
+container as `_docType: 'profileDeletionLock'`, scoped to the verified user
+partition. The lease has a five-minute TTL and expiry, is renewed while the
+deletion runs, and is removed on completion; it stores no deletion journal,
+progress, or resume state. The user-data sweep excludes the active lease so it
+can remain held until cleanup finishes.
 
 The container is configured with `defaultTtl: -1` so Daily and Weekly
 documents can use per-document TTL values. Feedback documents deliberately

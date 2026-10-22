@@ -228,7 +228,7 @@ export const ResultRow = React.memo(function ResultRow({ item, onPress, isFirst,
 // SearchState
 // ---------------------------------------------------------------------------
 
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 500;
 
 // ---------------------------------------------------------------------------
 // Relative usage helper
@@ -250,50 +250,69 @@ export function SearchState({ query, recents, initialResults, initialResultsQuer
   const [error, setError] = useState<string | null>(null);
   const [searchedQuery, setSearchedQuery] = useState(hasMatchingCache ? query.trim() : '');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestIdRef = useRef(0);
 
   const doSearch = useCallback(async (q: string) => {
+    const requestId = ++searchRequestIdRef.current;
     const normalizedQuery = q.trim();
     if (normalizedQuery.length === 0) {
       setResults([]);
       setError(null);
       setSearchedQuery('');
+      setLoading(false);
       return;
     }
     setLoading(true);
     setError(null);
     try {
       const { results: r } = await foodApi.search(normalizedQuery);
+      if (requestId !== searchRequestIdRef.current) return;
       setResults(r);
       setSearchedQuery(normalizedQuery);
       onResultsChange?.(r, normalizedQuery);
     } catch (e: unknown) {
+      if (requestId !== searchRequestIdRef.current) return;
       setError(formatApiError(e, 'Suche fehlgeschlagen'));
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestIdRef.current) setLoading(false);
     }
   }, [onResultsChange]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    searchRequestIdRef.current += 1;
     const normalizedQuery = query.trim();
     if (initialResultsQuery === normalizedQuery) {
       setResults(initialResults ?? []);
       setSearchedQuery(normalizedQuery);
       setError(null);
       setLoading(false);
-      return;
+      return () => { searchRequestIdRef.current += 1; };
     }
+
+    setError(null);
+    setLoading(false);
+    if (normalizedQuery.length === 0) {
+      setResults([]);
+      setSearchedQuery('');
+      return () => { searchRequestIdRef.current += 1; };
+    }
+
     debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
       void doSearch(query);
     }, DEBOUNCE_MS);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      searchRequestIdRef.current += 1;
     };
   }, [query, doSearch, initialResults, initialResultsQuery]);
 
   const hasQuery = query.trim().length > 0;
-  const hasResults = results.length > 0;
-  const showFallback = hasQuery && !loading && !error;
+  const resultsMatchQuery = searchedQuery === query.trim();
+  const visibleResults = resultsMatchQuery ? results : [];
+  const hasResults = visibleResults.length > 0;
+  const showFallback = hasQuery && resultsMatchQuery && !loading && !error;
 
   return (
     <View style={styles.container}>
@@ -309,7 +328,7 @@ export function SearchState({ query, recents, initialResults, initialResultsQuer
 
       {!loading && !error && hasQuery ? (
         <BottomSheetFlatList
-          data={results}
+          data={visibleResults}
           keyExtractor={(item) => `${item.source}-${item.id}`}
           renderItem={({ item, index }) => <ResultRow item={item} onPress={onSelect} isFirst={index === 0} quickAcceptLabel={quickAcceptLabel} onQuickAccept={onQuickAccept} />}
           keyboardShouldPersistTaps="handled"

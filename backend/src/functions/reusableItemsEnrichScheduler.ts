@@ -11,6 +11,7 @@
 import { app, type InvocationContext } from '@azure/functions';
 import { getCosmos } from '../lib/cosmos';
 import { enqueueEnrichment } from '../lib/queueClient';
+import { isProfileDeletionInProgress } from '../lib/repositories/profileDeletionRepository';
 import type { ReusableItem } from '@fittrack/shared';
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ export const reusableItemsEnrichSchedulerHandler = async (
 
   let enqueued = 0;
   for (const row of resources) {
+    if (await isProfileDeletionInProgress(row.userId)) continue;
     await enqueueEnrichment(row.userId, row.id, ctx);
     enqueued++;
   }

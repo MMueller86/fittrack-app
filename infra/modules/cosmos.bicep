@@ -137,11 +137,46 @@ resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containe
             { path: '/lastUsedAt', order: 'descending' }
             { path: '/updatedAt', order: 'descending' }
           ]
+          [
+            { path: '/updatedAt', order: 'descending' }
+            { path: '/id', order: 'ascending' }
+          ]
         ] : []
       }
     }
   }
 }]
+
+resource communityRecipesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+  parent: database
+  name: 'communityRecipes'
+  properties: {
+    resource: {
+      id: 'communityRecipes'
+      partitionKey: {
+        paths: ['/id']
+        kind: 'Hash'
+      }
+      conflictResolutionPolicy: {
+        mode: 'LastWriterWins'
+        conflictResolutionPath: '/_ts'
+        conflictResolutionProcedure: ''
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [{ path: '/*' }]
+        excludedPaths: [{ path: '/"_etag"/?' }]
+        compositeIndexes: [
+          [
+            { path: '/updatedAt', order: 'descending' }
+            { path: '/id', order: 'ascending' }
+          ]
+        ]
+      }
+    }
+  }
+}
 
 @description('Cosmos DB account resource id.')
 output accountId string = account.id

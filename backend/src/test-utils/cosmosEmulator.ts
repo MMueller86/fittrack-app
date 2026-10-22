@@ -73,7 +73,12 @@ export async function createTestDatabase(databaseId: string): Promise<EmulatorCo
   const { database } = await client.databases.createIfNotExists({ id: databaseId });
 
   // Same partition keys as production; keeps contract tests honest.
-  const containerDefs: Array<{ id: string; partitionKey: string; compositeIndexes?: object[][] }> = [
+  const containerDefs: Array<{
+    id: string;
+    partitionKey: string;
+    defaultTtl?: number;
+    compositeIndexes?: Array<Array<{ path: string; order: 'ascending' | 'descending' }>>;
+  }> = [
     { id: 'users', partitionKey: '/id' },
     { id: 'nutritionProfiles', partitionKey: '/userId' },
     { id: 'profiles', partitionKey: '/userId' },
@@ -88,18 +93,31 @@ export async function createTestDatabase(databaseId: string): Promise<EmulatorCo
           { path: '/lastUsedAt', order: 'descending' },
           { path: '/updatedAt', order: 'descending' },
         ],
+        [
+          { path: '/updatedAt', order: 'descending' },
+          { path: '/id', order: 'ascending' },
+        ],
       ],
+    },
+    {
+      id: 'communityRecipes',
+      partitionKey: '/id',
+      compositeIndexes: [[
+        { path: '/updatedAt', order: 'descending' },
+        { path: '/id', order: 'ascending' },
+      ]],
     },
     { id: 'foodProducts', partitionKey: '/id' },
     { id: 'aiUsage', partitionKey: '/userId' },
-    { id: 'aiInsights', partitionKey: '/userId' },
+    { id: 'aiInsights', partitionKey: '/userId', defaultTtl: -1 },
     { id: 'userFoodRelations', partitionKey: '/userId' },
   ];
 
   for (const def of containerDefs) {
     await database.containers.createIfNotExists({
       id: def.id,
-      partitionKey: { paths: [def.partitionKey], kind: 'Hash' },
+      partitionKey: { paths: [def.partitionKey] },
+      ...(def.defaultTtl !== undefined ? { defaultTtl: def.defaultTtl } : {}),
       indexingPolicy: def.compositeIndexes
         ? {
             indexingMode: 'consistent',

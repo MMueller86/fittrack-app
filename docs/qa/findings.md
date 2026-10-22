@@ -162,6 +162,90 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-141 | US-03 obsolete planned Home and prompt provenance KB, AC-8 | Non-blocking | Documentation | Awaiting decision |
 | FT-QA-2026-142 | US-03 historical equality/source accepted, AC-2/8 | Blocking | Backend | Awaiting decision |
 | FT-QA-2026-143 | US-03 eval current/yesterday attribution, AC-8 | Blocking | Backend | Awaiting decision |
+| FT-QA-2026-144 | Profile deletion local cleanup failures, AC-10 | Blocking | Frontend | Closed |
+| FT-QA-2026-145 | Profile deletion stale legal copy test | Blocking | Frontend | Closed |
+| FT-QA-2026-146 | Profile deletion Entra ownership KB wording, AC-5/11 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-147 | Profile deletion dialog overstates local cleanup, AC-10 | Blocking | Frontend | Closed |
+| FT-QA-2026-148 | Embedded privacy policy date mismatch | Blocking | Frontend | Closed |
+
+## Profile Deletion QA Review
+- **Latest re-review (2026-10-22):** Independent [QA report](reports/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md) is PASS against all 13 criteria after the D2 corrections. Mobile suite passed 950/950; backend suite passed 1,881/1,881; Mobile typecheck, backend build verification, and offline Bicep compilation passed. Cosmos contracts remain **UNVERIFIED**. The approved force-close/token/queue residual is not a finding. Findings 144–148 are closed based on the recorded scope decisions and QA verification.
+
+### FT-QA-2026-144
+
+- **Finding key:** Q1-AC10-01.
+- **Plan reference:** `docs/User Stories/Profile/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md`.
+- **Acceptance criterion:** AC-10.
+- **Description:** The first correction added a durable cleanup marker and a restart gate, but `completeAccountDeletionLocally()` catches and ignores failure to set the marker, then continues cleanup. If any later key/token cleanup fails, the current process is gated only by the in-memory flag. After restart, an absent marker allows `initialize()` to hydrate a surviving valid access token and authenticate; incomplete local data also loses its retry notice. This remains an AC-10 failure.
+- **Criticality:** Blocking.
+- **Owner:** Frontend.
+- **Evidence:** [accountDeletionService.ts](../mobile/src/services/accountDeletionService.ts), [accountDeletionService.test.ts](../mobile/src/services/accountDeletionService.test.ts), [authService.ts](../mobile/src/services/authService.ts), [useAuthStore.ts](../mobile/src/modules/auth/useAuthStore.ts), [ProfileEditScreen.tsx](../mobile/src/modules/profile/ProfileEditScreen.tsx).
+- **Recommendation:** Do not suppress failure to establish durable recovery unless another durable startup gate is guaranteed. Keep token hydration and authenticated navigation blocked until cleanup is verified complete, and test marker-write rejection combined with subsequent local-key/token failures across simulated restart. Assert Login remains unauthenticated and local retry never resends `DELETE /api/profile`.
+- **Status:** Closed.
+- **History:** 2026-10-21 - Registered from the profile deletion QA FAIL report; focused Frontend correction requested under the approved correction workflow.
+- **History:** 2026-10-21 - QA re-review confirms same-process recovery but verifies the in-memory flag is lost after force-close; valid surviving tokens can restore the authenticated shell. Finding remains Blocking. Route the final automatic F1 correction attempt to add durable local recovery and auth-hydration gating, without retrying the backend deletion request.
+- **History:** 2026-10-21 - Final automatic F1 attempt added a persisted marker and auth gate, but QA found marker-write rejection is swallowed; cleanup failure followed by process restart can still restore a surviving token. F1 retry limit 2/2 exhausted; paused pending user direction.
+- **History:** 2026-10-22 - PO approved revised best-effort AC-10, de-scoping the persistent marker/restart guarantee. F1-R3 removed the marker and QA verified the revised behavior; remaining device residue is an accepted plan boundary. Closed as superseded, not as a code guarantee.
+
+### FT-QA-2026-145
+
+- **Finding key:** Q1-TEST-01.
+- **Plan reference:** `docs/User Stories/Profile/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md`.
+- **Acceptance criterion:** N/A.
+- **Description:** The full mobile suite fails because `LegalDocumentView.test.tsx` still expects the retired “Konto löschen ist in der Alpha noch nicht verfügbar.” text, replaced by the PO-approved deletion copy. Focused deletion and legal-copy tests pass, but the package-wide test gate is red.
+- **Criticality:** Blocking.
+- **Owner:** Frontend.
+- **Evidence:** `npm exec --workspace=mobile -- vitest run` exited 1; [LegalDocumentView.test.tsx](../mobile/src/modules/legal/LegalDocumentView.test.tsx); [datenschutzerklaerung-alpha.md](../legal/datenschutzerklaerung-alpha.md).
+- **Recommendation:** Update the rendered privacy document test to assert the approved account-deletion wording, then rerun the complete mobile suite.
+- **Status:** Closed.
+- **History:** 2026-10-21 - Registered from the profile deletion QA FAIL report; focused Frontend correction requested under the approved correction workflow.
+- **History:** 2026-10-21 - QA re-review confirms the package-wide mobile suite still fails on the same retired-copy assertion. D2 correction has not yet been routed.
+- **History:** 2026-10-21 - Final F1 review still reports the stale-copy assertion; D2 correction was not started before the correction loop paused at F1's retry limit.
+- **History:** 2026-10-22 - D2 updated the retired-copy test. Latest full Mobile run reports a separate embedded-policy date mismatch; close this original finding.
+
+### FT-QA-2026-146
+
+- **Finding key:** Q1-DOC-01.
+- **Plan reference:** `docs/User Stories/Profile/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md`.
+- **Acceptance criterion:** AC-5 / AC-11.
+- **Description:** The internal authentication Knowledge Base says the user completes manual Entra identity deletion after backend success. The approved plan assigns any such follow-up to the Product Owner as an internal task, not to the user. The privacy policy and in-app copy do not contain the stale instruction.
+- **Criticality:** Non-blocking.
+- **Owner:** Documentation.
+- **Evidence:** [05-authentication.md](../kb/tech/05-authentication.md); approved ownership in [PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md](../User%20Stories/Profile/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md).
+- **Recommendation:** Align the internal authentication KB wording with the approved Product Owner ownership and keep it out of user-facing/privacy copy.
+- **Status:** Closed.
+- **History:** 2026-10-21 - Registered from the profile deletion QA FAIL report. Awaiting the user's fix, accept, or defer decision; no correction inferred from plan approval.
+- **History:** 2026-10-22 - D1 corrected the Mobile/UX ownership wording; the current QA report confirms the internal authentication KB assigns follow-up internally. Close.
+
+### FT-QA-2026-147
+
+- **Finding key:** Q2-AC10-01.
+- **Plan reference:** `docs/User Stories/Profile/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md`.
+- **Acceptance criterion:** AC-10.
+- **Description:** The deletion dialog says local tokens, sync queues, and diagnostic logs “entfernen wir auch”, presenting cleanup as guaranteed although revised AC-10 defines a one-shot best-effort attempt that may fail. The screen test asserts this obsolete sentence.
+- **Criticality:** Blocking.
+- **Owner:** Frontend.
+- **Evidence:** [ProfileEditScreen.tsx](../mobile/src/modules/profile/ProfileEditScreen.tsx), [ProfileEditScreen.test.tsx](../mobile/src/modules/profile/ProfileEditScreen.test.tsx), and [accountDeletionService.ts](../mobile/src/services/accountDeletionService.ts); latest QA finding Q2-AC10-01.
+- **Recommendation:** Remove the unconditional claim or replace it with approved best-effort wording, update the screen assertion, and rerun focused profile/legal tests and the full Mobile suite.
+- **Status:** Closed.
+- **History:** 2026-10-22 - Registered from approved-scope QA FAIL; correction routed to Frontend.
+- **History:** 2026-10-22 - Frontend replaced the unconditional cleanup guarantee with best-effort wording and updated the screen assertion; awaiting independent QA verification.
+- **History:** 2026-10-22 - Independent QA report `docs/qa/reports/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md` returned PASS; AC-2/AC-10 copy and assertion verified. Closed.
+
+### FT-QA-2026-148
+
+- **Finding key:** Q2-LEGAL-01.
+- **Plan reference:** `docs/User Stories/Profile/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md`.
+- **Acceptance criterion:** N/A.
+- **Description:** The embedded privacy document in `mobile/src/modules/legal/legalTexts.ts` is dated `2026-10-21`, while the durable German policy is dated `2026-10-22`. The existing mirror test fails on this mismatch and accounts for the only failure in the Mobile suite.
+- **Criticality:** Blocking.
+- **Owner:** Frontend.
+- **Evidence:** [legalTexts.ts](../mobile/src/modules/legal/legalTexts.ts), [legalTexts.test.ts](../mobile/src/modules/legal/legalTexts.test.ts), and [datenschutzerklaerung-alpha.md](../legal/datenschutzerklaerung-alpha.md); latest QA finding Q2-LEGAL-01, Mobile 949/950.
+- **Recommendation:** Align the embedded document date with the durable policy and rerun the full Mobile suite.
+- **Status:** Closed.
+- **History:** 2026-10-22 - Registered from approved-scope QA FAIL; correction routed to Frontend.
+- **History:** 2026-10-22 - Frontend synchronized the embedded policy date to 2026-10-22; focused and full Mobile suites plus typecheck pass; awaiting independent QA verification.
+- **History:** 2026-10-22 - Independent QA report `docs/qa/reports/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md` returned PASS; policy mirror verified and Mobile suite passed 950/950. Closed.
 
 ## US-03 Current Review And Verification Notes
 

@@ -18,6 +18,7 @@
 import { app, type InvocationContext } from '@azure/functions';
 import { AzureOpenAI } from 'openai';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
+import { isProfileDeletionInProgress } from '../lib/repositories/profileDeletionRepository';
 import { buildKeywordPrompt } from '../lib/prompts/foodKeywords';
 
 // ---------------------------------------------------------------------------
@@ -75,6 +76,15 @@ export const reusableItemsEnrichHandler = async (
   }
 
   ctx.log(`[reusableItemsEnrich] Processing itemId=${itemId} userId=${userId}`);
+
+  if (await isProfileDeletionInProgress(userId)) {
+    throw new Error('Profile deletion is in progress');
+  }
+
+  await enrichItem(userId, itemId, ctx);
+};
+
+async function enrichItem(userId: string, itemId: string, ctx: InvocationContext): Promise<void> {
 
   const repo = getReusableItemsRepository();
 
@@ -136,7 +146,7 @@ export const reusableItemsEnrichHandler = async (
   });
 
   ctx.log(`[reusableItemsEnrich] Enriched itemId=${itemId} with ${aiKeywords.length} AI keywords. Total terms: ${merged.length}`);
-};
+}
 
 // ---------------------------------------------------------------------------
 // Registration

@@ -1,13 +1,14 @@
 // LoginScreen — Entra External ID login via expo-auth-session (PKCE).
 // Single "Sign in" button — Entra handles identity provider routing (Google).
 
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { colors, spacing, typography } from '../../app/theme';
 import { authConfig } from '../../services/authConfig';
 import { authService } from '../../services/authService';
+import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import { LegalDocumentView } from '../legal/LegalDocumentView';
 
 // Needed so the browser dismisses properly after auth redirect.
@@ -24,12 +25,20 @@ const redirectUri = AuthSession.makeRedirectUri({ scheme: 'fittrack', path: 'aut
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
+  accountDeletionCleanupNotice?: boolean;
+  onAccountDeletionCleanupNoticeShown?: () => void;
 }
 
-export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
+export default function LoginScreen({
+  onLoginSuccess,
+  accountDeletionCleanupNotice = false,
+  onAccountDeletionCleanupNoticeShown,
+}: LoginScreenProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const cleanupNoticeShown = useRef(false);
+  const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
   const [request, response, promptAsync] = AuthSession.useAuthRequest(
     {
@@ -56,6 +65,17 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       setLoading(false);
     }
   }, [response]);
+
+  useEffect(() => {
+    if (!accountDeletionCleanupNotice || cleanupNoticeShown.current) return;
+    cleanupNoticeShown.current = true;
+    showSnackbar({
+      message: 'Einige private App-Daten von FitTrack konnten auf diesem Gerät nicht gelöscht werden. Du kannst die App-Daten in den Android-Einstellungen entfernen.',
+      durationMs: 6000,
+      numberOfLines: null,
+    });
+    onAccountDeletionCleanupNoticeShown?.();
+  }, [accountDeletionCleanupNotice, onAccountDeletionCleanupNoticeShown, showSnackbar]);
 
   async function exchangeCode(code: string, codeVerifier: string) {
     try {
@@ -95,37 +115,44 @@ export default function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-      <Text style={styles.title}>FitTrack</Text>
-      <Text style={styles.subtitle}>Track your nutrition, effortlessly.</Text>
+    <View style={styles.root}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+        <Text style={styles.title}>FitTrack</Text>
+        <Text style={styles.subtitle}>Track your nutrition, effortlessly.</Text>
 
-      <Pressable
-        style={[styles.button, (!request || loading) && styles.buttonDisabled]}
-        onPress={handleSignIn}
-        disabled={!request || loading}
-      >
-        {loading ? (
-          <ActivityIndicator color={colors.text} />
-        ) : (
-          <Text style={styles.buttonText}>Sign in with Google</Text>
-        )}
-      </Pressable>
+        <Pressable
+          style={[styles.button, (!request || loading) && styles.buttonDisabled]}
+          onPress={handleSignIn}
+          disabled={!request || loading}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.text} />
+          ) : (
+            <Text style={styles.buttonText}>Sign in with Google</Text>
+          )}
+        </Pressable>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+        {error && <Text style={styles.error}>{error}</Text>}
 
-      <Pressable
-        style={styles.privacyLink}
-        onPress={() => setShowPrivacy(true)}
-        accessibilityRole="button"
-        accessibilityLabel="Datenschutzerklärung lesen"
-      >
-        <Text style={styles.privacyLinkText}>Datenschutzerklärung</Text>
-      </Pressable>
-    </ScrollView>
+        <Pressable
+          style={styles.privacyLink}
+          onPress={() => setShowPrivacy(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Datenschutzerklärung lesen"
+        >
+          <Text style={styles.privacyLinkText}>Datenschutzerklärung</Text>
+        </Pressable>
+      </ScrollView>
+      <Snackbar ref={snackbarRef} bottomOffset={spacing.lg} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   scroll: {
     flex: 1,
     backgroundColor: colors.background,

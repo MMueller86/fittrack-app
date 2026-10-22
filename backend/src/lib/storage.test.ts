@@ -3,8 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __setStorageClientForTests,
+  communityRecipeImageBlobName,
+  copyRecipeImageToCommunity,
   downloadRecipeImage,
   downloadRecipeImageWithContentType,
+  listPersonalProductImageBlobNames,
+  listPersonalRecipeImageBlobNames,
   RECIPE_IMAGE_MAX_BYTES,
   RecipeImageTooLargeError,
   RecipeImageUnsupportedContentTypeError,
@@ -122,5 +126,68 @@ describe('downloadRecipeImageWithContentType', () => {
     await expect(downloadRecipeImageWithContentType('user/recipe/unknown-size.jpg')).rejects.toBeInstanceOf(
       RecipeImageTooLargeError,
     );
+  });
+});
+
+describe('community recipe image copy', () => {
+  it('copies to a deterministic neutral path and can safely repeat the copy', async () => {
+    const source = {
+      getProperties: vi.fn().mockResolvedValue({ contentLength: 4, contentType: 'image/png' }),
+      downloadToBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
+    };
+    const target = { uploadData: vi.fn().mockResolvedValue(undefined) };
+    const container = {
+      getBlockBlobClient: vi.fn((name: string) => name === 'owner/recipe-1/image-1.png' ? source : target),
+    };
+    const client = { getContainerClient: vi.fn(() => container) } as unknown as BlobServiceClient;
+    __setStorageClientForTests(client);
+
+    const first = await copyRecipeImageToCommunity('owner/recipe-1/image-1.png', 'recipe-1', 'image-1');
+    const second = await copyRecipeImageToCommunity('owner/recipe-1/image-1.png', 'recipe-1', 'image-1');
+
+    expect(first).toBe('community/recipe-1/image-1.png');
+    expect(second).toBe(first);
+    expect(target.uploadData).toHaveBeenCalledTimes(2);
+    expect(target.uploadData).toHaveBeenCalledWith(Buffer.from('image'), {
+      blobHTTPHeaders: { blobContentType: 'image/png' },
+    });
+    expect(communityRecipeImageBlobName('recipe/1', 'image 1', 'image/jpeg'))
+      .toBe('community/recipe%2F1/image%201.jpg');
+  });
+
+  it('does not copy an image that already has its stable community path', async () => {
+    const client = { getContainerClient: vi.fn() } as unknown as BlobServiceClient;
+    __setStorageClientForTests(client);
+
+    await expect(copyRecipeImageToCommunity('community/recipe-1/image-1.png', 'recipe-1', 'image-1'))
+      .resolves.toBe('community/recipe-1/image-1.png');
+    expect(client.getContainerClient).not.toHaveBeenCalled();
+  });
+});
+
+describe('personal blob inventory', () => {
+  it('lists active personal blobs only under the authenticated user prefixes', async () => {
+    const recipeContainer = {
+      listBlobsFlat: vi.fn(async function* ({ prefix }: { prefix: string }) {
+        yield { name: `${prefix}recipe-1/image.jpg` };
+      }),
+    };
+    const productContainer = {
+      listBlobsFlat: vi.fn(async function* ({ prefix }: { prefix: string }) {
+        yield { name: `${prefix}item-1.png` };
+      }),
+    };
+    const client = {
+      getContainerClient: vi.fn((name: string) =>
+        name === 'recipe-images' ? recipeContainer : productContainer),
+    } as unknown as BlobServiceClient;
+    __setStorageClientForTests(client);
+
+    await expect(listPersonalRecipeImageBlobNames('user-1'))
+      .resolves.toEqual(['user-1/recipe-1/image.jpg']);
+    await expect(listPersonalProductImageBlobNames('user-1'))
+      .resolves.toEqual(['user-1/item-1.png']);
+    expect(recipeContainer.listBlobsFlat).toHaveBeenCalledWith({ prefix: 'user-1/' });
+    expect(productContainer.listBlobsFlat).toHaveBeenCalledWith({ prefix: 'user-1/' });
   });
 });

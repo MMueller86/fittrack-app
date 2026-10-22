@@ -137,12 +137,34 @@ backend ──SDK──────────▶ Azure Blob Storage
 No direct AI calls from mobile. No API keys in the mobile app. The backend owns all secrets.
 
 ## Key Architectural Principles
-
 - **Backend owns secrets** — no keys in mobile, no keys in Cosmos, no keys in Git
 - **No generic AI chat** — all AI features are task-specific guided workflows
 - **Cost-aware design** — gpt-4o-mini, serverless Cosmos, quota enforcement
 - **Cloud-only** — no offline mode, Internet required
 - **Reuse-first logging** — users build a personal food library; search suggests it first
+
+
+
+## FitTrack Data Deletion and Retention
+
+Authenticated `DELETE /api/profile` removes active FitTrack data scoped only to
+the verified JWT `sub`. It uses a renewable concurrency lease in the existing
+`aiInsights` Cosmos container. `204` confirms the selected steps in that
+request finished; work admitted before the lease may still write later. The
+deletion flow calls Cosmos DB and Blob Storage, not Microsoft Graph, Azure
+OpenAI, or Document Intelligence. Microsoft Entra identity deletion remains
+manual.
+
+Published community recipes selected for retention remain usable as ownerless
+records in `communityRecipes`, with author `Anonymous` and images at neutral
+`community/{recipeId}/{imageId}.{jpg|png}` paths. Personal recipe and product
+image blobs under the user's prefix are deleted normally. The endpoint does
+not delete the Microsoft Entra identity; any required follow-up is an internal
+manual Product Owner task, not an end-user instruction. Existing Health
+Connect exports and backups are unchanged; Application Insights logs are not
+targeted and use the configured 30-day retention, while Blob Soft Delete may
+retain recovery copies for up to seven days. See the full [deletion API
+contract](09-api-reference.md#delete-apiprofile).
 
 ## Cross-references
 

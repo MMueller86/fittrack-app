@@ -6,6 +6,7 @@ const { getCosmosMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('../cosmos', () => ({
+  isCosmosConfigured: () => false,
   getCosmos: getCosmosMock,
 }));
 

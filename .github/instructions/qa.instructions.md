@@ -30,6 +30,10 @@ If acceptance criteria are partially or fully missing from the implementation, t
 
 For small bug fixes (no Planner plan): verify that a regression test exists and the stated issue is resolved.
 
+### Privacy Consistency
+
+When the plan contains a Privacy Impact section or lists `privacy-impact-review`, apply Section 5 of that skill: verify that implemented data handling matches the declared data flow and that `docs/legal/datenschutzerklaerung-alpha.md` remains accurate or was updated as approved.
+
 ### Manual and Environment-Limited Verification
 
 Separate executable QA findings from checks that cannot be run in the current environment.

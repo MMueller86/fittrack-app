@@ -230,7 +230,7 @@ export const getDiaryHandler = withHandler(
       hintState.lastHintDate !== localDate;
     if (hintChanged) {
       updatedState.userId = userId;
-      getHintStateRepository().upsert(userId, updatedState).catch(() => {
+      await getHintStateRepository().upsert(userId, updatedState).catch(() => {
         // Non-critical — hint will be re-evaluated on next request
       });
     }
@@ -410,8 +410,8 @@ export const addItemHandler = withHandler(
         };
         logEvent(ctx, 'info', 'diary.item.macrosFromProduct', { productId: d.productId });
         // Increment usageCount so the item floats to the top of the "recently used" list.
-        // Fire-and-forget — errors are swallowed inside incrementUsageCount.
-        void getReusableItemsRepository().incrementUsageCount(userId, d.productId);
+        // Errors are swallowed inside incrementUsageCount.
+        await getReusableItemsRepository().incrementUsageCount(userId, d.productId);
       } else if (d.calculatedNutrition != null) {
         // Fallback: productId given but not a stored ReusableItem (e.g. OpenFoodFacts)
         macros = {
@@ -475,9 +475,9 @@ export const addItemHandler = withHandler(
       });
       logEvent(ctx, 'info', 'diary.item.added', { userId, mealId });
 
-      // Fire-and-forget: Nutzungshistorie aufzeichnen (UserFoodRelation)
+      // Best-effort: Nutzungshistorie aufzeichnen (UserFoodRelation)
       // Ermittelt foodRef + foodRefType aus dem sourceType des Items
-      void (async () => {
+      await (async () => {
         try {
           const effectiveSourceType = d.sourceType;
           let foodRef: string | null = null;
@@ -686,7 +686,7 @@ export const bulkCopyItemsHandler = withHandler(
       const copiedItems = result.copiedCount > 0
         ? result.targetMeal.items.slice(-result.copiedCount)
         : [];
-      void recordCopiedDiaryItemUsages(userId, copiedItems, result.targetMeal).catch(() => {});
+      await recordCopiedDiaryItemUsages(userId, copiedItems, result.targetMeal).catch(() => {});
       logEvent(ctx, 'info', 'diary.items.bulkCopied', {
         userId,
         copiedCount: result.copiedCount,
