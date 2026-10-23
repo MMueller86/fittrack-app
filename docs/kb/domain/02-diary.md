@@ -9,6 +9,28 @@ Day
         └── NutritionValues (snapshot)
 ```
 
+Each Meal has a required `createdAt` and an optional `updatedAt`. New meals
+initialize both to the creation instant. Every successful persisted Meal
+replacement (item add/update/delete, bulk item mutation, or reusable-item macro
+refresh) stamps `updatedAt`; deleting a Meal removes it without a tombstone.
+Optional `updatedAt` is a Class 0 change: existing documents remain valid and
+readable, and no migration or backfill is performed. The repository-only
+`listMealsUpdatedSince(userId, since)` query is inclusive, scoped to the
+existing `/userId` partition, and excludes DayMeta and other non-Meal
+documents. For legacy meals without `updatedAt`, it compares `createdAt`. The
+paginated full export also returns only legacy Meal documents and documents
+with `_docType: 'meal'`.
+
+`GET /api/diary/changes/meals` exposes current Meal documents changed in an
+inclusive UTC window bounded by `since` and one fixed `checkpointAt`. It does
+not return item-level deletion events: deleting an item stamps the surviving
+Meal, while deleting a Meal removes the document. Neither operation creates a
+server tombstone. The local ID-only Health Connect delete retry is proposed in
+the unapproved [HC-4 draft](../../User%20Stories/HealthConnect/HC-4_Health-Connect-Synchronisation-vereinfachen.md);
+it is Mobile-owned and is not implemented by the backend delta endpoint. See
+the [exact API contract](../tech/09-api-reference.md#diary) for cursor and
+error behavior.
+
 ## Meal Types
 
 `MealType` — `'breakfast' | 'lunch' | 'dinner' | 'snack' | 'preworkout' | 'postworkout'`

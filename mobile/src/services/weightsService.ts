@@ -4,7 +4,7 @@
 
 import { apiClient } from '../shared/api/client';
 import { getLocalIsoDate } from '../shared/date/localDate';
-import type { WeightEntry, WeightUnit } from '@fittrack/shared';
+import type { WeightChangesResponse, WeightEntry, WeightUnit } from '@fittrack/shared';
 
 interface ListWeightsResponse {
   entries: WeightEntry[];
@@ -13,6 +13,11 @@ interface ListWeightsResponse {
 export async function listWeights(): Promise<WeightEntry[]> {
   const { data } = await apiClient.get<ListWeightsResponse>('/weights');
   return data.entries;
+}
+
+export async function getWeightChanges(since: string): Promise<WeightChangesResponse> {
+  const { data } = await apiClient.get<WeightChangesResponse>('/weights/changes', { params: { since } });
+  return data;
 }
 
 export interface AddWeightInput {

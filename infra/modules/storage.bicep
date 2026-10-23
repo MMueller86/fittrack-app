@@ -53,6 +53,7 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01
     deleteRetentionPolicy: {
       enabled: true
       days: 7
+      allowPermanentDelete: false
     }
   }
 }
@@ -61,6 +62,8 @@ resource recipeImages 'Microsoft.Storage/storageAccounts/blobServices/containers
   parent: blobServices
   name: recipeImagesContainerName
   properties: {
+    defaultEncryptionScope: '$account-encryption-key'
+    denyEncryptionScopeOverride: false
     publicAccess: 'None'
   }
 }
@@ -69,6 +72,8 @@ resource labelScans 'Microsoft.Storage/storageAccounts/blobServices/containers@2
   parent: blobServices
   name: 'label-scans'
   properties: {
+    defaultEncryptionScope: '$account-encryption-key'
+    denyEncryptionScopeOverride: false
     publicAccess: 'None'
   }
 }
@@ -104,7 +109,7 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
 }
 
 // Queue service + enrichment queue for async AI keyword generation.
-resource queueServices 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' = {
+resource queueServices 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' existing = {
   parent: storage
   name: 'default'
 }

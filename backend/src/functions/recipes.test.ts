@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import type { Recipe } from '@fittrack/shared';
+import { copyPublishedCommunityRecipe } from '../lib/communityRecipeTransfer';
 
 // Mock storage — no real Azure Blob calls in unit tests
 vi.mock('../lib/storage', () => ({
   uploadRecipeImage: () => Promise.resolve({ blobName: 'u1/r1/img1.jpg', imageId: 'img1' }),
   deleteRecipeImage: () => Promise.resolve(undefined),
+  copyRecipeImageToOwnerSnapshot: () => Promise.resolve('test-owner/recipe/image.jpg'),
   generateRecipeImageSasUrl: () => Promise.resolve('https://blob.example.com/img?sas=token'),
 }));
 
@@ -42,6 +45,11 @@ import { performance } from 'node:perf_hooks';
 import { enforceQuota, trackUsage } from '../lib/quota';
 import { validateRecipeExportPreparationOutput } from '../lib/recipeAnalyzeValidation';
 import { __resetRecipesRepositoryForTests, getRecipesRepository } from '../lib/repositories/recipesRepository';
+import {
+  _resetFoodProductRepository,
+  _setFoodProductRepository,
+  type FoodProductRepository,
+} from '../lib/repositories/foodProductRepository';
 import { __resetDiaryRepositoryForTests } from '../lib/repositories/diaryRepository';
 import { __resetUserFoodRelationRepositoryForTests, getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
 import {
@@ -136,7 +144,7 @@ function responseEtag(response: { headers?: unknown }): string {
   return headers?.['ETag'] ?? headers?.['etag'] ?? '';
 }
 
-async function createTestRecipe(ingredients = [baseIngredient], description?: string) {
+async function createTestRecipe(ingredients: unknown[] = [baseIngredient], description?: string) {
   const req = await makeAuthRequest({
     body: {
       name: 'Sauerteigbrot',
@@ -1667,6 +1675,79 @@ describe('GET /recipes/:id — getRecipe', () => {
 // ---------------------------------------------------------------------------
 
 describe('PUT /recipes/:id — updateRecipe', () => {
+  it.each(['manual', 'label-scan', 'unknown', 'ai', 'openFoodFacts'] as const)(
+    'preserves copied %s provenance through an amount-only PUT and recalculates nutrition',
+    async (nutritionSource) => {
+      const linkedProductId = nutritionSource === 'openFoodFacts' ? 'openFoodFacts:1234567890123' : null;
+      const ingredient = {
+        ...baseIngredient,
+        inputMode: 'grams' as const,
+        linkedProductId,
+        isAiEstimate: nutritionSource === 'ai',
+        nutritionSource,
+      };
+      const source: Recipe = {
+        id: `published-${nutritionSource}`,
+        ownerUserId: 'publisher',
+        name: 'Published recipe',
+        portions: 4,
+        ingredients: [ingredient],
+        steps: [baseStep],
+        images: [],
+        nutritionTotal: { calories: 1870, protein: 55, carbs: 396, fat: 5.5, fiber: 16.5 },
+        nutritionPerPortion: { calories: 467.5, protein: 13.8, carbs: 99, fat: 1.4, fiber: 4.1 },
+        visibility: 'community',
+        sharedWithUserIds: [],
+        tags: [],
+        usageCount: 0,
+        createdAt: '2026-10-01T00:00:00.000Z',
+        updatedAt: '2026-10-02T00:00:00.000Z',
+      };
+      const { recipeId } = await copyPublishedCommunityRecipe(TEST_USER_ID, source);
+      const copied = await getRecipesRepository().get(TEST_USER_ID, recipeId);
+      expect(copied).not.toBeNull();
+      const editedContribution = {
+        calories: 935,
+        protein: 27.5,
+        carbs: 198,
+        fat: 2.8,
+        fiber: 8.3,
+      };
+
+      const response = await updateRecipeHandler(await makeAuthRequest({
+        params: { id: recipeId },
+        body: {
+          ingredients: [{
+            ...copied!.ingredients[0],
+            inputAmount: 275,
+            amountGrams: 275,
+            nutritionContribution: editedContribution,
+          }],
+        },
+      }), ctx);
+
+      expect(response.status, JSON.stringify(response.jsonBody)).toBe(200);
+      const updated = response.jsonBody as Recipe;
+      expect(updated.ingredients[0]).toMatchObject({
+        inputAmount: 275,
+        amountGrams: 275,
+        linkedProductId,
+        isAiEstimate: nutritionSource === 'ai',
+        nutritionSource,
+      });
+      expect(updated.ingredients[0]).toHaveProperty('linkedReusableItemId', null);
+      expect(updated.ingredients[0]!.nutritionContribution).toEqual(editedContribution);
+      expect(updated.nutritionTotal).toEqual(updated.ingredients[0]!.nutritionContribution);
+      expect(updated.nutritionPerPortion).toEqual({
+        calories: 233.8,
+        protein: 6.9,
+        carbs: 49.5,
+        fat: 0.7,
+        fiber: 2.1,
+      });
+    },
+  );
+
   it('updates name and recalculates nutrition', async () => {
     const created = await createTestRecipe();
     const req = await makeAuthRequest({
@@ -1678,6 +1759,68 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     expect((res.jsonBody as Record<string, unknown>)['name']).toBe('Roggenbrot');
     expect((res.jsonBody as Record<string, unknown>)['portions']).toBe(2);
     expect(responseEtag(res)).toMatch(/^".+"$/);
+  });
+
+  it('preserves unlinked AI provenance on an amount-only PUT and recalculates nutrition', async () => {
+    const aiIngredient = { ...baseIngredient, id: '00000000-0000-0000-0000-000000000003', isAiEstimate: true };
+    const created = await createTestRecipe([aiIngredient]);
+    const recipeId = String(created['id']);
+    const savedIngredient = (created['ingredients'] as Array<Record<string, unknown>>)[0]!;
+
+    const res = await updateRecipeHandler(await makeAuthRequest({
+      params: { id: recipeId },
+      body: { ingredients: [{ ...savedIngredient, inputAmount: 275, amountGrams: 275 }] },
+    }), ctx);
+
+    expect(res.status).toBe(200);
+    const updated = res.jsonBody as Record<string, unknown>;
+    const ingredient = (updated['ingredients'] as Array<Record<string, unknown>>)[0]!;
+    expect(ingredient).toMatchObject({
+      inputAmount: 275,
+      amountGrams: 275,
+      isAiEstimate: true,
+      nutritionSource: 'ai',
+    });
+    expect(updated['nutritionTotal']).toMatchObject({ calories: 935 });
+    expect(updated['nutritionPerPortion']).toMatchObject({ calories: 233.8 });
+  });
+
+  it('preserves OFF provenance on an amount-only PUT and recalculates nutrition', async () => {
+    const products = {
+      search: vi.fn().mockResolvedValue([]),
+      getById: vi.fn().mockResolvedValue({ source: 'openFoodFacts' }),
+    };
+    _setFoodProductRepository(products as unknown as FoodProductRepository);
+    try {
+      const offIngredient = {
+        ...baseIngredient,
+        id: '00000000-0000-0000-0000-000000000004',
+        linkedProductId: 'openFoodFacts:1234567890123',
+      };
+      const created = await createTestRecipe([offIngredient]);
+      const recipeId = String(created['id']);
+      const savedIngredient = (created['ingredients'] as Array<Record<string, unknown>>)[0]!;
+
+      const res = await updateRecipeHandler(await makeAuthRequest({
+        params: { id: recipeId },
+        body: { ingredients: [{ ...savedIngredient, inputAmount: 275, amountGrams: 275 }] },
+      }), ctx);
+
+      expect(res.status).toBe(200);
+      const updated = res.jsonBody as Record<string, unknown>;
+      const ingredient = (updated['ingredients'] as Array<Record<string, unknown>>)[0]!;
+      expect(ingredient).toMatchObject({
+        inputAmount: 275,
+        amountGrams: 275,
+        linkedProductId: 'openFoodFacts:1234567890123',
+        isAiEstimate: false,
+        nutritionSource: 'openFoodFacts',
+      });
+      expect(updated['nutritionTotal']).toMatchObject({ calories: 935 });
+      expect(updated['nutritionPerPortion']).toMatchObject({ calories: 233.8 });
+    } finally {
+      _resetFoodProductRepository();
+    }
   });
 
   it('marks an unchanged exportView stale after a source update and preserves it when omitted', async () => {

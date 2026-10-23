@@ -10,6 +10,7 @@ import type {
   DiaryBulkMoveRequest,
   DiaryBulkMoveResponse,
   DiaryDayResponse,
+  MealChangesResponse,
   MealType,
   Meal,
   NutritionValues,
@@ -180,6 +181,15 @@ export const diaryApi = {
     return apiClient
       .get<{ meals: Meal[]; cursor?: string }>('/diary/meals', {
         params: { limit: limit ?? 50, ...(cursor ? { cursor } : {}) },
+      })
+      .then((r) => r.data);
+  },
+
+  /** GET /api/diary/changes/meals?since=<UTC-ISO>&limit=50&cursor=<token> */
+  getMealChanges(since: string, limit = 50, cursor?: string): Promise<MealChangesResponse> {
+    return apiClient
+      .get<MealChangesResponse>('/diary/changes/meals', {
+        params: { since, limit, ...(cursor ? { cursor } : {}) },
       })
       .then((r) => r.data);
   },

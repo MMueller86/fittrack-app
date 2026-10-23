@@ -39,6 +39,8 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
   kind: 'web'
   properties: {
     Application_Type: 'web'
+    Flow_Type: 'Bluefield'
+    Request_Source: 'rest'
     WorkspaceResourceId: workspace.id
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'
@@ -47,6 +49,9 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
 
 @description('Application Insights instrumentation key.')
 output instrumentationKey string = appInsights.properties.InstrumentationKey
+
+@description('Application Insights resource id.')
+output appInsightsId string = appInsights.id
 
 @description('Application Insights connection string (preferred for SDKs).')
 output connectionString string = appInsights.properties.ConnectionString

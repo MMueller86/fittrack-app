@@ -120,6 +120,11 @@ function findComponentProps<T>(renderer: ReactTestRenderer, component: unknown):
   return node.props as T;
 }
 
+function expectNoGlobalHealthConnectAttemptStatus(renderer: ReactTestRenderer): void {
+  const visibleText = renderer.root.findAll((node) => node.type === 'Text').map(getTextContent).join(' ');
+  expect(visibleText).not.toMatch(/Synchronisation läuft|Abgleich läuft|Abgleich fehlgeschlagen|Letzter Versuch/i);
+}
+
 async function renderProgressScreen(entries: WeightEntry[]): Promise<ReactTestRenderer> {
   mocks.listWeights.mockResolvedValue(entries);
   let renderer!: ReactTestRenderer;
@@ -135,6 +140,16 @@ async function saveInput(renderer: ReactTestRenderer, value: string): Promise<vo
   act(() => findComponentProps<ProgressHeroCardProps>(renderer, ProgressHeroCard).onInputChange(value));
   await act(async () => {
     findComponentProps<ProgressHeroCardProps>(renderer, ProgressHeroCard).onSave();
+    await Promise.resolve();
+  });
+}
+
+async function confirmDelete(renderer: ReactTestRenderer): Promise<void> {
+  const sheet = renderer.root.findAll((node) => node.type === 'ConfirmSheet')[0];
+  if (!sheet) throw new Error('Delete confirmation not found');
+  const action = (sheet.props.actions as Array<{ onPress: () => void }>)[0];
+  await act(async () => {
+    action!.onPress();
     await Promise.resolve();
   });
 }
@@ -161,6 +176,14 @@ afterEach(() => {
 });
 
 describe('ProgressScreen weight editor', () => {
+  it('keeps ordinary Progress entries free of Health Connect status badges', async () => {
+    const renderer = await renderProgressScreen([weightEntry('ordinary', '2026-10-14', 77.5)]);
+    const visibleText = renderer.root.findAll((node) => node.type === 'Text').map(getTextContent).join(' ');
+
+    expect(visibleText).toContain('77,5 kg');
+    expect(visibleText).not.toMatch(/Health Connect|Synchronisationsstatus|Ausstehende Löschungen|Letzter erfolgreicher Abgleich/);
+  });
+
   it('shows one latest-weight summary and keeps today\'s measurements visible in history', async () => {
     const currentEntry: WeightEntry = {
       ...weightEntry('today-current', '2026-10-16', 81),
@@ -242,6 +265,38 @@ describe('ProgressScreen weight editor', () => {
     expect(renderer.root.findAll((node) => node.type === 'Modal')[1]!.props.visible).toBe(false);
     expect(findComponentProps<Pick<HistoryListProps, 'entries'>>(renderer, HistoryList).entries)
       .toContainEqual(weightEntry('added', '2026-10-14', 77.5));
+  });
+
+  it('does not start Health Connect sync when creating a weight fails', async () => {
+    mocks.addWeight.mockRejectedValue(new Error('Create unavailable'));
+    const renderer = await renderProgressScreen([]);
+
+    await saveInput(renderer, '77,5');
+
+    expect(mocks.addWeight).toHaveBeenCalledWith({ value: 77.5, unit: 'kg', date: '2026-10-16' });
+    expect(mocks.syncWeightUpsert).not.toHaveBeenCalled();
+    expect(findComponentProps<Pick<HistoryListProps, 'entries'>>(renderer, HistoryList).entries).toEqual([]);
+  });
+
+  it('does not expose global attempt status while a mutation sync is pending or fails', async () => {
+    let rejectSync!: (failure: Error) => void;
+    const syncAttempt = new Promise<void>((_resolve, reject) => {
+      rejectSync = reject;
+    }).catch(() => undefined);
+    mocks.syncWeightUpsert.mockReturnValue(syncAttempt);
+    const renderer = await renderProgressScreen([]);
+
+    await saveInput(renderer, '77,5');
+
+    expect(mocks.syncWeightUpsert).toHaveBeenCalledWith(weightEntry('added', '2026-10-14', 77.5));
+    expectNoGlobalHealthConnectAttemptStatus(renderer);
+
+    await act(async () => {
+      rejectSync(new Error('Simulated Health Connect provider failure'));
+      await syncAttempt;
+    });
+
+    expectNoGlobalHealthConnectAttemptStatus(renderer);
   });
 
   it('opens an existing calendar date with its value and updates by the exact ID', async () => {
@@ -416,7 +471,35 @@ describe('ProgressScreen weight editor', () => {
     expect(input.props.value).toBe('75,1');
     expect(historyEntries).toContainEqual(historicalEntry);
     expect(visibleText).toContain('74,2 kg');
+    expect(visibleText.join(' ')).not.toMatch(/Health Connect|Synchronisationsstatus|Ausstehende Löschungen|Letzter erfolgreicher Abgleich/);
     expect(cardProps.saveError).toBeTruthy();
     expect(alerts).toContain(cardProps.saveError);
+  });
+
+  it('syncs a weight delete only after the FitTrack delete succeeds', async () => {
+    const entry = weightEntry('deleted', '2026-10-12', 74.2);
+    const renderer = await renderProgressScreen([entry]);
+    act(() => findComponentProps<HistoryListProps>(renderer, HistoryList).onDelete(entry));
+
+    await confirmDelete(renderer);
+
+    expect(mocks.deleteWeight).toHaveBeenCalledWith('deleted');
+    expect(mocks.syncWeightDelete).toHaveBeenCalledWith('deleted');
+    expect(findComponentProps<Pick<HistoryListProps, 'entries'>>(renderer, HistoryList).entries)
+      .not.toContainEqual(entry);
+  });
+
+  it('does not sync a weight delete when the FitTrack delete fails', async () => {
+    const entry = weightEntry('delete-failed', '2026-10-12', 74.2);
+    mocks.deleteWeight.mockRejectedValue(new Error('Delete unavailable'));
+    const renderer = await renderProgressScreen([entry]);
+    act(() => findComponentProps<HistoryListProps>(renderer, HistoryList).onDelete(entry));
+
+    await confirmDelete(renderer);
+
+    expect(mocks.deleteWeight).toHaveBeenCalledWith('delete-failed');
+    expect(mocks.syncWeightDelete).not.toHaveBeenCalled();
+    expect(findComponentProps<Pick<HistoryListProps, 'entries'>>(renderer, HistoryList).entries)
+      .toContainEqual(entry);
   });
 });

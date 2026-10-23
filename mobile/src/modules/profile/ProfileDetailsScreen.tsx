@@ -70,10 +70,11 @@ export default function ProfileDetailsScreen({ navigation }: Props) {
             style={styles.editButton}
             onPress={() => navigation.navigate('ProfileEdit', { profile })}
             activeOpacity={0.7}
+            hitSlop={4}
             accessibilityRole="button"
             accessibilityLabel="Profil bearbeiten"
           >
-            <Text style={styles.editButtonText}>Bearbeiten</Text>
+            <Icon lib="feather" name="edit-2" size={14} color={colors.textSecondary} />
           </TouchableOpacity>
         ) : (
           <View style={styles.headerSpacer} />
@@ -110,15 +111,14 @@ const styles = StyleSheet.create({
   },
   headerSpacer: { width: spacing.xxl },
   editButton: {
-    backgroundColor: colors.primarySoft,
+    width: 40,
+    height: 40,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.full,
-    minHeight: spacing.xxl,
-    paddingHorizontal: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  editButtonText: { ...typography.button, color: colors.primaryBright },
-  scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
+  scroll: { padding: spacing.md, paddingBottom: spacing.md },
   centerContent: {
     flexGrow: 1,
     alignItems: 'center',

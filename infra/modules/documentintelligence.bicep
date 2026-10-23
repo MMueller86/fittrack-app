@@ -33,6 +33,3 @@ resource documentIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' 
 
 @description('Document Intelligence endpoint URL.')
 output endpoint string = documentIntelligence.properties.endpoint
-
-@description('Document Intelligence primary access key.')
-output primaryKey string = documentIntelligence.listKeys().key1

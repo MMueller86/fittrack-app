@@ -24,7 +24,6 @@ import { healthPlatformService } from '../../services/health/healthPlatformServi
 import { healthSyncService } from '../../services/health/healthSyncService';
 import { nutritionSyncService } from '../../services/health/nutritionSyncService';
 import { MockHealthPlatformService } from '../../services/health/MockHealthPlatformService';
-import { syncLogger, type SyncLogEntry } from '../../services/health/syncLogger';
 import type { UserProfile } from '@fittrack/shared';
 import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/ConfirmSheet';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
@@ -37,9 +36,6 @@ import {
 } from './healthConnectCopy';
 
 const IS_DEV = process.env.EXPO_PUBLIC_APP_VARIANT === 'development';
-const IS_DEBUG_BUILD =
-  process.env.EXPO_PUBLIC_APP_VARIANT === 'development' ||
-  process.env.EXPO_PUBLIC_APP_VARIANT === 'preview';
 
 const PLAY_STORE_URL = 'market://details?id=com.google.android.apps.healthdata';
 
@@ -105,8 +101,6 @@ export default function HealthConnectScreen({ navigation }: Props) {
   const [activatingNutrition, setActivatingNutrition] = useState(false);
   const [reexportingNutrition, setReexportingNutrition] = useState(false);
   const [syncStatusSheetVisible, setSyncStatusSheetVisible] = useState(false);
-  const [syncLog, setSyncLog] = useState<SyncLogEntry[]>([]);
-  const [logExpanded, setLogExpanded] = useState(false);
 
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
@@ -147,9 +141,6 @@ export default function HealthConnectScreen({ navigation }: Props) {
     })();
     void loadAvailability();
     profileApi.getMe().then((r) => setProfile(r.profile as UserProfile | null)).catch(() => undefined);
-    if (IS_DEBUG_BUILD) {
-      void syncLogger.readAll().then((entries) => setSyncLog([...entries].reverse()));
-    }
     opacity.value = withTiming(1, { duration: 250 });
   }, [loadAvailability, refreshSyncStatus]);
 
@@ -160,6 +151,8 @@ export default function HealthConnectScreen({ navigation }: Props) {
       const result = await healthSyncService.enableSync(entries);
       if (result === 'permission_denied') {
         showSnackbar({ message: 'Berechtigung nicht erteilt – FitTrack benötigt Schreibzugriff auf Gewichtsdaten.' });
+      } else if (result === 'user_unavailable') {
+        showSnackbar({ message: 'Dein Nutzerkonto konnte nicht ermittelt werden. Bitte melde dich erneut an.' });
       }
       refreshSyncStatus();
     } catch {
@@ -191,7 +184,8 @@ export default function HealthConnectScreen({ navigation }: Props) {
     setReexporting(true);
     try {
       const entries = await listWeights();
-      await healthSyncService.runFullExport(entries);
+      const succeeded = await healthSyncService.runFullExport(entries);
+      if (!succeeded) showSnackbar({ message: 'Der Voll-Export war nicht vollständig. FitTrack versucht es beim nächsten Abgleich erneut.' });
       refreshSyncStatus();
     } catch {
       showSnackbar({ message: 'Re-Export fehlgeschlagen.' });
@@ -200,27 +194,13 @@ export default function HealthConnectScreen({ navigation }: Props) {
     }
   }, [refreshSyncStatus]);
 
-  const handleDismissPermanent = useCallback(async () => {
-    await healthSyncService.dismissPermanentFailures();
-    refreshSyncStatus();
-  }, [refreshSyncStatus]);
-
-  const refreshLog = useCallback(async () => {
-    if (!IS_DEBUG_BUILD) return;
-    const entries = await syncLogger.readAll();
-    setSyncLog([...entries].reverse());
-  }, []);
-
-  const clearLog = useCallback(async () => {
-    await syncLogger.clear();
-    setSyncLog([]);
-  }, []);
-
   const handleReauthorize = useCallback(async () => {
     const entries = await listWeights().catch(() => []);
     const result = await healthSyncService.enableSync(entries);
     if (result === 'permission_denied') {
       showSnackbar({ message: 'Berechtigung nicht erteilt – bitte erteile FitTrack die Berechtigung in Health Connect.' });
+    } else if (result === 'user_unavailable') {
+      showSnackbar({ message: 'Dein Nutzerkonto konnte nicht ermittelt werden. Bitte melde dich erneut an.' });
     }
     refreshSyncStatus();
   }, [refreshSyncStatus]);
@@ -231,6 +211,8 @@ export default function HealthConnectScreen({ navigation }: Props) {
       const result = await nutritionSyncService.enableSync();
       if (result === 'permission_denied') {
         showSnackbar({ message: 'Berechtigung nicht erteilt – FitTrack benötigt Schreibzugriff auf Ernährungsdaten.' });
+      } else if (result === 'user_unavailable') {
+        showSnackbar({ message: 'Dein Nutzerkonto konnte nicht ermittelt werden. Bitte melde dich erneut an.' });
       }
       refreshSyncStatus();
     } catch {
@@ -261,18 +243,14 @@ export default function HealthConnectScreen({ navigation }: Props) {
   const handleReexportNutrition = useCallback(async () => {
     setReexportingNutrition(true);
     try {
-      await nutritionSyncService.runFullExport();
+      const succeeded = await nutritionSyncService.runFullExport();
+      if (!succeeded) showSnackbar({ message: 'Der Voll-Export war nicht vollständig. FitTrack versucht es beim nächsten Abgleich erneut.' });
       refreshSyncStatus();
     } catch {
       showSnackbar({ message: 'Re-Export fehlgeschlagen.' });
     } finally {
       setReexportingNutrition(false);
     }
-  }, [refreshSyncStatus]);
-
-  const handleDismissPermanentNutrition = useCallback(async () => {
-    await nutritionSyncService.dismissPermanentFailures();
-    refreshSyncStatus();
   }, [refreshSyncStatus]);
 
   // --- iOS placeholder ---
@@ -380,37 +358,6 @@ export default function HealthConnectScreen({ navigation }: Props) {
                 </View>
               )}
 
-              {/* Permanent failure warning card */}
-              {syncStatus.permanentFailures.length > 0 && (
-                <View style={[styles.card, styles.cardWarning]}>
-                  <Text style={styles.warningTitle}>
-                    {syncStatus.permanentFailures.length} {syncStatus.permanentFailures.length === 1 ? 'Eintrag konnte' : 'Einträge konnten'} nicht synchronisiert werden.
-                  </Text>
-                  <Text style={styles.bodyText}>
-                    FitTrack konnte diese Einträge dauerhaft nicht an Health Connect übertragen. Du kannst alle Gewichtsdaten neu exportieren — das ist sicher und erzeugt keine Duplikate.
-                  </Text>
-                  <View style={styles.buttonRow}>
-                    <TouchableOpacity
-                      style={[styles.primaryButton, reexporting && styles.buttonDisabled]}
-                      onPress={() => void handleReexport()}
-                      activeOpacity={0.8}
-                      disabled={reexporting}
-                    >
-                      {reexporting
-                        ? <ActivityIndicator color={colors.white} size="small" />
-                        : <Text style={styles.primaryButtonText}>Alle Gewichtsdaten neu exportieren</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.ghostButton}
-                      onPress={() => void handleDismissPermanent()}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.ghostButtonText}>Ignorieren</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
               {/* Sync status card */}
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Gewicht synchronisieren</Text>
@@ -421,22 +368,27 @@ export default function HealthConnectScreen({ navigation }: Props) {
                       <Text style={styles.statusLabel}>Sync-Status</Text>
                       <StatusChip status="sync_active" />
                     </View>
-                    {syncStatus.lastFullExportAt && (
-                      <TouchableOpacity
-                        onPress={() => setSyncStatusSheetVisible(true)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.metaText}>
-                          Letzter Export: {new Date(syncStatus.lastFullExportAt).toLocaleString('de-DE', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </Text>
-                      </TouchableOpacity>
+                    {syncStatus.lastSuccessfulSyncAt && (
+                      <Text style={styles.metaText}>
+                        Letzter erfolgreicher Abgleich: {new Date(syncStatus.lastSuccessfulSyncAt).toLocaleString('de-DE', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
                     )}
+                    <TouchableOpacity
+                      style={[styles.secondaryButton, reexporting && styles.buttonDisabled]}
+                      onPress={() => void handleReexport()}
+                      activeOpacity={0.8}
+                      disabled={reexporting}
+                    >
+                      {reexporting
+                        ? <ActivityIndicator color={colors.primaryBright} size="small" />
+                        : <Text style={styles.secondaryButtonText}>Alle Gewichtsdaten erneut exportieren</Text>}
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.destructiveButton]}
                       onPress={() => void handleDisable()}
@@ -478,37 +430,6 @@ export default function HealthConnectScreen({ navigation }: Props) {
                 </View>
               )}
 
-              {/* Nutrition permanent failure card */}
-              {nutritionSyncStatus.permanentFailures.length > 0 && (
-                <View style={[styles.card, styles.cardWarning]}>
-                  <Text style={styles.warningTitle}>
-                    {nutritionSyncStatus.permanentFailures.length} {nutritionSyncStatus.permanentFailures.length === 1 ? 'Eintrag konnte' : 'Einträge konnten'} nicht synchronisiert werden.
-                  </Text>
-                  <Text style={styles.bodyText}>
-                    FitTrack konnte diese Ernährungseinträge dauerhaft nicht an Health Connect übertragen. Du kannst alle Ernährungsdaten neu exportieren — das ist sicher und erzeugt keine Duplikate.
-                  </Text>
-                  <View style={styles.buttonRow}>
-                    <TouchableOpacity
-                      style={[styles.primaryButton, reexportingNutrition && styles.buttonDisabled]}
-                      onPress={() => void handleReexportNutrition()}
-                      activeOpacity={0.8}
-                      disabled={reexportingNutrition}
-                    >
-                      {reexportingNutrition
-                        ? <ActivityIndicator color={colors.white} size="small" />
-                        : <Text style={styles.primaryButtonText}>Alle Ernährungsdaten neu exportieren</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.ghostButton}
-                      onPress={() => void handleDismissPermanentNutrition()}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={styles.ghostButtonText}>Ignorieren</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
-
               {/* Nutrition sync card */}
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>Ernährung synchronisieren</Text>
@@ -519,9 +440,9 @@ export default function HealthConnectScreen({ navigation }: Props) {
                       <Text style={styles.statusLabel}>Sync-Status</Text>
                       <StatusChip status="nutrition_sync_active" />
                     </View>
-                    {nutritionSyncStatus.lastFullExportAt && (
+                    {nutritionSyncStatus.lastSuccessfulSyncAt && (
                       <Text style={styles.metaText}>
-                        Letzter Export: {new Date(nutritionSyncStatus.lastFullExportAt).toLocaleString('de-DE', {
+                        Letzter erfolgreicher Abgleich: {new Date(nutritionSyncStatus.lastSuccessfulSyncAt).toLocaleString('de-DE', {
                           day: '2-digit',
                           month: '2-digit',
                           year: 'numeric',
@@ -530,6 +451,16 @@ export default function HealthConnectScreen({ navigation }: Props) {
                         })}
                       </Text>
                     )}
+                    <TouchableOpacity
+                      style={[styles.secondaryButton, reexportingNutrition && styles.buttonDisabled]}
+                      onPress={() => void handleReexportNutrition()}
+                      activeOpacity={0.8}
+                      disabled={reexportingNutrition}
+                    >
+                      {reexportingNutrition
+                        ? <ActivityIndicator color={colors.primaryBright} size="small" />
+                        : <Text style={styles.secondaryButtonText}>Alle Ernährungsdaten erneut exportieren</Text>}
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.destructiveButton]}
                       onPress={() => void handleDisableNutrition()}
@@ -554,6 +485,15 @@ export default function HealthConnectScreen({ navigation }: Props) {
                   </>
                 )}
               </View>
+
+              <TouchableOpacity
+                style={styles.ghostButton}
+                onPress={() => setSyncStatusSheetVisible(true)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+              >
+                <Text style={styles.ghostButtonText}>Synchronisationsstatus anzeigen</Text>
+              </TouchableOpacity>
             </>
           )}
 
@@ -582,53 +522,6 @@ export default function HealthConnectScreen({ navigation }: Props) {
             </View>
           )}
 
-          {/* Sync diagnostics log — visible in development + preview builds */}
-          {IS_DEBUG_BUILD && (
-            <View style={styles.devCard}>
-              <TouchableOpacity
-                style={styles.logHeader}
-                onPress={() => {
-                  if (!logExpanded) void refreshLog();
-                  setLogExpanded((v) => !v);
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.devLabel}>SYNC LOG ({syncLog.length} Einträge)</Text>
-                <Icon lib="feather" name={logExpanded ? 'chevron-up' : 'chevron-down'} size="sm" color={colors.textSecondary} />
-              </TouchableOpacity>
-
-              {logExpanded && (
-                <>
-                  <View style={styles.logActions}>
-                    <TouchableOpacity style={styles.devButton} onPress={() => void refreshLog()} activeOpacity={0.7}>
-                      <Text style={styles.devButtonText}>Aktualisieren</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.devButton} onPress={() => void clearLog()} activeOpacity={0.7}>
-                      <Text style={[styles.devButtonText, styles.devButtonTextDanger]}>Log leeren</Text>
-                    </TouchableOpacity>
-                  </View>
-                  {syncLog.length === 0 ? (
-                    <Text style={styles.logEmpty}>Keine Log-Einträge</Text>
-                  ) : (
-                    syncLog.map((entry, i) => (
-                      <View key={i} style={styles.logEntry}>
-                        <Text style={styles.logMeta}>
-                          {new Date(entry.ts).toLocaleTimeString('de-DE')} [{entry.tag}]
-                        </Text>
-                        <Text style={[styles.logMessage, entry.level === 'error' && styles.logError, entry.level === 'warn' && styles.logWarn]}>
-                          {entry.message}
-                        </Text>
-                        {!!entry.detail && (
-                          <Text style={styles.logDetail}>{entry.detail}</Text>
-                        )}
-                      </View>
-                    ))
-                  )}
-                </>
-              )}
-            </View>
-          )}
-
           <View style={{ height: spacing.xxl }} />
         </ScrollView>
       </Animated.View>
@@ -641,7 +534,8 @@ export default function HealthConnectScreen({ navigation }: Props) {
       />
       <SyncStatusSheet
         visible={syncStatusSheetVisible}
-        syncStatus={syncStatus}
+        weightSyncStatus={syncStatus}
+        nutritionSyncStatus={nutritionSyncStatus}
         onClose={() => setSyncStatusSheetVisible(false)}
       />
       <Snackbar ref={snackbarRef} />
@@ -700,10 +594,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  cardWarning: {
-    borderColor: colors.warning,
-    backgroundColor: colors.surface,
   },
   cardTitle: {
     ...typography.overline,
@@ -827,15 +717,4 @@ const styles = StyleSheet.create({
   },
   devButtonActive: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   devButtonText: { ...typography.caption, color: colors.textSecondary },
-  devButtonTextDanger: { color: colors.negative },
-
-  logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: spacing.xxl },
-  logActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  logEntry: { marginBottom: spacing.xs, paddingBottom: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
-  logMeta: { ...typography.caption, color: colors.textMuted },
-  logMessage: { ...typography.caption, color: colors.textSecondary },
-  logError: { color: colors.negative },
-  logWarn: { color: colors.warning },
-  logDetail: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
-  logEmpty: { ...typography.caption, color: colors.textMuted, textAlign: 'center', paddingVertical: spacing.sm },
 });

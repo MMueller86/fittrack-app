@@ -1,484 +1,404 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Meal, MealType } from '@fittrack/shared';
 
-// ---------------------------------------------------------------------------
-// Mocks — vi.hoisted ensures these are available when vi.mock factories run.
-// ---------------------------------------------------------------------------
-
-const {
-  mockUpsertRecord,
-  mockDeleteRecord,
-  mockInitialize,
-  mockRequestPermissions,
-  mockListAllMeals,
-  mockAsyncStorageGetItem,
-  mockAsyncStorageSetItem,
-  mockAsyncStorageRemoveItem,
-} = vi.hoisted(() => ({
-  mockUpsertRecord: vi.fn(),
-  mockDeleteRecord: vi.fn(),
-  mockInitialize: vi.fn().mockResolvedValue(true),
-  mockRequestPermissions: vi.fn().mockResolvedValue(true),
-  mockListAllMeals: vi.fn(),
-  mockAsyncStorageGetItem: vi.fn().mockResolvedValue(null),
-  mockAsyncStorageSetItem: vi.fn().mockResolvedValue(undefined),
-  mockAsyncStorageRemoveItem: vi.fn().mockResolvedValue(undefined),
+const mocks = vi.hoisted(() => ({
+  upsertRecord: vi.fn(),
+  deleteRecord: vi.fn(),
+  initialize: vi.fn(),
+  requestPermissions: vi.fn(),
+  hasPermissions: vi.fn(),
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  getUserId: vi.fn(),
+  listAllMeals: vi.fn(),
+  getMealChanges: vi.fn(),
 }));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
-  default: {
-    getItem: mockAsyncStorageGetItem,
-    setItem: mockAsyncStorageSetItem,
-    removeItem: mockAsyncStorageRemoveItem,
-  },
+  default: { getItem: mocks.getItem, setItem: mocks.setItem, removeItem: mocks.removeItem },
 }));
-
 vi.mock('./healthPlatformService', () => ({
   healthPlatformService: {
-    initialize: mockInitialize,
-    requestPermissions: mockRequestPermissions,
-    hasPermissions: vi.fn().mockResolvedValue(true),
-    upsertRecord: mockUpsertRecord,
-    deleteRecord: mockDeleteRecord,
-    getAvailability: vi.fn().mockResolvedValue({ status: 'available' }),
-    readRecords: vi.fn().mockResolvedValue([]),
+    upsertRecord: mocks.upsertRecord,
+    deleteRecord: mocks.deleteRecord,
+    initialize: mocks.initialize,
+    requestPermissions: mocks.requestPermissions,
+    hasPermissions: mocks.hasPermissions,
   },
 }));
-
 vi.mock('../../shared/api/diaryApi', () => ({
-  diaryApi: {
-    listAllMeals: mockListAllMeals,
-  },
+  diaryApi: { listAllMeals: mocks.listAllMeals, getMealChanges: mocks.getMealChanges },
 }));
+vi.mock('../authService', () => ({ authService: { getAuthenticatedUserId: mocks.getUserId } }));
 
-// ---------------------------------------------------------------------------
-// Import NutritionSyncService class (not the singleton) for fresh instances.
-// ---------------------------------------------------------------------------
+import { NutritionSyncService } from './nutritionSyncService';
 
-import { NutritionSyncService, toNutritionRecord } from './nutritionSyncService';
+const SINCE = '2026-10-23T09:00:00.000Z';
+const CHECKPOINT = '2026-10-23T10:00:00.000Z';
+const FOREGROUND_INTERVAL_MS = 15 * 60 * 1000;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function makeMeal(id: string, type: MealType = 'breakfast', items: Meal['items'] = []): Meal {
+function makeMeal(id: string, itemId = `item-${id}`, type: MealType = 'breakfast', updatedAt = CHECKPOINT): Meal {
   return {
     id,
     userId: 'u1',
-    date: '2026-08-01',
+    date: '2026-10-23',
     type,
     name: `Meal ${id}`,
-    items,
-    createdAt: '2026-08-01T10:00:00Z',
+    items: [{
+      id: itemId,
+      name: 'Test food',
+      sourceType: 'manual',
+      quantity: 100,
+      unit: 'g',
+      macros: { calories: 250, protein: 20, carbs: 30, fat: 8, fiber: 4 },
+    }],
+    createdAt: SINCE,
+    updatedAt,
   };
 }
 
-function makeItem(calories: number, protein = 0, carbs = 0, fat = 0, fiber = 0): Meal['items'][number] {
+function storedState(overrides: Record<string, unknown> = {}) {
   return {
-    id: `item-${Math.random()}`,
-    name: 'Test Item',
-    sourceType: 'manual',
-    quantity: 100,
-    unit: 'g',
-    macros: { calories, protein, carbs, fat, fiber },
+    enabled: true,
+    userId: 'u1',
+    watermark: SINCE,
+    pendingDeleteIds: [],
+    ...overrides,
   };
 }
 
-function makeFreshService() {
-  return new NutritionSyncService();
+function latestSavedState(): Record<string, unknown> {
+  const calls = mocks.setItem.mock.calls;
+  return JSON.parse(calls[calls.length - 1]![1] as string) as Record<string, unknown>;
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe('nutritionSyncService', () => {
-  let service: NutritionSyncService;
-
+describe('nutritionSyncService delta state', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockUpsertRecord.mockResolvedValue(undefined);
-    mockDeleteRecord.mockResolvedValue(undefined);
-    mockRequestPermissions.mockResolvedValue(true);
-    mockInitialize.mockResolvedValue(true);
-    mockAsyncStorageGetItem.mockResolvedValue(null);
-    mockAsyncStorageSetItem.mockResolvedValue(undefined);
-    mockAsyncStorageRemoveItem.mockResolvedValue(undefined);
-    mockListAllMeals.mockResolvedValue({ meals: [], cursor: undefined });
-    service = makeFreshService();
+    vi.useRealTimers();
+    vi.resetAllMocks();
+    mocks.upsertRecord.mockResolvedValue(undefined);
+    mocks.deleteRecord.mockResolvedValue(undefined);
+    mocks.initialize.mockResolvedValue(true);
+    mocks.requestPermissions.mockResolvedValue(true);
+    mocks.hasPermissions.mockResolvedValue(true);
+    mocks.getItem.mockResolvedValue(null);
+    mocks.setItem.mockResolvedValue(undefined);
+    mocks.removeItem.mockResolvedValue(undefined);
+    mocks.getUserId.mockResolvedValue('u1');
+    mocks.listAllMeals.mockResolvedValue({ meals: [], cursor: undefined });
+    mocks.getMealChanges.mockResolvedValue({ meals: [], checkpointAt: CHECKPOINT });
   });
 
-  it('clears persisted and in-memory sync state after account deletion without touching Health Connect', async () => {
-    mockAsyncStorageGetItem.mockResolvedValueOnce(JSON.stringify({
+  it('purges a legacy meal snapshot queue without sending its data', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify({
       enabled: true,
-      permissionRevoked: false,
-      lastFullExportAt: '2026-10-20T10:00:00.000Z',
-      exportCursor: 'next-page',
-      pendingOperations: [{ entryId: 'meal-item-1', type: 'delete', retryCount: 2, sessionCount: 1 }],
+      exportCursor: 'old-cursor',
+      pendingOperations: [{ entryId: 'item-old', type: 'upsert', item: makeMeal('old').items[0] }],
     }));
+    const service = new NutritionSyncService();
+
     await service.loadState();
 
-    await service.resetForAccountDeletion();
+    expect(mocks.removeItem).toHaveBeenCalledWith('hc:nutrition:sync');
+    expect(service.getSyncStatus().enabled).toBe(false);
+    expect(mocks.initialize).not.toHaveBeenCalled();
+    expect(mocks.requestPermissions).not.toHaveBeenCalled();
+    expect(mocks.hasPermissions).not.toHaveBeenCalled();
+    expect(mocks.upsertRecord).not.toHaveBeenCalled();
+    expect(mocks.deleteRecord).not.toHaveBeenCalled();
+    expect(mocks.listAllMeals).not.toHaveBeenCalled();
+    expect(mocks.getMealChanges).not.toHaveBeenCalled();
+  });
 
-    expect(mockAsyncStorageRemoveItem).toHaveBeenCalledWith('hc:nutrition:sync');
-    expect(service.getSyncStatus()).toMatchObject({
+  it('purges enabled state with a missing stored userId without Health Connect writes', async () => {
+    const { userId: _userId, ...stateWithoutUserId } = storedState({ pendingDeleteIds: ['item-stale-user'] });
+    mocks.getItem.mockResolvedValue(JSON.stringify(stateWithoutUserId));
+    const service = new NutritionSyncService();
+
+    await service.syncNutritionUpsert(makeMeal('new'));
+
+    expect(mocks.removeItem).toHaveBeenCalledWith('hc:nutrition:sync');
+    expect(service.getSyncStatus()).toMatchObject({ enabled: false, permissionRevoked: false, pendingDeleteCount: 0 });
+    expect(mocks.initialize).not.toHaveBeenCalled();
+    expect(mocks.requestPermissions).not.toHaveBeenCalled();
+    expect(mocks.hasPermissions).not.toHaveBeenCalled();
+    expect(mocks.upsertRecord).not.toHaveBeenCalled();
+    expect(mocks.deleteRecord).not.toHaveBeenCalled();
+    expect(mocks.listAllMeals).not.toHaveBeenCalled();
+    expect(mocks.getMealChanges).not.toHaveBeenCalled();
+  });
+
+  it('purges numeric epoch timestamps instead of converting them to ISO', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState({
+      lastForegroundAttemptAt: Date.parse(CHECKPOINT),
+    })));
+    const service = new NutritionSyncService();
+
+    await service.loadState();
+
+    expect(mocks.removeItem).toHaveBeenCalledWith('hc:nutrition:sync');
+    expect(mocks.setItem).not.toHaveBeenCalled();
+    expect(service.getSyncStatus().enabled).toBe(false);
+    expect(mocks.getMealChanges).not.toHaveBeenCalled();
+  });
+
+  it('keeps the existing paginated full export and persists only approved state fields', async () => {
+    mocks.listAllMeals
+      .mockResolvedValueOnce({ meals: [makeMeal('m1')], cursor: 'page-2' })
+      .mockResolvedValueOnce({ meals: [makeMeal('m2', 'item-m2', 'lunch', CHECKPOINT)], cursor: undefined });
+    const service = new NutritionSyncService();
+
+    await expect(service.enableSync()).resolves.toBe('success');
+
+    expect(mocks.listAllMeals).toHaveBeenNthCalledWith(1, 50, undefined);
+    expect(mocks.listAllMeals).toHaveBeenNthCalledWith(2, 50, 'page-2');
+    expect(mocks.upsertRecord).toHaveBeenCalledTimes(2);
+    expect(mocks.hasPermissions).toHaveBeenCalledTimes(3);
+    const saved = latestSavedState();
+    expect(Object.keys(saved).sort()).toEqual(['enabled', 'pendingDeleteIds', 'userId', 'watermark']);
+    expect(saved).toMatchObject({ enabled: true, userId: 'u1', pendingDeleteIds: [], watermark: CHECKPOINT });
+    expect(JSON.stringify(saved)).not.toContain('Test food');
+    expect(JSON.stringify(saved)).not.toContain('250');
+  });
+
+  it('does not throttle an activation full export after a recent foreground attempt', async () => {
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const previousAttemptAt = new Date(now.getTime() - 60_000).toISOString();
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState({
       enabled: false,
-      permissionRevoked: false,
-      permanentFailures: [],
-      temporaryFailures: [],
-    });
-    expect(mockDeleteRecord).not.toHaveBeenCalled();
-    expect(mockUpsertRecord).not.toHaveBeenCalled();
+      lastForegroundAttemptAt: previousAttemptAt,
+    })));
+    mocks.listAllMeals.mockResolvedValue({ meals: [makeMeal('activation')], cursor: undefined });
+    const service = new NutritionSyncService();
+
+    await expect(service.enableSync()).resolves.toBe('success');
+
+    expect(mocks.listAllMeals).toHaveBeenCalledTimes(1);
+    expect(mocks.getMealChanges).not.toHaveBeenCalled();
+    expect(mocks.upsertRecord).toHaveBeenCalledTimes(1);
+    expect(latestSavedState().lastForegroundAttemptAt).toBe(previousAttemptAt);
   });
 
-  // -------------------------------------------------------------------------
-  // toNutritionRecord
-  // -------------------------------------------------------------------------
+  it('preserves the watermark and outstanding delete IDs when deactivated', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState({ pendingDeleteIds: ['item-deleted'] })));
+    const service = new NutritionSyncService();
+    await service.loadState();
 
-  describe('toNutritionRecord', () => {
-    it.each<[MealType, number]>([
-      ['breakfast', 1],
-      ['lunch', 2],
-      ['dinner', 3],
-      ['snack', 4],
-      ['preworkout', 0],
-      ['postworkout', 0],
-    ])('maps %s to mealType=%i', (type, expectedMealType) => {
-      const meal = makeMeal('m1', type);
-      const record = toNutritionRecord(meal, makeItem(0));
-      expect(record.mealType).toBe(expectedMealType);
-    });
+    await service.disableSync();
 
-    it('maps single item macros to record fields', () => {
-      const meal = makeMeal('m1', 'lunch');
-      const item = makeItem(300, 25, 40, 10, 5);
-      const record = toNutritionRecord(meal, item);
-      expect(record.energy?.value).toBeCloseTo(300);
-      expect(record.protein?.value).toBeCloseTo(25);
-      expect(record.totalCarbohydrate?.value).toBeCloseTo(40);
-      expect(record.totalFat?.value).toBeCloseTo(10);
-      expect(record.dietaryFiber?.value).toBeCloseTo(5);
-    });
-
-    it('emits no energy field when item has 0 calories', () => {
-      const meal = makeMeal('m1', 'breakfast');
-      const record = toNutritionRecord(meal, makeItem(0));
-      expect(record.energy).toBeUndefined();
-      expect(record.protein).toBeUndefined();
-      expect(record.totalCarbohydrate).toBeUndefined();
-      expect(record.totalFat).toBeUndefined();
-      expect(record.dietaryFiber).toBeUndefined();
-    });
-
-    it('omits dietaryFiber when item fiber is 0', () => {
-      const meal = makeMeal('m1', 'lunch');
-      const record = toNutritionRecord(meal, makeItem(500, 30, 60, 20, 0));
-      expect(record.energy?.value).toBeCloseTo(500);
-      expect(record.dietaryFiber).toBeUndefined();
-    });
-
-    it('falls back to noon local time when createdAt is absent', () => {
-      const meal: Meal = {
-        id: 'm-fallback',
-        userId: 'u1',
-        date: '2026-08-01',
-        type: 'breakfast',
-        name: 'Test',
-        items: [],
-        createdAt: '',
-      };
-      const record = toNutritionRecord(meal, makeItem(0));
-      const [y, m, d] = meal.date.split('-').map(Number);
-      expect(record.startTime).toBe(new Date(y, m - 1, d, 12, 0, 0, 0).toISOString());
-    });
-
-    it('uses clientRecordId = item.id', () => {
-      const meal = makeMeal('m1');
-      const item = makeItem(100);
-      const record = toNutritionRecord(meal, item);
-      expect(record.metadata.clientRecordId).toBe(item.id);
-      expect(record.recordType).toBe('Nutrition');
-      expect(typeof record.metadata.clientRecordVersion).toBe('number');
-    });
-
-    it('sets endTime 1 second after startTime', () => {
-      const meal = makeMeal('m1');
-      const record = toNutritionRecord(meal, makeItem(0));
-      expect(new Date(record.endTime).getTime()).toBe(new Date(record.startTime).getTime() + 1000);
+    expect(latestSavedState()).toMatchObject({
+      enabled: false,
+      userId: 'u1',
+      watermark: SINCE,
+      pendingDeleteIds: ['item-deleted'],
     });
   });
 
-  // -------------------------------------------------------------------------
-  // enableSync
-  // -------------------------------------------------------------------------
+  it('clears state and refuses writes when the current user differs from the stored user', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState({ pendingDeleteIds: ['item-other-user'] })));
+    mocks.getUserId.mockResolvedValue('u2');
+    const service = new NutritionSyncService();
+    await service.loadState();
 
-  describe('enableSync', () => {
-    it('returns success when permissions granted', async () => {
-      const result = await service.enableSync();
-      expect(result).toBe('success');
-    });
+    await service.syncNutritionUpsert(makeMeal('m-new'));
 
-    it('sets state.enabled=true on success', async () => {
-      await service.enableSync();
-      expect(service.getSyncStatus().enabled).toBe(true);
-    });
-
-    it('returns permission_denied when permissions refused', async () => {
-      mockRequestPermissions.mockResolvedValueOnce(false);
-      const result = await service.enableSync();
-      expect(result).toBe('permission_denied');
-      expect(service.getSyncStatus().enabled).toBe(false);
-    });
-
-    it('does not call listAllMeals when permission denied', async () => {
-      mockRequestPermissions.mockResolvedValueOnce(false);
-      await service.enableSync();
-      expect(mockListAllMeals).not.toHaveBeenCalled();
-    });
-
-    it('performs paginated export across 2 batches', async () => {
-      mockListAllMeals
-        .mockResolvedValueOnce({ meals: [makeMeal('m1', 'breakfast', [makeItem(300)]), makeMeal('m2', 'lunch', [makeItem(400)])], cursor: 'cursor-page2' })
-        .mockResolvedValueOnce({ meals: [makeMeal('m3', 'dinner', [makeItem(200)])], cursor: undefined });
-
-      await service.enableSync();
-
-      expect(mockListAllMeals).toHaveBeenCalledTimes(2);
-      expect(mockListAllMeals).toHaveBeenNthCalledWith(1, 50, undefined);
-      expect(mockListAllMeals).toHaveBeenNthCalledWith(2, 50, 'cursor-page2');
-      expect(mockUpsertRecord).toHaveBeenCalledTimes(3);
-    });
-
-    it('persists exportCursor after first batch', async () => {
-      mockListAllMeals
-        .mockResolvedValueOnce({ meals: [makeMeal('m1')], cursor: 'mid-cursor' })
-        .mockResolvedValueOnce({ meals: [], cursor: undefined });
-
-      await service.enableSync();
-
-      const calls = mockAsyncStorageSetItem.mock.calls.map((c) => JSON.parse(c[1] as string));
-      const cursorPersisted = calls.some((s) => s.exportCursor === 'mid-cursor');
-      expect(cursorPersisted).toBe(true);
-    });
+    expect(mocks.removeItem).toHaveBeenCalledWith('hc:nutrition:sync');
+    expect(service.getSyncStatus().enabled).toBe(false);
+    expect(mocks.upsertRecord).not.toHaveBeenCalled();
   });
 
-  // -------------------------------------------------------------------------
-  // syncNutritionUpsert
-  // -------------------------------------------------------------------------
+  it('uses the same since, limit, and checkpoint across all delta pages', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
+    mocks.getMealChanges
+      .mockResolvedValueOnce({ meals: [makeMeal('m1')], checkpointAt: CHECKPOINT, cursor: 'next-page' })
+      .mockResolvedValueOnce({ meals: [makeMeal('m2', 'item-m2', 'lunch')], checkpointAt: CHECKPOINT });
+    const service = new NutritionSyncService();
+    await service.loadState();
 
-  describe('syncNutritionUpsert', () => {
-    it('does nothing when sync is disabled', async () => {
-      await service.syncNutritionUpsert(makeMeal('m1'));
-      expect(mockUpsertRecord).not.toHaveBeenCalled();
-    });
+    await service.syncForeground();
 
-    it('calls upsertRecord when enabled', async () => {
-      await service.enableSync();
-      mockUpsertRecord.mockClear();
-      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
-      expect(mockUpsertRecord).toHaveBeenCalledTimes(1);
-    });
-
-    it('upserts only the supplied item ids when filtering a meal', async () => {
-      const existingItem = makeItem(200);
-      existingItem.id = 'existing-item';
-      const movedItem = makeItem(300);
-      movedItem.id = 'moved-item';
-      await service.enableSync();
-      mockUpsertRecord.mockClear();
-
-      await service.syncNutritionUpsert(
-        makeMeal('m1', 'dinner', [existingItem, movedItem]),
-        ['moved-item'],
-      );
-
-      expect(mockUpsertRecord).toHaveBeenCalledTimes(1);
-      expect(mockUpsertRecord).toHaveBeenCalledWith(
-        expect.objectContaining({
-          metadata: expect.objectContaining({ clientRecordId: 'moved-item' }),
-        }),
-      );
-    });
-
-    it('queues a pendingOp on upsert failure', async () => {
-      await service.enableSync();
-      mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
-      const status = service.getSyncStatus();
-      expect(status.temporaryFailures.length).toBe(1);
-    });
-
-    it('retries queued op on drain after failure', async () => {
-      await service.enableSync();
-      mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
-      mockUpsertRecord.mockResolvedValue(undefined);
-      await service.drainPendingQueue();
-      expect(mockUpsertRecord.mock.calls.length).toBeGreaterThanOrEqual(2);
-    });
+    expect(mocks.getMealChanges).toHaveBeenNthCalledWith(1, SINCE, 50, undefined);
+    expect(mocks.getMealChanges).toHaveBeenNthCalledWith(2, SINCE, 50, 'next-page');
+    expect(mocks.upsertRecord).toHaveBeenCalledTimes(2);
+    expect(service.getSyncStatus().lastSuccessfulSyncAt).toBe(CHECKPOINT);
   });
 
-  // -------------------------------------------------------------------------
-  // syncNutritionDelete
-  // -------------------------------------------------------------------------
+  it('does not advance the watermark when a page changes checkpoint or a Health Connect write fails', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
+    mocks.getMealChanges
+      .mockResolvedValueOnce({ meals: [makeMeal('m1')], checkpointAt: CHECKPOINT, cursor: 'next-page' })
+      .mockResolvedValueOnce({ meals: [makeMeal('m2')], checkpointAt: '2026-10-23T10:01:00.000Z' });
+    const service = new NutritionSyncService();
+    await service.loadState();
 
-  describe('syncNutritionDelete', () => {
-    it('does nothing when sync is disabled', async () => {
-      await service.syncNutritionDelete('meal-id');
-      expect(mockDeleteRecord).not.toHaveBeenCalled();
-    });
+    await service.syncForeground();
 
-    it('calls deleteRecord with correct type and id', async () => {
-      await service.enableSync();
-      await service.syncNutritionDelete('meal-del');
-      expect(mockDeleteRecord).toHaveBeenCalledWith('Nutrition', 'meal-del');
-    });
+    expect(service.getSyncStatus().lastSuccessfulSyncAt).toBe(SINCE);
 
-    it('queues a pendingOp on delete failure', async () => {
-      await service.enableSync();
-      mockDeleteRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionDelete('meal-fail');
-      const status = service.getSyncStatus();
-      expect(status.temporaryFailures.length).toBe(1);
-    });
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
+    mocks.getMealChanges.mockResolvedValue({ meals: [makeMeal('m3')], checkpointAt: CHECKPOINT });
+    mocks.upsertRecord.mockRejectedValueOnce(new Error('temporary failure'));
+    const freshService = new NutritionSyncService();
+    await freshService.loadState();
+    await freshService.syncForeground();
 
-    it('retries queued delete op on drain', async () => {
-      await service.enableSync();
-      mockDeleteRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionDelete('meal-fail');
-      mockDeleteRecord.mockResolvedValue(undefined);
-      await service.drainPendingQueue();
-      const deleteCalls = mockDeleteRecord.mock.calls.filter((c) => c[1] === 'meal-fail');
-      expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
-    });
+    expect(freshService.getSyncStatus().lastSuccessfulSyncAt).toBe(SINCE);
   });
 
-  // -------------------------------------------------------------------------
-  // drainPendingQueue
-  // -------------------------------------------------------------------------
-
-  describe('drainPendingQueue', () => {
-    it('disables sync on permission error during drain', async () => {
-      await service.enableSync();
-      mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
-      mockUpsertRecord.mockRejectedValueOnce(new Error('PERMISSION_DENIED'));
-      await service.drainPendingQueue();
-      const status = service.getSyncStatus();
-      expect(status.enabled).toBe(false);
-      expect(status.permissionRevoked).toBe(true);
+  it('checks current permission before every write and disables without advancing on revocation', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
+    mocks.getMealChanges.mockResolvedValue({
+      meals: [makeMeal('m1'), makeMeal('m2', 'item-m2', 'lunch')],
+      checkpointAt: CHECKPOINT,
     });
+    mocks.hasPermissions.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    const service = new NutritionSyncService();
+    await service.loadState();
 
-    it('removes op from queue on successful retry', async () => {
-      await service.enableSync();
-      mockUpsertRecord.mockRejectedValueOnce(new Error('IO error'));
-      await service.syncNutritionUpsert(makeMeal('m1', 'breakfast', [makeItem(300)]));
-      expect(service.getSyncStatus().temporaryFailures.length).toBe(1);
-      mockUpsertRecord.mockResolvedValue(undefined);
-      await service.drainPendingQueue();
-      expect(service.getSyncStatus().temporaryFailures.length).toBe(0);
-    });
+    await service.syncForeground();
 
-    it('marks op as permanent after retryCount>=10 and sessionCount>=2', async () => {
-      const storedState = JSON.stringify({
-        enabled: true,
-        permissionRevoked: false,
-        pendingOperations: [
-          {
-            entryId: 'm-perm',
-            type: 'upsert',
-            item: makeItem(300),
-            mealType: 'breakfast',
-            mealDate: '2026-08-01',
-            mealCreatedAt: '2026-08-01T10:00:00Z',
-            retryCount: 9,
-            sessionCount: 1,
-            errorType: 'temporary',
-          },
-        ],
-      });
-      mockAsyncStorageGetItem.mockResolvedValue(storedState);
-      const freshService = makeFreshService();
-
-      mockUpsertRecord.mockRejectedValue(new Error('IO error'));
-      // Drain: sessionCount 1→2, retry fails → retryCount 9→10, sessionCount=2 → permanent
-      await freshService.drainPendingQueue();
-
-      expect(freshService.getSyncStatus().permanentFailures.length).toBe(1);
-    });
-
-    it('does not mark op as permanent when sessionCount < 2', async () => {
-      const storedState = JSON.stringify({
-        enabled: true,
-        permissionRevoked: false,
-        pendingOperations: [
-          {
-            entryId: 'm-temp',
-            type: 'upsert',
-            meal: makeMeal('m-temp'),
-            retryCount: 9,
-            sessionCount: 0,
-            errorType: 'temporary',
-          },
-        ],
-      });
-      mockAsyncStorageGetItem.mockResolvedValue(storedState);
-      const freshService = makeFreshService();
-
-      mockUpsertRecord.mockRejectedValue(new Error('IO error'));
-      // sessionCount 0→1, retryCount 9→10 but sessionCount=1 < 2 → not permanent
-      await freshService.drainPendingQueue();
-
-      expect(freshService.getSyncStatus().permanentFailures.length).toBe(0);
-    });
+    expect(mocks.hasPermissions).toHaveBeenCalledTimes(3);
+    expect(mocks.upsertRecord).toHaveBeenCalledTimes(1);
+    expect(service.getSyncStatus()).toMatchObject({ enabled: false, permissionRevoked: true, lastSuccessfulSyncAt: SINCE });
   });
 
-  // -------------------------------------------------------------------------
-  // loadState
-  // -------------------------------------------------------------------------
-
-  describe('loadState', () => {
-    it('loads persisted state — getSyncStatus returns stored enabled value', async () => {
-      const stored = JSON.stringify({
-        enabled: true,
-        permissionRevoked: false,
-        lastFullExportAt: '2026-08-01T10:00:00Z',
-        pendingOperations: [],
-      });
-      mockAsyncStorageGetItem.mockResolvedValue(stored);
-      const fresh = makeFreshService();
-      await fresh.loadState();
-      const status = fresh.getSyncStatus();
-      expect(status.enabled).toBe(true);
-      expect(status.lastFullExportAt).toBe('2026-08-01T10:00:00Z');
+  it('persists failed foreground attempt time before requesting delta and throttles subsequent attempts', async () => {
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
+    mocks.getMealChanges.mockImplementation(async () => {
+      const saved = latestSavedState();
+      expect(saved.lastForegroundAttemptAt).toBe(now.toISOString());
+      expect(Object.keys(saved).sort()).toEqual([
+        'enabled', 'lastForegroundAttemptAt', 'pendingDeleteIds', 'userId', 'watermark',
+      ]);
+      throw new Error('offline');
     });
+    const service = new NutritionSyncService();
+    await service.loadState();
 
-    it('is idempotent — calling twice does not re-read AsyncStorage', async () => {
-      mockAsyncStorageGetItem.mockResolvedValue(null);
-      const fresh = makeFreshService();
-      await fresh.loadState();
-      await fresh.loadState();
-      expect(mockAsyncStorageGetItem).toHaveBeenCalledTimes(1);
-    });
+    await service.syncForeground();
+
+    expect(mocks.getMealChanges).toHaveBeenCalledTimes(1);
+    expect(service.getSyncStatus().lastSuccessfulSyncAt).toBe(SINCE);
+
+    mocks.getItem.mockResolvedValue(JSON.stringify(latestSavedState()));
+    const restartedService = new NutritionSyncService();
+    await restartedService.syncForeground();
+
+    expect(mocks.getMealChanges).toHaveBeenCalledTimes(1);
   });
 
-  // -------------------------------------------------------------------------
-  // disableSync
-  // -------------------------------------------------------------------------
+  it.each([
+    { boundary: 'below', elapsedMs: FOREGROUND_INTERVAL_MS - 1, expectedCalls: 0 },
+    { boundary: 'at', elapsedMs: FOREGROUND_INTERVAL_MS, expectedCalls: 1 },
+    { boundary: 'above', elapsedMs: FOREGROUND_INTERVAL_MS + 1, expectedCalls: 1 },
+  ])('applies the persisted foreground throttle $boundary the 15-minute boundary after cold start', async ({ elapsedMs, expectedCalls }) => {
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState({
+      lastForegroundAttemptAt: new Date(now.getTime() - elapsedMs).toISOString(),
+    })));
+    const service = new NutritionSyncService();
 
-  describe('disableSync', () => {
-    it('sets enabled to false', async () => {
-      await service.enableSync();
-      await service.disableSync();
-      expect(service.getSyncStatus().enabled).toBe(false);
-    });
+    await service.syncForeground();
 
-    it('does not call upsertRecord after disable', async () => {
-      await service.enableSync();
-      await service.disableSync();
-      mockUpsertRecord.mockClear();
-      await service.syncNutritionUpsert(makeMeal('m1'));
-      expect(mockUpsertRecord).not.toHaveBeenCalled();
+    expect(mocks.getMealChanges).toHaveBeenCalledTimes(expectedCalls);
+    if (expectedCalls === 0) expect(mocks.setItem).not.toHaveBeenCalled();
+    else expect(latestSavedState().lastForegroundAttemptAt).toBe(now.toISOString());
+  });
+
+  it('runs manual full export through every full-list page', async () => {
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const previousAttemptAt = new Date(now.getTime() - 60_000).toISOString();
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState({ lastForegroundAttemptAt: previousAttemptAt })));
+    mocks.listAllMeals
+      .mockResolvedValueOnce({ meals: [makeMeal('manual-1')], cursor: 'page-2' })
+      .mockResolvedValueOnce({ meals: [makeMeal('manual-2', 'item-manual-2', 'lunch')], cursor: undefined });
+    const service = new NutritionSyncService();
+
+    await expect(service.runFullExport()).resolves.toBe(true);
+
+    expect(mocks.getMealChanges).not.toHaveBeenCalled();
+    expect(mocks.listAllMeals).toHaveBeenNthCalledWith(1, 50, undefined);
+    expect(mocks.listAllMeals).toHaveBeenNthCalledWith(2, 50, 'page-2');
+    expect(mocks.upsertRecord).toHaveBeenCalledTimes(2);
+    expect(service.getSyncStatus().lastSuccessfulSyncAt).toBe(CHECKPOINT);
+    expect(latestSavedState().lastForegroundAttemptAt).toBe(previousAttemptAt);
+  });
+
+  it('does not throttle or timestamp diary mutation triggers', async () => {
+    const now = new Date('2026-10-23T12:00:00.000Z');
+    const previousAttemptAt = new Date(now.getTime() - 60_000).toISOString();
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState({ lastForegroundAttemptAt: previousAttemptAt })));
+    const service = new NutritionSyncService();
+
+    await service.syncNutritionUpsert(makeMeal('mutation-upsert'));
+    await service.syncNutritionDelete('item-mutation-delete');
+
+    expect(mocks.upsertRecord).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteRecord).toHaveBeenCalledWith('Nutrition', 'item-mutation-delete');
+    expect(mocks.getMealChanges).not.toHaveBeenCalled();
+    expect(latestSavedState().lastForegroundAttemptAt).toBe(previousAttemptAt);
+  });
+
+  it('retries failed deletions with IDs only and preserves the account-deletion reset contract', async () => {
+    const service = new NutritionSyncService();
+    await service.enableSync();
+    mocks.deleteRecord.mockRejectedValueOnce(new Error('temporary failure'));
+
+    await service.syncNutritionDelete('item-deleted');
+
+    expect(service.getSyncStatus().pendingDeleteCount).toBe(1);
+    const pending = latestSavedState();
+    expect(Object.keys(pending).sort()).toEqual(['enabled', 'pendingDeleteIds', 'userId']);
+    expect(pending.pendingDeleteIds).toEqual(['item-deleted']);
+    expect(JSON.stringify(pending)).not.toContain('Test food');
+
+    mocks.deleteRecord.mockResolvedValue(undefined);
+    mocks.getMealChanges.mockResolvedValue({ meals: [], checkpointAt: CHECKPOINT });
+    await service.syncForeground();
+    expect(mocks.deleteRecord).toHaveBeenCalledWith('Nutrition', 'item-deleted');
+    expect(service.getSyncStatus().pendingDeleteCount).toBe(0);
+
+    mocks.upsertRecord.mockClear();
+    mocks.deleteRecord.mockClear();
+    await service.resetForAccountDeletion();
+    expect(mocks.removeItem).toHaveBeenCalledWith('hc:nutrition:sync');
+    expect(service.getSyncStatus()).toMatchObject({ enabled: false, permissionRevoked: false, pendingDeleteCount: 0 });
+    expect(mocks.upsertRecord).not.toHaveBeenCalled();
+    expect(mocks.deleteRecord).not.toHaveBeenCalled();
+  });
+
+  it('persists every meal delete ID before permission-denied deletion and disables sync', async () => {
+    mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
+    mocks.hasPermissions.mockResolvedValue(false);
+    const service = new NutritionSyncService();
+    await service.loadState();
+    const meal = {
+      ...makeMeal('m-delete', 'item-first'),
+      items: [makeMeal('m-delete', 'item-first').items[0]!, makeMeal('m-delete', 'item-second').items[0]!],
+    };
+
+    await service.syncNutritionDeleteMeal(meal);
+
+    expect(mocks.hasPermissions).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteRecord).not.toHaveBeenCalled();
+    expect(service.getSyncStatus()).toMatchObject({ enabled: false, permissionRevoked: true, pendingDeleteCount: 2 });
+    expect(latestSavedState()).toMatchObject({
+      enabled: false,
+      userId: 'u1',
+      pendingDeleteIds: ['item-first', 'item-second'],
     });
+    expect(JSON.stringify(latestSavedState())).not.toContain('Test food');
   });
 });

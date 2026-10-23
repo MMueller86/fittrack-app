@@ -15,6 +15,7 @@ import type { DiaryDayResponse, MealType, Recipe } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { recipeApi } from '../../shared/api/recipeApi';
 import { diaryApi } from '../../shared/api/diaryApi';
+import { nutritionDiaryService } from '../../services/nutritionDiaryService';
 import { getLocalIsoDate } from '../../shared/date/localDate';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { MealChip } from '../../shared/components/MealChip';
@@ -148,7 +149,7 @@ export default function LogRecipeModal({ visible, recipe, onClose, onLogged, onU
         },
         {
           getDiary: diaryApi.getDay,
-          createMeal: diaryApi.createMeal,
+          createMeal: nutritionDiaryService.createMealForRecipeSetup,
           logRecipe: recipeApi.log,
         },
       );

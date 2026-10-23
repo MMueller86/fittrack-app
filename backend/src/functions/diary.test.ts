@@ -10,6 +10,7 @@ import {
   setDayTypeHandler,
   getDiaryHandler,
   listMealsHandler,
+  listMealChangesHandler,
 } from './diary';
 import { listFavoritesHandler } from './favorites';
 import { getDiaryRepository, __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
@@ -20,7 +21,7 @@ import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, signTestToken
 import { getUserFoodRelationRepository, __resetUserFoodRelationRepositoryForTests } from '../lib/repositories/userFoodRelationRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { getRecipesRepository, __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
-import type { SpecialActivity } from '@fittrack/shared';
+import type { Meal, SpecialActivity } from '@fittrack/shared';
 
 // Unit tests for POST /api/diary/meals/:id/items
 //
@@ -50,6 +51,7 @@ afterEach(() => {
   __resetDiaryRepositoryForTests();
   __resetRecipesRepositoryForTests();
   __resetUserFoodRelationRepositoryForTests();
+  vi.useRealTimers();
 });
 
 /** Create a meal and return its id. */
@@ -60,6 +62,19 @@ async function createMeal(): Promise<string> {
   );
   const body = res.jsonBody as { meal: { id: string } };
   return body.meal.id;
+}
+
+function makeDeltaMeal(id: string, createdAt: string, updatedAt?: string): Meal {
+  return {
+    id,
+    userId: TEST_USER_ID,
+    date: '2026-05-08',
+    type: 'breakfast',
+    name: 'Breakfast',
+    items: [],
+    createdAt,
+    ...(updatedAt ? { updatedAt } : {}),
+  };
 }
 
 async function createRecipeForDiary(userId = 'test-user-abc-123') {
@@ -1992,5 +2007,175 @@ describe('GET /api/diary/meals — listMealsHandler', () => {
     const req = makeRequest({ query: {} });
     const res = await listMealsHandler(req, makeContext());
     expect(res.status).toBe(401);
+  });
+});
+
+describe('GET /api/diary/changes/meals', () => {
+  const since = '2026-06-01T10:00:00.000Z';
+
+  it('returns the exact empty response shape and one checkpoint', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+
+    const res = await listMealChangesHandler(await makeAuthRequest({ query: { since } }), makeContext());
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toEqual({ meals: [], checkpointAt: '2026-06-01T12:00:00.000Z' });
+  });
+
+  it('uses an inclusive timestamp window, the legacy createdAt fallback, and tuple ordering', async () => {
+    const checkpointAt = '2026-06-01T12:00:00.000Z';
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkpointAt));
+    const repo = getDiaryRepository();
+    const querySpy = vi.spyOn(repo, 'listMealsUpdatedSince').mockResolvedValue([
+      makeDeltaMeal('updated-boundary', '2026-06-01T09:00:00.000Z', checkpointAt),
+      makeDeltaMeal('future', '2026-06-01T09:00:00.000Z', '2026-06-01T12:00:00.001Z'),
+      makeDeltaMeal('legacy-boundary', since),
+      makeDeltaMeal('middle', '2026-06-01T09:00:00.000Z', '2026-06-01T11:00:00.000Z'),
+      makeDeltaMeal('old', '2026-06-01T09:59:59.999Z'),
+    ]);
+
+    const res = await listMealChangesHandler(await makeAuthRequest({ query: { since } }), makeContext());
+
+    expect(res.status).toBe(200);
+    expect((res.jsonBody as { meals: Meal[] }).meals.map(({ id }) => id)).toEqual([
+      'legacy-boundary', 'middle', 'updated-boundary',
+    ]);
+    expect((res.jsonBody as { checkpointAt: string }).checkpointAt).toBe(checkpointAt);
+    expect(querySpy).toHaveBeenCalledWith(TEST_USER_ID, since);
+  });
+
+  it('keeps equal-timestamp IDs across pages and reuses the first-page checkpoint', async () => {
+    vi.useFakeTimers();
+    const checkpointAt = '2026-06-01T12:00:00.000Z';
+    vi.setSystemTime(new Date(checkpointAt));
+    const repo = getDiaryRepository();
+    const meals = await Promise.all(Array.from({ length: 4 }, () => repo.createMeal({
+      userId: TEST_USER_ID,
+      date: '2026-05-08',
+      type: 'breakfast',
+      name: 'Breakfast',
+    })));
+    const expectedIds = meals.map(({ id }) => id).sort((left, right) => left.localeCompare(right));
+
+    const first = await listMealChangesHandler(
+      await makeAuthRequest({ query: { since: checkpointAt, limit: '2' } }),
+      makeContext(),
+    );
+    const firstBody = first.jsonBody as { meals: Meal[]; checkpointAt: string; cursor: string };
+    vi.setSystemTime(new Date('2026-06-02T12:00:00.000Z'));
+    const second = await listMealChangesHandler(
+      await makeAuthRequest({ query: { since: checkpointAt, limit: '2', cursor: firstBody.cursor } }),
+      makeContext(),
+    );
+    const secondBody = second.jsonBody as { meals: Meal[]; checkpointAt: string; cursor?: string };
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(firstBody.checkpointAt).toBe(checkpointAt);
+    expect(secondBody.checkpointAt).toBe(checkpointAt);
+    expect(firstBody.meals.map(({ id }) => id)).toEqual(expectedIds.slice(0, 2));
+    expect(secondBody.meals.map(({ id }) => id)).toEqual(expectedIds.slice(2));
+    expect(new Set([...firstBody.meals, ...secondBody.meals].map(({ id }) => id)).size).toBe(4);
+    expect(secondBody.cursor).toBeUndefined();
+  });
+
+  it.each([
+    ['missing since', {}],
+    ['invalid since', { since: 'not-a-date' }],
+    ['offset timestamp', { since: '2026-06-01T10:00:00.000+00:00' }],
+    ['local timestamp', { since: '2026-06-01T10:00:00.000' }],
+    ['noncanonical timestamp', { since: '2026-06-01T10:00:00Z' }],
+    ['future since', { since: '9999-12-31T23:59:59.999Z' }],
+    ['unknown query parameter', { since, userId: 'forged-user' }],
+    ['repeated since', { since: [since, since] }],
+    ['repeated limit', { since, limit: ['10', '20'] }],
+    ['invalid limit text', { since, limit: 'abc' }],
+    ['fractional limit', { since, limit: '1.5' }],
+    ['zero limit', { since, limit: '0' }],
+    ['overlarge limit', { since, limit: '101' }],
+  ] as const)('returns invalid_delta_query for %s', async (_label, query) => {
+    const res = await listMealChangesHandler(await makeAuthRequest({ query }), makeContext());
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'invalid_delta_query' });
+  });
+
+  it('defaults delta pages to 50 entries', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+    const repo = getDiaryRepository();
+    vi.spyOn(repo, 'listMealsUpdatedSince').mockResolvedValue(Array.from({ length: 51 }, (_, index) =>
+      makeDeltaMeal(`meal-${String(index).padStart(2, '0')}`, `2026-06-01T10:${String(index).padStart(2, '0')}:00.000Z`),
+    ));
+
+    const res = await listMealChangesHandler(await makeAuthRequest({ query: { since } }), makeContext());
+    const body = res.jsonBody as { meals: Meal[]; cursor?: string };
+
+    expect(res.status).toBe(200);
+    expect(body.meals).toHaveLength(50);
+    expect(body.cursor).toBeDefined();
+  });
+
+  it('rejects malformed, foreign-user, mismatched-since, and mismatched-limit cursors', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+    const repo = getDiaryRepository();
+    await Promise.all(Array.from({ length: 2 }, () => repo.createMeal({
+      userId: TEST_USER_ID,
+      date: '2026-05-08',
+      type: 'breakfast',
+      name: 'Breakfast',
+    })));
+    const first = await listMealChangesHandler(
+      await makeAuthRequest({ query: { since, limit: '1' } }),
+      makeContext(),
+    );
+    const cursor = (first.jsonBody as { cursor: string }).cursor;
+    const invalidCursor = async (query: Record<string, string>, token?: string) =>
+      listMealChangesHandler(
+        makeRequest({
+          query,
+          ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+        }),
+        makeContext(),
+      );
+
+    const malformed = await invalidCursor({ since, limit: '1', cursor: 'not-a-cursor' }, await signTestToken());
+    const changedSince = await invalidCursor({ since: '2026-06-01T09:59:59.999Z', limit: '1', cursor }, await signTestToken());
+    const changedLimit = await invalidCursor({ since, limit: '2', cursor }, await signTestToken());
+    const foreignUser = await invalidCursor({ since, limit: '1', cursor }, await signTestToken('another-user'));
+
+    for (const response of [malformed, changedSince, changedLimit, foreignUser]) {
+      expect(response.status).toBe(400);
+      expect(response.jsonBody).toEqual({ error: 'invalid_delta_cursor' });
+    }
+  });
+
+  it('binds each authenticated query to that JWT subject and requires auth on continuation', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'));
+    const repo = getDiaryRepository();
+    const ownMeal = await repo.createMeal({ userId: TEST_USER_ID, date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    await repo.createMeal({ userId: 'another-user', date: '2026-05-08', type: 'breakfast', name: 'Breakfast' });
+    const querySpy = vi.spyOn(repo, 'listMealsUpdatedSince');
+
+    const response = await listMealChangesHandler(await makeAuthRequest({ query: { since: '2026-06-01T12:00:00.000Z' } }), makeContext());
+    const unauthorized = await listMealChangesHandler(
+      makeRequest({ query: { since: '2026-06-01T12:00:00.000Z', cursor: 'opaque' } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect((response.jsonBody as { meals: Meal[] }).meals.map(({ id }) => id)).toEqual([ownMeal.id]);
+    expect(querySpy).toHaveBeenCalledWith(TEST_USER_ID, '2026-06-01T12:00:00.000Z');
+    expect(unauthorized.status).toBe(401);
+  });
+
+  it('returns 500 when the delta repository fails', async () => {
+    vi.spyOn(getDiaryRepository(), 'listMealsUpdatedSince').mockRejectedValueOnce(new Error('storage unavailable'));
+    const res = await listMealChangesHandler(await makeAuthRequest({ query: { since } }), makeContext());
+    expect(res.status).toBe(500);
+    expect(res.jsonBody).toEqual({ error: 'Internal server error' });
   });
 });

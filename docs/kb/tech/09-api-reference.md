@@ -115,22 +115,47 @@ the deletion lease.
 | Method | Route | Auth | Notes |
 |---|---|---|---|
 | GET | `/api/weights` | Yes | `{ entries: WeightEntry[] }` |
+| GET | `/api/weights/changes?since=<UTC-ISO>` | Yes | `{ entries: WeightEntry[], checkpointAt }`; strict inclusive delta window |
 | POST | `/api/weights` | Yes | `{ value, unit?, date }`; `date` is a required real `YYYY-MM-DD` calendar date |
 | PUT | `/api/weights/{id}` | Yes | Update the value of one entry owned by the authenticated user |
 | DELETE | `/api/weights/{id}` | Yes | |
 
-`PUT /api/weights/{id}` accepts the strict body `{ "value": 82.5 }`. The value
-must be finite, greater than `0`, and at most `1000`; numeric strings are
+New weight entries initialize `updatedAt` from `createdAt`. The
+`PUT /api/weights/{id}` route accepts the strict body `{ "value": 82.5 }`. The
+value must be finite, greater than `0`, and at most `1000`; numeric strings are
 coerced to numbers. Unknown fields are rejected with `400`. Success (`200`)
-returns the updated `WeightEntry`. Only its `value` is changed; `date`, `unit`,
-`createdAt`, ID, and ownership are preserved. An unknown or other-user ID
-returns `404 { "error": "Entry not found" }`.
+returns the updated `WeightEntry`. It changes `value` and stamps `updatedAt`
+with the current UTC instant; `date`, `unit`, `createdAt`, ID, and ownership
+are preserved. The optional `updatedAt` is a Class 0 schema change: legacy
+entries without it remain valid and use `createdAt` for delta comparison, with
+no migration or backfill. An unknown or other-user ID returns
+`404 { "error": "Entry not found" }`.
+
+`GET /api/weights/changes` accepts only the required canonical UTC
+`Date.toISOString()` `since` value. It returns current entries in the inclusive
+`since` to `checkpointAt` window, sorted by `(updatedAt ?? createdAt, id)`.
+The handler captures `checkpointAt` once per request as a UTC
+`Date.toISOString()` value and returns exactly
+`{ "entries": WeightEntry[], "checkpointAt": "<UTC-ISO>" }`, including an
+empty array when there are no matches. The lower and upper time bounds are
+inclusive. The endpoint is not paginated and accepts no `limit` or `cursor`.
+Missing/noncanonical/future `since`, unknown or repeated query parameters
+return `400 { "error": "invalid_delta_query" }`. The existing
+`GET /api/weights` full export stays non-paginated and returns
+`{ "entries": WeightEntry[] }` without a checkpoint.
+
+Meal objects in diary responses include optional `updatedAt`; it is initialized
+on creation and refreshed by persisted Meal changes. Legacy meals may omit it.
+This is a Class 0 change: reads use `createdAt` as the effective timestamp when
+`updatedAt` is absent, and no migration or backfill is required.
 
 ## Diary
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
 | GET | `/api/diary?date=YYYY-MM-DD&localDate=YYYY-MM-DD&localHour=0..23` | Yes | Meals + summary + hint + day metadata/activity fields; no `targets` object; `date` and `localDate` are required, `localHour` is optional |
+| GET | `/api/diary/meals?limit=<n>&cursor=<opaque>` | Yes | Existing paginated full export `{ meals, cursor? }`; no checkpoint |
+| GET | `/api/diary/changes/meals?since=<UTC-ISO>&limit=<n>&cursor=<opaque>` | Yes | Paginated delta `{ meals, checkpointAt, cursor? }`; default limit 50, maximum 100 |
 | POST | `/api/diary/meals` | Yes | Create meal for a date |
 | PUT | `/api/diary/meals/{mealId}` | Yes | Update meal metadata |
 | DELETE | `/api/diary/meals/{mealId}` | Yes | |
@@ -143,6 +168,37 @@ returns `404 { "error": "Entry not found" }`.
 | PUT | `/api/diary/day/{date}/meta` | Yes | Set dayType / workoutType |
 | PUT | `/api/diary/day/{date}/special-activity` | Yes | Record a hiking or cycling activity and calculate activity bonus |
 | DELETE | `/api/diary/day/{date}/special-activity` | Yes | Remove the special activity for a day |
+
+The two delta routes accept only their listed query parameters, reject repeated
+parameters, and bind every query to the verified JWT `sub`. Meal `since` must
+be repeated unchanged on continuation; the effective limit must also match.
+The meal cursor carries the user, `since`, limit, fixed checkpoint, and last
+`(updatedAt ?? createdAt, id)` tuple. Every page authenticates independently.
+The exact meal success shape is
+`{ "meals": Meal[], "checkpointAt": "<UTC-ISO>", "cursor"?: "<opaque>" }`;
+`cursor` is present only when another page exists. `limit` defaults to `50` and
+must be an integer from `1` through `100`. Unauthenticated requests return
+`401`, and unexpected handler/repository errors return
+`500 { "error": "Internal server error" }`.
+
+The checkpoint is fixed across a paginated run, but is not a database snapshot
+or server-side transfer state. Rows are current existing documents only; there
+are no deletion tombstones, deletion history, or server-held deletion-ID list.
+A row changed beyond the fixed checkpoint is omitted until a later run. The
+existing diary full-export route retains its original permissive limit parser
+and continuation behavior, with no checkpoint field.
+
+**Health Connect deletion boundary:** The [HC-4 story](../../User%20Stories/HealthConnect/HC-4_Health-Connect-Synchronisation-vereinfachen.md)
+defines Mobile-side ID-only delete retry state; the backend delta routes do not
+supply deleted IDs or implement that local list. Mobile purges legacy
+snapshot-based `pendingOperations` without sending them. The existing delta
+routes return current documents only and do not provide tombstones or deletion
+history.
+
+Missing/noncanonical `since`, `since > checkpointAt`, unknown or repeated
+parameters, and invalid delta limits return
+`400 { "error": "invalid_delta_query" }`. Invalid, foreign-user, or
+mismatched meal cursors return `400 { "error": "invalid_delta_cursor" }`.
 
 For `GET /api/diary`, `date` is the requested diary date and `localDate` is the
 current local device date used for local state decisions. Both must be real
@@ -457,6 +513,38 @@ envelope above.
 | GET | `/api/community-recipes?limit=<n>&continuationToken=<token>` | Yes | Paginated published recipes; default limit 20, maximum 50; `{ recipes: CommunityRecipe[], continuationToken? }` |
 | GET | `/api/community-recipes/{id}` | Yes | One current community recipe; private, deleted, or unknown IDs return 404 |
 | GET | `/api/community-recipes/{id}/images/{imageId}` | Yes | Protected JPEG/PNG bytes; visibility is rechecked on every request; never returns a SAS URL |
+| POST | `/api/community-recipes/{id}/copy` | Yes | Bodyless; creates or returns the caller's deterministic private recipe snapshot; `{ recipeId }` |
+
+`POST /api/community-recipes/{id}/copy` uses the verified JWT `sub` and source
+recipe ID to derive one stable owner recipe UUID. It reads that owner-scoped
+recipe before checking the source, so retries return the existing copy even if
+the source has since become private or was deleted. Without a copy, the source
+must currently be published. If it is unavailable, the endpoint performs one
+final owner-scoped read to resolve a concurrent copy; otherwise it returns the
+same 404 used for unavailable community recipes. A published source snapshot
+already loaded may finish copying without another publication check.
+
+The endpoint has no request body. A new copy returns `201`; an existing or
+concurrently created copy returns `200`. Both return the identical
+`{ "recipeId": "..." }` body. The private snapshot preserves the loaded
+recipe fields, stored nutrition values and ingredient provenance without
+catalog lookups, nutrition recalculation, or AI calls. It removes personal
+reusable-item links and retains a product link only for canonical
+`openFoodFacts:<numeric-barcode>` IDs. The copy is private and independently
+editable through the existing owner recipe routes.
+
+Images are copied to deterministic owner paths separate from the community
+source. Blob creation is conditional (`If-None-Match: *`); an existing target
+is reused only when its validated JPEG/PNG type and bytes match. A different or
+unreadable target fails without overwriting or deleting it. If any source image
+cannot be read, no recipe document is committed. A failure after some image
+uploads can leave unreferenced owner blobs; retries may reuse identical blobs.
+Blob Soft Delete remains unchanged. Same-path recreation after a soft-deleted
+owner blob requires the plan's Alpha storage smoke test; local Azurite tests do
+not establish Azure account-policy behavior.
+The route follows normal `requireUser()` admission, so an active account
+deletion lease returns retryable `409 PROFILE_DELETION_IN_PROGRESS` before
+recipe or image work begins.
 
 An invalid limit returns `400` with code `INVALID_COMMUNITY_LIMIT`; an empty or
 invalid continuation token returns `400` with code
@@ -464,9 +552,12 @@ invalid continuation token returns `400` with code
 above. The continuation token is opaque and is passed back unchanged.
 
 `CommunityRecipe` is a safe read projection containing the recipe's name,
-description, portions, ingredients, steps, nutrition, tags, image metadata,
-timestamps, `authorDisplayName`, `isOwnRecipe`, and
+description, portions, the nullable `totalTimeMinutes`, ingredients, steps,
+nutrition, tags, image metadata, timestamps, `authorDisplayName`, `isOwnRecipe`, and
 `ingredientNotices: { containsAiEstimates, containsManualIngredients }`.
+`totalTimeMinutes` is numeric only while the stored export-view fingerprint
+matches the current recipe source; missing or stale confirmation is returned
+as `null`. No teaser, difficulty, or export-step metadata is included.
 Ingredient source-link IDs are omitted. Ingredient provenance is projected as
 `nutritionSource: 'openFoodFacts' | 'manual' | 'ai' | 'label-scan' | 'unknown'`;
 unknown history is not presented as a verified source. The DTO does not expose

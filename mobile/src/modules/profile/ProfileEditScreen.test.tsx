@@ -2,6 +2,8 @@ import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ProfileEditScreen from './ProfileEditScreen';
+import { ProfileDeletionAction } from './ProfileDeletionAction';
+import { colors, spacing } from '../../app/theme';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -77,6 +79,14 @@ function renderScreen(existing: unknown) {
   return { renderer, navigation };
 }
 
+function renderDeletionAction() {
+  let renderer!: ReactTestRenderer;
+  act(() => {
+    renderer = create(<ProfileDeletionAction />);
+  });
+  return { renderer };
+}
+
 function allText(renderer: ReactTestRenderer): string {
   return renderer.root
     .findAll((n) => n.type === 'Text')
@@ -124,7 +134,10 @@ beforeEach(() => {
 
 describe('ProfileEditScreen', () => {
   it('opens the exact confirmation and requires case-sensitive DELETE without sending on open or dismissal', async () => {
-    const { renderer } = renderScreen(profile);
+    const { renderer } = renderDeletionAction();
+    const deleteAction = findButton(renderer, 'Konto löschen');
+    const buttonStyles = deleteAction.props.style as Record<string, unknown>[];
+    expect(buttonStyles.some((style) => style.borderColor === colors.negative)).toBe(true);
     expect(mocks.profileApi.deleteProfile).not.toHaveBeenCalled();
 
     await openDeletion(renderer);
@@ -133,11 +146,10 @@ describe('ProfileEditScreen', () => {
     expect(mocks.profileApi.deleteProfile).not.toHaveBeenCalled();
     expect(allText(renderer)).toContain('Profil endgültig löschen?');
     expect(allText(renderer)).toContain(
-      'Dein FitTrack-Profil und deine persönlichen FitTrack-Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.\n\nGib zur Bestätigung DELETE ein.',
+      'Dein FitTrack-Profil und deine persönlichen FitTrack-Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.',
     );
-    expect(allText(renderer)).toContain(
-      'Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen. Wenn das auf deinem Gerät nicht klappt, zeigt FitTrack dir einen Hinweis. Bereits in Health Connect gespeicherte Einträge und Berechtigungen bleiben davon unberührt.',
-    );
+    expect(allText(renderer)).toContain('Bereits in Health Connect gespeicherte Daten bleiben davon unberührt.');
+    expect(allText(renderer)).not.toContain('Nach erfolgreicher Kontolöschung versucht die App');
     expect(allText(renderer)).not.toContain('entfernen wir auch deine FitTrack-Anmeldetokens');
     expect(allText(renderer)).not.toContain('Microsoft-Entra');
     expect(allText(renderer)).not.toContain('manuell');
@@ -147,6 +159,15 @@ describe('ProfileEditScreen', () => {
     const confirmation = renderer.root.findAll(
       (node: ReactTestInstance) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Löschbestätigung',
     )[0]!;
+    expect(confirmation.props.underlineColorAndroid).toBe('transparent');
+    expect((confirmation.props.style as Record<string, unknown>).height).toBe(spacing.xxl);
+    const dialogItems = findType(renderer, 'Modal').findAll(
+      (node: ReactTestInstance) => node.type === 'Text' || node.type === 'TextInput',
+    );
+    const promptIndex = dialogItems.findIndex(
+      (node: ReactTestInstance) => node.type === 'Text' && node.props.children === 'Gib zur Bestätigung DELETE ein.',
+    );
+    expect(dialogItems[promptIndex + 1]?.type).toBe('TextInput');
     const confirm = findButton(renderer, 'Endgültig löschen');
     expect(confirm.props.accessibilityState).toEqual({ disabled: true });
     act(() => changeText(confirmation, 'delete'));
@@ -183,11 +204,31 @@ describe('ProfileEditScreen', () => {
     expect(allText(renderer)).not.toContain('Konto löschen');
   });
 
+  it('keeps one save action in the fixed screen footer', () => {
+    const { renderer } = renderScreen(profile);
+    const saveButtons = renderer.root.findAll(
+      (node: ReactTestInstance) => node.type === 'TouchableOpacity' && node.props.accessibilityLabel === 'Speichern',
+    );
+
+    expect(saveButtons).toHaveLength(1);
+    const footer = renderer.root.findAll(
+      (node: ReactTestInstance) => node.type === 'View' && node.props.testID === 'profile-edit-save-footer',
+    )[0]!;
+    expect(footer.findAll(
+      (node: ReactTestInstance) => node.type === 'TouchableOpacity' && node.props.accessibilityLabel === 'Speichern',
+    )).toHaveLength(1);
+    expect(footer.findAll(
+      (node: ReactTestInstance) => node.type === 'TouchableOpacity' && node.props.accessibilityLabel === 'Konto löschen',
+    )).toHaveLength(0);
+    const formScroll = renderer.root.findAll((node: ReactTestInstance) => node.type === 'ScrollView')[0]!;
+    expect(formScroll.findAll((node: ReactTestInstance) => node.props.accessibilityLabel === 'Konto löschen')).toHaveLength(0);
+  });
+
   it('shows the community choice only for published recipes and resets it to Nein on each open', async () => {
     mocks.recipeApi.list.mockResolvedValue({
       recipes: [{ visibility: 'community', communityPublication: { displayNameConsent: false } }],
     });
-    const { renderer } = renderScreen(profile);
+    const { renderer } = renderDeletionAction();
 
     await openDeletion(renderer);
 
@@ -218,7 +259,7 @@ describe('ProfileEditScreen', () => {
         response: { data: { error: 'profile_deletion_in_progress' } },
       })
       .mockResolvedValueOnce(undefined);
-    const { renderer } = renderScreen(profile);
+    const { renderer } = renderDeletionAction();
     await openDeletion(renderer);
 
     const confirmation = renderer.root.findAll(
@@ -252,7 +293,7 @@ describe('ProfileEditScreen', () => {
 
   it('does not offer a backend retry after server deletion when local cleanup fails', async () => {
     mocks.completeAccountDeletionLocally.mockResolvedValue(true);
-    const { renderer } = renderScreen(profile);
+    const { renderer } = renderDeletionAction();
     await openDeletion(renderer);
     const confirmation = renderer.root.findAll(
       (node: ReactTestInstance) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Löschbestätigung',
@@ -278,7 +319,7 @@ describe('ProfileEditScreen', () => {
     mocks.profileApi.deleteProfile.mockImplementation(
       () => new Promise<void>((resolve) => { resolveDeletion = resolve; }),
     );
-    const { renderer } = renderScreen(profile);
+    const { renderer } = renderDeletionAction();
     await openDeletion(renderer);
     const confirmation = renderer.root.findAll(
       (node: ReactTestInstance) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Löschbestätigung',

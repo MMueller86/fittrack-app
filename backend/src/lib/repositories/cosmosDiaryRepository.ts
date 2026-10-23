@@ -80,8 +80,30 @@ export class CosmosDiaryRepository implements DiaryRepository {
     return resource ?? null;
   }
 
+  async listMealsUpdatedSince(userId: string, since: string): Promise<Meal[]> {
+    const { containers } = await getCosmos();
+    const { resources } = await containers.nutritionDiaryMeals.items
+      .query<Meal>(
+        {
+          query: "SELECT * FROM c WHERE c.userId = @userId AND (NOT IS_DEFINED(c._docType) OR c._docType = 'meal') AND ((IS_DEFINED(c.updatedAt) AND c.updatedAt >= @since) OR (NOT IS_DEFINED(c.updatedAt) AND c.createdAt >= @since))",
+          parameters: [
+            { name: '@userId', value: userId },
+            { name: '@since', value: since },
+          ],
+        },
+        { partitionKey: userId },
+      )
+      .fetchAll();
+    return resources
+      .map(stripCosmosSystemProperties)
+      .sort((left, right) =>
+        (left.updatedAt ?? left.createdAt).localeCompare(right.updatedAt ?? right.createdAt) || left.id.localeCompare(right.id),
+      );
+  }
+
   async createMeal(input: CreateMealInput): Promise<Meal> {
     const { containers } = await getCosmos();
+    const createdAt = new Date().toISOString();
     const meal: Meal = {
       id: randomUUID(),
       userId: input.userId,
@@ -89,7 +111,8 @@ export class CosmosDiaryRepository implements DiaryRepository {
       type: input.type,
       name: input.name,
       items: [],
-      createdAt: new Date().toISOString(),
+      createdAt,
+      updatedAt: createdAt,
     };
     const { resource } = await containers.nutritionDiaryMeals.items.create<Meal>(meal);
     return resource ?? meal;
@@ -121,6 +144,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
       },
     };
     existing.items = [...(existing.items ?? []), newItem];
+    existing.updatedAt = new Date().toISOString();
 
     const { resource: updated } = await containers.nutritionDiaryMeals
       .item(mealId, userId)
@@ -141,6 +165,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
     item.quantity = input.quantity;
     item.unit = input.unit;
     item.macros = input.macros;
+    existing.updatedAt = new Date().toISOString();
 
     const { resource: updated } = await containers.nutritionDiaryMeals
       .item(mealId, userId)
@@ -158,6 +183,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
     const before = existing.items.length;
     existing.items = existing.items.filter((i) => i.id !== itemId);
     if (existing.items.length === before) return null;
+    existing.updatedAt = new Date().toISOString();
 
     const { resource: updated } = await containers.nutritionDiaryMeals
       .item(mealId, userId)
@@ -201,12 +227,14 @@ export class CosmosDiaryRepository implements DiaryRepository {
       mealsById,
     );
 
+    const updatedAt = new Date().toISOString();
     const updatedMeals = new Map<string, Meal>();
     for (const [mealId, meal] of sourceMeals) {
       const itemIds = groupedReferences.get(mealId)!;
       updatedMeals.set(mealId, {
         ...meal,
         items: (meal.items ?? []).filter((item) => !itemIds.has(item.id)),
+        updatedAt,
       });
     }
     const operations: OperationInput[] = [...updatedMeals.values()].map((meal) => ({
@@ -258,6 +286,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
       mealsById,
     );
 
+    const updatedAt = new Date().toISOString();
     let targetMeal: Meal;
     let isNewTarget = false;
     if (targetMealId) {
@@ -274,7 +303,8 @@ export class CosmosDiaryRepository implements DiaryRepository {
         type: newMealType,
         name: newMealType.charAt(0).toUpperCase() + newMealType.slice(1),
         items: [],
-        createdAt: new Date().toISOString(),
+        createdAt: updatedAt,
+        updatedAt,
       };
       isNewTarget = true;
     } else {
@@ -292,9 +322,14 @@ export class CosmosDiaryRepository implements DiaryRepository {
       updatedSources.set(mealId, {
         ...meal,
         items: (meal.items ?? []).filter((item) => !itemIds.has(item.id)),
+        updatedAt,
       });
     }
-    const updatedTarget: Meal = { ...targetMeal, items: [...(targetMeal.items ?? []), ...movedItems] };
+    const updatedTarget: Meal = {
+      ...targetMeal,
+      items: [...(targetMeal.items ?? []), ...movedItems],
+      updatedAt,
+    };
     const operations: OperationInput[] = [];
     for (const meal of updatedSources.values()) {
       operations.push({
@@ -360,6 +395,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
       mealsById,
     );
 
+    const updatedAt = new Date().toISOString();
     let targetMeal: Meal;
     let targetEtag: string | undefined;
     let isNewTarget = false;
@@ -378,7 +414,8 @@ export class CosmosDiaryRepository implements DiaryRepository {
         type: newMealType,
         name: newMealType.charAt(0).toUpperCase() + newMealType.slice(1),
         items: [],
-        createdAt: new Date().toISOString(),
+        createdAt: updatedAt,
+        updatedAt,
       };
       isNewTarget = true;
     } else {
@@ -390,7 +427,11 @@ export class CosmosDiaryRepository implements DiaryRepository {
       const item = (meal.items ?? []).find((candidate) => candidate.id === reference.itemId)!;
       return { ...structuredClone(item), id: randomUUID() };
     });
-    const updatedTarget: Meal = { ...targetMeal, items: [...(targetMeal.items ?? []), ...copiedItems] };
+    const updatedTarget: Meal = {
+      ...targetMeal,
+      items: [...(targetMeal.items ?? []), ...copiedItems],
+      updatedAt,
+    };
     const operations: OperationInput[] = isNewTarget
       ? [{ operationType: 'Create', resourceBody: updatedTarget } as unknown as OperationInput]
       : [{
@@ -495,6 +536,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
         count++;
       }
       if (changed) {
+        meal.updatedAt = new Date().toISOString();
         await containers.nutritionDiaryMeals.item(meal.id, userId).replace<Meal>(meal);
       }
     }
@@ -509,7 +551,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
     const limit = Math.min(options?.limit ?? 50, 100);
     const iterator = containers.nutritionDiaryMeals.items.query<Meal>(
       {
-        query: 'SELECT * FROM c WHERE c.userId = @userId ORDER BY c.date ASC',
+        query: "SELECT * FROM c WHERE c.userId = @userId AND (NOT IS_DEFINED(c._docType) OR c._docType = 'meal') ORDER BY c.date ASC",
         parameters: [{ name: '@userId', value: userId }],
       },
       {

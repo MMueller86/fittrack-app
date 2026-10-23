@@ -1,10 +1,12 @@
 import React from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { MealItem } from '@fittrack/shared';
+import type { Meal, MealItem } from '@fittrack/shared';
 import EditItemSheet from './EditItemSheet';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const diary = vi.hoisted(() => ({ updateItem: vi.fn() }));
 
 const animations = vi.hoisted(() => ({
   withTiming: vi.fn((value: number) => value),
@@ -53,7 +55,7 @@ vi.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Light: 'light' },
   NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('../../services/nutritionDiaryService', () => ({ nutritionDiaryService: { updateItem: vi.fn() } }));
+vi.mock('../../services/nutritionDiaryService', () => ({ nutritionDiaryService: diary }));
 vi.mock('../../shared/components/ConfirmSheet', () => ({ ConfirmSheet: () => null }));
 vi.mock('./useSourceProduct', () => ({ useSourceProduct: () => ({ product: null }) }));
 
@@ -93,5 +95,41 @@ describe('EditItemSheet entrance', () => {
 
     expect(animations.withTiming).toHaveBeenCalledWith(0, { duration: 220 });
     expect(animations.withSpring).not.toHaveBeenCalled();
+  });
+
+  it('updates through the diary facade before reporting success', async () => {
+    const updatedMeal = { id: 'meal-1', items: [item] } as Meal;
+    const onSaved = vi.fn();
+    diary.updateItem.mockResolvedValue({ meal: updatedMeal });
+
+    act(() => {
+      renderer = create(
+        <EditItemSheet
+          visible
+          mealId="meal-1"
+          mealName="Frühstück"
+          dateLabel="Heute"
+          item={item}
+          onSaved={onSaved}
+          onDeleted={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      );
+    });
+
+    const saveButton = renderer!.root.findAll((node) => node.type === 'TouchableOpacity'
+      && node.findAll((text) => text.type === 'Text' && String(text.props.children).includes('Speichern')).length > 0)[0]!;
+    const onPress = saveButton.props.onPress;
+    if (typeof onPress !== 'function') throw new Error('Save button has no action');
+    await act(async () => {
+      await onPress();
+    });
+
+    expect(diary.updateItem).toHaveBeenCalledWith('meal-1', 'item-1', {
+      inputMode: 'grams',
+      amountGrams: 100,
+    });
+    expect(onSaved).toHaveBeenCalledWith(updatedMeal);
+    expect(onSaved.mock.invocationCallOrder[0]).toBeGreaterThan(diary.updateItem.mock.invocationCallOrder[0]);
   });
 });

@@ -87,6 +87,164 @@ describe('CosmosDiaryRepository (contract)', () => {
     expect(day.meals[0].date).toBe('2026-05-04');
   });
 
+  it('listMealsUpdatedSince includes legacy meals, excludes DayMeta, and stays in one user partition', async () => {
+    const since = '2026-05-04T08:00:00.000Z';
+    const container = ctx!.database.container('nutritionDiaryMeals');
+    await container.items.create({
+      id: 'legacy-old', userId: USER_A, date: '2026-05-04', type: 'breakfast', name: 'Old',
+      items: [], createdAt: '2026-05-03T08:00:00.000Z',
+    });
+    await container.items.create({
+      id: 'legacy-boundary', userId: USER_A, date: '2026-05-04', type: 'lunch', name: 'Legacy',
+      items: [], createdAt: since,
+    });
+    await container.items.create({
+      id: 'updated-boundary', userId: USER_A, date: '2026-05-04', type: 'dinner', name: 'Updated',
+      items: [], createdAt: '2026-05-02T08:00:00.000Z', updatedAt: since, _docType: 'meal',
+    });
+    await container.items.create({
+      id: 'foreign-boundary', userId: USER_B, date: '2026-05-04', type: 'snack', name: 'Foreign',
+      items: [], createdAt: since,
+    });
+    await container.items.create({
+      id: 'day:2026-05-04', userId: USER_A, date: '2026-05-04', dayType: 'training',
+      updatedAt: '2026-05-05T08:00:00.000Z', _docType: 'dayMeta',
+    });
+
+    const delta = await repo.listMealsUpdatedSince(USER_A, since);
+
+    expect(delta.map((meal) => meal.id)).toEqual(['legacy-boundary', 'updated-boundary']);
+    expect(delta.every((meal) => meal.userId === USER_A)).toBe(true);
+  });
+
+  it('listAllMeals includes only legacy and explicitly typed Meals', async () => {
+    const container = ctx!.database.container('nutritionDiaryMeals');
+    await container.items.create({
+      id: 'full-export-legacy-meal', userId: USER_A, date: '2026-05-04', type: 'breakfast', name: 'Legacy',
+      items: [], createdAt: '2026-05-04T08:00:00.000Z',
+    });
+    await container.items.create({
+      id: 'full-export-explicit-meal', userId: USER_A, date: '2026-05-05', type: 'lunch', name: 'Meal',
+      items: [], createdAt: '2026-05-05T08:00:00.000Z', _docType: 'meal',
+    });
+    await container.items.create({
+      id: 'day:2026-05-06', userId: USER_A, date: '2026-05-06', dayType: 'training',
+      updatedAt: '2026-05-06T08:00:00.000Z', _docType: 'dayMeta',
+    });
+    await container.items.create({
+      id: 'hintState', userId: USER_A, lastHintDate: '2026-05-07', lastHintId: 'H1',
+      updatedAt: '2026-05-07T08:00:00.000Z', _docType: 'hintState',
+    });
+
+    const result = await repo.listAllMeals(USER_A);
+
+    expect(result.meals.map((meal) => meal.id)).toEqual([
+      'full-export-legacy-meal',
+      'full-export-explicit-meal',
+    ]);
+    expect(result.meals.every((meal) => !('_docType' in meal) || meal._docType === 'meal')).toBe(true);
+  });
+
+  it('persists updatedAt on meal creation and every replacement write path', async () => {
+    const container = ctx!.database.container('nutritionDiaryMeals');
+    const clearUpdatedAt = async (mealId: string) => {
+      await container.item(mealId, USER_A).patch([{ op: 'remove', path: '/updatedAt' }]);
+    };
+    const expectUpdatedAt = async (mealId: string) => {
+      const { resource } = await container.item(mealId, USER_A).read<{ updatedAt?: string }>();
+      expect(resource?.updatedAt).toMatch(/^\d{4}-\d\d-\d\dT/);
+    };
+    const create = (name: string, type: MealType = 'breakfast', date = '2026-05-04') =>
+      repo.createMeal(makeMealInput({ name, type, date }));
+    const add = (mealId: string, sourceId?: string) => repo.addItem(USER_A, mealId, {
+      name: 'Food', calories: 100, protein: 5, carbs: 10, fat: 2, fiber: 1, sourceId,
+    });
+
+    const created = await create('Created');
+    expect(created.updatedAt).toBe(created.createdAt);
+
+    let meal = await create('Add');
+    await clearUpdatedAt(meal.id);
+    let withItem = await add(meal.id);
+    await expectUpdatedAt(meal.id);
+
+    await clearUpdatedAt(meal.id);
+    meal = (await repo.updateItem(USER_A, meal.id, withItem.items[0]!.id, {
+      quantity: 2,
+      unit: 'portion',
+      macros: { calories: 200, protein: 10, carbs: 20, fat: 4, fiber: 2 },
+    }))!;
+    await expectUpdatedAt(meal.id);
+
+    await clearUpdatedAt(meal.id);
+    await repo.deleteItem(USER_A, meal.id, withItem.items[0]!.id);
+    await expectUpdatedAt(meal.id);
+
+    const bulkDeleteMeal = await create('Bulk delete');
+    withItem = await add(bulkDeleteMeal.id);
+    await clearUpdatedAt(bulkDeleteMeal.id);
+    await repo.bulkDeleteItems(USER_A, {
+      sourceDate: '2026-05-04',
+      items: [{ mealId: bulkDeleteMeal.id, itemId: withItem.items[0]!.id }],
+    });
+    await expectUpdatedAt(bulkDeleteMeal.id);
+
+    const moveSource = await create('Move source');
+    const moveTarget = await create('Move target', 'lunch');
+    withItem = await add(moveSource.id);
+    await clearUpdatedAt(moveSource.id);
+    await clearUpdatedAt(moveTarget.id);
+    const moved = await repo.bulkMoveItems(USER_A, {
+      sourceDate: '2026-05-04',
+      items: [{ mealId: moveSource.id, itemId: withItem.items[0]!.id }],
+      target: { mealId: moveTarget.id },
+    });
+    await expectUpdatedAt(moveSource.id);
+    await expectUpdatedAt(moveTarget.id);
+    expect(moved.targetMeal.updatedAt).toBeTruthy();
+
+    const newMoveSource = await create('New move source');
+    withItem = await add(newMoveSource.id);
+    await clearUpdatedAt(newMoveSource.id);
+    const movedToNew = await repo.bulkMoveItems(USER_A, {
+      sourceDate: '2026-05-04',
+      items: [{ mealId: newMoveSource.id, itemId: withItem.items[0]!.id }],
+      target: { newMealType: 'dinner' },
+    });
+    await expectUpdatedAt(newMoveSource.id);
+    expect(movedToNew.targetMeal.updatedAt).toBeTruthy();
+
+    const copySource = await create('Copy source');
+    const copyTarget = await create('Copy target', 'lunch', '2026-05-05');
+    withItem = await add(copySource.id);
+    await clearUpdatedAt(copyTarget.id);
+    await repo.bulkCopyItems(USER_A, {
+      sourceDate: '2026-05-04',
+      targetDate: '2026-05-05',
+      items: [{ mealId: copySource.id, itemId: withItem.items[0]!.id }],
+      target: { mealId: copyTarget.id },
+    });
+    await expectUpdatedAt(copyTarget.id);
+
+    const newCopySource = await create('New copy source');
+    withItem = await add(newCopySource.id);
+    const copiedToNew = await repo.bulkCopyItems(USER_A, {
+      sourceDate: '2026-05-04',
+      targetDate: '2026-05-06',
+      items: [{ mealId: newCopySource.id, itemId: withItem.items[0]!.id }],
+      target: { newMealType: 'snack' },
+    });
+    expect(copiedToNew.targetMeal.updatedAt).toBeTruthy();
+
+    const macroMeal = await create('Macros');
+    await add(macroMeal.id, 'reusable-1');
+    await clearUpdatedAt(macroMeal.id);
+    await repo.updateMacrosBySourceId(USER_A, 'reusable-1', {
+      calories: 200, protein: 10, carbs: 20, fat: 4, fiber: 2,
+    });
+    await expectUpdatedAt(macroMeal.id);
+  });
+
   it('getDay excludes DayMeta documents while retaining legacy meals without a discriminator', async () => {
     const date = '2026-05-04';
     const meal = await repo.createMeal(makeMealInput({ date, type: 'lunch', name: 'Lunch' }));

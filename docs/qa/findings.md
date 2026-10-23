@@ -167,6 +167,14 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-146 | Profile deletion Entra ownership KB wording, AC-5/11 | Non-blocking | Documentation | Closed |
 | FT-QA-2026-147 | Profile deletion dialog overstates local cleanup, AC-10 | Blocking | Frontend | Closed |
 | FT-QA-2026-148 | Embedded privacy policy date mismatch | Blocking | Frontend | Closed |
+| FT-QA-2026-149 | US-12 stale/missing copied time snapshot, AC-3 | Blocking | Backend | Closed |
+| FT-QA-2026-150 | US-12 unlinked provenance amount-edit coverage, AC-6 | Blocking | Backend | Closed |
+| FT-QA-2026-151 | US-12 delete-and-recopy lifecycle coverage, AC-7 | Blocking | Backend | Closed |
+| FT-QA-2026-152 | US-12 unrelated full Backend suite failure | Blocking | Backend | Closed |
+| FT-QA-2026-153 | HC-4 Meal-only full export and watermark, AC-8/AC-9 | Blocking | Backend | Closed |
+| FT-QA-2026-154 | HC-4 required Mobile typecheck, AC-12 | Blocking | Frontend | Closed |
+| FT-QA-2026-155 | HC-4 mock diagnostic logs contain client record IDs, AC-11 | Non-blocking | Frontend | Awaiting decision |
+| FT-QA-2026-156 | HC-4 Domain KB retry status is stale, AC-11 | Non-blocking | Documentation | Awaiting decision |
 
 ## Profile Deletion QA Review
 - **Latest re-review (2026-10-22):** Independent [QA report](reports/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md) is PASS against all 13 criteria after the D2 corrections. Mobile suite passed 950/950; backend suite passed 1,881/1,881; Mobile typecheck, backend build verification, and offline Bicep compilation passed. Cosmos contracts remain **UNVERIFIED**. The approved force-close/token/queue residual is not a finding. Findings 144–148 are closed based on the recorded scope decisions and QA verification.
@@ -246,6 +254,69 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **History:** 2026-10-22 - Registered from approved-scope QA FAIL; correction routed to Frontend.
 - **History:** 2026-10-22 - Frontend synchronized the embedded policy date to 2026-10-22; focused and full Mobile suites plus typecheck pass; awaiting independent QA verification.
 - **History:** 2026-10-22 - Independent QA report `docs/qa/reports/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md` returned PASS; policy mirror verified and Mobile suite passed 950/950. Closed.
+
+## US-12 Community Recipe Copy QA
+
+The initial [US-12 QA report](reports/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md) returned FAIL; independent re-review on 2026-10-23 returned PASS for AC-1 through AC-10. Findings 149–151 were corrected by Backend and independently verified. The unrelated weights test and full Backend suite also passed on re-review without changes under US-12. Cosmos and Azure Soft Delete remain verification limits below.
+
+### FT-QA-2026-149
+
+- **Finding key:** US12-QA-01.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md`.
+- **Acceptance criterion:** AC-3.
+- **Description:** Copy-transfer tests cover current time snapshots but do not prove missing or stale time snapshots are omitted from the private copy.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** `backend/src/lib/communityRecipeTransfer.test.ts` covers current copy time; projection tests cover current/stale community time, but the copy path lacks stale/missing cases. See the [US-12 QA report](reports/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md).
+- **Recommendation:** Add transfer regressions for missing time, stale source fingerprint, and stale copy-time snapshot; assert no time snapshot is persisted for non-current values.
+- **Status:** Closed.
+- **History:** 2026-10-22 - Registered from US-12 QA FAIL; routed to Backend under the approved correction workflow.
+- **History:** 2026-10-23 - Backend added current/missing/stale copy-time transfer regressions; awaiting independent QA verification.
+- **History:** 2026-10-23 - Independent US-12 QA re-review returned PASS and verified missing, stale, and current copy-time cases. Closed.
+
+### FT-QA-2026-150
+
+- **Finding key:** US12-QA-02.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md`.
+- **Acceptance criterion:** AC-6.
+- **Description:** Normal PUT amount-edit coverage exists for unlinked AI and canonical OFF ingredients, but not for unlinked manual, label-scan, and unknown provenance.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** `backend/src/functions/recipes.test.ts` covers AI/OFF amount edits; `mobile/src/modules/recipes/recipeWizardEditBootstrap.test.ts` does not complete an amount-edit/PUT regression for the other provenances. See the [US-12 QA report](reports/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md).
+- **Recommendation:** Add focused amount-change and normal PUT regressions for manual, label-scan, unknown, AI, and canonical OFF ingredients. Assert recalculated contribution/aggregates, retained provenance/AI flags, and absence of foreign reusable links.
+- **Status:** Closed.
+- **History:** 2026-10-22 - Registered from US-12 QA FAIL; routed to Backend under the approved correction workflow.
+- **History:** 2026-10-23 - Backend added normal PUT amount-edit regressions for manual, label-scan, unknown, AI and OFF sources; awaiting independent QA verification.
+- **History:** 2026-10-23 - Independent US-12 QA re-review returned PASS and verified all required provenance amount-edit cases. Closed.
+
+### FT-QA-2026-151
+
+- **Finding key:** US12-QA-03.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md`.
+- **Acceptance criterion:** AC-7.
+- **Description:** Copy idempotency and owner recipe deletion are tested separately, but no regression proves a completed delete permits a new copy with the same deterministic ID and current source snapshot.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** `backend/src/functions/communityRecipes.test.ts` covers copy retries; `backend/src/functions/recipes.test.ts` covers owner recipe deletion. Neither sequences copy, completed delete, source update, and recopy. See the [US-12 QA report](reports/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md).
+- **Recommendation:** Add a handler/repository regression that copies, completes owner DELETE, changes the still-published source, and copies again; assert same deterministic recipe ID, refreshed source snapshot, and no durable idempotency marker.
+- **Status:** Closed.
+- **History:** 2026-10-22 - Registered from US-12 QA FAIL; routed to Backend under the approved correction workflow.
+- **History:** 2026-10-23 - Backend added copy-delete-source-update-recopy regression coverage; awaiting independent QA verification.
+- **History:** 2026-10-23 - Independent US-12 QA re-review returned PASS and verified completed delete followed by recopy using the same ID and current source snapshot. Closed.
+
+### FT-QA-2026-152
+
+- **Finding key:** US12-QA-04.
+- **Plan reference:** `docs/User Stories/Reciepe/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md`.
+- **Acceptance criterion:** N/A (full Backend suite gate).
+- **Description:** The full Backend unit suite fails in an unrelated weights PUT test; no US-12 source change touches that test or weights behavior.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** `npm exec --workspace=backend -- vitest run --reporter=dot` exited 1 with one failure in `backend/src/functions/weights.test.ts`; isolated rerun reproduced it. Focused US-12 tests pass. See the [US-12 QA report](reports/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md).
+- **Recommendation:** Resolve this in its owning workstream and rerun the full Backend suite before merge/release; do not alter weights behavior under US-12.
+- **Status:** Closed.
+- **History:** 2026-10-22 - Registered from US-12 QA FAIL. Kept separate from the approved recipe-copy correction scope; no weights changes were made under US-12.
+- **History:** 2026-10-23 - Independent US-12 QA re-review reports the isolated test and full Backend suite passing. No current failure reproduced; closed without changing the unrelated weights workstream.
 
 ## US-03 Current Review And Verification Notes
 
@@ -1896,6 +1967,9 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Status:** Resolved
 - **Decision:** Fix requested by the user on 2026-10-12 ("Lasse alles anpassen, außer FT-QA-2026-110"); to be covered by the revised plan.
 - **History:** 2026-10-12 - Registered from the Profilbereich QA report (PASS WITH ISSUES).
+ - **History:** 2026-10-23 - Independent US-12 QA re-review returned PASS and verified missing, stale, and current copy-time cases. Closed.
+ - **History:** 2026-10-23 - Independent US-12 QA re-review returned PASS and verified all required provenance amount-edit cases. Closed.
+ - **History:** 2026-10-23 - Independent US-12 QA re-review returned PASS and verified completed delete followed by recopy using the same ID and current source snapshot. Closed.
 - **History:** 2026-10-12 - User decision: Fix requested.
 - **History:** 2026-10-12 - Corrected in R2 F-2.3; [R2 QA report](reports/PLAN_Profilebereich_Redesign_und_Strukturierung_R2.md): drei Dateien tokenisiert, `colors.overlay` eingeführt; Rest `Icon size={12}` in `SearchState.tsx` Z. 215 als FT-QA-2026-113 erfasst. Status Resolved, bis FT-QA-2026-113 entschieden ist.
 
@@ -2063,6 +2137,9 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 - **Recommendation:** Contract-Test ergänzen (Relation anlegen, Methode mit neuer Marke/Name aufrufen, Rohdokument prüfen; Fall „keine Relation → kein Dokument“) und mit Emulator ausführen.
 - **Status:** Awaiting decision
 - **Decision:** Pending user decision (Fix requested / Accepted / Deferred). Nicht Teil der „korrigiere die Findings“-Anweisung (Test wäre ohne Emulator unverifiziert).
+ - **Status:** Closed.
+ - **History:** 2026-10-22 - Registered from US-12 QA FAIL. Kept separate from the approved recipe-copy correction scope; no weights changes were made under US-12.
+ - **History:** 2026-10-23 - Independent US-12 QA re-review reports the isolated test and full Backend suite passing. No current failure reproduced; closed without changing the unrelated weights workstream.
 - **History:** 2026-10-12 - Registered from the targeted QA report.
 
 ### FT-QA-2026-120
@@ -2291,6 +2368,18 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 
 ## Verification Notes (Not Findings)
 
+### US-12 Final QA Verification Limits (2026-10-23)
+
+- `UNVERIFIED`: Cosmos contract suite could not initialize because the local emulator at `127.0.0.1:18081` was unavailable. No remote Cosmos endpoint was contacted.
+- `MANUAL VALIDATION REQUIRED`: After an approved Alpha deployment, verify re-creation of the same owner image path during the seven-day Blob Soft Delete window by copying a published recipe, deleting the private copy, and copying again; confirm matching active bytes/content type and recipe reference.
+- Source: [US-12 QA report](reports/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md).
+
+### US-12 QA Verification Limits (2026-10-22)
+
+- `UNVERIFIED`: Cosmos contract suite could not reach the local emulator at `127.0.0.1:18081`; Docker was unavailable. No remote Cosmos endpoint was contacted.
+- `MANUAL VALIDATION REQUIRED`: After an approved Alpha deployment, test same-path image recreation during the seven-day Blob Soft Delete window by copying, deleting the private copy, and copying again. Verify the image and recipe are available with matching bytes/content type.
+- Source: [US-12 QA report](reports/PLAN_US-12_Community-Rezepte_uebernehmen_und_teilen.md).
+
 ### Targeted QA Findings 113-117 Verification Limits (2026-10-12)
 
 - UNVERIFIED: Cosmos-Contract-Tests (Emulator nicht erreichbar, `fetch failed`).
@@ -2446,6 +2535,75 @@ These items were reported as unverified environment checks. They must not lower 
 - **Manual action:** Start the local Cosmos emulator or use the emulator-backed CI service, then rerun `npx vitest run --config vitest.contract.config.mts` from `backend/`.
 - **Expected result:** Bulk delete/move/copy atomicity, ETag conflicts, target creation, user-partition isolation, and existing document roundtrips pass against Cosmos Emulator.
 - **Result:** Not run against Cosmos in this QA environment.
+
+### HC-4 QA Verification Limits
+
+- `UNVERIFIED`: The initial Cosmos contract run could not initialize because the local emulator at `127.0.0.1:18081` was unreachable (11 suites/110 skipped); the focused correction re-review also failed setup (25 skipped before assertions). No remote Cosmos endpoint was used.
+- `MANUAL VALIDATION REQUIRED`: Android Health Connect provider permissions and record operations, status-sheet rendering/accessibility, and backup/restore behavior were not exercised on a device. The report's device checklist remains outstanding.
+- Source: [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md).
+
+## HC-4 Health Connect Synchronisation QA
+
+The initial validated [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md) returned FAIL. Findings 153–154 were blocking and are now closed after independent targeted re-review. Findings 155–156 remain non-blocking and await the user's disposition. Account deletion remains separate and is not treated as completed by HC-4.
+
+### FT-QA-2026-153
+
+- **Finding key:** HC4-QA-01.
+- **Plan reference:** `docs/User Stories/HealthConnect/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md`.
+- **Acceptance criterion:** AC-8, AC-9.
+- **Description:** The Cosmos full-export query selects every document in the `nutritionDiaryMeals` user partition instead of filtering to Meal documents. `DayMeta` is stored in the same container and has `updatedAt`; Mobile's full exporter treats each returned object as a Meal and includes its timestamp when computing the watermark. With pagination, a Meal changed after its page was read can be missed while a later non-Meal document advances the watermark beyond that change, causing the next inclusive delta to omit it. The response can also contain non-Meal documents despite the Meal-only contract.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md); [cosmosDiaryRepository.ts](../../backend/src/lib/repositories/cosmosDiaryRepository.ts#L554) has no `_docType` predicate; [nutritionSyncService.ts](../../mobile/src/services/health/nutritionSyncService.ts#L271) incorporates each returned timestamp and [nutritionSyncService.ts](../../mobile/src/services/health/nutritionSyncService.ts#L288) persists the resulting watermark. Emulator contract tests were unable to run.
+- **Recommendation:** Restrict the full-export query to legacy Meal documents and `_docType: 'meal'`; add emulator coverage proving DayMeta/HintState exclusion and that only Meal timestamps contribute to the export watermark.
+- **Status:** Closed.
+- **Decision:** Automatic correction loop started after QA `FAIL`; no acceptance or deferral decision applies.
+- **History:** Registered from the validated HC-4 QA FAIL report and routed to Backend under B1 correction attempt 1.
+- **History:** 2026-10-23 - Backend reports the full-export query now includes only legacy Meal documents and `_docType: 'meal'`; contract coverage asserts DayMeta/HintState exclusion. Backend unit suite, typecheck and `build:verify` pass. Cosmos contract setup failed because `127.0.0.1:18081` was unreachable and all 25 tests were skipped. Awaiting independent targeted QA; emulator runtime remains `UNVERIFIED`. Backend also reports an adjacent `02-diary.md` wording update; FT-QA-2026-156 remains separately Awaiting decision and is not treated as resolved by this handoff.
+- **History:** 2026-10-23 - Independent [HC-4 QA re-review](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md) verified the production predicate and contract assertions exclude DayMeta/HintState and return legacy plus explicit Meal documents. Closed for the demonstrated defect and regression coverage; Cosmos runtime remains `UNVERIFIED` because emulator setup failed.
+
+### FT-QA-2026-154
+
+- **Finding key:** HC4-QA-02.
+- **Plan reference:** `docs/User Stories/HealthConnect/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md`.
+- **Acceptance criterion:** AC-12.
+- **Description:** The required Mobile package typecheck fails on a missing `deleteSecondaryNotice` style reference in `ProfileDeletionAction.tsx`. This file is outside HC-4 scope, but the current full-package typecheck gate is red.
+- **Criticality:** Blocking.
+- **Owner:** Frontend.
+- **Evidence:** `cd mobile && npx tsc --noEmit` exits 2 at [ProfileDeletionAction.tsx](../../mobile/src/modules/profile/ProfileDeletionAction.tsx#L208); all 958 Mobile unit tests pass. See the [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md).
+- **Recommendation:** Resolve the style reference in its owning change and rerun the required Mobile typecheck before treating the package gate as green.
+- **Status:** Closed.
+- **Decision:** Automatic correction loop started after QA `FAIL`; preserve the separate account-deletion work and do not change its behavior.
+- **History:** Registered from the validated HC-4 QA FAIL report and routed to Frontend under F1 correction attempt 1.
+- **History:** 2026-10-23 - Frontend added the missing `deleteSecondaryNotice` style in `ProfileDeletionAction.tsx`; the Mobile typecheck exits 0 and full Mobile suite passes 958/958 across 102 files. The owner reports no change to account-deletion behavior, API, retention, or cleanup semantics. Awaiting independent QA verification.
+- **History:** 2026-10-23 - Independent [HC-4 QA re-review](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md) verified the style exists, Mobile typecheck exits 0, and all 958 Mobile tests pass. The account-deletion service remains unchanged; closed without treating the separate account-deletion work as complete.
+
+### FT-QA-2026-155
+
+- **Finding key:** HC4-QA-03.
+- **Plan reference:** `docs/User Stories/HealthConnect/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md`.
+- **Acceptance criterion:** AC-11.
+- **Description:** In development and non-Android builds, `MockHealthPlatformService` logs Health Connect client record IDs on upsert and delete. `syncLogger` persists these messages in AsyncStorage, so the local diagnostic log contains stable IDs beyond the approved state allowlist and logger description.
+- **Criticality:** Non-blocking.
+- **Owner:** Frontend.
+- **Evidence:** [QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md); [healthPlatformService.ts](../../mobile/src/services/health/healthPlatformService.ts#L10) selects the mock for development/non-Android; [MockHealthPlatformService.ts](../../mobile/src/services/health/MockHealthPlatformService.ts#L41) and [MockHealthPlatformService.ts](../../mobile/src/services/health/MockHealthPlatformService.ts#L45) log IDs; [syncLogger.ts](../../mobile/src/services/health/syncLogger.ts#L37) persists log entries.
+- **Recommendation:** Remove client IDs from mock diagnostic messages and add a regression assertion that persisted logs contain only the approved event/type/time/technical-error information.
+- **Status:** Awaiting decision.
+- **History:** Registered from the validated HC-4 QA FAIL report; no non-blocking correction is inferred before the user's disposition.
+
+### FT-QA-2026-156
+
+- **Finding key:** HC4-QA-04.
+- **Plan reference:** `docs/User Stories/HealthConnect/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md`.
+- **Acceptance criterion:** AC-11.
+- **Description:** The Backend and Domain Knowledge Base still describe HC-4 as an unapproved draft and the local ID-only retry as proposed. `docs/kb/tech/02-backend.md` additionally says Mobile still persists snapshot-based `pendingOperations`, which is stale against the implemented sync services. The plan is approved and F1 has implemented the Mobile-owned retry; the backend no-tombstone boundary remains accurate.
+- **Criticality:** Non-blocking.
+- **Owner:** Documentation.
+- **Evidence:** [QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md); [02-backend.md](../../docs/kb/tech/02-backend.md#L161), [02-diary.md](../../docs/kb/domain/02-diary.md#L28), and [05-weight-tracking.md](../../docs/kb/domain/05-weight-tracking.md#L31) contain stale draft/snapshot wording; [03-mobile.md](../../docs/kb/tech/03-mobile.md#L160) documents the implemented Mobile behavior.
+- **Recommendation:** Align the stale Backend and Domain KB statements with the approved plan and implemented Mobile-owned retry while retaining that the backend provides no tombstones or deletion-ID list.
+- **Status:** Awaiting decision.
+- **History:** Registered from the validated HC-4 QA FAIL report; no non-blocking correction is inferred before the user's disposition.
+- **History:** 2026-10-23 - Independent [HC-4 QA re-review](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md) confirms the stale Backend/Domain wording remains. No acceptance, deferral, or correction authorization is inferred.
 
 ### VER-2026-014 - US-01 Android visual and accessibility validation
 

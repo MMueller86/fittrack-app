@@ -65,6 +65,10 @@ export interface CommunityRecipeListParams {
   continuationToken?: string;
 }
 
+export interface CommunityRecipeCopyResponse {
+  recipeId: string;
+}
+
 export interface VersionedRecipeResponse {
   recipe: Recipe;
   etag: string;
@@ -137,6 +141,13 @@ export const recipeApi = {
         `/community-recipes/${encodeURIComponent(id)}`,
         signal ? { signal } : undefined,
       )
+      .then((r) => r.data);
+  },
+
+  /** POST /api/community-recipes/:id/copy — create or return the owner's deterministic copy */
+  copyCommunity(id: string): Promise<CommunityRecipeCopyResponse> {
+    return apiClient
+      .post<CommunityRecipeCopyResponse>(`/community-recipes/${encodeURIComponent(id)}/copy`)
       .then((r) => r.data);
   },
 

@@ -18,6 +18,7 @@ function withoutAccountDeletionSection(markdown: string): string {
 
 const APPROVED_ACCOUNT_DELETION_TEXT = 'Wenn du die Kontolöschung bestätigst, löschen wir deine aktiven persönlichen FitTrack-Daten. Veröffentlichte Community-Rezepte, die du behalten möchtest, bleiben ohne aktive Zuordnung zu deinem Konto erhalten; ihr Autor wird als „Anonymous“ angezeigt. Betriebs- und Fehlerprotokolle werden nicht einzeln gelöscht und gemäß der konfigurierten Aufbewahrungszeit gespeichert (derzeit 30 Tage). Bestehende Backups werden nicht verändert. Gelöschte Bilder können gemäß der bestehenden Azure-Blob-Soft-Delete-Konfiguration noch bis zu sieben Tage als Plattform-Wiederherstellungskopie vorhanden sein.';
 const LOCAL_DELETION_NOTE = 'Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen. Wenn das auf deinem Gerät nicht klappt, zeigt FitTrack dir einen Hinweis. Bereits in Health Connect gespeicherte Einträge und Berechtigungen bleiben davon unberührt.';
+const APPROVED_HEALTH_CONNECT_LOCAL_DATA_TEXT = 'Für den Abgleich speichert FitTrack auf deinem Gerät deine Nutzerkennung, je Datentyp den Aktivierungsstatus, den Zeitpunkt des letzten vollständig erfolgreichen Abgleichs und den Zeitpunkt des letzten Vordergrundversuchs sowie IDs noch ausstehender Löschungen. Gewichts- und Mahlzeitenwerte werden nicht in einer lokalen Wiederholungswarteschlange zwischengespeichert. Ein lokales technisches Diagnoseprotokoll bleibt bestehen. Diese Daten können jederzeit über Android-Mittel in der App-Speicherverwaltung gelöscht werden. Bei einer Deinstallation werden lokale App-Daten üblicherweise entfernt. Da Android-Backups für die App nicht ausgeschlossen sind, können gesicherte Daten abhängig von Android-Version, Geräteeinstellungen und Backup-Anbieter bei einer späteren Wiederherstellung erneut auf das Gerät gelangen.';
 
 const SOURCES: Record<LegalDocumentId, string> = {
   privacy: 'datenschutzerklaerung-alpha.md',
@@ -47,6 +48,8 @@ describe('embedded legal texts', () => {
 
   it('contains the approved account-deletion and local-device wording', () => {
     const { markdown } = LEGAL_DOCUMENTS.privacy;
+    expect(markdown).toContain('Stand: 2026-10-23');
+    expect(markdown).toContain(APPROVED_HEALTH_CONNECT_LOCAL_DATA_TEXT);
     expect(markdown).toContain('Das ist eine Alpha-Version. Dieser Text kann sich ändern.');
     expect(markdown).toContain(APPROVED_ACCOUNT_DELETION_TEXT);
     expect(markdown).toContain(LOCAL_DELETION_NOTE);

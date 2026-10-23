@@ -36,6 +36,15 @@ describe('recipeApi image crop contract', () => {
     expect(getMock).toHaveBeenCalledWith('/recipes/recipe-1');
   });
 
+  it.each([200, 201])('returns the owner recipe ID for a community copy with HTTP %i', async (status) => {
+    const response = { recipeId: 'owner-copy-1' };
+    postMock.mockResolvedValueOnce({ data: response, status });
+
+    await expect(recipeApi.copyCommunity('community-recipe-1')).resolves.toEqual(response);
+
+    expect(postMock).toHaveBeenCalledWith('/community-recipes/community-recipe-1/copy');
+  });
+
   it('sends no confirmation fields or If-Match header for an ordinary update', async () => {
     await recipeApi.update('recipe-1', { name: 'Neuer Name' });
 

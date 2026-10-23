@@ -6,12 +6,18 @@ import ProfileScreen from './ProfileScreen';
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const mocks = vi.hoisted(() => ({
-  profileApi: { getMe: vi.fn() },
+  profileApi: { getMe: vi.fn(), deleteProfile: vi.fn() },
+  recipeApi: { list: vi.fn() },
+  completeAccountDeletionLocally: vi.fn(),
   showSnackbar: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  Modal: 'Modal',
+  Platform: { OS: 'android' },
+  Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
   StyleSheet: {
@@ -19,7 +25,9 @@ vi.mock('react-native', () => ({
     create: <T,>(styles: T) => styles,
   },
   Text: 'Text',
+  TextInput: 'TextInput',
   TouchableOpacity: 'TouchableOpacity',
+  Switch: 'Switch',
   View: 'View',
 }));
 
@@ -32,6 +40,10 @@ vi.mock('@react-navigation/native', async () => {
 
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('../../shared/api/profileApi', () => ({ profileApi: mocks.profileApi }));
+vi.mock('../../shared/api/recipeApi', () => ({ recipeApi: mocks.recipeApi }));
+vi.mock('../../services/accountDeletionService', () => ({
+  completeAccountDeletionLocally: mocks.completeAccountDeletionLocally,
+}));
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
 vi.mock('../../shared/components/Snackbar', () => ({
   Snackbar: 'Snackbar',
@@ -115,6 +127,7 @@ function expectPermanentGroups(renderer: ReactTestRenderer) {
   expect(all).not.toContain('Gemeinsam');
   expect(textNodes(renderer)).not.toContain('Persönliche Daten');
   expect(findByLabel(renderer, 'Profil & Tagesziele')).toHaveLength(0);
+  expect(findByLabel(renderer, 'Konto löschen')).toHaveLength(0);
 }
 
 function expectLegalNavigation(renderer: ReactTestRenderer, navigation: { navigate: ReturnType<typeof vi.fn> }) {
@@ -136,15 +149,24 @@ beforeEach(() => {
 });
 
 describe('ProfileScreen', () => {
-  it('shows one Basisdaten card and the groups in fixed order without a repeated tab title', async () => {
+  it('shows one Profil & Tagesziele card and the groups in fixed order without a repeated tab title', async () => {
     mocks.profileApi.getMe.mockResolvedValue({ profile, targets });
     const { renderer } = await renderScreen();
 
     const nodes = textNodes(renderer);
     const all = text(renderer);
     expect(textNodes(renderer)).not.toContain('Profil');
-    expect(all).toContain('Basisdaten');
-    expect(nodes.filter((t) => t === 'Basisdaten')).toHaveLength(1);
+    expect(all).toContain('Profil & Tagesziele');
+    expect(nodes.filter((t) => t === 'Profil & Tagesziele')).toHaveLength(1);
+    expect(findByLabel(renderer, 'Konto löschen')).toHaveLength(1);
+    const profileScroll = renderer.root.findAll(
+      (node: ReactTestInstance) => node.type === 'ScrollView' && node.props.refreshControl != null,
+    )[0]!;
+    expect(profileScroll.findAll((node: ReactTestInstance) => node.props.accessibilityLabel === 'Konto löschen')).toHaveLength(0);
+    const deleteFooter = renderer.root.findAll(
+      (node: ReactTestInstance) => node.type === 'View' && node.props.testID === 'profile-delete-footer',
+    )[0]!;
+    expect(deleteFooter.findAll((node: ReactTestInstance) => node.props.accessibilityLabel === 'Konto löschen')).toHaveLength(1);
     expect(all).toContain('Männlich');
     expect(all).toContain('34 Jahre');
     expect(all).toContain('180 cm');
@@ -152,10 +174,7 @@ describe('ProfileScreen', () => {
     expect(all).toContain('78 kg');
 
     const order = [
-      'Basisdaten',
-      'Persönliche Daten',
       'Profil & Tagesziele',
-      'Details ansehen und bearbeiten',
       'Bibliothek',
       'Integrationen',
       'Rechtliches',
@@ -219,8 +238,8 @@ describe('ProfileScreen', () => {
     await flush();
 
     expect(mocks.profileApi.getMe).toHaveBeenCalledTimes(2);
-    expect(text(renderer)).toContain('Basisdaten');
-    expect(textNodes(renderer)).toContain('Persönliche Daten');
+    expect(text(renderer)).toContain('Profil & Tagesziele');
+    expect(textNodes(renderer)).not.toContain('Persönliche Daten');
   });
 
   it('shows "Noch kein Profil" with setup action only after a successful request without profile', async () => {
@@ -253,7 +272,7 @@ describe('ProfileScreen', () => {
     await flush();
 
     expect(mocks.profileApi.getMe).toHaveBeenCalledTimes(2);
-    expect(text(renderer)).toContain('Basisdaten');
+    expect(text(renderer)).toContain('Profil & Tagesziele');
   });
 
   it('keeps data and shows a snackbar when a refresh fails after a successful load', async () => {
@@ -268,6 +287,6 @@ describe('ProfileScreen', () => {
     await flush();
 
     expect(mocks.showSnackbar).toHaveBeenCalledWith({ message: 'Profil konnte nicht aktualisiert werden.' });
-    expect(text(renderer)).toContain('Basisdaten');
+    expect(text(renderer)).toContain('Profil & Tagesziele');
   });
 });

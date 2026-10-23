@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('./cosmosDiaryRepository', () => ({
   CosmosDiaryRepository: class {
     async getDay() { return { meals: [], summary: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 } }; }
+    async listMealsUpdatedSince() { return []; }
     async createMeal(i: { userId: string; date: string; type: string; name: string }) {
       return { id: 'mock-id', items: [], createdAt: new Date().toISOString(), ...i };
     }
@@ -140,6 +141,110 @@ describe('InMemoryDiaryRepository (via factory)', () => {
     const day = await repo.getDay('u', '2026-05-04');
     expect(day.meals).toHaveLength(1);
     expect(day.meals[0].date).toBe('2026-05-04');
+  });
+
+  it('lists meal deltas inclusively, falls back to createdAt for legacy meals, and stays user-scoped', async () => {
+    const repo = getDiaryRepository();
+    const since = '2026-05-04T08:00:00.000Z';
+    const old = await repo.createMeal({ userId: 'u', date: '2026-05-04', type: 'breakfast', name: 'Old' });
+    old.createdAt = '2026-05-03T08:00:00.000Z';
+    delete old.updatedAt;
+    const legacyBoundary = await repo.createMeal({ userId: 'u', date: '2026-05-04', type: 'lunch', name: 'Legacy' });
+    legacyBoundary.createdAt = since;
+    delete legacyBoundary.updatedAt;
+    const updatedBoundary = await repo.createMeal({ userId: 'u', date: '2026-05-04', type: 'dinner', name: 'Updated' });
+    updatedBoundary.createdAt = '2026-05-02T08:00:00.000Z';
+    updatedBoundary.updatedAt = '2026-05-04T08:00:01.000Z';
+    await repo.createMeal({ userId: 'other-user', date: '2026-05-04', type: 'snack', name: 'Foreign' });
+
+    const delta = await repo.listMealsUpdatedSince('u', since);
+
+    expect(delta.map((meal) => meal.id)).toEqual([legacyBoundary.id, updatedBoundary.id]);
+  });
+
+  it('stamps every meal mutation and creates new bulk targets with updatedAt', async () => {
+    const repo = getDiaryRepository();
+    const start = Date.parse('2026-06-01T00:00:00.000Z');
+    const setTime = (offset: number) => vi.setSystemTime(new Date(start + offset));
+    const isoAt = (offset: number) => new Date(start + offset).toISOString();
+    vi.useFakeTimers();
+
+    try {
+      setTime(0);
+      const editable = await repo.createMeal({ userId: 'u', date: '2026-06-01', type: 'breakfast', name: 'Editable' });
+      expect(editable.updatedAt).toBe(isoAt(0));
+
+      setTime(1_000);
+      const withItem = await repo.addItem('u', editable.id, {
+        name: 'Egg', calories: 90, protein: 6, carbs: 0, fat: 6, fiber: 0, sourceId: 'food-1',
+      });
+      expect(withItem.updatedAt).toBe(isoAt(1_000));
+
+      setTime(2_000);
+      const updated = await repo.updateItem('u', editable.id, withItem.items[0]!.id, {
+        quantity: 2,
+        unit: 'portion',
+        macros: { calories: 180, protein: 12, carbs: 0, fat: 12, fiber: 0 },
+      });
+      expect(updated?.updatedAt).toBe(isoAt(2_000));
+
+      setTime(3_000);
+      const deleted = await repo.deleteItem('u', editable.id, withItem.items[0]!.id);
+      expect(deleted?.updatedAt).toBe(isoAt(3_000));
+
+      setTime(4_000);
+      const deleteMeal = await repo.createMeal({ userId: 'u', date: '2026-06-01', type: 'lunch', name: 'Bulk delete' });
+      const deleteItem = await repo.addItem('u', deleteMeal.id, {
+        name: 'Toast', calories: 80, protein: 3, carbs: 15, fat: 1, fiber: 1,
+      });
+      setTime(5_000);
+      await repo.bulkDeleteItems('u', {
+        sourceDate: '2026-06-01',
+        items: [{ mealId: deleteMeal.id, itemId: deleteItem.items[0]!.id }],
+      });
+      expect((await repo.getMealById('u', deleteMeal.id))?.updatedAt).toBe(isoAt(5_000));
+
+      setTime(6_000);
+      const moveSource = await repo.createMeal({ userId: 'u', date: '2026-06-01', type: 'snack', name: 'Move source' });
+      const moveItem = await repo.addItem('u', moveSource.id, {
+        name: 'Apple', calories: 50, protein: 0, carbs: 14, fat: 0, fiber: 2,
+      });
+      setTime(7_000);
+      const moved = await repo.bulkMoveItems('u', {
+        sourceDate: '2026-06-01',
+        items: [{ mealId: moveSource.id, itemId: moveItem.items[0]!.id }],
+        target: { newMealType: 'dinner' },
+      });
+      expect((await repo.getMealById('u', moveSource.id))?.updatedAt).toBe(isoAt(7_000));
+      expect(moved.targetMeal).toMatchObject({ createdAt: isoAt(7_000), updatedAt: isoAt(7_000) });
+
+      setTime(8_000);
+      const copySource = await repo.createMeal({ userId: 'u', date: '2026-06-01', type: 'breakfast', name: 'Copy source' });
+      const copyItem = await repo.addItem('u', copySource.id, {
+        name: 'Oats', calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4,
+      });
+      setTime(9_000);
+      const copied = await repo.bulkCopyItems('u', {
+        sourceDate: '2026-06-01',
+        targetDate: '2026-06-02',
+        items: [{ mealId: copySource.id, itemId: copyItem.items[0]!.id }],
+        target: { newMealType: 'lunch' },
+      });
+      expect(copied.targetMeal).toMatchObject({ createdAt: isoAt(9_000), updatedAt: isoAt(9_000) });
+
+      setTime(10_000);
+      const macroMeal = await repo.createMeal({ userId: 'u', date: '2026-06-01', type: 'dinner', name: 'Macros' });
+      await repo.addItem('u', macroMeal.id, {
+        name: 'Food', calories: 100, protein: 5, carbs: 10, fat: 2, fiber: 1, sourceId: 'reusable-1',
+      });
+      setTime(11_000);
+      await repo.updateMacrosBySourceId('u', 'reusable-1', {
+        calories: 200, protein: 10, carbs: 20, fat: 4, fiber: 2,
+      });
+      expect((await repo.getMealById('u', macroMeal.id))?.updatedAt).toBe(isoAt(11_000));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('addItem appends item and updates summary', async () => {

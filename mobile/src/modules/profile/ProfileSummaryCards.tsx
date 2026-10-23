@@ -1,8 +1,7 @@
-// ProfileSummaryCards — Profilkarten (Basisdaten, Alltag & Training, Ziel, Tagesziele).
-// Basisdaten liegt im Profil-Hub, die übrigen Karten in ProfileDetails.
+// ProfileSummaryCards — Profilübersicht sowie Detailkarten für Alltag, Ziel und Tagesziele.
 
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { UserProfile, ProfileTargets, Gender, ActivityLevel, GoalType } from '@fittrack/shared';
 import { colors, spacing, typography } from '../../app/theme';
 import { Icon } from '../../shared/components/Icon';
@@ -81,16 +80,26 @@ function MacroGrid({
   );
 }
 
-export function BasicDataCard({ profile }: { profile: UserProfile }) {
+export function BasicDataCard({ profile, onPress }: { profile: UserProfile; onPress: () => void }) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Basisdaten</Text>
+    <TouchableOpacity
+      style={[styles.card, styles.summaryCard]}
+      onPress={onPress}
+      activeOpacity={0.75}
+      accessibilityRole="button"
+      accessibilityLabel="Profil & Tagesziele"
+      accessibilityHint={`Geschlecht ${GENDER_LABELS[profile.gender]}, Alter ${profile.age} Jahre, Größe ${profile.heightCm} cm, Gewicht ${profile.weightKg} kg, Zielgewicht ${profile.targetWeightKg} kg. Öffnet deine Profil- und Tagesziel-Details.`}
+    >
+      <View style={styles.summaryHeader}>
+        <Text style={styles.summaryTitle}>Profil & Tagesziele</Text>
+        <Icon lib="feather" name="chevron-right" size="md" color={colors.textMuted} />
+      </View>
       <InfoRow label="Geschlecht" value={GENDER_LABELS[profile.gender]} />
       <InfoRow label="Alter" value={`${profile.age} Jahre`} />
       <InfoRow label="Größe" value={`${profile.heightCm} cm`} />
       <InfoRow label="Gewicht" value={`${profile.weightKg} kg`} />
       <InfoRow label="Zielgewicht" value={`${profile.targetWeightKg} kg`} />
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -160,6 +169,15 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+  summaryCard: { padding: spacing.md },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  summaryTitle: { ...typography.h3, color: colors.text, flex: 1 },
   cardTitle: { ...typography.overline, color: colors.textMuted, marginBottom: spacing.sm, textTransform: 'uppercase' },
 
   infoRow: {

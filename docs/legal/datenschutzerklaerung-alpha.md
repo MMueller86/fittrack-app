@@ -1,6 +1,6 @@
 # Datenschutzerklärung
 
-Stand: 2026-10-22
+Stand: 2026-10-23
 
 ## Wer ist verantwortlich?
 
@@ -42,6 +42,8 @@ Wenn du Feedback zu einem Insight sendest, werden dein Kommentar, die Insight-An
 - FitTrack schreibt die Einträge in Health Connect auf deinem Gerät.
 - Deaktivieren stoppt nur die weitere Übertragung. Bereits geschriebene Einträge bleiben in Health Connect.
 - Was Health Connect, Android oder andere Apps mit diesen Daten machen, regeln deren eigene Bedingungen.
+
+Für den Abgleich speichert FitTrack auf deinem Gerät deine Nutzerkennung, je Datentyp den Aktivierungsstatus, den Zeitpunkt des letzten vollständig erfolgreichen Abgleichs und den Zeitpunkt des letzten Vordergrundversuchs sowie IDs noch ausstehender Löschungen. Gewichts- und Mahlzeitenwerte werden nicht in einer lokalen Wiederholungswarteschlange zwischengespeichert. Ein lokales technisches Diagnoseprotokoll bleibt bestehen. Diese Daten können jederzeit über Android-Mittel in der App-Speicherverwaltung gelöscht werden. Bei einer Deinstallation werden lokale App-Daten üblicherweise entfernt. Da Android-Backups für die App nicht ausgeschlossen sind, können gesicherte Daten abhängig von Android-Version, Geräteeinstellungen und Backup-Anbieter bei einer späteren Wiederherstellung erneut auf das Gerät gelangen.
 
 ## Wer sieht meine Daten?
 

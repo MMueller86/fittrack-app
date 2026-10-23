@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('./cosmosWeightsRepository', () => ({
   CosmosWeightsRepository: class CosmosWeightsRepository {
     async list() { return []; }
+    async listUpdatedSince() { return []; }
     async add(e: unknown) { return e; }
     async delete() { return false; }
   },
@@ -111,6 +112,33 @@ describe('InMemoryWeightsRepository (via factory)', () => {
     expect(u2.map((e) => e.id)).toEqual(['c']);
   });
 
+  it('lists updates inclusively, falls back to createdAt for legacy entries, and stays user-scoped', async () => {
+    const repo = getWeightsRepository();
+    const since = '2026-04-30T08:00:00.000Z';
+    const old = await repo.add({
+      id: 'old', userId: 'user-1', date: '2026-04-28', value: 80, unit: 'kg',
+      createdAt: '2026-04-28T08:00:00.000Z',
+    });
+    delete old.updatedAt;
+    const legacyBoundary = await repo.add({
+      id: 'legacy-boundary', userId: 'user-1', date: '2026-04-30', value: 81, unit: 'kg',
+      createdAt: since,
+    });
+    delete legacyBoundary.updatedAt;
+    await repo.add({
+      id: 'updated-boundary', userId: 'user-1', date: '2026-04-29', value: 82, unit: 'kg',
+      createdAt: '2026-04-29T08:00:00.000Z', updatedAt: since,
+    });
+    await repo.add({
+      id: 'foreign-boundary', userId: 'user-2', date: '2026-04-30', value: 70, unit: 'kg',
+      createdAt: since,
+    });
+
+    const delta = await repo.listUpdatedSince('user-1', since);
+
+    expect(delta.map((entry) => entry.id)).toEqual(['legacy-boundary', 'updated-boundary']);
+  });
+
   it('delete returns true when removed and false when missing', async () => {
     const repo = getWeightsRepository();
     await repo.add({
@@ -146,9 +174,15 @@ describe('InMemoryWeightsRepository (via factory)', () => {
     await repo.add(userOneEntry);
     await repo.add(userTwoEntry);
 
-    expect(await repo.updateValue('user-1', 'shared-id', 82.5)).toEqual({ ...userOneEntry, value: 82.5 });
-    expect(await repo.list('user-1')).toEqual([{ ...userOneEntry, value: 82.5 }]);
-    expect(await repo.list('user-2')).toEqual([userTwoEntry]);
+    const updated = await repo.updateValue('user-1', 'shared-id', 82.5);
+    expect(updated).toMatchObject({
+      ...userOneEntry,
+      value: 82.5,
+      updatedAt: expect.any(String),
+    });
+    expect(updated?.updatedAt).not.toBe(userOneEntry.createdAt);
+    expect(await repo.list('user-1')).toEqual([updated]);
+    expect(await repo.list('user-2')).toEqual([{ ...userTwoEntry, updatedAt: userTwoEntry.createdAt }]);
   });
 
   it('leaves a same-date sibling entry completely unchanged when updating one ID', async () => {
@@ -172,14 +206,16 @@ describe('InMemoryWeightsRepository (via factory)', () => {
     await repo.add(targetEntry);
     await repo.add(siblingEntry);
 
-    const targetBeforeUpdate = { ...targetEntry };
-    const siblingBeforeUpdate = { ...siblingEntry };
     const updated = await repo.updateValue('user-1', targetEntry.id, 82.5);
 
-    expect(updated).toEqual({ ...targetBeforeUpdate, value: 82.5 });
-    expect(await repo.list('user-1')).toEqual([
-      siblingBeforeUpdate,
-      { ...targetBeforeUpdate, value: 82.5 },
+    expect(updated).toMatchObject({
+      ...targetEntry,
+      value: 82.5,
+      updatedAt: expect.any(String),
+    });
+    expect(await repo.list('user-1')).toMatchObject([
+      { ...siblingEntry, updatedAt: siblingEntry.createdAt },
+      updated,
     ]);
   });
 

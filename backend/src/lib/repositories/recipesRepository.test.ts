@@ -126,6 +126,29 @@ describe('in-memory recipe revisions', () => {
     expect(await repo.getCommunityById(created.recipe.id)).not.toHaveProperty('authorDisplayName');
   });
 
+  it('creates a deterministic owner snapshot once without overwriting its first contents', async () => {
+    const repo = getRecipesRepository();
+    const source = await repo.create('publisher', input);
+    const snapshot: Recipe = {
+      ...source,
+      id: '607f7a61-6d5b-57f1-8d33-e1f7e82ffa47',
+      ownerUserId: 'copy-owner',
+      visibility: 'private',
+      communityCopyTimeSnapshot: { totalTimeMinutes: 35, sourceFingerprint: `sha256:${'a'.repeat(64)}` },
+    };
+
+    expect(await repo.createSnapshotCopy('copy-owner', snapshot)).toBe(true);
+    expect(await repo.createSnapshotCopy('copy-owner', { ...snapshot, name: 'Must not replace' })).toBe(false);
+    expect(await repo.get('copy-owner', snapshot.id)).toMatchObject({
+      id: snapshot.id,
+      ownerUserId: 'copy-owner',
+      name: source.name,
+      communityCopyTimeSnapshot: snapshot.communityCopyTimeSnapshot,
+    });
+    expect(await repo.get('publisher', snapshot.id)).toBeNull();
+    await expect(repo.createSnapshotCopy('different-owner', snapshot)).rejects.toThrow('Invalid private recipe snapshot copy');
+  });
+
   it('does not create an ownerless copy from a private recipe', async () => {
     const recipe = await getRecipesRepository().create('user-1', input);
     expect(() => toOwnerlessCommunityRecipe(recipe)).toThrow('Only published recipes can be preserved');

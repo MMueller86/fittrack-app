@@ -14,8 +14,8 @@ Located in `backend/src/functions/`. Each file owns one domain.
 |---|---|---|---|
 | `profile.ts` | GET/POST/PUT /profile/me, POST /profile/calculate-preview, DELETE /profile | Yes | Authenticated full FitTrack data deletion |
 | `nutritionTargets.ts` | nutrition targets endpoints | Yes | |
-| `weights.ts` | GET/POST /weights, PUT/DELETE /weights/{id} | Yes | |
-| `diary.ts` | GET/POST /diary/day/{date}, meal CRUD | Yes | |
+| `weights.ts` | GET/POST /weights, GET /weights/changes, PUT/DELETE /weights/{id} | Yes | Delta route uses a fixed checkpoint; full export remains unchanged |
+| `diary.ts` | GET/POST /diary/day/{date}, meal CRUD, GET /diary/changes/meals | Yes | Delta pages use a fixed checkpoint and stateless tuple cursor; full export remains unchanged |
 | `reusableItems.ts` | CRUD /reusable-items | Yes | |
 | `reusableItemsEnrich.ts` | POST /reusable-items/{id}/enrich | Yes | AI enrichment |
 | `reusableItemsEnrichScheduler.ts` | Timer trigger | — | Background enrichment |
@@ -132,10 +132,36 @@ Available repositories:
 - `profileDeletionRepository` — TTL concurrency lease and full Cosmos user-partition sweep
 
 `WeightsRepository.updateValue(userId, id, value)` uses `userId` as the Cosmos
-partition key and patches only `/value`. The entry's ID, owner, date, unit,
-and creation timestamp remain unchanged; a missing or foreign-partition ID
-returns `null` for the handler to expose as 404. No document migration is
-required.
+partition key and patches `/value` plus `/updatedAt`. The entry's ID, owner,
+date, unit, and creation timestamp remain unchanged; a missing or
+foreign-partition ID returns `null` for the handler to expose as 404. New
+entries initialize `updatedAt` from `createdAt`; changing a value stamps a new
+UTC `updatedAt`. `listUpdatedSince(userId, since)` is an inclusive,
+single-partition delta read; legacy entries without `updatedAt` use `createdAt`
+for the comparison. The optional field is a Class 0 change: old documents remain
+valid, reads handle the absent field, and no migration or backfill is required.
+
+`DiaryRepository.listMealsUpdatedSince(userId, since)` uses the existing
+`nutritionDiaryMeals` `/userId` partition and returns meals with an inclusive
+UTC ISO timestamp comparison. Legacy meals without `updatedAt` use
+`createdAt`; DayMeta documents are excluded. Meal creates initialize both
+timestamps, and every persisted Meal replacement stamps `updatedAt`. Hard
+deletes have no delta tombstone and therefore are not represented by this
+repository query. Optional Meal `updatedAt` is also Class 0: legacy documents
+remain readable through the `createdAt` fallback, with no migration or
+backfill.
+
+The registered `GET /api/weights/changes` and
+`GET /api/diary/changes/meals` handlers authenticate each request and derive
+the only repository partition identity from the verified JWT `sub`. Both use a
+canonical UTC `since` and a fixed server UTC `checkpointAt`; the meal cursor
+keeps that checkpoint and resumes after a stable `(updatedAt ?? createdAt,
+id)` tuple. These are queries over current documents, not change journals or
+database snapshots. The backend stores no device checkpoint, transfer status,
+deletion history, or deletion-ID list. The local ID-only Health Connect delete
+retry described by the unapproved [HC-4 draft](../../User%20Stories/HealthConnect/HC-4_Health-Connect-Synchronisation-vereinfachen.md)
+is Mobile-owned and is not implemented by these backend changes; the current
+Mobile sync services still persist snapshot-based `pendingOperations`.
 
 `ProfileRepository.get()` resolves missing legacy `macroRanges` in memory from
 the profile weight and each day's stored calorie and fat targets. This read

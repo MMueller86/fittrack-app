@@ -4,12 +4,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   __setStorageClientForTests,
   communityRecipeImageBlobName,
+  copyRecipeImageToOwnerSnapshot,
   copyRecipeImageToCommunity,
   downloadRecipeImage,
   downloadRecipeImageWithContentType,
   listPersonalProductImageBlobNames,
   listPersonalRecipeImageBlobNames,
   RECIPE_IMAGE_MAX_BYTES,
+  RecipeImageSnapshotConflictError,
   RecipeImageTooLargeError,
   RecipeImageUnsupportedContentTypeError,
 } from './storage';
@@ -189,5 +191,83 @@ describe('personal blob inventory', () => {
       .resolves.toEqual(['user-1/item-1.png']);
     expect(recipeContainer.listBlobsFlat).toHaveBeenCalledWith({ prefix: 'user-1/' });
     expect(productContainer.listBlobsFlat).toHaveBeenCalledWith({ prefix: 'user-1/' });
+  });
+});
+
+describe('owner snapshot image copy', () => {
+  it('uses a deterministic owner path and create-only upload conditions', async () => {
+    const source = {
+      getProperties: vi.fn().mockResolvedValue({ contentLength: 5, contentType: 'image/png' }),
+      downloadToBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
+    };
+    const target = { uploadData: vi.fn().mockResolvedValue(undefined) };
+    const container = {
+      getBlockBlobClient: vi.fn((name: string) => name === 'community/source/image-1.png' ? source : target),
+    };
+    __setStorageClientForTests({ getContainerClient: vi.fn(() => container) } as unknown as BlobServiceClient);
+
+    await expect(copyRecipeImageToOwnerSnapshot('community/source/image-1.png', 'user-1', 'recipe-1', 'image-1'))
+      .resolves.toBe('user-1/recipe-1/image-1.png');
+
+    expect(target.uploadData).toHaveBeenCalledWith(Buffer.from('image'), {
+      blobHTTPHeaders: { blobContentType: 'image/png' },
+      conditions: { ifNoneMatch: '*' },
+    });
+  });
+
+  it.each([
+    ['different bytes', { contentLength: 5, contentType: 'image/png' }, Buffer.from('other')],
+    ['different type', { contentLength: 5, contentType: 'image/jpeg' }, Buffer.from('image')],
+  ])('does not overwrite a conflicting target with %s', async (_label, targetProperties, targetBytes) => {
+    const source = {
+      getProperties: vi.fn().mockResolvedValue({ contentLength: 5, contentType: 'image/png' }),
+      downloadToBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
+    };
+    const target = {
+      uploadData: vi.fn().mockRejectedValue(Object.assign(new Error('condition failed'), {
+        statusCode: 412,
+        code: 'ConditionNotMet',
+      })),
+      getProperties: vi.fn().mockResolvedValue(targetProperties),
+      downloadToBuffer: vi.fn().mockResolvedValue(targetBytes),
+      deleteIfExists: vi.fn(),
+    };
+    const container = {
+      getBlockBlobClient: vi.fn((name: string) => name === 'source/image-1.png' ? source : target),
+    };
+    __setStorageClientForTests({ getContainerClient: vi.fn(() => container) } as unknown as BlobServiceClient);
+
+    await expect(copyRecipeImageToOwnerSnapshot('source/image-1.png', 'user-1', 'recipe-1', 'image-1'))
+      .rejects.toBeInstanceOf(RecipeImageSnapshotConflictError);
+    expect(target.uploadData).toHaveBeenCalledTimes(1);
+    expect(target.deleteIfExists).not.toHaveBeenCalled();
+  });
+
+  it('reuses an identical existing target after a 409 create-only conflict without deleting it', async () => {
+    const source = {
+      getProperties: vi.fn().mockResolvedValue({ contentLength: 5, contentType: 'image/png' }),
+      downloadToBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
+    };
+    const target = {
+      uploadData: vi.fn().mockRejectedValue(Object.assign(new Error('already exists'), {
+        statusCode: 409,
+        code: 'BlobAlreadyExists',
+      })),
+      getProperties: vi.fn().mockResolvedValue({ contentLength: 5, contentType: 'image/png' }),
+      downloadToBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
+      deleteIfExists: vi.fn(),
+    };
+    const container = {
+      getBlockBlobClient: vi.fn((name: string) => name === 'source/image-1.png' ? source : target),
+    };
+    __setStorageClientForTests({ getContainerClient: vi.fn(() => container) } as unknown as BlobServiceClient);
+
+    await expect(copyRecipeImageToOwnerSnapshot('source/image-1.png', 'user-1', 'recipe-1', 'image-1'))
+      .resolves.toBe('user-1/recipe-1/image-1.png');
+    expect(target.uploadData).toHaveBeenCalledWith(Buffer.from('image'), {
+      blobHTTPHeaders: { blobContentType: 'image/png' },
+      conditions: { ifNoneMatch: '*' },
+    });
+    expect(target.deleteIfExists).not.toHaveBeenCalled();
   });
 });

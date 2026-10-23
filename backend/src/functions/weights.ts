@@ -3,10 +3,11 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 import { requireUser } from '../lib/auth';
+import { effectiveUpdatedAt, hasOnlyQueryParams, isCanonicalUtcIso } from '../lib/deltaSync';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { getWeightsRepository } from '../lib/repositories/weightsRepository';
-import type { WeightEntry } from '@fittrack/shared';
+import type { WeightChangesResponse, WeightEntry } from '@fittrack/shared';
 
 // GET    /api/weights     — list entries for current user (newest first)
 // POST   /api/weights     — add weight entry for current user
@@ -68,6 +69,34 @@ export const listWeightsHandler = withHandler(
     const repo = getWeightsRepository();
     const entries = await repo.list(userId);
     return { status: 200, jsonBody: { entries } };
+  },
+);
+
+export const listWeightChangesHandler = withHandler(
+  'weights.changes',
+  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const since = request.query.get('since');
+    if (!hasOnlyQueryParams(request.query, ['since']) || since === null || !isCanonicalUtcIso(since)) {
+      return { status: 400, jsonBody: { error: 'invalid_delta_query' } };
+    }
+
+    const checkpointAt = new Date().toISOString();
+    if (since > checkpointAt) {
+      return { status: 400, jsonBody: { error: 'invalid_delta_query' } };
+    }
+
+    const entries = await getWeightsRepository().listUpdatedSince(userId, since);
+    const changedEntries = entries
+      .filter((entry) => {
+        const timestamp = effectiveUpdatedAt(entry);
+        return timestamp >= since && timestamp <= checkpointAt;
+      })
+      .sort((left, right) =>
+        effectiveUpdatedAt(left).localeCompare(effectiveUpdatedAt(right)) || left.id.localeCompare(right.id),
+      );
+    const response: WeightChangesResponse = { entries: changedEntries, checkpointAt };
+    return { status: 200, jsonBody: response };
   },
 );
 
@@ -156,6 +185,13 @@ app.http('weights-list', {
   authLevel: 'anonymous',
   route: 'weights',
   handler: listWeightsHandler,
+});
+
+app.http('weights-changes', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'weights/changes',
+  handler: listWeightChangesHandler,
 });
 
 app.http('weights-add', {

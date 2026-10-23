@@ -77,6 +77,14 @@ export interface Meal {
   name: string;
   items: MealItem[];
   createdAt: string;
+  /** Last persisted change; absent on legacy documents until they are updated. */
+  updatedAt?: string;
+}
+
+export interface MealChangesResponse {
+  meals: Meal[];
+  checkpointAt: string;
+  cursor?: string;
 }
 
 export interface DiaryItemReference {

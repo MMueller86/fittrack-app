@@ -80,7 +80,7 @@ export interface FakeRequestInit {
   body?: unknown;
   rawBody?: string; // when provided, body is ignored — used for invalid-JSON tests
   params?: Record<string, string>;
-  query?: Record<string, string>;
+  query?: Record<string, string | string[]>;
   headers?: Record<string, string>;
   formData?: FormData;
 }
@@ -89,6 +89,9 @@ export function makeRequest(init: FakeRequestInit = {}): HttpRequest {
   const params = init.params ?? {};
   const headers = init.headers ?? {};
   const queryMap = init.query ?? {};
+  const queryEntries = Object.entries(queryMap).flatMap(([key, value]) =>
+    (Array.isArray(value) ? value : [value]).map((entry) => [key, entry] as const),
+  );
   const rawBody = init.rawBody;
   const body = init.body;
   const fakeFormData = init.formData;
@@ -99,7 +102,9 @@ export function makeRequest(init: FakeRequestInit = {}): HttpRequest {
       get: (name: string) => headers[name.toLowerCase()] ?? null,
     },
     query: {
-      get: (key: string) => queryMap[key] ?? null,
+      get: (key: string) => queryEntries.find(([name]) => name === key)?.[1] ?? null,
+      getAll: (key: string) => queryEntries.filter(([name]) => name === key).map(([, value]) => value),
+      keys: () => queryEntries.map(([key]) => key)[Symbol.iterator](),
     },
     json: async () => {
       if (rawBody !== undefined) {

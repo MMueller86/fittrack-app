@@ -1,7 +1,7 @@
 // SyncStatusSheet — slide-up overlay showing Health Connect sync details.
 // Triggered by tapping the "Letzter Sync" row on HealthConnectScreen.
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Modal,
   ScrollView,
@@ -14,53 +14,65 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { Icon } from '../../shared/components/Icon';
-import { healthSyncService } from '../../services/health/healthSyncService';
-import type { PendingOp } from '../../services/health/healthSyncService';
+import type { healthSyncService } from '../../services/health/healthSyncService';
+import type { nutritionSyncService } from '../../services/health/nutritionSyncService';
+import { SYNC_STATUS_COPY } from './healthConnectCopy';
 
 interface Props {
   visible: boolean;
-  syncStatus: ReturnType<typeof healthSyncService.getSyncStatus>;
+  weightSyncStatus: ReturnType<typeof healthSyncService.getSyncStatus>;
+  nutritionSyncStatus: ReturnType<typeof nutritionSyncService.getSyncStatus>;
   onClose: () => void;
 }
 
-// ---------------------------------------------------------------------------
-// Failure row
-// ---------------------------------------------------------------------------
+type SyncStatus = ReturnType<typeof healthSyncService.getSyncStatus>;
 
-function FailureRow({ op }: { op: PendingOp & { errorStack?: string } }) {
-  const [expanded, setExpanded] = useState(false);
+function StatusSection({ title, syncStatus }: { title: string; syncStatus: SyncStatus }) {
   return (
-    <View style={styles.failureRow}>
-      <Text style={styles.failureType}>{op.type === 'upsert' ? 'upsert' : 'delete'}</Text>
-      <Text style={styles.failureId} numberOfLines={1}>{op.entryId}</Text>
-      {op.errorMessage ? (
-        <Text style={styles.failureMessage}>{op.errorMessage}</Text>
-      ) : null}
-      {op.errorStack ? (
-        <>
-          <TouchableOpacity
-            style={styles.detailsButton}
-            onPress={() => setExpanded((v) => !v)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.detailsButtonText}>{expanded ? 'Details ausblenden' : 'Details'}</Text>
-          </TouchableOpacity>
-          {expanded && (
-            <ScrollView style={styles.stackScroll} nestedScrollEnabled>
-              <Text style={styles.stackText}>{op.errorStack}</Text>
-            </ScrollView>
-          )}
-        </>
-      ) : null}
+    <View>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>{SYNC_STATUS_COPY.enabledLabel}</Text>
+        <Text style={[styles.rowValue, syncStatus.enabled ? styles.valuePositive : styles.valueMuted]}>
+          {syncStatus.enabled ? SYNC_STATUS_COPY.enabled : SYNC_STATUS_COPY.disabled}
+        </Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>{SYNC_STATUS_COPY.permissionLabel}</Text>
+        <Text style={[styles.rowValue, syncStatus.permissionRevoked ? styles.valueNegative : styles.valueMuted]}>
+          {syncStatus.permissionRevoked
+            ? SYNC_STATUS_COPY.permissionRevoked
+            : SYNC_STATUS_COPY.permissionNotRevoked}
+        </Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>{SYNC_STATUS_COPY.pendingDeleteCountLabel}</Text>
+        <Text style={[styles.rowValue, syncStatus.pendingDeleteCount > 0 ? styles.valueNegative : styles.valueMuted]}>
+          {syncStatus.pendingDeleteCount}
+        </Text>
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>{SYNC_STATUS_COPY.lastSuccessfulSyncAtLabel}</Text>
+        <Text style={[styles.rowValue, styles.dateValue]}>
+          {syncStatus.lastSuccessfulSyncAt
+            ? new Date(syncStatus.lastSuccessfulSyncAt).toLocaleString('de-DE', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+              })
+            : SYNC_STATUS_COPY.noSuccessfulSync}
+        </Text>
+      </View>
     </View>
   );
 }
 
-// ---------------------------------------------------------------------------
 // Sheet
 // ---------------------------------------------------------------------------
 
-export function SyncStatusSheet({ visible, syncStatus, onClose }: Props) {
+export function SyncStatusSheet({ visible, weightSyncStatus, nutritionSyncStatus, onClose }: Props) {
   return (
     <Modal
       visible={visible}
@@ -73,7 +85,7 @@ export function SyncStatusSheet({ visible, syncStatus, onClose }: Props) {
         <View style={styles.sheet}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Sync Status</Text>
+            <Text style={styles.headerTitle}>{SYNC_STATUS_COPY.title}</Text>
             <TouchableOpacity
               style={styles.closeButton}
               onPress={onClose}
@@ -91,64 +103,8 @@ export function SyncStatusSheet({ visible, syncStatus, onClose }: Props) {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Status section */}
-            <Text style={styles.sectionTitle}>Status</Text>
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>Sync aktiviert</Text>
-              <Text style={[styles.rowValue, syncStatus.enabled ? styles.valuePositive : styles.valueMuted]}>
-                {syncStatus.enabled ? 'Ja' : 'Nein'}
-              </Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>Berechtigung</Text>
-              <Text style={[styles.rowValue, syncStatus.permissionRevoked ? styles.valueNegative : styles.valuePositive]}>
-                {syncStatus.permissionRevoked ? 'Entzogen' : 'OK'}
-              </Text>
-            </View>
-
-            {/* Last export */}
-            <Text style={styles.sectionTitle}>Letzter Export</Text>
-            <Text style={styles.exportDate}>
-              {syncStatus.lastFullExportAt
-                ? new Date(syncStatus.lastFullExportAt).toLocaleString('de-DE', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : 'Noch kein Export'}
-            </Text>
-
-            {/* Temporary failures */}
-            {syncStatus.temporaryFailures.length > 0 && (
-              <>
-                <Text style={styles.sectionTitle}>
-                  Temporäre Fehler ({syncStatus.temporaryFailures.length})
-                </Text>
-                {syncStatus.temporaryFailures.map((op) => (
-                  <FailureRow key={`${op.entryId}:${op.type}`} op={op} />
-                ))}
-              </>
-            )}
-
-            {/* Permanent failures */}
-            {syncStatus.permanentFailures.length > 0 && (
-              <>
-                <Text style={styles.sectionTitle}>
-                  Permanente Fehler ({syncStatus.permanentFailures.length})
-                </Text>
-                {syncStatus.permanentFailures.map((op) => (
-                  <FailureRow key={`${op.entryId}:${op.type}`} op={op} />
-                ))}
-              </>
-            )}
-
-            {syncStatus.temporaryFailures.length === 0 && syncStatus.permanentFailures.length === 0 && (
-              <Text style={styles.emptyText}>Keine fehlgeschlagenen Operationen.</Text>
-            )}
-
-            <View style={{ height: spacing.lg }} />
+            <StatusSection title={SYNC_STATUS_COPY.weight} syncStatus={weightSyncStatus} />
+            <StatusSection title={SYNC_STATUS_COPY.nutrition} syncStatus={nutritionSyncStatus} />
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -205,37 +161,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  rowLabel: { ...typography.body2, color: colors.textSecondary },
-  rowValue: { ...typography.body2, fontWeight: '600' as const },
+  rowLabel: { ...typography.body2, color: colors.textSecondary, flexShrink: 1 },
+  rowValue: { ...typography.body2, fontWeight: '600' as const, textAlign: 'right' as const, flexShrink: 1 },
   valuePositive: { color: colors.primaryBright },
   valueNegative: { color: colors.negative },
   valueMuted: { color: colors.textMuted },
-
-  exportDate: { ...typography.body1, color: colors.text },
-
-  failureRow: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    marginBottom: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  failureType: { ...typography.caption, color: colors.textMuted, textTransform: 'uppercase' },
-  failureId: { ...typography.body2, color: colors.textSecondary, marginTop: spacing.xs },
-  failureMessage: { ...typography.caption, color: colors.negative, marginTop: spacing.xs },
-
-  detailsButton: { marginTop: spacing.xs, alignSelf: 'flex-start' },
-  detailsButtonText: { ...typography.caption, color: colors.primaryBright },
-  stackScroll: { maxHeight: 200, marginTop: spacing.xs },
-  stackText: {
-    fontFamily: 'monospace',
-    fontSize: typography.overline.fontSize,
-    color: colors.textSecondary,
-    lineHeight: 16,
-  },
-
-  emptyText: { ...typography.body2, color: colors.textMuted, marginTop: spacing.sm },
+  dateValue: { flex: 1, color: colors.text },
 });

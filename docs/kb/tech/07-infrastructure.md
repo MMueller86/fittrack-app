@@ -33,6 +33,13 @@ infra/
 | Function App | `functionapp.bicep` | Node.js 22, TypeScript build output |
 | Document Intelligence | `documentintelligence.bicep` | F0 for dev, S0 for alpha/prod |
 
+For Alpha, the existing Cosmos account and Function App/plan are referenced as
+existing resources to avoid What-if changes to provider-returned parent fields.
+The Alpha deployment still manages the Cosmos database and containers and the
+Function App `config/web`; it does not reconcile the parent resources or app
+settings. Dev and other environments continue to create and manage those
+parents.
+
 **Not in IaC:**
 - Azure OpenAI resource — pre-existing shared resource
 - Resource group — must already exist (`rg-Michael-Mueller`)

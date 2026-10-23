@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   recipeApi: {
     getCommunity: vi.fn(),
     getCommunityImage: vi.fn(),
+    copyCommunity: vi.fn(),
   },
   favoritesApi: {
     listFavorites: vi.fn(),
@@ -96,7 +97,7 @@ function makeCommunityRecipe(overrides: Partial<CommunityRecipe> = {}): Communit
 type DetailProps = React.ComponentProps<typeof CommunityRecipeDetailScreen>;
 
 async function renderDetail() {
-  const navigation = { goBack: vi.fn(), navigate: vi.fn() };
+  const navigation = { goBack: vi.fn(), navigate: vi.fn(), replace: vi.fn() };
   const props = {
     route: {
       key: 'RecipeDetail',
@@ -248,5 +249,49 @@ describe('CommunityRecipeDetailScreen', () => {
     expect(visibleText(renderer)).not.toContain('Paprikasalat');
     expect(mocks.recipeApi.getCommunityImage).not.toHaveBeenCalled();
     expect(renderer.root.findAll((node) => node.type === 'LogRecipeModal')).toHaveLength(0);
+  });
+
+  it.each([
+    { label: 'current', totalTimeMinutes: 35, expected: 'Gesamtzeit: 35 Min.' },
+    { label: 'null', totalTimeMinutes: null, expected: null },
+    { label: 'missing', totalTimeMinutes: undefined, expected: null },
+  ])('renders community total time only for a $label value', async ({ totalTimeMinutes, expected }) => {
+    mocks.recipeApi.getCommunity.mockResolvedValueOnce(makeCommunityRecipe(
+      totalTimeMinutes === undefined ? {} : { totalTimeMinutes },
+    ));
+    const { renderer } = await renderDetail();
+
+    if (expected) expect(visibleText(renderer)).toContain(expected);
+    else expect(visibleText(renderer)).not.toContain('Gesamtzeit:');
+  });
+
+  it('copies the community recipe and opens the returned owner recipe without rereading the source', async () => {
+    const { renderer, navigation } = await renderDetail();
+    mocks.recipeApi.copyCommunity.mockResolvedValueOnce({ recipeId: 'deterministic-owner-copy' });
+    const copyButton = findOne(
+      renderer,
+      (node) => node.type === 'TouchableOpacity' && node.props.accessibilityLabel === 'Rezept kopieren',
+      'community copy button',
+    );
+
+    await act(async () => {
+      const result = (copyButton.props.onPress as (() => unknown) | undefined)?.();
+      if (result instanceof Promise) await result;
+    });
+    await settle();
+
+    expect(mocks.recipeApi.copyCommunity).toHaveBeenCalledWith('recipe-1');
+    expect(navigation.replace).toHaveBeenCalledWith('RecipeDetail', {
+      id: 'deterministic-owner-copy',
+    });
+    expect(mocks.recipeApi.getCommunity).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not offer copying an own community recipe', async () => {
+    mocks.recipeApi.getCommunity.mockResolvedValueOnce(makeCommunityRecipe({ isOwnRecipe: true }));
+    const { renderer } = await renderDetail();
+
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Rezept kopieren')).toHaveLength(0);
+    expect(visibleText(renderer)).not.toContain('Rezept kopieren');
   });
 });

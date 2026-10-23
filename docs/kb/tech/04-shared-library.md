@@ -35,7 +35,7 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `NutritionValues` — `{ calories, protein, carbs, fat, fiber, sugar?, saturatedFat?, salt? }`
 - `PortionInfo` — `{ label, weightGrams?, nutrition }`
 - `MealItem` — diary entry for one food item; includes `isAiEstimate`, `confidence`, `warnings`, `components`
-- `Meal` — container for multiple `MealItem`s on a date, with a `type`
+- `Meal` — container for multiple `MealItem`s on a date, with a `type` and optional `updatedAt` (absent on legacy documents)
 - `DaySummary` — aggregated macro totals for a day
 - `DayMeta` — per-day metadata (`dayType: 'rest' | 'training'`, `workoutType`, `specialActivity?`)
 - `ReusableItem` — user's personal food library item; includes AI-generated `searchTerms` and `aiKeywords`
@@ -140,7 +140,7 @@ pair and any supplied ETag precondition, and computes the persisted fingerprint.
 
 ### `weights.ts`
 - `WeightUnit` — `'kg' | 'lbs'`
-- `WeightEntry` — date-stamped weight measurement
+- `WeightEntry` — date-stamped weight measurement with optional `updatedAt` (absent on legacy documents)
 
 ### `weightTrend.ts`
 - `calculateWeightTrendPerWeek` — fixed 30-calendar-day linear regression, projected to a weekly change and converted to the requested weight unit

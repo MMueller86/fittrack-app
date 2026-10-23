@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, beforeAll, afterAll, afterEach, vi } from 'vitest';
 
-import { addWeightHandler, deleteWeightHandler, listWeightsHandler, updateWeightHandler } from './weights';
+import {
+  addWeightHandler,
+  deleteWeightHandler,
+  listWeightChangesHandler,
+  listWeightsHandler,
+  updateWeightHandler,
+} from './weights';
 import { __resetWeightsRepositoryForTests, getWeightsRepository } from '../lib/repositories/weightsRepository';
 import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, teardownTestAuth, TEST_USER_ID } from '../test-utils/http';
 
@@ -55,6 +61,69 @@ describe('GET /api/weights', () => {
     const body = res.jsonBody as { entries: Array<{ value: number; date: string; userId: string }> };
     expect(body.entries.map((e) => e.date)).toEqual(['2026-04-30', '2026-04-28']);
     expect(body.entries.every((e) => e.userId === TEST_USER_ID)).toBe(true);
+  });
+});
+
+describe('GET /api/weights/changes', () => {
+  const since = '2026-04-30T10:00:00.000Z';
+
+  it('returns the inclusive, checkpoint-bounded window sorted by effective timestamp and id', async () => {
+    const checkpointAt = '2026-04-30T12:00:00.000Z';
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(checkpointAt));
+    const repo = getWeightsRepository();
+    const querySpy = vi.spyOn(repo, 'listUpdatedSince').mockResolvedValue([
+      { id: 'tie-b', userId: TEST_USER_ID, date: '2026-04-30', value: 80, unit: 'kg', createdAt: since },
+      { id: 'future', userId: TEST_USER_ID, date: '2026-04-30', value: 80, unit: 'kg', createdAt: checkpointAt, updatedAt: '2026-04-30T12:00:00.001Z' },
+      { id: 'tie-a', userId: TEST_USER_ID, date: '2026-04-30', value: 80, unit: 'kg', createdAt: '2026-04-30T09:00:00.000Z', updatedAt: since },
+      { id: 'old', userId: TEST_USER_ID, date: '2026-04-30', value: 80, unit: 'kg', createdAt: '2026-04-30T09:59:59.999Z' },
+    ]);
+
+    const res = await listWeightChangesHandler(await makeAuthRequest({ query: { since } }), makeContext());
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toMatchObject({ checkpointAt });
+    expect((res.jsonBody as { entries: { id: string }[] }).entries.map(({ id }) => id)).toEqual(['tie-a', 'tie-b']);
+    expect(querySpy).toHaveBeenCalledWith(TEST_USER_ID, since);
+  });
+
+  it.each([
+    ['missing since', {}],
+    ['invalid since', { since: 'not-a-date' }],
+    ['offset timestamp', { since: '2026-04-30T10:00:00.000+00:00' }],
+    ['local timestamp', { since: '2026-04-30T10:00:00.000' }],
+    ['noncanonical timestamp', { since: '2026-04-30T10:00:00Z' }],
+    ['future since', { since: '9999-12-31T23:59:59.999Z' }],
+    ['unknown query parameter', { since, userId: 'forged-user' }],
+    ['repeated since', { since: [since, since] }],
+  ] as const)('returns invalid_delta_query for %s', async (_label, query) => {
+    const res = await listWeightChangesHandler(await makeAuthRequest({ query }), makeContext());
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'invalid_delta_query' });
+  });
+
+  it('binds the repository query to the authenticated JWT subject', async () => {
+    const repo = getWeightsRepository();
+    await repo.add({ id: 'owned-entry', userId: TEST_USER_ID, date: '2026-04-30', value: 80, unit: 'kg', createdAt: since });
+    await repo.add({ id: 'foreign-entry', userId: 'another-user', date: '2026-04-30', value: 70, unit: 'kg', createdAt: since });
+    const querySpy = vi.spyOn(repo, 'listUpdatedSince');
+
+    const res = await listWeightChangesHandler(await makeAuthRequest({ query: { since } }), makeContext());
+
+    expect(res.status).toBe(200);
+    expect((res.jsonBody as { entries: { id: string }[] }).entries.map(({ id }) => id)).toEqual(['owned-entry']);
+    expect(querySpy).toHaveBeenCalledWith(TEST_USER_ID, since);
+  });
+
+  it('returns 401 without a valid token and 500 when the repository fails', async () => {
+    const unauthorized = await listWeightChangesHandler(makeRequest({ query: { since } }), makeContext());
+    expect(unauthorized.status).toBe(401);
+
+    const repo = getWeightsRepository();
+    vi.spyOn(repo, 'listUpdatedSince').mockRejectedValueOnce(new Error('storage unavailable'));
+    const failed = await listWeightChangesHandler(await makeAuthRequest({ query: { since } }), makeContext());
+    expect(failed.status).toBe(500);
+    expect(failed.jsonBody).toEqual({ error: 'Internal server error' });
   });
 });
 
@@ -197,6 +266,7 @@ describe('PUT /api/weights/:id', () => {
       value: 70,
       unit: 'kg',
       createdAt: '2026-04-30T08:00:00.000Z',
+      updatedAt: '2026-04-30T08:00:00.000Z',
     }]);
   });
 

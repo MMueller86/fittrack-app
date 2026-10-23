@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { RecipeIngredient, UserProfile } from '@fittrack/shared';
 import { projectCommunityRecipe, projectRecipeReferenceAccess, resolveRecipeForRead } from './communityRecipes';
+import { computeRecipeSourceFingerprint } from './repositories/recipeExport';
 import { __resetRecipesRepositoryForTests, getRecipesRepository } from './repositories/recipesRepository';
 import { effectiveRecipeVisibility } from './repositories/recipePublication';
 import { resolveRecipeIngredientProvenance } from './repositories/recipeIngredientProvenance';
@@ -114,6 +115,23 @@ describe('community access and projection', () => {
       get: vi.fn(async () => null),
       getCommunityById: vi.fn(async () => ownerless),
     })).toEqual({ access: 'community', recipe: ownerless });
+  });
+
+  it('projects current copy time snapshots and hides missing or stale time', async () => {
+    const recipe = { ...(await getRecipesRepository().create('owner', input)), visibility: 'community' as const };
+    recipe.communityCopyTimeSnapshot = {
+      totalTimeMinutes: 35,
+      sourceFingerprint: computeRecipeSourceFingerprint(recipe),
+    };
+
+    expect((await projectCommunityRecipe(recipe, 'reader', imagePath)).totalTimeMinutes).toBe(35);
+    expect((await projectCommunityRecipe({ ...recipe, name: 'Changed recipe' }, 'reader', imagePath))
+      .totalTimeMinutes).toBeNull();
+    expect((await projectCommunityRecipe(toOwnerlessCommunityRecipe(recipe), 'reader', imagePath))
+      .totalTimeMinutes).toBe(35);
+
+    const legacy = { ...(await getRecipesRepository().create('owner', input)), visibility: 'community' as const };
+    expect((await projectCommunityRecipe(legacy, 'reader', imagePath)).totalTimeMinutes).toBeNull();
   });
 
   it('allowlists ingredients, images and steps and preserves positive legacy AI evidence', async () => {

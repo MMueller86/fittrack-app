@@ -42,7 +42,7 @@ Modals (overlaid on top):
 
 ### Profil-Hub: Informationsarchitektur
 
-`ProfileMain` zeigt genau eine Karte (`Basisdaten`: Geschlecht, Alter, Größe, Gewicht, Zielgewicht) und danach die Navigationsgruppen aus `mobile/src/modules/profile/profileHubGroups.ts` in fester Reihenfolge (leere Gruppen werden nicht gerendert). Der Tab `Profil` liefert den Screen-Kontext; ein zusätzlicher Seitentitel wird nicht wiederholt. `Alltag & Training`, `Ziel` und `Tagesziele` liegen nicht im Hub, sondern in `ProfileDetails`.
+`ProfileMain` zeigt genau eine Karte (`Basisdaten`: Geschlecht, Alter, Größe, Gewicht, Zielgewicht) und danach die Navigationsgruppen aus `mobile/src/modules/profile/profileHubGroups.ts` in fester Reihenfolge (leere Gruppen werden nicht gerendert). Bei geladenem Profil bleibt `Konto löschen` als roter Button in einem festen Footer oberhalb der Tab-Navigation sichtbar. Dies ist der einzige Einstieg zur Kontolöschung. Der Tab `Profil` liefert den Screen-Kontext; ein zusätzlicher Seitentitel wird nicht wiederholt. `Alltag & Training`, `Ziel` und `Tagesziele` liegen nicht im Hub, sondern in `ProfileDetails`.
 
 ```
 Profil (Tab)
@@ -61,6 +61,7 @@ INTEGRATIONEN
 RECHTLICHES
  › Impressum
  › Datenschutzerklärung
+[ Konto löschen ]  (fester Footer, nur mit Profil)
 ```
 
 | # | Gruppe | Inhalt | Ziel-Route |
@@ -72,10 +73,10 @@ RECHTLICHES
 | 5 | `Rechtliches` | `Impressum`, `Datenschutzerklärung` (native In-App-Seiten) | `Imprint`, `PrivacyPolicy` |
 
 - `Rechtliches` steht fest am Ende des Hubs; `Gemeinsam` steht fest zwischen `Integrationen` und `Rechtliches`; `Persönliche Daten` steht fest an erster Stelle.
-- `ProfileDetails` (`ProfileDetailsScreen`, Param `undefined`) hat einen Header mit Zurück, zentriertem Titel `Profil & Tagesziele` und rechts `Bearbeiten`; der Inhalt besteht aus `Alltag & Training`, `Ziel` und `Tagesziele` (Ruhetag/Trainingstag). `Bearbeiten` öffnet `ProfileEdit` mit dem geladenen Profil und ist der einzige Einstieg dorthin (Profil bearbeiten braucht damit zwei Taps). Der Screen lädt bei Fokus neu, sodass nach `ProfileEdit` → Speichern → Zurück die aktuellen Werte erscheinen. Ohne Profil zeigt er `Noch kein Profil` ohne `Bearbeiten` und ohne Einrichten-Button; die Einrichtung startet nur im Hub.
+- `ProfileDetails` (`ProfileDetailsScreen`, Param `undefined`) hat einen Header mit Zurück, zentriertem Titel `Profil & Tagesziele` und dem Iconbutton `Profil bearbeiten`; der Inhalt besteht aus `Alltag & Training`, `Ziel` und `Tagesziele` (Ruhetag/Trainingstag). `Bearbeiten` öffnet `ProfileEdit` mit dem geladenen Profil und ist der einzige Einstieg dorthin (Profil bearbeiten braucht damit zwei Taps). Der Screen lädt bei Fokus neu, sodass nach `ProfileEdit` → Speichern → Zurück die aktuellen Werte erscheinen. Ohne Profil zeigt er `Noch kein Profil` ohne `Bearbeiten` und ohne Einrichten-Button; die Einrichtung startet nur im Hub.
 - `Favoriten` und `Eigene Lebensmittel` sind ausschließlich über `Profil > Bibliothek` (`LibraryScreen`, zwei Tabs) erreichbar. Es gibt keine eigene Route und keinen zweiten Einstieg für `Eigene Lebensmittel`. `Eigene Lebensmittel` listet nur selbst angelegte Einträge und schließt `sourceType: 'openFoodFacts'` aus.
 - Datenschutz ist erreichbar über `Profil > Rechtliches`, `LoginScreen` und `ProfileWizardScreen` (Willkommensschritt und Vorschau), also auch vor dem ersten Speichern des Profils.
-- Die Profilbearbeitung (`ProfileEdit`) enthält keine aktive Löschfunktion; `Konto löschen` ist ein deaktivierter Platzhalter (`Wird später verfügbar`) ohne API-Aufruf.
+- In `ProfileDetails` und `ProfileEdit` gibt es keinen Löschbutton. Die Bestätigung zur Kontolöschung ist ausschließlich über den festen Footer in `ProfileMain` erreichbar.
 
 #### Hub-Zustände
 

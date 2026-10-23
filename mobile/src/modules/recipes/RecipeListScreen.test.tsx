@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
     listCommunity: vi.fn(),
     getCommunityImage: vi.fn(),
+    copyCommunity: vi.fn(),
   },
   favoritesApi: {
     listFavorites: vi.fn(),
@@ -393,5 +394,35 @@ describe('RecipeListScreen', () => {
 
     expect(visibleText(renderer)).toContain('Community-Rezept');
     expect(visibleText(renderer)).not.toContain('Verspätetes privates Rezept');
+  });
+
+  it('shows only current community recipe times in the list', async () => {
+    mocks.recipeApi.listCommunity.mockResolvedValue({
+      recipes: [
+        { ...makeCommunityRecipe('Rezept mit Zeit'), totalTimeMinutes: 35 },
+        makeCommunityRecipe('Rezept ohne Zeit'),
+        { ...makeCommunityRecipe('Rezept mit veralteter Zeit'), totalTimeMinutes: null },
+      ],
+    });
+    const { renderer } = await renderList();
+
+    await press(renderer, 'Community-Rezepte');
+
+    const text = visibleText(renderer);
+    expect(text).toContain('Gesamtzeit · 35 Min.');
+    expect(text.match(/Gesamtzeit ·/g)).toHaveLength(1);
+  });
+
+  it('does not show a copy action for community recipes in the overview', async () => {
+    const ownRecipe = makeCommunityRecipe('Eigenes veröffentlichtes Rezept', true);
+    mocks.recipeApi.listCommunity.mockResolvedValue({ recipes: [ownRecipe] });
+    const { renderer } = await renderList();
+
+    await press(renderer, 'Community-Rezepte');
+
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === `Rezept kopieren: ${ownRecipe.name}`)).toHaveLength(0);
+    expect(mocks.recipeApi.copyCommunity).not.toHaveBeenCalled();
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Zu Favoriten hinzufügen')).toHaveLength(1);
+    expect(mocks.recipeApi.listCommunity).toHaveBeenCalledTimes(1);
   });
 });

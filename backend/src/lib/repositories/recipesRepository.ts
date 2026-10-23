@@ -20,7 +20,7 @@ import type {
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { isCosmosConfigured } from '../cosmos';
 import { CosmosRecipesRepository } from './cosmosRecipesRepository';
-import { withRecipeExportViewStatus } from './recipeExport';
+import { computeRecipeSourceFingerprint, withRecipeExportViewStatus, type RecipeFingerprintSource } from './recipeExport';
 import { applyRecipeVisibility, communityPageSize, effectiveRecipeVisibility } from './recipePublication';
 import { resolveRecipeIngredientProvenance } from './recipeIngredientProvenance';
 
@@ -94,9 +94,27 @@ export function toOwnerlessCommunityRecipe(recipe: Recipe): OwnerlessCommunityRe
     Reflect.deleteProperty(ownerless, 'linkedReusableItemId');
     return ownerless as unknown as OwnerlessCommunityRecipeIngredient;
   });
+  const currentFingerprint = computeRecipeSourceFingerprint(recipe as RecipeFingerprintSource);
+  const currentCopyTimeSnapshot = recipe.communityCopyTimeSnapshot?.sourceFingerprint === currentFingerprint
+    ? recipe.communityCopyTimeSnapshot
+    : undefined;
+  const currentExportView = recipe.exportView &&
+    recipe.exportView.sourceFingerprint === computeRecipeSourceFingerprint(recipe as RecipeFingerprintSource)
+    ? recipe.exportView
+    : undefined;
+  const retainedTimeSnapshot = currentCopyTimeSnapshot ?? (currentExportView ? {
+    totalTimeMinutes: currentExportView.totalTimeMinutes,
+    sourceFingerprint: currentExportView.sourceFingerprint,
+  } : undefined);
 
   return {
     id: recipe.id,
+    ...(retainedTimeSnapshot !== undefined ? {
+      communityCopyTimeSnapshot: {
+        totalTimeMinutes: retainedTimeSnapshot.totalTimeMinutes,
+        sourceFingerprint: retainedTimeSnapshot.sourceFingerprint,
+      },
+    } : {}),
     name: recipe.name,
     ...(recipe.description !== undefined ? { description: recipe.description } : {}),
     portions: recipe.portions,
@@ -121,6 +139,9 @@ export function toOwnerlessCommunityRecipe(recipe: Recipe): OwnerlessCommunityRe
 export function sanitizeOwnerlessCommunityRecipe(recipe: OwnerlessCommunityRecipe): OwnerlessCommunityRecipe {
   return {
     id: recipe.id,
+    ...(recipe.communityCopyTimeSnapshot !== undefined
+      ? { communityCopyTimeSnapshot: structuredClone(recipe.communityCopyTimeSnapshot) }
+      : {}),
     name: recipe.name,
     ...(recipe.description !== undefined ? { description: recipe.description } : {}),
     portions: recipe.portions,
@@ -189,6 +210,7 @@ export interface RecipesRepository {
   getVersioned(userId: string, id: string): Promise<VersionedRecipe | null>;
   create(userId: string, input: CreateRecipeInput): Promise<Recipe>;
   createVersioned(userId: string, input: CreateRecipeInput): Promise<VersionedRecipe>;
+  createSnapshotCopy(userId: string, recipe: Recipe): Promise<boolean>;
   update(userId: string, id: string, input: UpdateRecipeInput): Promise<Recipe | null>;
   compareAndReplace(
     userId: string,
@@ -309,6 +331,16 @@ class InMemoryRecipesRepository implements RecipesRepository {
     const record = { recipe: structuredClone(recipe), etag: `"${randomUUID()}"` };
     this.store.set(this.key(userId, recipe.id), record);
     return { recipe: withEffectiveRecipeProjection(recipe), etag: record.etag };
+  }
+
+  async createSnapshotCopy(userId: string, recipe: Recipe): Promise<boolean> {
+    if (recipe.ownerUserId !== userId || recipe.visibility !== 'private') {
+      throw new Error('Invalid private recipe snapshot copy');
+    }
+    const key = this.key(userId, recipe.id);
+    if (this.store.has(key)) return false;
+    this.store.set(key, { recipe: structuredClone(recipe), etag: `"${randomUUID()}"` });
+    return true;
   }
 
   async getVersioned(userId: string, id: string): Promise<VersionedRecipe | null> {

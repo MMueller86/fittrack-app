@@ -46,10 +46,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (isAuthenticated !== true) return;
+    void healthSyncService.syncForeground();
+    void nutritionSyncService.syncForeground();
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && isAuthenticated) {
-        void healthSyncService.drainPendingQueue();
-        void nutritionSyncService.drainPendingQueue();
+      if (state === 'active') {
+        void healthSyncService.syncForeground();
+        void nutritionSyncService.syncForeground();
       }
     });
     return () => sub.remove();

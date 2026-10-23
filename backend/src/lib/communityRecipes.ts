@@ -1,6 +1,7 @@
 import type { CommunityRecipe, CommunityRecipeIngredient, MealItem, Recipe, RecipeAccess, RecipeNutrition, UserFoodRelation } from '@fittrack/shared';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../shared/types/recipeImageHeroCrop';
 import { effectiveIngredientNutritionSource } from './repositories/recipeIngredientProvenance';
+import { computeRecipeSourceFingerprint, type RecipeFingerprintSource } from './repositories/recipeExport';
 import {
   getRecipesRepository,
   type CommunityRecipeRecord,
@@ -34,6 +35,21 @@ export async function resolveRecipeForRead(
 
 function projectNutrition(nutrition: RecipeNutrition): RecipeNutrition {
   return { calories: nutrition.calories, protein: nutrition.protein, carbs: nutrition.carbs, fat: nutrition.fat, fiber: nutrition.fiber };
+}
+
+function projectedTotalTimeMinutes(recipe: CommunityRecipeRecord): number | null {
+  if (!('ownerUserId' in recipe) && recipe.communityCopyTimeSnapshot) {
+    return recipe.communityCopyTimeSnapshot.totalTimeMinutes;
+  }
+  const timeSnapshot = recipe.communityCopyTimeSnapshot;
+  if (timeSnapshot && timeSnapshot.sourceFingerprint === computeRecipeSourceFingerprint(recipe as RecipeFingerprintSource)) {
+    return timeSnapshot.totalTimeMinutes;
+  }
+  const exportView = recipe.exportView;
+  if (!exportView) return null;
+  return exportView.sourceFingerprint === computeRecipeSourceFingerprint(recipe as RecipeFingerprintSource)
+    ? exportView.totalTimeMinutes
+    : null;
 }
 
 export async function projectCommunityRecipe(
@@ -73,6 +89,7 @@ export async function projectCommunityRecipe(
     name: recipe.name,
     ...(recipe.description !== undefined ? { description: recipe.description } : {}),
     portions: recipe.portions,
+    totalTimeMinutes: projectedTotalTimeMinutes(recipe),
     ingredients,
     steps: recipe.steps.map(({ order, title, description }) => ({ order, ...(title !== undefined ? { title } : {}), description })),
     images: recipe.images.map((image) => {

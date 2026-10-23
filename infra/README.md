@@ -22,6 +22,12 @@ inherited from this RG via `resourceGroup().location` in `main.bicep`.
 | Function App (Consumption) + Plan | `func-fittrack-dev` | `modules/functionapp.bicep` |
 | Application Insights | `appi-fittrack-dev` | `modules/appinsights.bicep` |
 
+For Alpha, `main.bicep` treats the already-provisioned Cosmos account and
+Function App/plan as existing resources. It continues to manage the Cosmos
+database and containers and the Function App `config/web` settings, but Alpha
+Bicep does not reconcile parent-resource properties or app settings. Dev and
+other environments continue to create and manage those parent resources.
+
 ## NOT Managed Here
 
 - Azure OpenAI resource — already deployed (`oai-fittrack-dev`, `gpt4o-mini`)

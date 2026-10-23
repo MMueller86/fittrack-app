@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   syncNutritionUpsert: vi.fn(),
   syncNutritionDelete: vi.fn(),
   syncNutritionDeleteMeal: vi.fn(),
+  syncNutritionDeletes: vi.fn(),
   hydrateDayType: vi.fn(),
   setTargets: vi.fn(),
   dayStoryTarget: vi.fn(),
@@ -89,6 +90,7 @@ vi.mock('../../services/health/nutritionSyncService', () => ({
     syncNutritionUpsert: mocks.syncNutritionUpsert,
     syncNutritionDelete: mocks.syncNutritionDelete,
     syncNutritionDeleteMeal: mocks.syncNutritionDeleteMeal,
+    syncNutritionDeletes: mocks.syncNutritionDeletes,
   },
 }));
 
@@ -466,6 +468,7 @@ beforeEach(() => {
   mocks.syncNutritionUpsert.mockResolvedValue(undefined);
   mocks.syncNutritionDelete.mockResolvedValue(undefined);
   mocks.syncNutritionDeleteMeal.mockResolvedValue(undefined);
+  mocks.syncNutritionDeletes.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -476,6 +479,18 @@ afterEach(() => {
 });
 
 describe('DiaryScreen F2 bulk actions', () => {
+  it('does not show Health Connect status in diary entries', async () => {
+    const renderer = await renderScreen([makeDay([
+      makeMeal('meal-1', 'breakfast', 'Frühstück', [makeItem('item-1', 'Haferflocken')]),
+    ])]);
+    const visibleText = renderer.root.findAll((node) => node.type === 'Text')
+      .map((node) => typeof node.props.children === 'string' ? node.props.children : '')
+      .join(' ');
+
+    expect(visibleText).toContain('Haferflocken');
+    expect(visibleText).not.toMatch(/Health Connect|Synchronisationsstatus|Ausstehende Löschungen|Letzter erfolgreicher Abgleich/);
+  });
+
   it('puts date navigation below the Home search row and uses the same sheet inset', async () => {
     mocks.safeAreaTop = 24;
     const renderer = await renderScreen([makeDay([])]);
@@ -675,8 +690,7 @@ describe('DiaryScreen F2 bulk actions', () => {
     });
     expect(mocks.apiGetDay).toHaveBeenCalledTimes(2);
     expect(mocks.apiGetDay).toHaveBeenNthCalledWith(2, DATE);
-    expect(mocks.syncNutritionDelete).toHaveBeenCalledTimes(1);
-    expect(mocks.syncNutritionDelete).toHaveBeenCalledWith('item-1');
+    expect(mocks.syncNutritionDeletes).toHaveBeenCalledWith(['item-1']);
     expect(mocks.syncNutritionUpsert).not.toHaveBeenCalled();
     expect(mocks.apiAddItem).not.toHaveBeenCalled();
     expect(mocks.apiDeleteItem).not.toHaveBeenCalled();
@@ -724,7 +738,7 @@ describe('DiaryScreen F2 bulk actions', () => {
     expect(mocks.apiAddItem).not.toHaveBeenCalled();
     expect(mocks.apiDeleteItem).not.toHaveBeenCalled();
     expect(mocks.apiGetDay).toHaveBeenCalledTimes(2);
-    expect(mocks.syncNutritionDelete).toHaveBeenCalledWith('item-source');
+    expect(mocks.syncNutritionDeletes).toHaveBeenCalledWith(['item-source']);
     expect(mocks.syncNutritionUpsert).toHaveBeenCalledWith(targetAfter, ['item-moved']);
 
     const moveSnackbar = mocks.showSnackbar.mock.calls
@@ -740,7 +754,7 @@ describe('DiaryScreen F2 bulk actions', () => {
       target: { mealId: 'meal-breakfast' },
     });
     expect(mocks.apiGetDay).toHaveBeenCalledTimes(3);
-    expect(mocks.syncNutritionDelete).toHaveBeenCalledWith('item-moved');
+    expect(mocks.syncNutritionDeletes).toHaveBeenCalledWith(['item-moved']);
     expect(mocks.syncNutritionUpsert).toHaveBeenCalledWith(sourceAfterUndo, ['item-restored']);
   });
 
@@ -830,8 +844,7 @@ describe('DiaryScreen F2 bulk actions', () => {
     });
     expect(mocks.apiGetDay).toHaveBeenCalledTimes(2);
     expect(mocks.apiGetDay).toHaveBeenNthCalledWith(2, DATE);
-    expect(mocks.syncNutritionDelete).toHaveBeenNthCalledWith(1, 'item-1');
-    expect(mocks.syncNutritionDelete).toHaveBeenNthCalledWith(2, 'item-2');
+    expect(mocks.syncNutritionDeletes).toHaveBeenCalledWith(['item-1', 'item-2']);
     expect(mocks.syncNutritionUpsert).toHaveBeenCalledWith(targetAfter, ['item-moved-1', 'item-moved-2']);
     expect(mocks.apiCreateMeal).not.toHaveBeenCalled();
     expect(mocks.apiAddItem).not.toHaveBeenCalled();

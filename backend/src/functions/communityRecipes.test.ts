@@ -1,16 +1,33 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { downloadRecipeImageMock } = vi.hoisted(() => ({
+const { downloadRecipeImageMock, copyRecipeImageToOwnerSnapshotMock, deleteRecipeImageMock, deletionLockMock } = vi.hoisted(() => ({
   downloadRecipeImageMock: vi.fn(),
+  copyRecipeImageToOwnerSnapshotMock: vi.fn(),
+  deleteRecipeImageMock: vi.fn(),
+  deletionLockMock: vi.fn(),
 }));
 
 vi.mock('../lib/storage', async () => {
   const actual = await vi.importActual<typeof import('../lib/storage')>('../lib/storage');
-  return { ...actual, downloadRecipeImageWithContentType: downloadRecipeImageMock };
+  return {
+    ...actual,
+    downloadRecipeImageWithContentType: downloadRecipeImageMock,
+    copyRecipeImageToOwnerSnapshot: copyRecipeImageToOwnerSnapshotMock,
+    deleteRecipeImage: deleteRecipeImageMock,
+  };
 });
 
-import { getCommunityRecipeHandler, getCommunityRecipeImageHandler, listCommunityRecipesHandler } from './communityRecipes';
+vi.mock('../lib/repositories/profileDeletionRepository', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/repositories/profileDeletionRepository')>();
+  return { ...actual, assertProfileDeletionNotActive: deletionLockMock };
+});
+
+import { copyCommunityRecipeHandler, getCommunityRecipeHandler, getCommunityRecipeImageHandler, listCommunityRecipesHandler } from './communityRecipes';
+import { deleteRecipeHandler } from './recipes';
 import { __resetRecipesRepositoryForTests, getRecipesRepository } from '../lib/repositories/recipesRepository';
+import { createRecipeExportView } from '../lib/repositories/recipeExport';
+import { deriveCommunityRecipeCopyId } from '../lib/communityRecipeTransfer';
+import { ProfileDeletionInProgressError } from '../lib/repositories/profileDeletionRepository';
 import { RecipeImageTooLargeError, RecipeImageUnsupportedContentTypeError } from '../lib/storage';
 import { makeAuthRequest, makeContext, makeRequest, setupTestAuth, signTestToken, teardownTestAuth } from '../test-utils/http';
 
@@ -33,6 +50,10 @@ beforeEach(() => {
     buffer: Buffer.from('community-image'),
     contentType: 'image/jpeg',
   });
+  copyRecipeImageToOwnerSnapshotMock.mockReset().mockImplementation(async (_source: string, userId: string, recipeId: string, imageId: string) =>
+    `${userId}/${recipeId}/${imageId}.jpg`);
+  deleteRecipeImageMock.mockReset().mockResolvedValue(undefined);
+  deletionLockMock.mockReset().mockResolvedValue(undefined);
 });
 
 async function requestAs(userId: string, init: Parameters<typeof makeRequest>[0] = {}) {
@@ -165,11 +186,54 @@ describe('GET /api/community-recipes/{id}', () => {
     expect(missingResponse.jsonBody).toEqual(privateResponse.jsonBody);
     expect(publicResponse.status).toBe(200);
     expect(publicResponse.jsonBody).toMatchObject({ id: publicId, name: 'Published recipe', authorDisplayName: 'Anonymous' });
+    expect(publicResponse.jsonBody).toMatchObject({ totalTimeMinutes: null });
     expect(JSON.stringify(publicResponse.jsonBody)).not.toContain('publisher');
     expect(JSON.stringify(publicResponse.jsonBody)).not.toContain('/image.jpg');
     expect(JSON.stringify(publicResponse.jsonBody)).not.toContain('sig=');
     expect((publicResponse.jsonBody as { images: Array<{ url: string }> }).images[0]!.url)
       .toBe(`/api/community-recipes/${publicId}/images/image-1`);
+  });
+
+  it('projects only a current, server-fingerprinted recipe time', async () => {
+    const input = {
+      name: 'Timed recipe',
+      portions: 2,
+      ingredients: [],
+      steps: [{ order: 1, description: 'Cook.' }],
+      tags: [],
+      nutritionTotal: nutrition,
+      nutritionPerPortion: nutrition,
+    };
+    const exportView = createRecipeExportView({
+      version: 1,
+      teaser: 'A recipe',
+      totalTimeMinutes: 35,
+      difficulty: 'Easy',
+      steps: [{ order: 1, description: 'Cook.' }],
+      includedIngredientIds: [],
+    }, input);
+    const repository = getRecipesRepository();
+    const created = await repository.createVersioned('publisher', { ...input, exportView });
+    await repository.setVisibility('publisher', created.recipe.id, created.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+
+    const current = await getCommunityRecipeHandler(
+      await requestAs('reader', { params: { id: created.recipe.id } }),
+      ctx,
+    );
+    await repository.update('publisher', created.recipe.id, { name: 'Changed recipe' });
+    const stale = await getCommunityRecipeHandler(
+      await requestAs('reader', { params: { id: created.recipe.id } }),
+      ctx,
+    );
+
+    expect(current.jsonBody).toMatchObject({ totalTimeMinutes: 35 });
+    expect(stale.jsonBody).toMatchObject({ totalTimeMinutes: null });
+    expect(JSON.stringify(current.jsonBody)).not.toContain('A recipe');
+    expect(JSON.stringify(current.jsonBody)).not.toContain('difficulty');
   });
 });
 
@@ -291,5 +355,203 @@ describe('GET /api/community-recipes/{id}/images/{imageId}', () => {
     } finally {
       errorLogs.mockRestore();
     }
+  });
+});
+
+describe('POST /api/community-recipes/{id}/copy', () => {
+  it('requires authentication before reading recipes or copying images', async () => {
+    const repository = getRecipesRepository();
+    const ownerRead = vi.spyOn(repository, 'get');
+    const sourceRead = vi.spyOn(repository, 'getCommunityById');
+
+    const response = await copyCommunityRecipeHandler(
+      makeRequest({ params: { id: 'published-id' } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(401);
+    expect(ownerRead).not.toHaveBeenCalled();
+    expect(sourceRead).not.toHaveBeenCalled();
+    expect(copyRecipeImageToOwnerSnapshotMock).not.toHaveBeenCalled();
+  });
+
+  it('creates once, reads the deterministic owner copy before the source, and returns it after unpublish', async () => {
+    const sourceId = await createRecipe('publisher', true);
+    const repository = getRecipesRepository();
+    const order: string[] = [];
+    const originalGet = repository.get.bind(repository);
+    const originalCommunityGet = repository.getCommunityById.bind(repository);
+    vi.spyOn(repository, 'get').mockImplementation(async (userId, id) => {
+      order.push(`owner:${userId}:${id}`);
+      return originalGet(userId, id);
+    });
+    vi.spyOn(repository, 'getCommunityById').mockImplementation(async (id) => {
+      order.push(`source:${id}`);
+      return originalCommunityGet(id);
+    });
+
+    const request = () => requestAs('copy-owner', { params: { id: sourceId } });
+    const first = await copyCommunityRecipeHandler(await request(), ctx);
+    const recipeId = deriveCommunityRecipeCopyId('copy-owner', sourceId);
+    expect(first.status).toBe(201);
+    expect(first.jsonBody).toEqual({ recipeId });
+    expect(order.slice(0, 2)).toEqual([`owner:copy-owner:${recipeId}`, `source:${sourceId}`]);
+    expect(await repository.get('copy-owner', recipeId)).toMatchObject({
+      id: recipeId,
+      ownerUserId: 'copy-owner',
+      visibility: 'private',
+      images: [{ id: 'image-1', blobName: `copy-owner/${recipeId}/image-1.jpg` }],
+    });
+    expect(copyRecipeImageToOwnerSnapshotMock).toHaveBeenCalledWith(
+      `publisher/${sourceId}/image.jpg`, 'copy-owner', recipeId, 'image-1',
+    );
+
+    const published = await originalGet('publisher', sourceId);
+    const current = await repository.getVersioned('publisher', sourceId);
+    await repository.setVisibility('publisher', sourceId, current!.etag, { visibility: 'private' });
+    const second = await copyCommunityRecipeHandler(await request(), ctx);
+    expect(second.status).toBe(200);
+    expect(second.jsonBody).toEqual(first.jsonBody);
+    expect(copyRecipeImageToOwnerSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(published?.visibility).toBe('community');
+  });
+
+  it('recreates the deterministic copy after completed owner DELETE from the current published snapshot', async () => {
+    const sourceId = await createRecipe('publisher', true);
+    const repository = getRecipesRepository();
+    const initialSource = await repository.get('publisher', sourceId);
+    const initialExportView = createRecipeExportView({
+      version: 1,
+      teaser: 'Original recipe',
+      totalTimeMinutes: 25,
+      difficulty: 'Einfach',
+      steps: [{ order: 1, description: 'Mix the ingredients.' }],
+      includedIngredientIds: [],
+    }, initialSource!);
+    await repository.update('publisher', sourceId, { exportView: initialExportView });
+
+    const recipeId = deriveCommunityRecipeCopyId('copy-owner', sourceId);
+    const request = () => requestAs('copy-owner', { params: { id: sourceId } });
+    const firstCopy = await copyCommunityRecipeHandler(await request(), ctx);
+    expect(firstCopy.status).toBe(201);
+    expect(firstCopy.jsonBody).toEqual({ recipeId });
+    expect(await repository.get('copy-owner', recipeId)).toMatchObject({
+      name: 'Published recipe',
+      communityCopyTimeSnapshot: { totalTimeMinutes: 25 },
+    });
+
+    const deletion = await deleteRecipeHandler(
+      await requestAs('copy-owner', { params: { id: recipeId } }),
+      ctx,
+    );
+    expect(deletion.status).toBe(204);
+    expect(deleteRecipeImageMock).toHaveBeenCalledWith(`copy-owner/${recipeId}/image-1.jpg`);
+    expect(await repository.get('copy-owner', recipeId)).toBeNull();
+
+    const changedSource = await repository.update('publisher', sourceId, { name: 'Updated published recipe' });
+    expect(changedSource?.visibility).toBe('community');
+    const currentExportView = createRecipeExportView({
+      version: 1,
+      teaser: 'Updated recipe',
+      totalTimeMinutes: 45,
+      difficulty: 'Einfach',
+      steps: [{ order: 1, description: 'Mix the ingredients.' }],
+      includedIngredientIds: [],
+    }, changedSource!);
+    await repository.update('publisher', sourceId, { exportView: currentExportView });
+
+    const secondCopy = await copyCommunityRecipeHandler(await request(), ctx);
+    expect(secondCopy.status).toBe(201);
+    expect(secondCopy.jsonBody).toEqual({ recipeId });
+    expect(await repository.get('copy-owner', recipeId)).toMatchObject({
+      id: recipeId,
+      name: 'Updated published recipe',
+      visibility: 'private',
+      communityCopyTimeSnapshot: { totalTimeMinutes: 45 },
+    });
+    expect(copyRecipeImageToOwnerSnapshotMock).toHaveBeenCalledTimes(2);
+    expect(await repository.getCommunityById(sourceId)).toMatchObject({
+      id: sourceId,
+      name: 'Updated published recipe',
+      visibility: 'community',
+    });
+  });
+
+  it('returns the same deterministic result for parallel requests and 404 for an unavailable source', async () => {
+    const sourceId = await createRecipe('publisher', true);
+    const [first, second] = await Promise.all([
+      copyCommunityRecipeHandler(await requestAs('copy-owner', { params: { id: sourceId } }), ctx),
+      copyCommunityRecipeHandler(await requestAs('copy-owner', { params: { id: sourceId } }), ctx),
+    ]);
+    expect([first.status, second.status].sort()).toEqual([200, 201]);
+    expect(first.jsonBody).toEqual(second.jsonBody);
+
+    const missing = await copyCommunityRecipeHandler(
+      await requestAs('copy-owner', { params: { id: 'not-published' } }),
+      ctx,
+    );
+    expect(missing.status).toBe(404);
+  });
+
+  it('performs the final owner read when the source is unavailable and returns a concurrent copy', async () => {
+    const repository = getRecipesRepository();
+    const originalGet = repository.get.bind(repository);
+    const seed = await repository.create('seed-owner', {
+      name: 'Seed', portions: 1, ingredients: [], steps: [], tags: [],
+      nutritionTotal: nutrition, nutritionPerPortion: nutrition,
+    });
+    const recipeId = deriveCommunityRecipeCopyId('copy-owner', 'now-private');
+    let ownerReads = 0;
+    const get = vi.spyOn(repository, 'get').mockImplementation(async (userId, id) => {
+      if (id === recipeId && ++ownerReads === 2) {
+        await repository.createSnapshotCopy('copy-owner', {
+          ...seed,
+          id: recipeId,
+          ownerUserId: 'copy-owner',
+          visibility: 'private',
+          images: [],
+        });
+      }
+      return originalGet(userId, id);
+    });
+
+    const response = await copyCommunityRecipeHandler(
+      await requestAs('copy-owner', { params: { id: 'now-private' } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toEqual({ recipeId });
+    expect(get.mock.calls.filter(([, id]) => id === recipeId)).toHaveLength(2);
+  });
+
+  it('does not persist a recipe when a source image cannot be read', async () => {
+    const sourceId = await createRecipe('publisher', true);
+    copyRecipeImageToOwnerSnapshotMock.mockRejectedValueOnce(new Error('source image unavailable'));
+    const recipeId = deriveCommunityRecipeCopyId('copy-owner', sourceId);
+
+    const response = await copyCommunityRecipeHandler(
+      await requestAs('copy-owner', { params: { id: sourceId } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(500);
+    expect(await getRecipesRepository().get('copy-owner', recipeId)).toBeNull();
+  });
+
+  it('uses the normal auth path and rejects an active account-deletion lock before recipe reads or image writes', async () => {
+    const repository = getRecipesRepository();
+    const ownerRead = vi.spyOn(repository, 'get');
+    deletionLockMock.mockRejectedValueOnce(new ProfileDeletionInProgressError());
+
+    const response = await copyCommunityRecipeHandler(
+      await requestAs('locked-user', { params: { id: 'published-id' } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(409);
+    expect(response.jsonBody).toMatchObject({ code: 'PROFILE_DELETION_IN_PROGRESS', retryable: true });
+    expect(ownerRead).not.toHaveBeenCalled();
+    expect(copyRecipeImageToOwnerSnapshotMock).not.toHaveBeenCalled();
   });
 });

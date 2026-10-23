@@ -153,6 +153,8 @@ export interface DiaryRepository {
   getDay(userId: string, date: string): Promise<DiaryDayResult>;
   /** Fetch a single meal by id (across all days) — returns null if not found */
   getMealById(userId: string, mealId: string): Promise<Meal | null>;
+  /** List meals changed since an inclusive UTC ISO timestamp, within one user partition. */
+  listMealsUpdatedSince(userId: string, since: string): Promise<Meal[]>;
   createMeal(input: CreateMealInput): Promise<Meal>;
   addItem(userId: string, mealId: string, input: AddItemInput): Promise<Meal>;
   updateItem(userId: string, mealId: string, itemId: string, input: UpdateItemInput): Promise<Meal | null>;
@@ -175,6 +177,16 @@ export interface DiaryRepository {
     userId: string,
     options?: { limit?: number; cursor?: string },
   ): Promise<{ meals: Meal[]; cursor?: string }>;
+}
+
+function mealUpdateTimestamp(meal: Pick<Meal, 'createdAt' | 'updatedAt'>): string {
+  return meal.updatedAt ?? meal.createdAt;
+}
+
+function sortMealsByUpdateTimestamp(meals: Meal[]): Meal[] {
+  return meals.sort((left, right) =>
+    mealUpdateTimestamp(left).localeCompare(mealUpdateTimestamp(right)) || left.id.localeCompare(right.id),
+  );
 }
 
 export function computeSummary(meals: Meal[]): DaySummary {
@@ -239,7 +251,15 @@ class InMemoryDiaryRepository implements DiaryRepository {
     return null;
   }
 
+  async listMealsUpdatedSince(userId: string, since: string): Promise<Meal[]> {
+    const meals = [...this.mealsByDay.values()]
+      .flat()
+      .filter((meal) => meal.userId === userId && mealUpdateTimestamp(meal) >= since);
+    return sortMealsByUpdateTimestamp(meals);
+  }
+
   async createMeal(input: CreateMealInput): Promise<Meal> {
+    const createdAt = new Date().toISOString();
     const meal: Meal = {
       id: randomUUID(),
       userId: input.userId,
@@ -247,7 +267,8 @@ class InMemoryDiaryRepository implements DiaryRepository {
       type: input.type,
       name: input.name,
       items: [],
-      createdAt: new Date().toISOString(),
+      createdAt,
+      updatedAt: createdAt,
     };
     const k = this.key(input.userId, input.date);
     const list = this.mealsByDay.get(k) ?? [];
@@ -279,6 +300,7 @@ class InMemoryDiaryRepository implements DiaryRepository {
         },
       };
       meal.items.push(item);
+      meal.updatedAt = new Date().toISOString();
       return meal;
     }
     throw new Error(`Meal ${mealId} not found`);
@@ -293,6 +315,7 @@ class InMemoryDiaryRepository implements DiaryRepository {
       item.quantity = input.quantity;
       item.unit = input.unit;
       item.macros = input.macros;
+      meal.updatedAt = new Date().toISOString();
       return meal;
     }
     return null;
@@ -305,6 +328,7 @@ class InMemoryDiaryRepository implements DiaryRepository {
       const idx = meal.items.findIndex((i) => i.id === itemId);
       if (idx === -1) return null;
       meal.items.splice(idx, 1);
+      meal.updatedAt = new Date().toISOString();
       return meal;
     }
     return null;
@@ -339,12 +363,14 @@ class InMemoryDiaryRepository implements DiaryRepository {
       mealsById,
     );
 
+    const updatedAt = new Date().toISOString();
     const updatedMeals = new Map<string, Meal>();
     for (const [mealId, meal] of sourceMeals) {
       const itemIds = groupedReferences.get(mealId)!;
       updatedMeals.set(mealId, {
         ...meal,
         items: (meal.items ?? []).filter((item) => !itemIds.has(item.id)),
+        updatedAt,
       });
     }
     const operations = [...updatedMeals.values()].map((meal) => ({
@@ -381,6 +407,7 @@ class InMemoryDiaryRepository implements DiaryRepository {
       mealsById,
     );
 
+    const updatedAt = new Date().toISOString();
     let targetMeal: Meal;
     let isNewTarget = false;
     if ('mealId' in request.target && typeof request.target.mealId === 'string') {
@@ -401,7 +428,8 @@ class InMemoryDiaryRepository implements DiaryRepository {
         type,
         name: type.charAt(0).toUpperCase() + type.slice(1),
         items: [],
-        createdAt: new Date().toISOString(),
+        createdAt: updatedAt,
+        updatedAt,
       };
       isNewTarget = true;
     } else {
@@ -419,9 +447,14 @@ class InMemoryDiaryRepository implements DiaryRepository {
       updatedSources.set(mealId, {
         ...meal,
         items: (meal.items ?? []).filter((item) => !itemIds.has(item.id)),
+        updatedAt,
       });
     }
-    const updatedTarget: Meal = { ...targetMeal, items: [...(targetMeal.items ?? []), ...movedItems] };
+    const updatedTarget: Meal = {
+      ...targetMeal,
+      items: [...(targetMeal.items ?? []), ...movedItems],
+      updatedAt,
+    };
     const operations = [
       ...[...updatedSources.values()].map((meal) => ({
         operationType: 'Replace',
@@ -466,6 +499,7 @@ class InMemoryDiaryRepository implements DiaryRepository {
       mealsById,
     );
 
+    const updatedAt = new Date().toISOString();
     let targetMeal: Meal;
     let isNewTarget = false;
     if ('mealId' in request.target && typeof request.target.mealId === 'string') {
@@ -483,7 +517,8 @@ class InMemoryDiaryRepository implements DiaryRepository {
         type,
         name: type.charAt(0).toUpperCase() + type.slice(1),
         items: [],
-        createdAt: new Date().toISOString(),
+        createdAt: updatedAt,
+        updatedAt,
       };
       isNewTarget = true;
     } else {
@@ -495,7 +530,11 @@ class InMemoryDiaryRepository implements DiaryRepository {
       const item = (meal.items ?? []).find((candidate) => candidate.id === reference.itemId)!;
       return { ...structuredClone(item), id: randomUUID() };
     });
-    const updatedTarget: Meal = { ...targetMeal, items: [...(targetMeal.items ?? []), ...copiedItems] };
+    const updatedTarget: Meal = {
+      ...targetMeal,
+      items: [...(targetMeal.items ?? []), ...copiedItems],
+      updatedAt,
+    };
     const operations = [isNewTarget
       ? { operationType: 'Create', resourceBody: updatedTarget }
       : { operationType: 'Replace', id: updatedTarget.id, resourceBody: updatedTarget }];
@@ -534,11 +573,14 @@ class InMemoryDiaryRepository implements DiaryRepository {
     for (const [, meals] of this.mealsByDay) {
       for (const meal of meals) {
         if (meal.userId !== userId) continue;
+        let changed = false;
         for (const item of meal.items ?? []) {
           if (item.sourceId !== sourceId) continue;
           item.macros = recalcMacros(item, newNutritionPer100g, newPortionWeightGrams);
+          changed = true;
           count++;
         }
+        if (changed) meal.updatedAt = new Date().toISOString();
       }
     }
     return count;

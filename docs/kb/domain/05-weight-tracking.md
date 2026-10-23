@@ -12,10 +12,26 @@ interface WeightEntry {
   value: number;      // numeric weight
   unit: 'kg' | 'lbs';
   createdAt: string;  // ISO timestamp
+  updatedAt?: string; // last change; absent on legacy documents
 }
 ```
 
 One entry per measurement. Multiple entries per day are allowed (no deduplication enforced).
+
+New entries initialize `updatedAt` from `createdAt`; changing a value updates
+`updatedAt` without changing the measurement date or creation time. The
+repository-only `listUpdatedSince(userId, since)` query is inclusive and stays
+within the existing `/userId` partition. Legacy entries without `updatedAt`
+use `createdAt` for the comparison. Optional `updatedAt` is a Class 0 change:
+legacy documents remain valid and readable, with no migration or backfill.
+Deleting an entry physically removes it; no server deletion tombstone or
+deletion history is introduced. The [weight delta API](../tech/09-api-reference.md#weights)
+returns only current entries in its UTC checkpoint window.
+
+The local ID-only Health Connect delete retry described in the unapproved
+[HC-4 draft](../../User%20Stories/HealthConnect/HC-4_Health-Connect-Synchronisation-vereinfachen.md)
+is Mobile-owned and is not provided by the weights API. The backend does not
+store a device checkpoint, transfer status, or deleted Weight IDs.
 
 ## Units
 

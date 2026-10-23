@@ -53,6 +53,57 @@ to use their existing access rules and image contract. Existing diary logs are
 snapshots of the server's current recipe name, logged portions, and scaled
 nutrition; later edits, privacy changes, or deletion do not rewrite them.
 
+`CommunityRecipe.totalTimeMinutes` is numeric only when the confirmed export
+view fingerprint matches the currently published recipe source; missing or
+stale confirmation projects `null`. Teaser, difficulty, export steps, and
+source-link IDs are not part of the community projection.
+
+### Community Recipe Copies
+
+`POST /api/community-recipes/{id}/copy` creates one private, independently
+editable owner recipe per verified user and source recipe. A deterministic
+UUID makes repeat and concurrent requests idempotent. The endpoint reads the
+owner partition first and returns an existing copy even after its source is
+unpublished or deleted. Without an existing copy, only a currently published
+source is eligible; an unavailable source is followed by a final owner read to
+resolve a concurrent create.
+
+The copy preserves the loaded recipe snapshot, image order and `heroCrop`,
+stored ingredient nutrition bases and contributions, aggregate nutrition, and
+server-resolved `nutritionSource`. It does not call the Open Food Facts or
+reusable-item repositories, recalculate nutrition, or call AI. Personal
+`linkedReusableItemId` values are cleared to `null`, the existing nullable
+representation of no link. `linkedProductId` remains only when it has the
+canonical global `openFoodFacts:<numeric-barcode>` format; no food or
+reusable-item documents are created. Amount-only edits continue through the
+ordinary recipe PUT and preserve provenance when the ingredient identity,
+remaining links, AI flag, and nutrition basis are unchanged.
+
+Only a current confirmed time is copied, from either the current export view or
+a current server-owned copy-time snapshot. The private recipe stores that time
+with a server-owned fingerprint of the sanitized copy source; edits that
+change the fingerprint make the time stale. Community projections expose only
+the numeric time when current, otherwise `null`; they never expose the private
+fingerprint or other export-view fields. Ownerless preservation retains a
+current copy-time snapshot or confirmed export time and its fingerprint,
+without storing an owner mapping.
+
+Each image is copied to
+`{userId}/{deterministicRecipeId}/{sourceImageId}.{jpg|png}`, independent of
+the source blob path. Conditional create prevents overwrites. A conflict is
+reused only when the existing target has the same validated content type and
+bytes; targets are never deleted on an error path because a parallel copy may
+need them. An image read failure prevents the Recipe commit. A partial failure
+may leave an unreferenced owner blob for a later retry to reuse. Blob Soft
+Delete is unchanged. Same-path recreation after a soft-deleted owner blob is
+conditional on Azure Storage behavior and remains subject to the required
+Alpha storage smoke test; local Azurite tests do not establish that policy.
+
+The route uses the standard authenticated request path and therefore respects
+the active account-deletion lock with retryable `409
+PROFILE_DELETION_IN_PROGRESS`. The deletion workflow and its accepted
+pre-lock late-write behavior are unchanged.
+
 Owner recipes and their publication metadata continue to use the existing
 `recipes` container partitioned by `/userId`. The separate `communityRecipes`
 container uses `/id` and stores an ownerless copy for published community

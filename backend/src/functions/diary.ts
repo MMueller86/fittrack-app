@@ -1,7 +1,9 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
+import { Buffer } from 'node:buffer';
 import { z } from 'zod';
 
 import { requireUser } from '../lib/auth';
+import { effectiveUpdatedAt, hasOnlyQueryParams, isCanonicalUtcIso } from '../lib/deltaSync';
 import { parseBody, withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
 import { calculate, NutritionCalculationError } from '../lib/nutritionCalculator';
@@ -19,6 +21,7 @@ import { evaluateHint } from '../lib/hintEngine';
 import { resolveCalorieTargetSnapshot } from '../lib/weeklyTargetSnapshot';
 import { addRecipeDiarySnapshot } from '../lib/recipeDiary';
 import { recordCopiedDiaryItemUsages } from '../lib/diaryItemUsage';
+import type { MealChangesResponse } from '@fittrack/shared';
 import type { DayTargets } from '../../../shared/types/nutrition';
 
 // GET /api/diary?date=YYYY-MM-DD             — meals + day summary + dayType
@@ -69,6 +72,40 @@ const BulkCopyItemsSchema = z.object({
     z.object({ newMealType: MealTypeSchema }).strict(),
   ]),
 }).strict();
+
+const MealDeltaCursorSchema = z.object({
+  version: z.literal(1),
+  userId: z.string().min(1),
+  since: z.string(),
+  limit: z.number().int().min(1).max(100),
+  checkpointAt: z.string(),
+  lastTimestamp: z.string(),
+  lastId: z.string().min(1),
+}).strict();
+
+type MealDeltaCursor = z.infer<typeof MealDeltaCursorSchema>;
+
+function encodeMealDeltaCursor(cursor: MealDeltaCursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+}
+
+function decodeMealDeltaCursor(value: string): MealDeltaCursor | null {
+  try {
+    if (!/^[A-Za-z0-9_-]+$/u.test(value)) return null;
+    const json = Buffer.from(value, 'base64url').toString('utf8');
+    if (Buffer.from(json, 'utf8').toString('base64url') !== value) return null;
+    const parsed = MealDeltaCursorSchema.safeParse(JSON.parse(json));
+    if (!parsed.success) return null;
+    if (
+      !isCanonicalUtcIso(parsed.data.since) ||
+      !isCanonicalUtcIso(parsed.data.checkpointAt) ||
+      !isCanonicalUtcIso(parsed.data.lastTimestamp)
+    ) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
 
 const CreateMealSchema = z.object({
   date: isoDate,
@@ -321,6 +358,91 @@ export const listMealsHandler = withHandler(
       status: 200,
       jsonBody: { meals, ...(nextCursor ? { cursor: nextCursor } : {}) },
     };
+  },
+);
+
+export const listMealChangesHandler = withHandler(
+  'diary.meals.changes',
+  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    if (!hasOnlyQueryParams(request.query, ['since', 'limit', 'cursor'])) {
+      return { status: 400, jsonBody: { error: 'invalid_delta_query' } };
+    }
+
+    const since = request.query.get('since');
+    if (since === null || !isCanonicalUtcIso(since)) {
+      return { status: 400, jsonBody: { error: 'invalid_delta_query' } };
+    }
+
+    const rawLimit = request.query.get('limit');
+    let limit = 50;
+    if (rawLimit !== null) {
+      if (!/^\d+$/u.test(rawLimit)) {
+        return { status: 400, jsonBody: { error: 'invalid_delta_query' } };
+      }
+      limit = Number(rawLimit);
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        return { status: 400, jsonBody: { error: 'invalid_delta_query' } };
+      }
+    }
+
+    const rawCursor = request.query.get('cursor');
+    const cursor = rawCursor === null ? null : decodeMealDeltaCursor(rawCursor);
+    if (rawCursor !== null && cursor === null) {
+      return { status: 400, jsonBody: { error: 'invalid_delta_cursor' } };
+    }
+
+    let checkpointAt: string;
+    if (cursor) {
+      if (cursor.userId !== userId || cursor.since !== since || cursor.limit !== limit) {
+        return { status: 400, jsonBody: { error: 'invalid_delta_cursor' } };
+      }
+      checkpointAt = cursor.checkpointAt;
+    } else {
+      checkpointAt = new Date().toISOString();
+    }
+    if (since > checkpointAt) {
+      return { status: 400, jsonBody: { error: 'invalid_delta_query' } };
+    }
+    if (cursor && (cursor.lastTimestamp < since || cursor.lastTimestamp > checkpointAt)) {
+      return { status: 400, jsonBody: { error: 'invalid_delta_cursor' } };
+    }
+
+    const meals = await getDiaryRepository().listMealsUpdatedSince(userId, since);
+    const candidates = meals
+      .filter((meal) => {
+        const timestamp = effectiveUpdatedAt(meal);
+        return timestamp >= since && timestamp <= checkpointAt;
+      })
+      .sort((left, right) =>
+        effectiveUpdatedAt(left).localeCompare(effectiveUpdatedAt(right)) || left.id.localeCompare(right.id),
+      )
+      .filter((meal) => {
+        if (!cursor) return true;
+        const timestamp = effectiveUpdatedAt(meal);
+        const timestampComparison = timestamp.localeCompare(cursor.lastTimestamp);
+        return timestampComparison > 0 ||
+          (timestampComparison === 0 && meal.id.localeCompare(cursor.lastId) > 0);
+      });
+    const page = candidates.slice(0, limit);
+    const nextCursor = candidates.length > limit && page.length > 0
+      ? encodeMealDeltaCursor({
+          version: 1,
+          userId,
+          since,
+          limit,
+          checkpointAt,
+          lastTimestamp: effectiveUpdatedAt(page[page.length - 1]!),
+          lastId: page[page.length - 1]!.id,
+        })
+      : undefined;
+
+    const response: MealChangesResponse = {
+      meals: page,
+      checkpointAt,
+      ...(nextCursor ? { cursor: nextCursor } : {}),
+    };
+    return { status: 200, jsonBody: response };
   },
 );
 
@@ -729,6 +851,13 @@ app.http('diary-meals-list', {
   authLevel: 'anonymous',
   route: 'diary/meals',
   handler: listMealsHandler,
+});
+
+app.http('diary-meals-changes', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'diary/changes/meals',
+  handler: listMealChangesHandler,
 });
 
 app.http('diary-meals-update', {

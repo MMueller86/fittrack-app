@@ -86,6 +86,20 @@ az deployment group create `
 
 Verify the deployment succeeded (exit code 0, no ARM error in output). If it fails: **stop**. Do not proceed to Phase 2.
 
+Before proceeding to Phase 2, reconcile the complete Bicep change set with the
+target environment. A deployment scoped to a new resource does not cover
+updates to existing resources in the same Bicep change. Do not silently replace
+a full deployment whose what-if contains unrelated drift with a temporary
+template that applies only the new resource. If the full deployment is unsafe,
+stop and report the required changes and unrelated drift; continue only after a
+scoped Bicep deployment covers every required change or the user approves the
+full reconciliation.
+
+Verify the live properties required by the backend after deployment, not only
+the ARM provisioning state. For Cosmos query or index changes, inspect the
+actual indexing policies of every affected container and confirm the expected
+paths and sort orders before deploying backend code that uses those queries.
+
 After an infrastructure change, verify the Function App runtime before
 continuing:
 
@@ -259,6 +273,7 @@ Do not start the emulator proactively as part of a standard build or deploy.
 | Condition | Action |
 |---|---|
 | `az deployment` fails | Stop. Do not proceed to backend deploy. Report the ARM error. |
+| Required Bicep changes are not all applied and live-verified | Stop before backend deploy. Report the unapplied properties and any unrelated what-if drift. |
 | TypeScript compile errors | Stop. Do not sync or deploy. Report the compiler output. |
 | `Test-Path` after robocopy = False | Stop. Sync failed — deploying stale code is worse than not deploying. |
 | `func publish` fails | Stop. Describe rollback options (previous version remains active on Azure). |

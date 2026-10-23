@@ -88,6 +88,7 @@ function toRecipe(doc: CosmosRecipeDoc): Recipe {
     nutritionTotal: doc.nutritionTotal,
     nutritionPerPortion: doc.nutritionPerPortion,
     ...(doc.exportView !== undefined ? { exportView: doc.exportView } : {}),
+    ...(doc.communityCopyTimeSnapshot !== undefined ? { communityCopyTimeSnapshot: doc.communityCopyTimeSnapshot } : {}),
     visibility: effectiveRecipeVisibility(doc.visibility),
     ...(doc.communityPublication !== undefined ? { communityPublication: doc.communityPublication } : {}),
     sharedWithUserIds: doc.sharedWithUserIds ?? [],
@@ -132,6 +133,7 @@ function toStoredRecipe(recipe: Recipe, userId: string): CosmosRecipeDoc {
     userId,
   };
   if (recipe.exportView !== undefined) doc.exportView = recipe.exportView;
+  if (recipe.communityCopyTimeSnapshot !== undefined) doc.communityCopyTimeSnapshot = recipe.communityCopyTimeSnapshot;
   if (recipe.communityPublication !== undefined) doc.communityPublication = recipe.communityPublication;
   return doc;
 }
@@ -276,9 +278,14 @@ export class CosmosRecipesRepository implements RecipesRepository {
 
   async getVersioned(userId: string, id: string): Promise<VersionedRecipe | null> {
     const { containers } = await getCosmos();
-    const { resource, etag } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
-    if (!isCosmosRecipeDoc(resource) || resource.ownerUserId !== userId || resource.userId !== userId) return null;
-    return { recipe: toRecipe(resource), etag: requireCosmosEtag(etag) };
+    try {
+      const { resource, etag } = await containers.recipes.item(id, userId).read<CosmosRecipeDoc>();
+      if (!isCosmosRecipeDoc(resource) || resource.ownerUserId !== userId || resource.userId !== userId) return null;
+      return { recipe: toRecipe(resource), etag: requireCosmosEtag(etag) };
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
   }
 
   async create(userId: string, input: CreateRecipeInput): Promise<Recipe> {
@@ -313,6 +320,25 @@ export class CosmosRecipesRepository implements RecipesRepository {
     const { resource, etag } = await containers.recipes.items.create<CosmosRecipeDoc>(doc);
     if (!isCosmosRecipeDoc(resource)) throw new Error('Cosmos did not return the created recipe');
     return { recipe: toRecipe(resource), etag: requireCosmosEtag(etag) };
+  }
+
+  async createSnapshotCopy(userId: string, recipe: Recipe): Promise<boolean> {
+    if (recipe.ownerUserId !== userId || recipe.visibility !== 'private') {
+      throw new Error('Invalid private recipe snapshot copy');
+    }
+    const { containers } = await getCosmos();
+    try {
+      const { resource } = await containers.recipes.items.create<CosmosRecipeDoc>(toStoredRecipe(recipe, userId));
+      if (!isCosmosRecipeDoc(resource)) throw new Error('Cosmos did not return the created recipe snapshot');
+      return true;
+    } catch (error) {
+      try {
+        if (await this.get(userId, recipe.id)) return false;
+      } catch {
+        // Preserve the create error when the outcome cannot be resolved by an owner-scoped read.
+      }
+      throw error;
+    }
   }
 
   async update(userId: string, id: string, input: UpdateRecipeInput): Promise<Recipe | null> {

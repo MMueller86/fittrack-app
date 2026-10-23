@@ -65,15 +65,15 @@ export class HealthConnectService implements IHealthPlatformService {
   }
 
   async upsertRecord(record: HealthRecord): Promise<void> {
-    syncLogger.info('HealthConnectService', `insertRecords ${record.recordType} id=${record.metadata.clientRecordId}`);
+    syncLogger.info('HealthConnectService', `insertRecords ${record.recordType}`);
     await hc.insertRecords([record]);
-    syncLogger.info('HealthConnectService', `insertRecords OK id=${record.metadata.clientRecordId}`);
+    syncLogger.info('HealthConnectService', `insertRecords OK ${record.recordType}`);
   }
 
   async deleteRecord(recordType: HealthRecordType, clientId: string): Promise<void> {
-    syncLogger.info('HealthConnectService', `deleteRecord ${recordType} id=${clientId}`);
+    syncLogger.info('HealthConnectService', `deleteRecord ${recordType}`);
     await hc.deleteRecordsByUuids(recordType, [], [clientId]);
-    syncLogger.info('HealthConnectService', `deleteRecord OK id=${clientId}`);
+    syncLogger.info('HealthConnectService', `deleteRecord OK ${recordType}`);
   }
 
   async readRecords(_recordType: HealthRecordType, _options: ReadOptions): Promise<HealthRecord[]> {

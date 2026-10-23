@@ -182,6 +182,11 @@ export interface RecipeCommunityPublication {
   displayNameConsent: boolean;
 }
 
+export interface CommunityRecipeTimeSnapshot {
+  totalTimeMinutes: number;
+  sourceFingerprint: string;
+}
+
 export type RecipeVisibilityInput =
   | { visibility: 'community'; contentConfirmed: true; displayNameConsent: boolean }
   | { visibility: 'private' };
@@ -200,6 +205,7 @@ export interface CommunityRecipe {
   name: string;
   description?: string;
   portions: number;
+  totalTimeMinutes?: number | null;
   ingredients: CommunityRecipeIngredient[];
   steps: RecipeStep[];
   images: CommunityRecipeImage[];
@@ -221,6 +227,7 @@ export interface CommunityRecipesPage {
 export interface Recipe extends RecipeExportViewResponse {
   id: string;
   ownerUserId: string;
+  communityCopyTimeSnapshot?: CommunityRecipeTimeSnapshot;
   name: string;
   description?: string;
   /** Number of portions this recipe yields */

@@ -1,24 +1,20 @@
 // ProfileEditScreen — Einseitiges Bearbeitungsformular für das Benutzerprofil.
-// Wird aus ProfileScreen via Navigation aufgerufen und erhält das aktuelle Profil als Parameter.
+// Wird aus ProfileDetails via Navigation aufgerufen und erhält das aktuelle Profil als Parameter.
 // Speichert via PUT /api/profile (updateProfile).
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import axios from 'axios';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type {
   Gender,
@@ -28,38 +24,15 @@ import type {
   ActivityLevel,
   UserProfile,
 } from '@fittrack/shared';
-import { profileApi, type ProfileDeletionRequest } from '../../shared/api/profileApi';
-import { recipeApi } from '../../shared/api/recipeApi';
-import { completeAccountDeletionLocally } from '../../services/accountDeletionService';
+import { profileApi } from '../../shared/api/profileApi';
 import { listWeights } from '../../services/weightsService';
 import { colors, radius, spacing, typography } from '../../app/theme';
+import { Icon } from '../../shared/components/Icon';
 import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
-import { ProfileGroup, ProfileRow } from './ProfileGroup';
 import type { ProfileStackParamList } from '../../app/navigation/RootNavigator';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileEdit'>;
-type CommunityRecipeCheck = 'loading' | 'failed' | 'available' | 'none';
-
-function getDeletionErrorMessage(error: unknown): string {
-  if (axios.isAxiosError<{ error?: unknown }>(error)) {
-    switch (error.response?.data?.error) {
-      case 'profile_deletion_in_progress':
-        return 'Die Löschung konnte nicht durchgeführt werden. Bitte versuche es erneut.';
-      case 'profile_deletion_unavailable':
-        return 'Der Löschdienst ist vorübergehend nicht verfügbar. Bitte versuche es erneut.';
-      case 'profile_deletion_failed':
-        return 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.';
-      case 'invalid_profile_deletion_request':
-        return 'Die Löschanfrage ist ungültig. Bitte prüfe die Bestätigung und versuche es erneut.';
-      case 'authentication_required':
-        return 'Deine Anmeldung konnte nicht bestätigt werden. Bitte versuche es erneut.';
-      default:
-        return 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.';
-    }
-  }
-  return 'Die Löschung konnte nicht vollständig abgeschlossen werden. Bitte versuche es erneut.';
-}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -173,8 +146,26 @@ function profileToForm(p: UserProfile | null): FormState {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function SectionTitle({ children }: { children: string }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
+function SectionTitle({
+  children,
+  description,
+  iconName,
+}: {
+  children: string;
+  description: string;
+  iconName: 'user' | 'sun' | 'activity' | 'target';
+}) {
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={styles.sectionIcon}>
+        <Icon lib="feather" name={iconName} size="md" color={colors.primaryBright} />
+      </View>
+      <View style={styles.sectionHeadingText}>
+        <Text style={styles.sectionTitle}>{children}</Text>
+        <Text style={styles.sectionDescription}>{description}</Text>
+      </View>
+    </View>
+  );
 }
 
 function FieldLabel({ children }: { children: string }) {
@@ -238,89 +229,7 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
   const [form, setForm] = useState<FormState>(() => profileToForm(existing));
   const [loading, setLoading] = useState(false);
   const [saveErrorVisible, setSaveErrorVisible] = useState(false);
-  const [deleteOverlayVisible, setDeleteOverlayVisible] = useState(false);
-  const [deleteConfirmation, setDeleteConfirmation] = useState('');
-  const [deleteCommunityRecipes, setDeleteCommunityRecipes] = useState(false);
-  const [communityRecipeCheck, setCommunityRecipeCheck] = useState<CommunityRecipeCheck>('loading');
-  const [pendingDeletionRequest, setPendingDeletionRequest] = useState<ProfileDeletionRequest | null>(null);
-  const [deletionError, setDeletionError] = useState<string | null>(null);
-  const [deletionInProgress, setDeletionInProgress] = useState(false);
-  const deletionInProgressRef = useRef(false);
-  const recipeCheckSequence = useRef(0);
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
-
-  async function checkCommunityRecipes() {
-    const sequence = ++recipeCheckSequence.current;
-    setCommunityRecipeCheck('loading');
-    try {
-      const { recipes } = await recipeApi.list();
-      if (sequence !== recipeCheckSequence.current) return;
-      setCommunityRecipeCheck(
-        recipes.some((recipe) => recipe.visibility === 'community' && recipe.communityPublication != null)
-          ? 'available'
-          : 'none',
-      );
-    } catch {
-      if (sequence === recipeCheckSequence.current) setCommunityRecipeCheck('failed');
-    }
-  }
-
-  function openDeletionOverlay() {
-    setDeleteConfirmation('');
-    setDeleteCommunityRecipes(false);
-    setPendingDeletionRequest(null);
-    setDeletionError(null);
-    setDeleteOverlayVisible(true);
-    void checkCommunityRecipes();
-  }
-
-  function closeDeletionOverlay() {
-    if (deletionInProgressRef.current) return;
-    recipeCheckSequence.current++;
-    setDeleteOverlayVisible(false);
-    setDeleteConfirmation('');
-    setDeleteCommunityRecipes(false);
-    setPendingDeletionRequest(null);
-    setDeletionError(null);
-  }
-
-  async function submitDeletion(request: ProfileDeletionRequest) {
-    if (deletionInProgressRef.current) return;
-    deletionInProgressRef.current = true;
-    setDeletionInProgress(true);
-    setDeletionError(null);
-    try {
-      try {
-        await profileApi.deleteProfile(request);
-      } catch (error) {
-        setDeletionError(getDeletionErrorMessage(error));
-        return;
-      }
-      setDeleteOverlayVisible(false);
-      try {
-        await completeAccountDeletionLocally();
-      } catch {
-        // A local cleanup failure must not change the confirmed server result.
-      }
-    } finally {
-      deletionInProgressRef.current = false;
-      setDeletionInProgress(false);
-    }
-  }
-
-  function startDeletion() {
-    if (
-      deleteConfirmation !== 'DELETE' ||
-      (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none') ||
-      deletionInProgressRef.current
-    ) return;
-    const request: ProfileDeletionRequest = {
-      confirmation: 'DELETE',
-      deleteCommunityRecipes,
-    };
-    setPendingDeletionRequest(request);
-    void submitDeletion(request);
-  }
 
   // Pre-fill current weight from diary when creating a new profile
   useEffect(() => {
@@ -394,7 +303,7 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
   // ---------------------------------------------------------------------------
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         {/* Header */}
         <View style={styles.navHeader}>
@@ -407,185 +316,201 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
             <Text style={styles.cancelText}>Abbrechen</Text>
           </TouchableOpacity>
           <Text style={styles.navTitle} accessibilityRole="header">{isNew ? 'Profil anlegen' : 'Profil bearbeiten'}</Text>
-          <TouchableOpacity
-            style={styles.navAction}
-            onPress={handleSave}
-            disabled={!isValid() || loading}
-            accessibilityRole="button"
-            accessibilityLabel="Speichern"
-            accessibilityState={{ disabled: !isValid() || loading }}
-          >
-            {loading
-              ? <ActivityIndicator color={colors.primary} size="small" />
-              : <Text style={[styles.saveText, !isValid() && styles.saveTextDisabled]}>Speichern</Text>
-            }
-          </TouchableOpacity>
+          <View style={styles.navSpacer} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll}>
 
-          {/* ── Basisdaten ── */}
-          <SectionTitle>Basisdaten</SectionTitle>
+          <View style={styles.sectionCard}>
+            <SectionTitle description="Damit deine Ziele zu deinem Körper passen" iconName="user">
+              Basisdaten
+            </SectionTitle>
 
-          <FieldLabel>Geschlecht</FieldLabel>
-          <View style={styles.chipRow}>
-            {(['male', 'female', 'other'] as Gender[]).map((g) => (
-              <ChipButton key={g} label={GENDER_LABELS[g]} selected={form.gender === g} onPress={() => update({ gender: g })} />
-            ))}
+            <FieldLabel>Geschlecht</FieldLabel>
+            <View style={styles.chipRow}>
+              {(['male', 'female', 'other'] as Gender[]).map((g) => (
+                <ChipButton
+                  key={g}
+                  label={GENDER_LABELS[g]}
+                  selected={form.gender === g}
+                  onPress={() => update({ gender: g })}
+                />
+              ))}
+            </View>
+
+            <View style={styles.fieldRow}>
+              <FieldLabel>Wie möchtest du genannt werden? (optional)</FieldLabel>
+              <View style={styles.inputWithUnit}>
+                <TextInput
+                  style={styles.textInput}
+                  value={form.displayName}
+                  onChangeText={(v) => update({ displayName: v })}
+                  placeholder="z.B. Michael"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="words"
+                  maxLength={50}
+                />
+              </View>
+            </View>
+
+            <NumericField label="Alter" value={form.age} onChangeText={(v) => update({ age: v })} unit="Jahre" />
+            <NumericField label="Größe" value={form.heightCm} onChangeText={(v) => update({ heightCm: v })} unit="cm" />
+            <NumericField label="Aktuelles Gewicht" value={form.weightKg} onChangeText={(v) => update({ weightKg: v })} unit="kg" />
+            <NumericField label="Zielgewicht" value={form.targetWeightKg} onChangeText={(v) => update({ targetWeightKg: v })} unit="kg" />
           </View>
 
-          <View style={styles.fieldRow}>
-            <FieldLabel>Wie möchtest du genannt werden? (optional)</FieldLabel>
-            <View style={styles.inputWithUnit}>
-              <TextInput
-                style={styles.textInput}
-                value={form.displayName}
-                onChangeText={(v) => update({ displayName: v })}
-                placeholder="z.B. Michael"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="words"
-                maxLength={50}
+          <View style={styles.sectionCard}>
+            <SectionTitle description="Dein Alltag hilft bei der Berechnung" iconName="sun">
+              Alltag
+            </SectionTitle>
+
+            <FieldLabel>Schritte pro Tag</FieldLabel>
+            <View style={styles.chipRow}>
+              {STEP_PRESETS.map((p) => (
+                <ChipButton
+                  key={p}
+                  label={p.toLocaleString()}
+                  selected={!form.stepsUnknown && form.stepsPreset === p}
+                  onPress={() => update({ stepsPreset: p, stepsPerDay: '', activityLevel: null, stepsUnknown: false })}
+                />
+              ))}
+              <ChipButton
+                label="Eigene Zahl"
+                selected={!form.stepsUnknown && form.stepsPreset === null && form.stepsPerDay !== ''}
+                onPress={() => update({ stepsPreset: null, activityLevel: null, stepsUnknown: false })}
+              />
+              <ChipButton
+                label="Kenne ich nicht"
+                selected={form.stepsUnknown}
+                onPress={() => update({ stepsUnknown: true, stepsPreset: null, stepsPerDay: '' })}
               />
             </View>
-          </View>
 
-          <NumericField label="Alter" value={form.age} onChangeText={(v) => update({ age: v })} unit="Jahre" />
-          <NumericField label="Größe" value={form.heightCm} onChangeText={(v) => update({ heightCm: v })} unit="cm" />
-          <NumericField label="Aktuelles Gewicht" value={form.weightKg} onChangeText={(v) => update({ weightKg: v })} unit="kg" />
-          <NumericField label="Zielgewicht" value={form.targetWeightKg} onChangeText={(v) => update({ targetWeightKg: v })} unit="kg" />
-
-          {/* ── Alltag ── */}
-          <SectionTitle>Alltag</SectionTitle>
-
-          <FieldLabel>Schritte pro Tag</FieldLabel>
-          <View style={styles.chipRow}>
-            {STEP_PRESETS.map((p) => (
-              <ChipButton
-                key={p}
-                label={p.toLocaleString()}
-                selected={!form.stepsUnknown && form.stepsPreset === p}
-                onPress={() => update({ stepsPreset: p, stepsPerDay: '', activityLevel: null, stepsUnknown: false })}
+            {!form.stepsUnknown && form.stepsPreset === null && (
+              <NumericField
+                label="Eigene Schrittzahl"
+                value={form.stepsPerDay}
+                onChangeText={(v) => update({ stepsPerDay: v })}
+                unit="Schritte"
               />
-            ))}
-            <ChipButton
-              label="Eigene Zahl"
-              selected={!form.stepsUnknown && form.stepsPreset === null && form.stepsPerDay !== ''}
-              onPress={() => update({ stepsPreset: null, activityLevel: null, stepsUnknown: false })}
-            />
-            <ChipButton
-              label="Kenne ich nicht"
-              selected={form.stepsUnknown}
-              onPress={() => update({ stepsUnknown: true, stepsPreset: null, stepsPerDay: '' })}
-            />
+            )}
+
+            {form.stepsUnknown && (
+              <>
+                <FieldLabel>Aktivitätslevel</FieldLabel>
+                {ALL_ACTIVITY_LEVELS.map((level) => (
+                  <TouchableOpacity
+                    key={level}
+                    style={styles.optionRow}
+                    onPress={() => update({ activityLevel: level })}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.optionText, form.activityLevel === level && styles.optionTextSelected]}>
+                      {ACTIVITY_LEVEL_LABELS[level]}
+                    </Text>
+                    {form.activityLevel === level
+                      ? <Icon lib="feather" name="check" size="md" color={colors.primaryBright} />
+                      : null}
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
           </View>
 
-          {!form.stepsUnknown && form.stepsPreset === null && (
-            <NumericField
-              label="Eigene Schrittzahl"
-              value={form.stepsPerDay}
-              onChangeText={(v) => update({ stepsPerDay: v })}
-              unit="Schritte"
-            />
-          )}
+          <View style={styles.sectionCard}>
+            <SectionTitle description="Berücksichtige dein regelmäßiges Training" iconName="activity">
+              Training
+            </SectionTitle>
 
-          {form.stepsUnknown && (
-            <>
-              <FieldLabel>Aktivitätslevel</FieldLabel>
-              {ALL_ACTIVITY_LEVELS.map((level) => (
-                <TouchableOpacity
-                  key={level}
-                  style={[styles.optionRow, form.activityLevel === level && styles.optionRowSelected]}
-                  onPress={() => update({ activityLevel: level })}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.optionText, form.activityLevel === level && styles.optionTextSelected]}>
-                    {ACTIVITY_LEVEL_LABELS[level]}
-                  </Text>
-                </TouchableOpacity>
+            <FieldLabel>Trainingstage pro Woche</FieldLabel>
+            <View style={styles.chipRow}>
+              {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
+                <ChipButton
+                  key={n}
+                  label={n === 0 ? 'Kein' : `${n}×`}
+                  selected={form.trainingFrequencyPerWeek === n}
+                  onPress={() => update({ trainingFrequencyPerWeek: n })}
+                />
               ))}
-            </>
-          )}
+            </View>
 
-          {/* ── Training ── */}
-          <SectionTitle>Training</SectionTitle>
+            {form.trainingFrequencyPerWeek > 0 && (
+              <>
+                <FieldLabel>Dauer pro Training</FieldLabel>
+                <View style={styles.chipRow}>
+                  {DURATION_OPTIONS.map((d) => (
+                    <ChipButton
+                      key={d}
+                      label={`${d} min`}
+                      selected={form.trainingDurationMinutes === d}
+                      onPress={() => update({ trainingDurationMinutes: d })}
+                    />
+                  ))}
+                </View>
 
-          <FieldLabel>Trainingstage pro Woche</FieldLabel>
-          <View style={styles.chipRow}>
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
-              <ChipButton
-                key={n}
-                label={n === 0 ? 'Kein' : `${n}×`}
-                selected={form.trainingFrequencyPerWeek === n}
-                onPress={() => update({ trainingFrequencyPerWeek: n })}
-              />
-            ))}
+                <FieldLabel>Sportarten (optional)</FieldLabel>
+                <View style={styles.chipRow}>
+                  {ALL_SPORTS.map((sport) => (
+                    <ChipButton
+                      key={sport}
+                      label={SPORT_LABELS[sport]}
+                      selected={form.sports.includes(sport)}
+                      onPress={() => {
+                        const next = form.sports.includes(sport)
+                          ? form.sports.filter((s) => s !== sport)
+                          : [...form.sports, sport];
+                        update({ sports: next });
+                      }}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
           </View>
 
-          {form.trainingFrequencyPerWeek > 0 && (
-            <>
-              <FieldLabel>Dauer pro Training</FieldLabel>
-              <View style={styles.chipRow}>
-                {DURATION_OPTIONS.map((d) => (
-                  <ChipButton
-                    key={d}
-                    label={`${d} min`}
-                    selected={form.trainingDurationMinutes === d}
-                    onPress={() => update({ trainingDurationMinutes: d })}
-                  />
-                ))}
-              </View>
+          <View style={styles.sectionCard}>
+            <SectionTitle description="Wähle, worauf du hinarbeitest" iconName="target">
+              Ziel
+            </SectionTitle>
 
-              <FieldLabel>Sportarten (optional)</FieldLabel>
-              <View style={styles.chipRow}>
-                {ALL_SPORTS.map((sport) => (
-                  <ChipButton
-                    key={sport}
-                    label={SPORT_LABELS[sport]}
-                    selected={form.sports.includes(sport)}
-                    onPress={() => {
-                      const next = form.sports.includes(sport)
-                        ? form.sports.filter((s) => s !== sport)
-                        : [...form.sports, sport];
-                      update({ sports: next });
-                    }}
-                  />
-                ))}
-              </View>
-            </>
-          )}
+            {GOALS.map((g) => (
+              <TouchableOpacity
+                key={g}
+                style={styles.goalCard}
+                onPress={() => update({ goal: g, goalIntensity: null })}
+                activeOpacity={0.7}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: form.goal === g }}
+              >
+                <View style={styles.goalText}>
+                  <Text style={[styles.goalTitle, form.goal === g && styles.goalTitleSelected]}>
+                    {GOAL_LABELS[g]}
+                  </Text>
+                  <Text style={styles.goalDesc}>{GOAL_DESCRIPTIONS[g]}</Text>
+                </View>
+                {form.goal === g ? <Icon lib="feather" name="check" size="md" color={colors.primaryBright} /> : null}
+              </TouchableOpacity>
+            ))}
 
-          {/* ── Ziel ── */}
-          <SectionTitle>Ziel</SectionTitle>
+            {(form.goal === 'lose_weight' || form.goal === 'gain_muscle') && (
+              <>
+                <FieldLabel>Intensität</FieldLabel>
+                <View style={styles.chipRow}>
+                  {INTENSITIES.map((i) => (
+                    <ChipButton
+                      key={i}
+                      label={INTENSITY_LABELS[i]}
+                      selected={form.goalIntensity === i}
+                      onPress={() => update({ goalIntensity: i })}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
 
-          {GOALS.map((g) => (
-            <TouchableOpacity
-              key={g}
-              style={[styles.goalCard, form.goal === g && styles.goalCardSelected]}
-              onPress={() => update({ goal: g, goalIntensity: null })}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.goalTitle, form.goal === g && styles.goalTitleSelected]}>{GOAL_LABELS[g]}</Text>
-              <Text style={styles.goalDesc}>{GOAL_DESCRIPTIONS[g]}</Text>
-            </TouchableOpacity>
-          ))}
-
-          {(form.goal === 'lose_weight' || form.goal === 'gain_muscle') && (
-            <>
-              <FieldLabel>Intensität</FieldLabel>
-              <View style={styles.chipRow}>
-                {INTENSITIES.map((i) => (
-                  <ChipButton
-                    key={i}
-                    label={INTENSITY_LABELS[i]}
-                    selected={form.goalIntensity === i}
-                    onPress={() => update({ goalIntensity: i })}
-                  />
-                ))}
-              </View>
-            </>
-          )}
-
-          {/* Bottom save button */}
+        </ScrollView>
+        <View style={styles.saveFooter} testID="profile-edit-save-footer">
           <TouchableOpacity
             style={[styles.saveButton, !isValid() && styles.saveButtonDisabled]}
             onPress={handleSave}
@@ -593,26 +518,15 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
             activeOpacity={0.8}
             accessibilityRole="button"
             accessibilityLabel="Speichern"
-            accessibilityState={{ disabled: !isValid() || loading }}
+            accessibilityState={{ disabled: !isValid() || loading, busy: loading }}
           >
             {loading
               ? <ActivityIndicator color={colors.background} />
-              : <Text style={styles.saveButtonText}>Speichern</Text>
+              : <Icon lib="feather" name="save" size="md" color={colors.background} />
             }
+            <Text style={styles.saveButtonText}>Speichern</Text>
           </TouchableOpacity>
-
-          {!isNew && (
-            <ProfileGroup title="Konto">
-              <ProfileRow
-                label="Konto löschen"
-                detail="Profil und persönliche Daten endgültig löschen"
-                iconName="trash-2"
-                onPress={openDeletionOverlay}
-              />
-            </ProfileGroup>
-          )}
-
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
       <InfoOverlay
         visible={saveErrorVisible}
@@ -620,157 +534,6 @@ export default function ProfileEditScreen({ route, navigation }: Props) {
         body="Das Profil konnte nicht gespeichert werden. Bitte versuche es erneut."
         onClose={() => setSaveErrorVisible(false)}
       />
-      {deleteOverlayVisible ? (
-        <Modal
-          visible
-          transparent
-          animationType="fade"
-          onRequestClose={closeDeletionOverlay}
-        >
-          <View style={styles.deleteOverlayRoot}>
-            <Pressable
-              style={[StyleSheet.absoluteFillObject, styles.deleteBackdrop]}
-              onPress={closeDeletionOverlay}
-              disabled={deletionInProgress}
-              accessibilityRole="button"
-              accessibilityLabel="Bestätigung schließen"
-            />
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.deleteKeyboard}
-            >
-              <View style={styles.deleteDialog}>
-                <ScrollView
-                  contentContainerStyle={styles.deleteDialogContent}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  <Text style={styles.deleteTitle} accessibilityRole="header">
-                    Profil endgültig löschen?
-                  </Text>
-                  <Text style={styles.deleteBody}>
-                    Dein FitTrack-Profil und deine persönlichen FitTrack-Daten werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.{ '\n\n' }Gib zur Bestätigung DELETE ein.
-                  </Text>
-                  <Text style={styles.deleteSecondaryNotice}>
-                    Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen. Wenn das auf deinem Gerät nicht klappt, zeigt FitTrack dir einen Hinweis. Bereits in Health Connect gespeicherte Einträge und Berechtigungen bleiben davon unberührt.
-                  </Text>
-
-                  {communityRecipeCheck === 'loading' ? (
-                    <View style={styles.deleteCheckStatus}>
-                      <ActivityIndicator color={colors.primary} size="small" />
-                      <Text style={styles.deleteStatusText}>Community-Rezepte werden geprüft …</Text>
-                    </View>
-                  ) : null}
-                  {communityRecipeCheck === 'failed' ? (
-                    <View style={styles.deleteCheckError}>
-                      <Text style={styles.deleteErrorText}>
-                        Deine Community-Rezepte konnten nicht geprüft werden. Bitte versuche es erneut.
-                      </Text>
-                      <TouchableOpacity
-                        style={styles.deleteRetryCheck}
-                        onPress={() => void checkCommunityRecipes()}
-                        disabled={deletionInProgress}
-                        accessibilityRole="button"
-                        accessibilityLabel="Erneut prüfen"
-                      >
-                        <Text style={styles.deleteRetryCheckText}>Erneut prüfen</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-                  {communityRecipeCheck === 'available' ? (
-                    <>
-                      <View style={styles.deleteSwitchRow}>
-                        <Text style={styles.deleteSwitchLabel}>Auch meine Community Rezepte löschen</Text>
-                        <View style={styles.deleteSwitchControl}>
-                          <Text style={styles.deleteSwitchValue}>{deleteCommunityRecipes ? 'Ja' : 'Nein'}</Text>
-                          <Switch
-                            value={deleteCommunityRecipes}
-                            onValueChange={setDeleteCommunityRecipes}
-                            disabled={deletionInProgress || pendingDeletionRequest !== null}
-                            accessibilityLabel="Auch meine Community Rezepte löschen"
-                            accessibilityState={{
-                              checked: deleteCommunityRecipes,
-                              disabled: deletionInProgress || pendingDeletionRequest !== null,
-                            }}
-                          />
-                        </View>
-                      </View>
-                      <Text style={styles.deleteSecondaryNotice}>
-                        Deine Community-Rezepte bleiben ohne deine persönliche Namensanzeige erhalten, sofern du sie nicht ebenfalls löschst.
-                      </Text>
-                    </>
-                  ) : null}
-
-                  <TextInput
-                    style={styles.deleteInput}
-                    value={deleteConfirmation}
-                    onChangeText={setDeleteConfirmation}
-                    placeholder="DELETE"
-                    placeholderTextColor={colors.textMuted}
-                    autoCapitalize="characters"
-                    autoCorrect={false}
-                    maxLength={20}
-                    editable={!deletionInProgress && pendingDeletionRequest === null}
-                    accessibilityLabel="Löschbestätigung"
-                    accessibilityHint="Gib DELETE in Großbuchstaben ein."
-                  />
-
-                  {deletionInProgress ? (
-                    <View style={styles.deleteCheckStatus} accessibilityLiveRegion="polite">
-                      <ActivityIndicator color={colors.primary} size="small" />
-                      <Text style={styles.deleteStatusText}>Dein Profil wird gelöscht …</Text>
-                    </View>
-                  ) : null}
-                  {deletionError ? (
-                    <Text style={styles.deleteErrorText} accessibilityLiveRegion="polite">
-                      {deletionError}
-                    </Text>
-                  ) : null}
-
-                  <View style={styles.deleteActions}>
-                    <TouchableOpacity
-                      style={styles.deleteCancelButton}
-                      onPress={closeDeletionOverlay}
-                      disabled={deletionInProgress}
-                      accessibilityRole="button"
-                      accessibilityLabel="Abbrechen"
-                      accessibilityState={{ disabled: deletionInProgress }}
-                    >
-                      <Text style={styles.deleteCancelText}>Abbrechen</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.deleteConfirmButton, (
-                        deletionInProgress || (deletionError === null && (
-                          deleteConfirmation !== 'DELETE' ||
-                          (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none')
-                        ))
-                      ) && styles.deleteConfirmButtonDisabled]}
-                      onPress={deletionError && pendingDeletionRequest
-                        ? () => void submitDeletion(pendingDeletionRequest)
-                        : startDeletion}
-                      disabled={deletionInProgress || (deletionError === null && (
-                        deleteConfirmation !== 'DELETE' ||
-                        (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none')
-                      ))}
-                      accessibilityRole="button"
-                      accessibilityLabel={deletionError && pendingDeletionRequest ? 'Erneut versuchen' : 'Endgültig löschen'}
-                      accessibilityState={{
-                        disabled: deletionInProgress || (deletionError === null && (
-                          deleteConfirmation !== 'DELETE' ||
-                          (communityRecipeCheck !== 'available' && communityRecipeCheck !== 'none')
-                        )),
-                      }}
-                    >
-                      <Text style={styles.deleteConfirmText}>
-                        {deletionError && pendingDeletionRequest ? 'Erneut versuchen' : 'Endgültig löschen'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </View>
-            </KeyboardAvoidingView>
-          </View>
-        </Modal>
-      ) : null}
       <Snackbar ref={snackbarRef} />
     </SafeAreaView>
   );
@@ -794,28 +557,42 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   navAction: { minHeight: spacing.xxl, justifyContent: 'center' },
+  navSpacer: { width: spacing.xl },
   navTitle: { ...typography.h3, color: colors.text, flexShrink: 1, textAlign: 'center' },
   cancelText: { ...typography.body1, color: colors.textSecondary },
-  saveText: { ...typography.button, color: colors.primary },
-  saveTextDisabled: { color: colors.textDisabled },
 
-  scroll: { padding: spacing.md, paddingBottom: spacing.xxl },
+  scroll: { padding: spacing.md, paddingBottom: spacing.md, gap: spacing.sm },
 
-  sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  sectionCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    marginBottom: 0,
   },
+  sectionHeading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  sectionIcon: {
+    width: spacing.xxl,
+    height: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+  },
+  sectionHeadingText: { flex: 1, gap: spacing.xs },
+  sectionTitle: { ...typography.h3, color: colors.text },
+  sectionDescription: { ...typography.body2, color: colors.textSecondary },
   fieldLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+    ...typography.body2,
+    color: colors.textSecondary,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
   },
 
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
@@ -837,110 +614,61 @@ const styles = StyleSheet.create({
   inputWithUnit: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
+    minHeight: spacing.xxl,
   },
-  textInput: { flex: 1, color: colors.text, fontSize: typography.body1.fontSize, paddingVertical: spacing.md },
+  textInput: { ...typography.body1, flex: 1, color: colors.text, paddingVertical: spacing.sm },
   unitText: { ...typography.body2, color: colors.textMuted, marginLeft: spacing.sm },
 
   optionRow: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: spacing.xxl,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  optionRowSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   optionText: { ...typography.body1, color: colors.textSecondary },
   optionTextSelected: { color: colors.primaryBright, fontWeight: '600' },
 
   goalCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: spacing.xxl,
+    paddingHorizontal: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
-  goalCardSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  goalText: { flex: 1, gap: spacing.xs },
   goalTitle: { ...typography.body1, color: colors.text, fontWeight: '600' },
   goalTitleSelected: { color: colors.primaryBright },
   goalDesc: { ...typography.caption, color: colors.textMuted },
 
   saveButton: {
     backgroundColor: colors.primary,
-    borderRadius: radius.sm,
+    borderRadius: radius.md,
     minHeight: spacing.xxl,
     paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.xl,
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   saveButtonDisabled: { opacity: 0.4 },
   saveButtonText: { ...typography.button, color: colors.background },
-
-  deleteOverlayRoot: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  deleteBackdrop: { backgroundColor: colors.overlay },
-  deleteKeyboard: { flex: 1, justifyContent: 'center', padding: spacing.md },
-  deleteDialog: {
-    maxHeight: '94%',
-    backgroundColor: colors.surfaceElevated,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-  },
-  deleteDialogContent: { padding: spacing.lg, gap: spacing.md },
-  deleteTitle: { ...typography.h3, color: colors.text },
-  deleteBody: { ...typography.body2, color: colors.text },
-  deleteSecondaryNotice: { ...typography.body2, color: colors.textSecondary },
-  deleteCheckStatus: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  deleteStatusText: { ...typography.body2, color: colors.textSecondary, flexShrink: 1 },
-  deleteCheckError: { gap: spacing.xs },
-  deleteErrorText: { ...typography.body2, color: colors.negative },
-  deleteRetryCheck: { minHeight: spacing.xxl, justifyContent: 'center', alignSelf: 'flex-start' },
-  deleteRetryCheckText: { ...typography.button, color: colors.primaryBright },
-  deleteSwitchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  deleteSwitchLabel: { ...typography.body2, color: colors.text, flex: 1, flexShrink: 1 },
-  deleteSwitchControl: { alignItems: 'center', minWidth: spacing.xxl * 2 },
-  deleteSwitchValue: { ...typography.caption, color: colors.textSecondary },
-  deleteInput: {
-    ...typography.body1,
-    color: colors.text,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    minHeight: spacing.xxl,
+  saveFooter: {
+    gap: spacing.sm,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.background,
   },
-  deleteActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  deleteCancelButton: {
-    flex: 1,
-    minHeight: spacing.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  deleteCancelText: { ...typography.button, color: colors.textSecondary },
-  deleteConfirmButton: {
-    flex: 1,
-    minHeight: spacing.xxl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.sm,
-    backgroundColor: colors.negative,
-    paddingHorizontal: spacing.sm,
-  },
-  deleteConfirmButtonDisabled: { opacity: 0.4 },
-  deleteConfirmText: { ...typography.button, color: colors.background, textAlign: 'center' },
+
 });

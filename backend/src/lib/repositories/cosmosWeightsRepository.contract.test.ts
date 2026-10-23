@@ -81,6 +81,7 @@ describe('CosmosWeightsRepository (contract)', () => {
     expect(saved.id).toBe(entry.id);
     expect(saved.value).toBe(82.5);
     expect(saved.unit).toBe('kg');
+    expect(saved.updatedAt).toBe(entry.createdAt);
 
     const list = await repo.list(USER_A);
     expect(list).toHaveLength(1);
@@ -118,6 +119,34 @@ describe('CosmosWeightsRepository (contract)', () => {
     expect(bList.map((e) => e.id)).toEqual(['b1']);
   });
 
+  it('listUpdatedSince is inclusive, supports legacy documents, and stays in one user partition', async () => {
+    const since = '2026-04-30T08:00:00.000Z';
+    const container = ctx!.database.container('weights');
+    await container.items.create(makeEntry({
+      id: 'legacy-old',
+      createdAt: '2026-04-28T08:00:00.000Z',
+    }));
+    await container.items.create(makeEntry({
+      id: 'legacy-boundary',
+      createdAt: since,
+    }));
+    await container.items.create({
+      ...makeEntry({ id: 'updated-boundary', createdAt: '2026-04-29T08:00:00.000Z' }),
+      updatedAt: since,
+    });
+    await container.items.create(makeEntry({
+      id: 'foreign-boundary',
+      userId: USER_B,
+      createdAt: since,
+    }));
+
+    const delta = await repo.listUpdatedSince(USER_A, since);
+
+    expect(delta.map((entry) => entry.id)).toEqual(['legacy-boundary', 'updated-boundary']);
+    expect((await repo.list(USER_A)).find((entry) => entry.id === 'legacy-boundary'))
+      .not.toHaveProperty('updatedAt');
+  });
+
   it('selects with the reserved word "value" — must not throw a Cosmos SQL syntax error', async () => {
     // Regression test: an earlier version used `SELECT c.value` which fails
     // with `Syntax error, incorrect syntax near 'value'`. The current repo
@@ -151,6 +180,8 @@ describe('CosmosWeightsRepository (contract)', () => {
 
     expect(updated).toMatchObject(expected);
     expect(stored).toMatchObject(expected);
+    expect(updated?.updatedAt).toEqual(stored?.updatedAt);
+    expect(updated?.updatedAt).not.toBe(entry.createdAt);
   });
 
   it('updateValue returns null for a missing or foreign-partition ID', async () => {

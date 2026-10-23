@@ -1,6 +1,7 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import type { CommunityRecipesPage } from '@fittrack/shared';
 
+import { copyPublishedCommunityRecipe, deriveCommunityRecipeCopyId } from '../lib/communityRecipeTransfer';
 import { projectCommunityRecipe } from '../lib/communityRecipes';
 import { withRecipeHandler } from '../lib/recipeHttp';
 import { logEvent, type LogFields } from '../lib/log';
@@ -137,6 +138,37 @@ export const getCommunityRecipeHandler = withRecipeHandler(
   },
 );
 
+export const copyCommunityRecipeHandler = withRecipeHandler(
+  'communityRecipes.copy',
+  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+    const { userId } = await requireUser(request);
+    const sourceId = request.params['id'];
+    if (!sourceId) return { status: 400, jsonBody: { error: 'Missing recipe id' } };
+
+    const repository = getRecipesRepository();
+    const recipeId = deriveCommunityRecipeCopyId(userId, sourceId);
+    if (await repository.get(userId, recipeId)) {
+      return { status: 200, jsonBody: { recipeId } };
+    }
+
+    const source = await repository.getCommunityById(sourceId);
+    if (!source || source.visibility !== 'community') {
+      if (await repository.get(userId, recipeId)) {
+        return { status: 200, jsonBody: { recipeId } };
+      }
+      return { status: 404, jsonBody: { error: 'Recipe not found' } };
+    }
+
+    const result = await copyPublishedCommunityRecipe(userId, source, {
+      saveRecipe: (ownerId, recipe) => repository.createSnapshotCopy(ownerId, recipe),
+    });
+    return {
+      status: result.created ? 201 : 200,
+      jsonBody: { recipeId: result.recipeId },
+    };
+  },
+);
+
 export const getCommunityRecipeImageHandler = withRecipeHandler(
   'communityRecipes.getImage',
   async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
@@ -237,4 +269,11 @@ app.http('community-recipes-get-image', {
   authLevel: 'anonymous',
   route: 'community-recipes/{id}/images/{imageId}',
   handler: getCommunityRecipeImageHandler,
+});
+
+app.http('community-recipes-copy', {
+  methods: ['POST'],
+  authLevel: 'anonymous',
+  route: 'community-recipes/{id}/copy',
+  handler: copyCommunityRecipeHandler,
 });

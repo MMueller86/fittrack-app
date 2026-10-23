@@ -7,6 +7,7 @@ import ProfileDetailsScreen from './ProfileDetailsScreen';
 
 const mocks = vi.hoisted(() => ({
   profileApi: { getMe: vi.fn() },
+  recipeApi: { list: vi.fn() },
   showSnackbar: vi.fn(),
 }));
 
@@ -32,6 +33,10 @@ vi.mock('@react-navigation/native', async () => {
 
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('../../shared/api/profileApi', () => ({ profileApi: mocks.profileApi }));
+vi.mock('../../shared/api/recipeApi', () => ({ recipeApi: mocks.recipeApi }));
+vi.mock('../../services/accountDeletionService', () => ({
+  completeAccountDeletionLocally: vi.fn(),
+}));
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
 vi.mock('../../shared/components/Snackbar', () => ({
   Snackbar: 'Snackbar',
@@ -130,6 +135,7 @@ function refreshControls(renderer: ReactTestRenderer) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.recipeApi.list.mockResolvedValue({ recipes: [] });
 });
 
 describe('ProfileDetailsScreen', () => {
@@ -140,7 +146,16 @@ describe('ProfileDetailsScreen', () => {
     const nodes = textNodes(renderer);
     const all = text(renderer);
     expect(nodes).toContain('Profil & Tagesziele');
-    expect(nodes).toContain('Bearbeiten');
+    expect(nodes).not.toContain('Profil bearbeiten');
+    expect(findByLabel(renderer, 'Profil bearbeiten')).toHaveLength(1);
+    expect(findByLabel(renderer, 'Konto löschen')).toHaveLength(0);
+    const detailsScroll = renderer.root.findAll(
+      (node: ReactTestInstance) => node.type === 'ScrollView' && node.props.refreshControl != null,
+    )[0]!;
+    expect(detailsScroll.findAll((node: ReactTestInstance) => node.props.accessibilityLabel === 'Konto löschen')).toHaveLength(0);
+    expect(renderer.root.findAll(
+      (node: ReactTestInstance) => node.type === 'View' && node.props.testID === 'profile-details-delete-footer',
+    )).toHaveLength(0);
     expect(findByLabel(renderer, 'Zurück')).toHaveLength(1);
 
     expect(nodes).toContain('Alltag & Training');
@@ -189,7 +204,7 @@ describe('ProfileDetailsScreen', () => {
     expect(navigation.goBack).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a labelled spinner without Bearbeiten while loading', async () => {
+  it('shows a labelled spinner without profile actions while loading', async () => {
     mocks.profileApi.getMe.mockReturnValue(new Promise(() => {}));
     const { renderer } = await renderScreen();
 
@@ -197,6 +212,7 @@ describe('ProfileDetailsScreen', () => {
     expect(spinner).toHaveLength(1);
     expect(spinner[0]!.props.accessibilityLabel).toBe('Profil wird geladen');
     expect(findByLabel(renderer, 'Profil bearbeiten')).toHaveLength(0);
+    expect(findByLabel(renderer, 'Konto löschen')).toHaveLength(0);
   });
 
   it('shows a retryable error without Bearbeiten and recovers on retry', async () => {
@@ -206,6 +222,7 @@ describe('ProfileDetailsScreen', () => {
     expect(text(renderer)).toContain('Profil konnte nicht geladen werden');
     expect(text(renderer)).not.toContain('Noch kein Profil');
     expect(findByLabel(renderer, 'Profil bearbeiten')).toHaveLength(0);
+    expect(findByLabel(renderer, 'Konto löschen')).toHaveLength(0);
 
     mocks.profileApi.getMe.mockResolvedValueOnce({ profile, targets });
     pressByLabel(renderer, 'Erneut versuchen');
@@ -222,6 +239,7 @@ describe('ProfileDetailsScreen', () => {
 
     expect(text(renderer)).toContain('Noch kein Profil');
     expect(findByLabel(renderer, 'Profil bearbeiten')).toHaveLength(0);
+    expect(findByLabel(renderer, 'Konto löschen')).toHaveLength(0);
     expect(findByLabel(renderer, 'Profil einrichten')).toHaveLength(0);
   });
 

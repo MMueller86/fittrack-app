@@ -28,6 +28,13 @@ export class RecipeImageUnsupportedContentTypeError extends Error {
   }
 }
 
+export class RecipeImageSnapshotConflictError extends Error {
+  constructor() {
+    super('Recipe image snapshot target contains different content.');
+    this.name = 'RecipeImageSnapshotConflictError';
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Client (lazy singleton)
 // ---------------------------------------------------------------------------
@@ -191,6 +198,43 @@ export async function copyRecipeImageToCommunity(
     blobHTTPHeaders: { blobContentType: contentType },
   });
   return targetBlobName;
+}
+
+function isBlobCreateConflict(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const details = error as { code?: unknown; statusCode?: unknown };
+  return details.statusCode === 409 || details.statusCode === 412 ||
+    details.code === 409 || details.code === 412 ||
+    details.code === 'BlobAlreadyExists' || details.code === 'ConditionNotMet';
+}
+
+/** Create an independent owner image blob, reusing only an identical existing target. */
+export async function copyRecipeImageToOwnerSnapshot(
+  sourceBlobName: string,
+  userId: string,
+  recipeId: string,
+  imageId: string,
+): Promise<string> {
+  const { buffer, contentType } = await downloadRecipeImageWithContentType(sourceBlobName);
+  const extension = contentType === 'image/png' ? 'png' : 'jpg';
+  const targetBlobName = `${userId}/${recipeId}/${imageId}.${extension}`;
+  const target = getClient().getContainerClient(CONTAINER_NAME).getBlockBlobClient(targetBlobName);
+  try {
+    await target.uploadData(buffer, {
+      blobHTTPHeaders: { blobContentType: contentType },
+      conditions: { ifNoneMatch: '*' },
+    });
+    return targetBlobName;
+  } catch (error) {
+    if (!isBlobCreateConflict(error)) throw error;
+    try {
+      const existing = await downloadRecipeImageWithContentType(targetBlobName);
+      if (existing.contentType === contentType && existing.buffer.equals(buffer)) return targetBlobName;
+    } catch {
+      throw new RecipeImageSnapshotConflictError();
+    }
+    throw new RecipeImageSnapshotConflictError();
+  }
 }
 
 // ---------------------------------------------------------------------------

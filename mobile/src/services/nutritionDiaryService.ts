@@ -27,6 +27,10 @@ export const nutritionDiaryService = {
     return result;
   },
 
+  createMealForRecipeSetup(date: string, type: MealType): Promise<{ meal: Meal }> {
+    return diaryApi.createMeal(date, type);
+  },
+
   async deleteMeal(meal: Meal): Promise<void> {
     await diaryApi.deleteMeal(meal.id);
     void nutritionSyncService.syncNutritionDeleteMeal(meal);
@@ -46,17 +50,13 @@ export const nutritionDiaryService = {
 
   async bulkDeleteItems(input: DiaryBulkDeleteRequest): Promise<DiaryBulkDeleteResponse> {
     const result = await diaryApi.bulkDeleteItems(input);
-    for (const itemId of result.deletedItemIds) {
-      void nutritionSyncService.syncNutritionDelete(itemId);
-    }
+    void nutritionSyncService.syncNutritionDeletes(result.deletedItemIds);
     return result;
   },
 
   async bulkMoveItems(input: DiaryBulkMoveRequest): Promise<DiaryBulkMoveResponse> {
     const result = await diaryApi.bulkMoveItems(input);
-    for (const itemId of result.removedItemIds) {
-      void nutritionSyncService.syncNutritionDelete(itemId);
-    }
+    void nutritionSyncService.syncNutritionDeletes(result.removedItemIds);
     const movedItemIds = result.movedCount > 0
       ? result.targetMeal.items.slice(-result.movedCount).map((item) => item.id)
       : [];

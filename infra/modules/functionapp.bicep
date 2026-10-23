@@ -16,11 +16,17 @@ param planName string
 @description('Function App name (must be globally unique).')
 param functionAppName string
 
+@description('Create the Function App and plan; set false when they already exist outside this deployment.')
+param createFunctionApp bool = true
+
 @description('Storage account name backing the Function App.')
 param storageAccountName string
 
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
+
+@description('Application Insights resource id for the Function App link tag.')
+param appInsightsResourceId string
 
 // --- Cosmos ---
 @description('Cosmos DB documentEndpoint URL.')
@@ -71,14 +77,13 @@ param enrichQueueName string = 'reusable-items-enrich'
 @description('Tags applied to the resources.')
 param tags object = {}
 
-// Reference the storage account to read its connection string.
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
   name: storageAccountName
 }
 
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 
-resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
+resource plan 'Microsoft.Web/serverfarms@2023-12-01' = if (createFunctionApp) {
   name: planName
   location: location
   tags: tags
@@ -92,10 +97,12 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   }
 }
 
-resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
+resource functionApp 'Microsoft.Web/sites@2023-12-01' = if (createFunctionApp) {
   name: functionAppName
   location: location
-  tags: tags
+  tags: union(tags, {
+    'hidden-link: /app-insights-resource-id': appInsightsResourceId
+  })
   kind: 'functionapp,linux'
   identity: {
     type: 'SystemAssigned'
@@ -104,14 +111,6 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     serverFarmId: plan.id
     httpsOnly: true
     siteConfig: {
-      linuxFxVersion: 'Node|22'
-      ftpsState: 'Disabled'
-      minTlsVersion: '1.2'
-      use32BitWorkerProcess: false
-      cors: {
-        allowedOrigins: []
-        supportCredentials: false
-      }
       appSettings: [
         {
           name: 'AzureWebJobsStorage'
@@ -141,7 +140,6 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: appInsightsConnectionString
         }
-        // --- App-specific settings ---
         {
           name: 'COSMOS_ENDPOINT'
           value: cosmosEndpoint
@@ -198,8 +196,6 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
           name: 'ENRICH_QUEUE_NAME'
           value: enrichQueueName
         }
-        // Keep the app on package-based execution after the release build.
-        // The release workflow uses --build remote so native modules are built on Linux.
         {
           name: 'WEBSITE_RUN_FROM_PACKAGE'
           value: '1'
@@ -217,14 +213,35 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   }
 }
 
+resource existingFunctionApp 'Microsoft.Web/sites@2023-12-01' existing = {
+  name: functionAppName
+}
+
+resource functionAppWebConfig 'Microsoft.Web/sites/config@2023-12-01' = {
+  parent: existingFunctionApp
+  name: 'web'
+  properties: {
+    linuxFxVersion: 'Node|22'
+    ftpsState: 'Disabled'
+    localMySqlEnabled: false
+    minTlsVersion: '1.2'
+    use32BitWorkerProcess: false
+    cors: {
+      allowedOrigins: []
+      supportCredentials: false
+    }
+  }
+  dependsOn: [functionApp]
+}
+
 @description('Function App default hostname.')
-output defaultHostName string = functionApp.properties.defaultHostName
+output defaultHostName string = existingFunctionApp.properties.defaultHostName
 
 @description('Function App resource id.')
-output functionAppId string = functionApp.id
+output functionAppId string = existingFunctionApp.id
 
 @description('Function App name.')
-output functionAppName string = functionApp.name
+output functionAppName string = existingFunctionApp.name
 
 @description('System-assigned principal id for granting RBAC later.')
-output principalId string = functionApp.identity.principalId
+output principalId string = existingFunctionApp.identity.principalId

@@ -626,7 +626,7 @@ export function RecipeQuantityView({
         },
         {
           getDiary: recipeDiaryApi.getDay,
-          createMeal: recipeDiaryApi.createMeal,
+          createMeal: diaryApi.createMeal,
           logRecipe: recipeApi.log,
         },
       );

@@ -41,6 +41,12 @@ Examples:
 - `cosmosRecipesRepository.contract.test.ts` — owner-backed compatibility and ownerless `/id` community documents
 - `profileDeletionRepository.contract.test.ts` — user/legacy partition sweep, lock exclusion, and shared-data isolation
 
+Repository delta contract tests seed legacy documents without optional
+`updatedAt`, verify the `createdAt` fallback and inclusive boundary, and prove
+that reads stay within the requested `/userId` partition. Diary delta tests
+also seed `_docType: 'dayMeta'` in the shared container and verify it is not
+returned as a Meal. These additive Class-0 fields require no migration.
+
 Profile deletion unit coverage is colocated in `profileDeletion.test.ts`,
 `profileDeletionRepository.test.ts`, `functions/profile.test.ts`,
 `functions/reusableItems.test.ts`, `functions/reusableItemsEnrich.test.ts`,

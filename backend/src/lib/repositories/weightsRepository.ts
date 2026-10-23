@@ -14,9 +14,21 @@ import { CosmosWeightsRepository } from './cosmosWeightsRepository';
 
 export interface WeightsRepository {
   list(userId: string): Promise<WeightEntry[]>;
+  /** List changed entries since an inclusive UTC ISO timestamp, within one user partition. */
+  listUpdatedSince(userId: string, since: string): Promise<WeightEntry[]>;
   add(entry: WeightEntry): Promise<WeightEntry>;
   updateValue(userId: string, id: string, value: number): Promise<WeightEntry | null>;
   delete(userId: string, id: string): Promise<boolean>;
+}
+
+function updateTimestamp(entry: WeightEntry): string {
+  return entry.updatedAt ?? entry.createdAt;
+}
+
+function sortByUpdateTimestamp(entries: WeightEntry[]): WeightEntry[] {
+  return entries.sort((left, right) =>
+    updateTimestamp(left).localeCompare(updateTimestamp(right)) || left.id.localeCompare(right.id),
+  );
 }
 
 class InMemoryWeightsRepository implements WeightsRepository {
@@ -31,17 +43,24 @@ class InMemoryWeightsRepository implements WeightsRepository {
     });
   }
 
+  async listUpdatedSince(userId: string, since: string): Promise<WeightEntry[]> {
+    const entries = this.entriesByUser.get(userId) ?? [];
+    return sortByUpdateTimestamp(entries.filter((entry) => updateTimestamp(entry) >= since));
+  }
+
   async add(entry: WeightEntry): Promise<WeightEntry> {
     const list = this.entriesByUser.get(entry.userId) ?? [];
-    list.push(entry);
+    const stored = { ...entry, updatedAt: entry.updatedAt ?? entry.createdAt };
+    list.push(stored);
     this.entriesByUser.set(entry.userId, list);
-    return entry;
+    return stored;
   }
 
   async updateValue(userId: string, id: string, value: number): Promise<WeightEntry | null> {
     const entry = this.entriesByUser.get(userId)?.find((candidate) => candidate.id === id);
     if (!entry) return null;
     entry.value = value;
+    entry.updatedAt = new Date().toISOString();
     return entry;
   }
 

@@ -10,4 +10,11 @@ export interface WeightEntry {
   value: number;
   unit: WeightUnit;
   createdAt: string;
+  /** Last persisted change; absent on legacy documents until they are updated. */
+  updatedAt?: string;
+}
+
+export interface WeightChangesResponse {
+  entries: WeightEntry[];
+  checkpointAt: string;
 }

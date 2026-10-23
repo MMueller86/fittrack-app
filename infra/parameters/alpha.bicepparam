@@ -23,6 +23,7 @@ using '../main.bicep'
 
 param environmentName = 'alpha'
 param projectName = 'fittrack'
+param azureDocIntelligenceEndpoint = 'https://di-fittrack-dev-ppf5sc.cognitiveservices.azure.com/'
 
 // Document Intelligence — reuse the shared dev instance (stateless service, no user data).
 // F0 is limited to 1 per subscription, so we pass the dev endpoint/key directly

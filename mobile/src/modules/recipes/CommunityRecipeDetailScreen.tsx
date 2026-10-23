@@ -46,12 +46,30 @@ export default function CommunityRecipeDetailScreen({ route, navigation }: Props
   const [unavailable, setUnavailable] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [copyBusy, setCopyBusy] = useState(false);
   const [logVisible, setLogVisible] = useState(false);
   const [imageIndex, setImageIndex] = useState(0);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [errorNotice, setErrorNotice] = useState<ErrorNotice | null>(null);
   const requestRevisionRef = useRef(0);
+  const handleCopyRecipe = useCallback(async () => {
+    if (!recipe || copyBusy) return;
+    setCopyBusy(true);
+    try {
+      const result = await recipeApi.copyCommunity(recipe.id);
+      navigation.replace('RecipeDetail', { id: result.recipeId });
+    } catch (error: unknown) {
+      setErrorNotice({
+        title: 'Rezept konnte nicht kopiert werden',
+        body: getResponseStatus(error) === 404
+          ? 'Dieses Community-Rezept ist nicht mehr verfügbar. Bitte aktualisiere die Liste.'
+          : 'Bitte prüfe deine Verbindung und versuche es erneut.',
+      });
+    } finally {
+      setCopyBusy(false);
+    }
+  }, [copyBusy, navigation, recipe]);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const requestRevision = ++requestRevisionRef.current;
@@ -247,6 +265,12 @@ export default function CommunityRecipeDetailScreen({ route, navigation }: Props
               <Text style={styles.sectionLabel}>Portionen</Text>
               <Text style={styles.portionsValue}>{recipe.portions}</Text>
             </View>
+            {typeof recipe.totalTimeMinutes === 'number'
+              && Number.isFinite(recipe.totalTimeMinutes) && (
+                <Text style={styles.totalTime}>
+                  Gesamtzeit: {recipe.totalTimeMinutes} Min.
+                </Text>
+              )}
 
             <Text style={styles.sectionLabel}>Nährwerte pro Portion</Text>
             <View style={styles.nutritionRow}>
@@ -340,6 +364,26 @@ export default function CommunityRecipeDetailScreen({ route, navigation }: Props
           </ScrollView>
 
           <View style={styles.footer}>
+            {!recipe.isOwnRecipe && (
+              <TouchableOpacity
+                style={[styles.secondaryButton, { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm }]}
+                onPress={() => void handleCopyRecipe()}
+                disabled={copyBusy}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Rezept kopieren"
+                accessibilityState={{ disabled: copyBusy }}
+              >
+                {copyBusy ? (
+                  <ActivityIndicator size="small" color={colors.text} />
+                ) : (
+                  <Icon lib="ion" name="copy-outline" size="sm" color={colors.text} />
+                )}
+                <Text style={styles.secondaryButtonText}>
+                  {copyBusy ? 'Wird kopiert…' : 'Rezept kopieren'}
+                </Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.primaryButton}
               onPress={() => setLogVisible(true)}
@@ -426,6 +470,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   portionsValue: { ...typography.h3, color: colors.text },
+  totalTime: { ...typography.body2, color: colors.textSecondary, marginTop: spacing.xs },
   sectionLabel: {
     ...typography.overline,
     color: colors.textMuted,

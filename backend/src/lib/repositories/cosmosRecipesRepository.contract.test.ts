@@ -22,7 +22,7 @@ import {
 import { __resetCosmosForTests } from '../cosmos';
 import { CosmosRecipesRepository } from './cosmosRecipesRepository';
 import type { CreateRecipeInput } from './recipesRepository';
-import { createRecipeExportView } from './recipeExport';
+import { computeRecipeSourceFingerprint, createRecipeExportView } from './recipeExport';
 import { DEFAULT_RECIPE_IMAGE_HERO_CROP } from '../../../../shared/types/recipeImageHeroCrop';
 import { projectCommunityRecipe, projectRecipeReferenceAccess, resolveRecipeForRead } from '../communityRecipes';
 import { getReusableItemsRepository, __resetReusableItemsRepositoryForTests } from './reusableItemsRepository';
@@ -354,6 +354,50 @@ describe('CosmosRecipesRepository (contract)', () => {
     expect(fetched).not.toBeNull();
     expect(fetched!.id).toBe(created.id);
     expect(fetched!.name).toBe('Sauerteigbrot');
+  });
+
+  it('creates a deterministic owner snapshot once and preserves its server-only time metadata', async () => {
+    const source = await repo.create(USER_A, makeInput());
+    const recipeId = '607f7a61-6d5b-57f1-8d33-e1f7e82ffa47';
+    const snapshotBase = {
+      ...source,
+      id: recipeId,
+      ownerUserId: USER_B,
+      visibility: 'private' as const,
+    };
+    const snapshot = {
+      ...snapshotBase,
+      communityCopyTimeSnapshot: {
+        totalTimeMinutes: 35,
+        sourceFingerprint: computeRecipeSourceFingerprint(snapshotBase),
+      },
+    };
+
+    expect(await repo.createSnapshotCopy(USER_B, snapshot)).toBe(true);
+    expect(await repo.createSnapshotCopy(USER_B, { ...snapshot, name: 'Do not overwrite' })).toBe(false);
+    expect(await repo.get(USER_B, recipeId)).toMatchObject({
+      id: recipeId,
+      ownerUserId: USER_B,
+      name: source.name,
+      communityCopyTimeSnapshot: snapshot.communityCopyTimeSnapshot,
+    });
+    expect(await repo.get(USER_A, recipeId)).toBeNull();
+
+    const versioned = await repo.getVersioned(USER_B, recipeId);
+    expect(versioned).not.toBeNull();
+    await repo.setVisibility(USER_B, recipeId, versioned!.etag, {
+      visibility: 'community',
+      contentConfirmed: true,
+      displayNameConsent: false,
+    });
+    const projected = await projectCommunityRecipe((await repo.getCommunityById(recipeId))!, USER_B, (id, imageId) =>
+      `/api/community-recipes/${id}/images/${imageId}`);
+    expect(projected.totalTimeMinutes).toBe(35);
+    expect(projected).not.toHaveProperty('communityCopyTimeSnapshot');
+
+    const stored = await ctx!.database.container('recipes').item(recipeId, USER_B).read<Record<string, unknown>>();
+    expect(stored.resource).toMatchObject({ userId: USER_B, ownerUserId: USER_B });
+    expect(stored.resource).not.toHaveProperty('exportViewStatus');
   });
 
   it('reads a historical recipe without category and amountLabel', async () => {

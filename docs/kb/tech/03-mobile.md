@@ -29,12 +29,13 @@ mobile/src/
 │   ├── scanner/             BarcodeScannerScreen
 │   └── weight/              WeightDetailScreen
 ├── services/
-│   ├── health/              Health platform abstraction (HC-1, HC-2a, HC-2b)
+│   ├── health/              Health platform abstraction and server reconciliation (HC-1, HC-2a, HC-2b, HC-4)
 │   │   ├── IHealthPlatformService.ts   Interface + types
 │   │   ├── MockHealthPlatformService.ts
 │   │   ├── HealthConnectService.ts     Android implementation
 │   │   ├── healthPlatformService.ts    Factory (Mock vs Real)
-│   │   └── healthSyncService.ts        Sync state machine (AsyncStorage)
+│   │   ├── healthSyncService.ts        Weight sync state machine (AsyncStorage)
+│   │   └── nutritionSyncService.ts     Meal sync state machine (AsyncStorage)
 │   ├── authConfig.ts        CIAM OAuth config (from env vars)
 │   ├── authService.ts       Token storage, refresh, expiry check
 │   ├── imageService.ts      Image picker utility
@@ -58,7 +59,7 @@ Built with React Navigation. Architecture: one bottom tab navigator containing a
 | Nutrition | `DiaryScreen` | FoodEntryHub overlays from here |
 | Recipes (`Rezepte`) | `RecipeListScreen` | Visible tab label `Rezepte`; full CRUD through detail + wizard stack |
 | Weight | `ProgressScreen` | Visible tab label: `Progress`; weight chart, trend indicators |
-| Profile | `ProfileScreen` | Visible tab label: `Profil` (route id `Profile` unchanged; constants in `app/navigation/profileTab.ts`); hub starts with one `Basisdaten` card and navigation groups, without a repeated page title |
+| Profile | `ProfileScreen` | Visible tab label: `Profil` (route id `Profile` unchanged; constants in `app/navigation/profileTab.ts`); hub starts with one tappable `Profil & Tagesziele` summary card and navigation groups, without a repeated page title |
 
 ### Additional Screens (inside stacks)
 
@@ -149,6 +150,59 @@ See [tech/05-authentication.md](05-authentication.md) for full flow.
 
 ## Key Feature Modules
 
+### Health Connect Synchronization (HC-4)
+
+`healthSyncService` and `nutritionSyncService` reconcile the authenticated
+FitTrack weight and meal data with Health Connect. Activation and manual
+re-export use the existing full-list APIs; foreground runs use the authenticated
+weight and paginated meal delta APIs. The AppState listener starts a foreground
+run on authentication and when the app becomes active. There is no background
+worker or timer.
+
+Each datatype stores control state only in its own AsyncStorage key:
+`hc:weight:sync` and `hc:nutrition:sync`. The allowed fields are `enabled`,
+`pendingDeleteIds`, and optional `userId`, `watermark`, and
+`lastForegroundAttemptAt`; no weight or meal snapshots are queued locally.
+Both timestamps must be canonical UTC `Date.toISOString()` values. Invalid or
+unrecognized state, including numeric epoch values and legacy snapshot queues,
+is removed and reset to disabled without sending records. Every run and write
+requires the authenticated user ID to match the stored binding; a mismatch
+stops synchronization and discards that datatype's stored state. A missing
+authenticated user stops synchronization. `pendingDeleteIds` contains only
+Health Connect client record IDs, never record payloads. IDs remain pending
+when a Health Connect delete fails and are removed after a successful delete.
+Deactivation preserves the watermark and pending IDs; account deletion resets
+both datatype keys.
+
+Before every Health Connect upsert or delete, Mobile verifies that sync is
+enabled, the current authenticated user ID matches the stored binding, and the
+current write permission is granted. Delta watermarks advance only after every
+page and corresponding write/delete succeeds. Failed deletes retain their IDs.
+Successful diary mutations trigger `nutritionDiaryService` fire-and-forget;
+recipe logging triggers only after `recipeApi.log` succeeds. Successful weight
+create, update, and delete mutations trigger their corresponding weight sync.
+Each datatype's foreground attempt time is persisted as a canonical UTC ISO
+string before its delta flow starts. A missing timestamp permits the first run;
+a stored timestamp is loaded after app restart and suppresses another attempt
+until at least 15 minutes have elapsed. Failed attempts count. Weight and
+nutrition throttle independently because they use separate persisted states.
+Mutation triggers and activation/manual full exports are not throttled and do
+not change `lastForegroundAttemptAt`. The colocated sync-service tests cover
+the boundary just below, exactly at, and just above 15 minutes, cold-start
+throttling after a failed attempt, independent datatype throttles, and these
+unthrottled trigger paths.
+
+`HealthConnectScreen` presents the aggregate F1 status in a shared details
+sheet, with separate `Gewicht` and `Ernährung` sections. The PO-approved status
+allowlist is exactly `enabled`, `permissionRevoked`, `pendingDeleteCount`, and
+optional `lastSuccessfulSyncAt`; a false `permissionRevoked` value is shown as
+`Nicht als entzogen gemeldet`, not as confirmed permission. The aggregate view
+gets `lastSuccessfulSyncAt` from the stored watermark; it does not persist a
+separate run timestamp. The aggregate view does not synthesize global
+in-progress or failed states and does not show per-entry badges, queue-entry
+errors, raw error details, stacks, or emojis. Loading and feedback remain
+scoped to the manual action that caused them.
+
 ### Nutrition Module (`modules/nutrition/`)
 
 - `DiaryScreen.tsx` — daily diary view with meal cards and hint display
@@ -207,6 +261,7 @@ In recipe-ingredient context the same hub is opened as an ingredient picker. `us
 
 - `RecipeListScreen.tsx` — recipe overview
 - The own/Community selector is a flat tab row with `colors.primaryBright` active text and underline. Recipe creation uses an inline plus action in the first own-list heading or a labeled primary action in the empty state; there is no floating action button.
+- Community cards expose the favorite action only; copying is available from a foreign community recipe's detail page through the authenticated bodyless `POST /api/community-recipes/{id}/copy`. The copy action is hidden for own community recipes; both `200` and `201` open the returned owner recipe ID without reloading the source. Community list and detail show only numeric current `totalTimeMinutes`; missing or `null` values have no time row.
 - `RecipeDetailScreen.tsx` — recipe detail, temporary portion scaling, diary logging, crop-consistent image display
 - `RecipeWizardScreen.tsx` — single create/edit wizard; replaces the removed `RecipeCreateScreen`
 - `RecipeWizardInputPhase.tsx`, `RecipeWizardIngredientsPhase.tsx`, `RecipeWizardStepsPhase.tsx`, `RecipeWizardPreviewPhase.tsx` — phase views controlled by `RecipeWizardScreen`
@@ -522,15 +577,15 @@ release claim is made before that gate.
 
 ### Profile Module (`modules/profile/`) and Legal Module (`modules/legal/`)
 
-- `ProfileScreen.tsx` — Profil-Hub: title, one `Basisdaten` card slot (loading / error / no-profile state card in every non-ready state) and navigation groups below, rendered with `ProfileGroup.tsx` (`ProfileGroup` / `ProfileRow`). Title and the groups `Bibliothek`, `Integrationen`, `Rechtliches` render in every state; `Persönliche Daten` only with a loaded profile. `Profil einrichten` opens `ProfileWizardScreen` locally.
-- `ProfileDetailsScreen.tsx` — read-only `Profil & Tagesziele` (route `ProfileDetails`, param `undefined`): header with back, title and `Bearbeiten` (navigates to `ProfileEdit` with the loaded profile; hidden without a profile), content `Alltag & Training`, `Ziel`, `Tagesziele`. Reloads on focus so values are current after `ProfileEdit`.
+- `ProfileScreen.tsx` — Profil-Hub: one `Profil & Tagesziele` summary card opens `ProfileDetails`; navigation groups below use `ProfileGroup.tsx` (`ProfileGroup` / `ProfileRow`). `Bibliothek`, `Integrationen` and `Rechtliches` render in every state; `Profil einrichten` opens `ProfileWizardScreen` locally.
+- `ProfileDetailsScreen.tsx` — read-only profile and target details (route `ProfileDetails`, param `undefined`): header with back and title, content `Alltag & Training`, `Ziel`, `Tagesziele`, and icon-only `Profil bearbeiten` header action. No delete action is rendered here. Reloads on focus so values are current after `ProfileEdit`.
 - `ProfileSummaryCards.tsx` — `BasicDataCard` (hub), `LifestyleCard`, `GoalCard`, `TargetsSection` (details) and their label maps.
 - Profile target display — the wizard preview and `TargetsSection` show each rest/training day's `macroRanges.proteinG` and `macroRanges.carbsG` as gram ranges. Calories, fat and the existing fiber presentation are unchanged; Mobile does not derive ranges and falls back to scalar protein/carbohydrate values only when `macroRanges` is absent.
 - `useProfileData.ts` — loads `GET /api/profile` on focus for hub and details (`status: loading | ready | error`, `profile`, `targets`, `refresh`, `retry`); after a successful first load a failed refresh keeps the data and shows a snackbar.
 - `ProfileStateViews.tsx` — `ProfileLoadingState`, `ProfileErrorState`, `ProfileEmptyState` (setup button only when `onSetup` is passed).
-- `profileHubGroups.ts` — fixed group order `Persönliche Daten` → `Bibliothek` → `Integrationen` → `Gemeinsam` → `Rechtliches` via `getProfileHubGroups({ hasProfile, entries })`; empty groups are not rendered and `Persönliche Daten` is omitted without a profile. `Gemeinsam` (friends / shared household, working name) is `[Planned]` and has no entries yet.
+- `profileHubGroups.ts` — fixed group order `Bibliothek` → `Integrationen` → `Gemeinsam` → `Rechtliches` via `getProfileHubGroups({ entries })`; empty groups are not rendered. Profile details are opened from the summary card rather than a repeated navigation row. `Gemeinsam` (friends / shared household, working name) is `[Planned]` and has no entries yet.
 - `app/navigation/profileTab.ts` — `PROFILE_TAB_ROUTE = 'Profile'` and `PROFILE_TAB_LABEL = 'Profil'`, consumed by `RootNavigator`. The label decision (`Profil` instead of `Mehr`) is documented in [product/02-navigation.md](../product/02-navigation.md#tab-label-profil-entscheidung).
-- `ProfileEditScreen.tsx` — profile editing and account deletion. Opening the confirmation checks whether the user has published Community recipes so the optional delete choice is shown only when relevant; it does not submit a deletion request. The dialog requires the exact uppercase text `DELETE`; cancel, backdrop, and Android Back dismiss without deleting. For published recipes, `Auch meine Community Rezepte löschen` defaults to `Nein` on every open and shows the approved anonymous-author helper. Submission locks controls; on server error the entered confirmation and exact request payload remain available for retry. After `204`, `completeAccountDeletionLocally()` makes one best-effort attempt to remove the wizard preference, both Health Connect queues, the sync diagnostic log, and both SecureStore tokens, while resetting in-memory sync state. It logs out and returns to Login despite partial failures; a detected failure shows one transient notice in the running session. A local failure never repeats `DELETE /api/profile`; there is no durable cleanup marker, startup gate, or local retry. After force-close, a surviving token may authenticate again, and a surviving queue may drain to Health Connect when the app becomes active. Queue operations target Health Connect, not the FitTrack API. Health Connect records and permissions are not removed.
+- `ProfileScreen.tsx` — the only entry point for account deletion is the fixed red outlined `Konto löschen` action above the bottom tab bar, shown only after a profile loads. `ProfileDetailsScreen.tsx` and `ProfileEditScreen.tsx` do not render the action. `ProfileDeletionAction.tsx` hosts the existing flow: opening the confirmation checks whether the user has published Community recipes but does not submit a deletion request. The dialog requires the exact uppercase text `DELETE`; the prompt is immediately above the fixed-height confirmation field, whose Android native underline is disabled. The dialog states that data already saved in Health Connect remains unaffected. Cancel, backdrop, and Android Back dismiss without deleting. For published recipes, `Auch meine Community Rezepte löschen` defaults to `Nein` on every open and shows the approved anonymous-author helper. Submission locks controls; on server error the entered confirmation and exact request payload remain available for retry. After `204`, `completeAccountDeletionLocally()` makes one best-effort attempt to remove the wizard preference, both Health Connect queues, the sync diagnostic log, and both SecureStore tokens, while resetting in-memory sync state. It logs out and returns to Login despite partial failures; a detected failure shows one transient notice in the running session. A local failure never repeats `DELETE /api/profile`; there is no durable cleanup marker, startup gate, or local retry. After force-close, a surviving token may authenticate again, and a surviving queue may drain to Health Connect when the app becomes active. Queue operations target Health Connect, not the FitTrack API. Health Connect records and permissions are not removed.
 - `LibraryScreen.tsx` — single canonical library entry (hub entry `Favoriten & Eigene Lebensmittel`) with tabs `Favoriten` (`FavoritesView`) and `Eigene Lebensmittel` (`OwnFoodsView`). Shared list state in `useLibraryList.ts`, loading/empty/error states in `LibraryStateView.tsx`. `ownFoodItems.ts` filters out `sourceType: 'openFoodFacts'`, so `Eigene Lebensmittel` contains only self-created items. The former `MyProductsScreen` / `MyProducts` route was removed.
 - `LibraryFoodCard.tsx` — shared card container of `FavoritesView` and `OwnFoodsView` (main area, optionally tappable, plus a right 48 pt action button).
 - `favoriteFoodSummary.ts` — pure mapping `UserFoodRelation` → `FoodProductSummary` props (`favoriteSummaryProps`) for `FavoritesView`: origin badge, recipe brand fallback, `Rezept nicht verfügbar` for unavailable recipes, `nutritionBasis` fixed to `per100g`. `FavoritesView` has a single action, removing the favorite (heart, `ConfirmSheet`, snackbar on failure); the former `n× verwendet` line is gone. Product-display and favorites UX rules: [product/05-ux-patterns.md](../product/05-ux-patterns.md#favoriten-in-der-bibliothek).

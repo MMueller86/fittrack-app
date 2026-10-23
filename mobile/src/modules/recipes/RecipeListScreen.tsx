@@ -125,6 +125,13 @@ function RecipeCard({
               {formatKcal(recipe.nutritionPerPortion.calories)} · {recipe.portions}{' '}
               {recipe.portions === 1 ? 'Portion' : 'Portionen'}
             </Text>
+            {!isOwnerRecipe
+              && typeof recipe.totalTimeMinutes === 'number'
+              && Number.isFinite(recipe.totalTimeMinutes) && (
+                <Text style={cardStyles.meta}>
+                  Gesamtzeit · {recipe.totalTimeMinutes} Min.
+                </Text>
+              )}
             {statusLabel ? <Text style={cardStyles.status}>{statusLabel}</Text> : null}
             {authorName ? <Text style={cardStyles.author}>Von {authorName}</Text> : null}
             {recipe.tags.length > 0 && (

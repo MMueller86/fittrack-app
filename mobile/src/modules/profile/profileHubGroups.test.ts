@@ -10,34 +10,18 @@ describe('getProfileHubGroups', () => {
     const groups = getProfileHubGroups();
 
     expect(groups.map((g) => g.title)).toEqual([
-      'Persönliche Daten',
       'Bibliothek',
       'Integrationen',
       'Rechtliches',
     ]);
-    expect(groups.find((g) => g.id === 'profile')?.entries.map((e) => e.route)).toEqual(['ProfileDetails']);
     expect(groups.find((g) => g.id === 'library')?.entries.map((e) => e.route)).toEqual(['Library']);
     expect(groups.find((g) => g.id === 'integrations')?.entries.map((e) => e.route)).toEqual(['HealthConnect']);
     expect(groups.find((g) => g.id === 'legal')?.entries.map((e) => e.route)).toEqual(['Imprint', 'PrivacyPolicy']);
   });
 
-  it('defines the Profil & Tagesziele entry with detail text and user icon', () => {
-    expect(PROFILE_HUB_ENTRIES.profile).toEqual([
-      {
-        id: 'profileDetails',
-        label: 'Profil & Tagesziele',
-        detail: 'Details ansehen und bearbeiten',
-        route: 'ProfileDetails',
-        iconName: 'user',
-      },
-    ]);
-  });
-
-  it('hides Persönliche Daten without a profile and keeps the other groups', () => {
-    const groups = getProfileHubGroups({ hasProfile: false });
-
-    expect(groups.map((g) => g.title)).toEqual(['Bibliothek', 'Integrationen', 'Rechtliches']);
-    expect(groups.map((g) => g.id)).not.toContain('profile');
+  it('keeps profile details outside the navigation groups', () => {
+    expect(getProfileHubGroups().flatMap((group) => group.entries.map((entry) => entry.label)))
+      .not.toContain('Profil & Tagesziele');
   });
 
   it('does not register Gemeinsam without entries and keeps Rechtliches last', () => {
@@ -53,7 +37,6 @@ describe('getProfileHubGroups', () => {
     });
 
     expect(groups.map((g) => g.title)).toEqual([
-      'Persönliche Daten',
       'Bibliothek',
       'Integrationen',
       'Gemeinsam',

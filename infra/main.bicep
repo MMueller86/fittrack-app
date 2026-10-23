@@ -102,6 +102,7 @@ module cosmos 'modules/cosmos.bicep' = {
     location: location
     accountName: cosmosAccountName
     databaseName: 'fittrack-db'
+    createAccount: environmentName != 'alpha'
     tags: commonTags
   }
 }
@@ -139,13 +140,17 @@ module documentIntelligence 'modules/documentintelligence.bicep' = if (deployDi)
   }
 }
 
+resource existingDocumentIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+  name: documentIntelligenceName
+}
+
 // Resolve DI endpoint/key: use external values when provided, otherwise use the deployed module.
 // The #disable-next-line suppresses BCP318 (null-check on conditional module output) which
 // is safe here because the ternary condition mirrors the module deployment condition exactly.
 #disable-next-line BCP318
 var resolvedDiEndpoint = deployDi ? documentIntelligence.outputs.endpoint : azureDocIntelligenceEndpoint
 #disable-next-line BCP318
-var resolvedDiKey = deployDi ? documentIntelligence.outputs.primaryKey : azureDocIntelligenceKey
+var resolvedDiKey = deployDi ? existingDocumentIntelligence.listKeys().key1 : azureDocIntelligenceKey
 
 // Read the Cosmos primary key from the deployed account (kept inside the
 // template — never written to outputs).
@@ -156,8 +161,10 @@ module functionApp 'modules/functionapp.bicep' = {
     location: location
     planName: planName
     functionAppName: functionAppName
+    createFunctionApp: environmentName != 'alpha'
     storageAccountName: storage.outputs.storageAccountName
     appInsightsConnectionString: monitoring.outputs.connectionString
+    appInsightsResourceId: monitoring.outputs.appInsightsId
     cosmosEndpoint: cosmos.outputs.endpoint
     cosmosKey: cosmos.outputs.primaryMasterKey
     cosmosDatabaseId: cosmos.outputs.databaseName

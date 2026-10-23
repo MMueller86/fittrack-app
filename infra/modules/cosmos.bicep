@@ -4,7 +4,7 @@
 //   nutritionProfiles   /userId
 //   weights             /userId
 //   nutritionDiaryMeals /userId
-//   reusableMealItems   /userId
+//   reusableMealItems  /userId
 //   recipes             /userId
 //   aiUsage             /userId
 //   profiles            /userId
@@ -23,16 +23,24 @@ param accountName string
 @description('Logical database name.')
 param databaseName string = 'fittrack-db'
 
+@description('Create the Cosmos account; set false when the account already exists outside this deployment.')
+param createAccount bool = true
+
 @description('Tags applied to the account.')
 param tags object = {}
 
-resource account 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = {
+resource account 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = if (createAccount) {
   name: accountName
   location: location
   tags: tags
   kind: 'GlobalDocumentDB'
   properties: {
     databaseAccountOfferType: 'Standard'
+    analyticalStorageConfiguration: {
+      schemaType: 'WellDefined'
+    }
+    defaultIdentity: 'FirstPartyIdentity'
+    enableAutomaticFailover: true
     consistencyPolicy: {
       defaultConsistencyLevel: 'Session'
     }
@@ -91,6 +99,11 @@ resource aiInsightsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases
         kind: 'Hash'
       }
       defaultTtl: -1
+      conflictResolutionPolicy: {
+        mode: 'LastWriterWins'
+        conflictResolutionPath: '/_ts'
+        conflictResolutionProcedure: ''
+      }
       indexingPolicy: {
         indexingMode: 'consistent'
         automatic: true
@@ -112,6 +125,11 @@ resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containe
         paths: [c.partitionKey]
         kind: 'Hash'
       }
+      conflictResolutionPolicy: {
+        mode: 'LastWriterWins'
+        conflictResolutionPath: '/_ts'
+        conflictResolutionProcedure: ''
+      }
       indexingPolicy: {
         indexingMode: 'consistent'
         automatic: true
@@ -120,6 +138,7 @@ resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containe
         // consume excessive storage and RU on every write.
         includedPaths: c.name == 'foodProducts' ? [
           { path: '/normalizedName/?' }
+          { path: '/brand/?' }
           { path: '/searchKeywords/*' }
           { path: '/source/?' }
           { path: '/barcode/?' }
@@ -179,17 +198,19 @@ resource communityRecipesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDat
 }
 
 @description('Cosmos DB account resource id.')
-output accountId string = account.id
+output accountId string = resourceId('Microsoft.DocumentDB/databaseAccounts', accountName)
 
 @description('Cosmos DB account name.')
-output accountName string = account.name
+output accountName string = accountName
 
 @description('Cosmos DB documentEndpoint URL.')
-output endpoint string = account.properties.documentEndpoint
+#disable-next-line use-resource-symbol-reference
+output endpoint string = reference(resourceId('Microsoft.DocumentDB/databaseAccounts', accountName), '2024-05-15').documentEndpoint
 
 @description('Database name.')
 output databaseName string = database.name
 
 @description('Cosmos primary master key. Marked secure — not echoed in deployment outputs.')
 @secure()
-output primaryMasterKey string = account.listKeys().primaryMasterKey
+#disable-next-line use-resource-symbol-reference
+output primaryMasterKey string = listKeys(resourceId('Microsoft.DocumentDB/databaseAccounts', accountName), '2024-05-15').primaryMasterKey

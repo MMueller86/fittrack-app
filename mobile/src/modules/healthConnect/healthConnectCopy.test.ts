@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   HEALTH_CONNECT_TARGET,
   NUTRITION_SYNC_NOTICE,
+  SYNC_STATUS_COPY,
   WEIGHT_SYNC_NOTICE,
 } from './healthConnectCopy';
 
@@ -24,5 +25,34 @@ describe('Health Connect activation copy', () => {
     ].join(' ');
 
     expect(all).not.toMatch(/google|cloud|konto/i);
+  });
+
+  it('uses German labels for the existing sync fields without confirming permission', () => {
+    expect(SYNC_STATUS_COPY.enabledLabel).toBe('Synchronisation');
+    expect(SYNC_STATUS_COPY.permissionLabel).toBe('Berechtigung');
+    expect(SYNC_STATUS_COPY.pendingDeleteCountLabel).toBe('Ausstehende Löschungen');
+    expect(SYNC_STATUS_COPY.lastSuccessfulSyncAtLabel).toBe('Letzter erfolgreicher Abgleich');
+    expect(SYNC_STATUS_COPY.permissionNotRevoked).toBe('Nicht als entzogen gemeldet');
+    expect(SYNC_STATUS_COPY.permissionNotRevoked).not.toMatch(/erteilt|bestätigt|aktiv/i);
+  });
+
+  it('keeps every aggregate status label in German and free of emoji', () => {
+    const statusCopy = Object.values(SYNC_STATUS_COPY);
+
+    expect(statusCopy).toEqual([
+      'Synchronisationsstatus',
+      'Gewicht',
+      'Ernährung',
+      'Synchronisation',
+      'Aktiviert',
+      'Deaktiviert',
+      'Berechtigung',
+      'Entzogen',
+      'Nicht als entzogen gemeldet',
+      'Ausstehende Löschungen',
+      'Letzter erfolgreicher Abgleich',
+      'Noch kein erfolgreicher Abgleich',
+    ]);
+    expect(statusCopy.join(' ')).not.toMatch(/[\p{Extended_Pictographic}\p{Regional_Indicator}]/u);
   });
 });

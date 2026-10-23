@@ -184,11 +184,11 @@ follow-up is an internal manual Product Owner task, not an end-user action.
 ### Mobile cleanup after `204`
 
 After the backend returns `204`, Mobile makes one best-effort attempt to remove
-the wizard marker, both Health Connect sync queues, the local sync log, and both
-SecureStore tokens, then logs out even if cleanup partially fails. A partial
+the wizard marker, both per-datatype Health Connect sync-state keys, the local
+sync log, and both SecureStore tokens, then logs out even if cleanup partially fails. A partial
 failure displays a transient, one-time notice. Local cleanup is not durably
 retried and does not repeat `DELETE /api/profile`; force-closing the app can
-leave local token or queue state. Health Connect data already written and
+leave local token or sync state. Health Connect data already written and
 permissions are unchanged.
 
 See [`tech/02-backend.md`](02-backend.md#profile-deletion) for the deletion

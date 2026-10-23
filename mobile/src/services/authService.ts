@@ -32,6 +32,17 @@ export const authService = {
     return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
   },
 
+  async getAuthenticatedUserId(): Promise<string | null> {
+    let accessToken = await authService.getAccessToken();
+    if (!accessToken) return null;
+    if (authService.isTokenExpired(accessToken)) {
+      accessToken = await authService.refreshAccessToken();
+      if (!accessToken) return null;
+    }
+    const userId = decodePayload(accessToken)?.sub;
+    return typeof userId === 'string' && userId.trim() ? userId : null;
+  },
+
   async saveTokens(accessToken: string, refreshToken: string): Promise<void> {
     await Promise.all([
       SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken),
