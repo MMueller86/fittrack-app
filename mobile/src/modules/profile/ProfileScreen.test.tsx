@@ -38,7 +38,10 @@ vi.mock('@react-navigation/native', async () => {
   };
 });
 
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: 'SafeAreaView',
+  useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }),
+}));
 vi.mock('../../shared/api/profileApi', () => ({ profileApi: mocks.profileApi }));
 vi.mock('../../shared/api/recipeApi', () => ({ recipeApi: mocks.recipeApi }));
 vi.mock('../../services/accountDeletionService', () => ({
