@@ -146,6 +146,17 @@ Uses `expo-auth-session` for PKCE OAuth2 flow against Entra CIAM.
 - `authConfig.ts` — OIDC discovery URL, token endpoint, scopes (constructed from env vars)
 - `authService.ts` — stores tokens in `expo-secure-store`; implements `isTokenExpired()` (client-side decode only, backend re-validates); `refreshAccessToken()` hits CIAM token endpoint
 
+Login module (`mobile/src/modules/auth/`):
+
+- `LoginScreen.tsx` — single Google sign-in button; on error shows the message from `authTexts.ts` plus an "Erneut anmelden" retry link
+- `useAuthLogin.ts` — PKCE request, redirect handling (auth session result, `Linking` events, cold-start initial URL), abort handling via foreground-return grace period
+- `pendingLogin.ts` — pending login in SecureStore (`fittrack_pending_login`, 10 min, single-use)
+- `loginFlow.ts` — pure redirect/state/error logic
+- `authTexts.ts` — all user-visible login texts and error messages (German)
+- `services/authRedirect.ts` — redirect URI and optional `domain_hint`
+
+The redirect is an HTTPS Android App Link by default. `app.config.js` adds an `autoVerify` intent filter per variant (`/auth/callback/dev` for `APP_VARIANT=development`, otherwise `/auth/callback/alpha`) for the host in `auth-callback-host.json`; the `fittrack://` scheme stays registered. `eas.json` profile `preview` sets no redirect mode and therefore yields HTTPS; `EXPO_PUBLIC_AUTH_REDIRECT_MODE=scheme` rolls back to `fittrack://auth`, `EXPO_PUBLIC_AUTH_DOMAIN_HINT` optionally sets `domain_hint` (default off).
+
 See [tech/05-authentication.md](05-authentication.md) for full flow.
 
 ## Key Feature Modules
@@ -216,6 +227,8 @@ scoped to the manual action that caused them.
 - `AddItemModal.tsx` — [legacy, being superseded by FoodEntryHub]
 - `ProductEditor.tsx` — edit reusable item details
 - `EditItemSheet.tsx`, `CopyItemSheet.tsx`, `MoveItemSheet.tsx` — item management sheets
+
+Meal types use the shared `MEAL_LABELS` and monochrome MaterialCommunityIcons catalog in `modules/nutrition/mealLabels.ts` across the diary, meal filters, and copy/move sheets.
 
 The diary and its copy/move sheets render meal names from the typed `MealType`
 using the shared German label catalog. They do not display `Meal.name`, which

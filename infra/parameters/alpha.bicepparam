@@ -23,6 +23,10 @@ using '../main.bicep'
 
 param environmentName = 'alpha'
 param projectName = 'fittrack'
+
+// Auth relay Static Web App — shared by Dev and Alpha, deployed only here.
+param deployStaticWebApp = true
+param staticWebAppLocation = 'westeurope'
 param azureDocIntelligenceEndpoint = 'https://di-fittrack-dev-ppf5sc.cognitiveservices.azure.com/'
 
 // Document Intelligence — reuse the shared dev instance (stateless service, no user data).

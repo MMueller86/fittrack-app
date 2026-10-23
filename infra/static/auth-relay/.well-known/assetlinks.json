@@ -1,0 +1,22 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.fittrack.app",
+      "sha256_cert_fingerprints": [
+        "35:0F:E9:03:B0:04:63:85:F4:B7:31:DF:3B:1D:5A:91:04:A8:35:85:13:07:4E:E1:4E:8F:23:C5:A4:46:99:CC"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.fittrack.app.dev",
+      "sha256_cert_fingerprints": [
+        "2A:69:7F:96:3B:D9:F9:1D:E2:49:35:49:FA:BC:E5:0B:D5:53:0A:EE:8A:22:1A:01:4B:0F:DC:D5:EF:C4:F8:75"
+      ]
+    }
+  }
+]

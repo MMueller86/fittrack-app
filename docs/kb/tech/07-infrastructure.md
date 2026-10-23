@@ -18,6 +18,7 @@ infra/
     ├── appinsights.bicep    Log Analytics workspace + Application Insights
     ├── functionapp.bicep    App Service Plan + Function App + App Settings
     ├── documentintelligence.bicep  Azure Document Intelligence resource
+    ├── staticwebapp.bicep   Static Web App (Free) for the auth relay / App Links
     └── (Azure OpenAI not in IaC — existing shared resource)
 ```
 
@@ -32,6 +33,7 @@ infra/
 | App Service Plan | `functionapp.bicep` | Consumption (serverless) |
 | Function App | `functionapp.bicep` | Node.js 22, TypeScript build output |
 | Document Intelligence | `documentintelligence.bicep` | F0 for dev, S0 for alpha/prod |
+| Static Web App | `staticwebapp.bicep` | Optional (`deployStaticWebApp`); Alpha parameters only; see [Auth Relay Static Web App](#auth-relay-static-web-app) |
 
 For Alpha, the existing Cosmos account and Function App/plan are referenced as
 existing resources to avoid What-if changes to provider-returned parent fields.
@@ -141,6 +143,85 @@ feedback snapshots directly from this container. This feature introduces no
 new application role, permission model, Admin UI, read endpoint, or cleanup
 endpoint; it also grants no implicit database access to normal users or
 arbitrary JWT admins.
+
+## Auth Relay Static Web App
+
+Hosts the Android App Link verification file and the HTTPS redirect relay pages
+used by the mobile sign-in flow (plan
+`docs/User Stories/Auth/PLAN_US_Anmeldung-im-FitTrack-Design.md`, section 10).
+
+| Item | Value |
+|---|---|
+| Resource | `swa-fittrack-alpha-ppf5sc` (pattern `swa-${namePrefix}-${uniqueSuffix}`) |
+| SKU | Free |
+| Region | `westeurope` — the resource group region (`northeurope`) has no Free SWA; the module allows only `centralus`, `eastus2`, `westus2`, `westeurope`, `eastasia` |
+| Hostname | `blue-hill-03fb3c103.1.azurestaticapps.net` (also the `staticWebAppHostName` output of `main.bicep`; fixed in `relay.js`) |
+| Module settings | `stagingEnvironmentPolicy: Disabled`, `allowConfigFileUpdates: true` |
+
+**Parameters** (`main.bicep`): `deployStaticWebApp` (default `false`) and
+`staticWebAppLocation` (default `westeurope`). Only `alpha.bicepparam` sets
+`deployStaticWebApp = true`; `dev.bicepparam` does not. The single instance is
+shared by Dev and Alpha, separated by path: `/auth/callback/alpha` (package
+`com.fittrack.app`) and `/auth/callback/dev` (package `com.fittrack.app.dev`).
+
+### Static content: `infra/static/auth-relay/`
+
+- `index.html`, `auth/relay.js`, `auth/relay.css`
+- `auth/callback/alpha.html`, `auth/callback/dev.html` — routed via rewrite
+  from `/auth/callback/alpha|dev`
+- `.well-known/assetlinks.json`
+- `staticwebapp.config.json`
+
+`relay.js` takes the variant and package from static page attributes (never
+from the URL), keeps only `code`, `state`, `error`, `error_description` from
+the query, clears the query from the address bar via `history.replaceState`,
+and redirects to an `intent://` URL targeting the matching package. A
+fallback "Zurück zu FitTrack" link appears after 2.5 s if the page is still
+visible.
+
+**Deployment.** The Bicep module creates only the resource; content is
+deployed separately with the SWA CLI using a deployment token fetched at
+deploy time via `az staticwebapp secrets list`. The token is never stored in
+files. [Open] The exact SWA CLI command is not recorded in the repository.
+
+### `assetlinks.json`
+
+A JSON array of two `delegate_permission/common.handle_all_urls` statements
+(`namespace: android_app`), one per package: `com.fittrack.app` (Alpha) and
+`com.fittrack.app.dev` (Dev). Each has one `sha256_cert_fingerprints` entry,
+read from the built APK's signing certificate. When keystores change, re-read
+the fingerprints non-interactively from the built APKs (e.g. `apksigner verify
+--print-certs`) and update the file. [Open] Exact re-read command was not
+verified against repository files. Credential rotation or Play App Signing
+requires **adding** the new fingerprint to the array (keep the old one while
+it is still in use), then redeploying the content.
+
+### `staticwebapp.config.json`
+
+- `/.well-known/assetlinks.json`: `Content-Type: application/json`,
+  `Cache-Control: public, max-age=300`
+- Callback routes and `/auth/relay.js`: `Cache-Control: no-store`
+- Global headers: `Referrer-Policy: no-referrer`,
+  `X-Content-Type-Options: nosniff`, and a CSP of `default-src 'none';
+  script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none';
+  base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+
+### Manual Entra step (not in IaC)
+
+On the existing app registration, under platform "Mobile and desktop
+applications", add the redirect URIs
+`https://blue-hill-03fb3c103.1.azurestaticapps.net/auth/callback/alpha` and
+`.../auth/callback/dev`. The existing `fittrack://auth` URI is kept.
+
+### Logging
+
+SWA access logging and diagnostic settings are not configured in Bicep.
+[Open] Whether the platform logs URL query strings (which carry the
+authorization `code` and `state`) is unverified.
+
+`infra/static/entra-branding/` (contains `fittrack-signin.css`, a dark theme
+stylesheet for Entra External ID sign-in per its header comment) is not part of
+this change and is not deployed by `main.bicep`.
 
 ## Resource Naming Convention
 

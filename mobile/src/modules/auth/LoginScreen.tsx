@@ -2,26 +2,20 @@
 // Single "Sign in" button — Entra handles identity provider routing (Google).
 
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as WebBrowser from 'expo-web-browser';
-import { colors, spacing, typography } from '../../app/theme';
-import { authConfig } from '../../services/authConfig';
-import { authService } from '../../services/authService';
+import { colors, radius, spacing, typography } from '../../app/theme';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import { LegalDocumentView } from '../legal/LegalDocumentView';
+import type { LegalDocumentId } from '../legal/legalTexts';
+import { GoogleGlyph } from './landing/GoogleGlyph';
+import { LandingPager } from './landing/LandingPager';
+import { authTexts } from './authTexts';
+import { useAuthLogin } from './useAuthLogin';
 
 // Needed so the browser dismisses properly after auth redirect.
 WebBrowser.maybeCompleteAuthSession();
-
-const discovery: AuthSession.DiscoveryDocument = {
-  authorizationEndpoint: authConfig.authorizationEndpoint,
-  tokenEndpoint: authConfig.tokenEndpoint,
-};
-
-// Native redirect URI — uses the custom scheme defined in app.json.
-// Must match the redirect URI registered in Azure Portal (fittrack://auth).
-const redirectUri = AuthSession.makeRedirectUri({ scheme: 'fittrack', path: 'auth' });
 
 interface LoginScreenProps {
   onLoginSuccess: () => void;
@@ -34,115 +28,91 @@ export default function LoginScreen({
   accountDeletionCleanupNotice = false,
   onAccountDeletionCleanupNoticeShown,
 }: LoginScreenProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showPrivacy, setShowPrivacy] = useState(false);
+  const { loading, error, canStart, startLogin } = useAuthLogin(onLoginSuccess);
+  const [legalDocument, setLegalDocument] = useState<LegalDocumentId | null>(null);
   const cleanupNoticeShown = useRef(false);
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
-
-  const [request, response, promptAsync] = AuthSession.useAuthRequest(
-    {
-      clientId: authConfig.clientId,
-      scopes: authConfig.scopes,
-      redirectUri,
-      usePKCE: true,
-    },
-    discovery,
-  );
-
-  useEffect(() => {
-    if (response?.type === 'success' && response.params.code) {
-      exchangeCode(response.params.code, request?.codeVerifier ?? '');
-    } else if (response?.type === 'error') {
-      const errorDetail = response.params?.error_description
-        || response.error?.message
-        || 'Authentication failed';
-      setError(errorDetail);
-      setLoading(false);
-    } else if (response?.type === 'dismiss') {
-      setLoading(false);
-    }
-  }, [response]);
 
   useEffect(() => {
     if (!accountDeletionCleanupNotice || cleanupNoticeShown.current) return;
     cleanupNoticeShown.current = true;
     showSnackbar({
-      message: 'Einige private App-Daten von FitTrack konnten auf diesem Gerät nicht gelöscht werden. Du kannst die App-Daten in den Android-Einstellungen entfernen.',
+      message: authTexts.cleanupNotice,
       durationMs: 6000,
       numberOfLines: null,
     });
     onAccountDeletionCleanupNoticeShown?.();
   }, [accountDeletionCleanupNotice, onAccountDeletionCleanupNoticeShown, showSnackbar]);
 
-  async function exchangeCode(code: string, codeVerifier: string) {
-    try {
-      const tokenResponse = await AuthSession.exchangeCodeAsync(
-        {
-          clientId: authConfig.clientId,
-          code,
-          redirectUri,
-          extraParams: { code_verifier: codeVerifier },
-        },
-        discovery,
-      );
-
-      const { accessToken, refreshToken } = tokenResponse;
-      if (!accessToken || !refreshToken) {
-        setError('Token response missing access or refresh token');
-        setLoading(false);
-        return;
-      }
-
-      await authService.saveTokens(accessToken, refreshToken);
-      onLoginSuccess();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Token exchange failed');
-      setLoading(false);
-    }
-  }
-
   function handleSignIn() {
-    setError(null);
-    setLoading(true);
-    promptAsync();
+    void startLogin();
   }
 
-  if (showPrivacy) {
-    return <LegalDocumentView documentId="privacy" onBack={() => setShowPrivacy(false)} interceptHardwareBack />;
+  if (legalDocument) {
+    return <LegalDocumentView documentId={legalDocument} onBack={() => setLegalDocument(null)} interceptHardwareBack />;
   }
+
+  const signInDisabled = !canStart;
 
   return (
-    <View style={styles.root}>
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
-        <Text style={styles.title}>FitTrack</Text>
-        <Text style={styles.subtitle}>Track your nutrition, effortlessly.</Text>
+    <SafeAreaView style={styles.root}>
+      <LandingPager />
 
+      <View style={styles.footer}>
         <Pressable
-          style={[styles.button, (!request || loading) && styles.buttonDisabled]}
+          style={({ pressed }) => [styles.button, signInDisabled && styles.buttonDisabled, pressed && styles.buttonPressed]}
           onPress={handleSignIn}
-          disabled={!request || loading}
+          disabled={signInDisabled}
+          accessibilityRole="button"
+          accessibilityLabel={authTexts.signIn}
         >
           {loading ? (
-            <ActivityIndicator color={colors.text} />
+            <ActivityIndicator color={colors.background} />
           ) : (
-            <Text style={styles.buttonText}>Sign in with Google</Text>
+            <>
+              <GoogleGlyph size={24} />
+              <Text style={styles.buttonText}>{authTexts.signIn}</Text>
+            </>
           )}
         </Pressable>
 
-        {error && <Text style={styles.error}>{error}</Text>}
+        {error && (
+          <>
+            <Text style={styles.error}>{authTexts.errors[error]}</Text>
+            <Pressable
+              style={styles.retryLink}
+              onPress={handleSignIn}
+              disabled={signInDisabled}
+              accessibilityRole="button"
+              accessibilityLabel={authTexts.retry}
+            >
+              <Text style={styles.retryLinkText}>{authTexts.retry}</Text>
+            </Pressable>
+          </>
+        )}
 
-        <Pressable
-          style={styles.privacyLink}
-          onPress={() => setShowPrivacy(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Datenschutzerklärung lesen"
-        >
-          <Text style={styles.privacyLinkText}>Datenschutzerklärung</Text>
-        </Pressable>
-      </ScrollView>
+        <View style={styles.legalRow}>
+          <Pressable
+            style={styles.legalLink}
+            onPress={() => setLegalDocument('privacy')}
+            accessibilityRole="button"
+            accessibilityLabel={authTexts.privacyLinkLabel}
+          >
+            <Text style={styles.legalLinkText}>{authTexts.privacyLink}</Text>
+          </Pressable>
+          <Text style={styles.legalSeparator}>·</Text>
+          <Pressable
+            style={styles.legalLink}
+            onPress={() => setLegalDocument('imprint')}
+            accessibilityRole="button"
+            accessibilityLabel={authTexts.imprintLinkLabel}
+          >
+            <Text style={styles.legalLinkText}>{authTexts.imprintLink}</Text>
+          </Pressable>
+        </View>
+      </View>
       <Snackbar ref={snackbarRef} bottomOffset={spacing.lg} />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -151,42 +121,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  scroll: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    padding: spacing.lg,
-  },
-  title: {
-    ...typography.h1,
-    color: colors.primary,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    ...typography.body1,
-    color: colors.textSecondary,
-    marginBottom: spacing.xl,
+  footer: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   button: {
-    backgroundColor: colors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    borderRadius: 8,
-    minWidth: 220,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    height: 56,
+    borderRadius: radius.full,
+    backgroundColor: colors.white,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
+  buttonPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.98 }],
+  },
   buttonText: {
     ...typography.body1,
-    color: colors.text,
-    fontWeight: '600',
+    color: colors.background,
+    fontWeight: '700',
   },
   error: {
     ...typography.body2,
@@ -194,16 +152,33 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     textAlign: 'center',
   },
-  privacyLink: {
+  retryLink: {
+    minHeight: spacing.xxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  retryLinkText: {
+    ...typography.body2,
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: spacing.xs,
+  },
+  legalLink: {
     minHeight: spacing.xxl,
     justifyContent: 'center',
-    marginTop: spacing.lg,
     paddingHorizontal: spacing.md,
   },
-  privacyLinkText: {
+  legalLinkText: {
     ...typography.body2,
-    color: colors.primaryBright,
-    textAlign: 'center',
-    textDecorationLine: 'underline',
+    color: colors.textSecondary,
+  },
+  legalSeparator: {
+    ...typography.body2,
+    color: colors.textMuted,
   },
 });

@@ -8,6 +8,8 @@
 
 const { withAndroidManifest, withGradleProperties } = require('@expo/config-plugins');
 const IS_DEV = process.env.APP_VARIANT === 'development';
+// Single source of truth, also imported by src/services/authRedirect.ts.
+const AUTH_CALLBACK_HOST = require('./auth-callback-host.json').host;
 
 // Health Connect requires Android 8.0 (API 26). The Expo Gradle plugin reads the
 // `android.minSdkVersion` Gradle property to override the version catalog minSdk entry.
@@ -88,6 +90,22 @@ module.exports = ({ config }) => ({
     // Required for @gorhom/bottom-sheet keyboard handling on Android.
     // Without this, the keyboard overlaps sheet content instead of resizing the layout.
     softwareKeyboardLayoutMode: 'resize',
+    // Verified App Link for the HTTPS redirect. The fittrack:// scheme stays registered via app.json.
+    intentFilters: [
+      ...(config.android?.intentFilters ?? []),
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          {
+            scheme: 'https',
+            host: AUTH_CALLBACK_HOST,
+            pathPrefix: IS_DEV ? '/auth/callback/dev' : '/auth/callback/alpha',
+          },
+        ],
+        category: ['DEFAULT', 'BROWSABLE'],
+      },
+    ],
   },
   ios: {
     ...config.ios,

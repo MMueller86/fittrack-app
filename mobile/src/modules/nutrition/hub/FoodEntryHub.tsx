@@ -48,6 +48,7 @@ import { BarcodeSubFlow } from './BarcodeSubFlow';
 import { LabelSubFlow } from './LabelSubFlow';
 import { getSuggestedMealType } from './mealTimeRules';
 import { isUnavailableRecipeRelation } from './RelationRow.utils';
+import { MEAL_ICONS } from '../mealLabels';
 
 // Einziger Snap Point -- Sheet bleibt bei 85%, Tastatur überlagert nur den unteren Inhalt
 const DEFAULT_SNAP_POINTS = ['85%'];
@@ -58,16 +59,17 @@ const FULL_SNAP_POINTS = ['100%'];
 // ---------------------------------------------------------------------------
 
 type FilterKey = 'fuerDich' | 'zuleztVerwendet' | 'alle' | MealType;
+type FilterOption = { key: FilterKey; label: string; modalLabel?: string; mealType?: MealType };
 
-const FILTER_OPTIONS: Array<{ key: FilterKey; label: string; modalLabel?: string }> = [
+const FILTER_OPTIONS: FilterOption[] = [
   { key: 'fuerDich',        label: 'Für dich' },
   { key: 'zuleztVerwendet', label: 'Zuletzt verwendet' },
-  { key: 'breakfast',       label: '☀️ Frühstück',      modalLabel: 'Frühstück' },
-  { key: 'lunch',           label: '🌤️ Mittagessen',    modalLabel: 'Mittagessen' },
-  { key: 'dinner',          label: '🌙 Abendessen',     modalLabel: 'Abendessen' },
-  { key: 'snack',           label: '🍎 Snack',          modalLabel: 'Snack' },
-  { key: 'preworkout',      label: '⚡ Pre Workout',    modalLabel: 'Pre Workout' },
-  { key: 'postworkout',     label: '💪 Post Workout',   modalLabel: 'Post Workout' },
+  { key: 'breakfast',       label: 'Frühstück',         modalLabel: 'Frühstück',      mealType: 'breakfast' },
+  { key: 'lunch',           label: 'Mittagessen',       modalLabel: 'Mittagessen',    mealType: 'lunch' },
+  { key: 'dinner',          label: 'Abendessen',        modalLabel: 'Abendessen',     mealType: 'dinner' },
+  { key: 'snack',           label: 'Snack',             modalLabel: 'Snack',          mealType: 'snack' },
+  { key: 'preworkout',      label: 'Pre Workout',       modalLabel: 'Pre Workout',    mealType: 'preworkout' },
+  { key: 'postworkout',     label: 'Post Workout',      modalLabel: 'Post Workout',   mealType: 'postworkout' },
   { key: 'alle',            label: 'Alle' },
 ];
 
@@ -856,9 +858,10 @@ export function FoodEntryHub() {
   // searchActive bleibt auch nach Tastatur-Close per Scroll true
   const showSearch = searchActive || searchQuery.trim().length > 0;
 
+  const activeFilterOption = FILTER_OPTIONS.find((option) => option.key === activeFilter);
   const headerTitle = showSearch && searchQuery.trim().length > 0
     ? 'Suchergebnisse'
-    : FILTER_OPTIONS.find(o => o.key === activeFilter)?.label ?? 'Für dich';
+    : activeFilterOption?.label ?? 'Für dich';
 
   // Backdrop-Komponente für Hintergrundabdunklung (~10%)
   const renderBackdrop = useCallback(
@@ -977,9 +980,12 @@ export function FoodEntryHub() {
                 accessibilityLabel={`Filter: ${headerTitle}`}
               >
                 <View style={styles.hubHeaderRow}>
-                  <Text style={styles.hubHeaderTitle}>
-                    {headerTitle}
-                  </Text>
+                  <View style={styles.hubHeaderTitleGroup}>
+                    {activeFilterOption?.mealType && !showSearch && (
+                      <Icon lib="mci" name={MEAL_ICONS[activeFilterOption.mealType]} size="md" color={colors.textSecondary} />
+                    )}
+                    <Text style={styles.hubHeaderTitle}>{headerTitle}</Text>
+                  </View>
                   {!showSearch && (
                     <View style={styles.hubHeaderChevron}>
                       <Icon lib="feather" name="chevron-down" size={16} color={colors.textMuted} />
@@ -1012,9 +1018,12 @@ export function FoodEntryHub() {
                               style={[styles.filterModalItem, isActive && styles.filterModalItemActive]}
                               onPress={() => { Haptics.selectionAsync(); setActiveFilter(key); setFilterModalOpen(false); }}
                             >
-                              <Text style={[styles.filterModalItemText, isActive && styles.filterModalItemTextActive]}>
-                                {opt.modalLabel ?? opt.label}
-                              </Text>
+                              <View style={styles.filterModalItemLabel}>
+                                <Icon lib="mci" name={MEAL_ICONS[key]} size="sm" color={isActive ? colors.primary : colors.textSecondary} />
+                                <Text style={[styles.filterModalItemText, isActive && styles.filterModalItemTextActive]}>
+                                  {opt.modalLabel ?? opt.label}
+                                </Text>
+                              </View>
                               {isActive && <Icon lib="feather" name="check" size={16} color={colors.primary} />}
                             </TouchableOpacity>
                           );
@@ -1421,6 +1430,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  hubHeaderTitleGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   hubHeaderTitle: {
     ...typography.h3,
     color: colors.text,
@@ -1469,6 +1484,11 @@ const styles = StyleSheet.create({
   filterModalItemText: {
     ...typography.body2,
     color: colors.text,
+  },
+  filterModalItemLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   filterModalItemTextActive: {
     color: colors.primary,

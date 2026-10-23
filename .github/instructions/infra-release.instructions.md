@@ -214,22 +214,20 @@ az deployment group create `
 
 ## Health Check
 
-FitTrack has no dedicated `/api/health` endpoint (as of current implementation). Use the following interim check after every Azure Functions deployment:
+Use the anonymous `GET /api/health` endpoint after every Azure Functions deployment, plus one protected route to confirm auth middleware:
 
 ```powershell
-$response = Invoke-WebRequest `
-  -Uri "https://func-fittrack-alpha-ppf5sc.azurewebsites.net/api/diary/meals" `
-  -UseBasicParsing `
-  -ErrorAction SilentlyContinue
-Write-Host "Health check: $($response.StatusCode)"
+$base = "https://func-fittrack-alpha-ppf5sc.azurewebsites.net/api"
+(Invoke-WebRequest "$base/health" -UseBasicParsing).StatusCode   # expect 200
+try { Invoke-WebRequest "$base/diary/meals" -UseBasicParsing } catch { [int]$_.Exception.Response.StatusCode }   # expect 401
 ```
 
-**Pass condition:** HTTP 401. A 401 confirms the function app is running, the handler is registered, and the auth middleware is active.  
+**Pass condition:** `/health` returns HTTP 200 and `/diary/meals` returns HTTP 401 (function app running, handlers registered, auth middleware active).  
 **Fail condition:** HTTP 5xx, connection refused, or timeout.
 
-A 404 is ambiguous — it may indicate the route is not registered. Treat 404 as a warning; include it in the report and ask the user to verify.
+A 404 on either route is ambiguous — it may indicate the route is not registered. Treat 404 as a warning; include it in the report and ask the user to verify.
 
-> Note: A dedicated `GET /api/health` (public, no auth required) should be added as a future Backend work package. It will replace this interim check when available.
+Instagram/share handlers are registered as `recipes-render-instagram` and `recipes-share-bundle` (not `instagramRecipe`); use these names when verifying `func azure functionapp list-functions`.
 
 ---
 

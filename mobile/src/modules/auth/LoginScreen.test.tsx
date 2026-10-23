@@ -5,7 +5,10 @@ import LoginScreen from './LoginScreen';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const mocks = vi.hoisted(() => ({ showSnackbar: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  showSnackbar: vi.fn(),
+  useAuthRequest: vi.fn((..._args: unknown[]) => [{}, null, vi.fn()]),
+}));
 
 vi.mock('../../shared/components/Snackbar', () => ({
   Snackbar: 'Snackbar',
@@ -15,6 +18,8 @@ vi.mock('../../shared/components/Snackbar', () => ({
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+  Linking: { addEventListener: vi.fn(() => ({ remove: vi.fn() })), getInitialURL: vi.fn(() => Promise.resolve(null)) },
+  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   StyleSheet: { create: <T,>(styles: T) => styles },
@@ -23,13 +28,20 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('./landing/LandingPager', () => ({ LandingPager: 'LandingPager' }));
+vi.mock('./landing/GoogleGlyph', () => ({ GoogleGlyph: 'GoogleGlyph' }));
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
 vi.mock('expo-auth-session', () => ({
   makeRedirectUri: () => 'fittrack://auth',
-  useAuthRequest: () => [{}, null, vi.fn()],
+  useAuthRequest: mocks.useAuthRequest,
   exchangeCodeAsync: vi.fn(),
 }));
 vi.mock('expo-web-browser', () => ({ maybeCompleteAuthSession: vi.fn() }));
+vi.mock('expo-secure-store', () => ({
+  getItemAsync: vi.fn(async () => null),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
 vi.mock('../../services/authConfig', () => ({
   authConfig: { clientId: 'c', scopes: [], authorizationEndpoint: 'a', tokenEndpoint: 't' },
 }));
@@ -75,6 +87,17 @@ function CleanupNoticeHarness({ onNoticeShown }: { onNoticeShown: () => void }) 
 }
 
 describe('LoginScreen', () => {
+  it('uses the https redirect and no domain_hint by default', () => {
+    mocks.useAuthRequest.mockClear();
+    act(() => {
+      create(<LoginScreen onLoginSuccess={vi.fn()} />);
+    });
+    expect(mocks.useAuthRequest.mock.calls[0]![0]).toMatchObject({
+      redirectUri: 'https://blue-hill-03fb3c103.1.azurestaticapps.net/auth/callback/alpha',
+      extraParams: undefined,
+    });
+  });
+
   it('shows the transient cleanup warning once without blocking login or offering retry', () => {
     mocks.showSnackbar.mockClear();
     const onAccountDeletionCleanupNoticeShown = vi.fn();
@@ -101,14 +124,38 @@ describe('LoginScreen', () => {
     act(() => {
       renderer = create(<LoginScreen onLoginSuccess={vi.fn()} />);
     });
-    expect(texts(renderer)).toContain('Sign in with Google');
+    expect(texts(renderer)).toContain('Mit Google anmelden');
 
     pressByLabel(renderer, 'Datenschutzerklärung lesen');
     const privacy = texts(renderer);
     expect(privacy[0]).toBe('Datenschutzerklärung');
-    expect(privacy).not.toContain('Sign in with Google');
+    expect(privacy).not.toContain('Mit Google anmelden');
 
     pressByLabel(renderer, 'Zurück');
-    expect(texts(renderer)).toContain('Sign in with Google');
+    expect(texts(renderer)).toContain('Mit Google anmelden');
+  });
+
+  it('shows a German inline error with a retry action when the login cannot start', () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<LoginScreen onLoginSuccess={vi.fn()} />);
+    });
+    // The mocked request has no code verifier, so starting fails with the pending-login error.
+    pressByLabel(renderer, 'Mit Google anmelden');
+    expect(texts(renderer)).toContain('Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuche es erneut.');
+    expect(texts(renderer)).toContain('Erneut anmelden');
+  });
+
+  it('opens the Impressum in-app without authentication and returns to login', () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<LoginScreen onLoginSuccess={vi.fn()} />);
+    });
+
+    pressByLabel(renderer, 'Impressum lesen');
+    expect(texts(renderer)[0]).toBe('Impressum');
+
+    pressByLabel(renderer, 'Zurück');
+    expect(texts(renderer)).toContain('Mit Google anmelden');
   });
 });

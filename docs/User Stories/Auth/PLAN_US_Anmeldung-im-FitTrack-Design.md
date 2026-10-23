@@ -2,6 +2,10 @@
 
 Status: Vollständiger Plan zur Vision. Ziel: Entra-Bestätigungsdialog entfernen. Umsetzung in zwei Stufen mit hartem Gate nach WP 1 (Nachweis, dass der Dialog entfällt); WP 2–5 sind vollständig spezifiziert, starten aber erst nach bestandenem Gate.
 
+**Änderungsnotiz 2026-10-23 (Reihenfolge WP 1):** Der PO hat entschieden, den Spike zuerst auf dem Dev-Build durchzuführen; Alpha dient nur noch als abschließende Verifikation. Grund: Ein Dev-Client lädt JS per Metro vom Entwicklungsrechner und die Relay-Seite ist ein Web-Redeploy, daher brauchen Iterationen keine rund 40-minütigen Alpha-Builds; Alpha soll nicht unnötig blockiert werden. Gate G1 ist dafür in G1a (Dev) und G1b (Alpha) geteilt. Entscheidungen D1–D6, PO-1..PO-3 und die technische Architektur bleiben unverändert. Der PO hat die Dev-first-Reihenfolge (G1a Dev, G1b Alpha) am 2026-10-23 freigegeben; der Plan gilt damit als freigegeben.
+
+**Aktueller Stand (2026-10-23):** Dev-Build und Alpha-Build (`preview-https`) sind gebaut; `assetlinks.json` ist mit den realen Fingerprints deployt. Die Messreihe auf Dev läuft: G1a-Kernkriterien sind erfüllt (kein Dialog, kein Tap, direkte App-Link-Zustellung), G2 ist erfüllt. G1b (Alpha, `preview-https`) ist laut PO erfüllt (nutzerbeobachtet). Die Gates G1a, G1b und G2 sind erfüllt; WP 2–5 sind zum Start freigegeben (nächste Arbeiten: WP 2, WP 3, WP 4). Details: Abschnitt „Messergebnisse Spike (Dev, 2026-10-23)“ in WP 1.
+
 Infrastructure Impact: Alpha (neue Azure Static Web App; Dev nutzt dieselbe Instanz, siehe Entscheidung D3)
 Mobile Build Impact: Potential Native Impact (Intent-Filter in `app.config.js`, neuer Android-Build nötig)
 
@@ -65,7 +69,7 @@ Der Screenshot zeigt einen Dialog von `*.ciamlogin.com` **nach** der Google-Kont
 
 **Variante A (Vision):** Entra → 302 auf `https://<swa>/auth/callback/<variant>?code=…` → Android öffnet App per verifiziertem App Link. Vorteil: Code wird nur an die verifizierte App geliefert. Nachteil: R1.
 
-**Variante B (Relay, Fallback für R1):** Entra → `https://<swa>/auth/callback/<variant>?code&state` wird im Tab geladen → die Seite leitet **automatisch** per `intent://`-URI (Scheme `https`, gleicher Host und Pfad, `package=<Variant-Package>`) an die App weiter. Die App erhält damit dieselbe URL wie bei Variante A. Vorteil: robust gegen R1, kein Scheme-Wechsel. Nachteil: Der Code läuft kurz über eine FitTrack-eigene Seite (Datenschutz, siehe Abschnitt 6). Details in Abschnitt 4.
+**Variante B (Relay, Fallback für R1):** Entra → `https://<swa>/auth/callback/<variant>?code&state` wird im Tab geladen → die Seite leitet **automatisch** per `intent://`-URI (Scheme `https`, gleicher Host und Pfad, `package=<Variant-Package>`) an die App weiter. Die App erhält damit dieselbe URL wie bei Variante A. Vorteil: robust gegen R1, kein Scheme-Wechsel. Nachteil: Der Code läuft kurz über eine FitTrack-eigene Seite (Datenschutz, siehe Abschnitt 8). Details in Abschnitt 4.
 
 **Nicht empfohlen:**
 - *Eigene Bestätigung per API gegen Entra:* nicht möglich/zulässig; widerspricht Auftrag.
@@ -144,15 +148,18 @@ Festlegungen:
 
 | Gate | Bedingung | Bei Misserfolg |
 |---|---|---|
-| **G1 — Dialog entfällt im Regelablauf** | Auf realen Alpha-Preview-Builds mit HTTPS-Redirect: kein Entra-Dialog **und** keine Nutzeraktion nach der Google-Kontoauswahl bis zur Anzeige der App (automatische Zustellung per App Link oder automatische Relay-Weiterleitung). Der Button der Relay-Seite zählt nicht als Erfolg | Stopp, [PO-1], WP 2–5 starten nicht |
-| **G2 — Gleiche Identität** | Gleicher Google-Account liefert dieselbe `sub`, Profil und Admin-Rolle/Gruppen bleiben erhalten | Stopp, Entra-Konfiguration korrigieren; keine neue App-Registrierung |
+| **G1a — Dialog entfällt (Dev)** — *Status 2026-10-23: erfüllt (kein Dialog, kein Tap, direkte App-Link-Zustellung). T1, T5 und T10 sind per PO-Entscheidung für das Gate nicht erforderlich* | Auf dem Dev-Build (`com.fittrack.app.dev`) mit HTTPS-Redirect: kein Entra-Dialog **und** keine Nutzeraktion nach der Google-Kontoauswahl bis zur Anzeige der App (automatische Zustellung per App Link oder automatische Relay-Weiterleitung); Messungen T1–T7 und T10. Der Button der Relay-Seite zählt nicht als Erfolg | Iteration auf Dev; bei endgültigem Misserfolg Stopp, [PO-1], WP 2–5 starten nicht |
+| **G1b — Dialog entfällt (Alpha, Bestätigung)** — *Status 2026-10-23: erfüllt (nutzerbeobachtet, ohne Log-/adb-Evidenz)* | Dasselbe Ergebnis einmal auf dem realen Alpha-Build (`preview-https`, `com.fittrack.app`). WP 2–5 starten erst nach G1b; UI-/Auth-Code-Vorbereitung auf Dev darf nach G1a nur mit Zustimmung des PO beginnen. Kein Merge vor G1 (G1a und G1b) | Stopp, [PO-1], WP 2–5 starten nicht |
+| **G2 — Gleiche Identität** — *Status: erfüllt (Dev, Log-Evidenz)* | Gleicher Google-Account liefert dieselbe `sub`, Profil und Admin-Rolle/Gruppen bleiben erhalten | Stopp, Entra-Konfiguration korrigieren; keine neue App-Registrierung |
 | **G3 — Robustheit** | Abbruch, Fehler, Link-Übergabe, Cold Start, Dev+Alpha parallel, Zielgeräte bestanden. G3 gibt **nicht** die Abschaltung von `fittrack://auth` frei ([PO-2]) | Nachbessern vor Release |
 
 ## 6. Work Packages
 
 ### WP 1 — Technischer Durchstich (Spike, Gate G1/G2)
 
-Agent: Infrastructure & Release (SWA, Entra-Portal, Build) und Frontend (Mobile). Wegwerf-Code auf Branch, nur Alpha-Preview-Build; kein Merge in `main` vor G1.
+Agent: Infrastructure & Release (SWA, Entra-Portal, Build) und Frontend (Mobile). Wegwerf-Code auf Branch; kein Merge in `main` vor G1 (G1a und G1b).
+
+**Reihenfolge Dev zuerst, Alpha zuletzt:** Die Messreihe T0–T11 läuft zuerst auf dem Dev-Build (Package `com.fittrack.app.dev`, Redirect `https://blue-hill-03fb3c103.1.azurestaticapps.net/auth/callback/dev`). Dev liest Auth-, Redirect- und `domain_hint`-Schalter aus `mobile/.env`; Redirect-Modus und `domain_hint` (T5) ändern sich daher ohne Rebuild. Native Änderungen (Intent-Filter in `app.config.js`) erfordern weiterhin einen neuen Dev-Build; Änderungen an der Relay-Seite sind Web-Redeploys. Alpha (Profil `preview-https`, `com.fittrack.app`) bestätigt das Spike-Ergebnis abschließend (G1b; AK 6 verlangt die tatsächlich verwendeten Builds). T8 (Dev+Alpha parallel) und T11 benötigen beide Builds.
 
 Required Knowledge Base:
 - docs/kb/tech/05-authentication.md
@@ -164,14 +171,14 @@ Required Skills: `privacy-impact-review` (Relay-Seite empfängt Auth-Code)
 
 Subtasks (in dieser Reihenfolge):
 
-1. **Infra (Bicep, Agent Infrastructure):** neues Modul `infra/modules/staticwebapp.bicep` (Free-Tarif, `rg-Michael-Mueller`, Namenspräfix alpha, gemeinsam genutzt von Dev und Alpha gemäß D3), per Parameter nur im Alpha-Deployment aktiviert. Statische Dateien: `/.well-known/assetlinks.json` (Content-Type `application/json`, kein Redirect, ohne Auth — per `staticwebapp.config.json` sicherstellen) und `/auth/callback/*` (Relay-Seite). Keine Analytics. Alpha-Fingerprint per `eas credentials` ermitteln und eintragen. Verfügbarkeit des Free-Tarifs in der gewählten Region vor Deployment prüfen.
+1. **Infra (Bicep, Agent Infrastructure):** neues Modul `infra/modules/staticwebapp.bicep` (Free-Tarif, `rg-Michael-Mueller`, Namenspräfix alpha, gemeinsam genutzt von Dev und Alpha gemäß D3), per Parameter nur im Alpha-Deployment aktiviert. Statische Dateien: `/.well-known/assetlinks.json` (Content-Type `application/json`, kein Redirect, ohne Auth — per `staticwebapp.config.json` sicherstellen) und `/auth/callback/*` (Relay-Seite). Keine Analytics. Fingerprints nicht per `eas credentials` (nur interaktiv), sondern nicht-interaktiv aus den gebauten APKs lesen (`apksigner`/`keytool`): Dev-Fingerprint aus dem Dev-APK (Eintrag für `com.fittrack.app.dev`), Alpha-Fingerprint ebenso aus dem Alpha-APK (`com.fittrack.app`). Beide Einträge werden vor T8 benötigt. Ein Alpha-Build (`preview-https`) läuft bereits und wird für G1b/T8 verwendet. Verfügbarkeit des Free-Tarifs in der gewählten Region vor Deployment prüfen.
 2. **Entra (manuell, Portal):** zur bestehenden App-Registrierung unter Plattform "Mobile und Desktop" die HTTPS-Redirect-URI ergänzen; `fittrack://auth` bleibt als Rückfallweg. Keine neue Registrierung.
-3. **Mobile:** `app.config.js` um Android-Intent-Filter (`autoVerify`, `VIEW`, `BROWSABLE`/`DEFAULT`, `https`, Host der SWA, `pathPrefix` je Variante) erweitern; Redirect-URI im Spike-Build konfigurierbar (https statt `fittrack://auth`). Neuer Alpha-Preview-Build.
+3. **Mobile:** `app.config.js` um Android-Intent-Filter (`autoVerify`, `VIEW`, `BROWSABLE`/`DEFAULT`, `https`, Host der SWA, `pathPrefix` je Variante) erweitern; Redirect-URI im Spike-Build konfigurierbar (https statt `fittrack://auth`). Neuer Dev-Build für die Messreihe; Alpha-Preview-Build (`preview-https`) für die Abschlussbestätigung.
 4. **Messreihe auf realen Geräten** (Befund pro Zeile dokumentieren):
 
 | # | Test | Erwartung / Ergebnis |
 |---|---|---|
-| T1 | `adb shell pm get-app-links com.fittrack.app` | Domain `verified` |
+| T1 | `adb shell pm get-app-links com.fittrack.app.dev` (final auch `com.fittrack.app`) | Domain `verified` |
 | T0 | Baseline: aktueller Build mit `fittrack://auth` | Dialog erscheint (Referenz, Screenshot) |
 | T2 | HTTPS-Redirect, App Link verifiziert, ohne `domain_hint` | Dialog erscheint? App direkt geöffnet oder landet Tab auf SWA? |
 | T3 | Relay: Seite im Tab geladen, `intent://`-Weiterleitung (scheme=https, package) | Dialog erscheint? App öffnet automatisch ohne Tap? Erkennt die wartende AuthSession die Rückkehr? Query wird aus der Tab-URL entfernt? Wenn nicht: `fittrack://`-Ausweichlösung bewerten |
@@ -185,12 +192,47 @@ Subtasks (in dieser Reihenfolge):
 | T10 | Cold Start: App während offenem Custom Tab beenden (`adb shell am kill`), dann Login abschließen | Pending-Login wird geladen, Anmeldung gelingt; bei abgelaufenem/fehlendem Eintrag klare Meldung + "Erneut anmelden" |
 | T11 | Alter Build (`fittrack://auth`) und neuer Build auf demselben Gerät/Account | Beide Anmeldungen funktionieren, kein gegenseitiger Einfluss |
 
+#### Messergebnisse Spike (Dev, 2026-10-23)
+
+**Umgebung:** Dev-Client-Build `1040bc18-cf68-4c59-b611-fa9527da1fa7` (`com.fittrack.app.dev`), Metro auf dem Entwicklungsrechner, lokales Backend, Redirect `https://blue-hill-03fb3c103.1.azurestaticapps.net/auth/callback/dev`. Alpha-Build `preview-https` `1107b71f-9f72-49f7-94e9-541c54205f02` (`com.fittrack.app`, siehe G1b unten). `assetlinks.json` ist mit realen Fingerprints deployt (aus den APK-Signaturblöcken gelesen, nicht mit `eas credentials` gegengeprüft):
+
+- Dev: `2A:69:7F:96:3B:D9:F9:1D:E2:49:35:49:FA:BC:E5:0B:D5:53:0A:EE:8A:22:1A:01:4B:0F:DC:D5:EF:C4:F8:75`
+- Alpha: `35:0F:E9:03:B0:04:63:85:F4:B7:31:DF:3B:1D:5A:91:04:A8:35:85:13:07:4E:E1:4E:8F:23:C5:A4:46:99:CC`
+
+| # | Ergebnis | Quelle |
+|---|---|---|
+| T0 | Baseline `fittrack://auth` (https-Zeile in `mobile/.env` auskommentiert): Entra-Bestätigungsdialog erscheint | PO beobachtet |
+| T2/T3 (äquivalent, https-Redirect) | Kein Entra-Dialog, kein Tap nach der Google-Kontoauswahl, direkte Rückkehr in die App; keine Relay-Seite gesehen. Log: `Linking url event: <redirect URI> code=true state=true error=false`, `AuthSession response type=success`. Der verifizierte App Link wurde direkt zugestellt; der Relay-Rückfall war auf diesem Gerät nicht nötig | PO beobachtet + Log |
+| T3b | `EXPO_PUBLIC_AUTH_PROMPT=select_account` (Kontoauswahl erzwungen): funktioniert, kein Dialog gemeldet | PO beobachtet (kurze Meldung) |
+| T6 / G2 | Token-Claims `sub=TFp_OTVI…`, `roles=Admin`, `aud=<Client-ID-GUID>`, `iss=…ciamlogin.com/…/v2.0`; Backend-Log zeigt dasselbe userId-Präfix, `profile.get found=true`, Weekly Insight lud 7 Tage (2 enthalten) => bestehende Daten erhalten, gleiche Identität, Admin-Rolle vorhanden | Log-Evidenz |
+| T7 (Abbruch) | PO: Abbruch funktioniert, neuer Versuch funktioniert. Im Log fehlt jedoch eine Zeile `AuthSession response type=dismiss/cancel` | PO beobachtet; Log ohne Event |
+| G1b (Alpha) | Alpha-Preview-Build mit https-Redirect (`preview-https`, `1107b71f-9f72-49f7-94e9-541c54205f02`, `com.fittrack.app`) funktioniert ebenfalls. Meldung des PO am 2026-10-23. Keine Logs, keine adb-Evidenz; kein Fingerprint-Abgleich durch einen Agenten. `assetlinks.json` enthält den Alpha-Fingerprint, gelesen aus dem früheren Alpha-Preview-APK | PO beobachtet (nutzerbeobachtet) |
+| T1 | nicht erforderlich (PO-Entscheidung 2026-10-23): die direkte Rückkehr in die App belegt den App Link | PO-Entscheidung |
+| T5 | nicht erforderlich (PO-Entscheidung 2026-10-23): `domain_hint` bleibt gemäß D6 standardmäßig aus | PO-Entscheidung |
+| T10 | nicht erforderlich (PO-Entscheidung 2026-10-23) als manueller Test: Cold-Start-Verhalten ist durch das Pending-Login-Design spezifiziert und wird durch Unit-Tests in WP 2 abgedeckt | PO-Entscheidung |
+
+**Offener Befund für WP 2:** Die Abbruch-Erkennung darf sich nicht darauf verlassen, dass ein `dismiss`/`cancel`-Event zugestellt wird (die Spike-Diagnose zeigte es nicht). WP 2 braucht einen robusten Reset-/Timeout-Ansatz, der den Login-Zustand auch ohne Event zurücksetzt.
+
+**Hinweis zur Messmethodik:** Ohne `prompt` kehrt der PO direkt zurück, weil der Chrome Custom Tab bereits eine SSO-Sitzung hat. Abbruchtests brauchen daher eine erzwungene Kontoauswahl (`prompt=select_account`) oder gelöschte Browserdaten.
+
+**Nicht erforderlich (PO-Entscheidung 2026-10-23):** T1, T5, T10 (siehe Tabelle).
+
+**Nicht separat getestet:** T4, T8, T9, T11. Für T8 und T11 liegt kein dokumentiertes Ergebnis vor; sie werden in WP 5 (G3) geprüft.
+
+**Gate-Stand (2026-10-23):** G1a erfüllt, G1b erfüllt (nutzerbeobachtet), G2 erfüllt. WP 2–5 sind zum Start freigegeben; nächste Arbeiten: WP 2, WP 3, WP 4.
+
+**Verbleibende Entscheidungen/Punkte:**
+- [PO-2]: Zeitpunkt der Entfernung von `fittrack://auth` offen; die URI bleibt bis zur ausdrücklichen Freigabe registriert.
+- Datenschutzerklärung: Prüfung für das SWA-Relay (empfängt Auth-Code) steht aus; jede Änderung unter `docs/legal` braucht die ausdrückliche Zustimmung des PO.
+- Spike-Diagnose (`[AUTH-SPIKE]`, `EXPO_PUBLIC_AUTH_PROMPT`, Schalter `EXPO_PUBLIC_AUTH_REDIRECT_MODE`) wird in WP 2 entfernt oder dauerhaft übernommen.
+- KB-Updates erfolgen nach der Umsetzung (Abschnitt 10).
+
 5. **Ergebnisbericht:** Dialog ja/nein je Variante und Auslöser (T0–T4), empfohlene Variante, Aufwand für WP 2–5, ggf. PO-1.
 
-Akzeptanz Spike: T0–T4 und T6 dokumentiert. **Entscheidungsregel (G1):** Erscheint der Dialog in T2 und T3 weiterhin, oder ist in beiden Varianten ein Tap nötig, **Stopp**; Abweichung an PO ([PO-1]); WP 2–5 starten nicht.
+Akzeptanz Spike: T0–T4 und T6 dokumentiert (zuerst Dev, abschließend Alpha). **Entscheidungsregel (G1a/G1b):** Erscheint der Dialog in T2 und T3 weiterhin, oder ist in beiden Varianten ein Tap nötig, **Stopp**; Abweichung an PO ([PO-1]); WP 2–5 starten nicht.
 
 ### WP 2 — Auth-Umbau Mobile
-Status: startet nach G1 und G2
+Status: freigegeben (G1a, G1b, G2 erfüllt, 2026-10-23); nächste Arbeit
 
 Agent: Frontend. Required Skills: `privacy-impact-review`. Required Knowledge Base: `05-authentication.md`, `03-mobile.md`.
 
@@ -202,14 +244,14 @@ Agent: Frontend. Required Skills: `privacy-impact-review`. Required Knowledge Ba
 - Mobile Build Impact: neuer Build zwingend.
 
 ### WP 3 — Login-Screen im FitTrack-Design
-Status: kann parallel zu WP 2 entworfen werden, Merge nach G1
+Status: freigegeben (G1b erfüllt), kann parallel zu WP 2 umgesetzt werden; nächste Arbeit
 
 Agent: Frontend. Gestaltung mit vorhandenen Theme-Tokens: Logo/Claim, primärer Button "Mit Google anmelden", Datenschutz-Link bleibt, Ladezustand und Fehlertexte aus WP 2 (deutsch; aktuell "Sign in with Google").
 
 Eigene Bestätigung: entfernt ([PO-3], D4). Der Button-Tap ist die einzige Nutzeraktion; es gibt weder Hinweisdialog noch Modal, Checkbox oder zusätzlichen Tap. Ein statischer Hinweistext unter dem Button ist ebenfalls nicht vorgesehen. Dialoge nur bei Fehlern, die der Nutzer beheben muss (z. B. "Erneut anmelden").
 
 ### WP 4 — Infrastruktur & Release
-Status: Teil 1 läuft in WP 1; Rest nach G1
+Status: Teil 1 in WP 1 erledigt; Rest freigegeben (G1b erfüllt); nächste Arbeit
 
 Agent: Infrastructure. Required Knowledge Base: `07-infrastructure.md`, `01-system-overview.md`.
 
@@ -220,25 +262,82 @@ Status: nach WP 2–4
 
 Required Skills: `privacy-impact-review`. Prüft AK 1–6 mit realen Alpha-Builds (G3), Regression bestehender Nutzer (Profil, Daten, Admin-Rolle, Gruppen), Logout/Re-Login, Refresh-Token-Pfad (`refreshAccessToken` nutzt den Token-Endpoint; Redirect-URI-Bedarf beim Refresh prüfen), App-Chooser-Freiheit mit Dev+Alpha, Relay-Seite (Header, keine Logs/Drittressourcen), Rollback-Umschalter.
 
-## 5. Persistence Impact
+## 7. Persistence Impact
 
 Keine. Keine Cosmos-Änderung, kein Backend-Code.
 
-## 6. Privacy Impact
+## 8. Privacy Impact
 
-- Neue Verarbeitung: Eine FitTrack-eigene HTTPS-Seite (Azure Static Web App) wird beim Rücksprung vom Identitätsanbieter mit einem kurzlebigen Autorisierungscode (und `state`) in der URL aufgerufen und übergibt beides kontrolliert an die App. Der Code allein ist ohne `code_verifier` wertlos (PKCE). Die Seite speichert/loggt nichts, lädt keine Drittskripte, setzt keine Cookies. Azure-seitige Zugriffsprotokolle der SWA sind zu prüfen (Open question: ob URL-Query in Plattformlogs landet).
-- Neues lokales Datum: Pending-Login (`state`, `code_verifier`, `redirect_uri`, Zeitstempel) in SecureStore, 10 Minuten, einmalig, danach gelöscht. Es verlässt das Gerät nicht.
-- Neuer Auftragsverarbeiter/Anbieter: Azure Static Web Apps ist Teil derselben Microsoft-Azure-Umgebung; ob die Datenschutzerklärung den Hosting-Dienst abdeckt, ist gegen `docs/legal/datenschutzerklaerung-alpha.md` zu prüfen. Keine Änderung wird ohne ausdrückliche Freigabe vorgenommen. Rechtsgrundlagen/Fristen: Open question.
-- Bei Variante A läuft der Code nicht über die Webseite (sofern App Link greift).
+Privacy Impact: Policy update proposed (plus Open questions)
 
-## 7. Empfohlene Reihenfolge
+Stand der Prüfung: 2026-10-23, Skill `privacy-impact-review`. Dies ist eine technische Konsistenzprüfung, keine Rechtsberatung. Änderungen unter `docs/legal/` erfolgen nur nach ausdrücklicher Freigabe des PO.
 
-1. WP 1: Infra (SWA, assetlinks, Relay) → Entra-Redirect-URI → Mobile-Intent-Filter + Spike-Build → Messreihe T0–T9
-2. Gate G1/G2 → bei Misserfolg [PO-1]
-3. WP 2 + WP 3 → WP 4 (Rest) → WP 5 (G3)
+### 8.1 Datenfluss (aus dem Repository verifiziert)
 
-Deploy-Sequenz: Infrastruktur (SWA, `assetlinks.json`) → Entra-Redirect-URI → neuer Alpha-Build. Backend-Deploy nicht erforderlich.
+| Daten | Wohin / wo | Wer | Aufbewahrung | Für Nutzer sichtbar? |
+|---|---|---|---|---|
+| Autorisierungscode + `state` (kurzlebig, ohne `code_verifier` nutzlos, PKCE) in der URL `https://<host>/auth/callback/<alpha\|dev>?code=…&state=…` | Browser (Custom Tab) lädt die Relay-Seite der Azure Static Web App `swa-fittrack-alpha-ppf5sc` (Free, West Europe, `*.azurestaticapps.net`); die Seite übergibt `code`, `state`, `error`, `error_description` per `intent://` an die App und entfernt die Query per `history.replaceState`. Bei verifiziertem App Link läuft der Code ggf. gar nicht über die Seite (Spike: auf Dev direkte Zustellung beobachtet) | FitTrack (Betreiber der SWA); Hosting: Microsoft Azure | Die Seite speichert/loggt nichts, setzt keine Cookies, lädt keine Drittressourcen (CSP `default-src 'none'`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`; geprüft in `relay.js`, `alpha.html`, `staticwebapp.config.json`). **Azure-Plattformlogs/-Telemetrie der SWA zur URL-Query: nicht verifiziert (Open question)** | Nein (Seite zeigt nur "Anmeldung wird abgeschlossen …" bzw. Fehlerhilfe-Button) |
+| Pending-Login: `state`, `code_verifier`, `redirect_uri`, Zeitstempel | SecureStore auf dem Gerät (`fittrack_pending_login`, `pendingLogin.ts`) | Nur die App; verlässt das Gerät nicht (der `code_verifier` geht nur im Token-Request an Entra); kein `console`/Logger-Aufruf im Auth-Modul gefunden | Bis 10 Minuten; einmalig (`consumePendingLogin` löscht vor Rückgabe); gelöscht nach Erfolg/Fehler/Abbruch/Ablauf (`useAuthLogin.ts`); abgelaufene Einträge werden beim nächsten Laden bereinigt | Nein |
+| Anmeldung über Google als Identitätsanbieter innerhalb von Entra External ID | Browser-Anmeldung bei Google, föderiert über Entra; FitTrack erhält nur Entra-Tokens | Google (als Identitätsanbieter) und Microsoft Entra | Nicht in FitTrack geregelt; Google-/Microsoft-Bedingungen. Neu ist nur der Redirect, nicht die Google-Föderation (siehe Ist-Zustand: Entra routet bereits heute zu Google) | Ja (Google-Kontoauswahl) |
+| Neue Datenkategorien, Analytics, Berechtigungen | Keine (`staticwebapp.bicep` konfiguriert keine Analytics; keine neuen Berechtigungen) | – | – | – |
 
-## 8. Knowledge-Base-Updates (nach Umsetzung)
+Annahme (nicht verifiziert): Die SWA-Inhalte sind statisch; es gibt keine verbundene Function-API und keine Authentifizierung auf der SWA (`staticwebapp.config.json` enthält keine).
+
+### 8.2 Abgleich mit `datenschutzerklaerung-alpha.md` (Stand 2026-10-23)
+
+| Abschnitt / Satz | Bewertung |
+|---|---|
+| "Anmeldedaten (Konto über Microsoft Entra External ID)" | Covered (Konto weiterhin über Entra) |
+| "Anmeldung: Microsoft Entra External ID. Deine Anmelde-Tokens liegen verschlüsselt auf deinem Gerät (SecureStore)." | **Update needed (ergänzend):** Aussage bleibt wahr, ist aber unvollständig: Google als Anmeldeoption wird nirgends genannt; die FitTrack-Weiterleitungsseite und der kurzlebige lokale Anmeldevorgang fehlen |
+| "Speicherung: Microsoft Azure (Azure-Dienste in Europa): Cosmos DB …, Blob Storage …" | Covered (betrifft Nutzerdaten; die SWA speichert keine). Hosting-Wording für die Weiterleitungsseite: Open question |
+| "Betriebsprotokolle: Application Insights, 30 Tage" | Covered für Application Insights; die SWA hat keine Application-Insights-Anbindung im Bicep. Ob Azure auf der SWA-Plattformebene Zugriffsdaten protokolliert, ist offen (Open question) |
+| "Keine Weitergabe an Dritte zu anderen Zwecken" | Covered; Google als Identitätsanbieter wird von der Person selbst gewählt, Rolle (eigener Verantwortlicher) ist Open question |
+| "Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll … zu entfernen" | Kein Widerspruch (Pending-Login läuft nach 10 Minuten ab). Ob Logout/Kontolöschung den Pending-Login zusätzlich explizit löscht, ist im Code nicht verifiziert; für die Policy nicht nötig, siehe Open question 6 |
+| Übrige Abschnitte (KI, Feedback, Health Connect, Sichtbarkeit) | Nicht betroffen |
+
+Keine Aussage der Policy wird durch die Änderung falsch; es ist eine Ergänzung nötig (kein `Blocking`).
+
+### 8.3 Vorschlag, nicht freigegeben (Policy-Text, nur nach PO-Freigabe)
+
+Ersetzung der Zeile "**Anmeldung:**" im Abschnitt "Wo und womit werden die Daten verarbeitet?":
+
+> - **Anmeldung:** Microsoft Entra External ID. Du kannst dich mit deinem Google-Konto anmelden; die Anmeldung läuft dann über Google und Microsoft, FitTrack erhält nur das Anmeldeergebnis von Microsoft Entra. Nach der Anmeldung leitet dich eine FitTrack-Seite bei Microsoft Azure (Azure Static Web Apps, Europa) zurück in die App. Diese Seite speichert nichts, setzt keine Cookies und lädt keine Inhalte von Dritten; sie reicht den kurzlebigen Anmeldecode nur an die App weiter. Deine Anmelde-Tokens liegen verschlüsselt auf deinem Gerät (SecureStore). Während einer laufenden Anmeldung speichert die App kurzzeitig (höchstens 10 Minuten, einmalig verwendbar) einen technischen Anmeldevorgang verschlüsselt auf deinem Gerät und löscht ihn danach; er verlässt dein Gerät nicht.
+
+Optional (nur falls Open question 1 ergibt, dass Azure Zugriffsdaten protokolliert), Zusatz am Ende der Zeile "**Betriebsprotokolle:**":
+
+> Beim Aufruf der Weiterleitungsseite kann Microsoft Azure technische Zugriffsdaten (z. B. IP-Adresse, Zeitpunkt) verarbeiten. [Formulierung/Frist nach Klärung festlegen]
+
+`Stand:` müsste bei Freigabe auf das Änderungsdatum gesetzt werden. Die Formulierung "Azure Static Web Apps, Europa" ist hinsichtlich "Europa" an Open question 3 gebunden (konfigurierte Region ist West Europe; ob Auslieferung/Verarbeitung der Plattform ausschließlich in Europa erfolgt, ist nicht belegt).
+
+### 8.4 Offene Fragen an den PO
+
+1. **Azure-SWA-Logging:** Werden URL-Queries (`code`, `state`) oder IP-Adressen in Azure-Plattformlogs der SWA erfasst, und wie lange? Ungeprüft; keine Aussage in beide Richtungen. Entscheidet über den optionalen Zusatz in 8.3 und die Einordnung des Codes als protokolliertes Datum.
+2. **Google nennen?** Soll Google ausdrücklich genannt werden (Vorschlag: ja, da es im Anmeldefluss sichtbar ist und heute nicht erwähnt wird)? Rolle von Google (eigener Verantwortlicher) und Rechtsgrundlage: rechtlich zu klären.
+3. **Hosting-Wortlaut:** "Azure Static Web Apps, Europa" korrekt/gewünscht? Die Region ist West Europe; globale Auslieferung statischer Inhalte durch die Plattform ist nicht belegt oder ausgeschlossen.
+4. **Rechtsgrundlage, Auftragsverarbeitung, Fristen:** nicht in der Policy und nicht im Repository belegt; rechtliche Bestätigung nötig. Nichts davon wurde erfunden.
+5. **Pending-Login erwähnen oder weglassen?** Ein rein lokaler, kurzlebiger technischer Datensatz; der Vorschlag nennt ihn der Transparenz halber. Alternative: streichen, wenn der PO ihn als bereits durch "Anmelde-Tokens liegen verschlüsselt auf deinem Gerät" gedeckt ansieht.
+6. **Löschung:** Soll Logout/Kontolöschung den Pending-Login explizit mitlöschen (Frontend-Prüfung in WP 2; heute nur Ablauf nach 10 Minuten bzw. Bereinigung beim nächsten Laden)?
+7. **Zeitpunkt der Policy-Änderung:** Mit Release der neuen Builds (WP 4) oder früher? Die Relay-Seite ist für Dev/Alpha bereits deployt.
+
+### 8.5 Checkliste für WP 5 (QA)
+
+- [ ] Relay-Seite (Dev/Alpha): keine Speicherung, keine Cookies, keine Drittanfragen (Netzwerk-Tab), Header `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, CSP wie in `staticwebapp.config.json`; Query nach Aufruf aus der Tab-URL entfernt.
+- [ ] `relay.js` leitet nur die Allowlist (`code`, `state`, `error`, `error_description`) an festen Host/Package weiter.
+- [ ] Kein Auth-Code, `state`, `code_verifier` oder Token in App-Logs, Diagnoseprotokoll, Application Insights oder Backend-Logs (Code-Review und Stichprobe).
+- [ ] Pending-Login: 10-Minuten-Ablauf, Einmalverwendung, Löschung nach Erfolg/Fehler/Abbruch (vorhandene Tests `pendingLogin.test.ts`, `loginFlow.test.ts`, `useAuthLogin.test.tsx` prüfen und Lücken melden); Ergebnis zu Open question 6 dokumentieren.
+- [ ] Keine neuen Berechtigungen, keine Analytics, keine neue Datenkategorie, keine Cosmos-Änderung.
+- [ ] Ergebnis von Open question 1 (SWA-Logging) liegt vor und ist im Policy-Vorschlag berücksichtigt.
+- [ ] Policy-Stand: entweder PO-freigegebener Text unter `docs/legal/` mit aktualisiertem `Stand:`, oder Befund "Non-blocking: Policy nennt Google/Weiterleitungsseite nicht" bis zur Freigabe.
+- [ ] Bei Variante A (direkter App Link) und Relay-Rückfall derselbe Datenschutzbefund; ältere Builds mit `fittrack://auth` unverändert.
+
+## 9. Empfohlene Reihenfolge
+
+1. WP 1 (Dev zuerst): Infra (SWA, assetlinks, Relay) → Entra-Redirect-URI → Mobile-Intent-Filter + Dev-Build → Messreihe T0–T7, T10 auf Dev (G1a); Relay-/Schalteränderungen ohne Rebuild iterieren
+2. WP 1 (Alpha final): Alpha-Build `preview-https` (läuft bereits) → G1b, T8, T11, T9 → G1/G2 → bei Misserfolg [PO-1]
+3. WP 2 + WP 3 (erst nach G1b; Vorbereitung auf Dev nach G1a nur mit PO-Zustimmung) → WP 4 (Rest) → WP 5 (G3)
+
+Deploy-Sequenz: Infrastruktur (SWA, `assetlinks.json` mit Dev- und Alpha-Fingerprint) → Entra-Redirect-URI → Dev-Build (Messreihe) → Alpha-Build (Abschlussbestätigung). Backend-Deploy nicht erforderlich.
+
+## 10. Knowledge-Base-Updates (nach Umsetzung)
 
 `docs/kb/tech/05-authentication.md` (Redirect-URI, App Link, Relay), `docs/kb/tech/07-infrastructure.md` (SWA, `assetlinks.json`, Fingerprint-Pflege), `docs/kb/tech/03-mobile.md`. Bis dahin sind diese Inhalte `[Planned]`.

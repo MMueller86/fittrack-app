@@ -58,7 +58,7 @@ import {
   toggleDiaryItemSelection,
   toggleDiaryMealSelection,
 } from './diaryItemUtils';
-import { MEAL_LABELS } from './mealLabels';
+import { MEAL_ICONS, MEAL_LABELS } from './mealLabels';
 import { ActivityBonusSheet } from './components/ActivityBonusSheet';
 import type { NutritionStackParamList } from '../../app/navigation/RootNavigator';
 import { addLocalDays, getLocalIsoDate, isValidDateOnly } from '../../shared/date/localDate';
@@ -68,14 +68,6 @@ type Props = NativeStackScreenProps<NutritionStackParamList, 'DiaryMain'>;
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 // Mahlzeiten, die als leere State-B-Karten immer sichtbar sein sollen (Phase 6)
 export const DEFAULT_MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner'];
-const MEAL_ICONS: Record<MealType, string> = {
-  breakfast: '🌅',
-  lunch: '☀️',
-  dinner: '🌙',
-  snack: '🍎',
-  preworkout: '⚡',
-  postworkout: '💪',
-};
 
 function offsetDate(iso: string, days: number): string {
   return addLocalDays(iso, days);
@@ -209,7 +201,9 @@ function MealCard({
   if (isEmpty) {
     const compactContent = (
       <>
-        <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
+        <View style={styles.mealIcon}>
+          <Icon lib="mci" name={MEAL_ICONS[meal.type]} size={20} color={colors.textSecondary} />
+        </View>
         <Text style={styles.mealName}>{mealLabel}</Text>
         {!selectionMode && <Text style={styles.compactAddHint}>+ Hinzufügen</Text>}
       </>
@@ -259,7 +253,9 @@ function MealCard({
             <Icon lib="feather" name={mealSelectionIcon} size="md" color={mealSelectionColor} />
           </TouchableOpacity>
         )}
-        <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
+        <View style={styles.mealIcon}>
+          <Icon lib="mci" name={MEAL_ICONS[meal.type]} size={20} color={colors.textSecondary} />
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.mealName}>{mealLabel}</Text>
           {items.length > 0 && (
@@ -1000,7 +996,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
               <View style={styles.addMealGrid}>
                 {missingTypes.map((type) => (
                   <TouchableOpacity key={type} onPress={() => handleAddMeal(type)} style={styles.addMealChip}>
-                    <Text style={styles.addMealChipIcon}>{MEAL_ICONS[type]}</Text>
+                    <Icon lib="mci" name={MEAL_ICONS[type]} size={16} color={colors.textSecondary} />
                     <Text style={styles.addMealChipLabel}>{MEAL_LABELS[type]}</Text>
                   </TouchableOpacity>
                 ))}
@@ -1277,7 +1273,7 @@ const styles = StyleSheet.create({
   },
   inlineAddBtnText: { ...typography.caption, color: colors.primary, fontWeight: '600' as const },
   mealHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.sm },
-  mealIcon: { fontSize: 20, marginRight: spacing.sm, marginTop: 2 },
+  mealIcon: { width: 24, alignItems: 'center', marginRight: spacing.sm, marginTop: 2 },
   mealName: { ...typography.h3, color: colors.text },
   mealCal: { ...typography.caption, color: colors.textSecondary, marginTop: 2, fontVariant: ['tabular-nums'] as const },
   mealItemCount: { ...typography.caption, color: colors.textMuted },
@@ -1308,7 +1304,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     gap: spacing.xs,
   },
-  addMealChipIcon: { fontSize: 16 },
   addMealChipLabel: { ...typography.body2, color: colors.text },
 });
 

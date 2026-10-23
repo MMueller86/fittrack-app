@@ -3,6 +3,8 @@ import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Meal } from '@fittrack/shared';
 
+vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
+
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',

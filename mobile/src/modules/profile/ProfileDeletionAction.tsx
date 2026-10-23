@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import axios from 'axios';
 import { profileApi, type ProfileDeletionRequest } from '../../shared/api/profileApi';
 import { recipeApi } from '../../shared/api/recipeApi';
@@ -44,6 +45,7 @@ function getDeletionErrorMessage(error: unknown): string {
 }
 
 export function ProfileDeletionAction() {
+  const insets = useSafeAreaInsets();
   const [deleteOverlayVisible, setDeleteOverlayVisible] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteCommunityRecipes, setDeleteCommunityRecipes] = useState(false);
@@ -148,10 +150,17 @@ export function ProfileDeletionAction() {
             />
             <KeyboardAvoidingView
               behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={styles.deleteKeyboard}
+              style={[
+                styles.deleteKeyboard,
+                {
+                  paddingTop: insets.top + spacing.md,
+                  paddingBottom: Math.max(insets.bottom, spacing.md),
+                },
+              ]}
             >
               <View style={styles.deleteDialog}>
                 <ScrollView
+                  style={styles.deleteDialogBody}
                   contentContainerStyle={styles.deleteDialogContent}
                   keyboardShouldPersistTaps="handled"
                 >
@@ -210,7 +219,9 @@ export function ProfileDeletionAction() {
                       </Text>
                     </>
                   ) : null}
+                </ScrollView>
 
+                <View style={styles.deleteFooter} testID="profile-deletion-footer">
                   <Text style={styles.deleteConfirmationPrompt}>Gib zur Bestätigung DELETE ein.</Text>
                   <TextInput
                     style={styles.deleteInput}
@@ -280,7 +291,7 @@ export function ProfileDeletionAction() {
                       </Text>
                     </TouchableOpacity>
                   </View>
-                </ScrollView>
+                </View>
               </View>
             </KeyboardAvoidingView>
           </View>
@@ -291,18 +302,27 @@ export function ProfileDeletionAction() {
 }
 
 const styles = StyleSheet.create({
-  deleteOverlayRoot: { flex: 1, justifyContent: 'center' },
+  deleteOverlayRoot: { flex: 1 },
   deleteBackdrop: { backgroundColor: colors.overlay },
-  deleteKeyboard: { flex: 1, justifyContent: 'center', padding: spacing.md },
+  deleteKeyboard: { flex: 1, justifyContent: 'center', paddingHorizontal: spacing.md },
   deleteDialog: {
-    maxHeight: '94%',
+    maxHeight: '100%',
+    flexShrink: 1,
     backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     overflow: 'hidden',
   },
-  deleteDialogContent: { padding: spacing.lg, gap: spacing.md },
+  deleteDialogBody: { flexShrink: 1 },
+  deleteDialogContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.md, gap: spacing.md },
+  deleteFooter: {
+    flexShrink: 0,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.lg,
+    gap: spacing.md,
+  },
   deleteTitle: { ...typography.h3, color: colors.text },
   deleteBody: { ...typography.body2, color: colors.text },
   deleteHealthNotice: { ...typography.body2, color: colors.textSecondary },

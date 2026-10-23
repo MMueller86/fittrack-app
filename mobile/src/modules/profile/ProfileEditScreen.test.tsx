@@ -37,7 +37,10 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: 'SafeAreaView',
+  useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }),
+}));
 vi.mock('../../shared/api/profileApi', () => ({ profileApi: mocks.profileApi }));
 vi.mock('../../shared/api/recipeApi', () => ({ recipeApi: mocks.recipeApi }));
 vi.mock('../../services/accountDeletionService', () => ({
@@ -160,7 +163,29 @@ describe('ProfileEditScreen', () => {
       (node: ReactTestInstance) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Löschbestätigung',
     )[0]!;
     expect(confirmation.props.underlineColorAndroid).toBe('transparent');
+    expect(confirmation.props.selectionColor).toBe(colors.primaryBright);
     expect((confirmation.props.style as Record<string, unknown>).height).toBe(spacing.xxl);
+    const inputModal = findType(renderer, 'Modal');
+    const keyboardAvoider = inputModal.findAll(
+      (node: ReactTestInstance) => node.type === 'KeyboardAvoidingView',
+    )[0]!;
+    const dialog = inputModal.findAll(
+      (node: ReactTestInstance) => node.type === 'View'
+        && (node.props.style as Record<string, unknown>)?.backgroundColor === colors.surfaceElevated,
+    )[0]!;
+    const bodyScroll = inputModal.findAll(
+      (node: ReactTestInstance) => node.type === 'ScrollView',
+    )[0]!;
+    const footer = inputModal.findAll(
+      (node: ReactTestInstance) => node.type === 'View' && node.props.testID === 'profile-deletion-footer',
+    )[0]!;
+    expect(bodyScroll).toBeDefined();
+    expect(bodyScroll.findAll((node: ReactTestInstance) => node.type === 'TextInput')).toHaveLength(0);
+    expect(footer.findAll((node: ReactTestInstance) => node.type === 'TextInput')).toHaveLength(1);
+    expect(footer.findAll((node: ReactTestInstance) => node.type === 'TouchableOpacity'
+      && ['Abbrechen', 'Endgültig löschen'].includes(node.props.accessibilityLabel))).toHaveLength(2);
+    expect(keyboardAvoider.props.behavior).toBe('height');
+    expect(dialog.props.style.maxHeight).toBe('100%');
     const dialogItems = findType(renderer, 'Modal').findAll(
       (node: ReactTestInstance) => node.type === 'Text' || node.type === 'TextInput',
     );

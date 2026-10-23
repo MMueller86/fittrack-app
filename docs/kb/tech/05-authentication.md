@@ -11,14 +11,19 @@ Entra External ID (CIAM) — Microsoft's customer identity platform.
 ## Authentication Flow (Mobile → CIAM → Backend)
 
 ```
-1. Mobile: expo-auth-session initiates PKCE OAuth2 flow
+1. Mobile: expo-auth-session initiates PKCE OAuth2 flow (useAuthLogin.ts)
+   - Persists a pending login (state, code_verifier, redirect_uri) in SecureStore
    - Opens CIAM authorization endpoint in browser
+   - redirect_uri: HTTPS App Link https://<static web app host>/auth/callback/<alpha|dev>
+     (see "Login Redirect (HTTPS App Link)")
    - Uses scopes: [API_SCOPE, 'openid', 'profile', 'offline_access']
 
 2. CIAM: user authenticates (Google SSO or CIAM native)
-   - Returns authorization code
+   - Redirects with authorization code to the HTTPS redirect URI
 
-3. Mobile: exchanges code for tokens
+3. Mobile: receives the redirect (auth session result, Linking event or cold-start
+   initial URL), validates state against the pending login, then exchanges code for tokens
+   (code_verifier and redirect_uri taken from the pending login)
    - Access token (short-lived JWT, ~1h)
    - Refresh token (long-lived, for silent renewal)
 
@@ -35,6 +40,34 @@ Entra External ID (CIAM) — Microsoft's customer identity platform.
    - Validates issuer and audience
    - Extracts sub claim as userId
 ```
+
+## Login Redirect (HTTPS App Link)
+
+The OAuth redirect URI is `https://<static web app host>/auth/callback/<alpha|dev>`, delivered to the app as an Android App Link (`autoVerify`). The host is defined once in `mobile/auth-callback-host.json` (read by `app.config.js` and `authRedirect.ts`). The variant segment is `dev` for `APP_VARIANT=development`/`EXPO_PUBLIC_APP_VARIANT=development`, otherwise `alpha`.
+
+**Why:** with the custom scheme `fittrack://auth`, Entra shows a confirmation dialog (`AADSTS50199 / CmsiInterrupt`) before redirecting; Entra's safe list covers http/https redirects.
+
+**Hosting:** the Static Web App is defined in `infra/static/auth-relay/`. It serves `/.well-known/assetlinks.json` (package `com.fittrack.app` and `com.fittrack.app.dev` with their signing-certificate fingerprints) and the callback pages `/auth/callback/alpha` and `/auth/callback/dev`.
+
+**Relay fallback:** if Android opens the browser instead of the app, the callback page (`relay.js`) immediately forwards to an `intent://` URL for the fixed host and the fixed package of the page variant (`com.fittrack.app` / `com.fittrack.app.dev`). Only `code`, `state`, `error` and `error_description` are forwarded; the query is removed from the address bar. The page has no storage, no logging and no network access (CSP `default-src 'none'`, `no-store`, `no-referrer`). If the app does not open within 2.5 s, a manual "back to app" link is shown.
+
+**Scheme fallback / rollback:** `fittrack://auth` stays registered in the Entra app registration for older builds and as rollback; `EXPO_PUBLIC_AUTH_REDIRECT_MODE=scheme` makes a build use it again. Default (unset or any other value) is HTTPS. `eas.json` `preview` does not set the variable, so it uses HTTPS. [Open] Removal of `fittrack://auth` from Entra requires a Product Owner decision.
+
+**Entra registration:** redirect URIs are registered manually in the Azure portal on the existing app registration (platform "Mobile and desktop applications"). There is no new app registration, so identity (`sub`) and the Admin role are unchanged. The portal state is not verifiable from the repository.
+
+**`domain_hint`:** optional; `EXPO_PUBLIC_AUTH_DOMAIN_HINT` (pattern `[A-Za-z0-9._-]{1,64}`, e.g. `google`) is sent as `domain_hint`. Default is off. Known issues in the Entra external tenant: the Entra error page does not reach the app, and there is no automatic retry.
+
+### Pending login and cold start
+
+`pendingLogin.ts` stores `{ state, codeVerifier, redirectUri, createdAt }` in SecureStore key `fittrack_pending_login`. It is valid for 10 minutes, deleted when read (single-use), purged when expired or malformed, and never logged. Because the redirect may start the app cold (or recreate it), `useAuthLogin` also evaluates `Linking.getInitialURL()` and runtime `Linking` events. `handleRedirect()` exchanges the code at most once (`claimRedirect()` guards double delivery; the pending login is consumed). A state mismatch or missing pending login yields the `pending` error.
+
+### Abort handling
+
+No dismiss/cancel event is relied on. When the app leaves the foreground while waiting and returns without a received redirect, a 4 s grace period (`RETURN_GRACE_MS`) runs; then the attempt is reset with the `noReturn` error. A 10 minute hard timer resets the attempt as well. `access_denied` maps to `cancelled`; other provider errors to `provider`; token exchange failures to `exchange`. User-facing texts live in `authTexts.ts`; the login screen shows the text and an "Erneut anmelden" retry link.
+
+### Verified result (Spike)
+
+User-observed on 2026-10-23: Dev and Alpha builds return directly to the app without the Entra dialog and without an extra tap; same `sub` and Admin role. This is a manual observation, not an automated test.
 
 ## Silent Token Refresh
 
@@ -153,6 +186,13 @@ This is the only "simplified" auth path — it exists exclusively for automated 
 |---|---|
 | `mobile/src/services/authConfig.ts` | CIAM OAuth config (from env vars) |
 | `mobile/src/services/authService.ts` | Token storage, refresh, expiry |
+| `mobile/src/services/authRedirect.ts` | Redirect URI (HTTPS/scheme mode) and optional `domain_hint` |
+| `mobile/src/modules/auth/useAuthLogin.ts` | Login hook: PKCE request, redirect handling, abort handling |
+| `mobile/src/modules/auth/pendingLogin.ts` | Pending login in SecureStore (10 min, single-use) |
+| `mobile/src/modules/auth/loginFlow.ts` | Redirect parsing, state check, error mapping, double-delivery guard |
+| `mobile/src/modules/auth/authTexts.ts` | User-facing login texts and error messages |
+| `mobile/auth-callback-host.json` | Static Web App host for the HTTPS redirect / App Link |
+| `infra/static/auth-relay/` | Static Web App: assetlinks.json, callback/relay pages |
 | `mobile/src/shared/api/client.ts` | Axios interceptors for auth + 429 |
 | `backend/src/lib/auth.ts` | JWT validation, `requireUser()` |
 

@@ -40,7 +40,7 @@ Es werden nur Daten verarbeitet, die für die App-Funktionen nötig sind.
 
 - **Speicherung:** Microsoft Azure (Azure-Dienste in Europa): Cosmos DB für deine Daten, Blob Storage für Rezeptbilder.
 - **Betriebsprotokolle:** Application Insights, 30 Tage.
-- **Anmeldung:** Microsoft Entra External ID. Deine Anmelde-Tokens liegen verschlüsselt auf deinem Gerät (SecureStore).
+- **Anmeldung:** Microsoft Entra External ID. Du kannst dich mit deinem Google-Konto anmelden; die Anmeldung läuft dann über Google und Microsoft, FitTrack erhält nur das Anmeldeergebnis von Microsoft Entra. Danach leitet dich eine FitTrack-Seite bei Microsoft Azure (Azure Static Web Apps) zurück in die App. Diese Seite speichert nichts, setzt keine Cookies und lädt keine Inhalte von Dritten; sie reicht den kurzlebigen Anmeldecode nur an die App weiter. Beim Aufruf dieser Seite kann Microsoft Azure technische Zugriffsdaten (z. B. IP-Adresse, Zeitpunkt) verarbeiten. Deine Anmelde-Tokens liegen verschlüsselt auf deinem Gerät (SecureStore). Während einer laufenden Anmeldung speichert die App kurz (höchstens 10 Minuten, einmal verwendbar) einen technischen Anmeldevorgang verschlüsselt auf deinem Gerät und löscht ihn danach; er verlässt dein Gerät nicht.
 - **KI-Funktionen:** Je nach Funktion werden Text, Fotos oder Kontext (Profil, Tagebuch, Gewicht) an Azure OpenAI gesendet. Beim Etikettenscan wird das Foto zusätzlich mit Azure Document Intelligence ausgelesen. Ergebnisse werden erst gespeichert, nachdem du sie bestätigt hast.
   - An die KI werden keine Nutzer-ID, E-Mail-Adresse oder Anmelde-Tokens gesendet; deine Anfragen sind nicht mit deinem Konto verknüpft. Dein Anzeigename, deine Profildaten und von dir eingegebene Texte oder Fotos können aber Teil der Anfrage sein.
 

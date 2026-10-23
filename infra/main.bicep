@@ -76,6 +76,13 @@ param authAudience string = ''
 @description('JWKS URI for JWT signature verification.')
 param authJwksUri string = ''
 
+// --- Auth relay Static Web App (shared by Dev and Alpha; deployed with alpha only) ---
+@description('Deploy the auth relay Static Web App.')
+param deployStaticWebApp bool = false
+
+@description('Region for the Static Web App (Free SKU is not available in the RG region northeurope).')
+param staticWebAppLocation string = 'westeurope'
+
 // --- Naming ---
 
 var namePrefix = '${projectName}-${environmentName}'
@@ -87,6 +94,7 @@ var planName = 'asp-${namePrefix}'
 var appInsightsName = 'appi-${namePrefix}'
 var logAnalyticsName = 'log-${namePrefix}'
 var documentIntelligenceName = toLower('di-${namePrefix}-${uniqueSuffix}')
+var staticWebAppName = 'swa-${namePrefix}-${uniqueSuffix}'
 
 var commonTags = {
   project: projectName
@@ -122,6 +130,15 @@ module monitoring 'modules/appinsights.bicep' = {
     location: location
     workspaceName: logAnalyticsName
     appInsightsName: appInsightsName
+    tags: commonTags
+  }
+}
+
+module staticWebApp 'modules/staticwebapp.bicep' = if (deployStaticWebApp) {
+  name: 'staticwebapp-deploy'
+  params: {
+    location: staticWebAppLocation
+    name: staticWebAppName
     tags: commonTags
   }
 }
@@ -201,6 +218,10 @@ output functionAppHostName string = functionApp.outputs.defaultHostName
 
 @description('Function App name.')
 output functionAppName string = functionApp.outputs.functionAppName
+
+@description('Auth relay Static Web App hostname (empty when not deployed).')
+#disable-next-line BCP318
+output staticWebAppHostName string = deployStaticWebApp ? staticWebApp.outputs.defaultHostname : ''
 
 @description('Application Insights connection string.')
 output appInsightsConnectionString string = monitoring.outputs.connectionString

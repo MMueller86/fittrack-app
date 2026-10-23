@@ -13,12 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { DiaryBulkMoveTarget, DiaryItemReference, Meal, MealType } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { MEAL_LABELS } from './mealLabels';
-
-const MEAL_ICONS: Record<MealType, string> = {
-  breakfast: '🌅', lunch: '☀️', dinner: '🌙',
-  snack: '🍎', preworkout: '⚡', postworkout: '💪',
-};
+import { Icon } from '../../shared/components/Icon';
+import { MEAL_ICONS, MEAL_LABELS } from './mealLabels';
 
 const MEAL_ORDER: MealType[] = ['breakfast', 'preworkout', 'lunch', 'dinner', 'postworkout', 'snack'];
 
@@ -84,7 +80,7 @@ export default function MoveItemSheet({
                 disabled={!!movingTo || items.length === 0}
                 activeOpacity={0.7}
               >
-                <Text style={styles.mealIcon}>{MEAL_ICONS[meal.type]}</Text>
+                <Icon lib="mci" name={MEAL_ICONS[meal.type]} size={20} color={colors.textSecondary} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.mealName}>{MEAL_LABELS[meal.type]}</Text>
                   <Text style={styles.mealMeta}>
@@ -114,7 +110,7 @@ export default function MoveItemSheet({
                     onPress={() => { void doMove(`new-${type}`, { newMealType: type }); }}
                     disabled={!!movingTo || items.length === 0}
                   >
-                    <Text style={styles.chipIcon}>{MEAL_ICONS[type]}</Text>
+                    <Icon lib="mci" name={MEAL_ICONS[type]} size={16} color={colors.textSecondary} />
                     <Text style={styles.chipLabel}>{MEAL_LABELS[type]}</Text>
                   </TouchableOpacity>
                 ))}
@@ -154,7 +150,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: colors.border,
     gap: spacing.sm,
   },
-  mealIcon: { fontSize: 20 },
   mealName: { ...typography.body1, color: colors.text, fontWeight: '500' },
   mealMeta: { ...typography.caption, color: colors.textMuted, marginTop: 2 },
   chevron: { ...typography.h2, color: colors.textMuted, lineHeight: 26 },
@@ -167,7 +162,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: spacing.md, paddingVertical: spacing.sm,
   },
-  chipIcon: { fontSize: 16 },
   chipLabel: { ...typography.button, color: colors.text },
   cancelBtn: { paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.xs },
   cancelLabel: { ...typography.body1, color: colors.textSecondary },

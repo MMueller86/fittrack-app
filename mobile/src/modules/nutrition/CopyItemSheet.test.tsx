@@ -5,6 +5,8 @@ import type { DiaryBulkCopyResponse, DiaryDayResponse, Meal } from '@fittrack/sh
 
 const mockGetDay = vi.hoisted(() => vi.fn());
 
+vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
+
 vi.mock('../../services/nutritionDiaryService', () => ({
   nutritionDiaryService: { getDay: mockGetDay },
 }));
