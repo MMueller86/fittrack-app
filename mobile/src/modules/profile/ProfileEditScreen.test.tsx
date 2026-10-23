@@ -183,9 +183,10 @@ describe('ProfileEditScreen', () => {
     expect(bodyScroll.findAll((node: ReactTestInstance) => node.type === 'TextInput')).toHaveLength(0);
     expect(footer.findAll((node: ReactTestInstance) => node.type === 'TextInput')).toHaveLength(1);
     expect(footer.findAll((node: ReactTestInstance) => node.type === 'TouchableOpacity'
+      && typeof node.props.accessibilityLabel === 'string'
       && ['Abbrechen', 'Endgültig löschen'].includes(node.props.accessibilityLabel))).toHaveLength(2);
     expect(keyboardAvoider.props.behavior).toBe('height');
-    expect(dialog.props.style.maxHeight).toBe('100%');
+    expect((dialog.props.style as Record<string, unknown>).maxHeight).toBe('100%');
     const dialogItems = findType(renderer, 'Modal').findAll(
       (node: ReactTestInstance) => node.type === 'Text' || node.type === 'TextInput',
     );

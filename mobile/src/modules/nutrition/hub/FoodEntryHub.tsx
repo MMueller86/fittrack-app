@@ -1019,7 +1019,9 @@ export function FoodEntryHub() {
                               onPress={() => { Haptics.selectionAsync(); setActiveFilter(key); setFilterModalOpen(false); }}
                             >
                               <View style={styles.filterModalItemLabel}>
-                                <Icon lib="mci" name={MEAL_ICONS[key]} size="sm" color={isActive ? colors.primary : colors.textSecondary} />
+                                {opt.mealType && (
+                                  <Icon lib="mci" name={MEAL_ICONS[opt.mealType]} size="sm" color={isActive ? colors.primary : colors.textSecondary} />
+                                )}
                                 <Text style={[styles.filterModalItemText, isActive && styles.filterModalItemTextActive]}>
                                   {opt.modalLabel ?? opt.label}
                                 </Text>
