@@ -10,13 +10,14 @@ Bicep. All Azure resources are defined in `infra/`.
 infra/
 ├── main.bicep              Orchestrator — deploys all modules
 ├── parameters/
-│   ├── dev.bicepparam      Dev environment values
-│   └── alpha.bicepparam    Alpha (staging) environment values
+│   ├── dev.bicepparam            Dev environment values
+│   ├── alpha.bicepparam          Legacy Alpha (PRODYNA, Y1) — kept for the old environment
+│   └── alpha-fittrack.bicepparam Current Alpha (subscription `Fittrack`, Flex Consumption)
 └── modules/
     ├── cosmos.bicep         Cosmos DB account + database + containers
-    ├── storage.bicep        Storage account + blob container
+    ├── storage.bicep        Storage account + blob containers (incl. Flex deployment container)
     ├── appinsights.bicep    Log Analytics workspace + Application Insights
-    ├── functionapp.bicep    App Service Plan + Function App + App Settings
+    ├── functionapp.bicep    Flex Consumption (FC1) Plan + Function App + App Settings
     ├── documentintelligence.bicep  Azure Document Intelligence resource
     ├── staticwebapp.bicep   Static Web App (Free) for the auth relay / App Links
     └── (Azure OpenAI not in IaC — existing shared resource)
@@ -27,24 +28,86 @@ infra/
 | Resource | Module | Notes |
 |---|---|---|
 | Cosmos DB Account + DB | `cosmos.bicep` | Serverless, 12 containers |
-| Storage Account | `storage.bicep` | Blob for recipe images |
+| Storage Account | `storage.bicep` | One account per environment: Blob containers `recipe-images`, `product-images`, `label-scans`, Flex deployment container, and the queue `reusable-items-enrich` |
 | Log Analytics Workspace | `appinsights.bicep` | |
 | Application Insights | `appinsights.bicep` | |
-| App Service Plan | `functionapp.bicep` | Consumption (serverless) |
-| Function App | `functionapp.bicep` | Node.js 22, TypeScript build output |
-| Document Intelligence | `documentintelligence.bicep` | F0 for dev, S0 for alpha/prod |
+| App Service Plan | `functionapp.bicep` | Flex Consumption (FC1); only if `deployFunctionApp = true` |
+| Function App | `functionapp.bicep` | Node.js 24, Max Instances 5, Always Ready 0, 2048 MB; only if `deployFunctionApp = true` |
+| Document Intelligence | `documentintelligence.bicep` | Skipped when `azureDocIntelligenceEndpoint` is set (Alpha reuses the Dev instance) |
 | Static Web App | `staticwebapp.bicep` | Optional (`deployStaticWebApp`); Alpha parameters only; see [Auth Relay Static Web App](#auth-relay-static-web-app) |
 
-For Alpha, the existing Cosmos account and Function App/plan are referenced as
-existing resources to avoid What-if changes to provider-returned parent fields.
-The Alpha deployment still manages the Cosmos database and containers and the
-Function App `config/web`; it does not reconcile the parent resources or app
-settings. Dev and other environments continue to create and manage those
-parents.
+`deployFunctionApp` (default `false`) controls the Flex plan and Function App.
+Dev does not get a Function App (the backend runs locally); the current Alpha
+(`alpha-fittrack.bicepparam`) sets it to `true`.
 
 **Not in IaC:**
-- Azure OpenAI resource — pre-existing shared resource
-- Resource group — must already exist (`rg-Michael-Mueller`)
+- Azure OpenAI resource — pre-existing shared resource (`oai-fittrack-dev`)
+- Resource groups — must already exist (`rg-fittrack-dev`, `rg-fittrack-alpha`)
+
+## Azure Subscription, Region and Resource Groups
+
+| Item | Value |
+|---|---|
+| Subscription | `Fittrack` (`dd7539ab-c638-44f8-9173-8bcd28cdbae3`); every `az` command passes `--subscription` |
+| Region | `germanywestcentral` |
+| Dev RG | `rg-fittrack-dev` |
+| Alpha RG | `rg-fittrack-alpha` |
+
+This replaces the former single resource group `rg-Michael-Mueller`. Legacy
+PRODYNA resources (old Alpha `func-fittrack-alpha-ppf5sc` on Y1, and the auth
+relay Static Web App) remain in place for now and are not managed by the
+current parameter files except `alpha.bicepparam`. The old Alpha is kept
+unchanged as a backup and is no longer deployed to; the EAS profile `preview`
+targets the new Alpha.
+
+### Current Alpha resources (`rg-fittrack-alpha`)
+
+Names come from the deployment outputs.
+
+| Resource | Name |
+|---|---|
+| Function App (FC1, Node 24) | `func-fittrack-alpha-wcobsd` (`func-fittrack-alpha-wcobsd.azurewebsites.net`) |
+| Plan | `asp-fittrack-alpha` |
+| Cosmos DB | `cosmos-fittrack-alpha-wcobsd` |
+| Storage (data, queue, deployment container `app-package-func-fittrack-alpha-wcobsd`) | `stfittrackalphawcobsd` |
+| Application Insights / Log Analytics | `appi-fittrack-alpha` / `log-fittrack-alpha` |
+
+Dev resources (`rg-fittrack-dev`): `cosmos-fittrack-dev-hlpqe7`,
+`stfittrackdevhlpqe7`, `appi-fittrack-dev`, `oai-fittrack-dev`,
+`di-fittrack-dev-hlpqe7`.
+
+Alpha shares `oai-fittrack-dev` (deployment `gpt-4.1-mini`, `GlobalStandard`)
+and `di-fittrack-dev-hlpqe7` (F0) with Dev; there are no Alpha instances.
+
+### Alpha catalog seed
+
+The `foodProducts` catalog is copied
+from Dev (about 209,696 documents) with `scripts/migrate-food-products.mjs`
+(upsert only; endpoints and keys from environment variables
+`SOURCE_COSMOS_*` / `TARGET_COSMOS_*`, never committed).
+
+### Alpha user-data migration
+
+On 2026-10-26 the user data of the legacy Alpha (`cosmos-fittrack-alpha-ppf5sc`,
+`stfittrackalphappf5sc`) was copied once, unchanged and read-only from the source,
+into the current Alpha with `scripts/migrate-alpha-data.mjs`
+(`SRC_*` / `TGT_*` connection strings from environment variables, never committed;
+plan `docs/User Stories/plans/PLAN_Alpha-Datenmigration.md`).
+
+- Copied: 11 user containers (`profiles` 3, `weights` 97, `nutritionDiaryMeals` 449,
+  `reusableMealItems` 1, `recipes` 14, `aiUsage` 36, `userFoodRelations` 316,
+  `aiInsights` 5; others empty) and the Blob container `recipe-images`
+  (13 blobs, 9,492,935 bytes). Verified: counts, 20 samples per container, blob
+  count and bytes.
+- Not copied: `foodProducts` (seeded from Dev), `aiInsights` cache documents
+  (`dailyInsight`, `weeklyInsight`, documents without `_docType`; only
+  `insightFeedback` is kept), `product-images` (absent in the source), `label-scans`,
+  host/deployment containers and the queue.
+- Known limitation: one `userFoodRelations.imageUrl` is an absolute URL on the
+  legacy storage host. It was copied unchanged; it is a short-lived SAS URL and
+  falls back to the placeholder image in the app.
+- The migration is one-off. Do not re-run it (`clear`/`copy`) once users work
+  in the current Alpha.
 
 ## Deletion-Relevant Retention
 
@@ -57,9 +120,8 @@ This Bicep module does not declare a Cosmos backup retention period, so none is
 asserted here.
 
 The backend also uses a `product-images` Blob container and deletes personal
-image blobs under `{verifiedSub}/` during profile deletion. That container is
-not declared in the supplied `storage.bicep`; this documentation records the
-backend behavior without implying that this module provisions it.
+image blobs under `{verifiedSub}/` during profile deletion. `storage.bicep`
+provisions this container alongside `recipe-images`.
 
 ## Cosmos DB Containers
 
@@ -152,10 +214,11 @@ used by the mobile sign-in flow (plan
 
 | Item | Value |
 |---|---|
-| Resource | `swa-fittrack-alpha-ppf5sc` (pattern `swa-${namePrefix}-${uniqueSuffix}`) |
+| Resource | `swa-fittrack-alpha-wcobsd` in `rg-fittrack-alpha` (subscription `Fittrack`; pattern `swa-${namePrefix}-${uniqueSuffix}`) |
 | SKU | Free |
-| Region | `westeurope` — the resource group region (`northeurope`) has no Free SWA; the module allows only `centralus`, `eastus2`, `westus2`, `westeurope`, `eastasia` |
-| Hostname | `blue-hill-03fb3c103.1.azurestaticapps.net` (also the `staticWebAppHostName` output of `main.bicep`; fixed in `relay.js`) |
+| Region | `centralus` — `westeurope` is blocked by policy in `Fittrack` (`RequestDisallowedByAzure`); the module allows only `centralus`, `eastus2`, `westus2`, `westeurope`, `eastasia` |
+| Hostname | `red-mushroom-07229ab10.3.azurestaticapps.net` (fixed in `relay.js` and `mobile/auth-callback-host.json`) |
+| Legacy backup | `swa-fittrack-alpha-ppf5sc` (`blue-hill-03fb3c103.1.azurestaticapps.net`, PRODYNA) stays unchanged until the user removes it; builds made before the host switch still use it |
 | Module settings | `stagingEnvironmentPolicy: Disabled`, `allowConfigFileUpdates: true` |
 
 **Parameters** (`main.bicep`): `deployStaticWebApp` (default `false`) and
@@ -182,7 +245,18 @@ visible.
 **Deployment.** The Bicep module creates only the resource; content is
 deployed separately with the SWA CLI using a deployment token fetched at
 deploy time via `az staticwebapp secrets list`. The token is never stored in
-files. [Open] The exact SWA CLI command is not recorded in the repository.
+files, logs, or arguments; it is held only in the process environment variable
+`SWA_CLI_DEPLOYMENT_TOKEN` (read by the CLI) and removed afterwards.
+
+```powershell
+$env:SWA_CLI_DEPLOYMENT_TOKEN = (az staticwebapp secrets list --name swa-fittrack-alpha-wcobsd --resource-group rg-fittrack-alpha --subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3 --query properties.apiKey -o tsv)
+npx @azure/static-web-apps-cli deploy infra/static/auth-relay --env production
+Remove-Item Env:SWA_CLI_DEPLOYMENT_TOKEN
+```
+
+Verified 2026-10-26 (CLI 2.1.0): the dot folder `.well-known/` is uploaded and
+`/.well-known/assetlinks.json` is served as `application/json`; no extra flag
+is needed.
 
 ### `assetlinks.json`
 
@@ -210,8 +284,11 @@ it is still in use), then redeploying the content.
 
 On the existing app registration, under platform "Mobile and desktop
 applications", add the redirect URIs
-`https://blue-hill-03fb3c103.1.azurestaticapps.net/auth/callback/alpha` and
-`.../auth/callback/dev`. The existing `fittrack://auth` URI is kept.
+`https://red-mushroom-07229ab10.3.azurestaticapps.net/auth/callback/alpha` and
+`.../auth/callback/dev`. The old `blue-hill-03fb3c103.1...` URIs and
+`fittrack://auth` are kept. [Planned] The user adds the new URIs; the new
+`preview` EAS build (host from `mobile/auth-callback-host.json`) is [Planned]
+and follows afterwards.
 
 ### Logging
 
@@ -228,9 +305,9 @@ this change and is not deployed by `main.bicep`.
 Pattern: `{type}-{projectName}-{env}-{uniqueSuffix}`
 
 Examples:
-- `cosmos-fittrack-dev-ppf5sc`
-- `func-fittrack-alpha-ppf5sc`
-- `st-fittrack-dev-ppf5sc` (storage)
+- `cosmos-fittrack-dev-hlpqe7`
+- `func-fittrack-alpha-wcobsd`
+- `stfittrackalphawcobsd` (storage; no hyphens)
 
 `uniqueSuffix` defaults to a 6-char hash of the resource group ID, ensuring stable names across re-deploys.
 
@@ -238,20 +315,24 @@ Examples:
 
 | Environment | Purpose | Parameters |
 |---|---|---|
-| `dev` | Local + CI development | `parameters/dev.bicepparam` |
-| `alpha` | Staging integration environment | `parameters/alpha.bicepparam` |
+| `dev` | Local + CI development | `parameters/dev.bicepparam` (RG `rg-fittrack-dev`) |
+| `alpha` | Staging integration environment | `parameters/alpha-fittrack.bicepparam` (RG `rg-fittrack-alpha`) |
 | `staging` | (planned) | — |
 | `prod` | (planned) | — |
 
-[Rule] All resources stay in `rg-Michael-Mueller`. Never create new resource groups. Environments are separated by name prefix only.
+[Rule] Dev and Alpha each live in their own existing resource group (see above). Do not create further resource groups without a plan.
 
 ## Deploy Command
 
+Alpha secrets (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_DI_KEY`)
+are read from process environment variables and never stored in files.
+
 ```bash
 az deployment group create \
-  --resource-group rg-Michael-Mueller \
+  --subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3 \
+  --resource-group rg-fittrack-alpha \
   --template-file infra/main.bicep \
-  --parameters infra/parameters/dev.bicepparam
+  --parameters infra/parameters/alpha-fittrack.bicepparam
 ```
 
 ## Function App Deploy Workflow
@@ -279,29 +360,19 @@ fittrack-app/
 
 ### Azure Functions runtime
 
-The Function App uses Linux Functions runtime v4 with Node 22 LTS. The Bicep
-module pins `linuxFxVersion` to `Node|22` and
-`WEBSITE_NODE_DEFAULT_VERSION` to `~22`. Microsoft documents Node 22 as the
-last Node version supported on Linux Consumption; newer versions such as Node
-24 require Flex Consumption. The general Azure runtime listing can still show
-Node 24, but it must not be applied to this Y1 app. See Microsoft's
-[supported versions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-versions).
+The current Alpha Function App (`func-fittrack-alpha-wcobsd`) runs on Linux
+Flex Consumption (FC1) with Functions runtime v4 and Node 24. The runtime is
+set in `functionAppConfig.runtime` (`node` / `24`), not via `linuxFxVersion`.
+Scaling: Maximum Instances 5 (per function group), Always Ready 0, instance
+memory 2048 MB. The Flex deployment package lives in a blob container in the
+environment's single storage account. The legacy Alpha (Y1, `Node|22`) is only
+kept until the legacy environment is retired.
 
-Microsoft lists Node 22 support through **30 April 2027** and Linux
-Consumption retirement for **30 September 2028**. The Flex migration must be
-planned before the Node 22 support date; the later platform retirement is not
-the first deadline.
+After every infrastructure deployment, verify the live runtime and scale
+settings (`az functionapp show` / `az functionapp scale config show`) rather
+than relying on the ARM provisioning state.
 
-```powershell
-az functionapp list-runtimes --os-type linux -o table
-```
-
-After every infrastructure deployment, verify that the deployed Function App
-still reports `Node|22`; a successful ARM deployment alone is not a runtime
-version check. Moving to Node 24 requires the separate Flex migration workflow,
-which creates a new Function App rather than changing this Y1 app in place.
-
-`_deploy_staging/package.json` is a production-only Node 22 manifest. It
+`_deploy_staging/package.json` is a production-only Node 24 manifest. It
 contains the backend runtime packages and the renderer packages
 `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static ~1.46.0`,
 `@tabler/icons ~3.46.0`, `sharp ^0.35.5`, and `hyphen ^1.14.1` for German
@@ -340,7 +411,7 @@ must reject missing or unexpected files, and the staged tree must contain both
 `_deploy_staging/dist/backend/src/functions/instagramRecipe.js` and the full
 asset manifest, including
 `_deploy_staging/dist/backend/src/lib/instagramRenderer/assets/fonts/LICENSE.txt`.
-The native smoke gate is run with Linux Node 22 x64 dependencies from the
+The native smoke gate is run with Linux Node 24 x64 dependencies from the
 staging lockfile. The standard `--build remote` publish performs this install
 on Linux, so Windows-native `sharp` or Resvg modules are never used for the
 Azure package.
@@ -377,7 +448,7 @@ Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\L
 #    Oryx installs production dependencies on Linux; this is required for
 #    native packages such as sharp and @resvg/resvg-js.
 cd _deploy_staging
-func azure functionapp publish func-fittrack-alpha-ppf5sc --build remote --javascript
+func azure functionapp publish func-fittrack-alpha-wcobsd --build remote --javascript
 cd ..
 ```
 
@@ -428,9 +499,9 @@ For Alpha (deployed), all Application Settings are configured directly in the Az
 
 Both services are **intentionally shared across all environments** (Dev and Alpha). They are stateless — no user data, no environment-specific state.
 
-- Azure OpenAI endpoint: `https://oai-fittrackapp-dev.openai.azure.com/`
-- Deployment: `gpt-4o-mini` (version `2024-08-01-preview`)
-- Document Intelligence: shared F0/S0 instance
+- Azure OpenAI resource: `oai-fittrack-dev` (`rg-fittrack-dev`)
+- Deployment: `gpt-4.1-mini`, SKU `GlobalStandard` (API version `2024-08-01-preview`); processing is not limited to Europe
+- Document Intelligence: `di-fittrack-dev-hlpqe7` (F0, shared by Dev and Alpha)
 
 [Rule] Do not create separate OpenAI or Document Intelligence resources per environment. Deduplication is intentional.
 

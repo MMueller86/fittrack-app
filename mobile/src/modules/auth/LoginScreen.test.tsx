@@ -93,7 +93,7 @@ describe('LoginScreen', () => {
       create(<LoginScreen onLoginSuccess={vi.fn()} />);
     });
     expect(mocks.useAuthRequest.mock.calls[0]![0]).toMatchObject({
-      redirectUri: 'https://blue-hill-03fb3c103.1.azurestaticapps.net/auth/callback/alpha',
+      redirectUri: 'https://red-mushroom-07229ab10.3.azurestaticapps.net/auth/callback/alpha',
       extraParams: undefined,
     });
   });

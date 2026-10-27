@@ -2,6 +2,8 @@
 //   - AzureWebJobsStorage support for the Function App (default endpoints)
 //   - Blob container `recipe-images` for backend-proxied recipe images
 //   - Blob container `label-scans` for temporary OCR image storage (7-day TTL)
+//   - Blob container `product-images` for user product images
+//   - Optional private container for the Flex Consumption deployment package
 //   - Queue `reusable-items-enrich` for async AI keyword enrichment of user products
 //
 // Backend proxies all Blob access; no SAS tokens are exposed to mobile.
@@ -21,6 +23,9 @@ param recipeImagesContainerName string = 'recipe-images'
 
 @description('Queue name for async AI keyword enrichment of reusable items.')
 param enrichQueueName string = 'reusable-items-enrich'
+
+@description('Private blob container for the Flex Consumption deployment package; empty to skip.')
+param deploymentContainerName string = ''
 
 @description('Tags applied to the account.')
 param tags object = {}
@@ -71,6 +76,26 @@ resource recipeImages 'Microsoft.Storage/storageAccounts/blobServices/containers
 resource labelScans 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
   parent: blobServices
   name: 'label-scans'
+  properties: {
+    defaultEncryptionScope: '$account-encryption-key'
+    denyEncryptionScopeOverride: false
+    publicAccess: 'None'
+  }
+}
+
+resource productImages 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+  parent: blobServices
+  name: 'product-images'
+  properties: {
+    defaultEncryptionScope: '$account-encryption-key'
+    denyEncryptionScopeOverride: false
+    publicAccess: 'None'
+  }
+}
+
+resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = if (deploymentContainerName != '') {
+  parent: blobServices
+  name: deploymentContainerName
   properties: {
     defaultEncryptionScope: '$account-encryption-key'
     denyEncryptionScopeOverride: false

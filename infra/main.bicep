@@ -1,21 +1,21 @@
 // FitTrack Infrastructure — main Bicep orchestrator
-// Deploys all backend Azure resources for the dev environment.
+// Deploys the backend Azure resources of one environment.
 //
 // Resources created:
-//   - Cosmos DB Account + Database + 6 Containers (cosmos.bicep)
-//   - Storage Account + Blob Container (storage.bicep)
+//   - Cosmos DB Account + Database + 12 Containers (cosmos.bicep)
+//   - Storage Account + Blob Containers + Queue (storage.bicep)
 //   - Log Analytics Workspace + Application Insights (appinsights.bicep)
-//   - App Service Plan + Function App + App Settings (functionapp.bicep)
+//   - Flex Consumption Plan + Function App + App Settings (functionapp.bicep; only when deployFunctionApp = true)
 //
 // NOT created here (already exists):
-//   - Azure OpenAI resource and gpt4o-mini deployment
-//   - Resource group (use existing rg-Michael-Mueller)
+//   - Azure OpenAI resource and gpt-4.1-mini deployment
+//   - Resource group (create it first)
 //
 // Deploy with:
 //   az deployment group create \
-//     --resource-group rg-Michael-Mueller \
+//     --resource-group <rg> \
 //     --template-file infra/main.bicep \
-//     --parameters infra/parameters/dev.bicepparam
+//     --parameters infra/parameters/<env>.bicepparam
 //
 // Location defaults to the existing resource group's location
 // (resourceGroup().location), so resources are co-located with the RG.
@@ -50,10 +50,10 @@ param azureOpenAiEndpoint string = ''
 param azureOpenAiApiKey string = ''
 
 @description('Azure OpenAI API version.')
-param azureOpenAiApiVersion string = '2024-02-01'
+param azureOpenAiApiVersion string = '2024-08-01-preview'
 
 @description('Azure OpenAI deployment name.')
-param azureOpenAiDeploymentName string = 'gpt4o-mini'
+param azureOpenAiDeploymentName string = 'gpt-4.1-mini'
 
 @description('Document Intelligence pricing tier (F0 = free/dev, S0 = standard/alpha+prod).')
 @allowed(['F0', 'S0'])
@@ -83,6 +83,9 @@ param deployStaticWebApp bool = false
 @description('Region for the Static Web App (Free SKU is not available in the RG region northeurope).')
 param staticWebAppLocation string = 'westeurope'
 
+@description('Deploy the Flex Consumption Function App (Alpha). Dev runs the backend locally and leaves this false.')
+param deployFunctionApp bool = false
+
 // --- Naming ---
 
 var namePrefix = '${projectName}-${environmentName}'
@@ -91,6 +94,7 @@ var cosmosAccountName = toLower('cosmos-${namePrefix}-${uniqueSuffix}')
 var storageAccountName = toLower(replace('st${projectName}${environmentName}${uniqueSuffix}', '-', ''))
 var functionAppName = 'func-${namePrefix}-${uniqueSuffix}'
 var planName = 'asp-${namePrefix}'
+var deploymentContainerName = 'app-package-${functionAppName}'
 var appInsightsName = 'appi-${namePrefix}'
 var logAnalyticsName = 'log-${namePrefix}'
 var documentIntelligenceName = toLower('di-${namePrefix}-${uniqueSuffix}')
@@ -110,7 +114,6 @@ module cosmos 'modules/cosmos.bicep' = {
     location: location
     accountName: cosmosAccountName
     databaseName: 'fittrack-db'
-    createAccount: environmentName != 'alpha'
     tags: commonTags
   }
 }
@@ -120,6 +123,7 @@ module storage 'modules/storage.bicep' = {
   params: {
     location: location
     storageAccountName: storageAccountName
+    deploymentContainerName: deployFunctionApp ? deploymentContainerName : ''
     tags: commonTags
   }
 }
@@ -172,13 +176,13 @@ var resolvedDiKey = deployDi ? existingDocumentIntelligence.listKeys().key1 : az
 // Read the Cosmos primary key from the deployed account (kept inside the
 // template — never written to outputs).
 
-module functionApp 'modules/functionapp.bicep' = {
+module functionApp 'modules/functionapp.bicep' = if (deployFunctionApp) {
   name: 'functionapp-deploy'
   params: {
     location: location
     planName: planName
     functionAppName: functionAppName
-    createFunctionApp: environmentName != 'alpha'
+    deploymentContainerName: deploymentContainerName
     storageAccountName: storage.outputs.storageAccountName
     appInsightsConnectionString: monitoring.outputs.connectionString
     appInsightsResourceId: monitoring.outputs.appInsightsId
@@ -213,11 +217,13 @@ output cosmosDatabaseId string = cosmos.outputs.databaseName
 @description('Storage account name.')
 output storageAccountName string = storage.outputs.storageAccountName
 
-@description('Function App default hostname (https://...).')
-output functionAppHostName string = functionApp.outputs.defaultHostName
+@description('Function App default hostname (https://...); empty when not deployed.')
+#disable-next-line BCP318
+output functionAppHostName string = deployFunctionApp ? functionApp.outputs.defaultHostName : ''
 
-@description('Function App name.')
-output functionAppName string = functionApp.outputs.functionAppName
+@description('Function App name; empty when not deployed.')
+#disable-next-line BCP318
+output functionAppName string = deployFunctionApp ? functionApp.outputs.functionAppName : ''
 
 @description('Auth relay Static Web App hostname (empty when not deployed).')
 #disable-next-line BCP318

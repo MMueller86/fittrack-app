@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { AUTH_CALLBACK_HOST, buildAuthExtraParams, resolveAuthRedirect } from './authRedirect';
 
 const scheme = 'fittrack://auth';
-const host = 'https://blue-hill-03fb3c103.1.azurestaticapps.net';
+const host = 'https://red-mushroom-07229ab10.3.azurestaticapps.net';
 
 describe('resolveAuthRedirect', () => {
   it('defaults to the https callback of the alpha variant', () => {

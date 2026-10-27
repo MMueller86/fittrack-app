@@ -2,77 +2,69 @@
 
 Bicep Infrastructure-as-Code for all FitTrack Azure resources.
 
-## Target Resource Group
+## Target Resource Groups
 
-All resources are deployed into the **existing** resource group:
+Subscription `Fittrack` (`dd7539ab-c638-44f8-9173-8bcd28cdbae3`), region
+`germanywestcentral`. Every `az` command passes `--subscription`. Resources
+go into **existing** resource groups:
 
-```
-rg-Michael-Mueller
-```
+| Environment | Resource group | Parameters |
+|---|---|---|
+| Dev | `rg-fittrack-dev` | `parameters/dev.bicepparam` |
+| Alpha | `rg-fittrack-alpha` | `parameters/alpha-fittrack.bicepparam` |
 
-Do **not** create a new resource group. The location of every resource is
-inherited from this RG via `resourceGroup().location` in `main.bicep`.
+Do **not** create new resource groups. The former single group
+`rg-Michael-Mueller` and `parameters/alpha.bicepparam` belong to the legacy
+PRODYNA Alpha (Y1) and the old auth-relay Static Web App (backup), which remain for now.
+The current auth-relay SWA is `swa-fittrack-alpha-wcobsd` in `rg-fittrack-alpha`
+(deploy command: `docs/kb/tech/07-infrastructure.md`, "Auth Relay Static Web App").
 
 ## Resources Managed Here
 
-| Resource | Name | Module |
+| Resource | Alpha name | Module |
 |---|---|---|
-| Cosmos DB Account + DB + 6 containers | `cosmos-fittrack-dev` | `modules/cosmos.bicep` |
-| Storage Account + Blob container | `stfittrackdev` | `modules/storage.bicep` |
-| Function App (Consumption) + Plan | `func-fittrack-dev` | `modules/functionapp.bicep` |
-| Application Insights | `appi-fittrack-dev` | `modules/appinsights.bicep` |
+| Cosmos DB Account + DB + 12 containers | `cosmos-fittrack-alpha-wcobsd` | `modules/cosmos.bicep` |
+| Storage Account (one per environment: blobs incl. `product-images`, queue, Flex deployment container) | `stfittrackalphawcobsd` | `modules/storage.bicep` |
+| Function App (Flex Consumption FC1, Node 24) + Plan | `func-fittrack-alpha-wcobsd`, `asp-fittrack-alpha` | `modules/functionapp.bicep` |
+| Application Insights | `appi-fittrack-alpha` | `modules/appinsights.bicep` |
 
-For Alpha, `main.bicep` treats the already-provisioned Cosmos account and
-Function App/plan as existing resources. It continues to manage the Cosmos
-database and containers and the Function App `config/web` settings, but Alpha
-Bicep does not reconcile parent-resource properties or app settings. Dev and
-other environments continue to create and manage those parent resources.
+The Function App is only created when `deployFunctionApp = true` (Alpha);
+Dev has none because the backend runs locally.
 
 ## NOT Managed Here
 
-- Azure OpenAI resource — already deployed (`oai-fittrack-dev`, `gpt4o-mini`)
-- Resource group — pre-existing (`rg-Michael-Mueller`)
+- Azure OpenAI (`oai-fittrack-dev`, deployment `gpt-4.1-mini`, `GlobalStandard`) and Document Intelligence (`di-fittrack-dev-hlpqe7`) — shared by Dev and Alpha
+- Resource groups — pre-existing (`rg-fittrack-dev`, `rg-fittrack-alpha`)
 - Key Vault — out of MVP scope
 
-## Deploy (M1)
+## Deploy Alpha
+
+Secrets are read from process environment variables (`AZURE_OPENAI_ENDPOINT`,
+`AZURE_OPENAI_API_KEY`, `AZURE_DI_KEY`) and must never be written to files.
 
 ```powershell
-# Verify the resource group exists and check its location (one-time check)
-az group show --name rg-Michael-Mueller --query "{name:name, location:location}" -o table
-
-# Deploy all resources into the existing RG.
-# Location is inherited from the RG — no need to pass it.
-az deployment group create `
-  --resource-group rg-Michael-Mueller `
+az deployment group what-if `
+  --subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3 `
+  --resource-group rg-fittrack-alpha `
   --template-file infra/main.bicep `
-  --parameters infra/parameters/dev.bicepparam
+  --parameters infra/parameters/alpha-fittrack.bicepparam
+
+az deployment group create `
+  --subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3 `
+  --resource-group rg-fittrack-alpha `
+  --template-file infra/main.bicep `
+  --parameters infra/parameters/alpha-fittrack.bicepparam
 ```
 
-If you ever need to override the inherited location, edit
-`infra/parameters/dev.bicepparam` and uncomment the `param location = '...'` line.
+For Dev use `--resource-group rg-fittrack-dev` and `infra/parameters/dev.bicepparam`.
 
 ## Azure Functions Runtime
 
-The Function App is pinned to Linux `Node|22` and
-`WEBSITE_NODE_DEFAULT_VERSION=~22` with Functions runtime v4. Microsoft
-documents Node 22 as the last Node version supported on Linux Consumption;
-newer versions such as Node 24 require Flex Consumption. The general Azure
-runtime listing can still show Node 24, but it must not be applied to this Y1
-app. See Microsoft's [supported versions](https://learn.microsoft.com/en-us/azure/azure-functions/functions-versions).
-
-Microsoft lists Node 22 support through **30 April 2027** and Linux
-Consumption retirement for **30 September 2028**. Plan the Flex migration
-before the Node 22 support date; the later platform retirement is not the first
-deadline.
-
-```powershell
-az functionapp list-runtimes --os-type linux -o table
-```
-
-After an infrastructure deployment, the deployed app must report
-`linuxFxVersion: Node|22` and `WEBSITE_NODE_DEFAULT_VERSION: ~22`.
-Moving to Node 24 requires the separate Flex migration workflow; it creates a
-new Function App and is not a safe in-place runtime-setting change.
+The Alpha Function App runs on Flex Consumption (FC1) with Functions runtime
+v4 and Node 24 (`functionAppConfig.runtime`), Maximum Instances 5, Always
+Ready 0, 2048 MB. After an infrastructure deployment, confirm the live values
+with `az functionapp show` and `az functionapp scale config show` instead of
+trusting the ARM state.
 
 ## Azure Functions Release
 
@@ -96,7 +88,7 @@ Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\L
 
 # 4. Publish from staging with a Linux remote build.
 Push-Location _deploy_staging
-func azure functionapp publish <function-app-name> --build remote --javascript
+func azure functionapp publish func-fittrack-alpha-wcobsd --build remote --javascript
 Pop-Location
 ```
 
@@ -115,11 +107,11 @@ flow and inspect Application Insights for post-deploy errors.
 
 ## Naming Convention
 
-| Resource | Dev Name |
+| Resource | Alpha Name |
 |---|---|
-| Resource Group | `rg-Michael-Mueller` (existing) |
-| Cosmos DB Account | `cosmos-fittrack-dev` |
-| Storage Account | `stfittrackdev` |
-| Function App | `func-fittrack-dev` |
-| App Service Plan | `asp-fittrack-dev` |
-| App Insights | `appi-fittrack-dev` |
+| Resource Group | `rg-fittrack-alpha` (Dev: `rg-fittrack-dev`) |
+| Cosmos DB Account | `cosmos-fittrack-alpha-wcobsd` |
+| Storage Account | `stfittrackalphawcobsd` |
+| Function App | `func-fittrack-alpha-wcobsd` |
+| App Service Plan (FC1) | `asp-fittrack-alpha` |
+| App Insights | `appi-fittrack-alpha` |

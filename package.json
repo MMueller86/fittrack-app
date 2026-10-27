@@ -17,7 +17,7 @@
     }
   },
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=24.0.0",
     "npm": ">=10.0.0"
   },
   "scripts": {
@@ -31,6 +31,7 @@
     "analyze:off": "npm run analyze:off:tsx --workspace=@fittrack/off-import",
     "export:off": "npm run export:off --workspace=@fittrack/off-import",
     "import:cosmos": "npm run import:cosmos --workspace=@fittrack/off-import",
+    "test:scripts": "node --test scripts/migrate-food-products.test.mjs scripts/migrate-alpha-data.test.mjs",
     "check:encoding": "node scripts/check-encoding.mjs"
   }
 }

@@ -49,7 +49,7 @@ import { resetRedirectClaimsForTests } from './loginFlow';
 import { PENDING_LOGIN_KEY, savePendingLogin } from './pendingLogin';
 import { RETURN_GRACE_MS, useAuthLogin } from './useAuthLogin';
 
-const redirect = 'https://blue-hill-03fb3c103.1.azurestaticapps.net/auth/callback/alpha';
+const redirect = 'https://red-mushroom-07229ab10.3.azurestaticapps.net/auth/callback/alpha';
 type Api = ReturnType<typeof useAuthLogin>;
 const mounted: ReturnType<typeof create>[] = [];
 

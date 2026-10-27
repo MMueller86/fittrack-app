@@ -8,7 +8,7 @@
 
 | Service | Model / Config | Purpose |
 |---|---|---|
-| Azure OpenAI | `gpt-4o-mini`, Structured Outputs | Meal parsing, food estimation, recipe analysis, daily insight |
+| Azure OpenAI | `gpt-4.1-mini`, Structured Outputs | Meal parsing, food estimation, recipe analysis, daily insight |
 | Azure Document Intelligence | Standard / Free tier | OCR for nutrition label scan |
 
 Azure OpenAI uses **Structured Outputs** (JSON Schema enforcement on model response) for all features that return machine-readable data. API version must be ≥ `2024-07-01`.

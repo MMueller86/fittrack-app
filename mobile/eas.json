@@ -22,7 +22,7 @@
       },
       "env": {
         "EXPO_PUBLIC_APP_VARIANT": "preview",
-        "EXPO_PUBLIC_API_URL": "https://func-fittrack-alpha-ppf5sc.azurewebsites.net/api",
+        "EXPO_PUBLIC_API_URL": "https://func-fittrack-alpha-wcobsd.azurewebsites.net/api",
         "EXPO_PUBLIC_AUTH_CLIENT_ID": "ce439bd5-864f-46cb-ae77-518d3cba368b",
         "EXPO_PUBLIC_AUTH_TENANT_ID": "997c7414-a6e0-47fa-9f5f-de98ea6c426e",
         "EXPO_PUBLIC_AUTH_CIAM_HOST": "michaelmuellertestapp.ciamlogin.com",

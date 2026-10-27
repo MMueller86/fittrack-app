@@ -4,7 +4,7 @@
   "private": true,
   "main": "dist/backend/src/index.js",
   "engines": {
-    "node": ">=22.0.0",
+    "node": ">=24.0.0",
     "npm": ">=10.0.0"
   },
   "scripts": {
@@ -48,7 +48,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^24.0.0",
     "@types/sharp": "^0.31.1",
     "azurite": "^3.35.0",
     "pixelmatch": "~7.2.0",

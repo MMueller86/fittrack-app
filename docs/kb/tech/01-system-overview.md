@@ -28,10 +28,10 @@ fittrack-app/
 | Layer | Technology |
 |---|---|
 | Language | TypeScript (all packages) |
-| Backend runtime | Azure Functions v4, Node.js |
+| Backend runtime | Azure Functions v4 (Flex Consumption in Alpha), Node.js 24 |
 | Mobile framework | React Native (Expo SDK) |
 | Database | Azure Cosmos DB for NoSQL, serverless |
-| AI | Azure OpenAI (gpt-4o-mini, Structured Outputs) |
+| AI | Azure OpenAI (gpt-4.1-mini, Structured Outputs) |
 | OCR | Azure Document Intelligence |
 | Storage | Azure Blob Storage (recipe images) |
 | Auth | Entra External ID (CIAM) — OAuth2 PKCE |
@@ -60,7 +60,7 @@ shared  → (no internal dependencies)
 |---|---|
 | Mobile app | Expo Dev Build on physical device or emulator |
 | Backend | Local Azure Functions Core Tools (`func start` in `backend/`) |
-| Database | Local Cosmos Emulator (`scripts/start-cosmos-emulator.ps1`) or remote dev Cosmos (`cosmos-fittrack-dev-ppf5sc`) |
+| Database | Local Cosmos Emulator (`scripts/start-cosmos-emulator.ps1`) or remote dev Cosmos (`cosmos-fittrack-dev-hlpqe7`) |
 | Azure OpenAI | **Shared Azure service** — same instance as Alpha |
 | Document Intelligence | **Shared Azure service** — same instance as Alpha |
 | Blob Storage | Azurite local emulator (`scripts/storage.mjs`) or remote dev storage. `npm run dev` starts Azurite directly, polls HTTP-readiness on all three ports (2 min window), and only then starts Functions. If Azurite is already running, `dev` detects it and skips the start step. |
@@ -79,14 +79,15 @@ Config: `backend/local.settings.json` (gitignored) + `mobile/.env` (gitignored).
 | Component | Where it runs |
 |---|---|
 | Mobile app | Expo Preview Build (EAS) |
-| Backend | Azure Functions — `func-fittrack-alpha-ppf5sc` |
-| Database | Dedicated Azure Cosmos DB — `cosmos-fittrack-alpha-ppf5sc` |
-| Azure OpenAI | **Shared Azure service** — same instance as Dev |
-| Document Intelligence | **Shared Azure service** — same instance as Dev |
-| Blob Storage | Dedicated Azure Storage — Alpha environment |
+| Backend | Azure Functions (Flex Consumption FC1, Node 24) — `func-fittrack-alpha-wcobsd` |
+| Database | Dedicated Azure Cosmos DB — `cosmos-fittrack-alpha-wcobsd` (`foodProducts` catalog seeded from Dev; user data migrated once from the legacy Alpha on 2026-10-26) |
+| Azure OpenAI | **Shared Azure service** — `oai-fittrack-dev` (`gpt-4.1-mini`, `GlobalStandard`), same instance as Dev |
+| Document Intelligence | **Shared Azure service** — `di-fittrack-dev-hlpqe7`, same instance as Dev |
+| Blob Storage | Dedicated Azure Storage — `stfittrackalphawcobsd` (one account: blobs, queue, deployment container) |
 | Auth (CIAM) | **Shared Azure service** — same tenant as Dev |
 
 Config: Azure Function App Application Settings (managed in Azure Portal).
+Mobile build: EAS profile `preview` targets this Alpha. The legacy PRODYNA Alpha is kept unchanged as a backup and is no longer deployed to.
 
 ---
 
@@ -120,7 +121,7 @@ This is an intentional architectural decision:
 | Mobile build | Dev Build | Preview Build (EAS) | — |
 | Config source | `local.settings.json` + `.env` | Azure App Settings + EAS | — |
 
-All Azure resources live in resource group `rg-Michael-Mueller`. New resource groups must not be created. Environments are separated by name prefix: `*-fittrack-dev-*` vs `*-fittrack-alpha-*`.
+Azure subscription `Fittrack` (`germanywestcentral`). Dev resources live in `rg-fittrack-dev`, Alpha resources in `rg-fittrack-alpha` (replaces the former single group `rg-Michael-Mueller`). Do not create further resource groups without a plan. Legacy PRODYNA resources (old Alpha, auth-relay Static Web App) remain for now; the relay is still used by the login callback.
 
 See [tech/07-infrastructure.md](07-infrastructure.md) for Bicep modules and resource names.
 
@@ -139,7 +140,7 @@ No direct AI calls from mobile. No API keys in the mobile app. The backend owns 
 ## Key Architectural Principles
 - **Backend owns secrets** — no keys in mobile, no keys in Cosmos, no keys in Git
 - **No generic AI chat** — all AI features are task-specific guided workflows
-- **Cost-aware design** — gpt-4o-mini, serverless Cosmos, quota enforcement
+- **Cost-aware design** — gpt-4.1-mini, serverless Cosmos, quota enforcement
 - **Cloud-only** — no offline mode, Internet required
 - **Reuse-first logging** — users build a personal food library; search suggests it first
 

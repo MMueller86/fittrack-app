@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   // Fixed target host; variant and package come from static page attributes, never from the URL.
-  var HOST = 'blue-hill-03fb3c103.1.azurestaticapps.net';
+  var HOST = 'red-mushroom-07229ab10.3.azurestaticapps.net';
   var ALLOWED = ['code', 'state', 'error', 'error_description'];
   var VARIANTS = { alpha: 'com.fittrack.app', dev: 'com.fittrack.app.dev' };
 

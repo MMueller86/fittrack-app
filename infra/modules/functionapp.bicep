@@ -1,6 +1,4 @@
-// Linux Consumption (Y1) Function App, Node 22 LTS, Functions runtime v4.
-// Node 22 is the last Node version supported on Linux Consumption; Node 24
-// requires a migration to Flex Consumption.
+// Linux Flex Consumption (FC1) Function App, Node 24, Functions runtime v4.
 // Wires app settings for Cosmos, Storage, Azure OpenAI, JWT, Google, AppInsights.
 // Secrets that must remain secret (Cosmos key, JWT secrets, Google client id,
 // OpenAI key) are passed in as @secure() params and not echoed via outputs.
@@ -16,11 +14,17 @@ param planName string
 @description('Function App name (must be globally unique).')
 param functionAppName string
 
-@description('Create the Function App and plan; set false when they already exist outside this deployment.')
-param createFunctionApp bool = true
-
 @description('Storage account name backing the Function App.')
 param storageAccountName string
+
+@description('Private blob container (in the same storage account) that holds the Flex deployment package.')
+param deploymentContainerName string
+
+@description('Maximum on-demand instances per function group.')
+param maximumInstanceCount int = 5
+
+@description('Instance memory in MB.')
+param instanceMemoryMB int = 2048
 
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
@@ -48,10 +52,10 @@ param azureOpenAiEndpoint string = ''
 param azureOpenAiApiKey string = ''
 
 @description('Azure OpenAI API version.')
-param azureOpenAiApiVersion string = '2024-02-01'
+param azureOpenAiApiVersion string = '2024-08-01-preview'
 
 @description('Azure OpenAI deployment name.')
-param azureOpenAiDeploymentName string = 'gpt4o-mini'
+param azureOpenAiDeploymentName string = 'gpt-4.1-mini'
 
 // --- Entra External ID Auth ---
 @description('Entra JWT issuer URL (from OIDC discovery).')
@@ -83,13 +87,13 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
 
 var storageConnectionString = 'DefaultEndpointsProtocol=https;AccountName=${storage.name};AccountKey=${storage.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
 
-resource plan 'Microsoft.Web/serverfarms@2023-12-01' = if (createFunctionApp) {
+resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: planName
   location: location
   tags: tags
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'FC1'
+    tier: 'FlexConsumption'
   }
   kind: 'functionapp'
   properties: {
@@ -97,7 +101,7 @@ resource plan 'Microsoft.Web/serverfarms@2023-12-01' = if (createFunctionApp) {
   }
 }
 
-resource functionApp 'Microsoft.Web/sites@2023-12-01' = if (createFunctionApp) {
+resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: functionAppName
   location: location
   tags: union(tags, {
@@ -110,31 +114,44 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = if (createFunctionApp) {
   properties: {
     serverFarmId: plan.id
     httpsOnly: true
+    functionAppConfig: {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${storage.properties.primaryEndpoints.blob}${deploymentContainerName}'
+          authentication: {
+            type: 'StorageAccountConnectionString'
+            storageAccountConnectionStringName: 'DEPLOYMENT_STORAGE_CONNECTION_STRING'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: maximumInstanceCount
+        instanceMemoryMB: instanceMemoryMB
+      }
+      runtime: {
+        name: 'node'
+        version: '24'
+      }
+    }
     siteConfig: {
+      minTlsVersion: '1.2'
+      cors: {
+        allowedOrigins: []
+        supportCredentials: false
+      }
       appSettings: [
         {
           name: 'AzureWebJobsStorage'
           value: storageConnectionString
         }
         {
-          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
+          name: 'DEPLOYMENT_STORAGE_CONNECTION_STRING'
           value: storageConnectionString
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: toLower(functionAppName)
         }
         {
           name: 'FUNCTIONS_EXTENSION_VERSION'
           value: '~4'
-        }
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'node'
-        }
-        {
-          name: 'WEBSITE_NODE_DEFAULT_VERSION'
-          value: '~22'
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
@@ -196,52 +213,19 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = if (createFunctionApp) {
           name: 'ENRICH_QUEUE_NAME'
           value: enrichQueueName
         }
-        {
-          name: 'WEBSITE_RUN_FROM_PACKAGE'
-          value: '1'
-        }
-        {
-          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: 'true'
-        }
-        {
-          name: 'ENABLE_ORYX_BUILD'
-          value: 'true'
-        }
       ]
     }
   }
 }
 
-resource existingFunctionApp 'Microsoft.Web/sites@2023-12-01' existing = {
-  name: functionAppName
-}
-
-resource functionAppWebConfig 'Microsoft.Web/sites/config@2023-12-01' = {
-  parent: existingFunctionApp
-  name: 'web'
-  properties: {
-    linuxFxVersion: 'Node|22'
-    ftpsState: 'Disabled'
-    localMySqlEnabled: false
-    minTlsVersion: '1.2'
-    use32BitWorkerProcess: false
-    cors: {
-      allowedOrigins: []
-      supportCredentials: false
-    }
-  }
-  dependsOn: [functionApp]
-}
-
 @description('Function App default hostname.')
-output defaultHostName string = existingFunctionApp.properties.defaultHostName
+output defaultHostName string = functionApp.properties.defaultHostName
 
 @description('Function App resource id.')
-output functionAppId string = existingFunctionApp.id
+output functionAppId string = functionApp.id
 
 @description('Function App name.')
-output functionAppName string = existingFunctionApp.name
+output functionAppName string = functionApp.name
 
 @description('System-assigned principal id for granting RBAC later.')
-output principalId string = existingFunctionApp.identity.principalId
+output principalId string = functionApp.identity.principalId

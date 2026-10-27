@@ -17,7 +17,7 @@ Environment overview: [`../docs/kb/tech/01-system-overview.md`](../../docs/kb/te
 | `infra/` — all Bicep files | Running `az deployment group create`; editing all Bicep modules including `cosmos.bicep` |
 | `_deploy_staging/` | Build sync, staging area management |
 | Azure Functions deploy workflow | Clean-build → robocopy sync → `func publish` |
-| EAS builds | `development` and `preview` profiles |
+| EAS builds | `development` and `preview` profiles (`preview` targets the Alpha in `rg-fittrack-alpha`) |
 | Release verification | Post-deploy health check and function list confirmation |
 | Rollback assessment | Evaluating failure, describing options, escalating to user |
 
@@ -40,6 +40,14 @@ Environment overview: [`../docs/kb/tech/01-system-overview.md`](../../docs/kb/te
 **EAS CLI:** Same policy. Check session status with `eas whoami`. Attempt non-interactive re-authentication if possible. Escalate only if interactive login is required.
 
 **If escalation is needed:** Report the exact auth error and stop. One retry after the user resolves the session.
+
+---
+
+## Azure Context
+
+All Azure work targets subscription `Fittrack` (`dd7539ab-c638-44f8-9173-8bcd28cdbae3`, `germanywestcentral`). Pass `--subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3` to every `az` command. Dev: `rg-fittrack-dev`; Alpha: `rg-fittrack-alpha`. Do not touch the legacy PRODYNA environment (`func-fittrack-alpha-ppf5sc`, auth-relay Static Web App) unless the user explicitly asks.
+
+Current Alpha: Function App `func-fittrack-alpha-wcobsd` (Flex Consumption FC1, Node 24, host `func-fittrack-alpha-wcobsd.azurewebsites.net`). Secrets (OpenAI/Document Intelligence keys, master key) only as process environment variables, never in files, logs, or chat.
 
 ---
 
@@ -79,10 +87,13 @@ Check whether `infra/` contains changes not yet applied to Alpha (git diff or us
 
 ```powershell
 az deployment group create `
-  --resource-group rg-Michael-Mueller `
+  --subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3 `
+  --resource-group rg-fittrack-alpha `
   --template-file infra/main.bicep `
-  --parameters infra/parameters/alpha.bicepparam
+  --parameters infra/parameters/alpha-fittrack.bicepparam
 ```
+
+Run `az deployment group what-if` first. Delete/Recreate of existing resources is a stop condition. The parameter file reads `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_DI_KEY` from process environment variables.
 
 Verify the deployment succeeded (exit code 0, no ARM error in output). If it fails: **stop**. Do not proceed to Phase 2.
 
@@ -104,16 +115,15 @@ After an infrastructure change, verify the Function App runtime before
 continuing:
 
 ```powershell
-$runtime = az functionapp config show `
-  --resource-group rg-Michael-Mueller `
-  --name func-fittrack-alpha-ppf5sc `
-  --query linuxFxVersion -o tsv
-if ($runtime -ne 'Node|22') { Write-Error "Unexpected Function runtime: $runtime"; exit 1 }
+$sub = 'dd7539ab-c638-44f8-9173-8bcd28cdbae3'
+az functionapp show --subscription $sub `
+  --resource-group rg-fittrack-alpha `
+  --name func-fittrack-alpha-wcobsd `
+  --query "{sku:sku, runtime:functionAppConfig.runtime}" -o json
 ```
 
-The expected runtime is `Node|22`; do not continue with Node 20 or Node 24 on
-the current Linux Consumption Y1 plan. Node 24 requires the separate Flex
-Consumption migration workflow.
+Expected: Flex Consumption (FC1) with runtime `node` / `24`, Maximum Instances 5, Always Ready 0
+(`az functionapp scale config show`). Do not continue if the live values differ.
 
 ### Phase 2 — Backend Deploy (only if backend code changes exist)
 
@@ -140,7 +150,7 @@ Test-Path "_deploy_staging\dist\backend\src\lib\instagramRenderer\assets\fonts\L
 # 5. Deploy — remote build installs Linux-compatible production dependencies.
 #    Do not use --no-build for the normal Windows-to-Linux workflow.
 cd _deploy_staging
-func azure functionapp publish func-fittrack-alpha-ppf5sc --build remote --javascript
+func azure functionapp publish func-fittrack-alpha-wcobsd --build remote --javascript
 cd ..
 ```
 
@@ -198,12 +208,13 @@ resource myNewContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/cont
 }
 ```
 
-Add the container to both `dev.bicepparam` and `alpha.bicepparam` if the configuration differs between environments (rare — most containers are identical).
+Add the container to both `dev.bicepparam` and `alpha-fittrack.bicepparam` if the configuration differs between environments (rare — most containers are identical).
 
 Dev auto-apply command:
 ```powershell
 az deployment group create `
-  --resource-group rg-Michael-Mueller `
+  --subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3 `
+  --resource-group rg-fittrack-dev `
   --template-file infra/main.bicep `
   --parameters infra/parameters/dev.bicepparam
 ```
@@ -217,7 +228,7 @@ az deployment group create `
 Use the anonymous `GET /api/health` endpoint after every Azure Functions deployment, plus one protected route to confirm auth middleware:
 
 ```powershell
-$base = "https://func-fittrack-alpha-ppf5sc.azurewebsites.net/api"
+$base = "https://func-fittrack-alpha-wcobsd.azurewebsites.net/api"
 (Invoke-WebRequest "$base/health" -UseBasicParsing).StatusCode   # expect 200
 try { Invoke-WebRequest "$base/diary/meals" -UseBasicParsing } catch { [int]$_.Exception.Response.StatusCode }   # expect 401
 ```

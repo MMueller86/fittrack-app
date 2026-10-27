@@ -47,7 +47,7 @@ The OAuth redirect URI is `https://<static web app host>/auth/callback/<alpha|de
 
 **Why:** with the custom scheme `fittrack://auth`, Entra shows a confirmation dialog (`AADSTS50199 / CmsiInterrupt`) before redirecting; Entra's safe list covers http/https redirects.
 
-**Hosting:** the Static Web App is defined in `infra/static/auth-relay/`. It serves `/.well-known/assetlinks.json` (package `com.fittrack.app` and `com.fittrack.app.dev` with their signing-certificate fingerprints) and the callback pages `/auth/callback/alpha` and `/auth/callback/dev`.
+**Hosting:** the Static Web App is defined in `infra/static/auth-relay/`. It serves `/.well-known/assetlinks.json` (package `com.fittrack.app` and `com.fittrack.app.dev` with their signing-certificate fingerprints) and the callback pages `/auth/callback/alpha` and `/auth/callback/dev`. Current host: `red-mushroom-07229ab10.3.azurestaticapps.net` (`swa-fittrack-alpha-wcobsd`, `Fittrack` subscription). [Planned] Entra redirect URIs for the new host and a new `preview` build are still pending; the old SWA host remains as backup.
 
 **Relay fallback:** if Android opens the browser instead of the app, the callback page (`relay.js`) immediately forwards to an `intent://` URL for the fixed host and the fixed package of the page variant (`com.fittrack.app` / `com.fittrack.app.dev`). Only `code`, `state`, `error` and `error_description` are forwarded; the query is removed from the address bar. The page has no storage, no logging and no network access (CSP `default-src 'none'`, `no-store`, `no-referrer`). If the app does not open within 2.5 s, a manual "back to app" link is shown.
 

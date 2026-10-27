@@ -1,106 +1,132 @@
 /**
  * migrate-food-products.mjs
- * Migriert den foodProducts-Container von Dev nach Alpha.
- * Strategie: DELETE ALL in Alpha, dann INSERT ALL aus Dev (paginiert, Batches).
+ * Kopiert den Katalog-Container foodProducts aus dem Dev-Cosmos in das Alpha-Cosmos (reiner Upsert, wiederholbar).
+ * Die Quelle wird nur gelesen. Es wird nichts geloescht.
+ *
+ * Umgebungsvariablen (keine Argumente, keine Dateien):
+ *   SOURCE_COSMOS_ENDPOINT, SOURCE_COSMOS_KEY
+ *   TARGET_COSMOS_ENDPOINT, TARGET_COSMOS_KEY (im Dry-Run nicht noetig)
  *
  * Usage:
- *   node scripts/migrate-food-products.mjs <alpha-cosmos-key> <dev-cosmos-key>
- * oder via Env-Variablen: DEV_COSMOS_KEY und ALPHA_COSMOS_KEY setzen.
- *
- * Dev-Credentials werden NICHT hardcoded gespeichert.
+ *   node scripts/migrate-food-products.mjs [--dry-run]
  */
 
+import { fileURLToPath } from 'node:url';
 import { CosmosClient } from '@azure/cosmos';
 
-// ── Konfiguration ────────────────────────────────────────────────────────────
-const DEV_ENDPOINT  = 'https://cosmos-fittrack-dev-ppf5sc.documents.azure.com:443/';
-const DEV_KEY       = process.argv[3] ?? process.env.DEV_COSMOS_KEY;
-const ALPHA_ENDPOINT = 'https://cosmos-fittrack-alpha-ppf5sc.documents.azure.com:443/';
-const ALPHA_KEY     = process.argv[2] ?? process.env.ALPHA_COSMOS_KEY;
-const DB_NAME       = 'fittrack-db';
-const CONTAINER     = 'foodProducts';
-const BATCH_SIZE    = 50; // Cosmos bulk upsert batch
+// Muss mit backend/src/lib/cosmos.ts uebereinstimmen (foodProducts: Partition Key /id).
+const DB_NAME = 'fittrack-db';
+const CONTAINER = 'foodProducts';
+const BATCH_SIZE = 50;
+const MAX_RETRIES = 6;
 
-if (!DEV_KEY) {
-  console.error('ERROR: Dev Cosmos Key fehlt. Usage: node migrate-food-products.mjs <alpha-key> <dev-key> oder DEV_COSMOS_KEY setzen.');
-  process.exit(1);
+const ALLOWED_SOURCE_ACCOUNT = 'cosmos-fittrack-dev-hlpqe7';
+const TARGET_ACCOUNT_PREFIX = 'cosmos-fittrack-alpha-';
+const BLOCKED_ACCOUNTS = ['cosmos-fittrack-dev-ppf5sc', 'cosmos-fittrack-alpha-ppf5sc'];
+
+function accountName(endpoint) {
+  let host;
+  try {
+    host = new URL(endpoint).hostname.toLowerCase();
+  } catch {
+    throw new Error('Ungueltiger Cosmos-Endpoint.');
+  }
+  return host.split('.')[0];
 }
-if (!ALPHA_KEY) {
-  console.error('ERROR: Alpha Cosmos Key fehlt. Usage: node migrate-food-products.mjs <alpha-key> oder ALPHA_COSMOS_KEY setzen.');
-  process.exit(1);
+
+/** Wirft, wenn Quelle/Ziel nicht dem erlaubten Paar entsprechen. Gibt die Kontonamen zurueck. */
+export function assertSafeTarget(sourceEndpoint, targetEndpoint) {
+  const source = accountName(sourceEndpoint);
+  const target = accountName(targetEndpoint);
+  if (source !== ALLOWED_SOURCE_ACCOUNT) {
+    throw new Error(`Quelle muss ${ALLOWED_SOURCE_ACCOUNT} sein (gefunden: ${source}).`);
+  }
+  if (target === source) {
+    throw new Error('Ziel entspricht der Quelle.');
+  }
+  if (BLOCKED_ACCOUNTS.includes(target)) {
+    throw new Error(`Ziel ${target} ist gesperrt (altes PRODYNA-Konto).`);
+  }
+  if (!target.startsWith(TARGET_ACCOUNT_PREFIX)) {
+    throw new Error(`Ziel muss ein ${TARGET_ACCOUNT_PREFIX}*-Konto sein (gefunden: ${target}).`);
+  }
+  return { source, target };
 }
 
-// ── Clients ──────────────────────────────────────────────────────────────────
-const devClient   = new CosmosClient({ endpoint: DEV_ENDPOINT,   key: DEV_KEY   });
-const alphaClient = new CosmosClient({ endpoint: ALPHA_ENDPOINT, key: ALPHA_KEY });
-
-const devContainer   = devClient.database(DB_NAME).container(CONTAINER);
-const alphaContainer = alphaClient.database(DB_NAME).container(CONTAINER);
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
-function log(msg) { process.stdout.write(`\r${msg}                    `); }
-function logln(msg) { console.log(`\n${msg}`); }
-
-async function deleteAllInAlpha() {
-  logln('📦 Lese alle IDs aus Alpha zum Löschen…');
-  let deleted = 0;
-  const iterator = alphaContainer.items.query('SELECT c.id FROM c', { maxItemCount: 200 });
-  while (iterator.hasMoreResults()) {
-    const { resources } = await iterator.fetchNext();
-    if (!resources?.length) continue;
-
-    // Paralleles Löschen (max BATCH_SIZE gleichzeitig)
-    for (let i = 0; i < resources.length; i += BATCH_SIZE) {
-      const batch = resources.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(({ id }) =>
-        alphaContainer.item(id, id).delete().catch(() => {})
-      ));
-      deleted += batch.length;
-      log(`  Gelöscht: ${deleted}`);
+async function withRetry(op) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await op();
+    } catch (e) {
+      if (e?.code !== 429 || attempt >= MAX_RETRIES) throw e;
+      const wait = Math.max(e.retryAfterInMs ?? 0, 500 * 2 ** attempt);
+      await new Promise((r) => setTimeout(r, wait));
     }
   }
-  logln(`✅ Alpha geleert: ${deleted} Dokumente gelöscht`);
 }
 
-async function insertAllFromDev() {
-  logln('📥 Lese alle Produkte aus Dev und schreibe nach Alpha…');
-  let total = 0;
-  const iterator = devContainer.items.query('SELECT * FROM c', { maxItemCount: 200 });
-  while (iterator.hasMoreResults()) {
-    const { resources } = await iterator.fetchNext();
-    if (!resources?.length) continue;
+async function main() {
+  const dryRun = process.argv.slice(2).includes('--dry-run');
+  const env = process.env;
+  const sourceEndpoint = env.SOURCE_COSMOS_ENDPOINT;
+  const targetEndpoint = env.TARGET_COSMOS_ENDPOINT;
+  const sourceKey = env.SOURCE_COSMOS_KEY;
+  const targetKey = env.TARGET_COSMOS_KEY;
 
-    // Paralleles Upsert (max BATCH_SIZE gleichzeitig)
+  const missing = [
+    ['SOURCE_COSMOS_ENDPOINT', sourceEndpoint],
+    ['SOURCE_COSMOS_KEY', sourceKey],
+    ['TARGET_COSMOS_ENDPOINT', targetEndpoint],
+    ...(dryRun ? [] : [['TARGET_COSMOS_KEY', targetKey]]),
+  ].filter(([, v]) => !v).map(([k]) => k);
+  if (missing.length) throw new Error(`Fehlende Umgebungsvariablen: ${missing.join(', ')}`);
+
+  const { source, target } = assertSafeTarget(sourceEndpoint, targetEndpoint);
+  console.log(`foodProducts ${dryRun ? 'Dry-Run' : 'Seed'}: ${source} -> ${target} (${DB_NAME}/${CONTAINER})`);
+
+  const sourceContainer = new CosmosClient({ endpoint: sourceEndpoint, key: sourceKey })
+    .database(DB_NAME).container(CONTAINER);
+
+  if (dryRun) {
+    const { resources } = await withRetry(() =>
+      sourceContainer.items.query('SELECT VALUE COUNT(1) FROM c').fetchAll());
+    console.log(`Quelle: ${resources[0]} Dokumente. Dry-Run, es wurde nichts geschrieben.`);
+    return;
+  }
+
+  const targetContainer = new CosmosClient({ endpoint: targetEndpoint, key: targetKey })
+    .database(DB_NAME).container(CONTAINER);
+
+  let read = 0;
+  let upserted = 0;
+  let failed = 0;
+  const iterator = sourceContainer.items.query('SELECT * FROM c', { maxItemCount: 200 });
+  while (iterator.hasMoreResults()) {
+    const { resources } = await withRetry(() => iterator.fetchNext());
+    if (!resources?.length) continue;
+    read += resources.length;
     for (let i = 0; i < resources.length; i += BATCH_SIZE) {
-      const batch = resources.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map((doc) => {
+      const results = await Promise.all(resources.slice(i, i + BATCH_SIZE).map(async (doc) => {
         const { _rid, _self, _etag, _attachments, _ts, ...clean } = doc;
-        return alphaContainer.items.upsert(clean).catch((e) =>
-          console.error(`\nFehler bei ${doc.id}: ${e.message}`)
-        );
+        try {
+          await withRetry(() => targetContainer.items.upsert(clean));
+          return true;
+        } catch {
+          return false;
+        }
       }));
-      total += batch.length;
-      log(`  Übertragen: ${total}`);
+      upserted += results.filter(Boolean).length;
+      failed += results.filter((ok) => !ok).length;
     }
+    process.stdout.write(`\r  gelesen: ${read}, geschrieben: ${upserted}`);
   }
-  logln(`✅ Migration abgeschlossen: ${total} Produkte nach Alpha importiert`);
+  console.log(`\nBericht: gelesen=${read}, geschrieben=${upserted}, fehlgeschlagen=${failed}`);
+  if (failed > 0) process.exitCode = 1;
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-(async () => {
-  console.log('🚀 FitTrack foodProducts Migration: Dev → Alpha');
-  console.log(`   Dev:   ${DEV_ENDPOINT}`);
-  console.log(`   Alpha: ${ALPHA_ENDPOINT}`);
-  console.log(`   Container: ${CONTAINER}`);
-  console.log('');
-
-  const startTime = Date.now();
-  await deleteAllInAlpha();
-  await insertAllFromDev();
-
-  const elapsed = Math.round((Date.now() - startTime) / 1000);
-  logln(`\n🎉 Fertig in ${elapsed}s`);
-})().catch((err) => {
-  console.error('\n❌ Migration fehlgeschlagen:', err.message);
-  process.exit(1);
-});
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().catch((err) => {
+    console.error('Seed fehlgeschlagen:', err?.message ?? 'unbekannter Fehler');
+    process.exit(1);
+  });
+}
