@@ -24,11 +24,12 @@ import LabelScanReviewScreen from '../LabelScanReviewScreen';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 import type { MealType } from '@fittrack/shared';
 
-// ImageCropPicker with graceful fallback (native module)
-let ImageCropPicker: any = null;
+type ImageCropPickerModule = typeof import('react-native-image-crop-picker');
+let ImageCropPicker: ImageCropPickerModule['default'] | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  ImageCropPicker = require('react-native-image-crop-picker').default;
+  const imageCropPickerModule = require('react-native-image-crop-picker') as ImageCropPickerModule;
+  ImageCropPicker = imageCropPickerModule.default;
 } catch {
   // native module not available (Expo Go, CI, etc.)
 }

@@ -60,6 +60,72 @@ describe('POST /api/reusable-items — validation', () => {
     expect(res.status).toBe(400);
   });
 
+  it.each([
+    [
+      'negative manual calories',
+      { name: 'Apple', calories: -1, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      'calories',
+    ],
+    [
+      'manual name over 200 characters',
+      { name: 'A'.repeat(201), calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+      'name',
+    ],
+    [
+      'unknown AI source type',
+      { sourceType: 'import', name: 'Apple', nutritionPer100g: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+      'Invalid input',
+    ],
+    [
+      'negative AI nutrition',
+      { sourceType: 'ai', name: 'Apple', nutritionPer100g: { calories: 100, protein: -1, carbs: 0, fat: 0 } },
+      'nutritionPer100g',
+    ],
+    [
+      'AI confidence above one',
+      { sourceType: 'ai', name: 'Apple', nutritionPer100g: { calories: 100, protein: 0, carbs: 0, fat: 0 }, aiConfidence: 1.01 },
+      'aiConfidence',
+    ],
+    [
+      'zero portion weight',
+      { sourceType: 'label-scan', name: 'Apple', nutritionPer100g: { calories: 100, protein: 0, carbs: 0, fat: 0 }, portion: { label: '1 Stück', weightGrams: 0 } },
+      'portion',
+    ],
+  ])('returns a field-specific 400 for %s', async (_label, body, field) => {
+    const res = await createReusableItemHandler(await makeAuthRequest({ body }), ctx);
+
+    expect(res.status).toBe(400);
+    if (field === 'Invalid input') {
+      expect(res.jsonBody).toEqual({ error: field });
+    } else {
+      expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    }
+    expect(vi.mocked(enqueueEnrichment)).not.toHaveBeenCalled();
+  });
+
+  it('accepts trimmed 200-character names and coerces non-negative numeric strings in label-scan input', async () => {
+    const res = await createReusableItemHandler(
+      await makeAuthRequest({
+        body: {
+          sourceType: 'label-scan',
+          name: `\u00a0${'A'.repeat(198)}\u2003`,
+          nutritionPer100g: { calories: '0', protein: '1.5', carbs: 0, fat: 0, extraNutrient: 20 },
+          portion: { label: 'P'.repeat(100), weightGrams: '0.1', extraPortionField: true },
+          unknownTopLevelField: true,
+        },
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(201);
+    const { item } = res.jsonBody as { item: Record<string, unknown> };
+    expect(item.name).toBe('A'.repeat(198));
+    expect(item).not.toHaveProperty('unknownTopLevelField');
+    expect(item).not.toHaveProperty('nutritionPer100g.extraNutrient');
+    expect(item).not.toHaveProperty('portion.extraPortionField');
+    expect((item.nutritionPer100g as { calories: number }).calories).toBe(0);
+  });
+
   it('returns 400 when name is missing (manual)', async () => {
     const req = await makeAuthRequest({
       body: { calories: 100, protein: 10, carbs: 10, fat: 5, fiber: 2 },
@@ -349,6 +415,58 @@ describe('PATCH /api/reusable-items/:id — update', () => {
     );
     return (res.jsonBody as { item: { id: string } }).item.id;
   }
+
+  it.each([
+    ['empty name', { name: '' }, 'name'],
+    ['201-character name', { name: 'N'.repeat(201) }, 'name'],
+    ['numeric brand', { brand: 7 }, 'brand'],
+    ['negative nutrition', { nutritionPer100g: { calories: -1, protein: 0, carbs: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['empty search term', { searchTerms: [' \u00a0 '] }, 'searchTerms'],
+    ['51-character search term', { searchTerms: ['S'.repeat(51)] }, 'searchTerms'],
+    ['51 search terms', { searchTerms: Array.from({ length: 51 }, (_, index) => `term${index}`) }, 'searchTerms'],
+    ['non-boolean updateHistory', { name: 'Brot', updateHistory: 'true' }, 'updateHistory'],
+  ])('returns a field-specific 400 for %s', async (_label, body, field) => {
+    const id = await createProduct();
+    const res = await updateReusableItemHandler(await makeAuthRequest({ params: { id }, body }), ctx);
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+  });
+
+  it('rejects updateHistory by itself with the current refinement message', async () => {
+    const id = await createProduct();
+    const res = await updateReusableItemHandler(
+      await makeAuthRequest({ params: { id }, body: { updateHistory: true } }),
+      ctx,
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'At least one field must be provided' });
+  });
+
+  it('coerces nutrition strings, trims and lowercases search terms, and accepts nullable fields', async () => {
+    const id = await createProduct();
+    const res = await updateReusableItemHandler(
+      await makeAuthRequest({
+        params: { id },
+        body: {
+          brand: null,
+          nutritionPer100g: { calories: '0', protein: '1.5', carbs: 0, fat: 0 },
+          portion: null,
+          searchTerms: ['  QUARK  '],
+          unknownField: true,
+        },
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(200);
+    const { item } = res.jsonBody as { item: Record<string, unknown> };
+    expect(item.brand).toBeUndefined();
+    expect((item.nutritionPer100g as { calories: number }).calories).toBe(0);
+    expect(item.searchTerms).toContain('quark');
+    expect(item).not.toHaveProperty('unknownField');
+  });
 
   it('returns 200 and updated item when name is changed', async () => {
     const id = await createProduct();

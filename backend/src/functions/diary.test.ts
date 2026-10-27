@@ -101,6 +101,53 @@ async function createRecipeForDiary(userId = 'test-user-abc-123') {
   });
 }
 
+describe('POST /api/diary/meals request schema', () => {
+  it.each([
+    ['missing date', { type: 'breakfast' }, 'date'],
+    ['missing type', { date: '2026-05-08' }, 'type'],
+    ['impossible calendar date', { date: '2026-02-30', type: 'breakfast' }, 'date'],
+    ['invalid meal type', { date: '2026-05-08', type: 'brunch' }, 'type'],
+    ['numeric date', { date: 20260508, type: 'breakfast' }, 'date'],
+    ['null name', { date: '2026-05-08', type: 'breakfast', name: null }, 'name'],
+    ['whitespace-only Unicode name', { date: '2026-05-08', type: 'breakfast', name: '\u00a0\u2003' }, 'name'],
+    ['101-character name', { date: '2026-05-08', type: 'breakfast', name: 'N'.repeat(101) }, 'name'],
+  ])('returns a field-specific 400 for %s', async (_label, body, field) => {
+    const res = await createMealHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect((await getDiaryRepository().getDay(TEST_USER_ID, '2026-05-08')).meals).toHaveLength(0);
+  });
+
+  it('accepts a 100-character Unicode-trimmed name and strips unknown fields', async () => {
+    const res = await createMealHandler(
+      await makeAuthRequest({
+        body: {
+          date: '2026-05-08',
+          type: 'breakfast',
+          name: `\u00a0${'N'.repeat(100)}\u2003`,
+          unknownField: true,
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    expect(res.jsonBody).toMatchObject({ meal: { name: 'N'.repeat(100), type: 'breakfast' } });
+    expect(res.jsonBody).not.toHaveProperty('meal.unknownField');
+  });
+
+  it('uses the meal-type label when the optional name is omitted', async () => {
+    const res = await createMealHandler(
+      await makeAuthRequest({ body: { date: '2026-05-08', type: 'preworkout' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    expect(res.jsonBody).toMatchObject({ meal: { name: 'Preworkout' } });
+  });
+});
+
 describe('POST /api/diary/items/bulk-delete and bulk-move', () => {
   it('requires authentication and validates strict request bodies', async () => {
     const unauthorized = await bulkDeleteItemsHandler(
@@ -926,6 +973,56 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
     expect(body.meal.items[0]!.name).toBe('Lebkuchen');
   });
 
+  it.each([
+    ['invalid inputMode', { inputMode: 'ounces' }, 'inputMode'],
+    ['invalid sourceType', { sourceType: 'import' }, 'sourceType'],
+    ['negative calculated calories', { calculatedNutrition: { calories: -1, protein: 0, carbs: 0, fat: 0 } }, 'calculatedNutrition'],
+    ['invalid image URL', { imageUrl: 'not a URL' }, 'imageUrl'],
+    ['invalid AI confidence enum', { aiMealEstimateConfidence: 'certain' }, 'aiMealEstimateConfidence'],
+  ])('returns a field-specific 400 for %s without adding an item', async (_label, overrides, field) => {
+    const mealId = await createMeal();
+    const body = {
+      productName: 'Lebkuchen',
+      inputMode: 'grams',
+      inputAmount: 100,
+      amountGrams: 100,
+      calculatedNutrition: { calories: 220, protein: 3, carbs: 42, fat: 6 },
+      ...overrides,
+    };
+    const res = await addItemHandler(
+      await makeAuthRequest({ params: { id: mealId }, body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect((await getDiaryRepository().getMealById(TEST_USER_ID, mealId))?.items).toHaveLength(0);
+  });
+
+  it('coerces product quantity and nutrition numeric strings while stripping unknown keys', async () => {
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productName: 'Lebkuchen',
+          inputMode: 'grams',
+          inputAmount: '100',
+          amountGrams: '100',
+          calculatedNutrition: { calories: '220', protein: '3', carbs: '42', fat: '6', nestedUnknown: true },
+          unknownField: true,
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    const item = (res.jsonBody as { meal: { items: Array<Record<string, unknown>> } }).meal.items[0]!;
+    expect(item.quantity).toBe(100);
+    expect(item).not.toHaveProperty('unknownField');
+    expect(item).not.toHaveProperty('calculatedNutrition.nestedUnknown');
+  });
+
   it('returns 400 when neither name nor productName is provided', async () => {
     const mealId = await createMeal();
     const res = await addItemHandler(
@@ -1218,6 +1315,37 @@ describe('PUT /api/diary/meals/:id/items/:itemId — updateItemHandler', () => {
     __resetDayMetaRepositoryForTests();
   });
 
+  it.each([
+    ['missing inputMode', { amountGrams: 10 }],
+    ['invalid inputMode', { inputMode: 'ounces', amountGrams: 10 }],
+    ['missing amountGrams for grams mode', { inputMode: 'grams' }],
+    ['zero amountGrams', { inputMode: 'grams', amountGrams: 0 }],
+    ['string amountGrams', { inputMode: 'grams', amountGrams: '10' }],
+    ['null amountGrams', { inputMode: 'grams', amountGrams: null }],
+    ['missing portionCount for portion mode', { inputMode: 'portion' }],
+    ['zero portionCount', { inputMode: 'portion', portionCount: 0 }],
+    ['string portionCount', { inputMode: 'portion', portionCount: '1' }],
+  ])('returns 400 for invalid update schema case: %s', async (_label, body) => {
+    const res = await updateItemHandler(
+      await makeAuthRequest({ params: { id: 'missing-meal', itemId: 'missing-item' }, body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts positive fractional amounts and strips unknown update fields', async () => {
+    const res = await updateItemHandler(
+      await makeAuthRequest({
+        params: { id: 'missing-meal', itemId: 'missing-item' },
+        body: { inputMode: 'grams', amountGrams: 0.1, unknownField: true },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(404);
+  });
+
   it('scales macros proportionally for a manual item (grams mode)', async () => {
     const mealId = await createMeal();
     // Add a manual item: 100g → 200 kcal
@@ -1359,6 +1487,37 @@ describe('PUT /api/diary/:date/day-type with workoutType', () => {
     const repo = getDayMetaRepository();
     const stored = await repo.get('test-user-abc-123', '2026-05-08');
     expect(stored?.workoutType).toBe('gym');
+  });
+
+  it.each([
+    ['missing dayType', {}, 'dayType'],
+    ['invalid dayType', { dayType: 'off' }, 'dayType'],
+    ['numeric dayType', { dayType: 1 }, 'dayType'],
+    ['invalid workoutType', { dayType: 'training', workoutType: 'crossfit' }, 'workoutType'],
+    ['numeric workoutType', { dayType: 'training', workoutType: 1 }, 'workoutType'],
+  ])('returns a field-specific 400 for %s without writing day metadata', async (_label, body, field) => {
+    const res = await setDayTypeHandler(
+      await makeAuthRequest({ params: { date: '2026-05-08' }, body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(await getDayMetaRepository().get(TEST_USER_ID, '2026-05-08')).toBeNull();
+  });
+
+  it('accepts null workoutType and strips unknown body fields', async () => {
+    const res = await setDayTypeHandler(
+      await makeAuthRequest({
+        params: { date: '2026-05-08' },
+        body: { dayType: 'training', workoutType: null, unknownField: true },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).not.toHaveProperty('dayMeta.unknownField');
+    expect((res.jsonBody as { dayMeta: { workoutType?: string } }).dayMeta.workoutType).toBeUndefined();
   });
 
   it('clears workoutType when switching to rest day', async () => {

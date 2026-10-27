@@ -3,14 +3,14 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Meal, MealItem, MealType } from '@fittrack/shared';
-import type { NutritionHealthRecord } from './IHealthPlatformService';
+import type { HealthPermission, NutritionHealthRecord } from './IHealthPlatformService';
 import { healthPlatformService } from './healthPlatformService';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { authService } from '../authService';
 import { syncLogger } from './syncLogger';
 
 const STORAGE_KEY = 'hc:nutrition:sync';
-const NUTRITION_PERMISSIONS = [{ accessType: 'write' as const, recordType: 'Nutrition' }];
+const NUTRITION_PERMISSIONS: HealthPermission[] = [{ accessType: 'write', recordType: 'Nutrition' }];
 const BATCH_SIZE = 50;
 
 const MEAL_TYPE_MAP: Record<MealType, number> = {

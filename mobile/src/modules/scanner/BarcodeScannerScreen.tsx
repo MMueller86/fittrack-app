@@ -31,19 +31,12 @@ import { AndroidBarcodeScanner } from './AndroidBarcodeScanner';
 // Camera + CodeScanner import with graceful fallback
 // ---------------------------------------------------------------------------
 
-let Camera: any = null;
-let useCameraDevice: any = null;
-let useObjectOutput: any = null;
-let useCameraPermission: any = null;
+type VisionCameraModule = typeof import('react-native-vision-camera');
+let visionCamera: VisionCameraModule | null = null;
 
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const visionCamera = require('react-native-vision-camera');
-  Camera = visionCamera.Camera;
-  useCameraDevice = visionCamera.useCameraDevice;
-  useObjectOutput = visionCamera.useObjectOutput;
-  // v5: hook-based permission API
-  useCameraPermission = visionCamera.useCameraPermission;
+  visionCamera = require('react-native-vision-camera') as VisionCameraModule;
 } catch {
   // native module not available (Expo Go, CI, etc.)
 }
@@ -110,13 +103,16 @@ const SCAN_COOLDOWN_MS = 2000;
 // ---------------------------------------------------------------------------
 
 function CameraScanner({
+  visionCamera,
   onCodeScanned,
   onPermissionDenied,
 }: {
+  visionCamera: VisionCameraModule;
   onCodeScanned: (barcode: string) => void;
   onPermissionDenied: () => void;
 }) {
   const lastScan = useRef(0);
+  const { Camera, useCameraDevice, useObjectOutput, useCameraPermission } = visionCamera;
   const { hasPermission, requestPermission } = useCameraPermission();
 
   useEffect(() => {
@@ -133,9 +129,10 @@ function CameraScanner({
   // v5: useObjectOutput ist iOS-only (wirft auf Android)
   const objectOutput = useObjectOutput({
     types: ['ean-13', 'ean-8', 'upc-e', 'code-128', 'code-39', 'qr'],
-    onObjectsScanned: (objects: Array<{ value?: string }>) => {
-      const code = objects[0]?.value;
-      if (!code) return;
+    onObjectsScanned: (objects) => {
+      const scannedObject = objects[0];
+      const code = scannedObject && 'value' in scannedObject ? scannedObject.value : undefined;
+      if (typeof code !== 'string' || !code) return;
       const now = Date.now();
       if (now - lastScan.current < SCAN_COOLDOWN_MS) return;
       lastScan.current = now;
@@ -192,7 +189,7 @@ export default function BarcodeScannerScreen({
     setLastBarcode(null);
     setShowEditor(false);
 
-    if (!Camera || !useCameraPermission) {
+    if (!visionCamera) {
       setCameraPermission('denied');
     }
   }, [visible]);
@@ -235,7 +232,7 @@ export default function BarcodeScannerScreen({
   }
 
   // CameraScanner (useObjectOutput) wird nur auf iOS gerendert—auf Android nicht verfügbar
-  const nativeAvailable = !!Camera && Platform.OS === 'ios';
+  const nativeAvailable = visionCamera !== null && Platform.OS === 'ios';
 
   return (
     <>
@@ -250,9 +247,10 @@ export default function BarcodeScannerScreen({
                fängt den Fehler ab und setzt cameraPermission='denied' statt
                den gesamten App-Tree zu crashen. */}
           {/* iOS: react-native-vision-camera (useObjectOutput) */}
-          {Platform.OS === 'ios' && nativeAvailable && cameraPermission !== 'denied' && scanState === 'scanning' && (
+          {Platform.OS === 'ios' && visionCamera && cameraPermission !== 'denied' && scanState === 'scanning' && (
             <CameraErrorBoundary onError={() => setCameraPermission('denied')}>
               <CameraScanner
+                visionCamera={visionCamera}
                 onCodeScanned={handleCodeScanned}
                 onPermissionDenied={() => setCameraPermission('denied')}
               />

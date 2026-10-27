@@ -23,6 +23,7 @@
     "render:twenty-ingredients-details-template": "npm run build && node scripts/render-twenty-ingredients-details-template.mjs",
     "test:startup": "node --test scripts/dev.test.mjs scripts/storage.test.mjs scripts/wait-for-azurite.test.mjs scripts/run-eval.test.mjs",
     "test:watch": "vitest",
+    "test:functions-smoke": "node scripts/functions-smoke.mjs",
     "test:contract": "vitest run --config vitest.contract.config.mts",
     "migrate:insight-weight-trend": "node scripts/migrate-insight-weight-trend.mjs",
     "render:instagram-reference": "node scripts/render-golden.mjs",

@@ -128,6 +128,75 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     expect(body.effectiveCalorieTarget).toBe(2000 + 1550);
   });
 
+  it.each([
+    [
+      'hiking at schema limits',
+      { type: 'hiking', movementTimeMinutes: 30, distanceKm: 0.5, elevationGainM: 0, elevationLossM: 0 },
+    ],
+    [
+      'hiking at maximum schema values',
+      { type: 'hiking', movementTimeMinutes: 1200, distanceKm: 100, elevationGainM: 3000, elevationLossM: 3000 },
+    ],
+    [
+      'cycling at minimum schema values',
+      {
+        type: 'cycling', movementTimeMinutes: 15, distanceKm: 1, elevationGainM: 0, elevationLossM: 0,
+        asphaltShare: 0, gravelShare: 0, trailShare: 0, ebikeSupport: 'NONE',
+      },
+    ],
+    [
+      'cycling at maximum schema values',
+      {
+        type: 'cycling', movementTimeMinutes: 1200, distanceKm: 200, elevationGainM: 8000,
+        elevationLossM: 8000, asphaltShare: 1, gravelShare: 0, trailShare: 0, ebikeSupport: 'HIGH',
+      },
+    ],
+  ])('accepts %s', async (_label, body) => {
+    await createProfile();
+
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE }, body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it.each([
+    ['missing discriminator', {}, 'type'],
+    ['unknown discriminator', { type: 'swimming' }, 'type'],
+    ['missing hiking field', { ...VALID_HIKING_BODY, distanceKm: undefined }, 'distanceKm'],
+    ['numeric string', { ...VALID_HIKING_BODY, movementTimeMinutes: '240' }, 'movementTimeMinutes'],
+    ['unknown hiking enum', { ...VALID_HIKING_BODY, packCategory: 'ultra' }, 'packCategory'],
+    ['null optional hiking field', { ...VALID_HIKING_BODY, elevationLossM: null }, 'elevationLossM'],
+    ['missing cycling field', { ...VALID_CYCLING_BODY, asphaltShare: undefined }, 'asphaltShare'],
+    ['cycling share above one', { ...VALID_CYCLING_BODY, trailShare: 1.01 }, 'trailShare'],
+    ['unknown cycling enum', { ...VALID_CYCLING_BODY, ebikeSupport: 'MEDIUM' }, 'ebikeSupport'],
+  ])('returns a field-specific 400 for %s without persistence', async (_label, body, field) => {
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({ params: { date: VALID_DATE }, body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect((await getDayMetaRepository().get(TEST_USER_ID, VALID_DATE))?.specialActivity).toBeUndefined();
+  });
+
+  it('strips unknown fields from a valid hiking request', async () => {
+    await createProfile();
+    const res = await setSpecialActivityHandler(
+      await makeAuthRequest({
+        params: { date: VALID_DATE },
+        body: { ...VALID_HIKING_BODY, unknownField: true },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).not.toHaveProperty('specialActivity.unknownField');
+  });
+
   it('AC-10: training day uses training day calorie target', async () => {
     await createProfile();
     // Set the day as a training day

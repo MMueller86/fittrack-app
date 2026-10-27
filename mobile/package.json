@@ -8,7 +8,11 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "smoke:bundle": "node scripts/phase0-smokes.mjs bundle",
+    "smoke:manifest": "node scripts/phase0-smokes.mjs manifest",
+    "smoke:doctor": "node scripts/phase0-smokes.mjs doctor",
+    "smoke:android-debug": "node scripts/phase0-smokes.mjs android-debug"
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.2.14",

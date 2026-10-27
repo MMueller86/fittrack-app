@@ -3,7 +3,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { WeightEntry } from '@fittrack/shared';
-import type { WeightHealthRecord } from './IHealthPlatformService';
+import type { HealthPermission, WeightHealthRecord } from './IHealthPlatformService';
 import { healthPlatformService } from './healthPlatformService';
 import { profileApi } from '../../shared/api/profileApi';
 import { authService } from '../authService';
@@ -11,7 +11,7 @@ import { getWeightChanges } from '../weightsService';
 import { syncLogger } from './syncLogger';
 
 const STORAGE_KEY = 'hc:weight:sync';
-const WEIGHT_PERMISSIONS = [{ accessType: 'write' as const, recordType: 'Weight' }];
+const WEIGHT_PERMISSIONS: HealthPermission[] = [{ accessType: 'write', recordType: 'Weight' }];
 
 // ---------------------------------------------------------------------------
 // Helpers

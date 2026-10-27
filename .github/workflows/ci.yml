@@ -41,7 +41,7 @@ jobs:
   unit-tests:
     name: Tier 1 — Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -75,8 +75,124 @@ jobs:
           FITTRACK_PROMPT_GUARD_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
         run: npm run verify:daily-insight-prompt --workspace=backend
 
+      - name: Run shared unit tests
+        run: npm test --workspace=shared -- --reporter=dot --reporter=json --outputFile=${{ runner.temp }}/shared-vitest.json
+
       - name: Run backend unit tests
-        run: npm test --workspace=backend
+        run: npm test --workspace=backend -- --reporter=dot --reporter=json --outputFile=${{ runner.temp }}/backend-vitest.json
+
+      - name: Run mobile unit tests
+        run: npm test --workspace=mobile -- --reporter=dot --reporter=json --outputFile=${{ runner.temp }}/mobile-vitest.json
+
+      - name: Run repository script tests
+        run: npm run test:scripts
+
+      - name: Run backend startup tests
+        run: npm run test:startup --workspace=backend
+
+      - name: Verify backend build
+        run: npm run build:verify --workspace=backend
+
+      - name: Verify test parity
+        run: node scripts/check-test-parity.mjs --shared "${{ runner.temp }}/shared-vitest.json" --backend "${{ runner.temp }}/backend-vitest.json" --mobile "${{ runner.temp }}/mobile-vitest.json"
+
+  functions-host-smoke:
+    name: Functions host smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Azure Functions Core Tools
+        run: npm install --global azure-functions-core-tools@4.9.0 --unsafe-perm true
+
+      - name: Create non-secret local Functions settings
+        run: cp backend/local.settings.json.template backend/local.settings.json
+
+      - name: Run real Functions host smoke
+        run: npm run test:functions-smoke --workspace=backend
+
+  mobile-smokes:
+    name: Mobile bundle, manifest, and doctor smokes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export Android JavaScript bundle
+        run: npm run smoke:bundle --workspace=mobile
+
+      - name: Verify generated Android manifest
+        run: npm run smoke:manifest --workspace=mobile
+
+      - name: Verify Expo Doctor baseline
+        run: npm run smoke:doctor --workspace=mobile
+
+  android-debug-assemble:
+    name: Android debug assemble
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Assemble Android debug variant
+        run: npm run smoke:android-debug --workspace=mobile
+
+  renderer-reference-pixel-gate:
+    name: Renderer reference pixel gate
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compare canonical renderer reference pixels
+        run: npm test --workspace=backend -- src/lib/instagramRenderer/__tests__/referenceCorpus.test.ts --reporter=dot
 
   contract-tests:
     name: Tier 2 — Cosmos contract tests

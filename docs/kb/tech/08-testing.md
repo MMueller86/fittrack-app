@@ -84,6 +84,10 @@ cd shared && npx vitest run
 npx tsc --noEmit  # from mobile/ or shared/
 ```
 
+### Real Functions Host Smoke
+
+Run `cd backend && npm run test:functions-smoke` with Node.js 24, Azure Functions Core Tools, and `backend/local.settings.json` available. The smoke builds the backend, starts the existing local dev orchestration and Azurite, disables the queue and timer background functions, checks `GET /api/health` (200) and unauthenticated `GET /api/diary/meals` (401), and compares the host's registered function names against source registrations. It clears inherited cloud integration environment variables so Core Tools uses local settings, then stops the local process tree.
+
 ## Rules
 
 - [Rule] **Every logic change must be covered by unit tests.** Logic = pure functions, calculations, validations.
@@ -138,6 +142,25 @@ variants separately exercise natural sizing. Isolated cold-start tests block
 Sharp/Resvg imports and non-font reads and check missing/corrupt fonts and
 Satori failures. No live AI, authenticated photo or confirmed export view is
 required by these offline probe tests.
+
+### Instagram Renderer Reference Corpus
+
+`backend/src/lib/instagramRenderer/__tests__/referenceCorpus.test.ts` checks
+six versioned Satori/Resvg PNG fixtures and their renderer-neutral manifest:
+PNG format and `1080 x 1350` dimensions, non-empty output, an empty overflow
+list, text-box sizes and line counts. The fixtures cover Nutrition with and
+without a photo and detail templates with 1, 5, 9 and 20 ingredients. Every
+recipe photo is the versioned `quarkbroetchen-source.png`; the no-photo case
+uses a transparent generated pixel.
+
+The hard pixel comparison (`pixelmatch` threshold `0.10`, maximum differing
+pixel ratio `0.03`) is canonical on Windows x64 with Node 24. Other platforms
+still enforce the structural and text-layout metrics but do not claim a pixel
+pass. Reference regeneration is guarded by
+`UPDATE_RENDERER_REFERENCE_CORPUS=1` and is limited to the canonical platform;
+the generation command and historical-Golden separation are documented in
+`backend/src/lib/instagramRenderer/docs/golden-metrics.md`. A dedicated
+canonical-platform CI gate is part of the Phase-0 CI wiring.
 
 ### Recipe Preparation Feedback Loop Evidence
 
@@ -284,6 +307,22 @@ silent pass. The Daily Insight eval makes one live generation per fixture and
 uses deterministic local assertions for explicit safety contracts; model-based
 judge verdicts are not part of its pass criteria.
 
+## Phase-0 Gates
+
+The Phase-0 safety net combines focused tests with runtime checks:
+
+- **Wire-contract tests** exercise backend provider adapters against controlled HTTP responses, checking the serialized request and response mapping without calling a live provider.
+- **Schema characterization tests** record the current Zod request-schema behavior, including optional, nullable, and unknown fields, so later validation changes are deliberate.
+- **Renderer reference corpus** protects deterministic recipe-image output using checked-in reference inputs and expected rendering evidence; see the renderer corpus section above.
+- **Functions host smoke** (`npm run test:functions-smoke --workspace=backend`) builds and starts the real Core Tools host with Azurite, checks `/api/health` (200), an unauthenticated protected diary route (401), and all 79 registered function names against source declarations, then stops the process tree. CI installs Core Tools 4.9.0 and copies the non-secret `backend/local.settings.json.template`; no cloud credentials are used.
+- **Mobile bundle smoke** (`npm run smoke:bundle --workspace=mobile`) runs `expo export --platform android` into an OS temporary directory and requires a non-empty bundle.
+- **Mobile manifest smoke** (`npm run smoke:manifest --workspace=mobile`) runs Android prebuild in a temporary project outside the repository and checks Health Connect permissions and package visibility, the verified Alpha App Link, the URI scheme, and minSdk 26. It does not modify `mobile/android/`.
+- **Expo Doctor smoke** (`npm run smoke:doctor --workspace=mobile`) pins Expo Doctor 1.21.5. Its accepted baseline is exactly one finding: SDK expects Expo `~54.0.37`, installed `54.0.36`; any additional finding or changed mismatch fails.
+- **Android debug assemble** (`npm run smoke:android-debug --workspace=mobile`) runs the checked-in Gradle wrapper's `assembleDebug` and requires JDK 17 or newer. It is not an EAS build.
+- **Test parity gate** consumes the shared, backend, and mobile Vitest JSON reports. It enforces the checked-in file/test counts as minimums and rejects failed, skipped, pending, todo, or otherwise non-passing tests.
+
+CI runs the Functions host smoke, the three non-Gradle mobile smokes, Android debug assemble, and a Windows x64 Node 24 renderer pixel gate as separate jobs. The renderer job runs the canonical hard pixel comparison; Ubuntu Tier 1 still enforces the corpus structure and layout metrics. The parity check runs in the Tier 1 unit-test job. The existing Tier 2 Cosmos contract job is unchanged.
+
 ## Coverage Target
 
 High function-level coverage on business logic is explicitly desired. No specific percentage target is documented, but any logic that can be tested should be.
@@ -294,7 +333,7 @@ GitHub Actions — runs on every push and pull request to `main`.
 
 A separate encoding-check job also runs `node scripts/check-encoding.mjs`.
 
-### Tier 1 — Unit Tests and Offline Prompt Guard (10 min timeout)
+### Tier 1 — Unit Tests and Offline Prompt Guard (30 min timeout)
 
 Runs on `ubuntu-latest`. Steps in order:
 1. Typecheck `shared` — `npm run typecheck --workspace=shared`
@@ -302,9 +341,22 @@ Runs on `ubuntu-latest`. Steps in order:
 3. Typecheck `mobile` — catches TypeScript errors before `expo build` does
 4. Verify the active Daily prompt release —
 	`npm run verify:daily-insight-prompt --workspace=backend`
-5. Backend unit tests — `npm test --workspace=backend`
+5. Shared unit tests — `npm test --workspace=shared`
+6. Backend unit tests — `npm test --workspace=backend`
+7. Mobile unit tests — `npm test --workspace=mobile`
+8. Repository script tests — `npm run test:scripts`
+9. Backend startup tests — `npm run test:startup --workspace=backend`
+10. Backend build verification — `npm run build:verify --workspace=backend`
+11. Test parity — `node scripts/check-test-parity.mjs` with the three Vitest JSON reports
 
 All three typechecks run before tests to fail fast on cheap checks.
+
+The independent `functions-host-smoke`, `mobile-smokes`, and
+`android-debug-assemble` jobs run the Phase-0 runtime gates. The Android job
+uses JDK 17. These jobs require no secrets and perform no deployment.
+The separate `renderer-reference-pixel-gate` job runs the reference-corpus
+test on `windows-2022` with Node 24, the canonical platform for hard pixel
+comparison.
 
 ### Tier 2 — Contract Tests (20 min timeout)
 
@@ -328,9 +380,6 @@ container at `http://127.0.0.1:8081`.
 ### What CI Does Not Include
 
 - No deploy steps — CI is test-only
-- No mobile unit tests in CI (mobile unit tests run locally; CI runs mobile typecheck only)
-- No shared unit tests in CI (covered by typecheck; shared logic is tested via backend package)
+- No EAS builds
 - No live Azure OpenAI prompt evals in CI; those remain an explicit credentialed
 	check outside the normal pipeline
-
-[Open] A dedicated CI step for `shared` unit tests and `mobile` unit tests may be added in a future iteration.

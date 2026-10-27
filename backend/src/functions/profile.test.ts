@@ -139,6 +139,83 @@ describe('POST /api/profile', () => {
     expect(body.targets.trainingDay.macroRanges).toBeDefined();
   });
 
+  it.each([
+    'gender', 'age', 'heightCm', 'weightKg', 'targetWeightKg', 'stepsPerDay', 'activityLevel',
+    'trainingFrequencyPerWeek', 'trainingDurationMinutes', 'sports', 'goal', 'goalIntensity',
+  ])('returns a field-specific 400 when required field %s is missing', async (field) => {
+    const body: Record<string, unknown> = { ...validInput };
+    delete body[field];
+
+    const res = await createProfileHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(await getProfileRepository().get(TEST_USER_ID)).toBeNull();
+  });
+
+  it.each([
+    ['age below minimum', { age: 9 }, 'age'],
+    ['age above maximum', { age: 121 }, 'age'],
+    ['height below minimum', { heightCm: 49 }, 'heightCm'],
+    ['height above maximum', { heightCm: 301 }, 'heightCm'],
+    ['zero weight', { weightKg: 0 }, 'weightKg'],
+    ['weight above maximum', { weightKg: 501 }, 'weightKg'],
+    ['negative steps', { stepsPerDay: -1 }, 'stepsPerDay'],
+    ['steps above maximum', { stepsPerDay: 100001 }, 'stepsPerDay'],
+    ['invalid activity level', { activityLevel: 'extreme' }, 'activityLevel'],
+    ['training frequency above maximum', { trainingFrequencyPerWeek: 8 }, 'trainingFrequencyPerWeek'],
+    ['training duration above maximum', { trainingDurationMinutes: 601 }, 'trainingDurationMinutes'],
+    ['invalid sport', { sports: ['strength', 'tennis'] }, 'sports'],
+    ['invalid goal', { goal: 'bulk' }, 'goal'],
+    ['invalid goal intensity', { goalIntensity: 'extreme' }, 'goalIntensity'],
+    ['null display name', { displayName: null }, 'displayName'],
+    ['non-boolean health sync flag', { healthSyncEnabled: 1 }, 'healthSyncEnabled'],
+  ])('returns a field-specific 400 for %s', async (_label, overrides, field) => {
+    const res = await createProfileHandler(
+      await makeAuthRequest({ body: { ...validInput, ...overrides } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(await getProfileRepository().get(TEST_USER_ID)).toBeNull();
+  });
+
+  it.each([
+    [
+      'minimum profile values',
+      {
+        gender: 'other', age: 10, heightCm: 50, weightKg: 0.1, targetWeightKg: 0.1,
+        stepsPerDay: 0, activityLevel: null, trainingFrequencyPerWeek: 0, trainingDurationMinutes: 0,
+        sports: [], goal: 'maintain', goalIntensity: null,
+      },
+    ],
+    [
+      'maximum profile values',
+      {
+        gender: 'female', age: 120, heightCm: 300, weightKg: 500, targetWeightKg: 500,
+        stepsPerDay: 100000, activityLevel: 'very_active', trainingFrequencyPerWeek: 7,
+        trainingDurationMinutes: 600,
+        sports: ['strength', 'bouldering', 'running', 'cycling', 'swimming', 'hiking', 'teamsport', 'other'],
+        goal: 'recomposition', goalIntensity: 'aggressive', displayName: 'D'.repeat(50),
+      },
+    ],
+  ])('accepts %s', async (_label, body) => {
+    const res = await createProfileHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(res.status).toBe(201);
+  });
+
+  it('strips unknown profile fields before saving', async () => {
+    const res = await createProfileHandler(
+      await makeAuthRequest({ body: { ...validInput, unknownField: true } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    expect((res.jsonBody as { profile: UserProfile }).profile).not.toHaveProperty('unknownField');
+  });
+
   it('stores calculationMeta with formulaVersion', async () => {
     const res = await createProfileHandler(
       await makeAuthRequest({ body: validInput }),

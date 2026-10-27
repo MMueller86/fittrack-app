@@ -190,6 +190,76 @@ describe('POST /api/favorites', () => {
     });
   });
 
+  it.each([
+    ['null foodRef', { foodRef: null }, 'foodRef'],
+    ['numeric displayName', { displayName: 7 }, 'displayName'],
+    ['201-character displayBrand', { displayBrand: 'B'.repeat(201) }, 'displayBrand'],
+    ['invalid imageUrl', { imageUrl: 'not a URL' }, 'imageUrl'],
+    ['negative nutrition', { nutritionPer100g: { calories: -1, protein: 0, carbs: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['zero portion weight', { portion: { label: '1 Portion', weightGrams: 0 } }, 'portion'],
+  ])('returns a field-specific 400 for %s', async (_label, overrides, field) => {
+    const body = {
+      foodRef: 'openFoodFacts:schema-test',
+      foodRefType: 'catalog',
+      displayName: 'Testprodukt',
+      ...overrides,
+    };
+    const res = await addFavoriteHandler(await makeAuthRequest({ body }), ctx);
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, 'openFoodFacts:schema-test')).toBeNull();
+  });
+
+  it('accepts a whitespace-only optional displayBrand after trimming it to an empty string', async () => {
+    const res = await addFavoriteHandler(
+      await makeAuthRequest({
+        body: {
+          foodRef: 'openFoodFacts:blank-brand',
+          foodRefType: 'catalog',
+          displayName: 'Testprodukt',
+          displayBrand: ' \u00a0 ',
+        },
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(201);
+    expect(res.jsonBody).toMatchObject({ displayBrand: '' });
+  });
+
+  it('accepts exact field limits, trims Unicode whitespace, and strips unknown nested fields', async () => {
+    const imageUrl = `https://x/${'a'.repeat(990)}`;
+    const res = await addFavoriteHandler(
+      await makeAuthRequest({
+        body: {
+          foodRef: `\u00a0${'r'.repeat(498)}\u2003`,
+          foodRefType: 'catalog',
+          displayName: `\u00a0${'N'.repeat(198)}\u2003`,
+          displayBrand: 'B'.repeat(200),
+          imageUrl,
+          nutritionPer100g: {
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            fiber: 0,
+            extraNutrient: 100,
+          },
+          portion: { label: 'P'.repeat(100), weightGrams: 0.01, extraPortionField: true },
+          extraTopLevelField: true,
+        },
+      }),
+      ctx,
+    );
+
+    expect(res.status).toBe(201);
+    expect(res.jsonBody).not.toHaveProperty('extraTopLevelField');
+    expect(res.jsonBody).not.toHaveProperty('nutritionPer100g.extraNutrient');
+    expect(res.jsonBody).not.toHaveProperty('portion.extraPortionField');
+    expect(await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, 'r'.repeat(498))).not.toBeNull();
+  });
+
   it('stores nutritionPer100g when provided', async () => {
     const nutrition = { calories: 200, protein: 10, carbs: 30, fat: 5, fiber: 3 };
     const res = await addFavoriteHandler(

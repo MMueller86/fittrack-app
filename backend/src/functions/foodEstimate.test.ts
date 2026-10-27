@@ -69,6 +69,48 @@ describe('POST /api/ai/food-estimate/preview — input validation', () => {
     expect(res.status).toBe(400);
   });
 
+  it.each([
+    ['null name', { name: null }, 'name'],
+    ['numeric name', { name: 7 }, 'name'],
+    ['Unicode-whitespace-only name', { name: '\u00a0\u2003\u00a0' }, 'name'],
+    ['201-character name', { name: 'A'.repeat(201) }, 'name'],
+    ['null contextText', { name: 'Toast', contextText: null }, 'contextText'],
+    ['numeric contextText', { name: 'Toast', contextText: 7 }, 'contextText'],
+    ['501-character contextText', { name: 'Toast', contextText: 'X'.repeat(501) }, 'contextText'],
+  ])('returns a field-specific 400 for %s without calling OpenAI', async (_label, body, field) => {
+    const openAiMock = makeOpenAiMock(CHICKEN_ESTIMATE);
+    __setOpenAiClientForTests(openAiMock as any);
+
+    const req = await makeAuthRequest({ body });
+    const res = await foodEstimatePreviewHandler(req, makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(openAiMock.chat.completions.create).not.toHaveBeenCalled();
+  });
+
+  it('accepts trimmed Unicode names and exact maximum lengths while stripping unknown fields', async () => {
+    const openAiMock = makeOpenAiMock(CHICKEN_ESTIMATE);
+    __setOpenAiClientForTests(openAiMock as any);
+
+    const req = await makeAuthRequest({
+      body: {
+        name: `\u00a0${'A'.repeat(200)}\u2003`,
+        contextText: `\u00a0${'X'.repeat(500)}\u2003`,
+        unknownField: 'ignored',
+      },
+    });
+    const res = await foodEstimatePreviewHandler(req, makeContext());
+
+    expect(res.status).toBe(200);
+    expect(openAiMock.chat.completions.create).toHaveBeenCalledOnce();
+    const request = openAiMock.chat.completions.create.mock.calls[0]![0];
+    const serializedRequest = JSON.stringify(request);
+    expect(serializedRequest).toContain('A'.repeat(200));
+    expect(serializedRequest).toContain('X'.repeat(500));
+    expect(serializedRequest).not.toContain('unknownField');
+  });
+
   it('returns 400 when name is empty string', async () => {
     const req = await makeAuthRequest({
       body: { name: '' },

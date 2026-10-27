@@ -11,29 +11,9 @@ import type {
 } from './IHealthPlatformService';
 import { syncLogger } from './syncLogger';
 
-// Typed surface of react-native-health-connect that this service uses.
-type HCLib = {
-  getSdkStatus: () => Promise<number>;
-  initialize: () => Promise<boolean>;
-  requestPermission: (
-    permissions: { accessType: string; recordType: string }[],
-  ) => Promise<{ accessType: string; recordType: string }[]>;
-  getGrantedPermissions: () => Promise<{ accessType: string; recordType: string }[]>;
-  insertRecords: (records: object[]) => Promise<string[]>; // v4: still insertRecords, Mass type changed to { value, unit }
-  deleteRecordsByUuids: (
-    recordType: string,
-    recordIdsList: string[],
-    clientRecordIdsList: string[],
-  ) => Promise<void>;
-  SdkAvailabilityStatus: {
-    SDK_AVAILABLE: number;
-    SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED: number;
-    SDK_UNAVAILABLE: number;
-  };
-};
+type HealthConnectModule = typeof import('react-native-health-connect');
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const hc = require('react-native-health-connect') as HCLib;
+const hc = require('react-native-health-connect') as HealthConnectModule;
 const { SDK_AVAILABLE, SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED } = hc.SdkAvailabilityStatus;
 
 export class HealthConnectService implements IHealthPlatformService {

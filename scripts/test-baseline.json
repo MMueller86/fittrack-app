@@ -1,0 +1,18 @@
+{
+  "format": "fittrack-vitest-parity-v1",
+  "asOf": "2026-10-27",
+  "packages": {
+    "shared": {
+      "testFiles": 10,
+      "tests": 466
+    },
+    "backend": {
+      "testFiles": 77,
+      "tests": 1944
+    },
+    "mobile": {
+      "testFiles": 106,
+      "tests": 993
+    }
+  }
+}
