@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdtempSync,
-  mkdirSync,
   readdirSync,
   readFileSync,
   rmSync,
@@ -140,14 +140,20 @@ async function verifyGeneratedManifest(projectRoot) {
 async function withTemporaryAndroidProject(prefix, action) {
   const temporaryProject = mkdtempSync(join(tmpdir(), prefix));
   try {
-    for (const filename of ['app.json', 'app.config.js', 'auth-callback-host.json', 'package.json']) {
+    for (const filename of [
+      'app.json',
+      'app.config.js',
+      'auth-callback-host.json',
+      'babel.config.js',
+      'index.ts',
+      'metro.config.js',
+      'package.json',
+      'tsconfig.json',
+    ]) {
       copyFileSync(join(mobileRoot, filename), join(temporaryProject, filename));
     }
-    const brandAssets = join(temporaryProject, 'assets', 'brand');
-    mkdirSync(brandAssets, { recursive: true });
-    for (const filename of ['fittrack_app_icon_master_v1.png', 'fittrack_splash_logo_master_v1.png']) {
-      copyFileSync(join(mobileRoot, 'assets', 'brand', filename), join(brandAssets, filename));
-    }
+    cpSync(join(mobileRoot, 'assets'), join(temporaryProject, 'assets'), { recursive: true });
+    cpSync(join(mobileRoot, 'src'), join(temporaryProject, 'src'), { recursive: true });
     symlinkSync(workspaceNodeModules, join(temporaryProject, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
 
     return await action(temporaryProject);
@@ -161,6 +167,24 @@ async function prebuildAndroidProject(projectRoot) {
     cwd: projectRoot,
     env: getStandardEnvironment(),
   });
+  const entry = spawnSync(process.execPath, [
+    '-e',
+    "require('expo/scripts/resolveAppEntry')",
+    projectRoot,
+    'android',
+    'absolute',
+  ], {
+    cwd: projectRoot,
+    env: getStandardEnvironment(),
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  if (entry.error) throw entry.error;
+  assert.equal(entry.status, 0, `Expo entry resolver failed: ${entry.stderr.trim()}`);
+  const entryFile = entry.stdout.trim();
+  assert.ok(entryFile, 'Expo entry resolver returned an empty path.');
+  assert.ok(existsSync(entryFile), `Expo entry resolver returned a missing file: ${entryFile}`);
+
   const wrapper = process.platform === 'win32' ? 'gradlew.bat' : 'gradlew';
   assert.ok(
     existsSync(join(projectRoot, 'android', wrapper)),
