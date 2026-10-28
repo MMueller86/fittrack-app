@@ -137,8 +137,8 @@ async function verifyGeneratedManifest(projectRoot) {
   console.log('[mobile-smoke] Generated Android manifest and Gradle properties match the native baseline.');
 }
 
-async function runManifestSmoke() {
-  const temporaryProject = mkdtempSync(join(tmpdir(), 'fittrack-android-manifest-'));
+async function withTemporaryAndroidProject(prefix, action) {
+  const temporaryProject = mkdtempSync(join(tmpdir(), prefix));
   try {
     for (const filename of ['app.json', 'app.config.js', 'auth-callback-host.json', 'package.json']) {
       copyFileSync(join(mobileRoot, filename), join(temporaryProject, filename));
@@ -150,14 +150,29 @@ async function runManifestSmoke() {
     }
     symlinkSync(workspaceNodeModules, join(temporaryProject, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
 
-    await spawnProcess(process.execPath, [expoCliPath, 'prebuild', '--platform', 'android', '--no-install'], {
-      cwd: temporaryProject,
-      env: getStandardEnvironment(),
-    });
-    await verifyGeneratedManifest(temporaryProject);
+    return await action(temporaryProject);
   } finally {
     rmSync(temporaryProject, { recursive: true, force: true });
   }
+}
+
+async function prebuildAndroidProject(projectRoot) {
+  await spawnProcess(process.execPath, [expoCliPath, 'prebuild', '--platform', 'android', '--no-install'], {
+    cwd: projectRoot,
+    env: getStandardEnvironment(),
+  });
+  const wrapper = process.platform === 'win32' ? 'gradlew.bat' : 'gradlew';
+  assert.ok(
+    existsSync(join(projectRoot, 'android', wrapper)),
+    `Expo prebuild did not generate the Android Gradle wrapper: ${wrapper}`,
+  );
+}
+
+async function runManifestSmoke() {
+  await withTemporaryAndroidProject('fittrack-android-manifest-', async (temporaryProject) => {
+    await prebuildAndroidProject(temporaryProject);
+    await verifyGeneratedManifest(temporaryProject);
+  });
 }
 
 function runExpoDoctorSmoke() {
@@ -200,10 +215,13 @@ function runAndroidAssembleSmoke() {
     throw new Error('Android debug assemble requires JDK 17 or newer, with java available on PATH.');
   }
 
-  const wrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-  return spawnProcess(wrapper, ['assembleDebug'], {
-    cwd: join(mobileRoot, 'android'),
-    shell: process.platform === 'win32',
+  return withTemporaryAndroidProject('fittrack-android-assemble-', async (temporaryProject) => {
+    await prebuildAndroidProject(temporaryProject);
+    const wrapper = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
+    await spawnProcess(wrapper, ['assembleDebug'], {
+      cwd: join(temporaryProject, 'android'),
+      shell: process.platform === 'win32',
+    });
   });
 }
 
