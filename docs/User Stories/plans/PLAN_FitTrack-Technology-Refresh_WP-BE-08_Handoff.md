@@ -1,7 +1,7 @@
 # WP-BE-08 Handoff — Azurite-Kette (Teil 1)
 
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), Abschnitt 0 (PO-1 = D), WP-BE-08, Abschnitt 20 Schritt 7b; AC-7/AC-8/AC-19
-- Datum: 2026-10-30; Windows x64, Node `24.22.1`, npm `12.2.1`; Branch `chore/fittrack-technology-refresh-phase-0`, nicht committet, kein Deploy, keine Azure-Operation
+- Datum: 2026-10-30; Windows x64, Node `24.22.1`, npm `12.2.1`; Branch `chore/fittrack-technology-refresh-phase-0`, zum Zeitpunkt des Handoffs nicht committet (Stand 2026-10-30: committet in `bce9fe6`, `2763b20`, `cea53b6` und gepusht), kein Deploy, keine Azure-Operation
 - Status Teil 1: **behoben ohne Override**. Teil 2: entfällt (PO-1 = D, befristete Ausnahme).
 
 ## Teil 1: `@azure/identity` / `@azure/msal-node` (GHSA-xcx6-jx8p-x3h5)

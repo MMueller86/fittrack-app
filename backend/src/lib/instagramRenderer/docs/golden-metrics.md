@@ -10,7 +10,9 @@
 Die historische V1.7-Datei bleibt unveraendert. Der vorhandene Vergleich nutzt
 weiterhin `pixelmatch` mit `threshold=0.10` und einem maximalen
 Differenzverhaeltnis von `0.03`. Der aktuelle Renderer liegt gegen diese alte
-Komposition bei `0.5602764060356653` (rund `56.03 %`) und damit erwartbar
+Komposition bei `0.5945507544581619` (rund `59.46 %`, `pixelmatch` 8 mit
+OKLab-Farbabstand; unter `pixelmatch` 7.2 mit YIQ-Abstand war es `0.5639` auf
+demselben Bildpaar, die Satori/Resvg-Messung `0.5602764060356653`) und damit erwartbar
 ueber dem historischen Gate, weil die historische Datei noch die fruehere
 Landschaftsrotation enthaelt. Dieser Lauf ist eine Diagnose der historischen
 Abweichung, kein aktuelles Release-Gate. Weder die Datei noch der Threshold

@@ -24,7 +24,13 @@ Deployment name and API version are resolved only in `backend/src/lib/azureOpenA
 
 The former `gpt4o-mini` / `gpt-4o-mini` fallbacks and the `2024-07-01` fallback were removed. The defaults only apply when the env var is unset (e.g. a misconfigured Function App); Dev/Alpha set both explicitly, so deployed behaviour is unchanged until the Alpha app setting is deliberately changed.
 
+SDKs: `openai ^7.45.1` (resolved 7.45.1; the `AzureOpenAI` client is created from `createAzureOpenAiClientOptions()`, which throws when `AZURE_OPENAI_ENDPOINT` or `AZURE_OPENAI_API_KEY` is missing) and `@azure/ai-form-recognizer ^5.1.0` for Document Intelligence. Prompts and strict JSON schemas were not changed by the SDK upgrade. Offline wire-contract tests (`openai.wire.test.ts`, `documentIntelligence.wire.test.ts`, `reusableItemsEnrich.wire.test.ts`) check the serialized requests and response mapping without a live provider; they run in the normal Vitest suite.
+
+Configuration sources that still differ from the code default: `backend/local.settings.json.template` sets `AZURE_OPENAI_API_VERSION` to `2024-08-01-preview`, and the legacy parameter files `infra/parameters/dev.bicepparam` and `infra/parameters/alpha.bicepparam` still set `azureOpenAiDeploymentName` to `gpt-4o-mini` (the current `dev-fittrack.bicepparam` and `alpha-fittrack.bicepparam` use `gpt-4.1-mini`). The legacy files belong to the old PRODYNA environment and were not changed. **[Open]** align or retire them.
+
 ### Platform lifecycle (retrieved 2026-10-29)
+
+The table was retrieved from Microsoft pages on 2026-10-29. It was **not re-verified** on 2026-10-30 (no Microsoft access during the refresh handoffs); treat the dates as `UNVERIFIED` until re-checked.
 
 | Item | Finding | Source |
 |---|---|---|

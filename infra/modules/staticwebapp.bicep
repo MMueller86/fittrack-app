@@ -16,7 +16,7 @@ param location string
 
 param tags object = {}
 
-resource staticSite 'Microsoft.Web/staticSites@2023-12-01' = {
+resource staticSite 'Microsoft.Web/staticSites@2025-03-01' = {
   name: name
   location: location
   tags: tags

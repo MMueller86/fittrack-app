@@ -2,9 +2,21 @@
 
 ## Test Runner
 
-Vitest 5 (`^5.0.5`, Vite 8) — used in all three packages (`backend`, `mobile`, `shared`).
+Vitest 5 (`^5.0.5`, resolved 5.0.5, Vite 8) — used in all three packages (`backend`, `mobile`, `shared`). Type checking uses TypeScript 7 (`tsc --noEmit`); the classic TypeScript compiler API is not available in TS 7, so AST-based tests import `@typescript/typescript6` (see [02-backend.md](02-backend.md#runtime-and-production-dependencies)). Vitest 5 no longer supports `test.poolOptions`; `backend/vitest.eval.config.mts` and `backend/vitest.contract.config.mts` use `maxWorkers: 1` and `isolate: false` instead.
 
-Install scripts: npm 12 blocks dependency install scripts. The root `package.json` records explicit decisions under `allowScripts`; `esbuild` and `protobufjs` are denied (esbuild binaries come from platform packages; the protobufjs script only prints a version-scheme hint). Run `npm install-scripts ls` after dependency changes; do not approve scripts blanket-wide.
+Install scripts: npm 12 blocks dependency install scripts. The root `package.json` records explicit decisions under `allowScripts`; `@napi-rs/canvas`, `esbuild` and `protobufjs` are all set to `false` (canvas and esbuild binaries come from platform packages; the protobufjs script only prints a version-scheme hint). Run `npm install-scripts ls` after dependency changes; do not approve scripts blanket-wide. Tools that rely on a postinstall download need an explicit, scoped allowance, e.g. `--allow-scripts=azure-functions-core-tools` for Core Tools.
+
+### Current test counts (2026-10-30)
+
+Measured with Vitest JSON reports and recorded in the handoffs and in the QA report `docs/qa/reports/PLAN_FitTrack-Technology-Refresh_Findings.md`; the checked-in minimums in `scripts/test-baseline.json` (`asOf` 2026-10-30) equal them:
+
+| Package | Test files | Tests |
+|---|---:|---:|
+| `shared` | 10 | 466 |
+| `backend` | 84 | 2,709 |
+| `mobile` | 108 | 1,002 |
+
+Additional suites: `npm run test:scripts` 27 pass; `npm run test:startup --workspace=backend` 31 pass (28 before the staging-renderer smoke tests were added). These numbers change with the code; the baseline file and the parity gate are the authoritative, versioned source, not this table.
 
 Config files:
 - `backend/vitest.config.mts` — unit tests
@@ -138,17 +150,19 @@ invalid/skipped fields. The Alpha four-step sentence measures 300 x 112 px
 against 302 x 105 px; a shorter ingredient-preserving sentence passes at the
 unchanged 22 px step font. Three pre-extraction PNG SHA-256 fingerprints lock
 the full-render output. Boundary tests inject only the final measured dimension
-at 0.5 px / 0.5001 px while retaining real fonts and Satori nodes. Tests for each
+at 0.5 px / 0.5001 px while retaining real fonts and the real layout engine. Tests for each
 teaser selection size inject overflow in earlier attempts; real-font title
 variants separately exercise natural sizing. Isolated cold-start tests block
-Sharp/Resvg imports and non-font reads and check missing/corrupt fonts and
-Satori failures. No live AI, authenticated photo or confirmed export view is
+Sharp imports and non-font reads and check missing/corrupt fonts and
+render-engine failures (public error code `FONT_OR_SATORI_FAILED`, kept for contract stability). No live AI, authenticated photo or confirmed export view is
 required by these offline probe tests.
 
 ### Instagram Renderer Reference Corpus
 
 `backend/src/lib/instagramRenderer/__tests__/referenceCorpus.test.ts` checks
-six versioned Satori/Resvg PNG fixtures and their renderer-neutral manifest:
+six versioned PNG fixtures (the frozen baseline generated before the renderer
+moved from Satori/Resvg to `@napi-rs/canvas`; never overwritten by the new
+renderer) and their renderer-neutral manifest:
 PNG format and `1080 x 1350` dimensions, non-empty output, an empty overflow
 list, text-box sizes and line counts. The fixtures cover Nutrition with and
 without a photo and detail templates with 1, 5, 9 and 20 ingredients. Every
@@ -161,8 +175,16 @@ still enforce the structural and text-layout metrics but do not claim a pixel
 pass. Reference regeneration is guarded by
 `UPDATE_RENDERER_REFERENCE_CORPUS=1` and is limited to the canonical platform;
 the generation command and historical-Golden separation are documented in
-`backend/src/lib/instagramRenderer/docs/golden-metrics.md`. A dedicated
-canonical-platform CI gate is part of the Phase-0 CI wiring.
+`backend/src/lib/instagramRenderer/docs/golden-metrics.md`. The canonical-platform
+CI gate is the job `renderer-reference-pixel-gate` (`windows-2022`, Node from
+`.nvmrc`). When the renderer moved to `@napi-rs/canvas`, a Windows x64 pixelmatch
+comparison against the frozen baseline measured 0.31 % to 0.74 % differing
+pixels per fixture (gate 3 %); the agent's visual check of one fixture
+attributed the difference to text anti-aliasing (WP-BE-02
+handoff; the Product Owner's visual approval of the side-by-side images is
+**[Open]**). `golden.test.ts` (historical diagnostic, not a release gate)
+expects a differing-pixel ratio of about 0.5946 with a tolerance of 0.01 since
+`pixelmatch` 8 (OKLab distance); thresholds and gates were not weakened.
 
 ### Recipe Preparation Feedback Loop Evidence
 
@@ -319,14 +341,28 @@ The Phase-0 safety net combines focused tests with runtime checks:
 - **Wire-contract tests** exercise backend provider adapters against controlled HTTP responses, checking the serialized request and response mapping without calling a live provider.
 - **Schema characterization tests** record the current Zod request-schema behavior, including optional, nullable, and unknown fields, so later validation changes are deliberate.
 - **Renderer reference corpus** protects deterministic recipe-image output using checked-in reference inputs and expected rendering evidence; see the renderer corpus section above.
-- **Functions host smoke** (`npm run test:functions-smoke --workspace=backend`) builds and starts the real Core Tools host with Azurite, checks `/api/health` (200), an unauthenticated protected diary route (401), and all 79 registered function names against source declarations, then stops the process tree. CI installs Core Tools 4.9.0 with `--allow-scripts=azure-functions-core-tools` (npm 12 blocks the postinstall that downloads the `func` binary otherwise) and copies the non-secret `backend/local.settings.json.template`; no cloud credentials are used.
+- **Functions host smoke** (`npm run test:functions-smoke --workspace=backend`) builds and starts the real Core Tools host with Azurite, checks `/api/health` (200), an unauthenticated protected diary route (401), and all 79 registered function names against source declarations, then stops the process tree. CI installs Core Tools 4.16.0 with `--allow-scripts=azure-functions-core-tools` (npm 12 blocks the postinstall that downloads the `func` binary otherwise) and copies the non-secret `backend/local.settings.json.template`; no cloud credentials are used.
 - **Mobile bundle smoke** (`npm run smoke:bundle --workspace=mobile`) runs `expo export --platform android` into an OS temporary directory and requires a non-empty bundle.
 - **Mobile manifest smoke** (`npm run smoke:manifest --workspace=mobile`) runs Android prebuild in a temporary project outside the repository and checks Health Connect permissions and package visibility, the verified Alpha App Link, the URI scheme, and minSdk 26. It does not modify `mobile/android/`.
-- **Expo Doctor smoke** (`npm run smoke:doctor --workspace=mobile`) pins Expo Doctor 1.21.5. Its accepted baseline is exactly one finding: SDK expects Expo `~54.0.37`, installed `54.0.36`; any additional finding or changed mismatch fails.
+- **Expo Doctor smoke** (`npm run smoke:doctor --workspace=mobile`) pins Expo Doctor 1.21.5 and passes when all checks pass (20/20 on 2026-10-30 with SDK 58). The script still contains a tolerance for one SDK 54 patch-version mismatch (`expo ~54.0.37` vs `54.0.36`); with SDK 58 it cannot match and any finding fails the smoke. The stale tolerance is a code cleanup left open ([Open]).
 - **Android debug assemble** (`npm run smoke:android-debug --workspace=mobile`) runs Expo prebuild in an OS temporary project, then invokes its generated Gradle wrapper with `assembleDebug`; it requires JDK 17 or newer plus Android SDK Platform 36, Build Tools 36.0.0, and NDK 27.1.12297006, and does not modify `mobile/android/`. It is not an EAS build. On Windows, long checkout paths can exceed the NDK/Ninja 260-character path limit when generated CMake object paths include `node_modules`; the CI job runs on Ubuntu and is unaffected by this Windows-specific limitation.
-- **Test parity gate** consumes the shared, backend, and mobile Vitest JSON reports. It enforces the checked-in file/test counts as minimums and rejects failed, skipped, pending, todo, or otherwise non-passing tests.
+- **Test parity gate** (`scripts/check-test-parity.mjs`, versioned baseline `scripts/test-baseline.json`) consumes the shared, backend, and mobile Vitest JSON reports. It enforces the checked-in file/test counts as minimums and rejects failed, skipped, pending, todo, or otherwise non-passing tests. Raising the baseline is a deliberate edit of that file; lowering it requires a justification (rule: do not remove tests without justification).
+- **Staging renderer smoke** (`npm run smoke:staging-renderer --workspace=backend`, `backend/scripts/staging-renderer-smoke.mjs`) renders one PNG with the production-only install in `_deploy_staging`; `@napi-rs/canvas` must resolve from `_deploy_staging/node_modules`, and the PNG must be exactly 1080x1350 and non-empty. Its unit tests are part of `test:startup`. Locally it was run on Windows only; the Linux result needs the CI job (see below) and is `UNVERIFIED` until a run on the final state is recorded.
+- **Daily Insight prompt guard** (`npm run verify:daily-insight-prompt --workspace=backend`) is content-based: it diffs the provider-visible prompt/schema files against a base revision (`FITTRACK_PROMPT_GUARD_BASE`, push `before` SHA or merge base), requires a new append-only manifest release when they changed, and for `dailyInsightValidation.ts` compares only the exported `DAILY_INSIGHT_*_MAX_LENGTH` constants, so edits to local Zod post-validation do not trigger a release.
 
-CI runs the Functions host smoke, the three non-Gradle mobile smokes, Android debug assemble, and a Windows x64 Node 24 renderer pixel gate as separate jobs. The renderer job runs the canonical hard pixel comparison; Ubuntu Tier 1 still enforces the corpus structure and layout metrics. The parity check runs in the Tier 1 unit-test job. The existing Tier 2 Cosmos contract job is unchanged.
+CI runs the Functions host smoke, the three non-Gradle mobile smokes, Android debug assemble, a Windows x64 Node 24 renderer pixel gate, and the staging install/audit/renderer-smoke job as separate jobs. The renderer job runs the canonical hard pixel comparison; Ubuntu Tier 1 still enforces the corpus structure and layout metrics. The parity check runs in the Tier 1 unit-test job. The existing Tier 2 Cosmos contract job is unchanged apart from the emulator tag.
+
+## Dependency Policy and Update Process
+
+Versions and the two remaining audit exceptions are listed in [01-system-overview.md](01-system-overview.md#version-pins-and-support-matrix).
+
+- **Update source:** `.github/dependabot.yml` (weekly) covers npm for the root workspaces (`/`, one lockfile for `mobile`, `backend`, `shared`, `tools/off-import`), npm for `/_deploy_staging` (production-only set) and GitHub Actions. Expo SDK packages (`expo*`, `react-native*`, `@expo/*`) form one group for minor/patch updates; major updates, including a new Expo SDK, are separate PRs. Docker is not configured because the repository has no Dockerfile. The file was only syntax-checked locally; GitHub validates it after the push ([Open]).
+- **Expo-managed packages** move with the SDK: use `npx expo install --check` (must say up to date; `typescript` is excluded via `expo.install.exclude`) instead of raising them individually. On 2026-10-30 `react 19.3.1`, `react-native-gesture-handler 3.4.0`, `react-native-safe-area-context 5.11.0`, `react-native-worklets 0.13.1` and `@react-native-async-storage/async-storage 3.x` were newer than the pins but intentionally held to the SDK 58 line; `@types/node` stays on 24 because the runtime is Node 24.
+- **Audit gate:** the production set must be clean: `npm audit --omit=dev` in `_deploy_staging` (blocking in CI, 0 findings on 2026-10-30). The full root `npm audit` is report-only in CI (`continue-on-error`); any finding outside the documented exceptions PO-1 (Azurite chain) and PO-2 (Expo build tooling) must be investigated. Fix with a normal upgrade or lockfile update; no `--force`, no downgrade, no blanket overrides (the one existing override is targeted and nested). Time-limited exceptions need advisory ID, dependency path, reachability, upstream evidence and a review date, and are re-checked at every upstream release.
+- **npm 12 install scripts:** scripts are blocked unless allowed. Review new native/tool packages with `npm install-scripts ls`, record decisions in root `allowScripts`, and use scoped CLI flags (`--allow-scripts=<package>`) for global tools. CI installs npm 12.2.1 explicitly and reads the Node version from `.nvmrc`.
+- **After every dependency change** run, from the repository root: `npm ci --dry-run`, `npm ls --all` (also in `_deploy_staging`), `npm run typecheck`, the three Vitest suites, `npm run test:scripts`, `npm run test:startup --workspace=backend`, `npm run build:verify --workspace=backend`, `npm run check:encoding`, and the parity gate; for mobile changes also `smoke:bundle`, `smoke:manifest` and `smoke:doctor`. The Backend suite must run with `backend` as the working directory.
+- **Renderer-affecting updates** (`@napi-rs/canvas`, fonts, icon packages, `sharp`) must pass the reference corpus and the staging renderer smoke.
+- **Not covered by automated gates:** prompt evals (live, credentialed; one run on 2026-10-30 exited 0 with 61 tests, whether all calls were live is not independently proven), Cosmos contract tests (need an emulator, none was available locally; CI result is Product-Owner-reported only), Android debug assemble locally (Windows path length; CI only), and device validation of an Expo SDK change (`MANUAL VALIDATION REQUIRED`).
 
 ## Coverage Target
 
@@ -363,12 +399,24 @@ The separate `renderer-reference-pixel-gate` job runs the reference-corpus
 test on `windows-2022` with Node 24, the canonical platform for hard pixel
 comparison.
 
+The `staging-linux-renderer-smoke` job (`ubuntu-latest`) builds the backend, copies
+`backend/dist` to `_deploy_staging/dist`, runs `npm ci --omit=dev` in
+`_deploy_staging`, fails on `npm audit --omit=dev` findings (blocking), and runs
+`npm run smoke:staging-renderer --workspace=backend`: it loads
+`@napi-rs/canvas` from the staging `node_modules` and renders one PNG that must
+be exactly 1080x1350 and non-empty. A final root `npm audit` step is
+report-only (`continue-on-error`); the expected findings are the documented
+exceptions PO-1 (Azurite chain) and PO-2 (Expo build tooling). Dependabot
+(`.github/dependabot.yml`) opens weekly update PRs for npm (root workspaces and
+`_deploy_staging`) and GitHub Actions; Expo SDK packages form one group and
+major updates are separate PRs.
+
 ### Tier 2 — Contract Tests (20 min timeout)
 
 Runs only when Tier 1 passes (`needs: unit-tests`).
 
-Uses the **Azure Cosmos DB Linux Emulator** (`vnext-preview`) as a GitHub Actions service container:
-- Image: `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview`
+Uses the **Azure Cosmos DB Linux Emulator** (vNext, stable dated tag `vnext-EN20261019`) as a GitHub Actions service container:
+- Image: `mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261019`
 - Listens on **plain HTTP** (not HTTPS) at `http://127.0.0.1:8081`
 - `127.0.0.1` (not `localhost`) — avoids Node/undici resolving to IPv6
 

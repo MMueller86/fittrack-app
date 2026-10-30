@@ -2,7 +2,7 @@
 
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), WP-BE-06, AC-3/AC-10
 - Erstellt: 2026-10-30, nachträglich (AC-20). Quelle: Repository-Stand (Code-Suche, `git diff HEAD`, KB-Datei [06-ai-integrations.md](../../kb/tech/06-ai-integrations.md)), `npm view` und Läufe vom 2026-10-30. Es gab in dieser Sitzung **keinen** Zugriff auf Microsoft-Seiten; Microsoft-Aussagen sind nur als Zitat der KB (Stand 2026-10-29) übernommen und gelten `UNVERIFIED`.
-- Branch `chore/fittrack-technology-refresh-phase-0`, nicht committet.
+- Branch `chore/fittrack-technology-refresh-phase-0`, zum Zeitpunkt des Handoffs nicht committet; Stand 2026-10-30: committet (`bce9fe6`, `2763b20`, `cea53b6`) und gepusht.
 
 ## Einheitliche Konfigurationsquelle (belegt)
 

@@ -1,7 +1,7 @@
 # WP-BE-03 Handoff — Test-, Import- und weitere Workspace-Abhängigkeiten
 
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), WP-BE-03, AC-1/AC-6/AC-8
-- Erstellt: 2026-10-30, nachträglich (AC-20). Quelle: Repository-Stand (Manifeste, Lockfile, `git diff HEAD`) und Läufe vom 2026-10-30. Node `24.22.1`, npm `12.2.1`, Windows x64; Branch `chore/fittrack-technology-refresh-phase-0`, nicht committet.
+- Erstellt: 2026-10-30, nachträglich (AC-20). Quelle: Repository-Stand (Manifeste, Lockfile, `git diff HEAD`) und Läufe vom 2026-10-30. Node `24.22.1`, npm `12.2.1`, Windows x64; Branch `chore/fittrack-technology-refresh-phase-0`, zum Zeitpunkt des Handoffs nicht committet (Stand 2026-10-30: committet in `bce9fe6`, `2763b20`, `cea53b6` und gepusht).
 
 ## Aktualisierte Abhängigkeiten (Manifest vorher → jetzt; aufgelöst laut Root-`package-lock.json`)
 
@@ -22,7 +22,7 @@ TypeScript bleibt laut Plan Sache von WP-BE-05 (jetzt 7.0.2, siehe [WP-BE-05 Han
 ## Anpassungen für den neuen Teststack
 
 - `backend/scripts/run-eval.mjs`: Vitest 5 exportiert `./vitest.mjs` nicht mehr; die Binärdatei wird über `vitest/package.json` aufgelöst (Kommentar im Code).
-- `backend/vitest.eval.config.mts`: im Diff nur ein Kommentar (Default-Deployment `gpt-4.1-mini`, WP-BE-06). `test.poolOptions` steht weiterhin in `backend/vitest.eval.config.mts` (Zeile 45) und `backend/vitest.contract.config.mts` (Zeile 42); Vitest 5 warnt dazu `DEPRECATED test.poolOptions was removed in Vitest 4` (Eval-Lauf 2026-10-30). Bereinigung offen.
+- `backend/vitest.eval.config.mts`: im Diff nur ein Kommentar (Default-Deployment `gpt-4.1-mini`, WP-BE-06). `test.poolOptions` steht weiterhin in `backend/vitest.eval.config.mts` (Zeile 45) und `backend/vitest.contract.config.mts` (Zeile 42); Vitest 5 warnt dazu `DEPRECATED test.poolOptions was removed in Vitest 4` (Eval-Lauf 2026-10-30). Bereinigung offen. Nachtrag 2026-10-30: `poolOptions.forks.singleFork` durch `maxWorkers: 1` und `isolate: false` ersetzt (Vitest-4-Migrationsregel); `vitest list` beider Configs Exit 0 ohne Warnung.
 - Test-Dateien im Backend: 36 geänderte Dateien unter `backend/src` (+2.427/−271 Zeilen gegen HEAD, zusammen mit BE-01/BE-02/BE-06; keine Löschungen von Testdateien belegt: Dateizahl 82 → 84, Tests 2.682 → 2.709 laut Phase-0-Bericht und heutigem Lauf).
 - Overrides im Root: `azurite → @azure/ms-rest-js → form-data 2.5.6` besteht unverändert; der Override `fflate` ist entfernt (WP-BE-01/-02).
 
@@ -50,4 +50,4 @@ TypeScript bleibt laut Plan Sache von WP-BE-05 (jetzt 7.0.2, siehe [WP-BE-05 Han
 
 - Import-Skripte in `tools/off-import` (`analyze:off`, `import:cosmos` usw.) wurden nicht ausgeführt (brauchen Daten/Cosmos); belegt sind nur Typecheck und `tsx`-Kompatibilität aus dem WP-BE-05-Handoff.
 - `backend/scripts/functions-baseline.mjs` importiert `@typescript/typescript6`, das nur in `mobile/package.json` als devDependency steht und im Backend über Hoisting aufgelöst wird (Startup-Tests grün). Aufgelöst 2026-10-30: `@typescript/typescript6@~6.0.2` ist jetzt als devDependency in `backend/package.json` deklariert (Lockfile-Eintrag nur im Workspace-Block ergänzt, Paket war bereits aufgelöst; mobile unverändert).
-- Verbleibende `DEPRECATED test.poolOptions`-Warnung (s. o.).
+- `DEPRECATED test.poolOptions`-Warnung: erledigt 2026-10-30 (s. o.).

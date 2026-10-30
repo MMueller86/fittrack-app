@@ -63,9 +63,10 @@ Every document is intentionally focused. Cross-references are used instead of du
 
 ## Quick Facts
 
-- **Language:** TypeScript everywhere (backend, mobile, shared)
-- **Backend:** Azure Functions v4, Node.js — runs locally in Dev, on Azure in Alpha
-- **Frontend:** React Native (Expo), dark-only
+- **Language:** TypeScript 7 everywhere (backend, mobile, shared)
+- **Backend:** Azure Functions v4, Node.js 24 (`.nvmrc` 24.22.1, npm 12.2.1) — runs locally in Dev, on Azure in Alpha
+- **Frontend:** React Native 0.88 on Expo SDK 58, dark-only
+- **Versions and dependency policy:** exact pins, support matrix, upgrade path and audit exceptions in [tech/01-system-overview.md](tech/01-system-overview.md#version-pins-and-support-matrix); update process in [tech/08-testing.md](tech/08-testing.md#dependency-policy-and-update-process)
 - **Database:** Azure Cosmos DB (serverless), partition key `/userId` for all user data
 - **AI:** Azure OpenAI (gpt-4.1-mini), Azure Document Intelligence — backend-only, **shared across environments**
 - **Auth:** Entra External ID (CIAM) — PKCE OAuth2 from mobile, JWKS validation on backend, **shared across environments**

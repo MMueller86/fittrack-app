@@ -3,7 +3,7 @@
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), WP-FE-01 (Abschnitt 13); zusammen mit [WP-BE-05](PLAN_FitTrack-Technology-Refresh_WP-BE-05_Handoff.md)
 - Entscheidungen: Product Owner 2026-10-29 Option 2 (aktuelles Expo SDK mit TS-7-Unterstützung, kein TS-6-Alias für mobile); PO-4 = A (AC-5 = Zielstand SDK 58 geprüft); PO-3 = Kamerawechsel außerhalb des Plans
 - Prüfdatum: 2026-10-30, lokal Windows x64, Node `24.22.1`, npm `12.2.1`; Stand nach WP-FE-02 (Navigation-Update, `@babel/core 7.29.7`)
-- Stand: Branch `chore/fittrack-technology-refresh-phase-0` (Annahme aus früherem Handoff, nicht erneut geprüft), **nicht committet**
+- Stand: Branch `chore/fittrack-technology-refresh-phase-0` (Annahme aus früherem Handoff, nicht erneut geprüft), zum Zeitpunkt des Handoffs nicht committet; Stand 2026-10-30: committet in `bce9fe6`, `2763b20`, `cea53b6` und gepusht (`git log`, `git branch -r --contains cea53b6`)
 - Status: lokal geprüft; Geräte-Validierung und Android-Assemble offen
 - Dev Build Required: **YES** (nicht ausgelöst; kein EAS-Build)
 
@@ -56,7 +56,7 @@ Im Arbeitsbaum fehlen `react-native-vision-camera` und `react-native-image-crop-
 | Backend-Tests | `vitest run --reporter=json` (cwd `backend`) | 0 | 84 / 2.709, 0 failed |
 | Parität | `node scripts/check-test-parity.mjs --shared … --backend … --mobile …` | 0 | PASS (Minima 10/466, 77/1.944, 106/993) |
 | Build | `npm run build:verify --workspace=backend` | 0 | "All checks passed" |
-| Startup / Skripte | `npm run test:startup --workspace=backend` / `npm run test:scripts` | 0 / 0 | 28 pass, 0 fail / Skripttests grün (Anzahl nicht erfasst) |
+| Startup / Skripte | `npm run test:startup --workspace=backend` / `npm run test:scripts` | 0 / 0 | 28 pass, 0 fail / 27 pass, 0 fail, 0 skipped (erneuter Lauf 2026-10-30, Exit 0) |
 | Encoding | `npm run check:encoding` | 0 | passed |
 | Lockfile / Graph | `npm ci --dry-run` / `npm ls --all` (Root) | 0 / 0 | konsistent, ohne Problem |
 | Staging-Audit | `npm audit --omit=dev` in `_deploy_staging` | 0 | 0 Vulnerabilities |

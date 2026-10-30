@@ -27,18 +27,69 @@ fittrack-app/
 
 | Layer | Technology |
 |---|---|
-| Language | TypeScript (all packages) |
+| Language | TypeScript 7 (all packages; native compiler) |
 | Backend runtime | Azure Functions v4 (Flex Consumption in Alpha), Node.js 24 |
-| Mobile framework | React Native (Expo SDK) |
+| Mobile framework | React Native 0.88 on Expo SDK 58 (React 19.3) |
 | Database | Azure Cosmos DB for NoSQL, serverless |
-| AI | Azure OpenAI (gpt-4.1-mini, Structured Outputs) |
+| AI | Azure OpenAI (gpt-4.1-mini, Structured Outputs) via `openai` SDK 7.x |
 | OCR | Azure Document Intelligence |
 | Storage | Azure Blob Storage (recipe images) |
 | Auth | Entra External ID (CIAM) — OAuth2 PKCE |
 | HTTP client | Axios (mobile) |
-| Validation | Zod (backend) |
-| Test runner | Vitest (backend + shared + mobile) |
+| Validation | Zod 4 (backend) |
+| Image rendering | `@napi-rs/canvas` (Instagram recipe PNGs) and `sharp` (photo handling) |
+| Test runner | Vitest 5 (backend + shared + mobile) |
 | IaC | Bicep |
+
+Exact pins and their sources: [Version Pins and Support Matrix](#version-pins-and-support-matrix).
+
+## Version Pins and Support Matrix
+
+State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTrack-Technology-Refresh.md`). "Resolved" is the version in the lockfile (`npm ls`); manifests are the source for ranges. "Latest" is stated only where a handoff or QA report cites the npm registry on 2026-10-30; the registry moves, so re-check with `npm view` before relying on it.
+
+| Item | Pin / range | Resolved | Source |
+|---|---|---|---|
+| Node.js | `>=24.22.1 <25`, `.nvmrc` `24.22.1` | 24.22.1 | `package.json`, `backend/package.json`, `_deploy_staging/package.json` `engines`; `.nvmrc` |
+| npm | `12.2.1` (`engines`, `packageManager: npm@12.2.1`) | 12.2.1 | root `package.json`; CI installs `npm@12.2.1` |
+| TypeScript | `^7.0.2` (backend, shared, mobile, off-import) | 7.0.2 | manifests |
+| `@typescript/typescript6` | `~6.0.2` (backend and mobile devDependency; only for the classic AST API in `functions-baseline.mjs` and `nutritionDiaryMutationBoundary.test.ts`) | 6.0.2 | manifests |
+| Vitest | `^5.0.5` (backend, shared, mobile; Vite 8) | 5.0.5 | manifests |
+| Zod (backend) | `^4.6.7` | 4.6.7 | `backend/package.json` |
+| `openai` | `^7.45.1` | 7.45.1 | `backend/package.json` |
+| Azure SDKs (backend) | `@azure/cosmos ^4.10.1`, `@azure/functions ^4.17.0`, `@azure/storage-blob ^12.34.0`, `@azure/storage-queue ^12.32.0`, `@azure/ai-form-recognizer ^5.1.0` | as in lockfile | `backend/package.json` |
+| `@napi-rs/canvas` | `~1.1.0` | 1.1.0 | `backend/package.json`, `_deploy_staging/package.json` |
+| `pixelmatch` (test only) | `~8.0.0` | 8.0.0 | `backend/package.json` |
+| Expo SDK | `expo ~58.0.21` | 58.0.21 | `mobile/package.json` |
+| React Native / React | `0.88.1` / `19.3.0` | 0.88.1 / 19.3.0 | `mobile/package.json` |
+| React Navigation | `native ^7.5.1`, `bottom-tabs` and `native-stack ^7.21.0` | `native` 7.5.1, `core` 7.24.0 | `mobile/package.json`, WP-FE-02 handoff |
+| Azure Functions Core Tools | `4.16.0` (CI pin and cache key) | — | `.github/workflows/ci.yml` |
+| Cosmos emulator (CI) | `vnext-EN20261019` | — | `.github/workflows/ci.yml` |
+| GitHub Actions | `checkout@v7`, `setup-node@v7`, `cache@v6`, `setup-java@v6` | — | `.github/workflows/ci.yml` |
+| Bicep resource API versions | see [07-infrastructure.md](07-infrastructure.md#azure-resources-created-by-mainbicep) | — | `infra/` |
+| Azure OpenAI | deployment `gpt-4.1-mini`, API version default `2024-10-21` (deployed `2024-08-01-preview`) | — | `backend/src/lib/azureOpenAiConfig.ts`, `infra/` |
+
+`mobile/package.json` pins the native Expo-managed packages to the SDK 58 line (`npx expo install --check` passes, `typescript` is excluded from that check via `expo.install.exclude`). The Android project `mobile/android/` is **gitignored** (not versioned); EAS/prebuild generates the native layer, so a local copy can be stale and is not a source of truth.
+
+### Support status
+
+- Node 24 is the runtime of the Flex Consumption Function App (`functionAppConfig.runtime` `node` / `24`). Microsoft's support/retirement dates for the Node 24 Functions runtime were not retrieved in the refresh work: **[Open]** UNVERIFIED.
+- Azure OpenAI `gpt-4.1-mini` is marked deprecated with a retirement date of 2027-04-14 per the 2026-10-29 retrieval in [06-ai-integrations.md](06-ai-integrations.md#platform-lifecycle-retrieved-2026-10-29); not re-verified on 2026-10-30. Follow-up is `[Planned]` there.
+- Tools on the operator machine can lag the CI pins. On 2026-10-30 the local Core Tools were 4.9.0 and EAS CLI 21.6.0, while the registry `latest` was Core Tools 4.16.0 and EAS CLI 27.2.0 (WP-INFRA-01). The target EAS CLI version is **[Open]** (plan named 26.x, registry has moved on; Product Owner decides). See `.github/instructions/infra-release.instructions.md`.
+
+### Remaining time-limited exceptions
+
+Root `npm audit` on 2026-10-30 reports 12 findings (3 high, 4 moderate, 5 low), all covered by two Product Owner exceptions; the production set (`_deploy_staging`, `npm audit --omit=dev`) reports 0. Both exceptions are re-checked at every upstream release (Dependabot, CI audit step):
+
+| ID | Advisory | Path | Reachability | Status |
+|---|---|---|---|---|
+| PO-1 (Azurite, time-limited) | GHSA-w5hq-g745-h8pq (`uuid`; propagated to `@azure/ms-rest-js`, `sequelize`, `azurite`; moderate) | `backend` devDependency `azurite@3.37.0` → `@azure/ms-rest-js@2.7.0` / `sequelize@6.37.8` → `uuid@8.3.2` | local storage emulator only; not in `_deploy_staging` | No fix upstream: `azurite 3.37.0` is the latest and declares the affected ranges. No override, no downgrade. |
+| PO-2 (Expo build tooling, time-limited) | GHSA-mrhx-c7xc-m3w5 (`zod <4.6.6`, high; surfaces as `zod`, `@expo/cli`, `expo`) and GHSA-gcqx-w48m-w2h4 (`deepmerge >=4.2.0 <=4.3.1`, low; surfaces as `@expo/config`, `@expo/metro-config`, `@expo/prebuild-config`, `@expo/local-build-cache-provider`) | `mobile` → `expo@58.0.21` → `@expo/cli@58.1.17` → `zod@3.25.76`; `expo` → `@expo/config@58.0.9` → `deepmerge@4.3.1` | build tooling only (not imported in `mobile/src` or `shared`; bundle contents not scanned) | `expo`/`@expo/cli` 58.0.21/58.1.17 were the latest and keep `zod ^3.25.76`; no patched `deepmerge` exists. No override, no downgrade. Expo release notes/issues were not read ([Open]). |
+
+The backend's own `zod 4.6.7` is not affected. One targeted override remains in the root `package.json`: `azurite → @azure/ms-rest-js → form-data 2.5.6` (QA-reviewed, not blanket).
+
+### Upgrade path (Expo)
+
+The app moved from Expo SDK 54 (React Native 0.81) directly to SDK 58 (React Native 0.88.1). Product Owner decision PO-4 = A: the target state SDK 58 is verified; the intermediate SDKs 55–57 were not verified individually. The step was forced by TypeScript 7: `@expo/cli` 54 failed when loading `typescript` (`ts.sys.getCurrentDirectory`), `@expo/cli` 58 does not. Expo's official upgrade notes for SDK 55–58 were not compared online (**[Open]** UNVERIFIED). Because native packages changed, the next mobile release requires a new Dev Build / Preview Build (`Dev Build Required: YES`); device validation of the upgrade (App Link, CIAM login, Health Connect, camera/barcode/label scan, photo crop, Reanimated/bottom sheets, navigation deep links) is `MANUAL VALIDATION REQUIRED` and not yet recorded.
 
 ## Package Dependencies
 

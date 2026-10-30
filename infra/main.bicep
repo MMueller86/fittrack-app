@@ -161,7 +161,7 @@ module documentIntelligence 'modules/documentintelligence.bicep' = if (deployDi)
   }
 }
 
-resource existingDocumentIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' existing = {
+resource existingDocumentIntelligence 'Microsoft.CognitiveServices/accounts@2025-12-01' existing = {
   name: documentIntelligenceName
 }
 

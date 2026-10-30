@@ -17,7 +17,7 @@ param sku string = 'F0'
 @description('Tags applied to the resource.')
 param tags object = {}
 
-resource documentIntelligence 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
+resource documentIntelligence 'Microsoft.CognitiveServices/accounts@2025-12-01' = {
   name: accountName
   location: location
   tags: tags

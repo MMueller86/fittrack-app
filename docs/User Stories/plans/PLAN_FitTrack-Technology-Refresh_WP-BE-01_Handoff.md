@@ -2,7 +2,7 @@
 
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), WP-BE-01, AC-1/AC-2/AC-3/AC-8
 - Erstellt: 2026-10-30, nachträglich (AC-20). Quelle ausschließlich Repository-Stand (Manifeste, Lockfiles, `git diff HEAD`) und Läufe vom 2026-10-30; kein Vorwissen aus der Umsetzung.
-- Umgebung: Windows x64, Node `24.22.1`, npm `12.2.1`; Branch `chore/fittrack-technology-refresh-phase-0`, **nicht committet** (Diff gegen HEAD `23e92ff`).
+- Umgebung: Windows x64, Node `24.22.1`, npm `12.2.1`; Branch `chore/fittrack-technology-refresh-phase-0`, zum Zeitpunkt des Handoffs nicht committet (Diff gegen HEAD `23e92ff`); Stand 2026-10-30: committet in `bce9fe6`, `2763b20`, `cea53b6` und nach `origin/chore/fittrack-technology-refresh-phase-0` gepusht.
 - Status: lokal belegt, Teile `UNVERIFIED` (siehe unten).
 
 ## Node/npm-Pins

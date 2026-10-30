@@ -85,15 +85,17 @@ Requires `COSMOS_ENDPOINT` and `COSMOS_KEY` in your environment (or in `backend/
 Install these once before starting:
 
 ```powershell
-# 1. Node.js 20 LTS (required for all workspaces)
+# 1. Node.js 24 (required for all workspaces; verified with 24.22.1 / npm 12.2.1)
 winget install OpenJS.NodeJS.LTS
 
 # 2. Azure Functions Core Tools v4 (required to run backend locally)
-npm install -g --allow-scripts=azure-functions-core-tools azure-functions-core-tools@4
+#    npm 12 requires --allow-scripts for the Core Tools install script
+npm install -g --allow-scripts=azure-functions-core-tools azure-functions-core-tools@4.16.0
 
 # 3. Verify
-node --version   # should be v20.x
-func --version   # should be 4.x
+node --version   # should be v24.x
+npm --version    # should be 12.x
+func --version   # should be 4.16.0
 ```
 
 ## Local Development Setup

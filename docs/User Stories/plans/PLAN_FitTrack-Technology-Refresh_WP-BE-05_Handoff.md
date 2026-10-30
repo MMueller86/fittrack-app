@@ -2,7 +2,7 @@
 
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), WP-BE-05 (Abschnitt 12), AC-3/AC-7/AC-8
 - Prüfdatum: 2026-10-29, lokal Windows x64, Node `24.22.1`, npm `12.2.1`
-- Stand: Arbeitsverzeichnis auf Branch `chore/fittrack-technology-refresh-phase-0`, **nicht committet**
+- Stand: Arbeitsverzeichnis auf Branch `chore/fittrack-technology-refresh-phase-0`, zum Zeitpunkt des Handoffs nicht committet; Stand 2026-10-30: committet in `bce9fe6`, `2763b20`, `cea53b6` und gepusht
 - Status (Update 2026-10-30): **PASS-reif lokal** — der Expo-Blocker ist gelöst durch WP-FE-01 (Expo SDK 58, Product-Owner-Entscheidung 2026-10-29, Option 2), siehe [WP-FE-01 Handoff](PLAN_FitTrack-Technology-Refresh_WP-FE-01_Handoff.md). Planabweichung: WP-BE-05 zusammen mit WP-FE-01 abgeschlossen.
 - Status (Stand 2026-10-29, historisch): BLOCKIERT (Mobile/Expo), `smoke:bundle` scheiterte unter Expo SDK 54.
 
@@ -95,9 +95,9 @@ Lösungsoptionen für den Orchestrator (nicht umgesetzt, jede ist eine Abweichun
 - `backend/tsconfig.test.json` (nicht Teil von `typecheck`/`build`): 59 Typfehler unter TS 7 gegenüber 68 unter TS 5.9.3 (mit `moduleResolution: node`) in Testdateien; vorbestehend, nicht verschärft, nicht behoben.
 - Skripte in `docs/…/*.mjs` mit `require('typescript')` sind einmalige QA-Verifikationsskripte und mit TS 7 nicht mehr lauffähig; nicht angepasst.
 - `tools/off-import/package-lock.json` enthält weiterhin TS 5.9.3 (Workspace-Lockfile, wird von Root-Lockfile überlagert); nicht angepasst.
-- Die Paritätsbaseline [test-baseline.json](../../../scripts/test-baseline.json) ist niedriger als der aktuelle Stand (backend 77/1944, mobile 106/993); nicht verändert.
+- Die Paritätsbaseline [test-baseline.json](../../../scripts/test-baseline.json) war zum Zeitpunkt des Handoffs niedriger als der Ist-Stand (backend 77/1944, mobile 106/993) und unverändert; aktualisiert 2026-10-30: angehoben auf shared 10/466, backend 84/2.709, mobile 108/1.002 (siehe WP-BE-08-Handoff).
 - KB (`02-backend.md`, `08-testing.md`) erwähnt TS-Version nicht angepasst; Aktualisierung gehört zu WP-BE-04.
-- Der Arbeitsbaum enthält weiterhin ungetrackte/unkommittete Änderungen anderer Pakete; es wurde nichts zurückgesetzt oder committet.
+- Der Arbeitsbaum enthielt zum Zeitpunkt des Handoffs ungetrackte/unkommittete Änderungen anderer Pakete; es wurde nichts zurückgesetzt oder committet (inzwischen committet und gepusht, siehe Kopfzeile).
 
 ## Offene Punkte
 

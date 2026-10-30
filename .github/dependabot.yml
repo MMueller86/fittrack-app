@@ -1,0 +1,58 @@
+# Version updates only; no secrets, registries, or deploy steps.
+# Docker is intentionally omitted: the repository contains no Dockerfile
+# (the Cosmos emulator is a pinned service-container image in ci.yml).
+version: 2
+
+updates:
+  # Root npm workspaces (mobile, backend, shared, tools/off-import) share /package-lock.json.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Expo SDK packages move together; majors (SDK upgrades) stay separate PRs.
+      expo-sdk:
+        patterns:
+          - "expo*"
+          - "react-native*"
+          - "@expo/*"
+        update-types:
+          - minor
+          - patch
+      npm-minor-patch:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "expo*"
+          - "react-native*"
+          - "@expo/*"
+        update-types:
+          - minor
+          - patch
+
+  # Production-only dependency set that is published to the Function App.
+  - package-ecosystem: npm
+    directory: /_deploy_staging
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      staging-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch

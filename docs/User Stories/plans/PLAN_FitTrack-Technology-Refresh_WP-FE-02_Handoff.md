@@ -1,7 +1,7 @@
 # WP-FE-02 Handoff — Navigation-Kette und Babel (inkl. WP-FE-03-Beleg)
 
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), Abschnitt 0 und 13a (WP-FE-02, WP-FE-03)
-- Prüfdatum: 2026-10-30, lokal Windows x64, Node `24.22.1`, npm `12.2.1`; **nicht committet**
+- Prüfdatum: 2026-10-30, lokal Windows x64, Node `24.22.1`, npm `12.2.1`; zum Zeitpunkt des Handoffs nicht committet, Stand 2026-10-30 committet (`2763b20`, `cea53b6`) und gepusht
 - Voraussetzung: [WP-FE-01 Handoff](PLAN_FitTrack-Technology-Refresh_WP-FE-01_Handoff.md)
 - Status WP-FE-02: Findings behoben (Audit-Nachweis unten); Geräte-Checkliste Punkt App Link offen (MANUAL VALIDATION REQUIRED)
 - Status WP-FE-03: Ausnahme dokumentiert (PO-2 = C), kein Override
@@ -103,4 +103,4 @@ Quelle: `npm view` am 2026-10-30; kein Override, kein Downgrade, keine Änderung
 1. **MANUAL VALIDATION REQUIRED:** Geräte-Checkliste, Punkt App Link/Deep Link und Tab-/Stack-Navigation (Dev Build erforderlich).
 2. WP-BE-08 Teil 1 (`@azure/identity`/`msal-node`) liegt im Root-Lockfile beim Backend-Agenten; dieser Lauf hat das Lockfile nur für die oben genannten Pakete angefasst.
 3. WP-FE-03: bleibt bis zu einem gepatchten Expo-Release dokumentierte Ausnahme (PO-2 = C).
-4. Test-Baseline (`scripts/test-baseline.json`) ist nicht angehoben (Zuständigkeit Abschnitt 20, Schritt 7b).
+4. Test-Baseline (`scripts/test-baseline.json`): zum Zeitpunkt des Handoffs nicht angehoben; aktualisiert 2026-10-30: angehoben (asOf 2026-10-30; 10/466, 84/2.709, 108/1.002, siehe WP-BE-08-Handoff).

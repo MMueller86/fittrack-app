@@ -17,7 +17,7 @@ param appInsightsName string
 @description('Tags applied to the resources.')
 param tags object = {}
 
-resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+resource workspace 'Microsoft.OperationalInsights/workspaces@2025-07-01' = {
   name: workspaceName
   location: location
   tags: tags

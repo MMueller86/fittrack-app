@@ -42,6 +42,8 @@ export default defineConfig({
     hookTimeout: 10_000,
     fileParallelism: false,
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    // Vitest 4+ replacement for poolOptions.forks.singleFork.
+    maxWorkers: 1,
+    isolate: false,
   },
 });

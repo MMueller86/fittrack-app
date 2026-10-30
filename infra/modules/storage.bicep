@@ -30,7 +30,7 @@ param deploymentContainerName string = ''
 @description('Tags applied to the account.')
 param tags object = {}
 
-resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+resource storage 'Microsoft.Storage/storageAccounts@2025-08-01' = {
   name: storageAccountName
   location: location
   tags: tags
@@ -51,7 +51,7 @@ resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
 }
 
-resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = {
+resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2025-08-01' = {
   parent: storage
   name: 'default'
   properties: {
@@ -63,7 +63,7 @@ resource blobServices 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01
   }
 }
 
-resource recipeImages 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource recipeImages 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-08-01' = {
   parent: blobServices
   name: recipeImagesContainerName
   properties: {
@@ -73,7 +73,7 @@ resource recipeImages 'Microsoft.Storage/storageAccounts/blobServices/containers
   }
 }
 
-resource labelScans 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource labelScans 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-08-01' = {
   parent: blobServices
   name: 'label-scans'
   properties: {
@@ -83,7 +83,7 @@ resource labelScans 'Microsoft.Storage/storageAccounts/blobServices/containers@2
   }
 }
 
-resource productImages 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = {
+resource productImages 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-08-01' = {
   parent: blobServices
   name: 'product-images'
   properties: {
@@ -93,7 +93,7 @@ resource productImages 'Microsoft.Storage/storageAccounts/blobServices/container
   }
 }
 
-resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = if (deploymentContainerName != '') {
+resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-08-01' = if (deploymentContainerName != '') {
   parent: blobServices
   name: deploymentContainerName
   properties: {
@@ -104,7 +104,7 @@ resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/con
 }
 
 // Lifecycle policy: auto-delete label-scan blobs after 7 days.
-resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05-01' = {
+resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2025-08-01' = {
   parent: storage
   name: 'default'
   properties: {
@@ -134,12 +134,12 @@ resource lifecyclePolicy 'Microsoft.Storage/storageAccounts/managementPolicies@2
 }
 
 // Queue service + enrichment queue for async AI keyword generation.
-resource queueServices 'Microsoft.Storage/storageAccounts/queueServices@2023-05-01' existing = {
+resource queueServices 'Microsoft.Storage/storageAccounts/queueServices@2025-08-01' existing = {
   parent: storage
   name: 'default'
 }
 
-resource enrichQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2023-05-01' = {
+resource enrichQueue 'Microsoft.Storage/storageAccounts/queueServices/queues@2025-08-01' = {
   parent: queueServices
   name: enrichQueueName
 }
