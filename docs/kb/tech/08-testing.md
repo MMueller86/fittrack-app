@@ -270,7 +270,10 @@ and locking active v30, and the context-dependent system-prompt hashes. The
 offline release check
 `npm run verify:daily-insight-prompt --workspace=backend` verifies the active
 release fingerprint, historical manifest entries, and provider-visible prompt
-or schema changes without calling Azure OpenAI.
+or schema changes without calling Azure OpenAI. Changes to
+`dailyInsightValidation.ts` count as provider-visible only when an exported
+`DAILY_INSIGHT_*_MAX_LENGTH` constant is changed, added, or removed; edits to
+the local Zod post-validation do not require a new release.
 Local consistency checks for the same change include
 `npm run build:verify --workspace=backend`, `node scripts/check-encoding.mjs`,
 and `git diff --check`.
@@ -316,7 +319,7 @@ The Phase-0 safety net combines focused tests with runtime checks:
 - **Wire-contract tests** exercise backend provider adapters against controlled HTTP responses, checking the serialized request and response mapping without calling a live provider.
 - **Schema characterization tests** record the current Zod request-schema behavior, including optional, nullable, and unknown fields, so later validation changes are deliberate.
 - **Renderer reference corpus** protects deterministic recipe-image output using checked-in reference inputs and expected rendering evidence; see the renderer corpus section above.
-- **Functions host smoke** (`npm run test:functions-smoke --workspace=backend`) builds and starts the real Core Tools host with Azurite, checks `/api/health` (200), an unauthenticated protected diary route (401), and all 79 registered function names against source declarations, then stops the process tree. CI installs Core Tools 4.9.0 and copies the non-secret `backend/local.settings.json.template`; no cloud credentials are used.
+- **Functions host smoke** (`npm run test:functions-smoke --workspace=backend`) builds and starts the real Core Tools host with Azurite, checks `/api/health` (200), an unauthenticated protected diary route (401), and all 79 registered function names against source declarations, then stops the process tree. CI installs Core Tools 4.9.0 with `--allow-scripts=azure-functions-core-tools` (npm 12 blocks the postinstall that downloads the `func` binary otherwise) and copies the non-secret `backend/local.settings.json.template`; no cloud credentials are used.
 - **Mobile bundle smoke** (`npm run smoke:bundle --workspace=mobile`) runs `expo export --platform android` into an OS temporary directory and requires a non-empty bundle.
 - **Mobile manifest smoke** (`npm run smoke:manifest --workspace=mobile`) runs Android prebuild in a temporary project outside the repository and checks Health Connect permissions and package visibility, the verified Alpha App Link, the URI scheme, and minSdk 26. It does not modify `mobile/android/`.
 - **Expo Doctor smoke** (`npm run smoke:doctor --workspace=mobile`) pins Expo Doctor 1.21.5. Its accepted baseline is exactly one finding: SDK expects Expo `~54.0.37`, installed `54.0.36`; any additional finding or changed mismatch fails.

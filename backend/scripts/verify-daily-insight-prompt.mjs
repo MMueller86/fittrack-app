@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -7,11 +8,12 @@ import { fileURLToPath } from 'node:url';
 const scriptPath = fileURLToPath(import.meta.url);
 const backendDirectory = resolve(dirname(scriptPath), '..');
 const manifestPath = 'backend/src/lib/prompts/dailyInsightPromptManifest.ts';
+const validationPath = 'backend/src/lib/dailyInsightValidation.ts';
 const providerInputPaths = Object.freeze([
   'backend/src/lib/prompts/dailyInsightPrompt.ts',
   manifestPath,
   'backend/src/lib/dailyInsightSchema.ts',
-  'backend/src/lib/dailyInsightValidation.ts',
+  validationPath,
   'backend/src/lib/prompts/sharedTone.ts',
   'backend/src/lib/prompts/promptActivity.ts',
   'backend/src/lib/prompts/promptGeneral.ts',
@@ -39,6 +41,23 @@ export function parsePromptReleases(source) {
   }
 
   return releases;
+}
+
+const validationConstantPattern = /^export const (DAILY_INSIGHT_\w*_MAX_LENGTH)\s*=\s*([^;]+);/gm;
+
+// Only the exported *_MAX_LENGTH constants feed the provider schema; the local Zod post-validation does not.
+export function extractProviderVisibleValidationConstants(source) {
+  const constants = [];
+  for (const match of source.matchAll(validationConstantPattern)) {
+    constants.push(`${match[1]}=${match[2].replace(/[\s_]/g, '')}`);
+  }
+  return constants.sort();
+}
+
+export function validationProviderInputChanged(baseSource, currentSource) {
+  if (baseSource === null || currentSource === null) return true;
+  return JSON.stringify(extractProviderVisibleValidationConstants(baseSource))
+    !== JSON.stringify(extractProviderVisibleValidationConstants(currentSource));
 }
 
 function assertReleaseOrdering(releases, label) {
@@ -166,6 +185,19 @@ function getChangedFiles(repoDirectory, baseRevision) {
     .split(/\r?\n/)
     .filter(Boolean);
   for (const path of untrackedFiles) changedFiles.add(path);
+
+  if (changedFiles.has(validationPath)) {
+    let baseValidation = null;
+    try {
+      baseValidation = runGit(repoDirectory, ['show', `${baseRevision}:${validationPath}`]);
+    } catch {
+      // Missing in base: treated as changed.
+    }
+    const currentValidation = readFileSync(resolve(repoDirectory, validationPath), 'utf8');
+    if (!validationProviderInputChanged(baseValidation, currentValidation)) {
+      changedFiles.delete(validationPath);
+    }
+  }
   return changedFiles;
 }
 

@@ -119,8 +119,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Cache Azure Functions Core Tools
+        id: func-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/func-core-tools
+          key: func-core-tools-${{ runner.os }}-4.9.0
+
       - name: Install Azure Functions Core Tools
-        run: npm install --global azure-functions-core-tools@4.9.0
+        if: steps.func-cache.outputs.cache-hit != 'true'
+        # npm 12 blocks install scripts; Core Tools downloads its func binary in postinstall.
+        run: npm install --global --prefix "${{ runner.temp }}/func-core-tools" --allow-scripts=azure-functions-core-tools azure-functions-core-tools@4.9.0
+
+      - name: Add Core Tools to PATH
+        run: echo "${{ runner.temp }}/func-core-tools/bin" >> "$GITHUB_PATH"
 
       - name: Create non-secret local Functions settings
         run: cp backend/local.settings.json.template backend/local.settings.json

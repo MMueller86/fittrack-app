@@ -21,7 +21,7 @@ Install these once before starting local development:
 winget install OpenJS.NodeJS.LTS
 
 # Azure Functions Core Tools v4
-npm install -g azure-functions-core-tools@4 --unsafe-perm true
+npm install -g --allow-scripts=azure-functions-core-tools azure-functions-core-tools@4
 
 # Verify
 node --version    # v20.x

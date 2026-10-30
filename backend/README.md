@@ -89,7 +89,7 @@ Install these once before starting:
 winget install OpenJS.NodeJS.LTS
 
 # 2. Azure Functions Core Tools v4 (required to run backend locally)
-npm install -g azure-functions-core-tools@4 --unsafe-perm true
+npm install -g --allow-scripts=azure-functions-core-tools azure-functions-core-tools@4
 
 # 3. Verify
 node --version   # should be v20.x
