@@ -180,6 +180,194 @@ async function createTestRecipeWithExportView(description?: string) {
   return res.jsonBody as Record<string, unknown>;
 }
 
+const minimumRecipeRequest = {
+  name: 'A',
+  portions: 0.1,
+  ingredients: [],
+  steps: [],
+  tags: [],
+};
+
+function maximumRecipeRequest() {
+  const nutrition = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+  return {
+    name: 'N'.repeat(200),
+    description: 'D'.repeat(2000),
+    portions: 1,
+    ingredients: Array.from({ length: 100 }, (_, index) => ({
+      id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+      displayName: 'I'.repeat(200),
+      inputMode: 'grams',
+      inputAmount: 1,
+      amountGrams: 1,
+      unit: 'U'.repeat(50),
+      amountLabel: 'L'.repeat(100),
+      linkedProductId: null,
+      linkedReusableItemId: null,
+      isAiEstimate: false,
+      category: 'food',
+      portionWeightGrams: 1,
+      portionLabel: 'P'.repeat(50),
+      nutritionPer100g: nutrition,
+      nutritionContribution: nutrition,
+    })),
+    steps: Array.from({ length: 50 }, (_, index) => ({
+      order: index + 1,
+      title: 'T'.repeat(200),
+      description: 'S'.repeat(2000),
+    })),
+    tags: Array.from({ length: 20 }, () => 'G'.repeat(50)),
+  };
+}
+
+const recipeRequestHandlers = [
+  { route: 'POST /api/recipes', handler: createRecipeHandler, successStatus: 201 },
+  { route: 'PUT /api/recipes/:id', handler: updateRecipeHandler, successStatus: 200 },
+];
+
+async function submitRecipeRequest(
+  handler: typeof createRecipeHandler | typeof updateRecipeHandler,
+  body: Record<string, unknown>,
+) {
+  const params = handler === updateRecipeHandler
+    ? { id: String((await createTestRecipe())['id']) }
+    : undefined;
+  return handler(await makeAuthRequest({ ...(params ? { params } : {}), body }), ctx);
+}
+
+function expectRecipeSchemaError(response: { status?: number; jsonBody?: unknown }, path: string) {
+  expect(response.status).toBe(400);
+  expect(response.jsonBody).toMatchObject({
+    code: 'INVALID_REQUEST',
+    category: 'validation',
+    retryable: false,
+    fieldErrors: expect.arrayContaining([expect.objectContaining({ path })]),
+  });
+}
+
+describe.each(recipeRequestHandlers)('$route request schema', ({ handler, successStatus }) => {
+  it('accepts its minimum input shape', async () => {
+    const body = handler === createRecipeHandler ? minimumRecipeRequest : {};
+    const response = await submitRecipeRequest(handler, body);
+
+    expect(response.status).toBe(successStatus);
+  });
+
+  it('accepts the current maximum strings and array lengths', async () => {
+    const response = await submitRecipeRequest(handler, maximumRecipeRequest());
+
+    expect(response.status).toBe(successStatus);
+  });
+
+  it.each([
+    ['name', 'name'],
+    ['portions', 'portions'],
+    ['ingredients', 'ingredients'],
+    ['steps', 'steps'],
+    ['tags', 'tags'],
+  ])('requires create field %s', async (field, path) => {
+    if (handler !== createRecipeHandler) return;
+    const body: Record<string, unknown> = { ...minimumRecipeRequest };
+    delete body[field];
+
+    expectRecipeSchemaError(await submitRecipeRequest(handler, body), path);
+  });
+
+  it.each([
+    ['id', 'id'],
+    ['displayName', 'displayName'],
+    ['inputMode', 'inputMode'],
+    ['inputAmount', 'inputAmount'],
+    ['amountGrams', 'amountGrams'],
+    ['unit', 'unit'],
+    ['linkedProductId', 'linkedProductId'],
+    ['linkedReusableItemId', 'linkedReusableItemId'],
+    ['isAiEstimate', 'isAiEstimate'],
+    ['nutritionPer100g', 'nutritionPer100g'],
+    ['nutritionContribution', 'nutritionContribution'],
+  ])('requires ingredient field %s when an ingredient is supplied', async (field, nestedPath) => {
+    const ingredient: Record<string, unknown> = { ...baseIngredient };
+    delete ingredient[field];
+    const response = await submitRecipeRequest(handler, {
+      ...minimumRecipeRequest,
+      ingredients: [ingredient],
+    });
+
+    expectRecipeSchemaError(response, `ingredients[0].${nestedPath}`);
+  });
+
+  it.each(['nutritionPer100g', 'nutritionContribution'] as const)(
+    'requires every %s nutrient when supplied', async (nutritionField) => {
+      for (const nutrient of ['calories', 'protein', 'carbs', 'fat', 'fiber']) {
+        const ingredient: Record<string, unknown> = { ...baseIngredient };
+        const nutrition = { ...(ingredient[nutritionField] as Record<string, unknown>) };
+        delete nutrition[nutrient];
+        ingredient[nutritionField] = nutrition;
+        const response = await submitRecipeRequest(handler, {
+          ...minimumRecipeRequest,
+          ingredients: [ingredient],
+        });
+
+        expectRecipeSchemaError(response, `ingredients[0].${nutritionField}.${nutrient}`);
+      }
+    },
+  );
+
+  it.each([
+    ['order', { description: 'Mix.' }, 'steps[0].order'],
+    ['description', { order: 1 }, 'steps[0].description'],
+  ])('requires step %s when a step is supplied', async (_label, step, path) => {
+    const response = await submitRecipeRequest(handler, {
+      ...minimumRecipeRequest,
+      steps: [step],
+    });
+
+    expectRecipeSchemaError(response, path);
+  });
+
+  it.each([
+    ['empty name', { name: '' }, 'name'],
+    ['whitespace-only Unicode name', { name: '\u00a0\u2003' }, 'name'],
+    ['null name', { name: null }, 'name'],
+    ['numeric name', { name: 7 }, 'name'],
+    ['name over maximum', { name: 'N'.repeat(201) }, 'name'],
+    ['null portions', { portions: null }, 'portions'],
+    ['zero portions', { portions: 0 }, 'portions'],
+    ['empty-string portions', { portions: '' }, 'portions'],
+    ['null ingredients', { ingredients: null }, 'ingredients'],
+    ['non-array steps', { steps: {} }, 'steps'],
+    ['too many ingredients', { ingredients: Array.from({ length: 101 }, () => baseIngredient) }, 'ingredients'],
+    ['too many steps', { steps: Array.from({ length: 51 }, (_, index) => ({ order: index + 1, description: 'Mix.' })) }, 'steps'],
+    ['too many tags', { tags: Array.from({ length: 21 }, () => 'Tag') }, 'tags'],
+    ['invalid ingredient UUID', { ingredients: [{ ...baseIngredient, id: 'not-a-uuid' }] }, 'ingredients[0].id'],
+    ['invalid ingredient enum', { ingredients: [{ ...baseIngredient, inputMode: 'ounces' }] }, 'ingredients[0].inputMode'],
+    ['wrong ingredient flag type', { ingredients: [{ ...baseIngredient, isAiEstimate: 'false' }] }, 'ingredients[0].isAiEstimate'],
+    ['empty ingredient display name', { ingredients: [{ ...baseIngredient, displayName: '\u00a0 ' }] }, 'ingredients[0].displayName'],
+    ['ingredient display name over maximum', { ingredients: [{ ...baseIngredient, displayName: 'I'.repeat(201) }] }, 'ingredients[0].displayName'],
+    ['empty ingredient unit', { ingredients: [{ ...baseIngredient, unit: '' }] }, 'ingredients[0].unit'],
+    ['food amount is zero', { ingredients: [{ ...baseIngredient, amountGrams: 0 }] }, 'ingredients[0].amountGrams'],
+    ['invalid step order', { steps: [{ order: 0, description: 'Mix.' }] }, 'steps[0].order'],
+    ['empty step description', { steps: [{ order: 1, description: '\u00a0 ' }] }, 'steps[0].description'],
+    ['step description over maximum', { steps: [{ order: 1, description: 'S'.repeat(2001) }] }, 'steps[0].description'],
+  ])('returns the Recipe error code and field path for %s', async (_label, overrides, path) => {
+    const response = await submitRecipeRequest(handler, { ...minimumRecipeRequest, ...overrides });
+
+    expectRecipeSchemaError(response, path);
+  });
+
+  it('strips extra request and nested ingredient fields', async () => {
+    const response = await submitRecipeRequest(handler, {
+      ...minimumRecipeRequest,
+      extraField: true,
+      ingredients: [{ ...baseIngredient, extraIngredientField: true }],
+    });
+
+    expect(response.status).toBe(successStatus);
+    expect(response.jsonBody).not.toHaveProperty('extraField');
+    expect(response.jsonBody).not.toHaveProperty('ingredients.0.extraIngredientField');
+  });
+});
+
 function setValidPreparationAnalysis() {
   const analysis = {
       version: 1 as const,
@@ -1277,6 +1465,27 @@ describe('POST /recipes/{id}/export-view/prepare', () => {
 });
 
 describe('PUT /recipes/:id/visibility', () => {
+  it.each([
+    ['missing visibility', {}, 'visibility'],
+    ['null visibility', { visibility: null }, 'visibility'],
+    ['numeric visibility', { visibility: 1 }, 'visibility'],
+    ['unknown visibility', { visibility: 'shared' }, 'visibility'],
+    ['missing sharing confirmation', { visibility: 'community', displayNameConsent: false }, 'confirmContentSharing'],
+    ['null sharing confirmation', { visibility: 'community', confirmContentSharing: null, displayNameConsent: false }, 'confirmContentSharing'],
+    ['false sharing confirmation', { visibility: 'community', confirmContentSharing: false, displayNameConsent: false }, 'confirmContentSharing'],
+    ['missing display-name consent', { visibility: 'community', confirmContentSharing: true }, 'displayNameConsent'],
+    ['null display-name consent', { visibility: 'community', confirmContentSharing: true, displayNameConsent: null }, 'displayNameConsent'],
+    ['non-boolean display-name consent', { visibility: 'community', confirmContentSharing: true, displayNameConsent: 'yes' }, 'displayNameConsent'],
+    ['extra field on private branch', { visibility: 'private', extra: true }, 'body'],
+  ])('returns the Recipe validation code and field path for %s', async (_label, body, path) => {
+    const response = await setRecipeVisibilityHandler(
+      await makeAuthRequest({ params: { id: 'not-a-uuid' }, body }),
+      ctx,
+    );
+
+    expectRecipeSchemaError(response, path);
+  });
+
   it('requires strict sharing confirmation and uses an optional ETag precondition', async () => {
     const recipe = await createTestRecipe();
     const recipeId = String(recipe['id']);
@@ -1298,6 +1507,14 @@ describe('PUT /recipes/:id/visibility', () => {
     );
     expect(missingConfirmation.status).toBe(400);
     expect(extraField.status).toBe(400);
+    expect(missingConfirmation.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [expect.objectContaining({ path: expect.any(String), code: expect.any(String) })],
+    });
+    expect(extraField.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'body', code: 'unrecognized_keys' }],
+    });
     expect((await getRecipesRepository().get(TEST_USER_ID, recipeId))?.visibility).toBe('private');
 
     const published = await setRecipeVisibilityHandler(
@@ -1366,6 +1583,9 @@ describe('PUT /recipes/:id/visibility', () => {
     expect(injectedCreate.status).toBe(400);
     expect(injectedCreate.jsonBody).toMatchObject({ code: 'RECIPE_VISIBILITY_REQUIRES_DEDICATED_ENDPOINT' });
     expect(injectedUpdate.status).toBe(400);
+    expect(injectedUpdate.jsonBody).toMatchObject({
+      code: 'RECIPE_VISIBILITY_REQUIRES_DEDICATED_ENDPOINT', category: 'validation', retryable: false,
+    });
     expect((await getRecipesRepository().get(TEST_USER_ID, recipeId))?.visibility).toBe('private');
   });
 });
@@ -1385,6 +1605,10 @@ describe('POST /recipes — createRecipe', () => {
     const req = await makeAuthRequest({ body: { portions: 2, ingredients: [], steps: [], tags: [] } });
     const res = await createRecipeHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'name', code: 'invalid_type' }],
+    });
   });
 
   it('returns 400 for zero portions', async () => {
@@ -1394,6 +1618,10 @@ describe('POST /recipes — createRecipe', () => {
     const res = await createRecipeHandler(req, ctx);
     // portions: 0 fails coerce.number().positive()
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'portions', code: 'too_small' }],
+    });
   });
 
   it('returns 401 without token', async () => {
@@ -1447,6 +1675,10 @@ describe('POST /recipes — createRecipe', () => {
       },
     }), ctx);
     expect(withFingerprint.status).toBe(400);
+    expect(withFingerprint.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'exportView', code: 'unrecognized_keys' }],
+    });
 
     const withUnknownIngredient = await createRecipeHandler(await makeAuthRequest({
       body: {
@@ -1618,6 +1850,12 @@ describe('POST /recipes — createRecipe', () => {
     });
     const res = await createRecipeHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: expect.arrayContaining([
+        { path: 'ingredients[0].amountGrams', code: 'custom' },
+      ]),
+    });
   });
 });
 
@@ -2053,6 +2291,10 @@ describe('PUT /recipes/:id — updateRecipe', () => {
     });
     const res = await updateRecipeHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'ingredients[0].amountGrams', code: 'custom' }],
+    });
   });
 });
 
@@ -2085,7 +2327,7 @@ describe('DELETE /recipes/:id — deleteRecipe', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /recipes/:id/log — logRecipe', () => {
-  it.each([0.5, 1, 2])('creates an authoritative snapshot for %s portions with existing rounding', async (portions) => {
+  it.each([0.5, 1, 2, 50])('creates an authoritative snapshot for %s portions with existing rounding', async (portions) => {
     const created = await createTestRecipe();
 
     // Create a diary meal first
@@ -2137,6 +2379,10 @@ describe('POST /recipes/:id/log — logRecipe', () => {
     });
     const res = await logRecipeHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'mealId', code: 'invalid_type' }],
+    });
   });
 
   it('returns 400 for zero portions', async () => {
@@ -2147,6 +2393,42 @@ describe('POST /recipes/:id/log — logRecipe', () => {
     });
     const res = await logRecipeHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'portions', code: 'too_small' }],
+    });
+  });
+
+  it.each([
+    ['missing portions', { mealId: 'meal-id' }, 'portions'],
+    ['null portions', { portions: null, mealId: 'meal-id' }, 'portions'],
+    ['non-numeric portions', { portions: 'many', mealId: 'meal-id' }, 'portions'],
+    ['portions above maximum', { portions: 51, mealId: 'meal-id' }, 'portions'],
+    ['null mealId', { portions: 1, mealId: null }, 'mealId'],
+    ['numeric mealId', { portions: 1, mealId: 7 }, 'mealId'],
+    ['empty mealId', { portions: 1, mealId: '' }, 'mealId'],
+  ])('returns INVALID_REQUEST with a field path for %s', async (_label, body, path) => {
+    const response = await logRecipeHandler(
+      await makeAuthRequest({ params: { id: 'not-a-uuid' }, body }),
+      ctx,
+    );
+
+    expectRecipeSchemaError(response, path);
+  });
+
+  it('coerces numeric-string portions, accepts a non-UUID meal reference, and strips extras', async () => {
+    const created = await createTestRecipe();
+    const { getDiaryRepository } = await import('../lib/repositories/diaryRepository');
+    const meal = await getDiaryRepository().createMeal({
+      userId: TEST_USER_ID, date: '2026-06-02', type: 'dinner', name: 'Dinner',
+    });
+    const response = await logRecipeHandler(await makeAuthRequest({
+      params: { id: String(created['id']) },
+      body: { portions: '1', mealId: meal.id, extraField: true },
+    }), ctx);
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).not.toHaveProperty('extraField');
   });
 
   it('allows another user to log a published recipe from the current owner snapshot', async () => {
@@ -2374,9 +2656,48 @@ describe('POST /recipes/:id/images — uploadImage', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({
-      code: 'INVALID_HERO_CROP',
+      code: 'INVALID_HERO_CROP', category: 'validation', retryable: false,
       fieldErrors: [{ path: 'heroCrop', code: 'invalid_value' }],
     });
+  });
+
+  it.each([
+    ['missing version', { frame: 'instagram-recipe-v1', focusX: 0.5, focusY: 0.5, zoom: 1 }],
+    ['null frame', { version: 1, frame: null, focusX: 0.5, focusY: 0.5, zoom: 1 }],
+    ['string focusX', { version: 1, frame: 'instagram-recipe-v1', focusX: '0.5', focusY: 0.5, zoom: 1 }],
+    ['focusY above maximum', { version: 1, frame: 'instagram-recipe-v1', focusX: 0.5, focusY: 1.01, zoom: 1 }],
+    ['zoom below minimum', { version: 1, frame: 'instagram-recipe-v1', focusX: 0.5, focusY: 0.5, zoom: 0.99 }],
+    ['unknown crop field', { version: 1, frame: 'instagram-recipe-v1', focusX: 0.5, focusY: 0.5, zoom: 1, width: 1080 }],
+  ])('returns the current upload validation response for %s', async (_label, heroCrop) => {
+    const created = await createTestRecipe();
+    const response = await uploadImageHandler(
+      await makeAuthRequest({
+        params: { id: String(created['id']) },
+        formData: makeImageFormData('image/jpeg', 1024, heroCrop),
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({
+      code: 'INVALID_HERO_CROP', category: 'validation', retryable: false,
+      fieldErrors: [{ path: 'heroCrop', code: 'invalid_value' }],
+    });
+  });
+
+  it('accepts crop coordinate boundaries through multipart upload', async () => {
+    const created = await createTestRecipe();
+    const heroCrop = { version: 1, frame: 'instagram-recipe-v1', focusX: 0, focusY: 1, zoom: 1 };
+    const response = await uploadImageHandler(
+      await makeAuthRequest({
+        params: { id: String(created['id']) },
+        formData: makeImageFormData('image/jpeg', 1, heroCrop),
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(201);
+    expect(response.jsonBody).toMatchObject({ heroCrop });
   });
 
   it('keeps the legacy heroCrop default when an image is read without metadata', async () => {
@@ -2603,6 +2924,21 @@ describe('PUT /recipes/:id/images/order — reorderImages', () => {
     return recipeId;
   }
 
+  it.each([
+    ['missing imageIds', {}, 'imageIds'],
+    ['null imageIds', { imageIds: null }, 'imageIds'],
+    ['non-array imageIds', { imageIds: 'img1' }, 'imageIds'],
+    ['numeric image ID', { imageIds: [1] }, 'imageIds[0]'],
+    ['empty image ID', { imageIds: [''] }, 'imageIds[0]'],
+  ])('returns INVALID_REQUEST with a field path for %s', async (_label, body, path) => {
+    const response = await reorderImagesHandler(
+      await makeAuthRequest({ params: { id: 'not-a-uuid' }, body }),
+      ctx,
+    );
+
+    expectRecipeSchemaError(response, path);
+  });
+
   it('reorders images when imageIds are a complete permutation', async () => {
     const recipeId = await createRecipeWithImages();
     const req = await makeAuthRequest({
@@ -2651,6 +2987,12 @@ describe('PUT /recipes/:id/images/order — reorderImages', () => {
 
     expect(duplicateRes.status).toBe(400);
     expect(unknownRes.status).toBe(400);
+    for (const response of [duplicateRes, unknownRes]) {
+      expect(response.jsonBody).toMatchObject({
+        code: 'INVALID_IMAGE_ORDER', category: 'validation', retryable: false,
+      });
+      expect(response.jsonBody).not.toHaveProperty('fieldErrors');
+    }
   });
 
   it('returns 404 for an unknown recipe id', async () => {
@@ -2677,6 +3019,24 @@ describe('PUT /recipes/:id/images/:imageId/hero-crop — updateImageHeroCrop', (
     );
     return recipeId;
   }
+
+  it.each([
+    ['missing heroCrop', {}, 'heroCrop'],
+    ['null heroCrop', { heroCrop: null }, 'heroCrop'],
+    ['missing version', { heroCrop: { frame: 'instagram-recipe-v1', focusX: 0.5, focusY: 0.5, zoom: 1 } }, 'heroCrop.version'],
+    ['null focusX', { heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusX: null } }, 'heroCrop.focusX'],
+    ['string focusY', { heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, focusY: '0.5' } }, 'heroCrop.focusY'],
+    ['extra crop field', { heroCrop: { ...DEFAULT_RECIPE_IMAGE_HERO_CROP, width: 1080 } }, 'heroCrop'],
+    ['extra top-level field', { heroCrop: DEFAULT_RECIPE_IMAGE_HERO_CROP, ignored: true }, 'body'],
+  ])('returns INVALID_REQUEST with a field path for %s', async (_label, body, path) => {
+    const recipeId = await createRecipeWithImage();
+    const response = await updateImageHeroCropHandler(
+      await makeAuthRequest({ params: { id: recipeId, imageId: 'img1' }, body }),
+      ctx,
+    );
+
+    expectRecipeSchemaError(response, path);
+  });
 
   it('updates the crop for an image owned by the authenticated user', async () => {
     const recipeId = await createRecipeWithImage();
@@ -2710,6 +3070,10 @@ describe('PUT /recipes/:id/images/:imageId/hero-crop — updateImageHeroCrop', (
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST', category: 'validation', retryable: false,
+      fieldErrors: [expect.objectContaining({ path: 'heroCrop.focusX' })],
+    });
   });
 
   it('does not allow another user to update published image metadata', async () => {

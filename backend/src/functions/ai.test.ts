@@ -35,6 +35,7 @@ import {
   RECIPE_EXPORT_MAX_STEP_LENGTH,
   RECIPE_EXPORT_MAX_STEPS,
 } from '../../../shared/types/recipeExport';
+import { RECIPE_PORTION_MAX, RECIPE_PORTION_MIN } from '../../../shared/types/recipeScale';
 
 beforeAll(async () => {
   await setupTestAuth();
@@ -222,6 +223,7 @@ describe('POST /api/ai/meal-parser/preview', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Required' });
   });
 
   it('returns 400 when text is empty string', async () => {
@@ -232,6 +234,78 @@ describe('POST /api/ai/meal-parser/preview', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'text must not be empty' });
+  });
+
+  it.each([
+    ['null text', { text: null }, 'Expected string, received null'],
+    ['non-string text', { text: 7 }, 'Expected string, received number'],
+    ['text above maximum', { text: 'x'.repeat(501) }, 'text must be at most 500 characters'],
+    ['null context', { text: 'x', context: null }, 'Expected string, received null'],
+    ['non-string context', { text: 'x', context: 7 }, 'Expected string, received number'],
+    ['context above maximum', { text: 'x', context: 'x'.repeat(201) }, 'String must contain at most 200 character(s)'],
+  ])('returns the current Zod error response for %s', async (_label, body, error) => {
+    mockOpenAiClient([]);
+    mockFoodRepo([]);
+    const res = await mealParserPreviewHandler(
+      await makeAuthRequest({ body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error });
+    expect(res.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('accepts text and optional context at their current length boundaries', async () => {
+    mockOpenAiClient([]);
+    mockFoodRepo([]);
+
+    for (const body of [
+      { text: 'x' },
+      { text: 'x'.repeat(500) },
+      { text: 'x', context: '' },
+      { text: 'x', context: 'x'.repeat(200) },
+    ]) {
+      const res = await mealParserPreviewHandler(
+        await makeAuthRequest({ body }),
+        makeContext(),
+      );
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it('accepts and ignores unknown request fields', async () => {
+    mockOpenAiClient([]);
+    mockFoodRepo([]);
+    const res = await mealParserPreviewHandler(
+      await makeAuthRequest({ body: { text: 'x', extraField: 'ignored' } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it('currently accepts whitespace-only text because this schema does not trim', async () => {
+    mockOpenAiClient([]);
+    mockFoodRepo([]);
+    const response = await mealParserPreviewHandler(
+      await makeAuthRequest({ body: { text: ' \u00a0 ' } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it('currently returns the generic handler 500 for malformed JSON', async () => {
+    const response = await mealParserPreviewHandler(
+      await makeAuthRequest({ rawBody: '{not json' }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.jsonBody).toEqual({ error: 'Internal server error' });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 200 with matched item when AI returns one item and DB has strong match', async () => {
@@ -525,6 +599,7 @@ describe('POST /api/ai/meal-estimate/preview', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Required' });
   });
 
   it('returns 400 when text is empty string', async () => {
@@ -534,6 +609,67 @@ describe('POST /api/ai/meal-estimate/preview', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'text ist erforderlich' });
+  });
+
+  it.each([
+    ['null text', { text: null }, 'Expected string, received null'],
+    ['non-string text', { text: 7 }, 'Expected string, received number'],
+    ['text above maximum', { text: 'x'.repeat(501) }, 'text darf maximal 500 Zeichen lang sein'],
+  ])('returns the current JSON validation response for %s', async (_label, body, error) => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const res = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error });
+    expect(res.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('accepts the minimum and maximum text lengths and ignores unknown fields', async () => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+
+    for (const body of [
+      { text: 'x' },
+      { text: 'x'.repeat(500) },
+      { text: 'x', extraField: 'ignored' },
+    ]) {
+      const res = await mealEstimatePreviewHandler(
+        await makeAuthRequest({ body }),
+        makeContext(),
+      );
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it('trims surrounding Unicode whitespace and rejects whitespace-only text', async () => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const trimmed = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: '\u00a0Schnitzel mit Pommes\u2003' } }),
+      makeContext(),
+    );
+    const blank = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: '\u00a0\u2003' } }),
+      makeContext(),
+    );
+
+    expect(trimmed.status).toBe(200);
+    expect(blank.status).toBe(400);
+    expect(blank.jsonBody).toEqual({ error: 'text ist erforderlich' });
+    expect(blank.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('currently returns the generic handler 500 for malformed JSON', async () => {
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ rawBody: '{not json' }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.jsonBody).toEqual({ error: 'Internal server error' });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 200 with correct structure for a valid text request', async () => {
@@ -694,7 +830,7 @@ describe('analyzeRecipeText normalization', () => {
     expect(request.messages[0].content).not.toContain(preparation.recipeContext.name);
     expect(request.messages[0].content).not.toContain(preparation.steps[0]!.title);
     expect(request).toMatchObject({
-      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
+      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt-4.1-mini',
       temperature: 0.2,
       max_tokens: 2048,
       response_format: { type: 'json_schema', json_schema: { name: 'recipe_export_preparation', strict: true } },
@@ -833,6 +969,10 @@ describe('POST /api/ai/recipe-analyze', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST',
+      fieldErrors: [{ path: 'text', code: 'invalid_type' }],
+    });
   });
 
   it('returns 400 when text is too short (< 10 chars)', async () => {
@@ -843,6 +983,73 @@ describe('POST /api/ai/recipe-analyze', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST',
+      fieldErrors: [{ path: 'text', code: 'too_small' }],
+    });
+  });
+
+  it.each([
+    ['null text', { text: null }, 'invalid_type'],
+    ['non-string text', { text: 7 }, 'invalid_type'],
+    ['text below minimum', { text: 'x'.repeat(9) }, 'too_small'],
+    ['text above maximum', { text: 'x'.repeat(5001) }, 'too_big'],
+  ])('returns an API code and field path for %s', async (_label, body, issueCode) => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW_WITH_EXPORT_KEYS);
+    mockFoodRepo([]);
+    const res = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST',
+      fieldErrors: [{ path: 'text', code: issueCode }],
+    });
+  });
+
+  it('accepts the minimum and maximum text lengths and ignores unknown fields', async () => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW_WITH_EXPORT_KEYS);
+    mockFoodRepo([]);
+
+    for (const body of [
+      { text: 'x'.repeat(10) },
+      { text: 'x'.repeat(5000) },
+      { text: 'x'.repeat(10), extraField: 'ignored' },
+    ]) {
+      const res = await recipeAnalyzeHandler(
+        await makeAuthRequest({ body }),
+        makeContext(),
+      );
+      expect(res.status).toBe(200);
+    }
+  });
+
+  it('currently accepts ten whitespace characters because recipe analysis does not trim text', async () => {
+    mockRecipeAnalyzeClient(VALID_RECIPE_RAW_WITH_EXPORT_KEYS);
+    mockFoodRepo([]);
+
+    const response = await recipeAnalyzeHandler(
+      await makeAuthRequest({ body: { text: '          ' } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it('maps malformed JSON to the Recipe INVALID_JSON envelope', async () => {
+    const response = await recipeAnalyzeHandler(
+      await makeAuthRequest({ rawBody: '{not json' }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({
+      code: 'INVALID_JSON',
+      category: 'validation',
+      fieldErrors: [{ path: 'body', code: 'invalid_json' }],
+    });
   });
 
   it('returns 200 with correct structure for a valid request', async () => {
@@ -888,7 +1095,7 @@ describe('POST /api/ai/recipe-analyze', () => {
     expect(request).toMatchObject({
       temperature: 0.2,
       max_tokens: 2048,
-      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
+      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt-4.1-mini',
     });
     expect(request.response_format).toMatchObject({
       type: 'json_schema',
@@ -1534,6 +1741,9 @@ describe('POST /api/ai/recipe-scale/preview', () => {
   });
 
   it.each([
+    ['a missing targetPortions', undefined],
+    ['a null targetPortions', null],
+    ['a string targetPortions', '2'],
     ['a non-integer targetPortions', 2.5],
     ['a targetPortions below the lower bound', 0],
     ['a targetPortions above the upper bound', 51],
@@ -1550,20 +1760,60 @@ describe('POST /api/ai/recipe-scale/preview', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST',
+      fieldErrors: [expect.objectContaining({ path: 'targetPortions' })],
+    });
     expect(create).not.toHaveBeenCalled();
     expect(enforceQuota).not.toHaveBeenCalled();
   });
 
-  it('returns 400 for an invalid recipeId', async () => {
+  it.each([
+    ['missing recipeId', undefined],
+    ['null recipeId', null],
+    ['non-string recipeId', 7],
+    ['invalid recipeId', 'not-a-uuid'],
+  ])('returns 400 with a recipeId field error for %s', async (_label, recipeId) => {
     const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
     const res = await recipeScalePreviewHandler(
-      await makeAuthRequest({ body: { recipeId: 'not-a-uuid', targetPortions: 2 } }),
+      await makeAuthRequest({ body: { recipeId, targetPortions: 2 } }),
       makeContext(),
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({
+      code: 'INVALID_REQUEST',
+      fieldErrors: [expect.objectContaining({ path: 'recipeId' })],
+    });
     expect(create).not.toHaveBeenCalled();
     expect(enforceQuota).not.toHaveBeenCalled();
+  });
+
+  it.each([RECIPE_PORTION_MIN, RECIPE_PORTION_MAX])('accepts targetPortions boundary %i', async (targetPortions) => {
+    const recipe = await createRecipeForScale();
+    const create = mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+    const res = await recipeScalePreviewHandler(
+      await makeAuthRequest({ body: { recipeId: recipe.id, targetPortions } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.jsonBody).toMatchObject({ targetPortions });
+    expect(create).toHaveBeenCalledOnce();
+  });
+
+  it('strips unknown recipe-scale request fields', async () => {
+    const recipe = await createRecipeForScale();
+    mockRecipeScaleClient(VALID_RECIPE_SCALE_RAW);
+    const response = await recipeScalePreviewHandler(
+      await makeAuthRequest({
+        body: { recipeId: recipe.id, targetPortions: 2, ignored: true },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).not.toHaveProperty('ignored');
   });
 
   it('returns 404 for a recipe not owned by the authenticated user', async () => {

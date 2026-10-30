@@ -17,6 +17,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { randomUUID } from 'expo-crypto';
@@ -188,7 +189,7 @@ export default function RecipeWizardScreen({ route, navigation }: Props) {
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null);
   const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
   const lastDropTargetRef = useRef<number | null>(null);
-  const stepsScrollRef = useRef<ScrollView>(null);
+  const stepsScrollRef = useRef<ScrollViewInstance>(null);
   const stepsScrollOffsetRef = useRef(0);
   const stepsScrollContentHeightRef = useRef(0);
   const stepsScrollViewportHeightRef = useRef(0);

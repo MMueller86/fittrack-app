@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RecipeIngredient } from '@fittrack/shared';
@@ -129,7 +130,7 @@ export function RecipeInstagramPreview({
   const [expandedAsset, setExpandedAsset] = useState<PreviewAsset | null>(null);
   const [viewerIndex, setViewerIndex] = useState(0);
   const viewerIndexRef = useRef(0);
-  const viewerRef = useRef<ScrollView>(null);
+  const viewerRef = useRef<ScrollViewInstance>(null);
   const isRendering = renderStatus === 'loading';
   const isSaving = busy || assetStatus === 'loading' || shareStatus === 'loading';
   const hasPair = hasDistinctRecipeShareUris(instagramUri, detailUri);
@@ -885,7 +886,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
     opacity: 0.8,
   },
@@ -1199,7 +1200,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   renderingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,

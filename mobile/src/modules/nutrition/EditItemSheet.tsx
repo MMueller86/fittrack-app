@@ -316,7 +316,7 @@ export default function EditItemSheet({
 
 const styles = StyleSheet.create({
   gestureRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
   avoidingView: { justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: spacing.md, paddingTop: 0 },
   handleArea: { alignItems: 'center', paddingTop: 5, paddingBottom: 4, marginBottom: 0 },

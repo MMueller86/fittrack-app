@@ -43,7 +43,7 @@ vi.mock('react-native', () => {
       timing: () => ({ start: () => undefined }),
     },
     Easing: { out: (easing: unknown) => easing, cubic: 'cubic' },
-    StyleSheet: { absoluteFillObject: {}, create: <T,>(styles: T) => styles },
+    StyleSheet: { absoluteFill: {}, create: <T,>(styles: T) => styles },
     Text: 'Text',
     TouchableOpacity: 'TouchableOpacity',
     useWindowDimensions: () => ({ width: getWindowWidth(), height: 844, scale: 1, fontScale: 1 }),

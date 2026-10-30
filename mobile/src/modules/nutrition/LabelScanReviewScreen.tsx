@@ -1,7 +1,7 @@
 ﻿// LabelScanReviewScreen – shows OCR + AI parsed nutrition label results for user review
 // before saving as a reusable custom product.
 //
-// Rendered as a full-screen Modal (nested inside AddItemModal scan mode).
+// Rendered as a full-screen Modal (nested inside LabelSubFlow).
 //
 // Flow:
 //   1. Scanned label data is shown with all editable fields

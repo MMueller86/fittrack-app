@@ -169,6 +169,76 @@ describe('recipe favorite access', () => {
 // ---------------------------------------------------------------------------
 
 describe('POST /api/favorites', () => {
+  const validFavorite = {
+    foodRef: 'catalog:item-1',
+    foodRefType: 'catalog',
+    displayName: 'Haferflocken',
+  };
+
+  it.each(['foodRef', 'foodRefType', 'displayName'] as const)(
+    'returns a field-identifying 400 when required field %s is missing', async (field) => {
+      const body: Record<string, unknown> = { ...validFavorite };
+      delete body[field];
+
+      const response = await addFavoriteHandler(await makeAuthRequest({ body }), ctx);
+
+      expect(response.status).toBe(400);
+      expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+      expect(response.jsonBody).not.toHaveProperty('code');
+    },
+  );
+
+  it.each([
+    ['empty foodRef', { foodRef: '' }, 'foodRef'],
+    ['whitespace-only foodRef', { foodRef: '\u00a0\u2003' }, 'foodRef'],
+    ['foodRef over 500 characters', { foodRef: 'r'.repeat(501) }, 'foodRef'],
+    ['null foodRefType', { foodRefType: null }, 'foodRefType'],
+    ['non-string foodRefType', { foodRefType: 1 }, 'foodRefType'],
+    ['null displayName', { displayName: null }, 'displayName'],
+    ['empty displayName', { displayName: '' }, 'displayName'],
+    ['whitespace-only displayName', { displayName: '\u00a0\u2003' }, 'displayName'],
+    ['displayName over 200 characters', { displayName: 'N'.repeat(201) }, 'displayName'],
+    ['null displayBrand', { displayBrand: null }, 'displayBrand'],
+    ['nutritionPer100g null', { nutritionPer100g: null }, 'nutritionPer100g'],
+    ['null nested calories', { nutritionPer100g: { calories: null, protein: 0, carbs: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['missing nested calories', { nutritionPer100g: { protein: 0, carbs: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['negative nested nutrient', { nutritionPer100g: { calories: 0, protein: 0, carbs: 0, fat: -1 } }, 'nutritionPer100g'],
+    ['missing portion weight', { portion: { label: '1 Portion' } }, 'portion'],
+    ['null portion weight', { portion: { label: '1 Portion', weightGrams: null } }, 'portion'],
+    ['null portion label', { portion: { label: null, weightGrams: 1 } }, 'portion'],
+  ])('returns a field-identifying 400 for %s', async (_label, overrides, field) => {
+    const response = await addFavoriteHandler(
+      await makeAuthRequest({ body: { ...validFavorite, ...overrides } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('accepts minimum values, nulls where declared, and strips extra fields', async () => {
+    const response = await addFavoriteHandler(
+      await makeAuthRequest({
+        body: {
+          foodRef: 'a',
+          foodRefType: 'personal',
+          displayName: 'A',
+          displayBrand: '',
+          imageUrl: null,
+          nutritionPer100g: { calories: 0, protein: 0, carbs: 0, fat: 0 },
+          portion: null,
+          unknownField: true,
+        },
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(201);
+    expect(response.jsonBody).not.toHaveProperty('unknownField');
+    expect(response.jsonBody).toMatchObject({ foodRef: 'a', displayName: 'A', displayBrand: '' });
+  });
+
   it('accepts foodRefType "recipe" and returns 201', async () => {
     const recipe = await createRecipe(TEST_USER_ID);
     const res = await addFavoriteHandler(
@@ -208,6 +278,7 @@ describe('POST /api/favorites', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(res.jsonBody).not.toHaveProperty('code');
     expect(await getUserFoodRelationRepository().getByFoodRef(TEST_USER_ID, 'openFoodFacts:schema-test')).toBeNull();
   });
 
@@ -322,6 +393,8 @@ describe('POST /api/favorites', () => {
       ctx,
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: expect.stringContaining('Field "foodRefType"') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('does not generate a shortName when adding a favorite', async () => {
@@ -336,6 +409,33 @@ describe('POST /api/favorites', () => {
       ctx,
     );
     expect(res.status).toBe(201);
+  });
+});
+
+describe('GET /api/favorites query validation', () => {
+  it.each(['breakfast', 'lunch', 'dinner', 'snack', 'preworkout', 'postworkout'] as const)(
+    'accepts context %s with a real localDate', async (context) => {
+      const response = await listFavoritesHandler(
+        await makeAuthRequest({ query: { context, localDate: '2026-02-28' } }),
+        ctx,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.jsonBody).toMatchObject({ context });
+    },
+  );
+
+  it.each([
+    ['unknown context', { context: 'brunch', localDate: '2026-02-28' }, 'Invalid context.'],
+    ['missing localDate', { context: 'dinner' }, 'Query param "localDate"'],
+    ['malformed localDate', { context: 'dinner', localDate: '2026/02/28' }, 'Query param "localDate"'],
+    ['impossible localDate', { context: 'dinner', localDate: '2026-02-30' }, 'Query param "localDate"'],
+  ])('returns the current 400 response for %s', async (_label, query, expectedError) => {
+    const response = await listFavoritesHandler(await makeAuthRequest({ query }), ctx);
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(expectedError) });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 });
 
@@ -589,6 +689,7 @@ describe('GET /api/favorites — context param', () => {
     expect(res.status).toBe(400);
     const body = res.jsonBody as { error: string };
     expect(body.error).toMatch(/invalid context/i);
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('GET /api/favorites?context=breakfast → correct response shape', async () => {
@@ -616,6 +717,7 @@ describe('GET /api/favorites — context param', () => {
     );
     expect(missingDate.status).toBe(400);
     expect(missingDate.jsonBody).toMatchObject({ error: expect.stringContaining('localDate') });
+    expect(missingDate.jsonBody).not.toHaveProperty('code');
 
     const invalidDate = await listFavoritesHandler(
       await makeAuthRequest({ query: { context: 'lunch', localDate: '2026-02-30' } }),
@@ -623,5 +725,6 @@ describe('GET /api/favorites — context param', () => {
     );
     expect(invalidDate.status).toBe(400);
     expect(invalidDate.jsonBody).toMatchObject({ error: expect.stringContaining('localDate') });
+    expect(invalidDate.jsonBody).not.toHaveProperty('code');
   });
 });

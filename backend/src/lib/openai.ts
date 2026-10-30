@@ -1,8 +1,9 @@
 // Azure OpenAI client and prompt builders.
 // All AI calls are backend-only. No AI keys are exposed to mobile.
-// Uses Structured Outputs (API version >= 2024-07-01, model >= gpt-4o-mini 2024-07-18).
+// Uses Structured Outputs (API version and deployment come from azureOpenAiConfig.ts).
 
 import { AzureOpenAI } from 'openai';
+import { createAzureOpenAiClientOptions, getAzureOpenAiDeploymentName } from './azureOpenAiConfig';
 import type { ChatCompletionMessageParam } from 'openai/resources/chat/completions/completions';
 import type { RecipeExportPreparationDiagnostic } from './recipeAnalyzeValidation';
 import { importContractViolations } from './recipeAnalyzeValidation';
@@ -88,15 +89,7 @@ let _client: AzureOpenAI | null = null;
 
 function getClient(): AzureOpenAI {
   if (!_client) {
-    const endpoint = process.env['AZURE_OPENAI_ENDPOINT'];
-    const apiKey = process.env['AZURE_OPENAI_API_KEY'];
-    const apiVersion = process.env['AZURE_OPENAI_API_VERSION'] ?? '2024-07-01';
-
-    if (!endpoint || !apiKey) {
-      throw new Error('AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set');
-    }
-
-    _client = new AzureOpenAI({ endpoint, apiKey, apiVersion });
+    _client = new AzureOpenAI(createAzureOpenAiClientOptions());
   }
   return _client;
 }
@@ -121,7 +114,7 @@ export function __setOpenAiClientForTests(client: AzureOpenAI | null): void {
  */
 export async function parseMeal(text: string, context?: string): Promise<AiParsedItem[]> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   const userContent = context
     ? `Kontext: Diese Mahlzeit wurde in folgendem Umfeld verzehrt: ${context}.\nNutze diesen Kontext zur Portionsschätzung, aber behandle den Kontext NICHT als eigenständigen Lebensmittel-Eintrag.\n\n${text}`
@@ -247,7 +240,7 @@ export async function estimateFood(input: {
   contextText?: string;
 }): Promise<AiFoodEstimate> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   const userMessage = input.contextText
     ? `Food item: ${input.name}\nUser's original input: "${input.contextText}"`
@@ -337,7 +330,7 @@ export async function estimateMeal(input: {
   imageMimeType?: 'image/jpeg' | 'image/png';
 }): Promise<AiMealEstimate> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   type ContentPart =
     | { type: 'text'; text: string }
@@ -581,7 +574,7 @@ export function textCorrectionLimit(text: string, actual: { width: number; heigh
 
 export async function prepareRecipeExport(preparation: RecipePreparationContext, options: RecipePreparationProviderOptions = {}): Promise<RecipeExportPreparationOutput> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
   const correction = options.correction;
   const textOnly = correction && correction.validationErrors.length > 0 && correction.validationErrors.every((error) =>
     error.phase === 'template' && error.code === 'TEMPLATE_FIELD_OVERFLOW');
@@ -645,7 +638,7 @@ export class RecipeAnalysisContractError extends Error {
 
 export async function analyzeRecipeText(text: string): Promise<AiRecipeRaw> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: RECIPE_ANALYZE_SYSTEM_PROMPT },
@@ -778,7 +771,7 @@ const RECIPE_SCALE_SCHEMA = {
  */
 export async function scaleRecipeText(input: AiRecipeScaleInput): Promise<AiRecipeScaleRaw> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   const response = await client.chat.completions.create({
     model: deployment,
@@ -841,7 +834,7 @@ export async function estimateFoodBatch(names: string[]): Promise<AiFoodEstimate
   if (names.length === 0) return [];
 
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   const userMessage = names.map((n, i) => `${i + 1}. ${n}`).join('\n');
 
@@ -892,7 +885,7 @@ export async function generateWeeklyInsight(
   context: WeeklyInsightPromptContext,
 ): Promise<GenerateWeeklyInsightResult> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   const completion = await client.chat.completions.create({
     model: deployment,
@@ -968,7 +961,7 @@ export async function generateDailyInsight(
   promptSnapshot: DailyInsightPromptSnapshot = buildDailyInsightPrompt(intent, context),
 ): Promise<GenerateInsightResult> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
   let messages: ChatCompletionMessageParam[] = [
     { role: 'system', content: promptSnapshot.system },
     { role: 'user', content: promptSnapshot.user },

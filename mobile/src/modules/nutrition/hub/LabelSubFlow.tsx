@@ -1,4 +1,4 @@
-// LabelSubFlow — Nährwert-Label scannen via ImageCropPicker.
+// LabelSubFlow — Nährwert-Label scannen über den gemeinsamen Rahmen-Foto-Flow (FramedPhotoPicker).
 // Kamera oder Galerie → OCR/KI-Analyse → LabelScanReviewScreen → speichern.
 // Öffnet sich über dem FoodEntryHub als Full-Screen Modal.
 
@@ -21,18 +21,9 @@ import { isQuotaExceededError } from '../../../shared/api/client';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import LabelScanReviewScreen from '../LabelScanReviewScreen';
+import { FramedPhotoPicker, type FramedPhotoResult } from '../../../shared/camera/FramedPhotoPicker';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 import type { MealType } from '@fittrack/shared';
-
-type ImageCropPickerModule = typeof import('react-native-image-crop-picker');
-let ImageCropPicker: ImageCropPickerModule['default'] | null = null;
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const imageCropPickerModule = require('react-native-image-crop-picker') as ImageCropPickerModule;
-  ImageCropPicker = imageCropPickerModule.default;
-} catch {
-  // native module not available (Expo Go, CI, etc.)
-}
 
 interface Props {
   visible: boolean;
@@ -65,9 +56,11 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
   const [error, setError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<NutritionLabelScanResult | null>(null);
   const [resolvedMealId, setResolvedMealId] = useState<string | null>(null);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
 
   useEffect(() => {
     if (!visible) {
+      setShowPhotoPicker(false);
       setLoading(false);
       setError(null);
       setScanResult(null);
@@ -80,38 +73,11 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
       .catch((e) => setError(formatApiError(e, 'Mahlzeit konnte nicht geladen werden')));
   }, [visible, context.purpose, context.date, context.mealType, context.mealId]);
 
-  async function handlePickImage(source: 'camera' | 'gallery') {
+  async function handlePhotoSelected({ uri, mime }: FramedPhotoResult) {
     setError(null);
-
-    if (!ImageCropPicker) {
-      setError('Label-Scan ist nur in EAS-Builds verfügbar, nicht in Expo Go.');
-      return;
-    }
-
     setLoading(true);
     try {
-      let imageUri: string;
-      let mimeType: 'image/jpeg' | 'image/png' = 'image/jpeg';
-
-      if (source === 'camera') {
-        const image = await ImageCropPicker.openCamera({
-          cropping: true,
-          freeStyleCropEnabled: true,
-          mediaType: 'photo',
-        });
-        imageUri = image.path;
-        mimeType = image.mime === 'image/png' ? 'image/png' : 'image/jpeg';
-      } else {
-        const image = await ImageCropPicker.openPicker({
-          cropping: true,
-          freeStyleCropEnabled: true,
-          mediaType: 'photo',
-        });
-        imageUri = image.path;
-        mimeType = image.mime === 'image/png' ? 'image/png' : 'image/jpeg';
-      }
-
-      const scanResponse = await aiApi.scanLabel(imageUri, mimeType);
+      const scanResponse = await aiApi.scanLabel(uri, mime);
       setScanResult(scanResponse);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
@@ -184,25 +150,32 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
               <Text style={styles.loadingText}>Label wird analysiert…</Text>
             </View>
           ) : (
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.pickBtn}
-                onPress={() => void handlePickImage('camera')}
-              >
-                <Text style={styles.pickBtnText}>📷 Kamera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.pickBtn}
-                onPress={() => void handlePickImage('gallery')}
-              >
-                <Text style={styles.pickBtnText}>🖼️ Galerie</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.pickBtn}
+              onPress={() => setShowPhotoPicker(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Foto hinzufügen"
+            >
+              <Text style={styles.pickBtnText}>📷 Foto hinzufügen</Text>
+            </TouchableOpacity>
           )}
         </View>
       </SafeAreaView>
 
-      {/* Review Screen (nested Modal — same pattern as AddItemModal) */}
+      <FramedPhotoPicker
+        visible={showPhotoPicker}
+        preset="nutritionLabel"
+        output="cropped-file"
+        cameraReview="direct"
+        sourceTitle="Foto hinzufügen"
+        sourceSubtitle="Wähle eine Quelle für dein Nährwert-Label."
+        cameraPurpose="ein Nährwert-Label aufzunehmen"
+        editorTitle="Label-Ausschnitt"
+        onClose={() => setShowPhotoPicker(false)}
+        onSelected={(result) => void handlePhotoSelected(result)}
+      />
+
+      {/* Review Screen (nested Modal) */}
       {scanResult && resolvedMealId ? (
         <LabelScanReviewScreen
           visible
@@ -260,10 +233,6 @@ const styles = StyleSheet.create({
   loadingText: {
     ...typography.body2,
     color: colors.textMuted,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
   },
   pickBtn: {
     flex: 1,

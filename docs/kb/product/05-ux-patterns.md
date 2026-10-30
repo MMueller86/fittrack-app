@@ -424,6 +424,61 @@ Dark-only-Oberfläche.
 
 ---
 
+## Camera and Photo Capture
+
+[Rule] Every feature that takes or selects a photo uses the same capture flow. The
+look and behaviour of the camera is a quality hallmark of FitTrack and must not
+vary between features. The shared implementation lives in
+`mobile/src/shared/camera/`; features only choose a frame preset.
+
+**Flow**
+
+1. Tapping the photo action opens the FitTrack source sheet (`Foto hinzufügen`) with
+   `Kamera` and `Galerie`. No system camera app and no system cropper is ever
+   launched.
+2. `Kamera` opens a full-screen `FramedCameraCapture`: live preview, area outside
+   the **focus frame** dimmed, frame border in `colors.primaryBright`, close button
+   top left, title `Foto aufnehmen`, hint `Motiv im Rahmen platzieren` below the
+   frame, round shutter button at the bottom. The frame is sized from the preset
+   aspect ratio and respects the top and bottom safe-area insets.
+3. `Galerie` opens the system picker without editing (`allowsEditing: false`) and
+   continues in the `FramedImageEditor`: the image is moved with one finger and
+   zoomed with two fingers inside the same frame; it always covers the frame.
+4. What the user sees inside the frame is what the feature receives. Users are
+   never asked to crop after the fact. Whether the result is a cropped file or
+   crop metadata is a property of the preset (see below), not of the screen.
+
+**Frame presets** (`framePresets.ts`)
+
+| Preset | Aspect ratio | Result | Used by |
+|---|---|---|---|
+| `recipeHero` | `1080:1015` | Original file + `heroCrop` metadata; camera captures open the editor for fine-tuning | Recipe photos |
+| `nutritionLabel` | `3:4` | JPEG cropped to the frame, longest edge ≤ 2000 px, quality 0.85 | Label scan |
+| `mealPhoto` | `4:3` | JPEG cropped to the frame, longest edge ≤ 1600 px, quality 0.85 | AI meal estimate |
+
+**Required states** (identical text and behaviour everywhere)
+
+- Permission check: loading card `Kamera wird vorbereitet…`.
+- Permission denied: `Kein Kamerazugriff` with `Erneut versuchen` and `Abbrechen`;
+  if the system will not ask again, the message points to the device settings.
+- Failed capture: inline message with `Erneut versuchen`.
+- Gallery denied or unusable: error in the source sheet; cancel never creates a
+  draft or triggers a request.
+
+**Rules for new camera features**
+
+- Do not build a new camera, do not call `launchCameraAsync`, and do not add a
+  cropping library. Add a preset to `framePresets.ts` and mount `FramedPhotoPicker`.
+- Choose the aspect ratio from the content being photographed, not from the
+  screen. Document the preset in the table above.
+- Cropped-file presets must define a longest edge so that uploads stay below the
+  backend limit (for AI endpoints `4 MB`).
+- User-facing strings are German; colors, spacing and radii come from the theme.
+- The barcode scanner is a live scanner without a photo result. It uses the same
+  `expo-camera` stack and the same permission states, but has no focus-frame preset.
+
+---
+
 ## Optimistic Updates
 
 On delete operations (diary items, weight entries): remove from local state immediately, roll back on error.

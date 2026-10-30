@@ -101,12 +101,13 @@ type PixelBounds = {
   maxY: number;
 };
 
+// Thresholds admit anti-aliased arc pixels so the 1px outline stays connected under Skia rasterisation.
 function isLimePixel(image: RawImage, x: number, y: number): boolean {
   const offset = (y * image.info.width + x) * image.info.channels;
   return (
     image.data[offset + 3] >= 240 &&
-    image.data[offset + 1] - image.data[offset] >= 20 &&
-    image.data[offset + 1] >= 140 &&
+    image.data[offset + 1] - image.data[offset] >= 12 &&
+    image.data[offset + 1] >= 100 &&
     image.data[offset + 2] <= 130
   );
 }

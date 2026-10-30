@@ -2,7 +2,9 @@
 
 ## Test Runner
 
-Vitest — used in all three packages (`backend`, `mobile`, `shared`).
+Vitest 5 (`^5.0.5`, Vite 8) — used in all three packages (`backend`, `mobile`, `shared`).
+
+Install scripts: npm 12 blocks dependency install scripts. The root `package.json` records explicit decisions under `allowScripts`; `esbuild` and `protobufjs` are denied (esbuild binaries come from platform packages; the protobufjs script only prints a version-scheme hint). Run `npm install-scripts ls` after dependency changes; do not approve scripts blanket-wide.
 
 Config files:
 - `backend/vitest.config.mts` — unit tests
@@ -86,7 +88,7 @@ npx tsc --noEmit  # from mobile/ or shared/
 
 ### Real Functions Host Smoke
 
-Run `cd backend && npm run test:functions-smoke` with Node.js 24, Azure Functions Core Tools, and `backend/local.settings.json` available. The smoke builds the backend, starts the existing local dev orchestration and Azurite, disables the queue and timer background functions, checks `GET /api/health` (200) and unauthenticated `GET /api/diary/meals` (401), and compares the host's registered function names against source registrations. It clears inherited cloud integration environment variables so Core Tools uses local settings, then stops the local process tree.
+Run `cd backend && npm run test:functions-smoke` with Node.js 24, Azure Functions Core Tools, and `backend/local.settings.json` available. The smoke builds the backend, starts the existing local dev orchestration and Azurite, disables the queue and timer background functions, checks `GET /api/health` (200) and unauthenticated `GET /api/diary/meals` (401), and compares both source declarations and host registrations against the checked-in versioned 79-name baseline at `backend/scripts/fixtures/functions-baseline.v1.json`. The Node startup tests validate its version, fixed count, uniqueness, deterministic ordering, and comparison failures without starting the host. It clears inherited cloud integration environment variables so Core Tools uses local settings, then stops the local process tree.
 
 ## Rules
 
@@ -318,7 +320,7 @@ The Phase-0 safety net combines focused tests with runtime checks:
 - **Mobile bundle smoke** (`npm run smoke:bundle --workspace=mobile`) runs `expo export --platform android` into an OS temporary directory and requires a non-empty bundle.
 - **Mobile manifest smoke** (`npm run smoke:manifest --workspace=mobile`) runs Android prebuild in a temporary project outside the repository and checks Health Connect permissions and package visibility, the verified Alpha App Link, the URI scheme, and minSdk 26. It does not modify `mobile/android/`.
 - **Expo Doctor smoke** (`npm run smoke:doctor --workspace=mobile`) pins Expo Doctor 1.21.5. Its accepted baseline is exactly one finding: SDK expects Expo `~54.0.37`, installed `54.0.36`; any additional finding or changed mismatch fails.
-- **Android debug assemble** (`npm run smoke:android-debug --workspace=mobile`) runs Expo prebuild in an OS temporary project, then invokes its generated Gradle wrapper with `assembleDebug`; it requires JDK 17 or newer and does not modify `mobile/android/`. It is not an EAS build.
+- **Android debug assemble** (`npm run smoke:android-debug --workspace=mobile`) runs Expo prebuild in an OS temporary project, then invokes its generated Gradle wrapper with `assembleDebug`; it requires JDK 17 or newer plus Android SDK Platform 36, Build Tools 36.0.0, and NDK 27.1.12297006, and does not modify `mobile/android/`. It is not an EAS build. On Windows, long checkout paths can exceed the NDK/Ninja 260-character path limit when generated CMake object paths include `node_modules`; the CI job runs on Ubuntu and is unaffected by this Windows-specific limitation.
 - **Test parity gate** consumes the shared, backend, and mobile Vitest JSON reports. It enforces the checked-in file/test counts as minimums and rejects failed, skipped, pending, todo, or otherwise non-passing tests.
 
 CI runs the Functions host smoke, the three non-Gradle mobile smokes, Android debug assemble, and a Windows x64 Node 24 renderer pixel gate as separate jobs. The renderer job runs the canonical hard pixel comparison; Ubuntu Tier 1 still enforces the corpus structure and layout metrics. The parity check runs in the Tier 1 unit-test job. The existing Tier 2 Cosmos contract job is unchanged.

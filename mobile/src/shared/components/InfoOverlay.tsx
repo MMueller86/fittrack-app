@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
     opacity: 0.75,
   },

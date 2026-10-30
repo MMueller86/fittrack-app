@@ -675,8 +675,8 @@ partition-key change.
 |---|---|---|
 | `AZURE_OPENAI_ENDPOINT` | openai.ts | Azure OpenAI base URL |
 | `AZURE_OPENAI_API_KEY` | openai.ts | API key |
-| `AZURE_OPENAI_API_VERSION` | openai.ts | API version (default: `2024-07-01`) |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | openai.ts | Model deployment name |
+| `AZURE_OPENAI_API_VERSION` | azureOpenAiConfig.ts | API version (default: `2024-10-21`) |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | azureOpenAiConfig.ts | Model deployment name (default: `gpt-4.1-mini`) |
 | `COSMOS_ENDPOINT` | cosmos.ts | Cosmos DB endpoint |
 | `COSMOS_KEY` | cosmos.ts | Cosmos DB key |
 | `COSMOS_DATABASE` | cosmos.ts | Database name (`fittrack-db`) |
@@ -704,7 +704,10 @@ The backend runtime dependencies contain the renderer packages at the verified
 POC ranges: `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static
 ~1.46.0`, `@tabler/icons ~3.46.0`, and `sharp ^0.35.5`. `pixelmatch
 ~7.2.0`, TypeScript, Vitest, and type packages remain backend development or
-test dependencies and are not part of `_deploy_staging`.
+test dependencies and are not part of `_deploy_staging`. `pixelmatch` stays on
+7.x deliberately: v8 changes the diff counting and would invalidate the
+historical envelope constant in `golden.test.ts`; revisit with the renderer
+reference corpus (review 2027-01-31).
 
 `npm run copy:instagram-assets` validates and copies the complete nine-file
 manifest from `backend/src/lib/instagramRenderer/assets/` to

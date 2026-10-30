@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.surfaceMuted,
   },
-  image: { ...StyleSheet.absoluteFillObject },
+  image: { ...StyleSheet.absoluteFill },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.md },
   imagePlaceholderText: { ...typography.body2, color: colors.textMuted, textAlign: 'center' },
   imageDots: { flexDirection: 'row', justifyContent: 'center', gap: spacing.sm, marginTop: spacing.sm },

@@ -28,7 +28,7 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   StyleSheet: {
-    absoluteFillObject: {},
+    absoluteFill: {},
     create: <T,>(styles: T) => styles,
   },
   Text: 'Text',

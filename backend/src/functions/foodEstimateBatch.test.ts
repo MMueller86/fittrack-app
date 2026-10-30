@@ -95,7 +95,8 @@ describe('POST /api/ai/food-estimate/batch request schema', () => {
     const response = await foodEstimateBatchHandler(request, makeContext());
 
     expect(response.status).toBe(400);
-    expect(response.jsonBody).toMatchObject({ error: expect.any(String) });
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining('Field "items"') });
+    expect(response.jsonBody).not.toHaveProperty('code');
     expect(create).not.toHaveBeenCalled();
   });
 

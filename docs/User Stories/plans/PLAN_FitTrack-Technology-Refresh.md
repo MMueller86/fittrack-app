@@ -1,10 +1,66 @@
 # Plan: FitTrack-Toolchain und Abhängigkeiten vollständig aktualisieren
 
-- Status: Planentwurf, wartet auf ausdrückliche Umsetzungsfreigabe; Entscheidungen O-1 (Canvas), O-2 (Option A) und E-3 (`gpt-4.1-mini` bleibt) sind getroffen; Phase 0 (Sicherheitsnetz) ist ein hartes Gate vor jedem Upgrade
-- Planrevision: `2026-10-27-03` (Phase 0 Sicherheitsnetz ergänzt; zuvor: Plattform-/Cloud-Lifecycle, Update-Automatisierung, TypeScript-7-Trennung)
+- Status: In Umsetzung (Stand 2026-10-30). Phase-0-Gate `PASS` (Bericht `docs/qa/reports/PLAN_FitTrack-Technology-Refresh_Phase0.md`). WP-BE-01, -03, -06 laut Product Owner umgesetzt (Handoffs fehlen), WP-BE-02 und WP-BE-05 umgesetzt (Handoffs vorhanden), WP-FE-01 lokal umgesetzt (Handoff fehlt). Neues Ziel des Product Owners: alle Audit-Findings mit den neuesten Versionen beheben (siehe Abschnitt 0). Entscheidungen O-1 (Canvas) und E-3 (`gpt-4.1-mini` bleibt) gelten weiter; O-2 ist durch PO-1 (befristete Ausnahme) ersetzt, PO-1 bis PO-5 sind entschieden (Abschnitt 0)
+- Planrevision: `2026-10-30-01` (Ist-Stand eingearbeitet, Ziel "keine Findings", neue Work Packages WP-FE-02, WP-BE-08, WP-FE-03, WP-QA-02; zuvor `2026-10-27-03`: Phase 0 Sicherheitsnetz, Plattform-/Cloud-Lifecycle, Update-Automatisierung, TypeScript-7-Trennung)
 - Infrastructure Impact: Alpha
 - Mobile Build Impact: Potential Native Impact
 - Plan-Typ: Sicherheits-, Toolchain-, Dependency- und Native-Mobile-Migration
+
+## 0. Aktualisierung 2026-10-30: Ist-Stand, Ziel "keine Findings", offene Entscheidungen
+
+**Neues Ziel (Product Owner, 2026-10-30):** Mit den neuesten Versionen sollen alle Findings behoben werden. Vorab akzeptierte Ausnahmen, um einen früheren Plan einzuhalten, entfallen. Ein Finding darf nur dann bestehen bleiben, wenn Upstream nachweislich keine gepatchte Version bietet und der Product Owner das einzeln entscheidet (Advisory-ID, Pfad, Erreichbarkeit, Upstream-Beleg, Prüfdatum). Pauschale Overrides, `--force` und Downgrades (npm schlägt u. a. `expo@51.0.39` und `azurite@2.7.1` vor) sind weiterhin ausgeschlossen. Gezielte Overrides sind nur zulässig, wenn sie nachweislich eine gepatchte, kompatible Version installieren und alle Smokes und Tests grün bleiben.
+
+### Open Product Owner Decisions
+
+| ID | Frage | Optionen | Empfehlung |
+|---|---|---|---|
+| PO-1 (ersetzt O-2) | Wie werden die verbleibenden Azurite-Findings (`azurite`, `@azure/ms-rest-js`, `sequelize`, `uuid`, jeweils moderate) behoben? Azurite ist nur Dev-Werkzeug. `azurite@3.37.0` ist laut Registry die neueste Version und hält `@azure/ms-rest-js ^2.7.0` und `sequelize ^6.31.0`; ein Fix durch ein Azurite-Update existiert damit nicht. | (A) Gezieltes Override von `uuid` (neueste Linie, Registry `14.0.3`) und Test, ob Azurite damit startet und alle Startup-/Host-Smokes grün sind; (B) Azurite aus dem npm-Graphen entfernen und extern bereitstellen (globale Installation oder Container; lokal laut früherem Plan weder Docker noch WSL, `scripts/storage.mjs`, `npm run dev`, Startup-Tests und Host-Smoke müssten angepasst werden); (C) Entwicklung ohne Storage-Emulator gegen ein vorhandenes Azure-Storage-Konto (berührt Secrets, Kosten und die Regel "keine neuen Azure-Ressourcen", nur nach Prüfung); (D) Finding stehen lassen, einzeln begründet (widerspricht dem neuen Ziel, nur als letzte Option) | A zuerst technisch prüfen (WP-BE-08), bei Fehlschlag B. Nicht C. D nur mit erneuter PO-Entscheidung |
+| PO-2 | Wie wird das `zod@3.25.76`-Finding (GHSA-mrhx-c7xc-m3w5, betrifft `<4.6.6`) in `@expo/cli` (neueste Version `58.1.17` verlangt `zod ^3.25.76`) behoben, wenn Expo upstream nicht patcht? | (A) Auf einen Expo-Patch mit zod >= 4.6.6 warten und dann aktualisieren; (B) gezieltes Override von `zod` in `@expo/cli` auf `4.6.7`, nur wenn `smoke:bundle`, `smoke:manifest`, `smoke:doctor`, `expo-doctor` und Tests grün sind (Risiko: zod-3-zu-4-API-Unterschiede im CLI); (C) Finding als dokumentierte Ausnahme (Build-Tooling, nicht im App-Bundle) | A prüfen (WP-FE-03), B nur bei grünen Smokes, C nur als letzte Option |
+| PO-3 | Die Pakete `react-native-vision-camera` und `react-native-image-crop-picker` sind nicht mehr in `mobile/package.json`; `mobile/src` nutzt jetzt `expo-camera` (`CameraView` in `AndroidBarcodeScanner.tsx`, `FramedCameraCapture.tsx`) und `expo-image-manipulator` (`cropImageToFrame.ts`). Der Plan sah keinen Ersatz vor. Ist das gewollt? | (A) Bestätigen: Ersatz bleibt; Geräte-Checkliste für Barcode-Scan, Etikettenscan und Foto-Zuschnitt neu fahren, KB und Design-Doku nachziehen; (B) Rückbau auf die alten Pakete, falls UX/Funktion nicht gleichwertig | A bestätigen, wenn die Geräteprüfung besteht. Die Änderung gehört in den WP-FE-01-Handoff |
+| PO-4 | AC-5 verlangt SDK-Stufen 55, 56, 57, 58 einzeln. Geprüft wurde direkt SDK 58. | (A) AC-5 auf "Zielstand SDK 58 geprüft" ändern; (B) Zwischenstufen nachholen | A, weil die Zwischenstände keinen Nutzen haben und das Ergebnis (SDK 58 grün) zählt |
+| PO-5 | Linux-Node-24-Smoke für `@napi-rs/canvas` (WP-BE-02) fehlt lokal. | (A) Nachweis aus dem CI-Lauf (`ubuntu-latest`) als QA-Evidence; (B) ausdrückliche Freigabe als `UNVERIFIED` | A, sobald ein CI-Lauf auf dem aktuellen Stand grün vorliegt |
+
+**Entschieden am 2026-10-30:**
+
+- **PO-1 = D (befristet):** Der Product Owner akzeptiert die Azurite-Moderates (`azurite`, `@azure/ms-rest-js`, `sequelize`, `uuid`; nur Dev-Werkzeug, nicht im `_deploy_staging`-Graphen) als dokumentierte Ausnahme, bis Azurite eine Version mit gepatchter Kette veröffentlicht. WP-BE-08 Teil 2 entfällt bis dahin; bei jedem Azurite-Release wird neu geprüft (Dependabot/CI-Audit, WP-BE-07). Die High-Findings `@azure/identity`/`@azure/msal-node` bleiben in WP-BE-08 Teil 1 zu beheben (laut npm ohne Override möglich) und sind von dieser Ausnahme nicht erfasst. Die Ausnahme braucht im QA-Bericht Advisory-ID (GHSA-w5hq-g745-h8pq), Pfad, Erreichbarkeit (nur lokal) und Prüfdatum.
+- **PO-2 = C (befristet):** Der Product Owner akzeptiert das `zod@3.25.76`-Finding (GHSA-mrhx-c7xc-m3w5) in `@expo/cli` sowie die Expo-Low-Findings (`deepmerge`-Kette, GHSA-gcqx-w48m-w2h4) als dokumentierte Ausnahme, solange Expo keine gepatchte Version liefert (`@expo/cli@58.1.17` und `expo@58.0.21` sind am 2026-10-30 die neuesten). Begründung: Build-Tooling, nicht im App-Bundle; breit eingesetztes Werkzeug, ein Upstream-Fix wird erwartet. Kein Override und kein Downgrade. WP-FE-03 reduziert sich auf Beleg und Pflege der Ausnahme; bei jedem Expo-Release (Dependabot/CI-Audit, WP-BE-07) wird neu geprüft. Die Ausnahme braucht im QA-Bericht Advisory-ID, Pfad, Erreichbarkeit (nur Build), Upstream-Beleg und Prüfdatum.
+- **PO-3 = außerhalb dieses Plans:** Der Ersatz von `react-native-vision-camera` und `react-native-image-crop-picker` durch `expo-camera` und `expo-image-manipulator` stammt aus einer parallelen Entwicklung und wird in diesem Plan weder bewertet noch geändert. Der Plan setzt ihn als gegeben voraus; Prüfung und Dokumentation liegen bei der parallelen Entwicklung.
+- **PO-4 = A:** AC-5 wird auf "Zielstand SDK 58 geprüft" geändert; die Zwischenstufen 55 bis 57 entfallen.
+- **PO-5 = A:** Der Linux-Node-24-Nachweis für `@napi-rs/canvas` kommt aus einem grünen CI-Lauf auf `ubuntu-latest`. Der Lauf erfolgt einmal auf dem Stand nach WP-FE-02, WP-BE-08 Teil 1 und der angehobenen Test-Baseline (Abschnitt 20, Schritt 7b); Lauf-Link und Ergebnis kommen in den QA-Bericht. Bis dahin bleibt der Punkt `UNVERIFIED`.
+
+### Ist-Stand (Quelle: Arbeitsbaum und Messung vom 2026-10-30; Annahmen sind markiert)
+
+| Bereich | Stand | Quelle |
+|---|---|---|
+| Phase 0 | `PASS`; CI-Lauf, Cosmos-Contract-Job und Android-Assemble sind vom Product Owner ausdrücklich freigegeben (nicht unabhängig verifiziert) | QA-Bericht Phase 0 |
+| Backend | Node-Pins, `openai 7.45.1`, `zod 4.6.7`, Azure-SDKs, Vitest 5, Azurite 3.37.0, `@napi-rs/canvas 1.0.13`, TypeScript 7.0.2; Staging `npm audit --omit=dev` = 0 | Manifeste gelesen; Zählungen aus Handoffs (Agentenangabe, backend 84/2.709, shared 10/466, mobile 108/1.002) |
+| Mobile | `expo ~58.0.21`, React Native 0.88.1, React 19.3.0, TypeScript 7.0.2; Bundle-Smoke grün (Agentenangabe) | `mobile/package.json` gelesen |
+| Root-Audit | 18 Findings (6 low, 4 moderate, 8 high), vorher 27 (11/12/4); Ursachen siehe unten | `npm audit --json`, lokal gemessen |
+| Handoffs | vorhanden: WP-BE-02, WP-BE-05; **fehlen:** WP-BE-01, -03, -06, WP-FE-01 (vom Product Owner gelöscht, Plan verlinkte ihn noch) | Dateisuche |
+| `mobile/android/` | In `.gitignore`, nicht versioniert, stammt noch aus SDK 54. Die Annahme "eingechecktes Android-Projekt" in Abschnitt 7 und 19 ist falsch; EAS/Prebuild erzeugt es neu | `.gitignore` Zeile 18, `git ls-files` leer |
+| Android-Debug-Assemble | lokal nicht lauffähig (Windows-Pfadlänge im OneDrive-Pfad), CI-only | Agentenangabe, QA-Bericht |
+| Test-Baseline | `scripts/test-baseline.json` steht auf den Minima 10/466, 77/1.944, 106/993 und ist unter dem aktuellen Stand | Agentenangabe |
+
+### Gemessene Findings und Behebungspfad (Root `npm audit`, 2026-10-30)
+
+Die 8 High-Findings gehen auf 3 Ursachen zurück, npm propagiert ein Advisory auf alle abhängigen Pakete. Die Registry-Angaben wurden mit `npm view` geprüft.
+
+| Ursache | Advisory | Pfad | Behebung mit neuesten Versionen | Work Package |
+|---|---|---|---|---|
+| `decode-uri-component@0.2.2` (high, dazu `query-string`, `@react-navigation/core`) | GHSA-vcc3-ghjq-m6fr, GHSA-qr28-fpjm-wq7f | `mobile` → `@react-navigation/native@7.2.2` → `core@7.17.2` → `query-string@7.1.3` → `decode-uri-component@0.2.2` | `@react-navigation/native@7.5.1` verlangt `@react-navigation/core ^7.24.0`; `core@7.24.0` hat laut Registry keine `query-string`-Abhängigkeit mehr. Update des direkten Pakets entfernt die Kette (zu bestätigen mit `npm ls`) | WP-FE-02 |
+| `@azure/msal-node@6.0.1` (high, dazu `@azure/identity`) | GHSA-xcx6-jx8p-x3h5 (betrifft `<7.1.0`) | `backend` → `azurite@3.37.0` → `applicationinsights@3.17.0` → `@azure/identity@4.14.0` → `@azure/msal-node@6.0.1` | npm meldet `fixAvailable: true`; `@azure/identity@4.14.1` ist die neueste Version. Zu prüfen, ob sie `msal-node >= 7.1.0` zieht. Falls ja, reicht ein Lockfile-Update ohne Override | WP-BE-08 |
+| `zod@3.25.76` unter `expo/node_modules` (high, dazu `@expo/cli`, `expo`) | GHSA-mrhx-c7xc-m3w5 (betrifft `<4.6.6`) | `mobile` → `expo@58.0.21` → `@expo/cli@58.1.17` → `zod ^3.25.76` | Upstream-Fix fehlt: `@expo/cli@58.1.17` und `expo@58.0.21` sind die neuesten Versionen. npm schlägt nur das Downgrade `expo@51.0.39` vor (nicht zulässig). Entscheidung PO-2 | WP-FE-03 |
+| Expo-Low-Findings: `@expo/config`, `@expo/metro-config`, `@expo/prebuild-config`, `@expo/local-build-cache-provider`, `deepmerge` | GHSA-gcqx-w48m-w2h4 (deepmerge `<=4.3.1`) | über `@expo/config` | `deepmerge@4.3.1` ist die neueste Version, ein Upstream-Patch ist nach Registry nicht erkennbar. Zu belegen (Advisory-Text, Expo-Issue). Entscheidung PO-2, gleiche Logik | WP-FE-03 |
+| `@babel/core` (low, `<=7.29.0`) | GHSA-4x5r-pxfx-6jf8 | Mobile-Build | npm meldet `fixAvailable: true`; die Registry-Linie ist `8.0.10`. Zielversion innerhalb der von Expo/Babel unterstützten Linie prüfen (Babel 8 nur, wenn `babel-preset-expo` es trägt) | WP-FE-02 |
+| `azurite`, `@azure/ms-rest-js`, `sequelize`, `uuid` (moderate) | GHSA-w5hq-g745-h8pq (uuid `<11.1.1`) | `backend` (devDependency) → `azurite@3.37.0` | `azurite@3.37.0` ist die neueste Version; npm bietet nur das Downgrade `azurite@2.7.1`. Entscheidung PO-1 | WP-BE-08 |
+
+Warum High von 4 auf 8 stieg, ist nicht belegt (der alte Messstand ist nicht rekonstruierbar). Gesichert ist nur, dass die 8 Pakete auf die 3 Ursachen oben zurückgehen.
+
+### Risiken aus dem neuen Ziel
+
+- Ein Override von `uuid` oder `zod` kann Laufzeitverhalten ändern (Azurite-Datenbankschicht, Expo-CLI-Konfigurationsprüfung). Er zählt nur dann als Behebung, wenn die Smokes und Tests grün sind und der Nachweis im Handoff steht.
+- Expo-bezogene Findings liegen im Build-Tooling, nicht im App-Bundle. Sie sind trotzdem Findings und werden nur per Beleg und PO-Entscheidung stehen gelassen.
+- Das Ziel "Audit ohne Findings" ist zeitabhängig: neue Advisories können nach der Behebung auftreten. Das CI-Gate (WP-BE-07) meldet das, die Behebung ist dann ein neues Paket.
 
 ## 1. Requirement Assessment
 
@@ -117,7 +173,9 @@ Der Audit meldet für `@azure/ms-rest-js` (Bereich `*`) und `azurite` High-Findi
 
 **Option B:** Azurite aus dem npm-Graphen entfernen und außerhalb des Repositories bereitstellen (z. B. globale Installation oder Container). Beachten: lokale Windows-Umgebung hat laut früherem Plan weder Docker noch WSL; `scripts/storage.mjs`, `npm run dev` und die Startup-Tests müssten angepasst werden.
 
-**Entscheidung (2026-10-27): Option A.** AC-8 wird nach der Ausnahmeregel bewertet.
+**Entscheidung (2026-10-27): Option A.** AC-8 wurde nach der Ausnahmeregel bewertet.
+
+**Ersetzt am 2026-10-30:** Option A (Ausnahme für Azurite) gilt nicht mehr. Das Ziel ist ein Audit ohne Findings. Die Behebung der Azurite-Kette wird als Entscheidung PO-1 (Abschnitt 0) mit den Optionen A bis D neu vorgelegt; die Ausnahme darf nur als letzte Option und mit erneuter PO-Entscheidung bleiben. Die Findings `@azure/identity` und `@azure/msal-node` sind laut npm ohne Ausnahme behebbar (WP-BE-08).
 
 ### E-3: Azure-OpenAI-Modell
 
@@ -478,7 +536,7 @@ Expected Handoff:
 
 ### WP-BE-02: Satori/fflate-Kante vollständig beseitigen
 
-Status: Freigegeben für Option B (Canvas), O-1 entschieden am 2026-10-27
+Status: Freigegeben für Option B (Canvas), O-1 entschieden am 2026-10-27; umgesetzt, Handoff: [PLAN_FitTrack-Technology-Refresh_WP-BE-02_Handoff.md](PLAN_FitTrack-Technology-Refresh_WP-BE-02_Handoff.md) (Linux-Smoke offen)
 
 Agent: Backend
 
@@ -554,6 +612,8 @@ Expected Handoff:
 - gelöste Vitest/Tinypool-Critical-/High-Advisories mit Advisory-IDs; für Azurite/`@azure/ms-rest-js` Ergebnis gemäß O-2 mit Advisory-IDs und Pfaden
 
 ### WP-BE-05: TypeScript-7-Migration
+
+Status 2026-10-30: PASS-reif lokal (TS 7.0.2, Expo-Bundle grün), Android-Build nur CI/UNVERIFIED — siehe [WP-BE-05 Handoff](PLAN_FitTrack-Technology-Refresh_WP-BE-05_Handoff.md). Planabweichung: zusammen mit WP-FE-01 vorgezogen (Entscheidung Product Owner 2026-10-29, Option 2).
 
 Agent: Backend
 
@@ -668,6 +728,8 @@ Expected Handoff:
 
 ### WP-FE-01: Expo-/React-Native-SDK-Migration bis SDK 58
 
+Status 2026-10-30: lokal umgesetzt (Expo 58, React Native 0.88.1), Bundle-Smoke grün (Agentenangabe). **Handoff fehlt**: die Datei `PLAN_FitTrack-Technology-Refresh_WP-FE-01_Handoff.md` wurde vom Product Owner gelöscht und ist neu zu erstellen (AC-20). Offen: Geräte-Checkliste nach dem Upgrade (`MANUAL VALIDATION REQUIRED`), Android-Assemble nur in CI. AC-5 ist auf den Zielstand SDK 58 geändert (PO-4). Der Kamera-Paketwechsel (PO-3) stammt aus einer Parallelentwicklung und ist nicht Teil dieses Pakets. Planabweichung: zusammen mit WP-BE-05 vorgezogen (Entscheidung Product Owner 2026-10-29, Option 2).
+
 Agent: Frontend
 
 Goal: Mobile-App schrittweise auf die aktuelle kompatible Expo-/React-Native-/Native-Module-Linie migrieren.
@@ -706,6 +768,145 @@ Expected Handoff:
 - aktualisierte Native-Konfiguration; App-Links, CIAM, Health Connect, Camera, Crop Picker, Reanimated und Android Permissions unverändert funktionsfähig
 - Android Debug/Preview-Konfigurationsbuild sowie Testresultate; keine EAS-Build-ID ohne separate Freigabe
 - `Dev Build Required: YES`
+
+## 13a. Findings-Behebung (Work Packages, neu 2026-10-30)
+
+Ziel: Alle Findings aus Abschnitt 0 mit den neuesten Versionen beheben (AC-19). Reihenfolge: WP-FE-02 und WP-BE-08 sind unabhängig voneinander; WP-FE-03 läuft parallel als Beobachtung und Prüfung.
+
+### WP-FE-02: Mobile-Navigation-Kette und Babel
+
+Agent: Frontend
+
+Goal: Die High-Findings `decode-uri-component`, `query-string` und `@react-navigation/core` sowie das Low-Finding `@babel/core` beheben, ohne Navigation, Deep-Link-Verhalten oder Build zu ändern.
+
+Required Knowledge Base:
+- docs/kb/tech/03-mobile.md
+- docs/kb/tech/08-testing.md
+
+Required Repository Context:
+- mobile/package.json
+- package-lock.json
+- mobile/src (Navigation, Linking, App-Link-Konfiguration)
+- mobile/app.config.js
+
+Required Skills:
+- None
+
+Relevant Acceptance Criteria:
+- AC-5
+- AC-8
+- AC-19
+
+Dependencies:
+- WP-FE-01 `PASS`
+
+Expected Handoff:
+- `@react-navigation/native`, `bottom-tabs`, `native-stack` auf die neuesten kompatiblen Versionen (Registry-Stand `native@7.5.1`, `core@7.24.0`); `npm ls decode-uri-component query-string @react-navigation/core` zeigt die behobene Kette
+- `@babel/core` auf eine von Expo/`babel-preset-expo` unterstützte, gepatchte Version (Zielversion mit Beleg; Babel 8 nur wenn unterstützt)
+- Root-`npm audit` vorher/nachher mit Advisory-IDs; Typecheck, Mobile-Tests, Bundle-/Manifest-/Doctor-Smokes mit Exitcodes; Test-Parität
+- Breaking-Change-Liste der Navigation-Updates (API-Änderungen in Typen/Hooks, Linking-Optionen); Verhalten von App-Link und Deep-Link unverändert (Test und Geräte-Checkliste Punkt App Link)
+
+### WP-BE-08: Azurite-Kette
+
+Status: Teil 1 ausführbar; Teil 2 entfällt bis zu einem Azurite-Release mit gepatchter Kette (PO-1 = D, befristet).
+
+Agent: Backend
+
+Goal: Die Findings `@azure/identity`, `@azure/msal-node` (high) und `azurite`, `@azure/ms-rest-js`, `sequelize`, `uuid` (moderate) beheben.
+
+Required Knowledge Base:
+- docs/kb/tech/02-backend.md
+- docs/kb/tech/08-testing.md
+- docs/kb/tech/07-infrastructure.md
+
+Required Repository Context:
+- backend/package.json
+- package.json
+- package-lock.json
+- backend/scripts/storage.mjs, dev.mjs, wait-for-azurite.mjs, functions-smoke.mjs
+
+Required Skills:
+- None
+
+Relevant Acceptance Criteria:
+- AC-7
+- AC-8
+- AC-19
+
+Dependencies:
+- WP-BE-03 `PASS`
+- Teil 2: Entscheidung PO-1
+
+Expected Handoff:
+- Teil 1 (ohne PO-Entscheidung): Lockfile-Auflösung der Kette `azurite` → `applicationinsights` → `@azure/identity` → `@azure/msal-node` auf gepatchte Versionen prüfen (`@azure/identity@4.14.1`, `msal-node >= 7.1.0`), ohne Override, mit `npm ls`; falls nur per Override möglich, als Option an den Product Owner melden
+- Teil 2 (nach PO-1): Option A (gezieltes `uuid`-Override) mit Nachweis, dass Azurite startet und `npm run test:startup`, `test:functions-smoke` und Backend-Tests grün sind; oder Option B (Entfernung/Extern-Bereitstellung) samt angepassten Skripten und Tests
+- Root-`npm audit` vorher/nachher mit Advisory-IDs; Test-Parität; `_deploy_staging` unverändert 0 Findings
+
+### WP-FE-03: Expo-Findings (`zod`, `deepmerge`) prüfen und beheben
+
+Status: Beleg und Ausnahme-Dokumentation ausführbar; PO-2 = C entschieden (2026-10-30), kein Override.
+
+Agent: Frontend
+
+Goal: Die Findings `zod@3.25.76` unter `@expo/cli` (high, dazu `expo`) und `deepmerge`/`@expo/config`-Kette (low) so beheben, dass die neueste Expo-Linie erhalten bleibt.
+
+Required Knowledge Base:
+- docs/kb/tech/03-mobile.md
+- docs/kb/tech/08-testing.md
+
+Required Repository Context:
+- mobile/package.json
+- package.json
+- package-lock.json
+- mobile/scripts (Smokes)
+
+Required Skills:
+- None
+
+Relevant Acceptance Criteria:
+- AC-5
+- AC-8
+- AC-19
+
+Dependencies:
+- WP-FE-01 `PASS`
+- Entscheidung PO-2
+
+Expected Handoff:
+- Beleg (Quelle, Datum): neueste `expo`/`@expo/cli`-Patchstände, ob eine Version `zod >= 4.6.6` oder eine gepatchte `deepmerge`-Linie nutzt (Release-Notes, Expo-Issues); Registry-Stände
+- Falls Upstream-Fix vorhanden: Update und Audit-Nachweis. Falls nicht und PO-2 = B: gezieltes Override mit grünen `smoke:bundle`, `smoke:manifest`, `smoke:doctor`, `expo-doctor`, Typecheck und Tests. Falls PO-2 = C: Ausnahme-Dokumentation mit Advisory-ID, Pfad, Erreichbarkeit (Build-Tooling), Upstream-Status und Prüfdatum
+- keine Downgrades, keine pauschalen Overrides
+
+### WP-QA-02: Findings-Gate
+
+Agent: QA
+
+Goal: Unabhängig bestätigen, dass die Findings behoben sind.
+
+Required Knowledge Base:
+- docs/kb/tech/08-testing.md
+- docs/qa/reports/README.md
+
+Required Repository Context:
+- Diffs aller Manifeste und Lockfiles seit Phase 0
+- Root-/Staging-Audit
+- Handoffs der Pakete WP-FE-02, WP-BE-08, WP-FE-03
+
+Required Skills:
+- None
+
+Relevant Acceptance Criteria:
+- AC-19
+- AC-20
+
+Dependencies:
+- WP-FE-02, WP-BE-08, WP-FE-03 `PASS`
+
+Expected Handoff:
+- QA-Bericht `docs/qa/reports/PLAN_FitTrack-Technology-Refresh_Findings.md` mit `fittrack-qa-v1`, Verdict und Befehl, Exitcode und Zahlen je Audit/Suite
+- Liste der verbleibenden Findings mit PO-Entscheidung oder "keine"
+- Prüfung, dass keine Downgrades, kein `--force` und nur gezielte, belegte Overrides verwendet wurden
+- Geräte-Checkliste (Phase-0-Liste) nach den Mobile-Updates als `MANUAL VALIDATION REQUIRED`
 
 ## 14. Infrastructure and Release Work Package
 
@@ -855,7 +1056,7 @@ Relevant Acceptance Criteria:
 - AC-1 bis AC-18
 
 Dependencies:
-- WP-QA-00 `PASS` (Phase 0); WP-BE-01, WP-BE-02, WP-BE-03, WP-BE-05, WP-BE-06, WP-BE-07, WP-FE-01, WP-INFRA-01, WP-INFRA-02, WP-BE-04 `PASS`
+- WP-QA-00 `PASS` (Phase 0); WP-BE-01, WP-BE-02, WP-BE-03, WP-BE-05, WP-BE-06, WP-BE-07, WP-FE-01, WP-FE-02, WP-FE-03, WP-BE-08, WP-QA-02, WP-INFRA-01, WP-INFRA-02, WP-BE-04 `PASS`
 
 Expected Handoff:
 - QA-Bericht unter `docs/qa/reports/PLAN_FitTrack-Technology-Refresh.md` mit `fittrack-qa-v1`
@@ -880,10 +1081,10 @@ Expected Handoff:
 2. **AC-2 Backend-Produktion:** `_deploy_staging`-`npm audit --omit=dev` exit 0; `openai` und `zod` sind auf aktuelle kompatible Versionen migriert; alle bestehenden Structured Outputs behalten `strict: true`, identische Schemas und dokumentierte Responses.
 3. **AC-3 Backend-Kompatibilität:** Backend Tests, AI Offline-Tests, Typecheck und `build:verify` sind auf finalem Lockfile erfolgreich; notwendige AI Prompt-Evals sind bestanden.
 4. **AC-4 Renderer:** O-1 ist dokumentiert; Root und Staging haben gültige Abhängigkeitsgraphen ohne `ELSPROBLEMS`, und kein erreichbarer fflate-Advisory-Pfad bleibt. Node-24/Linux-x64 Smoke erzeugt ein nichtleeres PNG exakt `1080 x 1350`; visueller Vergleich ist reviewt.
-5. **AC-5 Mobile SDK:** Expo 55, 56, 57 und 58 wurden einzeln migriert und jeweils durch Expo Doctor/Typecheck validiert; finales Expo-/React-Native-/React-Modulset ist von Expo empfohlen und Expo SDK Advisories sind behoben.
+5. **AC-5 Mobile SDK:** Expo SDK 58 (Zielstand) ist durch Expo Doctor, Typecheck, Tests und Bundle-Smoke validiert; die Zwischenstufen 55 bis 57 werden nicht einzeln geprüft (PO-4 = A, 2026-10-30). Das finale Expo-/React-Native-/React-Modulset ist von Expo empfohlen; Expo-SDK-Advisories sind behoben oder nach PO-2 dokumentiert.
 6. **AC-6 Native App:** Android Gradle/Expo Native-Konfiguration entspricht dem SDK-Ziel; App Links, Authentication, Health Connect, Camera/Crop Picker und Reanimated bleiben funktionsfähig; Android Debug Build und relevante Tests passieren. Neues Native Dev Build ist als erforderlich dokumentiert, aber nicht ausgelöst.
 7. **AC-7 Dev/Test-Dependencies:** Critical/High Advisories aus Vitest/Tinypool, Azurite/Proxy-Addr, Shell-Quote und weiteren erreichbaren Dev-/Build-Pfaden sind behoben; alle Workspaces bestehen ihre Test- und Typecheck-Gates.
-8. **AC-8 Gesamtabhängigkeiten:** Alle direkten Dependencies (inklusive TypeScript 7 nach WP-BE-05) sind aktuell/stabil und kompatibel oder mit konkretem Grund, verantwortlicher Prüfung und Review-Datum zurückgestellt; `@types/sharp` ist entfernt. Root `npm ls --all` exit 0. Root `npm audit` meldet keine Critical/High in produktiven oder CI-erreichbaren Pfaden; jedes verbleibende Finding (z. B. Azurite/`@azure/ms-rest-js`) ist gemäß O-2 mit Advisory-ID, Pfad, Erreichbarkeit und Upstream-Status dokumentiert und wurde ausdrücklich akzeptiert. Ein unbegründetes Finding führt zu `FAIL`.
+8. **AC-8 Gesamtabhängigkeiten:** Alle direkten Dependencies (inklusive TypeScript 7 nach WP-BE-05) sind aktuell/stabil und kompatibel oder mit konkretem Grund, verantwortlicher Prüfung und Review-Datum zurückgestellt; `@types/sharp` ist entfernt. Root `npm ls --all` exit 0. Root `npm audit` meldet **keine Findings** (Soll 0, jede Severity). Ein verbleibendes Finding ist nur zulässig, wenn Upstream nachweislich keine gepatchte Version bietet; dann sind Advisory-ID, Pfad, Erreichbarkeit, Upstream-Beleg und Prüfdatum dokumentiert und der Product Owner hat es einzeln entschieden (PO-1, PO-2). Ein nicht belegtes oder nicht entschiedenes Finding führt zu `FAIL`.
 9. **AC-9 Release/Docs:** CLI-/Action-Versionen und KB/Release-Anleitungen stimmen mit verifizierten Zuständen überein. Kein Bicep-Apply, Azure Functions Publish, EAS Build oder Submit wurde ausgeführt; solche Operationen warten auf getrennte ausdrückliche Freigabe.
 10. **AC-10 Azure-AI-Plattform:** Der Abkündigungstermin von `gpt-4.1-mini` und die Unterstützung der API-Version sind mit Quelle und Datum belegt, ein Modellwechsel wurde nicht durchgeführt; es existiert genau eine Konfigurationsquelle ohne `gpt4o-mini`-Fallback; Strict-Schemas sind unverändert; die Document-Intelligence-SDK-Entscheidung ist dokumentiert und durch Tests abgesichert; Prompt-Evals bestanden oder `UNVERIFIED`; die Privacy-Aussage liegt vor, `docs/legal/` wurde nicht ohne Freigabe geändert.
 11. **AC-11 Update-Automatisierung:** Dependabot oder Renovate deckt npm-Workspaces, `_deploy_staging`, GitHub Actions und Docker-Images ab; CI enthält ein Audit-Gate für den Staging-Produktionsgraphen; Workflows nutzen aktuelle geprüfte Action-Versionen und einen aktuellen stabilen Cosmos-Emulator-Tag; es gibt keine Deploy-Schritte oder Secrets in Workflows.
@@ -894,6 +1095,8 @@ Expected Handoff:
 16. **AC-16 Renderer-Referenzkorpus:** Mindestens 6 Fixtures mit Referenz-PNGs und renderer-neutralem Metrik-Manifest (Format, exakt `1080 x 1350`, nicht leer, Überlauf, Zeilenzahlen, Textbox-Maße); Metrik-Test als hartes Gate, Pixelvergleich mit Toleranz; Erzeugungsplattform festgelegt; keine Alpha-Fotos; bestehende Renderer-Tests unverändert grün.
 17. **AC-17 Host- und Mobile-Smokes:** Host-Smoke bestätigt `/api/health` = 200, `/api/diary/meals` ohne Token = 401 und die Funktionsliste gegen die Baseline; `app.config.js`-Tests, Bundle-Smoke `expo export --platform android`, `expo-doctor`-Baseline, Manifest-Prüfung und Android-Debug-Assemble sind als Befehle reproduzierbar und grün; native Wrapper sind typisiert, sodass `tsc` API-Drift erkennt; `mobile/android/` blieb unverändert; alle Smokes laufen in CI.
 18. **AC-18 Phase-0-Gate:** Auf unverändertem Dependency-Stand sind alle Suiten (shared, backend, mobile, scripts, startup, Typechecks, `build:verify`, neue Phase-0-Tests und -Smokes) lokal und in CI grün; Contract-Tests sind in CI grün; Prompt-Evals sind ausgeführt und bestanden oder vom Product Owner ausdrücklich als `UNVERIFIED` freigegeben; Manifest- und Lockfile-Diff beweist, dass in Phase 0 keine Dependency-Version geändert wurde; kein Test wurde entfernt oder abgeschwächt; die manuelle Geräte-Checkliste liegt vor; WP-QA-00 hat `PASS`. Erst dann darf WP-BE-01 starten.
+19. **AC-19 Findings-frei:** Root `npm audit` und `_deploy_staging` `npm audit --omit=dev` melden jeweils 0 Findings, oder jedes verbleibende Finding ist nach der Regel in AC-8 belegt und durch den Product Owner entschieden; es wurden weder `--force` noch Downgrades (`expo@51`, `azurite@2.7.1`) noch pauschale Overrides verwendet; jedes Override ist gezielt, installiert nachweislich eine gepatchte Version und ist mit grünen Smokes und Tests belegt. Nach jedem Behebungsschritt gilt die Test-Parität (AC-13).
+20. **AC-20 Handoff-Vollständigkeit:** Für WP-BE-01, -02, -03, -05, -06, -07, WP-FE-01, -02, -03, WP-BE-08 und die INFRA-Pakete liegt ein Handoff mit Befehlen, Exitcodes und Zahlen vor; fehlende Handoffs (aktuell BE-01, BE-03, BE-06, FE-01) sind nachgeholt, bevor WP-QA-01 startet.
 
 ## 19. Risks and Edge Cases
 
@@ -924,8 +1127,10 @@ Expected Handoff:
 3. WP-BE-03: Backend-/Shared-/Off-Import-Test-, Build- und Utility-Dependencies aktualisieren (ohne TypeScript 7).
 4. WP-BE-06: Azure-AI-Plattform-Lebenszyklus (Modell/API-Version, Document-Intelligence-SDK) klären und bereinigen.
 5. WP-BE-02: Rendererroute gemäß O-1 (Canvas) implementieren.
-6. WP-BE-05: TypeScript 7 in allen Workspaces migrieren.
-7. WP-FE-01: Expo SDK stufenweise 54→55→56→57→58 migrieren und nativen Android Build validieren.
+6. WP-BE-05: TypeScript 7 in allen Workspaces migrieren. **Erledigt (lokal), zusammen mit Schritt 7 vorgezogen (PO 2026-10-29).**
+7. WP-FE-01: Expo SDK auf 58 migrieren und nativen Android Build validieren. **Lokal erledigt; Handoff neu erstellen (AC-20), PO-3 und PO-4 klären.**
+7a. **Findings-Behebung (neu, parallel):** WP-FE-02 (Navigation-Kette, Babel), WP-BE-08 Teil 1 (`@azure/identity`/`msal-node`), WP-FE-03 (Expo-Beleg). Danach WP-BE-08 Teil 2 nach PO-1 und WP-FE-03 nach PO-2. Dann WP-QA-02.
+7b. Fehlende Handoffs nachholen (BE-01, BE-03, BE-06, FE-01), Test-Baseline in `scripts/test-baseline.json` auf den aktuellen Stand anheben (Backend-Agent, Paritätsregel bleibt), CI-Lauf mit Linux-Renderer-Nachweis für PO-5.
 8. WP-INFRA-01: unterstützte Runtime und lokale CLIs prüfen; Release-Dokumentation vorbereiten, ohne Deployment.
 9. WP-INFRA-02: Bicep-API-Versionen und Repo-Altlasten bereinigen (nur `build` und lesendes `what-if`).
 10. WP-BE-07: Update-Automatisierung, CI-Audit-Gate, aktuelle Actions und Cosmos-Emulator-Tag.

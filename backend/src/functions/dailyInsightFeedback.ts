@@ -16,7 +16,7 @@ import type {
 } from '@fittrack/shared';
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const UUID_PATTERN = z.string().uuid();
+const UUID_PATTERN = z.guid();
 
 const isoDate = z
   .string()

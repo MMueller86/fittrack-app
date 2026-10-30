@@ -165,11 +165,23 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
   it.each([
     ['missing discriminator', {}, 'type'],
     ['unknown discriminator', { type: 'swimming' }, 'type'],
+    ['missing hiking movement time', { ...VALID_HIKING_BODY, movementTimeMinutes: undefined }, 'movementTimeMinutes'],
     ['missing hiking field', { ...VALID_HIKING_BODY, distanceKm: undefined }, 'distanceKm'],
+    ['missing hiking elevation gain', { ...VALID_HIKING_BODY, elevationGainM: undefined }, 'elevationGainM'],
     ['numeric string', { ...VALID_HIKING_BODY, movementTimeMinutes: '240' }, 'movementTimeMinutes'],
+    ['null hiking movement time', { ...VALID_HIKING_BODY, movementTimeMinutes: null }, 'movementTimeMinutes'],
+    ['null hiking distance', { ...VALID_HIKING_BODY, distanceKm: null }, 'distanceKm'],
+    ['null hiking elevation gain', { ...VALID_HIKING_BODY, elevationGainM: null }, 'elevationGainM'],
     ['unknown hiking enum', { ...VALID_HIKING_BODY, packCategory: 'ultra' }, 'packCategory'],
     ['null optional hiking field', { ...VALID_HIKING_BODY, elevationLossM: null }, 'elevationLossM'],
+    ['missing cycling movement time', { ...VALID_CYCLING_BODY, movementTimeMinutes: undefined }, 'movementTimeMinutes'],
+    ['missing cycling distance', { ...VALID_CYCLING_BODY, distanceKm: undefined }, 'distanceKm'],
+    ['missing cycling elevation gain', { ...VALID_CYCLING_BODY, elevationGainM: undefined }, 'elevationGainM'],
     ['missing cycling field', { ...VALID_CYCLING_BODY, asphaltShare: undefined }, 'asphaltShare'],
+    ['missing cycling gravel share', { ...VALID_CYCLING_BODY, gravelShare: undefined }, 'gravelShare'],
+    ['missing cycling trail share', { ...VALID_CYCLING_BODY, trailShare: undefined }, 'trailShare'],
+    ['missing cycling support enum', { ...VALID_CYCLING_BODY, ebikeSupport: undefined }, 'ebikeSupport'],
+    ['null cycling distance', { ...VALID_CYCLING_BODY, distanceKm: null }, 'distanceKm'],
     ['cycling share above one', { ...VALID_CYCLING_BODY, trailShare: 1.01 }, 'trailShare'],
     ['unknown cycling enum', { ...VALID_CYCLING_BODY, ebikeSupport: 'MEDIUM' }, 'ebikeSupport'],
   ])('returns a field-specific 400 for %s without persistence', async (_label, body, field) => {
@@ -180,6 +192,7 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(res.jsonBody).not.toHaveProperty('code');
     expect((await getDayMetaRepository().get(TEST_USER_ID, VALID_DATE))?.specialActivity).toBeUndefined();
   });
 
@@ -252,6 +265,8 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: expect.stringContaining('Field "movementTimeMinutes"') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('AC-18: distanceKm = 200 → 400 (exceeds max 100)', async () => {
@@ -266,6 +281,8 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: expect.stringContaining('Field "distanceKm"') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('AC-19: 60 min, 20 km → 422 (speed 20 km/h > 10 km/h)', async () => {
@@ -405,6 +422,29 @@ describe('PUT /api/diary/day/{date}/special-activity', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: 'Route param "date" must be a valid ISO YYYY-MM-DD date',
+    });
+  });
+
+  it.each([
+    ['missing date', undefined],
+    ['malformed date', '2026/07/20'],
+    ['impossible date', '2026-02-30'],
+  ])('returns 400 for %s before activity persistence', async (_label, date) => {
+    const response = await setSpecialActivityHandler(
+      await makeAuthRequest({
+        params: date === undefined ? {} : { date },
+        body: VALID_HIKING_BODY,
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({
+      error: 'Route param "date" must be a valid ISO YYYY-MM-DD date',
+    });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 
   it('persists the specialActivity to the repository', async () => {
@@ -475,6 +515,26 @@ describe('DELETE /api/diary/day/{date}/special-activity', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: 'Route param "date" must be a valid ISO YYYY-MM-DD date',
+    });
+  });
+
+  it.each([
+    ['missing date', undefined],
+    ['malformed date', '2026/07/20'],
+    ['impossible date', '2026-02-30'],
+  ])('returns 400 for %s', async (_label, date) => {
+    const response = await removeSpecialActivityHandler(
+      await makeAuthRequest({ params: date === undefined ? {} : { date } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({
+      error: 'Route param "date" must be a valid ISO YYYY-MM-DD date',
+    });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 });
 

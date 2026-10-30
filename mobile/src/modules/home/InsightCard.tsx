@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   menuBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
     opacity: 0.6,
   },

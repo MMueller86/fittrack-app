@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -352,7 +353,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
   // ScrollView ref + meal Y-offsets for DayStoryCard chip scroll-to
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ScrollViewInstance>(null);
   const mealOffsets = useRef<Partial<Record<MealType, number>>>({}).current;
 
   // Day-transition fade animation
@@ -615,7 +616,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
     });
   };
 
-  // Open hub for adding items (replaces AddItemModal as primary entry)
+  // Open hub for adding items
   const handleOpenFoodEntryShortcut = (initialSubflow?: 'ai' | 'barcode') => {
     const params = {
       date,

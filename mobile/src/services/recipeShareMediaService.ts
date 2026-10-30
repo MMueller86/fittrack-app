@@ -1,5 +1,5 @@
 import * as FileSystem from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import { Platform } from 'react-native';
 import { openNativeMultiImageShareCandidate, validateLocalPngUris } from './nativeShareCandidate';
 

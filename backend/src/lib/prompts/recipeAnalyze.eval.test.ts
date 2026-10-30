@@ -17,6 +17,7 @@ import type { RecipeIngredient, PrepareRecipeExportViewResponseV2 } from '@fittr
 import * as openai from '../openai';
 import { analyzeRecipeText } from '../openai';
 import type { AiRecipeIngredientLine } from '../openai';
+import { getAzureOpenAiApiVersion } from '../azureOpenAiConfig';
 import { RECIPE_ANALYZE_PROMPT_VERSION, RECIPE_ANALYZE_SYSTEM_PROMPT, RECIPE_PREPARATION_PROMPT_VERSION, RECIPE_PREPARATION_SYSTEM_PROMPT, RECIPE_PREPARATION_CORRECTION_SYSTEM_PROMPT, RECIPE_TEXT_CORRECTION_SYSTEM_PROMPT } from './recipeAnalyze';
 import { prepareRecipeExportViewHandler } from '../../functions/recipes';
 import { __resetRecipesRepositoryForTests, getRecipesRepository } from '../repositories/recipesRepository';
@@ -423,7 +424,7 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live
       }));
       console.info('Synthetic preparation counts and handler evidence', JSON.stringify({
         fixture: fixture.id, sdkCalls: provider.mock.calls.length, preparationCalls: analyzer.mock.calls.length,
-        model: provider.mock.calls[0]?.[0].model, apiVersion: process.env['AZURE_OPENAI_API_VERSION'] ?? '2024-07-01',
+        model: provider.mock.calls[0]?.[0].model, apiVersion: getAzureOpenAiApiVersion(),
         temperature: provider.mock.calls[0]?.[0].temperature, maxTokens: provider.mock.calls[0]?.[0].max_tokens,
         finishReasons: providerResponses.map((value) => value?.choices[0]?.finish_reason),
         sourceCount: savedBefore!.recipe.steps.length, exportCount: result?.steps.length,

@@ -618,7 +618,7 @@ app.http('recipe-analyze', {
 // ---------------------------------------------------------------------------
 
 const RecipeScaleBodySchema = z.object({
-  recipeId: z.string().uuid('recipeId must be a valid UUID'),
+  recipeId: z.guid('recipeId must be a valid UUID'),
   targetPortions: z.number()
     .int('targetPortions must be a whole number')
     .min(RECIPE_PORTION_MIN, `targetPortions must be at least ${RECIPE_PORTION_MIN}`)

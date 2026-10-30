@@ -101,6 +101,263 @@ async function createRecipeForDiary(userId = 'test-user-abc-123') {
   });
 }
 
+type BulkSchemaHandler = typeof bulkDeleteItemsHandler;
+type BulkRequestBody = Record<string, unknown>;
+type BulkBodyMutation = (body: BulkRequestBody) => void;
+
+const bulkSchemaHandlers: Array<{
+  route: string;
+  handler: BulkSchemaHandler;
+  makeBody: () => BulkRequestBody;
+}> = [
+  {
+    route: 'POST /api/diary/items/bulk-delete',
+    handler: bulkDeleteItemsHandler,
+    makeBody: () => ({ sourceDate: '2026-05-08', items: [{ mealId: 'm', itemId: 'i' }] }),
+  },
+  {
+    route: 'POST /api/diary/items/bulk-move',
+    handler: bulkMoveItemsHandler,
+    makeBody: () => ({
+      sourceDate: '2026-05-08', items: [{ mealId: 'm', itemId: 'i' }], target: { mealId: 'target' },
+    }),
+  },
+  {
+    route: 'POST /api/diary/items/bulk-copy',
+    handler: bulkCopyItemsHandler,
+    makeBody: () => ({
+      sourceDate: '2026-05-08', targetDate: '2026-05-09',
+      items: [{ mealId: 'm', itemId: 'i' }], target: { mealId: 'target' },
+    }),
+  },
+];
+
+const commonBulkSchemaFailures: Array<{
+  label: string;
+  field?: string;
+  detail?: string;
+  mutate: BulkBodyMutation;
+}> = [
+  { label: 'missing sourceDate', field: 'sourceDate', mutate: (body) => { delete body.sourceDate; } },
+  { label: 'null sourceDate', field: 'sourceDate', mutate: (body) => { body.sourceDate = null; } },
+  { label: 'wrong-type sourceDate', field: 'sourceDate', mutate: (body) => { body.sourceDate = 20260508; } },
+  { label: 'malformed sourceDate', field: 'sourceDate', mutate: (body) => { body.sourceDate = '2026/05/08'; } },
+  { label: 'impossible sourceDate', field: 'sourceDate', mutate: (body) => { body.sourceDate = '2026-02-30'; } },
+  { label: 'missing items', field: 'items', mutate: (body) => { delete body.items; } },
+  { label: 'null items', field: 'items', mutate: (body) => { body.items = null; } },
+  { label: 'wrong-type items', field: 'items', mutate: (body) => { body.items = {}; } },
+  { label: 'null item reference', field: 'items', mutate: (body) => { body.items = [null]; } },
+  {
+    label: 'missing reference mealId', field: 'items',
+    mutate: (body) => { body.items = [{ itemId: 'i' }]; },
+  },
+  {
+    label: 'null reference mealId', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: null, itemId: 'i' }]; },
+  },
+  {
+    label: 'wrong-type reference mealId', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: 1, itemId: 'i' }]; },
+  },
+  {
+    label: 'blank reference mealId after trim', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: '  ', itemId: 'i' }]; },
+  },
+  {
+    label: 'reference mealId above maximum', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: 'm'.repeat(257), itemId: 'i' }]; },
+  },
+  {
+    label: 'missing reference itemId', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: 'm' }]; },
+  },
+  {
+    label: 'null reference itemId', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: 'm', itemId: null }]; },
+  },
+  {
+    label: 'wrong-type reference itemId', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: 'm', itemId: false }]; },
+  },
+  {
+    label: 'blank reference itemId after trim', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: 'm', itemId: '\t ' }]; },
+  },
+  {
+    label: 'reference itemId above maximum', field: 'items',
+    mutate: (body) => { body.items = [{ mealId: 'm', itemId: 'i'.repeat(257) }]; },
+  },
+  {
+    label: 'extra reference field', field: 'items', detail: 'extra',
+    mutate: (body) => { body.items = [{ mealId: 'm', itemId: 'i', extra: true }]; },
+  },
+  {
+    label: 'extra top-level field', detail: 'extra',
+    mutate: (body) => { body.extra = true; },
+  },
+];
+
+function expectGenericBulkParseFailure(
+  response: { status?: number; jsonBody?: unknown },
+  detail: string,
+): void {
+  expect(response.status).toBe(400);
+  expect(response.jsonBody).toEqual({ error: expect.stringContaining(detail) });
+  expect(response.jsonBody).not.toHaveProperty('code');
+}
+
+describe.each(bulkSchemaHandlers)('$route request schema', ({ handler, makeBody }) => {
+  it.each(commonBulkSchemaFailures)('returns the generic parseBody error for $label', async ({ field, detail, mutate }) => {
+    const body = makeBody();
+    mutate(body);
+
+    const response = await handler(await makeAuthRequest({ body }), makeContext());
+
+    expectGenericBulkParseFailure(response, field ? `Field "${field}"` : detail!);
+    if (detail) {
+      expect((response.jsonBody as { error: string }).error).toContain(detail);
+    }
+  });
+
+  it.each([
+    ['one-character reference IDs', 'm', 'i'],
+    ['maximum-length reference IDs', 'm'.repeat(256), 'i'.repeat(256)],
+    ['trimmed reference IDs', ' m ', ' i '],
+  ])('accepts %s and reaches repository reference validation', async (_label, mealId, itemId) => {
+    const body = makeBody();
+    body.items = [{ mealId, itemId }];
+
+    const response = await handler(await makeAuthRequest({ body }), makeContext());
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'diary_bulk_reference_not_found' });
+  });
+
+  it('passes an empty items array to the current bulk-request validation', async () => {
+    const body = makeBody();
+    body.items = [];
+
+    const response = await handler(await makeAuthRequest({ body }), makeContext());
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: 'invalid_diary_bulk_request' });
+  });
+});
+
+const bulkTargetSchemaFailures: Array<{
+  label: string;
+  field: string;
+  detail?: string;
+  mutate: BulkBodyMutation;
+}> = [
+  { label: 'missing target', field: 'target', mutate: (body) => { delete body.target; } },
+  { label: 'null target', field: 'target', mutate: (body) => { body.target = null; } },
+  { label: 'wrong-type target', field: 'target', mutate: (body) => { body.target = 'dinner'; } },
+  { label: 'empty target selector', field: 'target', mutate: (body) => { body.target = {}; } },
+  {
+    label: 'both target selectors', field: 'target',
+    mutate: (body) => { body.target = { mealId: 'target', newMealType: 'dinner' }; },
+  },
+  {
+    label: 'null target mealId', field: 'target',
+    mutate: (body) => { body.target = { mealId: null }; },
+  },
+  {
+    label: 'wrong-type target mealId', field: 'target',
+    mutate: (body) => { body.target = { mealId: 1 }; },
+  },
+  {
+    label: 'blank target mealId after trim', field: 'target',
+    mutate: (body) => { body.target = { mealId: '  ' }; },
+  },
+  {
+    label: 'target mealId above maximum', field: 'target',
+    mutate: (body) => { body.target = { mealId: 't'.repeat(257) }; },
+  },
+  {
+    label: 'invalid target meal type', field: 'target',
+    mutate: (body) => { body.target = { newMealType: 'brunch' }; },
+  },
+  {
+    label: 'null target meal type', field: 'target',
+    mutate: (body) => { body.target = { newMealType: null }; },
+  },
+  {
+    label: 'wrong-type target meal type', field: 'target',
+    mutate: (body) => { body.target = { newMealType: 1 }; },
+  },
+  {
+    label: 'extra target-selector field', field: 'target', detail: 'extra',
+    mutate: (body) => { body.target = { mealId: 'target', extra: true }; },
+  },
+];
+
+const bulkCopyDateSchemaFailures: Array<{
+  label: string;
+  field: string;
+  mutate: BulkBodyMutation;
+}> = [
+  { label: 'missing targetDate', field: 'targetDate', mutate: (body) => { delete body.targetDate; } },
+  { label: 'null targetDate', field: 'targetDate', mutate: (body) => { body.targetDate = null; } },
+  { label: 'wrong-type targetDate', field: 'targetDate', mutate: (body) => { body.targetDate = 20260509; } },
+  { label: 'malformed targetDate', field: 'targetDate', mutate: (body) => { body.targetDate = '2026/05/09'; } },
+  { label: 'impossible targetDate', field: 'targetDate', mutate: (body) => { body.targetDate = '2026-02-30'; } },
+];
+
+describe.each(bulkSchemaHandlers.filter(({ handler }) => handler !== bulkDeleteItemsHandler))(
+  '$route target schema',
+  ({ handler, makeBody }) => {
+    it.each(bulkTargetSchemaFailures)('rejects $label with the current parseBody envelope', async ({ field, detail, mutate }) => {
+      const body = makeBody();
+      mutate(body);
+
+      const response = await handler(await makeAuthRequest({ body }), makeContext());
+
+      expectGenericBulkParseFailure(response, `Field "${field}"`);
+      if (detail) {
+        expect((response.jsonBody as { error: string }).error).toContain(detail);
+      }
+    });
+
+    it.each([
+      ['one-character target mealId', { mealId: 't' }],
+      ['maximum-length target mealId', { mealId: 't'.repeat(256) }],
+      ['valid newMealType selector', { newMealType: 'dinner' }],
+    ])('accepts %s and reaches repository reference validation', async (_label, target) => {
+      const body = makeBody();
+      body.target = target;
+
+      const response = await handler(await makeAuthRequest({ body }), makeContext());
+
+      expect(response.status).toBe(404);
+      expect(response.jsonBody).toEqual({ error: 'diary_bulk_reference_not_found' });
+    });
+  },
+);
+
+describe('POST /api/diary/items/bulk-copy date schema', () => {
+  it.each(bulkCopyDateSchemaFailures)('rejects $label with the current parseBody envelope', async ({ field, mutate }) => {
+    const body = bulkSchemaHandlers[2]!.makeBody();
+    mutate(body);
+
+    const response = await bulkCopyItemsHandler(await makeAuthRequest({ body }), makeContext());
+
+    expectGenericBulkParseFailure(response, `Field "${field}"`);
+  });
+
+  it('accepts the same date for source and target', async () => {
+    const response = await bulkCopyItemsHandler(await makeAuthRequest({
+      body: {
+        sourceDate: '2026-05-08', targetDate: '2026-05-08',
+        items: [{ mealId: 'm', itemId: 'i' }], target: { newMealType: 'dinner' },
+      },
+    }), makeContext());
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'diary_bulk_reference_not_found' });
+  });
+});
+
 describe('POST /api/diary/meals request schema', () => {
   it.each([
     ['missing date', { type: 'breakfast' }, 'date'],
@@ -161,6 +418,8 @@ describe('POST /api/diary/items/bulk-delete and bulk-move', () => {
       makeContext(),
     );
     expect(invalidDate.status).toBe(400);
+    expect(invalidDate.jsonBody).toEqual({ error: expect.stringContaining('Field "sourceDate"') });
+    expect(invalidDate.jsonBody).not.toHaveProperty('code');
 
     const unknownField = await bulkMoveItemsHandler(
       await makeAuthRequest({
@@ -174,6 +433,8 @@ describe('POST /api/diary/items/bulk-delete and bulk-move', () => {
       makeContext(),
     );
     expect(unknownField.status).toBe(400);
+    expect(unknownField.jsonBody).toEqual({ error: expect.stringContaining('userId') });
+    expect(unknownField.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns stable not-found errors without applying a partial delete', async () => {
@@ -498,7 +759,7 @@ describe('POST /api/diary/items/bulk-copy', () => {
       await makeAuthRequest({ body: { ...body, extra: true } }),
       makeContext(),
     );
-    expect(unknownField.status).toBe(400);
+    expectGenericBulkParseFailure(unknownField, 'extra');
 
     const userId = TEST_USER_ID;
     const repository = getDiaryRepository();
@@ -996,6 +1257,7 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(res.jsonBody).not.toHaveProperty('code');
     expect((await getDiaryRepository().getMealById(TEST_USER_ID, mealId))?.items).toHaveLength(0);
   });
 
@@ -1039,6 +1301,10 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided',
+    });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('stores inputAmount as quantity (not amountGrams) when inputMode is portion', async () => {
@@ -1190,6 +1456,198 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
   });
 });
 
+describe('POST /api/diary/meals/:id/items request schema characterization', () => {
+  const flatMacros = {
+    name: 'Apfel', calories: 52, protein: 0.3, carbs: 14, fat: 0.2,
+  };
+  const calculated = {
+    name: 'Haferflocken', quantityMode: 'grams', quantity: 80,
+    nutritionPer100g: { calories: 370, protein: 13, carbs: 58, fat: 7 },
+  };
+  const product = {
+    productName: 'Birne', amountGrams: 120,
+    calculatedNutrition: { calories: 57, protein: 0.4, carbs: 15, fat: 0.1 },
+  };
+
+  async function submit(body: Record<string, unknown>) {
+    const mealId = await createMeal();
+    return addItemHandler(
+      await makeAuthRequest({ params: { id: mealId }, body }),
+      makeContext(),
+    );
+  }
+
+  it.each([
+    ['flat macros', flatMacros],
+    ['calculated quantity', calculated],
+    ['product nutrition', product],
+  ])('accepts the %s input shape at its applicable minimum', async (_label, body) => {
+    const response = await submit(body);
+
+    expect(response.status).toBe(201);
+  });
+
+  it('accepts the recipe snapshot shape and its minimum portion amount', async () => {
+    const mealId = await createMeal();
+    const recipe = await createRecipeForDiary();
+    const response = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          sourceType: 'recipe', productId: recipe.id,
+          inputMode: 'portion', inputAmount: 0.1,
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(201);
+  });
+
+  it('accepts the declared string maxima across flat, calculated, and product shapes', async () => {
+    const flat = await submit({
+      ...flatMacros,
+      name: 'N'.repeat(200),
+      unit: 'U'.repeat(50),
+      aiMealEstimateContext: 'C'.repeat(100),
+    });
+    const calculatedMaximum = await submit({
+      ...calculated,
+      name: 'N'.repeat(200),
+      unit: 'U'.repeat(50),
+      quantity: 500,
+      nutritionPer100g: { calories: 100000, protein: 100, carbs: 100, fat: 100, fiber: 100 },
+    });
+    const productMaximum = await submit({
+      ...product,
+      productName: 'P'.repeat(200),
+      amountGrams: 100000,
+      calculatedNutrition: { calories: 100000, protein: 100, carbs: 100, fat: 100, fiber: 100 },
+    });
+
+    expect(flat.status).toBe(201);
+    expect(calculatedMaximum.status).toBe(201);
+    expect(productMaximum.status).toBe(201);
+  });
+
+  it.each([
+    ['missing recipe productId', { sourceType: 'recipe', inputMode: 'portion', inputAmount: 1 }],
+    ['missing recipe inputMode', { sourceType: 'recipe', productId: 'recipe-id', inputAmount: 1 }],
+    ['missing recipe inputAmount', { sourceType: 'recipe', productId: 'recipe-id', inputMode: 'portion' }],
+  ])('rejects %s at the AddItem union refinement with 400', async (_label, body) => {
+    const response = await submit(body);
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({
+      error: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided',
+    });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it.each([
+    ['recipe productId is blank after trim', { sourceType: 'recipe', productId: '  ', inputMode: 'portion', inputAmount: 1 }, 'productId'],
+    ['recipe inputMode is null', { sourceType: 'recipe', productId: 'recipe-id', inputMode: null, inputAmount: 1 }, 'inputMode'],
+    ['recipe inputMode is unknown', { sourceType: 'recipe', productId: 'recipe-id', inputMode: 'ounces', inputAmount: 1 }, 'inputMode'],
+    ['recipe inputAmount is null', { sourceType: 'recipe', productId: 'recipe-id', inputMode: 'portion', inputAmount: null }, 'inputAmount'],
+    ['recipe inputAmount is zero', { sourceType: 'recipe', productId: 'recipe-id', inputMode: 'portion', inputAmount: 0 }, 'inputAmount'],
+    ['productName is null', { ...product, productName: null }, 'productName'],
+    ['productName exceeds maximum', { ...product, productName: 'P'.repeat(201) }, 'productName'],
+    ['amountGrams is zero', { ...product, amountGrams: 0 }, 'amountGrams'],
+    ['amountGrams is a non-numeric string', { ...product, amountGrams: 'many' }, 'amountGrams'],
+    ['calculated nutrition calories is a string', { ...product, calculatedNutrition: { ...product.calculatedNutrition, calories: 'many' } }, 'calculatedNutrition'],
+    ['calculated nutrition carbs is missing', { ...product, calculatedNutrition: { calories: 57, protein: 0.4, fat: 0.1 } }, 'calculatedNutrition'],
+    ['calculated nutrition fat is negative', { ...product, calculatedNutrition: { ...product.calculatedNutrition, fat: -1 } }, 'calculatedNutrition'],
+    ['calculated quantity is a non-numeric string', { ...calculated, quantity: 'many' }, 'quantity'],
+    ['calculated quantityMode is null', { ...calculated, quantityMode: null }, 'quantityMode'],
+    ['flat protein is a non-numeric string', { ...flatMacros, protein: 'many' }, 'protein'],
+    ['flat carbs is negative', { ...flatMacros, carbs: -1 }, 'carbs'],
+    ['unit exceeds maximum', { ...flatMacros, unit: 'U'.repeat(51) }, 'unit'],
+  ])('returns the current 400 field error when %s', async (_label, body, field) => {
+    const response = await submit(body);
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('strips extra fields in the recipe snapshot shape and reports missing recipes as domain 404', async () => {
+    const mealId = await createMeal();
+    const response = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          sourceType: 'recipe', productId: 'not-a-uuid', inputMode: 'portion', inputAmount: 1,
+          extraField: true,
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'Recipe not found' });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('returns 422 when the schema-valid calculated shape has no nutrition reference', async () => {
+    const response = await submit({
+      name: 'Haferflocken', quantityMode: 'grams', quantity: 80,
+    });
+
+    expect(response.status).toBe(422);
+    expect(response.jsonBody).toEqual({
+      error: 'Cannot calculate from grams: nutritionPer100g is not available for this item',
+    });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it.each([
+    ['missing flat calories', { ...flatMacros, calories: undefined }, 'Either flat macros'],
+    ['missing flat protein', { ...flatMacros, protein: undefined }, 'Either flat macros'],
+    ['missing flat carbs', { ...flatMacros, carbs: undefined }, 'Either flat macros'],
+    ['missing flat fat', { ...flatMacros, fat: undefined }, 'Either flat macros'],
+    ['missing calculated quantityMode', { name: 'Haferflocken', quantity: 80 }, 'Either flat macros'],
+    ['missing calculated quantity', { name: 'Haferflocken', quantityMode: 'grams' }, 'Either flat macros'],
+    ['missing productName', { amountGrams: 120, calculatedNutrition: product.calculatedNutrition }, 'Either flat macros'],
+    ['missing product amountGrams', { ...product, amountGrams: undefined }, 'Either flat macros'],
+    ['missing calculatedNutrition', { ...product, calculatedNutrition: undefined }, 'Either flat macros'],
+    ['blank trimmed name', { ...flatMacros, name: '\u00a0\u2003' }, 'Field "name"'],
+    ['null name', { ...flatMacros, name: null }, 'Field "name"'],
+    ['name above maximum', { ...flatMacros, name: 'N'.repeat(201) }, 'Field "name"'],
+    ['null calculated quantity', { ...calculated, quantity: null }, 'Field "quantity"'],
+    ['zero calculated quantity', { ...calculated, quantity: 0 }, 'Field "quantity"'],
+    ['invalid quantity mode', { ...calculated, quantityMode: 'ounces' }, 'Field "quantityMode"'],
+    ['invalid source type', { ...flatMacros, sourceType: 'import' }, 'Field "sourceType"'],
+    ['negative nutrition', { ...product, calculatedNutrition: { ...product.calculatedNutrition, calories: -1 } }, 'Field "calculatedNutrition"'],
+    ['invalid image URL', { ...flatMacros, imageUrl: 'not a URL' }, 'Field "imageUrl"'],
+    ['invalid AI estimate confidence', { ...product, sourceType: 'ai-meal-estimate', aiMealEstimateConfidence: 'certain' }, 'Field "aiMealEstimateConfidence"'],
+  ])('returns the current 400 parseBody response for %s', async (_label, body, expectedError) => {
+    const response = await submit(body);
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(expectedError) });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('observes null-to-zero coercion for flat macro values', async () => {
+    const response = await submit({ ...flatMacros, calories: null });
+
+    expect(response.status).toBe(201);
+    expect((response.jsonBody as { meal: { items: Array<{ macros: { calories: number } }> } })
+      .meal.items[0]?.macros.calories).toBe(0);
+  });
+
+  it('currently coerces null calculated nutrition to zero under Zod 3', async () => {
+    const response = await submit({
+      ...product,
+      calculatedNutrition: { ...product.calculatedNutrition, protein: null },
+    });
+
+    expect(response.status).toBe(201);
+    expect((response.jsonBody as { meal: { items: Array<{ macros: { protein: number } }> } })
+      .meal.items[0]?.macros.protein).toBe(0);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Flat macros input (manual mode — existing behaviour)
 // ---------------------------------------------------------------------------
@@ -1219,6 +1677,10 @@ describe('POST /api/diary/meals/:id/items â€” flat macros input', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided',
+    });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 });
 
@@ -1253,6 +1715,7 @@ describe('POST /api/diary/meals/:id/items â€” quantityMode input', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Missing meal id' });
   });
 });
 
@@ -1316,22 +1779,24 @@ describe('PUT /api/diary/meals/:id/items/:itemId — updateItemHandler', () => {
   });
 
   it.each([
-    ['missing inputMode', { amountGrams: 10 }],
-    ['invalid inputMode', { inputMode: 'ounces', amountGrams: 10 }],
-    ['missing amountGrams for grams mode', { inputMode: 'grams' }],
-    ['zero amountGrams', { inputMode: 'grams', amountGrams: 0 }],
-    ['string amountGrams', { inputMode: 'grams', amountGrams: '10' }],
-    ['null amountGrams', { inputMode: 'grams', amountGrams: null }],
-    ['missing portionCount for portion mode', { inputMode: 'portion' }],
-    ['zero portionCount', { inputMode: 'portion', portionCount: 0 }],
-    ['string portionCount', { inputMode: 'portion', portionCount: '1' }],
-  ])('returns 400 for invalid update schema case: %s', async (_label, body) => {
+    ['missing inputMode', { amountGrams: 10 }, 'Field "inputMode"'],
+    ['invalid inputMode', { inputMode: 'ounces', amountGrams: 10 }, 'Field "inputMode"'],
+    ['missing amountGrams for grams mode', { inputMode: 'grams' }, 'amountGrams required'],
+    ['zero amountGrams', { inputMode: 'grams', amountGrams: 0 }, 'Field "amountGrams"'],
+    ['string amountGrams', { inputMode: 'grams', amountGrams: '10' }, 'Field "amountGrams"'],
+    ['null amountGrams', { inputMode: 'grams', amountGrams: null }, 'Field "amountGrams"'],
+    ['missing portionCount for portion mode', { inputMode: 'portion' }, 'portionCount for portion mode'],
+    ['zero portionCount', { inputMode: 'portion', portionCount: 0 }, 'Field "portionCount"'],
+    ['string portionCount', { inputMode: 'portion', portionCount: '1' }, 'Field "portionCount"'],
+  ])('returns the current 400 error for invalid update schema case: %s', async (_label, body, detail) => {
     const res = await updateItemHandler(
       await makeAuthRequest({ params: { id: 'missing-meal', itemId: 'missing-item' }, body }),
       makeContext(),
     );
 
     expect(res.status).toBe(400);
+  expect(res.jsonBody).toEqual({ error: expect.stringContaining(detail) });
+  expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('accepts positive fractional amounts and strips unknown update fields', async () => {
@@ -1416,6 +1881,8 @@ describe('PUT /api/diary/meals/:id/items/:itemId — updateItemHandler', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: expect.stringContaining('amountGrams required') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('scales macros proportionally for an OFf item (sourceId starts with openFoodFacts:)', async () => {
@@ -1489,8 +1956,59 @@ describe('PUT /api/diary/:date/day-type with workoutType', () => {
     expect(stored?.workoutType).toBe('gym');
   });
 
+  it.each(['rest', 'training'] as const)('accepts dayType %s', async (dayType) => {
+    const response = await setDayTypeHandler(
+      await makeAuthRequest({ params: { date: '2026-05-08' }, body: { dayType } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({ dayMeta: { dayType } });
+  });
+
+  it.each(['gym', 'bouldering', 'running', 'cycling', 'other'] as const)(
+    'accepts workoutType %s on a training day', async (workoutType) => {
+      const response = await setDayTypeHandler(
+        await makeAuthRequest({
+          params: { date: '2026-05-08' },
+          body: { dayType: 'training', workoutType },
+        }),
+        makeContext(),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.jsonBody).toMatchObject({ dayMeta: { dayType: 'training', workoutType } });
+    },
+  );
+
+  it.each([
+    ['missing date', undefined],
+    ['malformed date', '2026/05/08'],
+  ])('returns the route-param 400 for %s', async (_label, date) => {
+    const response = await setDayTypeHandler(
+      await makeAuthRequest({ params: date === undefined ? {} : { date }, body: { dayType: 'rest' } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: 'Route param "date" must be YYYY-MM-DD' });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('currently accepts an impossible calendar date when its route-param shape matches', async () => {
+    const response = await setDayTypeHandler(
+      await makeAuthRequest({ params: { date: '2026-02-30' }, body: { dayType: 'rest' } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({ dayMeta: { date: '2026-02-30', dayType: 'rest' } });
+  });
+
   it.each([
     ['missing dayType', {}, 'dayType'],
+    ['null dayType', { dayType: null }, 'dayType'],
+    ['empty dayType', { dayType: '' }, 'dayType'],
     ['invalid dayType', { dayType: 'off' }, 'dayType'],
     ['numeric dayType', { dayType: 1 }, 'dayType'],
     ['invalid workoutType', { dayType: 'training', workoutType: 'crossfit' }, 'workoutType'],
@@ -1503,6 +2021,7 @@ describe('PUT /api/diary/:date/day-type with workoutType', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(res.jsonBody).not.toHaveProperty('code');
     expect(await getDayMetaRepository().get(TEST_USER_ID, '2026-05-08')).toBeNull();
   });
 
@@ -2032,6 +2551,21 @@ describe('GET /api/diary — specialActivity response fields', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('date') });
+  });
+
+  it.each([
+    ['minimum hour', '0'],
+    ['maximum hour', '23'],
+    ['negative hour', '-1'],
+    ['hour above maximum', '24'],
+    ['fractional hour', '12.5'],
+    ['non-numeric hour', 'noon'],
+    ['unsafe integer hour', '9007199254740992'],
+  ])('does not reject the diary request for %s localHour input', async (_label, localHour) => {
+    const req = await makeGetRequest(GET_DATE, GET_DATE, localHour);
+    const res = await getDiaryHandler(req, makeContext());
+
+    expect(res.status).toBe(200);
   });
 });
 

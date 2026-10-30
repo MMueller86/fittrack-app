@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as ExpoMediaLibrary from 'expo-media-library';
+import * as ExpoMediaLibrary from 'expo-media-library/legacy';
 
 const nativeShareMocks = vi.hoisted(() => ({
   open: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('expo-file-system', () => ({
   Paths: { cache: 'cache' },
 }));
 
-vi.mock('expo-media-library', () => ({
+vi.mock('expo-media-library/legacy', () => ({
   isAvailableAsync: vi.fn(),
   requestPermissionsAsync: vi.fn(),
   getAlbumAsync: vi.fn(),

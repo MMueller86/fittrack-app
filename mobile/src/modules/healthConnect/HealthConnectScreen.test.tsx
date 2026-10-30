@@ -27,7 +27,7 @@ vi.mock('react-native', () => ({
   Modal: 'Modal',
   Platform: { OS: 'android' },
   ScrollView: 'ScrollView',
-  StyleSheet: { absoluteFillObject: {}, create: <T,>(styles: T) => styles },
+  StyleSheet: { absoluteFill: {}, create: <T,>(styles: T) => styles },
   Text: 'Text',
   TouchableOpacity: 'TouchableOpacity',
   View: 'View',

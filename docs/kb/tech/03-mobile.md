@@ -224,7 +224,6 @@ scoped to the manual action that caused them.
 - `FoodEstimateReviewScreen.tsx` — review/edit AI food estimates
 - `LabelScanReviewScreen.tsx` — review OCR + AI extracted nutrition label
 - `MealEstimateReviewScreen.tsx` — review AI meal image estimate
-- `AddItemModal.tsx` — [legacy, being superseded by FoodEntryHub]
 - `ProductEditor.tsx` — edit reusable item details
 - `EditItemSheet.tsx`, `CopyItemSheet.tsx`, `MoveItemSheet.tsx` — item management sheets
 
@@ -386,21 +385,49 @@ merge or retry. A defensive `MISSING_EXPORT_VIEW` is recovered inside Share,
 not by returning to the wizard. The existing tag, highlight, crop, paired
 image, media-library, and native-share flow remains in place.
 
+#### Photo capture (shared)
+
+All photo capture runs through `mobile/src/shared/camera/`. The design rule is
+described in [05-ux-patterns.md](../product/05-ux-patterns.md#camera-and-photo-capture).
+
+| File | Responsibility |
+|---|---|
+| `framePresets.ts` | `FRAME_PRESETS` (`recipeHero`, `nutritionLabel`, `mealPhoto`) with aspect ratio and optional `maxEdge`; JPEG quality constant |
+| `frameCropMath.ts` | Pure geometry: cover scale, pan clamping, focus/zoom ↔ transform, source rectangle of a crop, preview-to-photo mapping, frame sizing |
+| `FramedCameraCapture.tsx` | `expo-camera` `CameraView` with focus frame, permission and capture states; returns the photo plus the pixel rectangle visible in the frame |
+| `FramedImageEditor.tsx` | Pan/pinch editor inside the frame (gallery images, recipe fine-tuning) |
+| `FramedPhotoPicker.tsx` | Source sheet, camera, gallery and editor; `output: 'metadata' \| 'cropped-file'`, `cameraReview: 'direct' \| 'editor'` |
+| `cropImageToFrame.ts` | Pixel crop, downsizing and JPEG encoding via `expo-image-manipulator` |
+
+Technology decision: `expo-camera` (live preview, capture, barcode),
+`expo-image-picker` (gallery only) and `expo-image-manipulator` (pixel crop).
+`react-native-image-crop-picker` and `react-native-vision-camera` were removed;
+the app is Android-only, so no iOS-specific camera path exists. Do not
+reintroduce system cameras or system croppers.
+
+Consumers: `RecipeImageSourcePicker` (preset `recipeHero`, metadata output,
+camera captures open the editor), `LabelSubFlow` (preset `nutritionLabel`,
+cropped file, `scanLabel`) and `AISubFlow` (preset `mealPhoto`, cropped file,
+`estimateMeal`). Camera captures with `cameraReview: 'direct'` are cropped to
+the rectangle that was visible in the frame; gallery images pass through the
+editor first.
+
 #### Recipe images: camera, gallery and Hero-Crop
 
-The recipe wizard offers a FitTrack-owned source picker through
-`RecipeImageSourcePicker`:
+The recipe wizard offers the FitTrack source picker through
+`RecipeImageSourcePicker`, a thin wrapper around `FramedPhotoPicker` with the
+`recipeHero` preset:
 
-- **Camera:** Uses the existing `expo-camera` `CameraView` integration. The
-    preview shows a responsive `1080:1015` frame, dims the area outside the
-    frame, accounts for top and bottom safe-area insets, and displays the hint
-    `Motiv im Rahmen platzieren`.
+- **Camera:** `FramedCameraCapture` shows the responsive `1080:1015` frame, dims
+    the area outside the frame, accounts for top and bottom safe-area insets, and
+    displays the hint `Motiv im Rahmen platzieren`.
 - **Gallery:** Uses `expo-image-picker` with `allowsEditing: false`. The
     selected image is handed over without a system `4:3` crop. The picker uses a
     normal JPEG quality setting, but does not create a spatially cropped Hero
     file.
 
-Both sources enter the same `RecipeImageHeroCropEditor`. The editor keeps the
+Both sources enter the same `RecipeImageHeroCropEditor` (a wrapper around
+`FramedImageEditor`). The editor keeps the
     source URI and lets the user move the image with one-finger pan and change
     the zoom with pinch. The minimum scale fully covers the frame and panning is
     clamped so that no empty space appears. Only normalized presentation
@@ -548,7 +575,11 @@ does not upload to Google Photos, Instagram or FitTrack persistence.
 
 `mobile/app.config.js` configures the existing `expo-camera` plugin. Its
 permission description explicitly includes recipe photos alongside the
-Barcode-Scanner and AI use cases; microphone recording remains disabled. A
+Barcode-Scanner and AI use cases; microphone recording remains disabled. The
+`expo-media-library` photo permission text covers recipe images, nutrition
+labels and meal photos. `expo-image-manipulator` is a native module and
+`react-native-image-crop-picker` / `react-native-vision-camera` were removed, so a
+new Dev and Alpha build is required once. A
 change to this native permission configuration has **potential native build
 impact**: a new Dev Build may be necessary even though the exact decision is
 environment- and release-dependent. The Infrastructure release gate decides

@@ -1,7 +1,7 @@
 // FoodEstimateReviewScreen — shows an AI-estimated nutrition profile for user review and editing
 // before optionally saving it as a reusable custom product.
 //
-// Rendered as a full-screen Modal (nested inside MealParserReviewScreen or AddItemModal).
+// Rendered as a full-screen Modal (nested inside MealParserReviewScreen or AISubFlow).
 //
 // Flow:
 //   1. AI estimate is shown with all editable fields

@@ -50,7 +50,7 @@ Every document is intentionally focused. Cross-references are used instead of du
 | [02-navigation.md](product/02-navigation.md) | Tab structure, stacks, screen list, entry points | Frontend agent |
 | [03-design-system.md](product/03-design-system.md) | Color tokens, typography, spacing, component patterns | Frontend agent |
 | [04-food-entry-hub.md](product/04-food-entry-hub.md) | Hub state machine, UX flows, finalized decisions | Frontend agent |
-| [05-ux-patterns.md](product/05-ux-patterns.md) | Recurring UX patterns: bottom sheets, snackbars, errors | Frontend agent |
+| [05-ux-patterns.md](product/05-ux-patterns.md) | Recurring UX patterns: bottom sheets, snackbars, errors, camera and photo capture | Frontend agent |
 
 ### Agent Strategy — `agents/`
 

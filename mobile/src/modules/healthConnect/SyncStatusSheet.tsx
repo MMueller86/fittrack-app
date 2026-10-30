@@ -118,7 +118,7 @@ export function SyncStatusSheet({ visible, weightSyncStatus, nutritionSyncStatus
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.overlay,
   },
   sheetWrapper: {

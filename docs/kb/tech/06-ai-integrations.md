@@ -11,7 +11,42 @@
 | Azure OpenAI | `gpt-4.1-mini`, Structured Outputs | Meal parsing, food estimation, recipe analysis, daily insight |
 | Azure Document Intelligence | Standard / Free tier | OCR for nutrition label scan |
 
-Azure OpenAI uses **Structured Outputs** (JSON Schema enforcement on model response) for all features that return machine-readable data. API version must be ≥ `2024-07-01`.
+Azure OpenAI uses **Structured Outputs** (JSON Schema enforcement on model response) for all features that return machine-readable data. API version must support Structured Outputs (`2024-08-01-preview` or later; code default `2024-10-21` GA).
+
+### Configuration (single source)
+
+Deployment name and API version are resolved only in `backend/src/lib/azureOpenAiConfig.ts` (used by `openai.ts`, `labelParser.ts`, `reusableItemsEnrich.ts`, `dailyInsight.ts`, `weeklyInsight.ts`, and the eval helpers).
+
+| Env var | Default (code) | Deployed value (Bicep, unchanged) |
+|---|---|---|
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | `gpt-4.1-mini` | `gpt-4.1-mini` |
+| `AZURE_OPENAI_API_VERSION` | `2024-10-21` | `2024-08-01-preview` |
+
+The former `gpt4o-mini` / `gpt-4o-mini` fallbacks and the `2024-07-01` fallback were removed. The defaults only apply when the env var is unset (e.g. a misconfigured Function App); Dev/Alpha set both explicitly, so deployed behaviour is unchanged until the Alpha app setting is deliberately changed.
+
+### Platform lifecycle (retrieved 2026-10-29)
+
+| Item | Finding | Source |
+|---|---|---|
+| `gpt-4.1-mini` (version `2025-04-14`) | Stage **Deprecated** (still serves inference, blocked for new customers), **retirement date 2027-04-14**, no replacement named in the table. The page does not split the date by SKU; applying it to `GlobalStandard` is an assumption (UNVERIFIED per SKU). Auto-upgrade for Global Standard is Microsoft-managed; GA retirement notice is at least 60 days. Page updated 2026-09-23. | https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule and https://learn.microsoft.com/en-us/azure/ai-foundry/openai/concepts/model-retirements |
+| Dated API versions | Microsoft is moving to the unversioned v1 API (opt-in since 2025-08); `2024-10-21` is the latest GA dated data-plane spec. **No retirement date for `2024-08-01-preview` was found on the retrieved pages — UNVERIFIED.** `2024-07-01` is not listed as an API version in the retrieved pages (only `2024-07-01-preview`) — UNVERIFIED; it was an unused code fallback. | https://learn.microsoft.com/en-us/azure/ai-foundry/openai/api-version-lifecycle and https://learn.microsoft.com/en-us/azure/ai-foundry/openai/reference |
+| `@azure/ai-form-recognizer` 5.1.0 | Not marked deprecated on npm (latest 5.1.0, no `deprecated` flag); Microsoft's Document Intelligence SDK overview lists JS 5.0.0 (v3.1 API, `DocumentAnalysisClient`) as a supported GA client next to `@azure-rest/ai-document-intelligence` 1.0.0 (v4.0). No end-of-support notice found. | https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/sdk-overview-v4-0 and https://registry.npmjs.org/@azure/ai-form-recognizer |
+
+**Decision — Document Intelligence SDK: keep** `@azure/ai-form-recognizer`. It is neither deprecated nor unsupported, only `prebuilt-read` OCR text is used, and migrating would change the wire client without functional benefit. Coverage: `documentIntelligence.wire.test.ts` (real SDK client against a mocked HTTP layer) plus the label-parser tests. Revisit if Microsoft announces end of support.
+
+**Decision — API version default `2024-10-21`** instead of `2024-07-01`: the old fallback is not a documented version, while `2024-10-21` is GA and supports `response_format: json_schema` with `strict: true`. The deployed Bicep value `2024-08-01-preview` is not changed here; moving Alpha to a GA version is an infra decision [Open].
+
+### Follow-up: `gpt-4.1-mini` retirement (2027-04-14)
+
+[Planned] Owner: Backend + Planner. Deadlines:
+- 2026-12-31 — choose replacement model (Microsoft lists none) and decide E-3 successor; check Global Standard auto-upgrade behaviour.
+- 2027-02-15 — run all prompt evals (`npm run test:eval --workspace=backend`) and quota/cost review against the candidate on a non-production deployment.
+- 2027-03-15 — switch Alpha deployment/app settings (infra change, separate package), leaving 30 days before retirement.
+
+### Privacy (data handling, unchanged by this configuration work)
+
+- Sent to Azure OpenAI: user free text, label OCR text, recipe text/images, and (insights) profile/diary/weight context; no user ID or tokens in prompts. Sent to Document Intelligence: the label photo. Both are shared stateless Azure resources (`oai-fittrack-dev`, `di-fittrack-dev-hlpqe7`); OpenAI `GlobalStandard` processing is not limited to Europe.
+- `docs/legal/datenschutzerklaerung-alpha.md` already lists Azure OpenAI and Document Intelligence and states Europe only for storage; this work package requires no policy change. [Open] The policy does not mention that AI processing may occur outside Europe (pre-existing; product/legal decision).
 
 ## AI Features
 

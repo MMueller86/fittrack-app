@@ -2,8 +2,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
-import type { Font, SatoriNode } from "satori";
-
+import type { LaidOutTree, RenderNode, RendererFont } from "./canvasRenderer";
 import { compose, type RecipeTitleLayout } from "./compose";
 import {
   CANVAS_HEIGHT,
@@ -59,18 +58,16 @@ import type {
   RenderResult,
 } from "./types";
 
-type SatoriRenderer = typeof import("satori").default;
-type ResvgConstructor = typeof import("@resvg/resvg-js").Resvg;
-type SharpFactory = typeof import("sharp").default;
+type LayoutEngine = typeof import("./canvasRenderer").layoutElementTree;
+type SharpFactory = typeof import("sharp");
 
 type RuntimeDependencies = {
-  satori: SatoriRenderer;
-  Resvg: ResvgConstructor;
+  layoutTree: LayoutEngine;
   sharp: SharpFactory;
 };
 
 type RendererAssets = {
-  fonts: Font[];
+  fonts: RendererFont[];
   nutritionHighlights: Record<"high-protein" | "low-fat", string>;
   recipeMetaIcons: Awaited<ReturnType<typeof loadRecipeMetaIcons>>;
   barbell: string;
@@ -112,12 +109,13 @@ const DESIGN_ASSET_FILES = {
 
 let runtimeDependenciesPromise: Promise<RuntimeDependencies> | undefined;
 let rendererAssetsPromise: Promise<RendererAssets> | undefined;
-let satoriPromise: Promise<SatoriRenderer> | undefined;
-let fontsPromise: Promise<Font[]> | undefined;
+let layoutEnginePromise: Promise<LayoutEngine> | undefined;
+let fontsPromise: Promise<RendererFont[]> | undefined;
 
-function getSatori(): Promise<SatoriRenderer> {
-  satoriPromise ??= import("satori").then((module) => module.default);
-  return satoriPromise;
+// Loaded lazily so a missing native canvas binary fails the render, not function-app startup.
+function getLayoutEngine(): Promise<LayoutEngine> {
+  layoutEnginePromise ??= import("./canvasRenderer").then((module) => module.layoutElementTree);
+  return layoutEnginePromise;
 }
 
 function errorMessage(error: unknown): string {
@@ -160,15 +158,13 @@ function toImageError(error: UnreadableImageError): RenderResult {
 }
 
 async function loadRuntimeDependencies(): Promise<RuntimeDependencies> {
-  const [satoriModule, resvgModule, sharpModule] = await Promise.all([
-    getSatori(),
-    import("@resvg/resvg-js"),
+  const [layoutTree, sharpModule] = await Promise.all([
+    getLayoutEngine(),
     import("sharp"),
   ]);
 
   return {
-    satori: satoriModule,
-    Resvg: resvgModule.Resvg,
+    layoutTree,
     sharp: (sharpModule.default ?? sharpModule) as SharpFactory,
   };
 }
@@ -288,7 +284,7 @@ function getRendererAssets(): Promise<RendererAssets> {
   return rendererAssetsPromise;
 }
 
-function getRendererFonts(): Promise<Font[]> {
+function getRendererFonts(): Promise<RendererFont[]> {
   fontsPromise ??= (async () => {
     const root = findAssetRoot();
     const [medium, mediumItalic, semiBold, displayBold] = await Promise.all([
@@ -458,9 +454,19 @@ export async function loadPhoto(sharp: SharpFactory, image: RenderInput["image"]
   }
 }
 
-function getNodeMarker(node: SatoriNode): string | undefined {
+function getNodeMarker(node: RenderNode): string | undefined {
   const marker = node.props["data-render-node"];
   return typeof marker === "string" ? marker : undefined;
+}
+
+function assertPngDimensions(png: Buffer): Buffer {
+  const isPng = png.length > 24 && png.readUInt32BE(0) === 0x89504e47;
+  const width = isPng ? png.readUInt32BE(16) : 0;
+  const height = isPng ? png.readUInt32BE(20) : 0;
+  if (width !== CANVAS_WIDTH || height !== CANVAS_HEIGHT) {
+    throw new Error(`Unexpected render dimensions: ${width}x${height}.`);
+  }
+  return png;
 }
 
 function validateMeasuredLayout(
@@ -473,7 +479,7 @@ function validateMeasuredLayout(
   hasRecipeMeta: boolean,
 ): RenderFail | undefined {
   if (titleWidth === undefined) {
-    throw new Error("Satori did not report the title measurement node.");
+    throw new Error("The layout engine did not report the title measurement node.");
   }
   const titleMaxHeight =
     titleLayout === "wrapped" ? TITLE_WRAPPED_MAX_HEIGHT : undefined;
@@ -498,7 +504,7 @@ function validateMeasuredLayout(
   }
 
   if (tagCount !== tagWidths.length) {
-    throw new Error("Satori did not report every tag chip measurement node.");
+    throw new Error("The layout engine did not report every tag chip measurement node.");
   }
   const tagRowWidth =
     tagWidths.reduce((total, width) => total + width, 0) +
@@ -516,7 +522,7 @@ function validateMeasuredLayout(
 
   if (hasRecipeMeta) {
     if (recipeMetaWidth === undefined) {
-      throw new Error("Satori did not report the recipe meta measurement node.");
+      throw new Error("The layout engine did not report the recipe meta measurement node.");
     }
     if (recipeMetaWidth > RECIPE_META_ROW_WIDTH) {
       return {
@@ -580,20 +586,19 @@ async function render(input: RenderInput): Promise<RenderResult> {
     wordmarkMimeType: assets.wordmarkMimeType,
   };
   const titleLayouts: RecipeTitleLayout[] = ["default", "scaled", "wrapped"];
-  let svg: string | undefined;
+  let laidOut: LaidOutTree | undefined;
   let lastTitleError: RenderResult | undefined;
   for (const titleLayout of titleLayouts) {
     let titleWidth: number | undefined;
     let titleHeight: number | undefined;
     const tagWidths: number[] = [];
     let recipeMetaWidth: number | undefined;
-    const candidateSvg = await runtime.satori(
-      compose(normalizedInput, composeAssets, titleLayout) as unknown as Parameters<SatoriRenderer>[0],
+    const candidate = await runtime.layoutTree(
+      compose(normalizedInput, composeAssets, titleLayout),
       {
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         fonts: assets.fonts,
-        embedFont: true,
         onNodeDetected: (node) => {
           const marker = getNodeMarker(node);
           if (marker === "title") {
@@ -618,7 +623,7 @@ async function render(input: RenderInput): Promise<RenderResult> {
       normalizedInput.recipeMeta !== undefined,
     );
     if (!layoutError) {
-      svg = candidateSvg;
+      laidOut = candidate;
       break;
     }
     if (layoutError.error.code !== "TITLE_OVERFLOW" || titleLayout === "wrapped") {
@@ -627,16 +632,8 @@ async function render(input: RenderInput): Promise<RenderResult> {
     lastTitleError = layoutError;
   }
 
-  if (svg === undefined) {
+  if (laidOut === undefined) {
     return lastTitleError ?? toInternalError(new Error("No supported title layout was rendered."));
-  }
-
-  const rendered = new runtime.Resvg(svg, {
-    fitTo: { mode: "original" },
-    font: { loadSystemFonts: false },
-  }).render();
-  if (rendered.width !== CANVAS_WIDTH || rendered.height !== CANVAS_HEIGHT) {
-    throw new Error(`Unexpected render dimensions: ${rendered.width}x${rendered.height}.`);
   }
 
   return {
@@ -644,7 +641,7 @@ async function render(input: RenderInput): Promise<RenderResult> {
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
     format: "png",
-    buffer: rendered.asPng(),
+    buffer: assertPngDimensions(await laidOut.toPng()),
   };
 }
 
@@ -681,7 +678,7 @@ function createDetailsMeasurements(): DetailsProbeMeasurements {
   return { ingredients: new Map(), steps: new Map() };
 }
 
-function detectDetailsNode(measurements: DetailsProbeMeasurements, node: SatoriNode): void {
+function detectDetailsNode(measurements: DetailsProbeMeasurements, node: RenderNode): void {
   const marker = getNodeMarker(node) ?? "";
   const measurement = { width: node.width, height: node.height };
   if (marker === RECIPE_DETAILS_TEMPLATE_TITLE_NODE) {
@@ -782,7 +779,7 @@ export async function probeInstagramRecipeDetailsGeneratedText(
   });
 
   try {
-    const [satori, fonts] = await Promise.all([getSatori(), getRendererFonts()]);
+    const [layoutTree, fonts] = await Promise.all([getLayoutEngine(), getRendererFonts()]);
     for (const descriptionFontSize of DESCRIPTION_FONT_SIZES) {
       const fields = getRecipeDetailsTextLayoutFields(input, descriptionFontSize);
       const diagnostics = [...invalidDiagnostics];
@@ -795,7 +792,7 @@ export async function probeInstagramRecipeDetailsGeneratedText(
           continue;
         }
         const layout = await addMeasuredGermanBreaks([field], (requests) =>
-          measureDetailTextWidths(satori, fonts, requests),
+          measureDetailTextWidths(layoutTree, fonts, requests),
         );
         if (!layout.ok) {
           textById.set(field.id, "");
@@ -822,11 +819,10 @@ export async function probeInstagramRecipeDetailsGeneratedText(
       }
 
       const measurements = createDetailsMeasurements();
-      await satori(
-        composeRecipeDetailsGeneratedText(input, createDetailsTextOverrides(input, textById, descriptionFontSize)) as
-          unknown as Parameters<SatoriRenderer>[0],
+      await layoutTree(
+        composeRecipeDetailsGeneratedText(input, createDetailsTextOverrides(input, textById, descriptionFontSize)),
         {
-          width: CANVAS_WIDTH, height: CANVAS_HEIGHT, fonts, embedFont: true,
+          width: CANVAS_WIDTH, height: CANVAS_HEIGHT, fonts,
           onNodeDetected: (node) => detectDetailsNode(measurements, node),
         },
       );
@@ -1172,7 +1168,7 @@ export async function renderInstagramRecipeDetailsTemplate(
     for (const descriptionFontSize of DESCRIPTION_FONT_SIZES) {
       const textFields = getRecipeDetailsTextLayoutFields(input, descriptionFontSize);
       const textLayout = await addMeasuredGermanBreaks(textFields, (requests) =>
-        measureDetailTextWidths(runtime.satori, assets.fonts, requests),
+        measureDetailTextWidths(runtime.layoutTree, assets.fonts, requests),
       );
       if (!textLayout.ok) {
         if (textLayout.error.field === "description" && descriptionFontSize > 18) {
@@ -1204,18 +1200,17 @@ export async function renderInstagramRecipeDetailsTemplate(
       const textById = textLayout.textById;
       const textOverrides = createDetailsTextOverrides(input, textById, descriptionFontSize);
       const measurements = createDetailsMeasurements();
-      const svg = await runtime.satori(
+      const laidOut = await runtime.layoutTree(
         composeRecipeDetailsTemplate(input, {
           photo,
           wordmark: assets.wordmark,
           wordmarkMimeType: assets.wordmarkMimeType,
           nutritionHighlights: assets.nutritionHighlights,
-        }, textOverrides) as unknown as Parameters<SatoriRenderer>[0],
+        }, textOverrides),
         {
           width: CANVAS_WIDTH,
           height: CANVAS_HEIGHT,
           fonts: assets.fonts,
-          embedFont: true,
           onNodeDetected: (node) => detectDetailsNode(measurements, node),
         },
       );
@@ -1229,20 +1224,12 @@ export async function renderInstagramRecipeDetailsTemplate(
         }
         return layoutError;
       }
-      const rendered = new runtime.Resvg(svg, {
-        fitTo: { mode: "original" },
-        font: { loadSystemFonts: false },
-      }).render();
-      if (rendered.width !== CANVAS_WIDTH || rendered.height !== CANVAS_HEIGHT) {
-        throw new Error(`Unexpected render dimensions: ${rendered.width}x${rendered.height}.`);
-      }
-
       return {
         ok: true,
         width: CANVAS_WIDTH,
         height: CANVAS_HEIGHT,
         format: "png",
-        buffer: rendered.asPng(),
+        buffer: assertPngDimensions(await laidOut.toPng()),
       };
     }
     throw new Error("No detail teaser font size was evaluated.");

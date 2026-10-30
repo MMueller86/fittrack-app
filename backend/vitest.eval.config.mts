@@ -19,7 +19,7 @@ import { dirname, resolve } from 'node:path';
 // Required env:
 //   AZURE_OPENAI_ENDPOINT
 //   AZURE_OPENAI_API_KEY
-//   AZURE_OPENAI_DEPLOYMENT_NAME   (optional, defaults to 'gpt4o-mini')
+//   AZURE_OPENAI_DEPLOYMENT_NAME   (optional, defaults to 'gpt-4.1-mini')
 //
 // Direct Vitest invocations still skip tests without credentials. The wrapper
 // reports that situation as UNVERIFIED so the explicit command cannot look green.

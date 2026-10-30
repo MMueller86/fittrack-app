@@ -58,6 +58,8 @@ describe('POST /api/reusable-items — validation', () => {
     const req = await makeAuthRequest({});
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Invalid JSON body' });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it.each([
@@ -100,6 +102,7 @@ describe('POST /api/reusable-items — validation', () => {
     } else {
       expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
     }
+    expect(res.jsonBody).not.toHaveProperty('code');
     expect(vi.mocked(enqueueEnrichment)).not.toHaveBeenCalled();
   });
 
@@ -132,6 +135,8 @@ describe('POST /api/reusable-items — validation', () => {
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Invalid input' });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 when calories is missing (manual)', async () => {
@@ -140,6 +145,8 @@ describe('POST /api/reusable-items — validation', () => {
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Invalid input' });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 when name is missing (AI path)', async () => {
@@ -151,6 +158,8 @@ describe('POST /api/reusable-items — validation', () => {
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Invalid input' });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 when nutritionPer100g is missing (AI path)', async () => {
@@ -159,6 +168,115 @@ describe('POST /api/reusable-items — validation', () => {
     });
     const res = await createReusableItemHandler(req, ctx);
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'Invalid input' });
+    expect(res.jsonBody).not.toHaveProperty('code');
+  });
+
+  it.each(['protein', 'carbs', 'fat', 'fiber'] as const)(
+    'returns the current union error when manual required field %s is missing', async (field) => {
+      const body: Record<string, unknown> = {
+        name: 'Apfel', calories: 52, protein: 0.3, carbs: 14, fat: 0.2, fiber: 2.4,
+      };
+      delete body[field];
+
+      const response = await createReusableItemHandler(await makeAuthRequest({ body }), ctx);
+
+      expect(response.status).toBe(400);
+      expect(response.jsonBody).toEqual({ error: 'Invalid input' });
+      expect(response.jsonBody).not.toHaveProperty('code');
+    },
+  );
+
+  it.each(['sourceType', 'name'] as const)(
+    'returns the current union error when AI required field %s is missing', async (field) => {
+      const body: Record<string, unknown> = {
+        sourceType: 'ai', name: 'Apfel',
+        nutritionPer100g: { calories: 52, protein: 0.3, carbs: 14, fat: 0.2 },
+      };
+      delete body[field];
+
+      const response = await createReusableItemHandler(await makeAuthRequest({ body }), ctx);
+
+      expect(response.status).toBe(400);
+      expect(response.jsonBody).toEqual({ error: 'Invalid input' });
+      expect(response.jsonBody).not.toHaveProperty('code');
+    },
+  );
+
+  it.each(['calories', 'protein', 'carbs', 'fat'] as const)(
+    'returns the current union error when nutritionPer100g.%s is missing', async (field) => {
+      const nutritionPer100g: Record<string, unknown> = { calories: 52, protein: 0.3, carbs: 14, fat: 0.2 };
+      delete nutritionPer100g[field];
+      const response = await createReusableItemHandler(await makeAuthRequest({
+        body: { sourceType: 'ai', name: 'Apfel', nutritionPer100g },
+      }), ctx);
+
+      expect(response.status).toBe(400);
+      expect(response.jsonBody).toEqual({ error: 'Invalid input' });
+      expect(response.jsonBody).not.toHaveProperty('code');
+    },
+  );
+
+  it('accepts all declared source enums and confidence boundaries', async () => {
+    for (const [sourceType, aiConfidence] of [
+      ['ai', 0], ['label-scan', 1], ['manual', 0.5],
+    ] as const) {
+      const response = await createReusableItemHandler(await makeAuthRequest({
+        body: {
+          sourceType, name: '  Äpfel  ',
+          nutritionPer100g: { calories: '0', protein: 0, carbs: 0, fat: 0 },
+          aiConfidence,
+        },
+      }), ctx);
+
+      expect(response.status).toBe(201);
+    }
+  });
+
+  it('accepts minimum manual values and the declared AI create string maxima', async () => {
+    const manual = await createReusableItemHandler(await makeAuthRequest({
+      body: { name: 'A', calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+    }), ctx);
+    const ai = await createReusableItemHandler(await makeAuthRequest({
+      body: {
+        sourceType: 'ai',
+        name: 'N'.repeat(200),
+        brand: 'B'.repeat(100),
+        nutritionPer100g: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, salt: 0, sugar: 0, saturatedFat: 0 },
+        portion: { label: 'P'.repeat(100), weightGrams: 0.1 },
+        aiConfidence: 1,
+        unknownField: true,
+      },
+    }), ctx);
+
+    expect(manual.status).toBe(201);
+    expect(ai.status).toBe(201);
+    expect(ai.jsonBody).not.toHaveProperty('unknownField');
+  });
+
+  it.each([
+    ['portion missing label', { sourceType: 'ai', name: 'Apfel', nutritionPer100g: { calories: 1, protein: 1, carbs: 1, fat: 1 }, portion: { weightGrams: 1 } }, 'Invalid input'],
+    ['portion missing weight', { sourceType: 'ai', name: 'Apfel', nutritionPer100g: { calories: 1, protein: 1, carbs: 1, fat: 1 }, portion: { label: 'Stück' } }, 'Invalid input'],
+    ['portion null label', { sourceType: 'ai', name: 'Apfel', nutritionPer100g: { calories: 1, protein: 1, carbs: 1, fat: 1 }, portion: { label: null, weightGrams: 1 } }, 'Invalid input'],
+    ['portion whitespace label', { sourceType: 'ai', name: 'Apfel', nutritionPer100g: { calories: 1, protein: 1, carbs: 1, fat: 1 }, portion: { label: '\u00a0\u2003', weightGrams: 1 } }, 'Field "portion"'],
+    ['brand over maximum', { sourceType: 'ai', name: 'Apfel', brand: 'B'.repeat(101), nutritionPer100g: { calories: 1, protein: 1, carbs: 1, fat: 1 } }, 'Field "brand"'],
+    ['negative AI confidence', { sourceType: 'ai', name: 'Apfel', aiConfidence: -0.01, nutritionPer100g: { calories: 1, protein: 1, carbs: 1, fat: 1 } }, 'Field "aiConfidence"'],
+  ])('returns the current union error for %s', async (_label, body, expectedError) => {
+    const response = await createReusableItemHandler(await makeAuthRequest({ body }), ctx);
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: expect.stringContaining(expectedError) });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('currently coerces null nutrition to zero while missing manual nutrition remains invalid', async () => {
+    const response = await createReusableItemHandler(await makeAuthRequest({
+      body: { name: 'Apfel', calories: null, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+    }), ctx);
+
+    expect(response.status).toBe(201);
+    expect((response.jsonBody as { item: { portion: { nutrition: { calories: number } } } })
+      .item.portion.nutrition.calories).toBe(0);
   });
 });
 
@@ -418,10 +536,20 @@ describe('PATCH /api/reusable-items/:id — update', () => {
 
   it.each([
     ['empty name', { name: '' }, 'name'],
+    ['Unicode-whitespace-only name', { name: '\u00a0\u2003' }, 'name'],
     ['201-character name', { name: 'N'.repeat(201) }, 'name'],
+    ['null name', { name: null }, 'name'],
     ['numeric brand', { brand: 7 }, 'brand'],
     ['negative nutrition', { nutritionPer100g: { calories: -1, protein: 0, carbs: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['nutrition missing calories', { nutritionPer100g: { protein: 0, carbs: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['nutrition missing protein', { nutritionPer100g: { calories: 0, carbs: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['nutrition missing carbs', { nutritionPer100g: { calories: 0, protein: 0, fat: 0 } }, 'nutritionPer100g'],
+    ['nutrition missing fat', { nutritionPer100g: { calories: 0, protein: 0, carbs: 0 } }, 'nutritionPer100g'],
+    ['portion missing label', { portion: { weightGrams: 1 } }, 'portion'],
+    ['portion missing weight', { portion: { label: 'Stück' } }, 'portion'],
+    ['portion non-numeric weight', { portion: { label: 'Stück', weightGrams: 'many' } }, 'portion'],
     ['empty search term', { searchTerms: [' \u00a0 '] }, 'searchTerms'],
+    ['null search terms', { searchTerms: null }, 'searchTerms'],
     ['51-character search term', { searchTerms: ['S'.repeat(51)] }, 'searchTerms'],
     ['51 search terms', { searchTerms: Array.from({ length: 51 }, (_, index) => `term${index}`) }, 'searchTerms'],
     ['non-boolean updateHistory', { name: 'Brot', updateHistory: 'true' }, 'updateHistory'],
@@ -431,6 +559,50 @@ describe('PATCH /api/reusable-items/:id — update', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(res.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('rejects an empty patch with the current refinement response', async () => {
+    const id = await createProduct();
+    const response = await updateReusableItemHandler(
+      await makeAuthRequest({ params: { id }, body: {} }),
+      ctx,
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: 'At least one field must be provided' });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('accepts update field maximums and a positive fractional portion weight', async () => {
+    const id = await createProduct();
+    const response = await updateReusableItemHandler(
+      await makeAuthRequest({
+        params: { id },
+        body: {
+          name: 'N'.repeat(200),
+          brand: 'B'.repeat(100),
+          portion: { label: 'P'.repeat(100), weightGrams: 0.1 },
+          searchTerms: ['T'.repeat(50)],
+        },
+      }),
+      ctx,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.jsonBody).toMatchObject({
+      item: { name: 'N'.repeat(200), brand: 'B'.repeat(100), portion: { weightGrams: 0.1 } },
+    });
+  });
+
+  it('does not impose a UUID format on a non-empty path id before lookup', async () => {
+    const response = await updateReusableItemHandler(
+      await makeAuthRequest({ params: { id: 'not-a-uuid' }, body: { name: 'Neuer Name' } }),
+      ctx,
+    );
+
+    expect(response.status).toBe(404);
+    expect(response.jsonBody).toEqual({ error: 'Item not found' });
   });
 
   it('rejects updateHistory by itself with the current refinement message', async () => {
@@ -442,6 +614,7 @@ describe('PATCH /api/reusable-items/:id — update', () => {
 
     expect(res.status).toBe(400);
     expect(res.jsonBody).toEqual({ error: 'At least one field must be provided' });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('coerces nutrition strings, trims and lowercases search terms, and accepts nullable fields', async () => {
@@ -508,6 +681,8 @@ describe('PATCH /api/reusable-items/:id — update', () => {
       ctx,
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: 'At least one field must be provided' });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('updates diary item macros when updateHistory is true', async () => {

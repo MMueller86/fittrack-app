@@ -1,11 +1,10 @@
-import { readFileSync } from 'node:fs';
+﻿import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as ts from 'typescript';
+import * as ts from '@typescript/typescript6';
 import { describe, expect, it } from 'vitest';
 
 const callerFiles = [
-  '../modules/nutrition/AddItemModal.tsx',
   '../modules/nutrition/DiaryScreen.tsx',
   '../modules/nutrition/EditItemSheet.tsx',
   '../modules/nutrition/FoodEstimateReviewScreen.tsx',

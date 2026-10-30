@@ -700,7 +700,7 @@ All AI-generated nutrition values carry:
 
 Azure OpenAI Structured Outputs are used for all features that return machine-readable data. This enforces JSON schema compliance at the model level, eliminating parsing failures.
 
-Required: API version ≥ `2024-07-01`, model ≥ `gpt-4o-mini 2024-07-18`.
+Required: an API version that supports Structured Outputs (code default `2024-10-21`; see [tech/06-ai-integrations.md](../tech/06-ai-integrations.md)), deployment `gpt-4.1-mini`.
 
 ## Prompt Versioning
 

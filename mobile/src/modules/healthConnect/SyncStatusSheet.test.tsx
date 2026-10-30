@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   ScrollView: 'ScrollView',
-  StyleSheet: { absoluteFillObject: {}, create: <T,>(styles: T) => styles },
+  StyleSheet: { absoluteFill: {}, create: <T,>(styles: T) => styles },
   Text: 'Text',
   TouchableOpacity: 'TouchableOpacity',
   View: 'View',

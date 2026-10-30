@@ -1,12 +1,13 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
+import {
+  assertHostFunctionsMatchBaseline,
+  assertSourceFunctionsMatchBaseline,
+  readFunctionBaseline,
+} from './functions-baseline.mjs';
 
-const backendRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const sourceRoot = join(backendRoot, 'src');
-const functionsRoot = join(sourceRoot, 'functions');
+const backendRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const baseUrl = 'http://127.0.0.1:7071';
 const startupTimeoutMs = 180_000;
 
@@ -33,49 +34,6 @@ const localHostSettings = {
   FUNCTIONS_WORKER_RUNTIME: 'node',
   ENRICH_QUEUE_NAME: 'reusable-items-enrich',
 };
-
-function getSourceFunctionNames() {
-  const functionFiles = readdirSync(functionsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts'))
-    .map((entry) => join(functionsRoot, entry.name));
-  const sourceFiles = [join(sourceRoot, 'index.ts'), ...functionFiles];
-  const names = [];
-
-  for (const filePath of sourceFiles) {
-    const source = ts.createSourceFile(
-      filePath,
-      readFileSync(filePath, 'utf8'),
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS,
-    );
-
-    const visit = (node) => {
-      if (
-        ts.isCallExpression(node)
-        && ts.isPropertyAccessExpression(node.expression)
-        && ts.isIdentifier(node.expression.expression)
-        && node.expression.expression.text === 'app'
-        && node.arguments.length > 0
-        && ts.isStringLiteralLike(node.arguments[0])
-      ) {
-        names.push(node.arguments[0].text);
-      }
-      ts.forEachChild(node, visit);
-    };
-
-    visit(source);
-  }
-
-  if (names.length === 0) {
-    throw new Error('No Azure Functions registrations found in backend/src.');
-  }
-  if (new Set(names).size !== names.length) {
-    throw new Error('Duplicate Azure Functions names found in backend/src.');
-  }
-
-  return names.sort();
-}
 
 function getSmokeEnvironment() {
   const env = { ...process.env, ...localHostSettings, ...backgroundFunctionSettings };
@@ -115,32 +73,15 @@ async function assertStatus(path, expectedStatus) {
   return response;
 }
 
-async function assertRegisteredFunctions() {
+async function assertRegisteredFunctions(baseline) {
   const response = await fetch(`${baseUrl}/admin/functions`, { signal: AbortSignal.timeout(10_000) });
   if (response.status !== 200) {
     throw new Error(`/admin/functions: expected HTTP 200, received ${response.status}.`);
   }
 
   const payload = await response.json();
-  if (!Array.isArray(payload) || payload.some((entry) => typeof entry?.name !== 'string')) {
-    throw new Error('/admin/functions returned an invalid function list.');
-  }
-
-  const actualNames = payload.map((entry) => entry.name).sort();
-  const expectedNames = getSourceFunctionNames();
-  const actualSet = new Set(actualNames);
-  const expectedSet = new Set(expectedNames);
-  const missing = expectedNames.filter((name) => !actualSet.has(name));
-  const unexpected = actualNames.filter((name) => !expectedSet.has(name));
-
-  if (actualNames.length !== expectedNames.length || missing.length > 0 || unexpected.length > 0) {
-    throw new Error(
-      `Registered Functions differ from source declarations: expected ${expectedNames.length}, received ${actualNames.length}; `
-      + `missing [${missing.join(', ')}], unexpected [${unexpected.join(', ')}].`,
-    );
-  }
-
-  console.log(`[functions-smoke] ${actualNames.length} registered function names match source declarations.`);
+  assertHostFunctionsMatchBaseline(payload, baseline);
+  console.log(`[functions-smoke] ${payload.length} registered function names match fixed v${baseline.version} baseline.`);
 }
 
 async function stopProcessTree(child) {
@@ -172,6 +113,10 @@ async function stopProcessTree(child) {
 }
 
 async function main() {
+  const baseline = readFunctionBaseline();
+  assertSourceFunctionsMatchBaseline(baseline);
+  console.log(`[functions-smoke] Source declarations match fixed v${baseline.version} baseline.`);
+
   const devScript = join(backendRoot, 'scripts', 'dev.mjs');
   const child = spawn(process.execPath, [devScript], {
     cwd: backendRoot,
@@ -186,7 +131,7 @@ async function main() {
     console.log('[functions-smoke] GET /api/health -> 200.');
     await assertStatus('/api/diary/meals', 401);
     console.log('[functions-smoke] GET /api/diary/meals without a token -> 401.');
-    await assertRegisteredFunctions();
+    await assertRegisteredFunctions(baseline);
   } finally {
     await stopProcessTree(child);
   }

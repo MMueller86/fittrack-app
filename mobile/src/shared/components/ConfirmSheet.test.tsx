@@ -8,7 +8,7 @@ import { ConfirmSheet } from './ConfirmSheet';
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   StyleSheet: {
-    absoluteFillObject: {},
+    absoluteFill: {},
     create: <T,>(styles: T) => styles,
   },
   Text: 'Text',

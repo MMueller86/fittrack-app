@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { ScrollViewInstance, TextInputInstance } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import type { FoodSearchResult, MealType } from '@fittrack/shared';
 import { calculateNutrition } from '../nutritionUtils';
@@ -240,8 +241,8 @@ export function QuantityView({ product, context, onBack, onAdded, prefill, onSel
   const [error, setError] = useState<string | null>(null);
 
   // Refs
-  const scrollRef = useRef<ScrollView>(null);
-  const inputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   // Android Back-Handler
   useEffect(() => {
@@ -575,8 +576,8 @@ export function RecipeQuantityView({
   const [selectedMeal, setSelectedMeal] = useState<MealType>(context.mealType);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
-  const inputRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const inputRef = useRef<TextInputInstance>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'android') return;

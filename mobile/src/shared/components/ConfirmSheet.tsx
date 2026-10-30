@@ -105,7 +105,7 @@ export function ConfirmSheet({ visible, title, subtitle, actions, checkbox, onCl
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.overlay,
   },
   sheet: {

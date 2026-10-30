@@ -1,6 +1,6 @@
 import React, { createRef } from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
-import type { ScrollView } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiaryDayResponse } from '@fittrack/shared';
 import { DayStoryCard } from './DayStoryCard';
@@ -72,7 +72,7 @@ function renderCard(target: MacroTarget | null, bonus?: number): ReactTestRender
         target={target}
         meals={[]}
         mealSummaries={[]}
-        scrollRef={createRef<ScrollView>()}
+        scrollRef={createRef<ScrollViewInstance>()}
         mealOffsets={{}}
         activityBonusInfo={bonus == null ? undefined : { bonus, onShowBreakdown: vi.fn() }}
       />,

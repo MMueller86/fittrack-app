@@ -109,6 +109,6 @@ const styles = StyleSheet.create({
     opacity: 0,
   },
   fallbackImage: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
 });

@@ -60,13 +60,19 @@ afterEach(() => {
 // Input validation (Zod)
 // ---------------------------------------------------------------------------
 
+function expectParseBodyFailure(response: { status?: number; jsonBody?: unknown }, field: string) {
+  expect(response.status).toBe(400);
+  expect(response.jsonBody).toEqual({ error: expect.stringContaining(`Field "${field}"`) });
+  expect(response.jsonBody).not.toHaveProperty('code');
+}
+
 describe('POST /api/ai/food-estimate/preview — input validation', () => {
   it('returns 400 when name is missing', async () => {
     const req = await makeAuthRequest({
       body: {},
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
-    expect(res.status).toBe(400);
+    expectParseBodyFailure(res, 'name');
   });
 
   it.each([
@@ -84,8 +90,7 @@ describe('POST /api/ai/food-estimate/preview — input validation', () => {
     const req = await makeAuthRequest({ body });
     const res = await foodEstimatePreviewHandler(req, makeContext());
 
-    expect(res.status).toBe(400);
-    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expectParseBodyFailure(res, field);
     expect(openAiMock.chat.completions.create).not.toHaveBeenCalled();
   });
 
@@ -116,7 +121,7 @@ describe('POST /api/ai/food-estimate/preview — input validation', () => {
       body: { name: '' },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
-    expect(res.status).toBe(400);
+    expectParseBodyFailure(res, 'name');
   });
 
   it('returns 400 when name exceeds 200 chars', async () => {
@@ -124,7 +129,7 @@ describe('POST /api/ai/food-estimate/preview — input validation', () => {
       body: { name: 'A'.repeat(201) },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
-    expect(res.status).toBe(400);
+    expectParseBodyFailure(res, 'name');
   });
 
   it('returns 400 when contextText exceeds 500 chars', async () => {
@@ -132,7 +137,7 @@ describe('POST /api/ai/food-estimate/preview — input validation', () => {
       body: { name: 'Hähnchenbrust', contextText: 'X'.repeat(501) },
     });
     const res = await foodEstimatePreviewHandler(req, makeContext());
-    expect(res.status).toBe(400);
+    expectParseBodyFailure(res, 'contextText');
   });
 });
 

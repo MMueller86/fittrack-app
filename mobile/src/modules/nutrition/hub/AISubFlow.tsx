@@ -16,7 +16,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
 import type { AiFoodEstimatePreview, AiMealEstimatePreview } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../../shared/api/aiApi';
@@ -26,6 +25,7 @@ import { formatApiError } from '../../../shared/api/apiError';
 import { isQuotaExceededError } from '../../../shared/api/client';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
+import { FramedPhotoPicker, type FramedPhotoResult } from '../../../shared/camera/FramedPhotoPicker';
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import MealEstimateReviewScreen from '../MealEstimateReviewScreen';
 import MealParserReviewScreen from '../MealParserReviewScreen';
@@ -92,9 +92,11 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showFullReview, setShowFullReview] = useState(false);
+  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
 
   useEffect(() => {
     if (!visible) {
+      setShowPhotoPicker(false);
       setText('');
       setMealPhoto(null);
       setError(null);
@@ -110,40 +112,8 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
     setSelectedMealType(context.mealType);
   }, [visible, context.mealType, initialQuery]);
 
-  async function handlePickPhoto(source: 'camera' | 'gallery') {
-    setError(null);
-    try {
-      let result: ImagePicker.ImagePickerResult;
-      if (source === 'camera') {
-        const perm = await ImagePicker.requestCameraPermissionsAsync();
-        if (!perm.granted) {
-          setError('Kamera-Berechtigung benötigt');
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          quality: 0.7,
-          allowsEditing: true,
-        });
-      } else {
-        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (!perm.granted) {
-          setError('Galerie-Berechtigung benötigt');
-          return;
-        }
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          quality: 0.7,
-          allowsEditing: true,
-        });
-      }
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      const mimeType = asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg';
-      setMealPhoto({ uri: asset.uri, mimeType });
-    } catch (e) {
-      setError(formatApiError(e, 'Foto konnte nicht geladen werden'));
-    }
+  function handlePhotoSelected({ uri, mime }: FramedPhotoResult) {
+    setMealPhoto({ uri, mimeType: mime });
   }
 
   async function handleAnalyze() {
@@ -553,20 +523,14 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
                 </TouchableOpacity>
               </View>
             ) : (
-              <>
-                <TouchableOpacity
-                  style={styles.photoBtn}
-                  onPress={() => void handlePickPhoto('camera')}
-                >
-                  <Text style={styles.photoBtnText}>📷 Kamera</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.photoBtn}
-                  onPress={() => void handlePickPhoto('gallery')}
-                >
-                  <Text style={styles.photoBtnText}>🖼️ Galerie</Text>
-                </TouchableOpacity>
-              </>
+              <TouchableOpacity
+                style={styles.photoBtn}
+                onPress={() => setShowPhotoPicker(true)}
+                accessibilityRole="button"
+                accessibilityLabel="Foto hinzufügen"
+              >
+                <Text style={styles.photoBtnText}>📷 Foto hinzufügen</Text>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -600,6 +564,19 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
           onSaved={handleParserSaved}
         />
       ) : null}
+
+      <FramedPhotoPicker
+        visible={showPhotoPicker}
+        preset="mealPhoto"
+        output="cropped-file"
+        cameraReview="direct"
+        sourceTitle="Foto hinzufügen"
+        sourceSubtitle="Wähle eine Quelle für dein Mahlzeitenfoto."
+        cameraPurpose="ein Mahlzeitenfoto aufzunehmen"
+        editorTitle="Foto-Ausschnitt"
+        onClose={() => setShowPhotoPicker(false)}
+        onSelected={handlePhotoSelected}
+      />
     </Modal>
   );
 }

@@ -1,7 +1,7 @@
 // MealEstimateReviewScreen — Fast Path: shows AI whole-meal estimate for review before saving.
 //
 // Props flow:
-//   AddItemModal estimates meal via AI → renders this screen.
+//   AISubFlow estimates meal via AI → renders this screen.
 //   User either:
 //     A. "Mahlzeit speichern" → single diary entry with sourceType 'ai-meal-estimate'
 //     B. "Schätzung verfeinern" → triggers previewMeal → transitions to MealParserReviewScreen

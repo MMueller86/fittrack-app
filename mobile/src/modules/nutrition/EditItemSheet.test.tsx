@@ -20,7 +20,7 @@ vi.mock('react-native', () => ({
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   Modal: 'Modal',
   Platform: { OS: 'ios' },
-  StyleSheet: { absoluteFillObject: {}, create: <T,>(styles: T) => styles },
+  StyleSheet: { absoluteFill: {}, create: <T,>(styles: T) => styles },
   Text: 'Text',
   TextInput: 'TextInput',
   TouchableOpacity: 'TouchableOpacity',
