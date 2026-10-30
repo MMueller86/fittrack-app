@@ -54,7 +54,7 @@ vi.mock('react-native', async () => {
     Pressable: 'Pressable',
     ScrollView: 'ScrollView',
     StyleSheet: {
-      absoluteFillObject: {},
+      absoluteFill: {},
       create: <T,>(styles: T) => styles,
     },
     Text: 'Text',

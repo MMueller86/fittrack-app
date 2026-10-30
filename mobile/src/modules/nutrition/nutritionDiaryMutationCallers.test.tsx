@@ -18,8 +18,7 @@ const mocks = vi.hoisted(() => {
   estimateFood: vi.fn(),
   estimateMeal: vi.fn(),
   scanLabel: vi.fn(),
-  openCamera: vi.fn(),
-  openPicker: vi.fn(),
+  photoPickerProps: { current: null as null | { onSelected: (result: unknown) => void } },
   };
 });
 
@@ -33,18 +32,12 @@ vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   SafeAreaView: 'SafeAreaView',
   ScrollView: 'ScrollView',
-  StyleSheet: { absoluteFillObject: {}, create: <T,>(styles: T) => styles, hairlineWidth: 1 },
+  StyleSheet: { absoluteFill: {}, create: <T,>(styles: T) => styles, hairlineWidth: 1 },
   Text: 'Text',
   TextInput: 'TextInput',
   TurboModuleRegistry: {
     get: () => null,
-    getEnforcing: () => ({
-      openCamera: mocks.openCamera,
-      openPicker: mocks.openPicker,
-      openCropper: vi.fn(),
-      clean: vi.fn(),
-      cleanSingle: vi.fn(),
-    }),
+    getEnforcing: () => ({}),
   },
   TouchableOpacity: 'TouchableOpacity',
   TouchableWithoutFeedback: 'TouchableWithoutFeedback',
@@ -66,14 +59,11 @@ vi.mock('expo-haptics', () => ({
   ImpactFeedbackStyle: { Medium: 'medium' },
   NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('expo-image-picker', () => ({
-  requestCameraPermissionsAsync: vi.fn(),
-  requestMediaLibraryPermissionsAsync: vi.fn(),
-  launchCameraAsync: vi.fn(),
-  launchImageLibraryAsync: vi.fn(),
-}));
-vi.mock('react-native-image-crop-picker', () => ({
-  default: { openCamera: mocks.openCamera, openPicker: mocks.openPicker },
+vi.mock('../../shared/camera/FramedPhotoPicker', () => ({
+  FramedPhotoPicker: (props: { onSelected: (result: unknown) => void }) => {
+    mocks.photoPickerProps.current = props;
+    return null;
+  },
 }));
 vi.mock('../../services/nutritionDiaryService', () => ({ nutritionDiaryService: mocks.diary }));
 vi.mock('../../shared/api/client', () => ({ isQuotaExceededError: () => false }));
@@ -90,7 +80,6 @@ vi.mock('../../shared/components/ErrorBanner', () => ({ ErrorBanner: 'ErrorBanne
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
 vi.mock('../../shared/components/ConfirmSheet', () => ({ ConfirmSheet: () => null }));
 
-import AddItemModal from './AddItemModal';
 import FoodEstimateReviewScreen from './FoodEstimateReviewScreen';
 import MealEstimateReviewScreen from './MealEstimateReviewScreen';
 import MealParserReviewScreen from './MealParserReviewScreen';
@@ -226,8 +215,6 @@ beforeEach(() => {
   mocks.estimateFood.mockResolvedValue(foodEstimate);
   mocks.estimateMeal.mockResolvedValue(mealEstimate);
   mocks.scanLabel.mockResolvedValue(labelResult);
-  mocks.openCamera.mockResolvedValue({ path: '/label.jpg', mime: 'image/jpeg' });
-  mocks.openPicker.mockResolvedValue({ path: '/label.jpg', mime: 'image/jpeg' });
 });
 
 afterEach(() => {
@@ -236,32 +223,6 @@ afterEach(() => {
 });
 
 describe('nutrition diary mutation caller flows', () => {
-  it('adds a selected product from AddItemModal through the facade before calling onSaved', async () => {
-    vi.useFakeTimers();
-    const onSaved = vi.fn();
-    const renderer = await render(
-      <AddItemModal visible mealId="meal-1" mealName="Frühstück" onClose={vi.fn()} onSaved={onSaved} />,
-    );
-    renderers.push(renderer);
-
-    const searchInput = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
-    const onChangeText = searchInput.props.onChangeText;
-    if (typeof onChangeText !== 'function') throw new Error('Search input has no change handler');
-    await act(async () => {
-      onChangeText('Hafer');
-      await vi.advanceTimersByTimeAsync(300);
-      for (let index = 0; index < 6; index += 1) await Promise.resolve();
-    });
-    await press(renderer, 'Haferflocken');
-    await press(renderer, 'Zur Mahlzeit hinzufügen');
-
-    expect(mocks.diary.addItem).toHaveBeenCalledWith('meal-1', expect.objectContaining({
-      productId: 'food-1',
-      productName: 'Haferflocken',
-    }));
-    expect(onSaved).toHaveBeenCalledTimes(1);
-  });
-
   it('saves a FoodEstimateReviewScreen entry through the facade and reports success', async () => {
     const onSaved = vi.fn();
     const renderer = await render(
@@ -360,6 +321,24 @@ describe('nutrition diary mutation caller flows', () => {
     expect(mocks.diary.createMeal).toHaveBeenCalledWith('2026-10-23', 'breakfast');
     expect(mocks.diary.addItem).not.toHaveBeenCalled();
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('sends the photo selected in the shared frame flow to the label scan', async () => {
+    const renderer = await render(
+      <LabelSubFlow visible context={makeContext()} onClose={vi.fn()} onSaved={vi.fn()} />,
+    );
+    renderers.push(renderer);
+
+    await act(async () => {
+      mocks.photoPickerProps.current?.onSelected({
+        uri: '/label.jpg',
+        mime: 'image/jpeg',
+        crop: { focusX: 0.5, focusY: 0.5, zoom: 1 },
+      });
+      for (let index = 0; index < 6; index += 1) await Promise.resolve();
+    });
+
+    expect(mocks.scanLabel).toHaveBeenCalledWith('/label.jpg', 'image/jpeg');
   });
 
   it('saves a ManuellerSubFlow entry through the facade and reports success', async () => {

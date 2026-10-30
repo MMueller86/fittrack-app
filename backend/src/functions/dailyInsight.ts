@@ -14,6 +14,7 @@ import { requireUser } from '../lib/auth';
 import { withHandler } from '../lib/http';
 import { trackUsage } from '../lib/quota';
 import { logEvent } from '../lib/log';
+import { getAzureOpenAiDeploymentName } from '../lib/azureOpenAiConfig';
 import { generateDailyInsight, DAILY_INSIGHT_PROMPT_VERSION } from '../lib/openai';
 import {
   getInsightRepository,
@@ -226,7 +227,7 @@ export const dailyInsightHandler = withHandler(
       systemPromptHash,
       intent,
       promptSnapshot,
-      model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
+      model: getAzureOpenAiDeploymentName(),
       inputHash: newHash,
       inputContext: context,
       response: fullResponse,

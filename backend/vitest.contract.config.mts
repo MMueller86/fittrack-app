@@ -39,6 +39,8 @@ export default defineConfig({
     // and to keep failure output readable.
     fileParallelism: false,
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    // Vitest 4+ replacement for poolOptions.forks.singleFork.
+    maxWorkers: 1,
+    isolate: false,
   },
 });

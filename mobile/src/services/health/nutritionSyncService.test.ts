@@ -32,7 +32,8 @@ vi.mock('../../shared/api/diaryApi', () => ({
 }));
 vi.mock('../authService', () => ({ authService: { getAuthenticatedUserId: mocks.getUserId } }));
 
-import { NutritionSyncService } from './nutritionSyncService';
+import { NutritionSyncService, toNutritionRecord } from './nutritionSyncService';
+import { addLocalDays, getLocalIsoDate } from '../../shared/date/localDate';
 
 const SINCE = '2026-10-23T09:00:00.000Z';
 const CHECKPOINT = '2026-10-23T10:00:00.000Z';
@@ -72,6 +73,41 @@ function latestSavedState(): Record<string, unknown> {
   const calls = mocks.setItem.mock.calls;
   return JSON.parse(calls[calls.length - 1]![1] as string) as Record<string, unknown>;
 }
+
+describe('toNutritionRecord', () => {
+  it('anchors a retroactively logged meal to its diary date with a neutral local timestamp', () => {
+    const now = new Date(2026, 9, 30, 9, 30);
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    const diaryDate = addLocalDays(getLocalIsoDate(now), -1);
+    const meal = { ...makeMeal('retroactive', 'item-retroactive', 'dinner'), date: diaryDate, createdAt: now.toISOString() };
+    const item = meal.items[0]!;
+
+    const record = toNutritionRecord(meal, item);
+
+    expect(getLocalIsoDate(new Date(record.startTime))).toBe(diaryDate);
+    expect(new Date(record.startTime).getHours()).toBe(12);
+    expect(new Date(record.endTime).getTime() - new Date(record.startTime).getTime()).toBe(1000);
+    const [year, month, day] = diaryDate.split('-').map(Number);
+    const anchorDate = new Date(year, month - 1, day, 12, 0, 0, 0);
+    const offsetMinutes = -anchorDate.getTimezoneOffset();
+    const offsetSign = offsetMinutes >= 0 ? '+' : '-';
+    const absoluteOffset = Math.abs(offsetMinutes);
+    const expectedOffset = `${offsetSign}${String(Math.floor(absoluteOffset / 60)).padStart(2, '0')}:${String(absoluteOffset % 60).padStart(2, '0')}`;
+    expect(record.startZoneOffset).toBe(expectedOffset);
+    expect(record.endZoneOffset).toBe(expectedOffset);
+    expect(record).toMatchObject({
+      metadata: { clientRecordId: item.id },
+      name: item.name,
+      mealType: 3,
+      energy: { value: 250, unit: 'kilocalories' },
+      protein: { value: 20, unit: 'grams' },
+      totalCarbohydrate: { value: 30, unit: 'grams' },
+      totalFat: { value: 8, unit: 'grams' },
+      dietaryFiber: { value: 4, unit: 'grams' },
+    });
+  });
+});
 
 describe('nutritionSyncService delta state', () => {
   beforeEach(() => {

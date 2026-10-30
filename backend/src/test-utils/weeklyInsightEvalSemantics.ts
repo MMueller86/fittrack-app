@@ -1,6 +1,7 @@
 import { AzureOpenAI } from 'openai';
 import { z } from 'zod';
 
+import { getAzureOpenAiApiVersion, getAzureOpenAiDeploymentName } from '../lib/azureOpenAiConfig';
 import type {
   WeeklyInsightDiagnosticRelation,
   WeeklyInsightSpecialActivityDiagnosticFixture,
@@ -117,7 +118,7 @@ export function hasWeeklyInsightEvalCredentials(): boolean {
 }
 
 export function getWeeklyInsightEvalModel(): string {
-  return process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  return getAzureOpenAiDeploymentName();
 }
 
 function getJudgeClient(): AzureOpenAI {
@@ -125,7 +126,7 @@ function getJudgeClient(): AzureOpenAI {
     judgeClient = new AzureOpenAI({
       endpoint: process.env['AZURE_OPENAI_ENDPOINT']!,
       apiKey: process.env['AZURE_OPENAI_API_KEY']!,
-      apiVersion: process.env['AZURE_OPENAI_API_VERSION'] ?? '2024-07-01',
+      apiVersion: getAzureOpenAiApiVersion(),
     });
   }
   return judgeClient;

@@ -9,7 +9,6 @@
     "tools/off-import"
   ],
   "overrides": {
-    "fflate": "0.7.5",
     "azurite": {
       "@azure/ms-rest-js": {
         "form-data": "2.5.6"
@@ -17,9 +16,10 @@
     }
   },
   "engines": {
-    "node": ">=24.0.0",
-    "npm": ">=10.0.0"
+    "node": ">=24.22.1 <25",
+    "npm": "12.2.1"
   },
+  "packageManager": "npm@12.2.1",
   "scripts": {
     "build:backend": "npm run build --workspace=backend",
     "build:verify:backend": "npm run build:verify --workspace=backend",
@@ -31,7 +31,12 @@
     "analyze:off": "npm run analyze:off:tsx --workspace=@fittrack/off-import",
     "export:off": "npm run export:off --workspace=@fittrack/off-import",
     "import:cosmos": "npm run import:cosmos --workspace=@fittrack/off-import",
-    "test:scripts": "node --test scripts/migrate-food-products.test.mjs scripts/migrate-alpha-data.test.mjs",
+    "test:scripts": "node --test scripts/migrate-food-products.test.mjs scripts/migrate-alpha-data.test.mjs scripts/check-test-parity.test.mjs",
     "check:encoding": "node scripts/check-encoding.mjs"
+  },
+  "allowScripts": {
+    "@napi-rs/canvas": false,
+    "esbuild": false,
+    "protobufjs": false
   }
 }

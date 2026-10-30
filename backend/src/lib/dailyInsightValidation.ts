@@ -7,12 +7,15 @@ export const DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH = 240;
 export const DAILY_INSIGHT_GREETING_MAX_LENGTH = 120;
 export const DAILY_INSIGHT_SHORT_INSIGHT_MAX_LENGTH = 240;
 
+// Zod 4 `.max()` counts code points; the contract is JS (UTF-16) length.
+const maxJsLength = (max: number) => (value: string) => value.length <= max;
+
 export const DAILY_INSIGHT_RESPONSE_SCHEMA = z.object({
-  greeting: z.string().trim().min(1).max(DAILY_INSIGHT_GREETING_MAX_LENGTH),
-  shortInsight: z.string().trim().min(1).max(DAILY_INSIGHT_SHORT_INSIGHT_MAX_LENGTH),
-  title: z.string().trim().min(1).max(DAILY_INSIGHT_TITLE_MAX_LENGTH),
-  summary: z.string().trim().min(1).max(DAILY_INSIGHT_SUMMARY_MAX_LENGTH),
-  recommendation: z.string().trim().min(1).max(DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH).nullable(),
+  greeting: z.string().trim().min(1).refine(maxJsLength(DAILY_INSIGHT_GREETING_MAX_LENGTH)),
+  shortInsight: z.string().trim().min(1).refine(maxJsLength(DAILY_INSIGHT_SHORT_INSIGHT_MAX_LENGTH)),
+  title: z.string().trim().min(1).refine(maxJsLength(DAILY_INSIGHT_TITLE_MAX_LENGTH)),
+  summary: z.string().trim().min(1).refine(maxJsLength(DAILY_INSIGHT_SUMMARY_MAX_LENGTH)),
+  recommendation: z.string().trim().min(1).refine(maxJsLength(DAILY_INSIGHT_RECOMMENDATION_MAX_LENGTH)).nullable(),
 }).strict();
 
 export type DailyInsightValidatedResponse = z.infer<typeof DAILY_INSIGHT_RESPONSE_SCHEMA>;

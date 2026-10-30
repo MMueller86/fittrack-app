@@ -1046,7 +1046,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end' as const,
   },
   terrainInfoBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   terrainInfoSheet: {

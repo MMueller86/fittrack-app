@@ -71,7 +71,8 @@ function runVitest(environment, extraArgs = []) {
   const child = spawn(
     process.execPath,
     [
-      require.resolve('vitest/vitest.mjs', { paths: [backendDirectory] }),
+      // Vitest 5 no longer exports ./vitest.mjs; resolve the bin via package.json.
+      resolve(dirname(require.resolve('vitest/package.json', { paths: [backendDirectory] })), 'vitest.mjs'),
       ...buildVitestArgs(extraArgs),
     ],
     {

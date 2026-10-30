@@ -10,7 +10,9 @@
 Die historische V1.7-Datei bleibt unveraendert. Der vorhandene Vergleich nutzt
 weiterhin `pixelmatch` mit `threshold=0.10` und einem maximalen
 Differenzverhaeltnis von `0.03`. Der aktuelle Renderer liegt gegen diese alte
-Komposition bei `0.5602764060356653` (rund `56.03 %`) und damit erwartbar
+Komposition bei `0.5945507544581619` (rund `59.46 %`, `pixelmatch` 8 mit
+OKLab-Farbabstand; unter `pixelmatch` 7.2 mit YIQ-Abstand war es `0.5639` auf
+demselben Bildpaar, die Satori/Resvg-Messung `0.5602764060356653`) und damit erwartbar
 ueber dem historischen Gate, weil die historische Datei noch die fruehere
 Landschaftsrotation enthaelt. Dieser Lauf ist eine Diagnose der historischen
 Abweichung, kein aktuelles Release-Gate. Weder die Datei noch der Threshold
@@ -42,6 +44,39 @@ Es gelten zwei getrennte Gates:
   PNG-Metadaten (`1080 x 1350`) und SHA-256-Provenienz festhalten. Bis dahin
   ist die aktuelle Referenz `UNVERIFIED`, nicht durch die historische Datei
   ersetzbar und nicht durch neue Toleranzen simulierbar.
+
+## Phase-0 Renderer-Referenzkorpus
+
+Das separate Korpus liegt unter
+`backend/src/lib/instagramRenderer/test-fixtures/reference-corpus/`. Es enthaelt
+sechs Satori/Resvg-Referenz-PNGs fuer Nutrition mit und ohne Foto sowie
+Detailtemplates mit 1, 5, 9 und 20 Zutaten. Alle sichtbaren Rezeptfotos
+verwenden ausschliesslich `quarkbroetchen-source.png`; der Fall ohne Foto nutzt
+ein transparentes 1-x-1-Pixel-Bild. Die Alpha-abgeleiteten Testtexte werden
+vor dem Rendern explizit auf das versionierte Quellbild umgestellt.
+
+`manifest.json` speichert je Fixture PNG-Format, `1080 x 1350`, Nicht-Leer-
+Status, leere Overflow-Liste, Textboxmasse, Zeilenzahlen und SHA-256 der
+Referenzdatei. Diese Metriken bleiben das harte Gate fuer kuenftige Renderer.
+Der Pixelvergleich verwendet `pixelmatch` mit Threshold `0.10` und maximal
+`0.03` Differenzverhaeltnis; er ist fuer die Satori-Baseline auf Windows x64
+mit Node 24 verbindlich. Nicht-kanonische Plattformen pruefen die Struktur-
+und Textmetriken, verifizieren aber keine Pixelgleichheit.
+
+Referenzen duerfen nur nach bewusster visueller Pruefung auf Windows x64 mit
+Node 24 aktualisiert werden. Aus `backend/`:
+
+```powershell
+$env:UPDATE_RENDERER_REFERENCE_CORPUS = "1"
+npm test -- --silent src/lib/instagramRenderer/__tests__/referenceCorpus.test.ts
+Remove-Item Env:UPDATE_RENDERER_REFERENCE_CORPUS
+```
+
+Der Update-Modus verweigert andere Plattformen. Dieses Korpus ist eine neue,
+renderer-neutrale Vorher-Basis und ersetzt weder das historische V1.7 Golden
+noch die noch nicht promovierte `fittrack_instagram_current_approved.png`.
+Beim Canvas-Vergleich bleiben Metriken hart; Pixelabweichungen dienen gemaess
+Plan der Berichterstattung und menschlichen Sichtpruefung.
 
 ---
 

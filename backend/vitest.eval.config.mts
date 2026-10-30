@@ -19,7 +19,7 @@ import { dirname, resolve } from 'node:path';
 // Required env:
 //   AZURE_OPENAI_ENDPOINT
 //   AZURE_OPENAI_API_KEY
-//   AZURE_OPENAI_DEPLOYMENT_NAME   (optional, defaults to 'gpt4o-mini')
+//   AZURE_OPENAI_DEPLOYMENT_NAME   (optional, defaults to 'gpt-4.1-mini')
 //
 // Direct Vitest invocations still skip tests without credentials. The wrapper
 // reports that situation as UNVERIFIED so the explicit command cannot look green.
@@ -42,6 +42,8 @@ export default defineConfig({
     hookTimeout: 10_000,
     fileParallelism: false,
     pool: 'forks',
-    poolOptions: { forks: { singleFork: true } },
+    // Vitest 4+ replacement for poolOptions.forks.singleFork.
+    maxWorkers: 1,
+    isolate: false,
   },
 });

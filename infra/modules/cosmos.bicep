@@ -29,7 +29,7 @@ param createAccount bool = true
 @description('Tags applied to the account.')
 param tags object = {}
 
-resource account 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = if (createAccount) {
+resource account 'Microsoft.DocumentDB/databaseAccounts@2025-10-15' = if (createAccount) {
   name: accountName
   location: location
   tags: tags
@@ -62,7 +62,7 @@ resource account 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = if (create
   }
 }
 
-resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15' = {
+resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2025-10-15' = {
   parent: account
   name: databaseName
   properties: {
@@ -88,7 +88,7 @@ var containerDefs = [
 // aiInsights is defined separately because it needs defaultTtl: -1 to enable
 // per-document TTL expiry. All other containers have no TTL (property omitted).
 // Cosmos DB only accepts -1 or a positive integer — omitting the property disables TTL.
-resource aiInsightsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+resource aiInsightsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-10-15' = {
   parent: database
   name: 'aiInsights'
   properties: {
@@ -115,7 +115,7 @@ resource aiInsightsContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases
   }
 }
 
-resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = [for c in containerDefs: {
+resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-10-15' = [for c in containerDefs: {
   parent: database
   name: c.name
   properties: {
@@ -166,7 +166,7 @@ resource containers 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containe
   }
 }]
 
-resource communityRecipesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = {
+resource communityRecipesContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2025-10-15' = {
   parent: database
   name: 'communityRecipes'
   properties: {

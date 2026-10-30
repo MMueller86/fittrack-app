@@ -1210,11 +1210,7 @@ export function FoodEntryHub() {
         </View>
       </BottomSheetModal>
 
-      {/* Sub-Flow Overlays — nur mounten wenn aktiv.
-           Hintergrund: react-native-vision-camera und react-native-image-crop-picker
-           sind native Module, die beim Mount initialisiert werden. Wenn sie immer
-           im Tree sitzen (visible=false), crashen sie beim App-Start außerhalb
-           eines EAS-Builds. Konditionelles Mounten löst das Problem. */}
+      {/* Sub-Flow Overlays — nur mounten wenn aktiv. */}
       {hubState.mode === 'subflow' && hubState.flow === 'manual' && !isRecipeContext && (
         <ManuellerSubFlow
           visible

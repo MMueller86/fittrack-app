@@ -3,9 +3,9 @@ name: CI
 # Two-tier test strategy:
 #   Tier 1 (unit-tests)     — fast, offline, no Docker, no Azure.
 #   Tier 2 (contract-tests) — runs CosmosWeightsRepository against the
-#                             Azure Cosmos DB Linux Emulator (vNext preview)
-#                             provided as a service container. Never against
-#                             real Azure Cosmos DB.
+#                             Azure Cosmos DB Linux Emulator (vNext, stable
+#                             dated tag) provided as a service container.
+#                             Never against real Azure Cosmos DB.
 #
 # Contract tests depend on unit tests passing first to fail fast on cheap
 # checks before spinning up the emulator.
@@ -32,29 +32,32 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
       - run: node scripts/check-encoding.mjs
 
   unit-tests:
     name: Tier 1 — Unit tests
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           # `cache: npm` reads the root `package-lock.json` (npm workspaces)
           # and restores `~/.npm` keyed on its hash.
           cache: npm
+
+      - name: Install npm 12.2.1
+        run: npm install -g npm@12.2.1
 
       - name: Install dependencies
         run: npm ci
@@ -75,8 +78,197 @@ jobs:
           FITTRACK_PROMPT_GUARD_BASE: ${{ github.event_name == 'push' && github.event.before || '' }}
         run: npm run verify:daily-insight-prompt --workspace=backend
 
+      - name: Run shared unit tests
+        run: npm test --workspace=shared -- --reporter=dot --reporter=json --outputFile=${{ runner.temp }}/shared-vitest.json
+
       - name: Run backend unit tests
-        run: npm test --workspace=backend
+        run: npm test --workspace=backend -- --reporter=dot --reporter=json --outputFile=${{ runner.temp }}/backend-vitest.json
+
+      - name: Run mobile unit tests
+        run: npm test --workspace=mobile -- --reporter=dot --reporter=json --outputFile=${{ runner.temp }}/mobile-vitest.json
+
+      - name: Run repository script tests
+        run: npm run test:scripts
+
+      - name: Run backend startup tests
+        run: npm run test:startup --workspace=backend
+
+      - name: Verify backend build
+        run: npm run build:verify --workspace=backend
+
+      - name: Verify test parity
+        run: node scripts/check-test-parity.mjs --shared "${{ runner.temp }}/shared-vitest.json" --backend "${{ runner.temp }}/backend-vitest.json" --mobile "${{ runner.temp }}/mobile-vitest.json"
+
+  functions-host-smoke:
+    name: Functions host smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm 12.2.1
+        run: npm install -g npm@12.2.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Azure Functions Core Tools
+        id: func-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/func-core-tools
+          key: func-core-tools-${{ runner.os }}-4.16.0
+
+      - name: Install Azure Functions Core Tools
+        if: steps.func-cache.outputs.cache-hit != 'true'
+        # npm 12 blocks install scripts; Core Tools downloads its func binary in postinstall.
+        run: npm install --global --prefix "${{ runner.temp }}/func-core-tools" --allow-scripts=azure-functions-core-tools azure-functions-core-tools@4.16.0
+
+      - name: Add Core Tools to PATH
+        run: echo "${{ runner.temp }}/func-core-tools/bin" >> "$GITHUB_PATH"
+
+      - name: Create non-secret local Functions settings
+        run: cp backend/local.settings.json.template backend/local.settings.json
+
+      - name: Run real Functions host smoke
+        run: npm run test:functions-smoke --workspace=backend
+
+  staging-linux-renderer-smoke:
+    name: Staging production install, audit, renderer smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm 12.2.1
+        run: npm install -g npm@12.2.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build backend
+        run: npm run build:verify --workspace=backend
+
+      - name: Stage compiled backend
+        run: |
+          mkdir -p _deploy_staging/dist
+          cp -R backend/dist/. _deploy_staging/dist/
+
+      - name: Install staging production dependencies (Linux)
+        working-directory: _deploy_staging
+        run: npm ci --omit=dev
+
+      - name: Audit staging production dependencies (blocking)
+        working-directory: _deploy_staging
+        run: npm audit --omit=dev
+
+      - name: Renderer smoke against the staging install
+        # Loads the Linux @napi-rs/canvas binary from _deploy_staging/node_modules
+        # and renders one PNG that must be exactly 1080x1350 and non-empty.
+        run: npm run smoke:staging-renderer --workspace=backend
+
+      - name: Audit full workspace graph (report only)
+        # Non-blocking: the documented exceptions PO-1 (Azurite chain: azurite,
+        # @azure/ms-rest-js, sequelize, uuid) and PO-2 (Expo build tooling: zod in
+        # @expo/cli, deepmerge chain) are expected until upstream ships fixes.
+        # Any other finding must be investigated.
+        continue-on-error: true
+        run: npm audit
+
+  mobile-smokes:
+    name: Mobile bundle, manifest, and doctor smokes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm 12.2.1
+        run: npm install -g npm@12.2.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Export Android JavaScript bundle
+        run: npm run smoke:bundle --workspace=mobile
+
+      - name: Verify generated Android manifest
+        run: npm run smoke:manifest --workspace=mobile
+
+      - name: Verify Expo Doctor baseline
+        run: npm run smoke:doctor --workspace=mobile
+
+  android-debug-assemble:
+    name: Android debug assemble
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm 12.2.1
+        run: npm install -g npm@12.2.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Assemble Android debug variant
+        run: npm run smoke:android-debug --workspace=mobile
+
+  renderer-reference-corpus:
+    name: Renderer reference corpus (pixel report)
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install npm 12.2.1
+        run: npm install -g npm@12.2.1
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run renderer reference corpus (pixel comparison is report-only)
+        run: npm test --workspace=backend -- src/lib/instagramRenderer/__tests__/referenceCorpus.test.ts --reporter=dot
 
   contract-tests:
     name: Tier 2 — Cosmos contract tests
@@ -85,12 +277,13 @@ jobs:
     timeout-minutes: 20
 
     # GitHub Actions service container.
-    # `vnext-preview` is the Linux variant — boots in <30 s and works on
-    # Linux runners. The legacy Windows emulator is NOT compatible with
-    # `runs-on: ubuntu-latest`.
+    # `vnext-EN20261019` is the newest stable (non-`pre`) dated vNext tag as of
+    # 2026-10-30 (same digest as `vnext-latest`). vNext is the Linux variant —
+    # boots in <30 s and works on Linux runners. The legacy 2.14.x emulator
+    # serves HTTPS and is not what these tests are written against.
     services:
       cosmos:
-        image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+        image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261019
         ports:
           - 8081:8081
 
@@ -100,20 +293,23 @@ jobs:
       # hard-codes the well-known emulator key as a defence-in-depth
       # against accidental real-Azure runs.
       #
-      # The vnext-preview Linux emulator listens on PLAIN HTTP (not HTTPS).
+      # The vNext Linux emulator listens on PLAIN HTTP (not HTTPS).
       # See its boot log: `server up with protocol http on 0.0.0.0:8081`.
       # 127.0.0.1 (not `localhost`) avoids Node/undici resolving to ::1.
       COSMOS_ENDPOINT: http://127.0.0.1:8081
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: .nvmrc
           cache: npm
+
+      - name: Install npm 12.2.1
+        run: npm install -g npm@12.2.1
 
       - name: Install dependencies
         run: npm ci
@@ -130,7 +326,7 @@ jobs:
         run: |
           echo "----- docker ps -a -----"
           docker ps -a
-          container_id=$(docker ps -a --filter "ancestor=mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview" --format '{{.ID}}' | head -n1)
+          container_id=$(docker ps -a --filter "ancestor=mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20261019" --format '{{.ID}}' | head -n1)
           if [ -n "$container_id" ]; then
             echo "----- docker logs (last 300 lines) -----"
             docker logs --tail 300 "$container_id" || true

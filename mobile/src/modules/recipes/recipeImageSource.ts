@@ -1,6 +1,7 @@
-import { spacing } from '../../app/theme';
+import { getCaptureFrame } from '../../shared/camera/frameCropMath';
+import { FRAME_PRESETS } from '../../shared/camera/framePresets';
 
-export const RECIPE_HERO_ASPECT_RATIO = 1080 / 1015;
+export const RECIPE_HERO_ASPECT_RATIO: number = FRAME_PRESETS.recipeHero.aspectRatio;
 
 export interface RecipeImageSelection {
   uri: string;
@@ -35,17 +36,5 @@ export function getRecipeHeroFrame(
   topInset: number,
   bottomInset: number,
 ): RecipeHeroFrame {
-  const topReserve = topInset + spacing.xxl * 2;
-  const bottomReserve = bottomInset + spacing.xxl * 3;
-  const availableHeight = Math.max(0, viewportHeight - topReserve - bottomReserve);
-  const availableWidth = Math.max(0, viewportWidth - spacing.xl);
-  const width = Math.min(availableWidth, availableHeight * RECIPE_HERO_ASPECT_RATIO);
-  const height = width / RECIPE_HERO_ASPECT_RATIO;
-
-  return {
-    left: (viewportWidth - width) / 2,
-    top: topReserve + Math.max(0, (availableHeight - height) / 2),
-    width,
-    height,
-  };
+  return getCaptureFrame(RECIPE_HERO_ASPECT_RATIO, viewportWidth, viewportHeight, topInset, bottomInset);
 }

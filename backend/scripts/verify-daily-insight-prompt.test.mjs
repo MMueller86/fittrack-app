@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { verifyPromptReleaseHistory } from './verify-daily-insight-prompt.mjs';
+import { verifyPromptReleaseHistory, validationProviderInputChanged } from './verify-daily-insight-prompt.mjs';
 
 const promptPath = 'backend/src/lib/prompts/dailyInsightPrompt.ts';
 const manifestPath = 'backend/src/lib/prompts/dailyInsightPromptManifest.ts';
@@ -109,4 +109,35 @@ test('accepts an appended release with an unchanged history', () => {
 
   assert.equal(result.currentRelease.releaseId, 'v15');
   assert.equal(result.baseReleaseCount, 1);
+});
+const validationSource = (extra = '', title = '40') => `import { z } from 'zod';
+export const DAILY_INSIGHT_TITLE_MAX_LENGTH = ${title};
+export const DAILY_INSIGHT_SUMMARY_MAX_LENGTH = 5_000;
+${extra}
+const maxJsLength = (max: number) => (value: string) => value.length <= max;
+export const DAILY_INSIGHT_RESPONSE_SCHEMA = z.object({ title: z.string().refine(maxJsLength(DAILY_INSIGHT_TITLE_MAX_LENGTH)) });
+`;
+
+test('does not require a release when only the local Zod post-validation changes', () => {
+  const base = validationSource();
+  const current = base
+    .replace('z.string()', 'z.string().trim().min(1)')
+    .replace('value.length <= max', 'Array.from(value).length <= max')
+    + 'const parsed = DAILY_INSIGHT_RESPONSE_SCHEMA.safeParse({});\n';
+
+  assert.equal(validationProviderInputChanged(base, current), false);
+});
+
+test('requires a release when a provider-visible *_MAX_LENGTH constant changes', () => {
+  assert.equal(validationProviderInputChanged(validationSource(), validationSource('', '41')), true);
+});
+
+test('requires a release when a *_MAX_LENGTH constant is added or removed', () => {
+  const added = validationSource('export const DAILY_INSIGHT_GREETING_MAX_LENGTH = 120;');
+  assert.equal(validationProviderInputChanged(validationSource(), added), true);
+  assert.equal(validationProviderInputChanged(added, validationSource()), true);
+});
+
+test('treats a validation file missing on either side as provider-visible', () => {
+  assert.equal(validationProviderInputChanged(null, validationSource()), true);
 });

@@ -3,6 +3,7 @@ import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } 
 import { requireUser } from '../lib/auth';
 import { withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
+import { getAzureOpenAiDeploymentName } from '../lib/azureOpenAiConfig';
 import { enforceQuota, trackUsage } from '../lib/quota';
 import {
   generateWeeklyInsight,
@@ -71,7 +72,7 @@ function makeWeeklyDocument(
     periodEnd: review.periodEnd,
     inputHash,
     promptVersion: WEEKLY_INSIGHT_PROMPT_VERSION,
-    model: process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini',
+    model: getAzureOpenAiDeploymentName(),
     response: {
       status: storedStatus,
       text: evaluation.text,

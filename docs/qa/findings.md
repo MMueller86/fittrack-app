@@ -175,6 +175,7 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-154 | HC-4 required Mobile typecheck, AC-12 | Blocking | Frontend | Closed |
 | FT-QA-2026-155 | HC-4 mock diagnostic logs contain client record IDs, AC-11 | Non-blocking | Frontend | Awaiting decision |
 | FT-QA-2026-156 | HC-4 Domain KB retry status is stale, AC-11 | Non-blocking | Documentation | Awaiting decision |
+| FT-QA-2026-157 | Technology refresh Phase 0 request-schema characterization, AC-15 | Blocking | Backend | Closed |
 
 ## Profile Deletion QA Review
 - **Latest re-review (2026-10-22):** Independent [QA report](reports/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md) is PASS against all 13 criteria after the D2 corrections. Mobile suite passed 950/950; backend suite passed 1,881/1,881; Mobile typecheck, backend build verification, and offline Bicep compilation passed. Cosmos contracts remain **UNVERIFIED**. The approved force-close/token/queue residual is not a finding. Findings 144–148 are closed based on the recorded scope decisions and QA verification.
@@ -2604,6 +2605,21 @@ The initial validated [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchron
 - **Status:** Awaiting decision.
 - **History:** Registered from the validated HC-4 QA FAIL report; no non-blocking correction is inferred before the user's disposition.
 - **History:** 2026-10-23 - Independent [HC-4 QA re-review](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md) confirms the stale Backend/Domain wording remains. No acceptance, deferral, or correction authorization is inferred.
+
+### FT-QA-2026-157
+
+- **Finding key:** WP-QA-00-SCHEMA-02.
+- **Plan reference:** `docs/User Stories/plans/PLAN_FitTrack-Technology-Refresh.md`.
+- **Acceptance criterion:** AC-15.
+- **Description:** Phase-0 request-schema characterization remains incomplete. The latest correction closes profile update and calculate-preview cases, but the profile-create route lacks the shared invalid-input matrix. Diary bulk-delete, bulk-move, and bulk-copy lack required per-handler field/type/date/ID/target cases; the bulk-copy unknown-field test still asserts only status. These are test-coverage gaps, not observed production defects. The approved plan requires handler-level characterization across schema-backed routes while preserving current behavior.
+- **Criticality:** Blocking.
+- **Owner:** Backend.
+- **Evidence:** [Phase-0 QA report](reports/PLAN_FitTrack-Technology-Refresh_Phase0.md); [profile.test.ts](../../backend/src/functions/profile.test.ts); [diary.test.ts](../../backend/src/functions/diary.test.ts); [profile.ts](../../backend/src/functions/profile.ts); [diary.ts](../../backend/src/functions/diary.ts).
+- **Recommendation:** Complete profile-create and each diary bulk-handler matrix; assert the current status, response envelope/field details, and absence of a stable API code where applicable. Keep runtime behavior unchanged.
+- **Status:** Closed.
+- **History:** Registered from the latest WP-QA-00 FAIL after two Backend correction attempts. AI, profile update, and calculate-preview gaps were closed, but profile create and diary bulk-route coverage remained incomplete. The automatic correction limit was exhausted; paused for user direction.
+- **History:** 2026-10-28 - The Product Owner authorized one additional correction cycle. Backend added the profile-create matrix and route-specific bulk-delete, bulk-move, and bulk-copy request-schema cases. Independent focused tests passed (434/434); the full Backend suite passed (367 suites / 2,364 tests), parity passed, and Backend typecheck plus build verification passed. Awaiting independent WP-QA-00 verification before closure.
+- **History:** 2026-10-29 - Further Backend correction added the Instagram render/share-bundle request matrices. The independent [WP-QA-00 report](reports/PLAN_FitTrack-Technology-Refresh_Phase0.md) returned `PASS` with AC-15 verified and no actionable findings. The related report findings AC17-01 and AC18-01 were corrected in the same cycle. CI, Cosmos contract, and Android assemble results are `PO-RELEASED (not independently verified)`. Closed.
 
 ### VER-2026-014 - US-01 Android visual and accessibility validation
 

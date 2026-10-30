@@ -142,7 +142,7 @@ export function ProfileDeletionAction() {
         <Modal visible transparent animationType="fade" onRequestClose={closeDeletionOverlay}>
           <View style={styles.deleteOverlayRoot}>
             <Pressable
-              style={[StyleSheet.absoluteFillObject, styles.deleteBackdrop]}
+              style={[StyleSheet.absoluteFill, styles.deleteBackdrop]}
               onPress={closeDeletionOverlay}
               disabled={deletionInProgress}
               accessibilityRole="button"

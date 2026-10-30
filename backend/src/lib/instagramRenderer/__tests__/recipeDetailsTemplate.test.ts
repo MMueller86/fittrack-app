@@ -3,8 +3,6 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import sharp from "sharp";
-import satori from "satori";
-import type { Font } from "satori";
 import { describe, expect, it, vi } from "vitest";
 
 import { gefluegelfrikadellenDetailsFixture as alphaGefluegelfrikadellenDetailsFixture } from "../fixtures/gefluegelfrikadellen-details";
@@ -19,6 +17,7 @@ import {
   getRecipeDetailsTextLayoutFields,
   getRecipeDetailsTitleLayout,
 } from "../recipeDetailsTemplateV3";
+import { layoutElementTree, type RendererFont } from "../canvasRenderer";
 import type { SatoriElement } from "../compose";
 import {
   addMeasuredGermanBreaks,
@@ -41,9 +40,9 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   };
 });
 
-vi.mock("satori", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("satori")>();
-  return { ...actual, default: vi.fn(actual.default) };
+vi.mock("../canvasRenderer", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../canvasRenderer")>();
+  return { ...actual, layoutElementTree: vi.fn(actual.layoutElementTree) };
 });
 
 const gefluegelfrikadellenDetailsFixture = {
@@ -71,9 +70,9 @@ const HYPHENATION_MARKER = "\uE000";
 const germanHyphenate = (require("hyphen/de") as {
   hyphenateSync: (text: string, options?: { hyphenChar?: string }) => string;
 }).hyphenateSync;
-let measurementFontsPromise: Promise<Font[]> | undefined;
+let measurementFontsPromise: Promise<RendererFont[]> | undefined;
 
-function loadMeasurementFonts(): Promise<Font[]> {
+function loadMeasurementFonts(): Promise<RendererFont[]> {
   measurementFontsPromise ??= readFile(
     resolve(process.cwd(), "src/lib/instagramRenderer/assets/fonts/Inter-Medium.ttf"),
   ).then((data) => [{ name: "Inter", weight: 500, data }]);
@@ -83,7 +82,7 @@ function loadMeasurementFonts(): Promise<Font[]> {
 async function measureTextRequests(
   requests: readonly DetailTextMeasureRequest[],
 ): Promise<ReadonlyMap<string, number>> {
-  return measureDetailTextWidths(satori, await loadMeasurementFonts(), requests);
+  return measureDetailTextWidths(layoutElementTree, await loadMeasurementFonts(), requests);
 }
 
 function createTextLayoutField(
@@ -121,15 +120,15 @@ function flattenTemplateElements(value: unknown): SatoriElement[] {
 }
 
 async function captureProductionMeasurements<Result>(action: () => Promise<Result>) {
-  const actual = await vi.importActual<typeof import("satori")>("satori");
+  const actual = await vi.importActual<typeof import("../canvasRenderer")>("../canvasRenderer");
   const measurements = new Map<string, { width: number; height: number }>();
   const teaserSizes: number[] = [];
-  vi.mocked(satori).mockImplementation(async (root, options) => {
+  vi.mocked(layoutElementTree).mockImplementation(async (root, options) => {
     const teaser = flattenTemplateElements(root).find(
       (node) => node.props["data-render-node"] === "recipe-details-description",
     );
     if (teaser) teaserSizes.push((teaser.props.style as Record<string, unknown>).fontSize as number);
-    return actual.default(root, {
+    return actual.layoutElementTree(root, {
       ...options,
       onNodeDetected: (node) => {
         const marker = node.props["data-render-node"];
@@ -143,7 +142,7 @@ async function captureProductionMeasurements<Result>(action: () => Promise<Resul
   try {
     return { result: await action(), measurements, teaserSizes };
   } finally {
-    vi.mocked(satori).mockImplementation(actual.default);
+    vi.mocked(layoutElementTree).mockImplementation(actual.layoutElementTree);
   }
 }
 
@@ -320,8 +319,8 @@ describe("B-1 generated detail text production probe", () => {
     { dimension: "height" as const, extra: 0.5, ok: true },
     { dimension: "height" as const, extra: 0.5001, ok: false },
   ])("shares the 0.5px $dimension boundary with full rendering: $extra", async ({ dimension, extra, ok }) => {
-    const actual = await vi.importActual<typeof import("satori")>("satori");
-    vi.mocked(satori).mockImplementation((root, options) => actual.default(root, {
+    const actual = await vi.importActual<typeof import("../canvasRenderer")>("../canvasRenderer");
+    vi.mocked(layoutElementTree).mockImplementation((root, options) => actual.layoutElementTree(root, {
       ...options,
       onNodeDetected: (node) => options.onNodeDetected?.(
         node.props["data-render-node"] === "recipe-details-step-0"
@@ -337,14 +336,14 @@ describe("B-1 generated detail text production probe", () => {
       expect(probe.ok).toBe(ok);
       expect(probe.status).toBe(ok ? "success" : "generated-text-failure");
     } finally {
-      vi.mocked(satori).mockImplementation(actual.default);
+      vi.mocked(layoutElementTree).mockImplementation(actual.layoutElementTree);
     }
   });
 
   it.each(["missing", "nan-width", "infinite-height", "missing-word"]) (
     "fails technically for %s production measurement, even with a correctable overflow", async (failure) => {
-      const actual = await vi.importActual<typeof import("satori")>("satori");
-      vi.mocked(satori).mockImplementation((root, options) => actual.default(root, {
+      const actual = await vi.importActual<typeof import("../canvasRenderer")>("../canvasRenderer");
+      vi.mocked(layoutElementTree).mockImplementation((root, options) => actual.layoutElementTree(root, {
         ...options,
         onNodeDetected: (node) => {
           const marker = node.props["data-render-node"];
@@ -365,7 +364,7 @@ describe("B-1 generated detail text production probe", () => {
         expect(result).toMatchObject({ ok: false, status: "technical-failure" });
         expect(result.diagnostics.some((item) => item.status === "technical-failure")).toBe(true);
       } finally {
-        vi.mocked(satori).mockImplementation(actual.default);
+        vi.mocked(layoutElementTree).mockImplementation(actual.layoutElementTree);
       }
     },
   );
@@ -391,13 +390,13 @@ describe("B-1 generated detail text production probe", () => {
   });
 
   it.each([22, 21, 20, 19, 18])("retains identical font-attempt selection through %ipx", async (selectedSize) => {
-    const actual = await vi.importActual<typeof import("satori")>("satori");
+    const actual = await vi.importActual<typeof import("../canvasRenderer")>("../canvasRenderer");
     const attempts: number[] = [];
-    vi.mocked(satori).mockImplementation((root, options) => {
+    vi.mocked(layoutElementTree).mockImplementation((root, options) => {
       const teaser = flattenTemplateElements(root).find((node) => node.props["data-render-node"] === "recipe-details-description");
       const fontSize = teaser ? (teaser.props.style as Record<string, unknown>).fontSize as number : undefined;
       if (fontSize !== undefined) attempts.push(fontSize);
-      return actual.default(root, {
+      return actual.layoutElementTree(root, {
         ...options,
         onNodeDetected: (node) => options.onNodeDetected?.(
           node.props["data-render-node"] === "recipe-details-description" && fontSize! > selectedSize
@@ -416,7 +415,7 @@ describe("B-1 generated detail text production probe", () => {
       expect(attempts).toEqual(fullAttempts);
       expect(attempts).toEqual(Array.from({ length: 23 - selectedSize }, (_size, index) => 22 - index));
     } finally {
-      vi.mocked(satori).mockImplementation(actual.default);
+      vi.mocked(layoutElementTree).mockImplementation(actual.layoutElementTree);
     }
   });
 
@@ -441,15 +440,14 @@ describe("B-1 generated detail text production probe", () => {
     }
   }, 20000);
 
-  it.each(["font-only", "missing-font", "corrupt-font", "satori-failure"])(
+  it.each(["font-only", "missing-font", "corrupt-font", "layout-failure"])(
     "cold probe stays text-only and fails closed: %s", async (mode) => {
       const actualFs = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
-      const actualSatori = await vi.importActual<typeof import("satori")>("satori");
+      const actualCanvas = await vi.importActual<typeof import("../canvasRenderer")>("../canvasRenderer");
       const reads: string[] = [];
       const nativeImport = vi.fn(() => { throw new Error("Native image dependencies must not be loaded by the probe."); });
       vi.resetModules();
       vi.doMock("sharp", nativeImport);
-      vi.doMock("@resvg/resvg-js", nativeImport);
       vi.doMock("node:fs/promises", () => ({
         ...actualFs,
         readFile: async (...args: Parameters<typeof actualFs.readFile>) => {
@@ -461,9 +459,11 @@ describe("B-1 generated detail text production probe", () => {
           return actualFs.readFile(...args);
         },
       }));
-      vi.doMock("satori", () => ({
-        ...actualSatori,
-        default: mode === "satori-failure" ? async () => { throw new Error("Simulated Satori failure."); } : actualSatori.default,
+      vi.doMock("../canvasRenderer", () => ({
+        ...actualCanvas,
+        layoutElementTree: mode === "layout-failure"
+          ? async () => { throw new Error("Simulated layout failure."); }
+          : actualCanvas.layoutElementTree,
       }));
       try {
         const { probeInstagramRecipeDetailsGeneratedText: freshProbe } = await import("../render");
@@ -481,9 +481,8 @@ describe("B-1 generated detail text production probe", () => {
         expect(reads).toHaveLength(4);
       } finally {
         vi.doUnmock("sharp");
-        vi.doUnmock("@resvg/resvg-js");
         vi.doUnmock("node:fs/promises");
-        vi.doUnmock("satori");
+        vi.doUnmock("../canvasRenderer");
         vi.resetModules();
       }
     },
@@ -521,16 +520,16 @@ describe("Instagram recipe details template", () => {
       ...input,
       steps: ["Mische Mehl, Quark, Zucker, Backpulver, Ei, Kerne und Salz zu Teig.", ...steps.slice(1)],
     };
-    const hashes = [
-      "b81a0cc528c389cc3b21113ef7d65ea6d7cc37ba2023b4d9fa035e087573036a",
-      "bc9276a5158de0c1247a9da9b33a4fd5a072268f4fec4c7108b40ac94f460d74",
-      "e1737c8af626890d61ae1cc3decac0a31e6e6de7da8ca98fe2a88982e17b130b",
-    ];
-    for (const [index, candidate] of [quarkbroetchenDetailsFixture, shorter, twentyIngredientsDetailsFixture].entries()) {
-      const result = await renderInstagramRecipeDetailsTemplate(candidate);
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(createHash("sha256").update(result.buffer).digest("hex")).toBe(hashes[index]);
+    // The Satori-era SHA-256 pins cannot hold for a different rasteriser; pixel parity is reported by referenceCorpus.test.ts.
+    for (const candidate of [quarkbroetchenDetailsFixture, shorter, twentyIngredientsDetailsFixture]) {
+      const first = await renderInstagramRecipeDetailsTemplate(candidate);
+      const second = await renderInstagramRecipeDetailsTemplate(candidate);
+      expect(first.ok).toBe(true);
+      expect(second.ok).toBe(true);
+      if (first.ok && second.ok) {
+        expect(await sharp(first.buffer).metadata()).toMatchObject({ width: 1080, height: 1350, format: "png" });
+        expect(createHash("sha256").update(first.buffer).digest("hex"))
+          .toBe(createHash("sha256").update(second.buffer).digest("hex"));
       }
     }
     const passing = await probeInstagramRecipeDetailsGeneratedText({
@@ -631,19 +630,19 @@ describe("Instagram recipe details template", () => {
   });
 
   it("keeps short teasers at 22px and shrinks only overflowing teasers to the largest fitting size", async () => {
-    const getAttemptSizes = () => vi.mocked(satori).mock.calls.flatMap(([root]) => {
+    const getAttemptSizes = () => vi.mocked(layoutElementTree).mock.calls.flatMap(([root]) => {
       const teaser = flattenTemplateElements(root).find(
         (node) => node.props["data-render-node"] === "recipe-details-description",
       );
       return teaser ? [(teaser.props.style as Record<string, unknown>).fontSize as number] : [];
     });
 
-    vi.mocked(satori).mockClear();
+    vi.mocked(layoutElementTree).mockClear();
     const short = await renderInstagramRecipeDetailsTemplate(quarkbroetchenDetailsFixture);
     expect(short.ok).toBe(true);
     expect(getAttemptSizes()).toEqual([22]);
 
-    vi.mocked(satori).mockClear();
+    vi.mocked(layoutElementTree).mockClear();
     const dense = await renderInstagramRecipeDetailsTemplate(twentyIngredientsDetailsFixture);
     expect(dense.ok).toBe(true);
     const sizes = getAttemptSizes();
@@ -791,7 +790,7 @@ describe("Instagram recipe details template", () => {
   });
 
   it("renders seven ingredients with the full serving label at index 6 as an Instagram PNG", async () => {
-    vi.mocked(satori).mockClear();
+    vi.mocked(layoutElementTree).mockClear();
     const result = await renderInstagramRecipeDetailsTemplate(servingLabelDetailsFixture);
 
     expect(result, result.ok ? undefined : JSON.stringify(result.error))
@@ -804,7 +803,7 @@ describe("Instagram recipe details template", () => {
       height: 1350,
       format: "png",
     });
-    const ingredientNodes = vi.mocked(satori).mock.calls.flatMap(([root]) =>
+    const ingredientNodes = vi.mocked(layoutElementTree).mock.calls.flatMap(([root]) =>
       flattenTemplateElements(root).filter(
         (node) => node.props["data-render-node"] === "recipe-details-ingredient-6",
       ),

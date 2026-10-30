@@ -328,7 +328,7 @@ then legacy default. The repository normally supplies the default for legacy
 images, and the adapter retains the fallback when called without stored
 metadata. An omitted request field does not reset the other crop fields. It applies
 `nutritionHighlight=null`; optional time and difficulty remain request-level
-metadata and are omitted when absent. Layout constants, Satori nodes, icon
+metadata and are omitted when absent. Layout constants, element trees, icon
 resolution, and nutrition rounding remain owned by the renderer.
 
 The versioned `instagram-recipe-v1` frame is the renderer's `1080 x 1015`
@@ -395,8 +395,10 @@ Before composition, `renderInstagramRecipeDetailsTemplate()` applies
 and steps. Normal wrapping stays at whitespace; an overwide word may split
 only at positions returned by the German `hyphen/de` patterns. Candidate
 segments are measured with the production fonts, including each inserted
-hyphen. Satori then measures the title, teaser, ingredient, and step text nodes
-against their assigned width and height before Resvg rasterizes the image. A
+hyphen. The `@napi-rs/canvas` renderer then lays out the element tree
+(`flexLayout.ts`, `canvasRenderer.ts`), measures the title, teaser, ingredient,
+and step text nodes against their assigned width and height with the bundled
+fonts (`fontBook.ts`), and paints the PNG (`canvasPaint.ts`). A
 non-fitting legal break or measured overflow returns `TEMPLATE_FIELD_OVERFLOW`
 with the field and, for list content, the item index and field; no detail PNG is
 returned. A bundle with any render failure withholds both images. The template
@@ -412,8 +414,8 @@ Recipe title, ingredient rows, and preparation text keep their existing sizes.
 backend-internal text-only entry point in `instagramRenderer/render.ts` and its
 existing barrel. It shares the production title/teaser subtree, preparation
 panel and parent constraints, German breaks, font cache, node collection and
-0.5 px bounds tolerance with the full renderer. It loads only Satori and the
-four bundled fonts, not photos, Blob data, design assets, Sharp or Resvg.
+0.5 px bounds tolerance with the full renderer. It loads only the layout engine
+and the bundled fonts, not photos, Blob data, design assets or Sharp.
 The complete 1-5 step candidate determines the existing large/compact layout;
 the saved title remains context, not an editable generated field. The teaser
 keeps the existing italic font, terminal-period display rule and 22/21/20/19/18
@@ -424,8 +426,10 @@ technical-failure`, per-field diagnostics and the evaluated `teaserFontSize`.
 Measured diagnostics include actual width/height and assigned bounds; German
 width-only failures have width and its limit but no invented multiline height.
 Invalid/skipped fields are never reported as fitting. Missing or non-finite
-measurements, unavailable/corrupt fonts, Satori errors and invalid/non-fitting
-saved-title context are technical failures, not AI-correctable failures.
+measurements, unavailable/corrupt fonts, layout/render engine errors and invalid/non-fitting
+saved-title context are technical failures, not AI-correctable failures. The public
+error code for such failures is still `FONT_OR_SATORI_FAILED`, and some internal
+types keep the `Satori*` prefix; both are kept for API/error-contract stability.
 Success establishes only generated teaser/step fit in that title context; it
 does not certify the saved title, ingredients, chips, images or share bundle.
 The full renderer retains its existing first-failure public contract, including
@@ -675,8 +679,8 @@ partition-key change.
 |---|---|---|
 | `AZURE_OPENAI_ENDPOINT` | openai.ts | Azure OpenAI base URL |
 | `AZURE_OPENAI_API_KEY` | openai.ts | API key |
-| `AZURE_OPENAI_API_VERSION` | openai.ts | API version (default: `2024-07-01`) |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | openai.ts | Model deployment name |
+| `AZURE_OPENAI_API_VERSION` | azureOpenAiConfig.ts | API version (default: `2024-10-21`) |
+| `AZURE_OPENAI_DEPLOYMENT_NAME` | azureOpenAiConfig.ts | Model deployment name (default: `gpt-4.1-mini`) |
 | `COSMOS_ENDPOINT` | cosmos.ts | Cosmos DB endpoint |
 | `COSMOS_KEY` | cosmos.ts | Cosmos DB key |
 | `COSMOS_DATABASE` | cosmos.ts | Database name (`fittrack-db`) |
@@ -690,6 +694,17 @@ partition-key change.
 
 Local values are in `backend/local.settings.json` (gitignored) — this is the **only** source of credentials for local development. See [tech/07-infrastructure.md](07-infrastructure.md#application-settings--local-dev-credentials) for the agent rule on handling missing keys.
 
+## Runtime and Production Dependencies
+
+Source of truth: `backend/package.json` and `_deploy_staging/package.json` (identical production dependency ranges, one lockfile resolution each). Full version matrix: [01-system-overview.md](01-system-overview.md#version-pins-and-support-matrix).
+
+- Node `>=24.22.1 <25`, npm `12.2.1` (`engines`); `.nvmrc` = `24.22.1`; TypeScript `^7.0.2` (native compiler).
+- `openai ^7.45.1` (resolved 7.45.1), `zod ^4.6.7` (resolved 4.6.7), `@azure/cosmos ^4.10.1`, `@azure/functions ^4.17.0`, `@azure/storage-blob ^12.34.0`, `@azure/storage-queue ^12.32.0`, `@azure/ai-form-recognizer ^5.1.0`, `jose ^6.2.14`, `sharp ^0.35.5`.
+- Azure OpenAI deployment name and API version come only from `backend/src/lib/azureOpenAiConfig.ts` (see [06-ai-integrations.md](06-ai-integrations.md#configuration-single-source)).
+- [Rule] Zod 4 changed default error texts and issue codes. They are part of the HTTP error contract, so `backend/src/lib/zodCompat.ts` restores the Zod 3 texts and codes and `http.ts`, `recipeHttp.ts` and `recipeAnalyzeValidation.ts` use it. Do not remove it without a contract decision. UUID-shaped ID fields (`ai.ts`, `recipes.ts`, `instagramRecipe.ts`, `dailyInsightFeedback.ts`) use `z.guid()` rather than `z.uuid()`; the reason is not documented in the repository ([Open], presumably preserves the lenient Zod 3 UUID check).
+- TypeScript 7 specifics: `backend/tsconfig.json` uses `moduleResolution: bundler` with `module: commonjs` (`node10` was removed) and no `baseUrl`; `tsconfig.base.json` sets `types: ["node"]` because `@types/*` are no longer auto-included. The classic compiler JS API (`require('typescript')`) does not exist in TypeScript 7: `backend/scripts/functions-baseline.mjs` and the mobile AST test import `@typescript/typescript6 ~6.0.2` (a devDependency of `backend` and `mobile`) for `createSourceFile`.
+- Local-only dev dependency `azurite ^3.37.0` carries a time-limited audit exception, see [08-testing.md](08-testing.md#dependency-policy-and-update-process).
+
 ## Build and Deploy
 
 - Local dev: `npm run dev` from `backend/`; the launcher checks port 7071, builds, starts Azurite, waits until its Blob, Queue, and Table services answer over HTTP, provisions the `reusable-items-enrich` queue, and only then starts Azure Functions. It fails early with an actionable message if another Functions host already owns port 7071. Azurite data is stored in the OS temp directory by default to avoid sync-folder file locks; `FITTRACK_AZURITE_LOCATION` can override it. `npm run start` assumes Azurite is already running.
@@ -700,20 +715,30 @@ Local values are in `backend/local.settings.json` (gitignored) — this is the *
 
 ### Instagram renderer package contract
 
-The backend runtime dependencies contain the renderer packages at the verified
-POC ranges: `satori ~0.33.4`, `@resvg/resvg-js ~2.6.2`, `lucide-static
-~1.46.0`, `@tabler/icons ~3.46.0`, and `sharp ^0.35.5`. `pixelmatch
-~7.2.0`, TypeScript, Vitest, and type packages remain backend development or
-test dependencies and are not part of `_deploy_staging`.
+The renderer is `@napi-rs/canvas` (Skia). Satori, `@resvg/resvg-js` and the
+`fflate` override were removed (Technology Refresh, WP-BE-02). The backend
+runtime dependencies (manifest ranges in `backend/package.json` and
+`_deploy_staging/package.json`) are `@napi-rs/canvas ~1.1.0`, `lucide-static
+~1.65.0`, `@tabler/icons ~3.50.0`, `sharp ^0.35.5` and `hyphen ^1.14.1`.
+`pixelmatch ~8.0.0`, TypeScript, Vitest, and type packages remain backend
+development or test dependencies and are not part of `_deploy_staging`.
+`@napi-rs/canvas` ships prebuilt platform packages; the root `allowScripts`
+entry for it is `false` (no install script needed), so a missing binary for the
+platform is not rebuilt at install time. `pixelmatch` 8 measures colour
+distance in OKLab instead of YIQ, which raised the historical diagnostic ratio
+in `golden.test.ts` (see `backend/src/lib/instagramRenderer/docs/golden-metrics.md`);
+the reference-corpus pixel thresholds were not changed (the corpus pixel
+comparison is report-only; see `08-testing.md`).
 
-`npm run copy:instagram-assets` validates and copies the complete nine-file
+`npm run copy:instagram-assets` validates and copies the complete ten-file
 manifest from `backend/src/lib/instagramRenderer/assets/` to
 `backend/dist/backend/src/lib/instagramRenderer/assets/`. The manifest is:
 
 - `branding/fittrack-wordmark.png` (legacy fallback)
 - `branding/micha-logo-writing.svg`
-- `fonts/Inter-Medium.ttf`, `fonts/Inter-SemiBold.ttf`,
-  `fonts/InterDisplay-Bold.ttf`, and `fonts/LICENSE.txt`
+- `fonts/Inter-Medium.ttf`, `fonts/Inter-MediumItalic.ttf`,
+  `fonts/Inter-SemiBold.ttf`, `fonts/InterDisplay-Bold.ttf`, and
+  `fonts/LICENSE.txt`
 - `nutrition/barbell-header-frame.svg`
 - `nutrition-highlights/high-protein.png` and `nutrition-highlights/low-fat.png`
 

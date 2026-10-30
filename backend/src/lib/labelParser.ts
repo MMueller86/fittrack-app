@@ -2,6 +2,7 @@
 // to map it to structured nutrition data (NutritionLabelScanResult).
 
 import { AzureOpenAI } from 'openai';
+import { createAzureOpenAiClientOptions, getAzureOpenAiDeploymentName } from './azureOpenAiConfig';
 import type { NutritionLabelScanResult } from '@fittrack/shared';
 import { LABEL_SCAN_SYSTEM_PROMPT } from './prompts/labelScan';
 
@@ -13,15 +14,7 @@ let _client: AzureOpenAI | null = null;
 
 function getClient(): AzureOpenAI {
   if (!_client) {
-    const endpoint = process.env['AZURE_OPENAI_ENDPOINT'];
-    const apiKey = process.env['AZURE_OPENAI_API_KEY'];
-    const apiVersion = process.env['AZURE_OPENAI_API_VERSION'] ?? '2024-07-01';
-
-    if (!endpoint || !apiKey) {
-      throw new Error('AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set');
-    }
-
-    _client = new AzureOpenAI({ endpoint, apiKey, apiVersion });
+    _client = new AzureOpenAI(createAzureOpenAiClientOptions());
   }
   return _client;
 }
@@ -86,7 +79,7 @@ const LABEL_SCAN_SCHEMA = {
  */
 export async function parseNutritionLabel(rawOcrText: string): Promise<Omit<NutritionLabelScanResult, 'rawOcrText' | 'ocrConfidence'>> {
   const client = getClient();
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt-4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   const response = await client.chat.completions.create({
     model: deployment,

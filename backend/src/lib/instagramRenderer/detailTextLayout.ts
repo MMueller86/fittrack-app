@@ -1,4 +1,4 @@
-import type { Font } from "satori";
+import type { RendererFont, layoutElementTree } from "./canvasRenderer";
 
 import { CANVAS_HEIGHT, CANVAS_WIDTH } from "./layout";
 import type { SatoriElement, SatoriStyle } from "./compose";
@@ -97,8 +97,8 @@ function edgeKey(startIndex: number, endIndex: number): string {
 }
 
 export async function measureDetailTextWidths(
-  satori: typeof import("satori").default,
-  fonts: Font[],
+  layoutTree: typeof layoutElementTree,
+  fonts: readonly RendererFont[],
   requests: readonly DetailTextMeasureRequest[],
 ): Promise<ReadonlyMap<string, number>> {
   if (requests.length === 0) {
@@ -150,11 +150,10 @@ export async function measureDetailTextWidths(
   };
   const measurements = new Map<string, number>();
 
-  await satori(root as unknown as Parameters<typeof satori>[0], {
+  await layoutTree(root, {
     width: CANVAS_WIDTH,
     height: Math.max(CANVAS_HEIGHT, Math.ceil(measurementHeight + 1)),
     fonts,
-    embedFont: true,
     onNodeDetected: (node) => {
       const marker = node.props["data-render-node"];
       if (typeof marker !== "string") {
@@ -169,7 +168,7 @@ export async function measureDetailTextWidths(
 
   for (const request of requests) {
     if (!measurements.has(request.id)) {
-      throw new Error(`Satori did not measure detail text request ${request.id}.`);
+      throw new Error(`The layout engine did not measure detail text request ${request.id}.`);
     }
   }
   return measurements;
@@ -210,7 +209,7 @@ export async function addMeasuredGermanBreaks(
   for (const work of wordWorks) {
     const width = wordWidths.get(work.widthRequestId);
     if (width === undefined || !Number.isFinite(width)) {
-      throw new Error(`Satori did not return a valid width for ${work.widthRequestId}.`);
+      throw new Error(`The layout engine did not return a valid width for ${work.widthRequestId}.`);
     }
     work.width = width;
     if (width > work.field.maxWidth) {
@@ -273,7 +272,7 @@ export async function addMeasuredGermanBreaks(
         const requestId = edgeRequestIds.get(edgeKey(startIndex, endIndex));
         const measuredWidth = requestId === undefined ? undefined : edgeWidths.get(requestId);
         if (measuredWidth === undefined || !Number.isFinite(measuredWidth)) {
-          throw new Error(`Satori did not return a valid width for ${requestId ?? "a hyphen candidate"}.`);
+          throw new Error(`The layout engine did not return a valid width for ${requestId ?? "a hyphen candidate"}.`);
         }
         if (measuredWidth > work.field.maxWidth) {
           continue;

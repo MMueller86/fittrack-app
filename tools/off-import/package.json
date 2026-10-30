@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "@azure/cosmos": "^4.1.1",
-    "mongodb": "^6.5.0"
+    "mongodb": "^7.8.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "tsx": "^4.7.0",
-    "typescript": "^5.4.0"
+    "@types/node": "^24.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }

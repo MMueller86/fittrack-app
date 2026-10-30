@@ -1,6 +1,6 @@
 // MealParserReviewScreen — shows AI-parsed meal items for user review before saving.
 //
-// Rendered as a full-screen Modal over AddItemModal.
+// Rendered as a full-screen Modal over AISubFlow.
 // User reviews matched / needsSelection / unmatched items and can:
 //   - Accept matched items as-is
 //   - Pick from candidates for needsSelection items

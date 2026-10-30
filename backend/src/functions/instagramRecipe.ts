@@ -61,7 +61,7 @@ const SelectedTagsSchema = z
 
 export const InstagramRecipeRenderRequestSchema = z
   .object({
-    imageId: z.string().uuid().optional(),
+    imageId: z.guid().optional(),
     presentation: PresentationSchema.optional(),
     selectedTags: SelectedTagsSchema.optional(),
     nutritionHighlight: z.enum(['high-protein']).nullable().optional(),

@@ -89,7 +89,7 @@ const NutritionPer100gSchema = z.object({
 });
 
 const RecipeIngredientSchema = z.object({
-  id: z.string().uuid(),
+  id: z.guid(),
   displayName: z.string().trim().min(1).max(200),
   inputMode: z.enum(['grams', 'portion']),
   inputAmount: nonNegativeFiniteNumber.nullable(),

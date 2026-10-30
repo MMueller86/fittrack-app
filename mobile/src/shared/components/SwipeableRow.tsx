@@ -109,7 +109,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   deleteArea: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.negative,
     alignItems: 'flex-end',
     justifyContent: 'center',

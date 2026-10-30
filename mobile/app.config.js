@@ -70,7 +70,7 @@ module.exports = ({ config }) => ({
     [
       'expo-media-library',
       {
-        photosPermission: 'FitTrack benötigt Zugriff auf deine Fotos, um Rezeptbilder zu speichern.',
+        photosPermission: 'FitTrack benötigt Zugriff auf deine Fotos, um Rezeptbilder, Nährwert-Labels und Mahlzeitenfotos auszuwählen.',
         savePhotosPermission: 'FitTrack benötigt Zugriff, um Rezeptbilder im Album FitTrack zu speichern.',
         granularPermissions: ['photo'],
       },

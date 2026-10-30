@@ -3,14 +3,14 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Meal, MealItem, MealType } from '@fittrack/shared';
-import type { NutritionHealthRecord } from './IHealthPlatformService';
+import type { HealthPermission, NutritionHealthRecord } from './IHealthPlatformService';
 import { healthPlatformService } from './healthPlatformService';
 import { diaryApi } from '../../shared/api/diaryApi';
 import { authService } from '../authService';
 import { syncLogger } from './syncLogger';
 
 const STORAGE_KEY = 'hc:nutrition:sync';
-const NUTRITION_PERMISSIONS = [{ accessType: 'write' as const, recordType: 'Nutrition' }];
+const NUTRITION_PERMISSIONS: HealthPermission[] = [{ accessType: 'write', recordType: 'Nutrition' }];
 const BATCH_SIZE = 50;
 
 const MEAL_TYPE_MAP: Record<MealType, number> = {
@@ -27,20 +27,15 @@ const MEAL_TYPE_MAP: Record<MealType, number> = {
 // ---------------------------------------------------------------------------
 
 export function toNutritionRecord(
-  meal: Pick<Meal, 'type' | 'date' | 'createdAt'>,
+  meal: Pick<Meal, 'type' | 'date'>,
   item: MealItem,
 ): NutritionHealthRecord {
-  const time = meal.createdAt
-    ? new Date(meal.createdAt).toISOString()
-    : (() => {
-        const [y, m, d] = meal.date.split('-').map(Number);
-        return new Date(y, m - 1, d, 12, 0, 0, 0).toISOString();
-      })();
+  const [year, month, day] = meal.date.split('-').map(Number);
+  const timeAnchor = new Date(year, month - 1, day, 12, 0, 0, 0);
+  const startIso = timeAnchor.toISOString();
+  const endIso = new Date(timeAnchor.getTime() + 1000).toISOString();
 
-  const startIso = time;
-  const endIso = new Date(new Date(time).getTime() + 1000).toISOString();
-
-  const offsetMins = -new Date().getTimezoneOffset();
+  const offsetMins = -timeAnchor.getTimezoneOffset();
   const sign = offsetMins >= 0 ? '+' : '-';
   const abs = Math.abs(offsetMins);
   const zone = `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`;

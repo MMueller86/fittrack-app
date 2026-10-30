@@ -39,7 +39,7 @@ vi.mock('react-native', () => ({
   Linking: { openSettings: vi.fn(async () => undefined) },
   ScrollView: 'ScrollView',
   StyleSheet: {
-    absoluteFillObject: {},
+    absoluteFill: {},
     create: <T,>(styles: T) => styles,
   },
   Text: 'Text',

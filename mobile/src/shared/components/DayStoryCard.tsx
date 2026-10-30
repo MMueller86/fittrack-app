@@ -4,7 +4,8 @@
 
 import React, { RefObject, useState } from 'react';
 import { Icon } from './Icon';
-import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import Svg, { Path, Circle, Line } from 'react-native-svg';
 import type { DiaryDayResponse, MacroRange, MealType } from '@fittrack/shared';
 import type { HintResult } from '../../../../shared/types/hint';
@@ -588,7 +589,7 @@ interface DayStoryCardProps {
   target: MacroTarget | null;
   meals: Array<{ type: MealType; items: unknown[] }>;
   mealSummaries: MealMacroSummary[];
-  scrollRef: RefObject<ScrollView | null>;
+  scrollRef: RefObject<ScrollViewInstance | null>;
   mealOffsets: Partial<Record<MealType, number>>;
   hint?: HintResult | null;
   /** When present and bonus > 0, shows the 3-line calorie breakdown in the macro panel. */

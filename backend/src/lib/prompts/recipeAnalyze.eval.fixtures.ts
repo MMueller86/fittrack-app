@@ -546,7 +546,7 @@ export const RECIPE_ANALYZE_EVAL_FIXTURES: RecipeEvalFixture[] = [
       // US-10 AC-15/16 and unchanged numbered input: reviewed semantic matrix 1..8.
       sourceStepSemanticAssertions: numberedInstructionSemantics,
       exportStepSemanticAssertions: [
-        { sourceStepOrder: 1, description: 'cook potatoes', patterns: [/(?:koch\w*[^;,.]*kartoffel|kartoffel[^;,.]*(?:koch\w*|gar\w*))/iu], contradictions: [/kartoffel[^;,.]*\b8\s*min/iu] },
+        { sourceStepOrder: 1, description: 'cook potatoes', patterns: [/(?:koch\w*[^;,.]*kartoffel|kartoffel[^;,.]*(?:koch\w*|gar\w*))/iu], contradictions: [/kartoffel(?:(?!\bund\b)[^;,.])*\b8\s*min/iu] },
         { sourceStepOrder: 2, description: 'cook beans independently', patterns: [/(?:gar\w*[^;,.]*bohn|koch\w*[^;,.]*bohn|bohn\w*[^;,.]*(?:gar\w*|koch\w*))/iu], contradictions: [/bohn\w*[^;,.]*\b18\s*min/iu] },
         { sourceStepOrder: 5, description: 'fry chicken', patterns: [/(?:brat\w*[^;.]*hähnchen|hähnchen[^;.]*brat\w*)/iu], contradictions: [/hähnchen[^;,.]*(?:\b6\s*min(?:uten)?\.?\s*(?:je|pro)\s+seite|(?:je|pro)\s+seite\s*6\s*min)/iu] },
         { sourceStepOrder: 6, description: 'finish cooking chicken after frying', patterns: [/(?:gar\w*[\s\S]*hähnchen|hähnchen[\s\S]*gar\w*)/iu], contradictions: [/(?:gar\w*[^;,.]*weitere\s+4\s*min|weitere\s+4\s*min[^;,.]*gar\w*)/iu, /gar\w*[^;,.]*(?:kartoffel|bohn)/iu] },

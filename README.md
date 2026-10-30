@@ -17,16 +17,16 @@ Android-first cross-platform nutrition and training app.
 Install these once before starting local development:
 
 ```powershell
-# Node.js 24
+# Node.js 24 (verified with 24.22.1 / npm 12.2.1)
 winget install OpenJS.NodeJS.LTS
 
-# Azure Functions Core Tools v4
-npm install -g azure-functions-core-tools@4 --unsafe-perm true
+# Azure Functions Core Tools v4 (npm 12 requires --allow-scripts)
+npm install -g --allow-scripts=azure-functions-core-tools azure-functions-core-tools@4.16.0
 
 # Verify
-node --version    # v20.x
-npm --version     # 10.x
-func --version    # 4.x
+node --version    # v24.x
+npm --version     # 12.x
+func --version    # 4.16.0
 ```
 
 ## Getting Started

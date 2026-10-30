@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AzureOpenAI } from 'openai';
 import { __setOpenAiClientForTests, generateDailyInsight } from '../openai';
+import { getAzureOpenAiApiVersion } from '../azureOpenAiConfig';
 import { DAILY_INSIGHT_PROMPT_FINGERPRINT, DAILY_INSIGHT_PROMPT_VERSION } from './dailyInsightPrompt';
 import { DAILY_INSIGHT_EVAL_FIXTURES } from './dailyInsight.eval.fixtures';
 
@@ -55,7 +56,7 @@ describe('dailyInsight: live prompt evaluation', () => {
     const liveClient = new AzureOpenAI({
       endpoint: process.env['AZURE_OPENAI_ENDPOINT']!,
       apiKey: process.env['AZURE_OPENAI_API_KEY']!,
-      apiVersion: process.env['AZURE_OPENAI_API_VERSION'] ?? '2024-07-01',
+      apiVersion: getAzureOpenAiApiVersion(),
     });
     let providerAttempt = 0;
     const create = vi.fn(async (...args: Parameters<typeof liveClient.chat.completions.create>) => {

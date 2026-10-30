@@ -20,6 +20,7 @@ import type {
 } from '@azure/functions';
 import { z, type ZodSchema } from 'zod';
 
+import { legacyIssueCode } from './zodCompat';
 import {
   UnauthorizedError,
   UserWriteBlockedDuringProfileDeletionError,
@@ -175,7 +176,7 @@ export async function parseBody<T>(
     },
     diagnostics: parsed.error.issues.map((issue) => {
       const diagnostic = {
-        code: issue.code,
+        code: legacyIssueCode(issue),
         path: formatSafeZodPath(issue.path),
       };
       if (issue.code !== 'unrecognized_keys') return diagnostic;

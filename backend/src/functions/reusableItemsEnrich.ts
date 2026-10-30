@@ -17,6 +17,7 @@
 
 import { app, type InvocationContext } from '@azure/functions';
 import { AzureOpenAI } from 'openai';
+import { createAzureOpenAiClientOptions, getAzureOpenAiDeploymentName } from '../lib/azureOpenAiConfig';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { isProfileDeletionInProgress } from '../lib/repositories/profileDeletionRepository';
 import { buildKeywordPrompt } from '../lib/prompts/foodKeywords';
@@ -29,11 +30,7 @@ let _client: AzureOpenAI | null = null;
 
 function getClient(): AzureOpenAI {
   if (!_client) {
-    const endpoint = process.env['AZURE_OPENAI_ENDPOINT'];
-    const apiKey = process.env['AZURE_OPENAI_API_KEY'];
-    const apiVersion = process.env['AZURE_OPENAI_API_VERSION'] ?? '2024-07-01';
-    if (!endpoint || !apiKey) throw new Error('AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set');
-    _client = new AzureOpenAI({ endpoint, apiKey, apiVersion });
+    _client = new AzureOpenAI(createAzureOpenAiClientOptions());
   }
   return _client;
 }
@@ -103,7 +100,7 @@ async function enrichItem(userId: string, itemId: string, ctx: InvocationContext
 
   // Build and send prompt
   const prompt = buildKeywordPrompt(item.name, item.brand);
-  const deployment = process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] ?? 'gpt4o-mini';
+  const deployment = getAzureOpenAiDeploymentName();
 
   let aiKeywords: string[] = [];
   try {

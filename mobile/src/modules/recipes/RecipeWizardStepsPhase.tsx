@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -172,7 +173,7 @@ interface Props {
   steps: WizardStepItem[];
   draggingStepId: string | null;
   dropTargetIndex: number | null;
-  stepsScrollRef: React.RefObject<ScrollView | null>;
+  stepsScrollRef: React.RefObject<ScrollViewInstance | null>;
   dragScrollAdjustment: SharedValue<number>;
   getStepOriginTop: (index: number) => number;
   onStepsScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;

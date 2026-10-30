@@ -7,7 +7,7 @@ export interface HealthConnectAvailability {
 
 export interface HealthPermission {
   accessType: 'read' | 'write';
-  recordType: string;
+  recordType: HealthRecordType;
 }
 
 export type HealthRecordType = 'Weight' | 'Nutrition';
@@ -23,7 +23,7 @@ export interface NutritionHealthRecord {
   startZoneOffset?: string;
   endZoneOffset?: string;
   name?: string;
-  mealType?: number;
+  mealType: number;
   energy?: { value: number; unit: 'kilocalories' };
   protein?: { value: number; unit: 'grams' };
   totalCarbohydrate?: { value: number; unit: 'grams' };

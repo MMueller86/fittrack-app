@@ -344,7 +344,7 @@ export function SearchState({ query, recents, initialResults, initialResultsQuer
                 onOpenSubflow={onOpenSubflow}
                 allowedSubflows={allowedSubflows}
               />
-            ) : null
+            ) : undefined
           }
         />
       ) : null}

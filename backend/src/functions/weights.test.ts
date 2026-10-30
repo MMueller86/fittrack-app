@@ -164,6 +164,7 @@ describe('POST /api/weights', () => {
     const res = await addWeightHandler(await makeAuthRequest({ body }), makeContext());
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('value') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 on invalid unit', async () => {
@@ -173,6 +174,7 @@ describe('POST /api/weights', () => {
     );
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('unit') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('accepts unit "lbs"', async () => {
@@ -182,6 +184,19 @@ describe('POST /api/weights', () => {
     );
     expect(res.status).toBe(201);
     expect((res.jsonBody as { unit: string }).unit).toBe('lbs');
+  });
+
+  it.each([0.001, 1000])('accepts positive value boundary %s and strips unknown fields', async (value) => {
+    const response = await addWeightHandler(
+      await makeAuthRequest({
+        body: { value: String(value), date: '2026-04-30', unknownField: true },
+      }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(201);
+    expect(response.jsonBody).toMatchObject({ value, unit: 'kg', date: '2026-04-30' });
+    expect(response.jsonBody).not.toHaveProperty('unknownField');
   });
 
   it.each([
@@ -195,6 +210,7 @@ describe('POST /api/weights', () => {
     );
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('date') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 when date is missing instead of using a UTC fallback', async () => {
@@ -204,6 +220,21 @@ describe('POST /api/weights', () => {
     );
     expect(res.status).toBe(400);
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('date') });
+    expect(res.jsonBody).not.toHaveProperty('code');
+  });
+
+  it.each([
+    ['null value', { value: null, date: '2026-04-30' }, 'value'],
+    ['empty value', { value: '', date: '2026-04-30' }, 'value'],
+    ['null unit', { value: 80, unit: null, date: '2026-04-30' }, 'unit'],
+    ['null date', { value: 80, date: null }, 'date'],
+    ['numeric date', { value: 80, date: 20260430 }, 'date'],
+  ])('returns a field-identifying 400 for %s', async (_label, body, field) => {
+    const response = await addWeightHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 on invalid JSON body', async () => {
@@ -213,6 +244,7 @@ describe('POST /api/weights', () => {
     );
     expect(res.status).toBe(400);
     expect(res.jsonBody).toEqual({ error: 'Invalid JSON body' });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 });
 
@@ -276,12 +308,15 @@ describe('PUT /api/weights/:id', () => {
     ['value above max', { value: 1001 }],
     ['non-numeric value', { value: 'abc' }],
     ['missing value', {}],
+    ['null value', { value: null }],
+    ['empty value', { value: '' }],
   ])('returns 400 for %s', async (_label, body) => {
     const res = await updateWeightHandler(
       await makeAuthRequest({ params: { id: 'unused' }, body }),
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).not.toHaveProperty('code');
     expect(res.jsonBody).toMatchObject({ error: expect.stringContaining('value') });
   });
 
@@ -297,6 +332,8 @@ describe('PUT /api/weights/:id', () => {
     );
 
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: expect.stringContaining('Unrecognized key') });
+    expect(res.jsonBody).not.toHaveProperty('code');
     expect(await getWeightsRepository().list(TEST_USER_ID)).toMatchObject([{ value: 80 }]);
   });
 

@@ -4,6 +4,7 @@ import { type ZodSchema } from 'zod';
 import { UnauthorizedError, UserWriteBlockedDuringProfileDeletionError } from './auth';
 import { ProfileDeletionInProgressError } from './repositories/profileDeletionRepository';
 import { withHandler, type Handler } from './http';
+import { legacyIssueCode } from './zodCompat';
 import { logEvent, type ValidationDiagnostic } from './log';
 
 export type RecipeApiErrorCategory =
@@ -433,7 +434,7 @@ export function validateRecipeValue<T>(
     const keys = issue.code === 'unrecognized_keys'
       ? issue.keys.filter((key) => /^[A-Za-z][A-Za-z0-9_]{0,79}$/u.test(key)).slice(0, 8)
       : undefined;
-    return { code: issue.code, path: path || 'body', ...(keys && keys.length > 0 ? { keys } : {}) };
+    return { code: legacyIssueCode(issue), path: path || 'body', ...(keys && keys.length > 0 ? { keys } : {}) };
   });
   const fieldErrors = diagnostics.map(({ path, code }) => ({ path: path.slice(0, 200), code: code.slice(0, 80) }));
   const invalidExportIngredients = parsed.error.issues.some(

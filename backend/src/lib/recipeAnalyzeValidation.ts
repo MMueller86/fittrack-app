@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { legacyIssueCode } from './zodCompat';
 import type { AiRecipeIngredientLine, AiRecipeRaw, RecipePreparationContext, RecipeExportPreparationOutput } from './openai';
 import {
   RECIPE_EXPORT_MAX_INGREDIENTS,
@@ -104,11 +105,11 @@ function preparationSchemaDiagnostics(issues: z.ZodIssue[], prefix = '', raw?: u
     const referenceIndex = issue.path[2] === 'sourceStepOrders' && typeof issue.path[3] === 'number' ? issue.path[3] : undefined;
     const reference = stepIndex !== undefined && referenceIndex !== undefined ? candidate?.steps?.[stepIndex]?.sourceStepOrders?.[referenceIndex] : undefined;
     return {
-      phase: 'schema', code: issue.code, path: prefix + formatValidationPath(issue.path),
+      phase: 'schema', code: legacyIssueCode(issue), path: prefix + formatValidationPath(issue.path),
       ...(stepIndex !== undefined ? { stepIndex } : {}),
       ...(typeof order === 'number' && Number.isFinite(order) ? { stepOrder: order } : {}),
       ...(typeof reference === 'number' && Number.isFinite(reference) ? { offendingReferences: [reference] } : {}),
-      constraint: issue.code,
+      constraint: legacyIssueCode(issue),
       ...(issue.code === 'too_big' && typeof issue.maximum === 'number' ? { allowedRange: { max: issue.maximum } } : {}),
       ...(issue.code === 'too_small' && typeof issue.minimum === 'number' ? { allowedRange: { min: issue.minimum } } : {}),
       explanation: 'The field must satisfy the strict Preparation schema.',

@@ -4,8 +4,8 @@
   "private": true,
   "main": "dist/backend/src/index.js",
   "engines": {
-    "node": ">=24.0.0",
-    "npm": ">=10.0.0"
+    "node": ">=24.22.1 <25",
+    "npm": "12.2.1"
   },
   "scripts": {
     "build": "tsc --project tsconfig.json && node scripts/copy-instagram-assets.mjs",
@@ -21,8 +21,10 @@
     "render:gefluegelfrikadellen-details-template": "npm run build && node scripts/render-gefluegelfrikadellen-details-template.mjs",
     "render:nine-ingredients-details-template": "npm run build && node scripts/render-nine-ingredients-details-template.mjs",
     "render:twenty-ingredients-details-template": "npm run build && node scripts/render-twenty-ingredients-details-template.mjs",
-    "test:startup": "node --test scripts/dev.test.mjs scripts/storage.test.mjs scripts/wait-for-azurite.test.mjs scripts/run-eval.test.mjs",
+    "test:startup": "node --test scripts/dev.test.mjs scripts/storage.test.mjs scripts/wait-for-azurite.test.mjs scripts/run-eval.test.mjs scripts/functions-baseline.test.mjs scripts/staging-renderer-smoke.test.mjs",
     "test:watch": "vitest",
+    "test:functions-smoke": "node scripts/functions-smoke.mjs",
+    "smoke:staging-renderer": "node scripts/staging-renderer-smoke.mjs",
     "test:contract": "vitest run --config vitest.contract.config.mts",
     "migrate:insight-weight-trend": "node scripts/migrate-insight-weight-trend.mjs",
     "render:instagram-reference": "node scripts/render-golden.mjs",
@@ -33,26 +35,25 @@
   },
   "dependencies": {
     "@azure/ai-form-recognizer": "^5.1.0",
-    "@azure/cosmos": "^4.1.1",
-    "@azure/functions": "^4.5.0",
-    "@azure/storage-blob": "^12.25.0",
-    "@azure/storage-queue": "^12.30.0",
-    "@resvg/resvg-js": "~2.6.2",
-    "@tabler/icons": "~3.46.0",
+    "@azure/cosmos": "^4.10.1",
+    "@azure/functions": "^4.17.0",
+    "@azure/storage-blob": "^12.34.0",
+    "@azure/storage-queue": "^12.32.0",
+    "@napi-rs/canvas": "~1.1.0",
+    "@tabler/icons": "~3.50.0",
     "hyphen": "^1.14.1",
-    "jose": "^6.2.3",
-    "lucide-static": "~1.46.0",
-    "openai": "^4.104.0",
+    "jose": "^6.2.14",
+    "lucide-static": "~1.65.0",
+    "openai": "^7.45.1",
     "sharp": "^0.35.5",
-    "satori": "~0.33.4",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
-    "@types/sharp": "^0.31.1",
-    "azurite": "^3.35.0",
-    "pixelmatch": "~7.2.0",
-    "typescript": "^5.8.0",
-    "vitest": "^2.1.9"
+    "@typescript/typescript6": "~6.0.2",
+    "azurite": "^3.37.0",
+    "pixelmatch": "~8.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }

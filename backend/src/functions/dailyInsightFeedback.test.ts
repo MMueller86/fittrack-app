@@ -202,19 +202,29 @@ describe('POST /api/ai/daily-insight/feedback', () => {
   });
 
   it.each([
-    ['impossible date', { ...validBody, date: '2026-02-30' }],
-    ['non-canonical timestamp', { ...validBody, insightGeneratedAt: '2026-08-20T08:30:00Z' }],
-    ['invalid UUID', { ...validBody, submissionId: 'not-a-uuid' }],
-    ['empty comment', { ...validBody, userComment: '   ' }],
-    ['comment above maximum', { ...validBody, userComment: 'x'.repeat(501) }],
-    ['client snapshot field', { ...validBody, response: {} }],
-  ])('returns 400 for %s', async (_label, body) => {
+    ['missing date', { ...validBody, date: undefined }, 'Field "date"'],
+    ['missing insight timestamp', { ...validBody, insightGeneratedAt: undefined }, 'Field "insightGeneratedAt"'],
+    ['missing submission ID', { ...validBody, submissionId: undefined }, 'Field "submissionId"'],
+    ['missing comment', { ...validBody, userComment: undefined }, 'Field "userComment"'],
+    ['null date', { ...validBody, date: null }, 'Field "date"'],
+    ['numeric timestamp', { ...validBody, insightGeneratedAt: 7 }, 'Field "insightGeneratedAt"'],
+    ['null submission ID', { ...validBody, submissionId: null }, 'Field "submissionId"'],
+    ['numeric comment', { ...validBody, userComment: 7 }, 'Field "userComment"'],
+    ['impossible date', { ...validBody, date: '2026-02-30' }, 'Field "date"'],
+    ['non-canonical timestamp', { ...validBody, insightGeneratedAt: '2026-08-20T08:30:00Z' }, 'Field "insightGeneratedAt"'],
+    ['invalid UUID', { ...validBody, submissionId: 'not-a-uuid' }, 'Field "submissionId"'],
+    ['empty comment', { ...validBody, userComment: '   ' }, 'Field "userComment"'],
+    ['comment above maximum', { ...validBody, userComment: 'x'.repeat(501) }, 'Field "userComment"'],
+    ['client snapshot field', { ...validBody, response: {} }, 'response'],
+  ])('returns a field-identifying 400 for %s', async (_label, body, field) => {
     const response = await dailyInsightFeedbackHandler(
       await makeAuthRequest({ body }),
       makeContext(),
     );
 
     expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(field) });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 for invalid JSON', async () => {
@@ -451,20 +461,43 @@ describe('PATCH /api/ai/daily-insight/feedback/status', () => {
   });
 
   it.each([
-    ['missing userId', { feedbackId: adminStatusBody.feedbackId, processingStatus: 'Done' }],
-    ['missing feedbackId', { userId: adminStatusBody.userId, processingStatus: 'Done' }],
-    ['invalid processingStatus', { ...adminStatusBody, processingStatus: 'Closed' }],
-    ['empty userId', { ...adminStatusBody, userId: '   ' }],
-    ['empty feedbackId', { ...adminStatusBody, feedbackId: '  ' }],
-    ['unknown field', { ...adminStatusBody, unknown: true }],
-  ])('returns 400 for %s', async (_label, body) => {
+    ['missing userId', { feedbackId: adminStatusBody.feedbackId, processingStatus: 'Done' }, 'Field "userId"'],
+    ['missing feedbackId', { userId: adminStatusBody.userId, processingStatus: 'Done' }, 'Field "feedbackId"'],
+    ['missing processingStatus', { userId: adminStatusBody.userId, feedbackId: adminStatusBody.feedbackId }, 'Field "processingStatus"'],
+    ['invalid processingStatus', { ...adminStatusBody, processingStatus: 'Closed' }, 'processingStatus'],
+    ['empty userId', { ...adminStatusBody, userId: '   ' }, 'userId'],
+    ['empty feedbackId', { ...adminStatusBody, feedbackId: '  ' }, 'feedbackId'],
+    ['null userId', { ...adminStatusBody, userId: null }, 'userId'],
+    ['numeric userId', { ...adminStatusBody, userId: 7 }, 'userId'],
+    ['null feedbackId', { ...adminStatusBody, feedbackId: null }, 'feedbackId'],
+    ['numeric feedbackId', { ...adminStatusBody, feedbackId: 7 }, 'feedbackId'],
+    ['null processingStatus', { ...adminStatusBody, processingStatus: null }, 'processingStatus'],
+    ['numeric processingStatus', { ...adminStatusBody, processingStatus: 1 }, 'processingStatus'],
+    ['unknown field', { ...adminStatusBody, unknown: true }, 'unknown'],
+  ])('returns a field-identifying 400 for %s', async (_label, body, detail) => {
     const response = await dailyInsightFeedbackStatusUpdateHandler(
       await makeAdminAuthRequest({ body }),
       makeContext(),
     );
 
     expect(response.status).toBe(400);
+  expect(response.jsonBody).toEqual({ error: expect.stringContaining(detail) });
+  expect(response.jsonBody).not.toHaveProperty('code');
   });
+
+  it.each(['Open', 'Done', 'Rejected'] as const)(
+    'accepts processingStatus %s and treats trimmed non-UUID IDs as strings', async (processingStatus) => {
+      const response = await dailyInsightFeedbackStatusUpdateHandler(
+        await makeAdminAuthRequest({
+          body: { userId: ' user-id ', feedbackId: ' feedback-id ', processingStatus },
+        }),
+        makeContext(),
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.jsonBody).toEqual({ code: 'feedback_not_found' });
+    },
+  );
 
   it('returns 400 for invalid JSON', async () => {
     const response = await dailyInsightFeedbackStatusUpdateHandler(
@@ -474,6 +507,7 @@ describe('PATCH /api/ai/daily-insight/feedback/status', () => {
 
     expect(response.status).toBe(400);
     expect(response.jsonBody).toEqual({ error: 'Invalid JSON body' });
+    expect(response.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 404 when feedback does not exist', async () => {

@@ -1,11 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import { Resvg } from "@resvg/resvg-js";
 import sharp from "sharp";
-import satori from "satori";
 import { describe, expect, it } from "vitest";
 
+import { layoutElementTree } from "../canvasRenderer";
 import { compose, type ComposeAssets, type SatoriElement } from "../compose";
 import { quarkbroetchenFixture } from "../fixtures/quarkbroetchen";
 import { smokeFixture } from "../fixtures/smoke";
@@ -387,7 +386,7 @@ async function renderNutritionComparison(barbell: string, uniformBackground = fa
     delete backgroundStyle["backgroundImage"];
     background.props.style = backgroundStyle;
   }
-  const svg = await satori(tree as never, {
+  const laidOut = await layoutElementTree(tree, {
     width: CANVAS_WIDTH,
     height: CANVAS_HEIGHT,
     fonts: [
@@ -399,15 +398,9 @@ async function renderNutritionComparison(barbell: string, uniformBackground = fa
         data: readFileSync(resolve(assetRoot, "fonts/InterDisplay-Bold.ttf")),
       },
     ],
-    embedFont: true,
   });
 
-  return new Resvg(svg, {
-    fitTo: { mode: "original" },
-    font: { loadSystemFonts: false },
-  })
-    .render()
-    .asPng();
+  return laidOut.toPng();
 }
 
 function isLimePixelAt(image: PixelImage, x: number, y: number): boolean {
@@ -574,13 +567,21 @@ describe("Instagram recipe renderer nutrition layout", () => {
       readFileSync(BARBELL_ASSET_PATH, "utf8"),
       true,
     ));
+    // Skia anti-aliases the mirrored, non-integer-scaled SVG halves independently, so edge pixels may differ by one step.
+    let asymmetricMetalPixels = 0;
+    let metalPixels = 0;
     for (let y = barbellPixelTop; y < barbellPixelBottom; y += 1) {
       for (let offset = 2; offset < 58; offset += 1) {
-        expect(isMetalPixel(symmetricImage, BARBELL_X + offset, y)).toBe(
-          isMetalPixel(symmetricImage, BARBELL_X + BARBELL_WIDTH - 1 - offset, y),
-        );
+        const left = isMetalPixel(symmetricImage, BARBELL_X + offset, y);
+        const right = isMetalPixel(symmetricImage, BARBELL_X + BARBELL_WIDTH - 1 - offset, y);
+        if (left) metalPixels += 1;
+        if (left !== right) asymmetricMetalPixels += 1;
       }
     }
+    expect(metalPixels).toBeGreaterThan(500);
+    expect(asymmetricMetalPixels, `asymmetric ${asymmetricMetalPixels} of ${metalPixels}`).toBeLessThanOrEqual(
+      Math.ceil(metalPixels * 0.02),
+    );
 
     const asset = readFileSync(BARBELL_ASSET_PATH, "utf8");
     expect(asset).toMatch(/viewBox="0 0 904 64"/);
@@ -808,8 +809,8 @@ describe("Instagram recipe renderer nutrition layout", () => {
     expect(isMetalPixel(image, labelLeft + 10, BARBELL_SHAFT_CENTER_Y)).toBe(true);
     expect(isMetalPixel(image, labelRight - 10, BARBELL_SHAFT_CENTER_Y)).toBe(true);
 
-    expect(pixelAt(image, labelLeft, labelTop)).toEqual(pixelAt(image, labelLeft - 1, labelTop));
-    expect(pixelAt(image, labelRight - 1, labelTop)).toEqual(pixelAt(image, labelRight, labelTop));
+    expect(colorDistance(pixelAt(image, labelLeft, labelTop), pixelAt(image, labelLeft - 1, labelTop))).toBeLessThanOrEqual(1);
+    expect(colorDistance(pixelAt(image, labelRight - 1, labelTop), pixelAt(image, labelRight, labelTop))).toBeLessThanOrEqual(1);
 
     const wordmarkStyle = styleOf(wordmark);
     expect(wordmarkStyle.left).toBe(WORDMARK_CENTER_X - WORDMARK_WIDTH / 2);

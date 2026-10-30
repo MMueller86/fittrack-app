@@ -12,11 +12,6 @@
       "android",
       "ios"
     ],
-    "splash": {
-      "image": "./assets/brand/fittrack_splash_logo_master_v1.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0B0F0C"
-    },
     "android": {
       "package": "com.fittrack.app",
       "adaptiveIcon": {
@@ -28,10 +23,17 @@
       "bundleIdentifier": "com.fittrack.app",
       "supportsTablet": false
     },
-    "newArchEnabled": true,
     "plugins": [
       "expo-web-browser",
-      "expo-dev-client"
+      "expo-dev-client",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/fittrack_splash_logo_master_v1.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0B0F0C"
+        }
+      ]
     ],
     "extra": {
       "eas": {

@@ -69,6 +69,65 @@ const validInput = {
   goalIntensity: 'gentle',
 } as const;
 
+const minimumProfileInput = {
+  gender: 'other', age: 10, heightCm: 50, weightKg: 0.1, targetWeightKg: 0.1,
+  stepsPerDay: 0, activityLevel: null, trainingFrequencyPerWeek: 0, trainingDurationMinutes: 0,
+  sports: [], goal: 'maintain', goalIntensity: null,
+};
+
+const maximumProfileInput = {
+  gender: 'female', age: 120, heightCm: 300, weightKg: 500, targetWeightKg: 500,
+  stepsPerDay: 100000, activityLevel: 'very_active', trainingFrequencyPerWeek: 7,
+  trainingDurationMinutes: 600,
+  sports: ['strength', 'bouldering', 'running', 'cycling', 'swimming', 'hiking', 'teamsport', 'other'],
+  goal: 'recomposition', goalIntensity: 'aggressive', displayName: 'D'.repeat(50),
+};
+
+const profileSchemaHandlers = [
+  { route: 'POST /api/profile', handler: createProfileHandler, successStatus: 201 },
+  { route: 'PUT /api/profile', handler: updateProfileHandler, successStatus: 200 },
+  { route: 'POST /api/profile/calculate-preview', handler: calculatePreviewHandler, successStatus: 200 },
+];
+
+const missingProfileFields = [
+  'gender', 'age', 'heightCm', 'weightKg', 'targetWeightKg', 'stepsPerDay', 'activityLevel',
+  'trainingFrequencyPerWeek', 'trainingDurationMinutes', 'sports', 'goal', 'goalIntensity',
+];
+
+const invalidProfileInputs: Array<{ label: string; overrides: Record<string, unknown>; field: string }> = [
+  { label: 'null gender', overrides: { gender: null }, field: 'gender' },
+  { label: 'unknown gender enum', overrides: { gender: 'nonbinary' }, field: 'gender' },
+  { label: 'string age', overrides: { age: '39' }, field: 'age' },
+  { label: 'age below minimum', overrides: { age: 9 }, field: 'age' },
+  { label: 'age above maximum', overrides: { age: 121 }, field: 'age' },
+  { label: 'string height', overrides: { heightCm: '173' }, field: 'heightCm' },
+  { label: 'height below minimum', overrides: { heightCm: 49 }, field: 'heightCm' },
+  { label: 'height above maximum', overrides: { heightCm: 301 }, field: 'heightCm' },
+  { label: 'null weight', overrides: { weightKg: null }, field: 'weightKg' },
+  { label: 'zero weight', overrides: { weightKg: 0 }, field: 'weightKg' },
+  { label: 'weight above maximum', overrides: { weightKg: 501 }, field: 'weightKg' },
+  { label: 'null target weight', overrides: { targetWeightKg: null }, field: 'targetWeightKg' },
+  { label: 'zero target weight', overrides: { targetWeightKg: 0 }, field: 'targetWeightKg' },
+  { label: 'target weight above maximum', overrides: { targetWeightKg: 501 }, field: 'targetWeightKg' },
+  { label: 'string steps', overrides: { stepsPerDay: '10000' }, field: 'stepsPerDay' },
+  { label: 'negative steps', overrides: { stepsPerDay: -1 }, field: 'stepsPerDay' },
+  { label: 'steps above maximum', overrides: { stepsPerDay: 100001 }, field: 'stepsPerDay' },
+  { label: 'unknown activity enum', overrides: { activityLevel: 'extreme' }, field: 'activityLevel' },
+  { label: 'negative training frequency', overrides: { trainingFrequencyPerWeek: -1 }, field: 'trainingFrequencyPerWeek' },
+  { label: 'training frequency above maximum', overrides: { trainingFrequencyPerWeek: 8 }, field: 'trainingFrequencyPerWeek' },
+  { label: 'string training duration', overrides: { trainingDurationMinutes: '60' }, field: 'trainingDurationMinutes' },
+  { label: 'training duration above maximum', overrides: { trainingDurationMinutes: 601 }, field: 'trainingDurationMinutes' },
+  { label: 'non-array sports', overrides: { sports: 'running' }, field: 'sports' },
+  { label: 'unknown sport enum', overrides: { sports: ['tennis'] }, field: 'sports' },
+  { label: 'unknown goal enum', overrides: { goal: 'bulk' }, field: 'goal' },
+  { label: 'unknown goal-intensity enum', overrides: { goalIntensity: 'extreme' }, field: 'goalIntensity' },
+  { label: 'null optional display name', overrides: { displayName: null }, field: 'displayName' },
+  { label: 'display name above maximum', overrides: { displayName: 'D'.repeat(51) }, field: 'displayName' },
+  { label: 'non-boolean health-sync flag', overrides: { healthSyncEnabled: 1 }, field: 'healthSyncEnabled' },
+  { label: 'null health-sync flag', overrides: { healthSyncEnabled: null }, field: 'healthSyncEnabled' },
+  { label: 'both activity inputs null', overrides: { stepsPerDay: null, activityLevel: null }, field: 'stepsPerDay' },
+];
+
 // ---------------------------------------------------------------------------
 // GET /api/profile/me
 // ---------------------------------------------------------------------------
@@ -139,6 +198,83 @@ describe('POST /api/profile', () => {
     expect(body.targets.trainingDay.macroRanges).toBeDefined();
   });
 
+  it.each([
+    'gender', 'age', 'heightCm', 'weightKg', 'targetWeightKg', 'stepsPerDay', 'activityLevel',
+    'trainingFrequencyPerWeek', 'trainingDurationMinutes', 'sports', 'goal', 'goalIntensity',
+  ])('returns a field-specific 400 when required field %s is missing', async (field) => {
+    const body: Record<string, unknown> = { ...validInput };
+    delete body[field];
+
+    const res = await createProfileHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(await getProfileRepository().get(TEST_USER_ID)).toBeNull();
+  });
+
+  it.each([
+    ['age below minimum', { age: 9 }, 'age'],
+    ['age above maximum', { age: 121 }, 'age'],
+    ['height below minimum', { heightCm: 49 }, 'heightCm'],
+    ['height above maximum', { heightCm: 301 }, 'heightCm'],
+    ['zero weight', { weightKg: 0 }, 'weightKg'],
+    ['weight above maximum', { weightKg: 501 }, 'weightKg'],
+    ['negative steps', { stepsPerDay: -1 }, 'stepsPerDay'],
+    ['steps above maximum', { stepsPerDay: 100001 }, 'stepsPerDay'],
+    ['invalid activity level', { activityLevel: 'extreme' }, 'activityLevel'],
+    ['training frequency above maximum', { trainingFrequencyPerWeek: 8 }, 'trainingFrequencyPerWeek'],
+    ['training duration above maximum', { trainingDurationMinutes: 601 }, 'trainingDurationMinutes'],
+    ['invalid sport', { sports: ['strength', 'tennis'] }, 'sports'],
+    ['invalid goal', { goal: 'bulk' }, 'goal'],
+    ['invalid goal intensity', { goalIntensity: 'extreme' }, 'goalIntensity'],
+    ['null display name', { displayName: null }, 'displayName'],
+    ['non-boolean health sync flag', { healthSyncEnabled: 1 }, 'healthSyncEnabled'],
+  ])('returns a field-specific 400 for %s', async (_label, overrides, field) => {
+    const res = await createProfileHandler(
+      await makeAuthRequest({ body: { ...validInput, ...overrides } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(await getProfileRepository().get(TEST_USER_ID)).toBeNull();
+  });
+
+  it.each([
+    [
+      'minimum profile values',
+      {
+        gender: 'other', age: 10, heightCm: 50, weightKg: 0.1, targetWeightKg: 0.1,
+        stepsPerDay: 0, activityLevel: null, trainingFrequencyPerWeek: 0, trainingDurationMinutes: 0,
+        sports: [], goal: 'maintain', goalIntensity: null,
+      },
+    ],
+    [
+      'maximum profile values',
+      {
+        gender: 'female', age: 120, heightCm: 300, weightKg: 500, targetWeightKg: 500,
+        stepsPerDay: 100000, activityLevel: 'very_active', trainingFrequencyPerWeek: 7,
+        trainingDurationMinutes: 600,
+        sports: ['strength', 'bouldering', 'running', 'cycling', 'swimming', 'hiking', 'teamsport', 'other'],
+        goal: 'recomposition', goalIntensity: 'aggressive', displayName: 'D'.repeat(50),
+      },
+    ],
+  ])('accepts %s', async (_label, body) => {
+    const res = await createProfileHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(res.status).toBe(201);
+  });
+
+  it('strips unknown profile fields before saving', async () => {
+    const res = await createProfileHandler(
+      await makeAuthRequest({ body: { ...validInput, unknownField: true } }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    expect((res.jsonBody as { profile: UserProfile }).profile).not.toHaveProperty('unknownField');
+  });
+
   it('stores calculationMeta with formulaVersion', async () => {
     const res = await createProfileHandler(
       await makeAuthRequest({ body: validInput }),
@@ -157,6 +293,8 @@ describe('POST /api/profile', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: expect.stringContaining('Field "targetWeightKg"') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 when both stepsPerDay and activityLevel are null', async () => {
@@ -167,6 +305,10 @@ describe('POST /api/profile', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({
+      error: expect.stringContaining('Field "stepsPerDay"'),
+    });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 400 for invalid gender', async () => {
@@ -175,6 +317,8 @@ describe('POST /api/profile', () => {
       makeContext(),
     );
     expect(res.status).toBe(400);
+    expect(res.jsonBody).toEqual({ error: expect.stringContaining('Field "gender"') });
+    expect(res.jsonBody).not.toHaveProperty('code');
   });
 
   it('returns 401 without token', async () => {
@@ -369,11 +513,97 @@ describe('POST /api/profile/calculate-preview', () => {
   });
 });
 
+describe.each(profileSchemaHandlers)('$route request schema', ({ handler, successStatus }) => {
+  it.each(missingProfileFields)('returns a field-specific 400 when %s is missing', async (field) => {
+    const body: Record<string, unknown> = { ...validInput };
+    delete body[field];
+
+    const response = await handler(await makeAuthRequest({ body }), makeContext());
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it.each(invalidProfileInputs)('returns the current field error for $label', async ({ overrides, field }) => {
+    const response = await handler(
+      await makeAuthRequest({ body: { ...validInput, ...overrides } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: expect.stringContaining(`Field "${field}"`) });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it.each([
+    ['minimum values', minimumProfileInput],
+    ['maximum values', maximumProfileInput],
+  ])('accepts %s and strips unknown keys', async (_label, input) => {
+    const response = await handler(
+      await makeAuthRequest({ body: { ...input, unknownField: true } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(successStatus);
+    expect(response.jsonBody).not.toHaveProperty('unknownField');
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+
+  it('accepts nullable and optional fields, including an empty display name', async () => {
+    const response = await handler(await makeAuthRequest({
+      body: {
+        ...validInput,
+        stepsPerDay: null,
+        activityLevel: 'light',
+        goalIntensity: null,
+        displayName: '',
+        healthSyncEnabled: false,
+      },
+    }), makeContext());
+
+    expect(response.status).toBe(successStatus);
+  });
+
+  it('returns the generic parseBody envelope for invalid JSON', async () => {
+    const response = await handler(await makeAuthRequest({ rawBody: '{not json' }), makeContext());
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual({ error: 'Invalid JSON body' });
+    expect(response.jsonBody).not.toHaveProperty('code');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // DELETE /api/profile
 // ---------------------------------------------------------------------------
 
 describe('DELETE /api/profile', () => {
+  const invalidDeletionResponse = {
+    error: 'invalid_profile_deletion_request',
+    message: 'Die Löschanfrage ist ungültig. Bitte prüfe die Bestätigung.',
+  };
+
+  it.each([
+    ['missing confirmation', { deleteCommunityRecipes: false }],
+    ['null confirmation', { confirmation: null, deleteCommunityRecipes: false }],
+    ['non-string confirmation', { confirmation: 7, deleteCommunityRecipes: false }],
+    ['empty confirmation', { confirmation: '', deleteCommunityRecipes: false }],
+    ['whitespace confirmation', { confirmation: ' \u00a0 ', deleteCommunityRecipes: false }],
+    ['missing community choice', { confirmation: 'DELETE' }],
+    ['null community choice', { confirmation: 'DELETE', deleteCommunityRecipes: null }],
+    ['string community choice', { confirmation: 'DELETE', deleteCommunityRecipes: 'false' }],
+    ['numeric community choice', { confirmation: 'DELETE', deleteCommunityRecipes: 0 }],
+  ])('normalizes %s to the stable request error without deleting data', async (_label, body) => {
+    const response = await deleteProfileHandler(await makeAuthRequest({ body }), makeContext());
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toEqual(invalidDeletionResponse);
+    expect(response.jsonBody).not.toHaveProperty('code');
+    expect(response.jsonBody).not.toHaveProperty('field');
+    expect(deleteUserProfileData).not.toHaveBeenCalled();
+  });
+
   it('requires the exact confirmation and community-recipe choice', async () => {
     const res = await deleteProfileHandler(await makeAuthRequest({
       body: { confirmation: 'DELETE' },
@@ -439,6 +669,16 @@ describe('DELETE /api/profile', () => {
 
     expect(res.status).toBe(204);
     expect(deleteUserProfileData).toHaveBeenCalledWith(TEST_USER_ID, false);
+  });
+
+  it('accepts the exact literal with deleteCommunityRecipes=true', async () => {
+    vi.mocked(deleteUserProfileData).mockResolvedValue(undefined);
+    const response = await deleteProfileHandler(await makeAuthRequest({
+      body: { confirmation: 'DELETE', deleteCommunityRecipes: true },
+    }), makeContext());
+
+    expect(response.status).toBe(204);
+    expect(deleteUserProfileData).toHaveBeenCalledWith(TEST_USER_ID, true);
   });
 
   it('returns retryable conflict while another deletion owns the lease', async () => {

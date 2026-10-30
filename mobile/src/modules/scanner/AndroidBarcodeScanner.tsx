@@ -1,5 +1,4 @@
-// AndroidBarcodeScanner — expo-camera basierter Barcode-Scanner für Android.
-// Wird ausschließlich auf Android gerendert; iOS nutzt react-native-vision-camera.
+// AndroidBarcodeScanner — expo-camera basierter Barcode-Scanner.
 //
 // expo-camera v17 (SDK 54): CameraView mit onBarcodeScanned + useCameraPermissions
 

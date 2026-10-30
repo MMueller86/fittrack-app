@@ -596,7 +596,7 @@ const rowStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   rangeTint: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     opacity: 0.12,
   },
   rangeStart: {

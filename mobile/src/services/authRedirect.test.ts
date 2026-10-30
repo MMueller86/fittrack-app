@@ -44,16 +44,96 @@ describe('buildAuthExtraParams', () => {
 
 describe('app.config.js consistency', () => {
   const require = createRequire(import.meta.url);
-  const config = require('../../app.config.js') as (ctx: { config: Record<string, unknown> }) => {
-    android: { intentFilters: { data: { host: string; pathPrefix: string }[] }[] };
+  const appConfigPath = require.resolve('../../app.config.js');
+  type AppConfig = {
+    name: string;
+    scheme: string;
+    plugins: unknown[];
+    android: {
+      package: string;
+      softwareKeyboardLayoutMode: string;
+      intentFilters: {
+        action: string;
+        autoVerify: boolean;
+        data: { scheme: string; host: string; pathPrefix: string }[];
+        category: string[];
+      }[];
+    };
+    ios: { bundleIdentifier: string };
   };
 
-  it('uses the same host and per-variant path as the redirect URI', () => {
-    const result = config({ config: {} });
-    const data = result.android.intentFilters.flatMap((f) => f.data);
-    expect(data).toHaveLength(1);
-    expect(data[0]!.host).toBe(AUTH_CALLBACK_HOST);
-    const redirect = resolveAuthRedirect({ variant: undefined, schemeRedirectUri: scheme }).redirectUri;
-    expect(redirect).toBe(`https://${data[0]!.host}${data[0]!.pathPrefix}`);
+  const loadConfig = (variant?: string): AppConfig => {
+    const previousVariant = process.env.APP_VARIANT;
+    if (variant) process.env.APP_VARIANT = variant;
+    else delete process.env.APP_VARIANT;
+    delete require.cache[appConfigPath];
+
+    try {
+      const config = require(appConfigPath) as (ctx: { config: Record<string, unknown> }) => AppConfig;
+      return config({
+        config: {
+          name: 'FitTrack',
+          scheme: 'fittrack',
+          plugins: ['expo-dev-client'],
+          android: {
+            package: 'com.fittrack.app',
+            softwareKeyboardLayoutMode: 'pan',
+            intentFilters: [],
+          },
+          ios: { bundleIdentifier: 'com.fittrack.app' },
+        },
+      });
+    } finally {
+      delete require.cache[appConfigPath];
+      if (previousVariant === undefined) delete process.env.APP_VARIANT;
+      else process.env.APP_VARIANT = previousVariant;
+    }
+  };
+
+  it.each([
+    { variant: undefined, name: 'FitTrack', packageName: 'com.fittrack.app', callbackPath: '/auth/callback/alpha' },
+    { variant: 'development', name: 'FitTrack (Dev)', packageName: 'com.fittrack.app.dev', callbackPath: '/auth/callback/dev' },
+  ])('keeps the $name variant aligned with its native config and redirect', ({ variant, name, packageName, callbackPath }) => {
+    const result = loadConfig(variant);
+    expect(result.name).toBe(name);
+    expect(result.scheme).toBe('fittrack');
+    expect(result.android.package).toBe(packageName);
+    expect(result.android.softwareKeyboardLayoutMode).toBe('resize');
+    expect(result.ios.bundleIdentifier).toBe(packageName);
+
+    const [filter] = result.android.intentFilters;
+    expect(filter).toEqual({
+      action: 'VIEW',
+      autoVerify: true,
+      data: [{ scheme: 'https', host: AUTH_CALLBACK_HOST, pathPrefix: callbackPath }],
+      category: ['DEFAULT', 'BROWSABLE'],
+    });
+    expect(resolveAuthRedirect({ variant, schemeRedirectUri: scheme }).redirectUri)
+      .toBe(`https://${AUTH_CALLBACK_HOST}${callbackPath}`);
+
+    const pluginIds = result.plugins.map((plugin) => Array.isArray(plugin) ? plugin[0] : plugin);
+    expect(pluginIds).toEqual(expect.arrayContaining([
+      'expo-dev-client',
+      'react-native-health-connect',
+      'expo-media-library',
+      'expo-camera',
+    ]));
+    expect(result.plugins.filter((plugin) => typeof plugin === 'function')).toHaveLength(2);
+    expect(result.plugins).toContainEqual([
+      'expo-media-library',
+      expect.objectContaining({
+        photosPermission: expect.any(String),
+        savePhotosPermission: expect.any(String),
+        granularPermissions: ['photo'],
+      }),
+    ]);
+    expect(result.plugins).toContainEqual([
+      'expo-camera',
+      expect.objectContaining({
+        cameraPermission: expect.any(String),
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      }),
+    ]);
   });
 });
