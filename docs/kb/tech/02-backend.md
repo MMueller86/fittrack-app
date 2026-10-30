@@ -727,7 +727,8 @@ entry for it is `false` (no install script needed), so a missing binary for the
 platform is not rebuilt at install time. `pixelmatch` 8 measures colour
 distance in OKLab instead of YIQ, which raised the historical diagnostic ratio
 in `golden.test.ts` (see `backend/src/lib/instagramRenderer/docs/golden-metrics.md`);
-the pixel gate thresholds were not changed.
+the reference-corpus pixel thresholds were not changed (the corpus pixel
+comparison is report-only; see `08-testing.md`).
 
 `npm run copy:instagram-assets` validates and copies the complete ten-file
 manifest from `backend/src/lib/instagramRenderer/assets/` to

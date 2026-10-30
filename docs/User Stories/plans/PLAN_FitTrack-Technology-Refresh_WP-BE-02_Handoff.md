@@ -3,7 +3,7 @@
 - Plan: [PLAN_FitTrack-Technology-Refresh.md](PLAN_FitTrack-Technology-Refresh.md), WP-BE-02, Entscheidung O-1 Option B
 - Prüfdatum: 2026-10-29, lokal Windows x64, Node `24.22.1`, npm `12.2.1`
 - Stand: Arbeitsverzeichnis auf Branch `chore/fittrack-technology-refresh-phase-0`, zum Zeitpunkt des Handoffs nicht committet; Stand 2026-10-30: committet in `bce9fe6`, `2763b20`, `cea53b6` und gepusht
-- Status: **Umsetzung erfolgt; zwei Nachweise offen** (Linux-Smoke, menschliche Freigabe der Optik, siehe "Offene Punkte")
+- Status: **Umsetzung erfolgt; Optik vom Product Owner freigegeben (2026-10-30); ein Nachweis offen** (Linux-Smoke, siehe "Offene Punkte")
 
 ## Gewählte Rendererquelle
 
@@ -62,5 +62,5 @@ Gate: höchstens 3 % je Fixture. Sichtprüfung durch den Agenten an `details-9-i
 ## Offene Punkte
 
 1. **Linux-Node-24-x64-Smoke: UNVERIFIED.** Lokal ist nur Windows verfügbar. Der Plan verlangt einen Nachweis auf Linux (Staging-Install mit `npm ci --omit=dev`, Laden von `@napi-rs/canvas-linux-x64-gnu`, nichtleeres PNG 1080 x 1350, Fonts). Die Renderer-Tests laufen im CI-Job auf `ubuntu-latest`, ein gezielter Linux-Smoke gegen den Staging-Install fehlt und ein CI-Lauf auf diesem Stand liegt nicht vor. Nachtrag 2026-10-30: CI-Job `staging-linux-renderer-smoke` ist mit WP-BE-07 angelegt (siehe dessen Handoff); ein CI-Lauf liegt weiterhin nicht vor (`UNVERIFIED`).
-2. **Visuelle Freigabe durch den Product Owner** der Side-by-side-Bilder (alle 6 Fixtures); Ablage lokal in `%TEMP%\fittrack-corpus-review`, bei Bedarf mit `RENDERER_CORPUS_REVIEW_DIR` neu erzeugen. Schriftmetriken auf Linux können von Windows abweichen.
+2. **Visuelle Freigabe durch den Product Owner: erteilt am 2026-10-30** (Meldung des Product Owners "die Bilder sehen gut aus" nach Durchsicht der mit dem Canvas-Renderer neu erzeugten Beispielbilder aller 6 Fixtures; Ablage lokal in `backend/output/canvas-review`, gitignored, mit `RENDERER_CORPUS_REVIEW_DIR` neu erzeugbar). Freigabe gilt für die Windows-Ausgabe; Schriftmetriken auf Linux können abweichen, sie sind nicht visuell geprüft (`UNVERIFIED`).
 3. Änderungen waren zum Zeitpunkt des Handoffs nicht committet (inzwischen committet und gepusht, siehe Kopfzeile); Alpha-Deploy bleibt out of scope.

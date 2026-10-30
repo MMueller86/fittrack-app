@@ -47,20 +47,22 @@ Vom Vorgänger geändert und von mir verifiziert (`npm outdated`, `npm ci --dry-
 | `react-native-health-connect` | `^4.1.2` | `^4.1.3` | mobile |
 | `zustand` | `^5.0.3` | `^5.0.16` | mobile |
 
-Nicht angehoben (Stand `npm outdated` 2026-10-30):
+Nachtrag 2026-10-30 (QA F-02): `mongodb` `^7.7.0` → `^7.8.0` (installiert 7.8.0, `tools/off-import`, Lockfile nur `mongodb` und der Workspace-Eintrag geändert). Die frühere Aussage "alle anderen direkten Abhängigkeiten aktuell" war falsch (`mongodb` lag hinter 7.8.0) und ist durch die folgende Tabelle ersetzt.
 
-| Paket | Ist → Latest | Grund |
-|---|---|---|
-| `@react-native-async-storage/async-storage` | 2.2.0 → 3.1.1 | Expo-verwaltet, `expo install --check` ("Dependencies are up to date") |
-| `react` | 19.3.0 → 19.3.1 | Expo-SDK-58-Pin |
-| `react-test-renderer` | 19.3.0 → 19.3.1 | muss zur `react`-Version passen (19.3.0) |
-| `react-native-gesture-handler` | 3.3.0 → 3.4.0 | Expo-verwaltet (`~3.3.0`) |
-| `react-native-safe-area-context` | 5.10.1 → 5.11.0 | Expo-verwaltet (`~5.10.1`) |
-| `react-native-worklets` | 0.13.0 → 0.13.1 | Expo-verwaltet (`0.13.0`) |
-| `@types/node` | 24.19.2 → 26.6.6 | Laufzeit ist Node 24 (`engines`, Azure Functions); Typen müssen zur Laufzeit passen (Stand 2026-10-30) |
-| `@typescript/typescript6` | `~6.0.x` | bewusst (Vorgabe) |
+Nicht angehoben (Stand `npm outdated` und `npm view` 2026-10-30; Prüfdatum 2026-10-30):
 
-Weitere direkte Abhängigkeiten (Root, shared, `tools/off-import`, `_deploy_staging`) waren laut `npm outdated` aktuell.
+| Paket | Ist → Latest | Grund | Quelle | Prüfdatum | Verantwortliche Prüfung |
+|---|---|---|---|---|---|
+| `@react-native-async-storage/async-storage` | 2.2.0 → 3.1.1 | Expo-verwaltet (SDK 58) | `npx expo install --check`, `npm outdated` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf |
+| `react` | 19.3.0 → 19.3.1 | Expo-SDK-58-Pin (`react-native 0.88.1`) | `mobile/package.json`, `npm outdated` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf |
+| `react-test-renderer` | 19.3.0 → 19.3.1 | muss zur `react`-Version passen (19.3.0) | `npm outdated` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf |
+| `react-native-gesture-handler` | 3.3.0 → 3.4.0 | Expo-verwaltet (`~3.3.0`) | `expo install --check`, `npm outdated` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf |
+| `react-native-safe-area-context` | 5.10.1 → 5.11.0 | Expo-verwaltet (`~5.10.1`) | `expo install --check`, `npm outdated` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf |
+| `react-native-worklets` | 0.13.0 → 0.13.1 | Expo-verwaltet (`0.13.0`) | `expo install --check`, `npm outdated` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf |
+| `@types/node` (backend, `tools/off-import`) | 24.19.2 → 26.6.6 | Laufzeit ist Node 24 (`engines`, Azure Functions); Typen müssen zur Laufzeit passen | `package.json` `engines`, `npm outdated` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf (bei Node-Laufzeitwechsel) |
+| `@typescript/typescript6` | `~6.0.2` = latest 6.0.2 (`npm view`) | bewusst auf 6.0.x: nur für die klassische AST-API (TS 7 hat sie nicht); kein Rückstand, aber Auslaufpfad offen | `npm view @typescript/typescript6 dist-tags`, `docs/kb/tech/02-backend.md` | 2026-10-30 | Product Owner / nächster Dependabot-Lauf (Re-Check bei neuer TS-7-API oder 6.x-Release) |
+
+Weitere direkte Abhängigkeiten (Root, shared, `tools/off-import`, `_deploy_staging`) waren laut `npm outdated` nach der `mongodb`-Anhebung aktuell oder sind oben aufgeführt.
 
 ### Golden-/pixelmatch-Änderung (Bewertung)
 

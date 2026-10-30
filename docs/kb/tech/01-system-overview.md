@@ -76,6 +76,10 @@ State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTra
 - Azure OpenAI `gpt-4.1-mini` is marked deprecated with a retirement date of 2027-04-14 per the 2026-10-29 retrieval in [06-ai-integrations.md](06-ai-integrations.md#platform-lifecycle-retrieved-2026-10-29); not re-verified on 2026-10-30. Follow-up is `[Planned]` there.
 - Tools on the operator machine can lag the CI pins. On 2026-10-30 the local Core Tools were 4.9.0 and EAS CLI 21.6.0, while the registry `latest` was Core Tools 4.16.0 and EAS CLI 27.2.0 (WP-INFRA-01). The target EAS CLI version is **[Open]** (plan named 26.x, registry has moved on; Product Owner decides). See `.github/instructions/infra-release.instructions.md`.
 
+### Deferred dependency updates
+
+Expo-managed mobile packages (`async-storage`, `react`, `react-test-renderer`, `gesture-handler`, `safe-area-context`, `worklets`), `@types/node` (kept at 24 to match the Node 24 runtime) and `@typescript/typescript6` (`~6.0.2`, currently the latest) are intentionally not raised. Reasons, sources, check date 2026-10-30 and reviewer (Product Owner / next Dependabot run) are in the table of the [WP-BE-07 handoff](../../User%20Stories/plans/PLAN_FitTrack-Technology-Refresh_WP-BE-07_Handoff.md).
+
 ### Remaining time-limited exceptions
 
 Root `npm audit` on 2026-10-30 reports 12 findings (3 high, 4 moderate, 5 low), all covered by two Product Owner exceptions; the production set (`_deploy_staging`, `npm audit --omit=dev`) reports 0. Both exceptions are re-checked at every upstream release (Dependabot, CI audit step):

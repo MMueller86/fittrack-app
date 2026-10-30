@@ -169,17 +169,22 @@ without a photo and detail templates with 1, 5, 9 and 20 ingredients. Every
 recipe photo is the versioned `quarkbroetchen-source.png`; the no-photo case
 uses a transparent generated pixel.
 
-The hard pixel comparison (`pixelmatch` threshold `0.10`, maximum differing
-pixel ratio `0.03`) is canonical on Windows x64 with Node 24. Other platforms
-still enforce the structural and text-layout metrics but do not claim a pixel
-pass. Reference regeneration is guarded by
+The hard checks are the manifest (including the recorded `pixelmatch` threshold
+`0.10` and maximum ratio `0.03`), PNG format and SHA-256/size of the baseline
+files, `1080 x 1350` dimensions, non-empty output, empty overflow list, line
+counts, text-box heights and text-box widths within the width tolerance. The
+pixel comparison itself (`pixelmatch`, threshold `0.10`) is **report-only**: the
+test only asserts that the differing-pixel ratio is finite and writes it to the
+optional review report (`RENDERER_CORPUS_REVIEW_DIR`). The `0.03` ratio is not
+enforced; the Product Owner's visual review is the acceptance step. The report
+is meaningful on Windows x64 with Node 24. Reference regeneration is guarded by
 `UPDATE_RENDERER_REFERENCE_CORPUS=1` and is limited to the canonical platform;
 the generation command and historical-Golden separation are documented in
 `backend/src/lib/instagramRenderer/docs/golden-metrics.md`. The canonical-platform
-CI gate is the job `renderer-reference-pixel-gate` (`windows-2022`, Node from
-`.nvmrc`). When the renderer moved to `@napi-rs/canvas`, a Windows x64 pixelmatch
+CI job is `renderer-reference-corpus` (`windows-2022`, Node from
+`.nvmrc`; formerly `renderer-reference-pixel-gate`). When the renderer moved to `@napi-rs/canvas`, a Windows x64 pixelmatch
 comparison against the frozen baseline measured 0.31 % to 0.74 % differing
-pixels per fixture (gate 3 %); the agent's visual check of one fixture
+pixels per fixture (reported against the 3 % reference value, not enforced); the agent's visual check of one fixture
 attributed the difference to text anti-aliasing (WP-BE-02
 handoff; the Product Owner's visual approval of the side-by-side images is
 **[Open]**). `golden.test.ts` (historical diagnostic, not a release gate)
@@ -350,7 +355,7 @@ The Phase-0 safety net combines focused tests with runtime checks:
 - **Staging renderer smoke** (`npm run smoke:staging-renderer --workspace=backend`, `backend/scripts/staging-renderer-smoke.mjs`) renders one PNG with the production-only install in `_deploy_staging`; `@napi-rs/canvas` must resolve from `_deploy_staging/node_modules`, and the PNG must be exactly 1080x1350 and non-empty. Its unit tests are part of `test:startup`. Locally it was run on Windows only; the Linux result needs the CI job (see below) and is `UNVERIFIED` until a run on the final state is recorded.
 - **Daily Insight prompt guard** (`npm run verify:daily-insight-prompt --workspace=backend`) is content-based: it diffs the provider-visible prompt/schema files against a base revision (`FITTRACK_PROMPT_GUARD_BASE`, push `before` SHA or merge base), requires a new append-only manifest release when they changed, and for `dailyInsightValidation.ts` compares only the exported `DAILY_INSIGHT_*_MAX_LENGTH` constants, so edits to local Zod post-validation do not trigger a release.
 
-CI runs the Functions host smoke, the three non-Gradle mobile smokes, Android debug assemble, a Windows x64 Node 24 renderer pixel gate, and the staging install/audit/renderer-smoke job as separate jobs. The renderer job runs the canonical hard pixel comparison; Ubuntu Tier 1 still enforces the corpus structure and layout metrics. The parity check runs in the Tier 1 unit-test job. The existing Tier 2 Cosmos contract job is unchanged apart from the emulator tag.
+CI runs the Functions host smoke, the three non-Gradle mobile smokes, Android debug assemble, a Windows x64 Node 24 renderer reference-corpus job, and the staging install/audit/renderer-smoke job as separate jobs. The renderer job enforces the corpus structure and layout metrics and reports the pixel difference (report-only); Ubuntu Tier 1 enforces the same structure and layout metrics. The parity check runs in the Tier 1 unit-test job. The existing Tier 2 Cosmos contract job is unchanged apart from the emulator tag.
 
 ## Dependency Policy and Update Process
 
@@ -395,9 +400,10 @@ All three typechecks run before tests to fail fast on cheap checks.
 The independent `functions-host-smoke`, `mobile-smokes`, and
 `android-debug-assemble` jobs run the Phase-0 runtime gates. The Android job
 uses JDK 17. These jobs require no secrets and perform no deployment.
-The separate `renderer-reference-pixel-gate` job runs the reference-corpus
-test on `windows-2022` with Node 24, the canonical platform for hard pixel
-comparison.
+The separate `renderer-reference-corpus` job runs the reference-corpus
+test on `windows-2022` with Node 24, the canonical platform for the
+report-only pixel comparison (structure and layout metrics gate; pixel ratio
+is reported, not enforced).
 
 The `staging-linux-renderer-smoke` job (`ubuntu-latest`) builds the backend, copies
 `backend/dist` to `_deploy_staging/dist`, runs `npm ci --omit=dev` in

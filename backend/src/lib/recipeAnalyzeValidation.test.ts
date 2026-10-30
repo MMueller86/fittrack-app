@@ -408,6 +408,13 @@ describe('Recipe Analyze fixture semantics offline', () => {
     expect(() => assertStepSemantics(result)).toThrow();
   });
 
+  it('accepts correct potato/bean times joined by "und" without punctuation in export text', () => {
+    const result = semanticRecipe();
+    result.exportSuggestion.steps[0]!.description = 'Koche Kartoffeln 18 Minuten in Salzwasser und gare Bohnen 8 Minuten; gieße ab.';
+    expect(validateRecipeAnalyzeOutput(result).ok).toBe(true);
+    assertStepSemantics(result);
+  });
+
   it('does not accept details moved to an unrelated export group', () => {
     const result = semanticRecipe();
     const first = result.exportSuggestion.steps[0]!;

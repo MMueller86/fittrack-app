@@ -196,6 +196,12 @@ page and corresponding write/delete succeeds. Failed deletes retain their IDs.
 Successful diary mutations trigger `nutritionDiaryService` fire-and-forget;
 recipe logging triggers only after `recipeApi.log` succeeds. Successful weight
 create, update, and delete mutations trigger their corresponding weight sync.
+Health Connect Nutrition records derive their timestamp from the diary's
+date-only `meal.date`, not `createdAt`: Mobile uses a neutral local 12:00 anchor
+on that calendar date and sets the end one second later. Both zone offsets come
+from the anchor date. This is a technical timestamp only; the diary does not
+gain a meal-time value. Nutrient values, meal-type mapping, and
+`clientRecordId` continue to come from the existing meal item.
 Each datatype's foreground attempt time is persisted as a canonical UTC ISO
 string before its delta flow starts. A missing timestamp permits the first run;
 a stored timestamp is loaded after app restart and suppresses another attempt

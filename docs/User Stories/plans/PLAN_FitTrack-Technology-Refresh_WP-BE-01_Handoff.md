@@ -54,6 +54,15 @@ Renderer-Wechsel (`@resvg/resvg-js`, `satori` → `@napi-rs/canvas ~1.0.13`) geh
 
 **Hinweis Prompt-Evals:** `run-eval.mjs` liest `AZURE_OPENAI_ENDPOINT`/`AZURE_OPENAI_API_KEY` aus `backend/local.settings.json`; beide waren gesetzt (Werte nicht ausgegeben). Der Lauf am 2026-10-30 hat daher mit hoher Wahrscheinlichkeit gegen den konfigurierten Azure-OpenAI-Endpunkt gerechnet (Laufzeit 136 s). Ob alle 61 Tests live oder teils per Fixture liefen, wurde nicht einzeln geprüft. Bewertung: bestanden, Live-Charakter `UNVERIFIED`.
 
+## Eval-Fixture `recipeAnalyze.eval.fixtures.ts` (QA F-03, Nachtrag 2026-10-30)
+
+- Änderung (Commit `bce9fe6`, eine Zeile): Fixture `side-dish-and-serving-actions`, Export-Assertion `cook potatoes`, Contradiction `/kartoffel[^;,.]*\b8\s*min/iu` → `/kartoffel(?:(?!\bund\b)[^;,.])*\b8\s*min/iu`. Dieselbe Technik (Negativ-Lookahead bis zu einem Konnektor) wie die dokumentierte Korrektur in `B-18C_Recipe-Kurzfassung-Review_Korrektur_Handoff_2026-10-09.md`.
+- Wirkung (mit `node` geprüft): "Koche Kartoffeln 18 Minuten in Salzwasser und gare Bohnen 8 Minuten" gilt nicht mehr als Widerspruch (vorher Fehlalarm: korrekte Zeiten, nur ohne Satzzeichen vor "und"). "Koche Kartoffeln 8 Minuten" bleibt Widerspruch. **Neue Blindstelle:** "Koche Kartoffeln und Bohnen 8 Minuten" (Bohnenzeit fälschlich auch für Kartoffeln) wird nicht mehr als Widerspruch erkannt (vorher erkannt). Die Assertion ist damit in einem Randfall schwächer, in einem Fehlalarmfall korrekt.
+- Ursache: Es ist keine Anpassung an Zod 4 oder die openai-SDK-7 (keine Schema-/Provider-Änderung, `git diff 23e92ff -- backend/src/lib/prompts` nur dieses Fixture); die Begründung steht in keinem Handoff und keinem Code-Kommentar. Die plausibelste Ursache ist ein Fehlalarm bei Modellausgaben ohne Satzzeichen (Annahme, `UNVERIFIED`).
+- Eval-Lauf: Dateiänderungszeit des Fixtures 2026-10-29 14:38, vor dem PO-akzeptierten Lauf vom 2026-10-30; `git diff HEAD` ist leer, die 61 Evals liefen daher sehr wahrscheinlich mit dieser Version (kein direkter Beleg, Evals nicht wiederholt).
+- Offline-Absicherung: neuer Test in `backend/src/lib/recipeAnalyzeValidation.test.ts` (korrekte Zeiten mit "und" ohne Satzzeichen werden akzeptiert); der bestehende Test "rejects swapped potato/bean times" bleibt unverändert.
+- Entscheidung Product Owner: Fixture belassen (Rücknahme würde den akzeptierten Eval-Lauf nicht mehr beschreiben) oder die Blindstelle schließen, z. B. zusätzlich `/kartoffel\s+und\s+bohn\w*[^;,.]*\b8\s*min/iu` als zweite Contradiction. Nicht ohne Freigabe geändert.
+
 ## Offen / UNVERIFIED
 
 - Cosmos-Contract-Tests (`test:contract`) lokal nicht ausgeführt (Emulator fehlt); CI-Ergebnis vom Product Owner freigegeben, nicht unabhängig belegt (QA-Bericht Phase 0).

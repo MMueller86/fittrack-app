@@ -247,8 +247,8 @@ jobs:
       - name: Assemble Android debug variant
         run: npm run smoke:android-debug --workspace=mobile
 
-  renderer-reference-pixel-gate:
-    name: Renderer reference pixel gate
+  renderer-reference-corpus:
+    name: Renderer reference corpus (pixel report)
     runs-on: windows-2022
     timeout-minutes: 20
     steps:
@@ -267,7 +267,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Compare canonical renderer reference pixels
+      - name: Run renderer reference corpus (pixel comparison is report-only)
         run: npm test --workspace=backend -- src/lib/instagramRenderer/__tests__/referenceCorpus.test.ts --reporter=dot
 
   contract-tests:
