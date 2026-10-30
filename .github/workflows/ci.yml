@@ -120,7 +120,7 @@ jobs:
         run: npm ci
 
       - name: Install Azure Functions Core Tools
-        run: npm install --global azure-functions-core-tools@4.9.0 --unsafe-perm true
+        run: npm install --global azure-functions-core-tools@4.9.0
 
       - name: Create non-secret local Functions settings
         run: cp backend/local.settings.json.template backend/local.settings.json

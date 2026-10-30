@@ -80,4 +80,4 @@ Nein. Das Lockfile-Update reicht. Kein Override eingeführt oder vorgeschlagen. 
 
 - Azurite-Start unter `@azure/identity 4.14.1` ist nur indirekt belegt (Startup-Tests und Functions-Smoke grün, Health 200 mit lokalem Host).
 - CI-Lauf auf `ubuntu-latest` (PO-5) steht aus; Linux-Renderer-Nachweis bleibt `UNVERIFIED`.
-- `backend/scripts/functions-baseline.mjs` importiert `@typescript/typescript6`, das nur in `mobile/package.json` steht (Hoisting); nicht Teil dieses Auftrags (siehe WP-BE-03 Handoff).
+- `backend/scripts/functions-baseline.mjs` importiert `@typescript/typescript6`, das jetzt auch in `backend/package.json` als devDependency deklariert ist (aufgelöst 2026-10-30, siehe WP-BE-03 Handoff).

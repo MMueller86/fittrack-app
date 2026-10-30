@@ -54,8 +54,8 @@ See [`docs/kb/domain/08-quota-system.md`](../../docs/kb/domain/08-quota-system.m
 ```
 AZURE_OPENAI_ENDPOINT          # required
 AZURE_OPENAI_API_KEY           # required
-AZURE_OPENAI_DEPLOYMENT_NAME   # defaults to 'gpt4o-mini'
-AZURE_OPENAI_API_VERSION       # defaults to '2024-07-01' (minimum required for Structured Outputs)
+AZURE_OPENAI_DEPLOYMENT_NAME   # code default 'gpt-4.1-mini' (azureOpenAiConfig.ts)
+AZURE_OPENAI_API_VERSION       # code default '2024-10-21'; deployed Dev/Alpha value via Bicep: '2024-08-01-preview'
 INTERNAL_USER_IDS              # comma-separated; add dev userId to bypass quota locally
 ```
 
@@ -73,7 +73,7 @@ These rules are non-negotiable. Violating any one of them is a QA-blocking findi
 - All machine-readable AI responses use `response_format: { type: 'json_schema', json_schema: { name, strict: true, schema } }`
 - Define the JSON Schema as a const next to the function in `openai.ts`
 - `additionalProperties: false` at every object level — required by the OpenAI strict mode
-- API version must be ≥ `2024-07-01`
+- API version must support Structured Outputs (`2024-08-01-preview` or later)
 
 ### Plausibility validation
 - For any AI feature returning nutrition values: run `validateNutritionEstimate()` from `nutritionValidator.ts`

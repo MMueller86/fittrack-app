@@ -171,7 +171,10 @@ function getChangedFiles(repoDirectory, baseRevision) {
 
 function runManifestTest() {
   const require = createRequire(import.meta.url);
-  const vitestPath = require.resolve('vitest/vitest.mjs', { paths: [backendDirectory] });
+  // Vitest 5 does not export its CLI file; resolve it through the exported package.json and its bin entry.
+  const vitestPackagePath = require.resolve('vitest/package.json', { paths: [backendDirectory] });
+  const vitestBin = require(vitestPackagePath).bin;
+  const vitestPath = resolve(dirname(vitestPackagePath), typeof vitestBin === 'string' ? vitestBin : vitestBin.vitest);
   const result = spawnSync(process.execPath, [
     vitestPath,
     'run',

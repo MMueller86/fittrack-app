@@ -49,5 +49,5 @@ TypeScript bleibt laut Plan Sache von WP-BE-05 (jetzt 7.0.2, siehe [WP-BE-05 Han
 ## Offen / UNVERIFIED
 
 - Import-Skripte in `tools/off-import` (`analyze:off`, `import:cosmos` usw.) wurden nicht ausgeführt (brauchen Daten/Cosmos); belegt sind nur Typecheck und `tsx`-Kompatibilität aus dem WP-BE-05-Handoff.
-- `backend/scripts/functions-baseline.mjs` importiert `@typescript/typescript6`, das nur in `mobile/package.json` als devDependency steht und im Backend über Hoisting aufgelöst wird (Startup-Tests grün). Ein eigener Eintrag in `backend/package.json` fehlt; Entscheidung (Backend-Manifest ergänzen oder Skript umstellen) offen, nicht Teil dieses Auftrags.
+- `backend/scripts/functions-baseline.mjs` importiert `@typescript/typescript6`, das nur in `mobile/package.json` als devDependency steht und im Backend über Hoisting aufgelöst wird (Startup-Tests grün). Aufgelöst 2026-10-30: `@typescript/typescript6@~6.0.2` ist jetzt als devDependency in `backend/package.json` deklariert (Lockfile-Eintrag nur im Workspace-Block ergänzt, Paket war bereits aufgelöst; mobile unverändert).
 - Verbleibende `DEPRECATED test.poolOptions`-Warnung (s. o.).

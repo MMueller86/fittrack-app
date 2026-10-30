@@ -14,7 +14,7 @@
 | Installiert | `typescript@^7.0.2` (aufgelöst `7.0.2`) in `backend`, `shared`, `mobile`, `tools/off-import` |
 | Vorher | `^5.8.0` (backend, mobile), `^5.4.0` (off-import), `5.9.3` im Lockfile; `shared` hatte keinen eigenen Eintrag (kam per Hoisting) |
 | Neu: `shared` | `typescript` als devDependency, da TS 7 nicht mehr hoisted wird und `tsc` sonst in `shared` fehlt |
-| Neu: `@typescript/typescript6@~6.0.2` | Update 2026-10-30: nur noch devDependency in `mobile` (AST-Test `nutritionDiaryMutationBoundary.test.ts`); aus `backend` entfernt, da `functions-baseline.mjs` die TS-API nicht mehr nutzt |
+| Neu: `@typescript/typescript6@~6.0.2` | Korrektur 2026-10-30: bleibt devDependency in `mobile` (AST-Test `nutritionDiaryMutationBoundary.test.ts`) **und** in `backend` (`scripts/functions-baseline.mjs` importiert `ts` weiterhin für `createSourceFile` und `ts.is*`-Prüfungen). Die frühere Aussage "aus `backend` entfernt, Skript nutzt die TS-API nicht mehr" war falsch; die Deklaration wurde im Backend-Manifest wieder ergänzt (PO-Entscheidung: jedes Workspace deklariert, was es importiert) |
 | Lockfile | Native Plattformpakete `@typescript/typescript-*@7.0.2` für alle Plattformen enthalten (u. a. `linux-x64`, `win32-x64`) |
 
 ## Geänderte Compiler-Optionen

@@ -84,7 +84,7 @@ Verify each item before issuing a verdict:
 - [ ] `trackUsage` called **after** success only (not in catch/finally)
 - [ ] Admin bypass and internal tier not duplicated in handler logic — handled by `enforceQuota`
 - [ ] Structured Outputs: `type: 'json_schema'`, `strict: true`, `additionalProperties: false` everywhere
-- [ ] API version ≥ `2024-07-01` (check `AZURE_OPENAI_API_VERSION` default in `openai.ts`)
+- [ ] API version supports Structured Outputs (`2024-08-01-preview` or later; check `DEFAULT_AZURE_OPENAI_API_VERSION` in `azureOpenAiConfig.ts`)
 
 ### Validation
 - [ ] Nutrition-bearing output passes through `validateNutritionEstimate()` (or equivalent)

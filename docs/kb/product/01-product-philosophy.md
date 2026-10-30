@@ -44,7 +44,7 @@ Users build a personal food library over time. The food search prioritizes the u
 
 ### 5. Cost-Aware Design
 
-- Azure gpt-4o-mini (cost-efficient model for MVP)
+- Azure gpt-4.1-mini (cost-efficient model for MVP)
 - Monthly quotas per feature per user
 - Serverless infrastructure (pay per use)
 - On-the-fly day summary calculation (no redundant storage)

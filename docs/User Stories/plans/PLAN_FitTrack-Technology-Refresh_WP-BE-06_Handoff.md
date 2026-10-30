@@ -21,7 +21,7 @@
 | `gpt4o-mini` / `gpt-4o-mini` in Produktionscode (`backend/src`, `shared`, ohne Tests) | **Keine Fallbacks mehr.** Einziger Treffer: Kommentar `shared/types/insight.ts:229` (`e.g. "gpt-4o-mini"`) |
 | dieselben Strings in Tests | Nur als Beispielwert des Feldes `model` in Testdaten (`dailyInsight.test.ts`, `dailyInsightFeedback.test.ts`, `weeklyInsight.test.ts`, `lib/weeklyInsight.test.ts`, `insightRepository.test.ts`, `cosmosInsightRepository.contract.test.ts`, `weeklyInsightEvalSemantics.test.ts`); kein Konfigurationszugriff |
 | `2024-07-01` im Backend | **Kein Code-Fallback mehr.** Nur als explizit gesetzte Test-Env in `openai.wire.test.ts` und `reusableItemsEnrich.wire.test.ts` |
-| veraltete Dokumentation | `.github/skills/azure-openai-feature-integration/SKILL.md` (Zeilen 57–58: Default `gpt4o-mini`, `2024-07-01`) und `references/implementation-checklist.md` (Zeile 87); `docs/kb/product/01-product-philosophy.md:47` ("Azure gpt-4o-mini"). **Nicht geändert** (nicht Teil des Auftrags), als Korrekturbedarf gemeldet |
+| veraltete Dokumentation | `.github/skills/azure-openai-feature-integration/SKILL.md` (Zeilen 57–58: Default `gpt4o-mini`, `2024-07-01`) und `references/implementation-checklist.md` (Zeile 87); `docs/kb/product/01-product-philosophy.md:47` ("Azure gpt-4o-mini"). Korrigiert 2026-10-30 (Defaults `gpt-4.1-mini` / `2024-10-21` laut `azureOpenAiConfig.ts`, deployt `2024-08-01-preview`; Produktphilosophie nennt `gpt-4.1-mini`) |
 | deployte API-Version | `2024-08-01-preview` in `infra/main.bicep`, `infra/modules/functionapp.bicep` und allen `infra/parameters/*.bicepparam` (Dev/Alpha); Bicep ist nicht Teil dieses Pakets, **keine Änderung**. Der Code-Default `2024-10-21` greift nur, wenn die Env-Variable fehlt |
 
 ## Document Intelligence
@@ -44,7 +44,7 @@
 | Backend-Tests inkl. Wire-/Config-Tests | `npm run test` (`backend`) | 0 | 84 Dateien / 2.709 Tests |
 | Typecheck | `npm run typecheck` (Root) | 0 | 0 Fehler |
 | Build | `npm run build:verify` (`backend`) | 0 | "All checks passed" |
-| Prompt-Evals | `npm run test:eval` (`backend`) | 0 | 5 Dateien / 61 Tests passed; Zugangsdaten in `local.settings.json` waren gesetzt, Lauf wahrscheinlich live gegen Azure OpenAI (136 s). Live-Charakter nicht einzeln belegt, daher `UNVERIFIED` |
+| Prompt-Evals | `npm run test:eval` (`backend`) | 0 | Ausgeführt 2026-10-30, Exit 0, 5 Dateien / 61 Tests passed, 136 s; PO akzeptiert, nicht wiederholen. Hinweis: Dass die Aufrufe live gegen Azure OpenAI liefen, ist nicht unabhängig belegt (Zugangsdaten waren gesetzt, Laufzeit spricht dafür) |
 
 ## Privacy-Impact-Aussage (Skill `privacy-impact-review`, kein Rechtsrat)
 
