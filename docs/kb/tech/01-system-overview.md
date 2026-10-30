@@ -78,7 +78,11 @@ State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTra
 
 ### Deferred dependency updates
 
-Expo-managed mobile packages (`async-storage`, `react`, `react-test-renderer`, `gesture-handler`, `safe-area-context`, `worklets`), `@types/node` (kept at 24 to match the Node 24 runtime) and `@typescript/typescript6` (`~6.0.2`, currently the latest) are intentionally not raised. Reasons, sources, check date 2026-10-30 and reviewer (Product Owner / next Dependabot run) are in the table of the [WP-BE-07 handoff](../../User%20Stories/plans/PLAN_FitTrack-Technology-Refresh_WP-BE-07_Handoff.md).
+Expo-managed mobile packages (`react`, `react-test-renderer`, `gesture-handler`, `safe-area-context`, `worklets`) and `@typescript/typescript6` (`~6.0.2`, currently the latest) are intentionally not raised. Reasons, sources, check date 2026-10-30 and reviewer (Product Owner / next Dependabot run) are in the table of the [WP-BE-07 handoff](../../User%20Stories/plans/PLAN_FitTrack-Technology-Refresh_WP-BE-07_Handoff.md).
+
+`@react-native-async-storage/async-storage` is separately pinned to `2.2.0`. Expo SDK 58's `bundledNativeModules.json` maps it to `2.2.0`, and `npx expo install --check` passes. npm has `3.1.1`, but that major version is not established as incompatible; it is simply not the version mapped or validated for this SDK. Revisit it on an Expo SDK upgrade, or after an explicit native build and device validation. Dependabot ignores only its semver-major updates; minor and patch updates remain eligible.
+
+`@types/node` remains on major 24 because the Azure Functions runtime is Node 24. Its major updates are ignored by Dependabot until the supported Functions runtime changes; minor and patch updates remain eligible. The package-specific major-update rules are in [`.github/dependabot.yml`](../../../.github/dependabot.yml).
 
 ### Remaining time-limited exceptions
 

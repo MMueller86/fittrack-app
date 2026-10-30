@@ -10,6 +10,16 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
+    ignore:
+      # Expo SDK 58 maps AsyncStorage to 2.2.0; revisit with an SDK upgrade
+      # and native validation, since 3.x is not currently verified here.
+      - dependency-name: "@react-native-async-storage/async-storage"
+        update-types:
+          - "version-update:semver-major"
+      # Azure Functions runs Node 24; revisit when the supported runtime changes.
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
     groups:
       # Expo SDK packages move together; majors (SDK upgrades) stay separate PRs.
       expo-sdk:
