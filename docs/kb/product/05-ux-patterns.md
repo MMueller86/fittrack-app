@@ -433,9 +433,14 @@ vary between features. The shared implementation lives in
 
 **Flow**
 
-1. Tapping the photo action opens the FitTrack source sheet (`Foto hinzufügen`) with
-   `Kamera` and `Galerie`. No system camera app and no system cropper is ever
-   launched.
+1. The entry point offers the sources in one tap. Where there is room (label scan,
+   AI meal estimate), it shows two actions side by side, `Kamera` and `Galerie`,
+   with Feather icons (`camera`, `image`); one tap opens the source directly and
+   the source sheet is skipped (`initialSource`). Entry points with a single photo
+   action (currently recipe photo) open the FitTrack source sheet
+   (`Foto hinzufügen`) with `Kamera` and `Galerie`. Both entry points share the
+   same camera, editor and states. No emojis as icons in photo actions. No system
+   camera app and no system cropper is ever launched.
 2. `Kamera` opens a full-screen `FramedCameraCapture`: live preview, area outside
    the **focus frame** dimmed, frame border in `colors.primaryBright`, close button
    top left, title `Foto aufnehmen`, hint `Motiv im Rahmen platzieren` below the
@@ -463,7 +468,9 @@ vary between features. The shared implementation lives in
   if the system will not ask again, the message points to the device settings.
 - Failed capture: inline message with `Erneut versuchen`.
 - Gallery denied or unusable: error in the source sheet; cancel never creates a
-  draft or triggers a request.
+  draft or triggers a request. With a direct entry (`initialSource`), the source
+  sheet appears only to show such an error; cancelling camera, gallery or editor
+  closes the picker.
 
 **Rules for new camera features**
 

@@ -16,6 +16,12 @@ import { CosmosDayMetaRepository } from './cosmosDayMetaRepository';
 
 export interface DayMetaRepository {
   get(userId: string, date: string): Promise<DayMeta | null>;
+  ensureCalorieTargetSnapshot(
+    userId: string,
+    date: string,
+    dayType: DayType,
+    snapshot: CalorieTargetSnapshot,
+  ): Promise<DayMeta>;
   upsert(
     userId: string,
     date: string,
@@ -36,6 +42,34 @@ class InMemoryDayMetaRepository implements DayMetaRepository {
 
   async get(userId: string, date: string): Promise<DayMeta | null> {
     return this.store.get(this.key(userId, date)) ?? null;
+  }
+
+  async ensureCalorieTargetSnapshot(
+    userId: string,
+    date: string,
+    dayType: DayType,
+    snapshot: CalorieTargetSnapshot,
+  ): Promise<DayMeta> {
+    const key = this.key(userId, date);
+    const existing = this.store.get(key);
+    const existingCalories = existing?.calorieTargetSnapshot?.calories;
+    if (existing && existingCalories != null && Number.isFinite(existingCalories) && existingCalories > 0) {
+      return existing;
+    }
+
+    const meta: DayMeta = {
+      ...(existing ?? {
+        id: `day:${date}`,
+        userId,
+        date,
+        dayType,
+        _docType: 'dayMeta',
+      }),
+      calorieTargetSnapshot: snapshot,
+      updatedAt: new Date().toISOString(),
+    };
+    this.store.set(key, meta);
+    return meta;
   }
 
   async upsert(

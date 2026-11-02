@@ -1,7 +1,7 @@
 # Plan: Einheitlicher Kamera-Flow mit Fokusrahmen für alle Foto-Aufnahmen
 
 - Status: Planentwurf, wartet auf Freigabe. **Prozessabweichung:** Eine Umsetzung liegt ohne Freigabe im Working Tree vor (siehe Abschnitt 0); der Product Owner entscheidet über Übernahme oder Verwerfung (PO-1)
-- Planrevision: `2026-10-30-01`
+- Planrevision: `2026-11-02-02`
 - Infrastructure Impact: None
 - Mobile Build Impact: Potential Native Impact
 
@@ -65,10 +65,11 @@ Der Product Owner bewertet den Rezeptfoto-Weg mit vorgegebenem Fokusfenster als 
 
 ## 4. Desired Behaviour
 
-- Jede Foto-Aufnahme öffnet dasselbe FitTrack-Quellenblatt (`Foto hinzufügen`: `Kamera`, `Galerie`). Weder System-Kamera-App noch System-Cropper werden gestartet.
+- Der Einstieg erfolgt mit einem Klick weniger (Product-Owner-Wunsch vom 2026-11-02): Label-Scan (`LabelSubFlow`) und KI-Mahlzeitenfoto (`AISubFlow`) zeigen direkt zwei Aktionen `Kamera` und `Galerie` mit Feather-Icons (`camera`, `image`; keine Emojis). Ein Tipp öffnet die Quelle direkt über die Prop `initialSource?: 'camera' | 'gallery'` am `FramedPhotoPicker`; das Quellenblatt entfällt dort, erscheint aber weiterhin bei Fehlern (Meldung im Blatt). Abbruch bei `initialSource` ruft `onClose`.
+- Das Rezeptfoto hat nur eine Foto-Aktion und bleibt unverändert: `RecipeImageSourcePicker` ohne `initialSource` zeigt das FitTrack-Quellenblatt (Titel `Foto hinzufügen`, Optionen `Kamera`, `Galerie`, `Abbrechen`). Weder System-Kamera-App noch System-Cropper werden gestartet.
 - Die Kamera zeigt Vollbild-Vorschau, abgedunkelten Bereich außerhalb des Fokusrahmens, Rahmenrand, Titel, Hinweis `Motiv im Rahmen platzieren`, Schließen- und Auslöser-Button und die einheitlichen Berechtigungs-, Lade- und Fehlerzustände.
 - Das Rahmenformat folgt aus dem Preset: `recipeHero` `1080:1015`, `nutritionLabel` `3:4`, `mealPhoto` `4:3`.
-- Label und KI erhalten bei Kameraaufnahme exakt den im Rahmen sichtbaren Ausschnitt, als JPEG (Qualität `0.85`), längste Kante höchstens `2000` px (Label) bzw. `1600` px (Mahlzeit).
+- Label und KI erhalten bei Kamera- und Galerieaufnahme den im Rahmen sichtbaren Ausschnitt, als JPEG (Qualität `0.85`), längste Kante höchstens `2000` px (Label) bzw. `1600` px (Mahlzeit).
 - Galeriebilder öffnen den Rahmen-Editor (verschieben, zoomen, immer rahmenfüllend); danach gleicher Zuschnitt wie bei der Kamera.
 - Rezeptfoto verhält sich fachlich unverändert: Originaldatei plus `heroCrop`-Metadaten, Kameraaufnahmen öffnen den Hero-Crop-Editor mit `Titel- und Tag-Zone`-Hinweis.
 - Der Barcode-Scanner nutzt `expo-camera` und dieselben Berechtigungszustände; er hat keinen Foto-Rahmen.
@@ -91,18 +92,18 @@ Der Product Owner bewertet den Rezeptfoto-Weg mit vorgegebenem Fokusfenster als 
 
 ## 7. Confirmed Facts
 
-- `expo-camera@17.0.10`, `expo-image-picker@17.0.11` sind installiert; `expo-image-manipulator@14.0.8` ist die von `npx expo install` für SDK 54 gewählte Version (`npm view expo-image-manipulator dist-tags`: `sdk-55 55.0.21`, `latest 58.0.16`; SDK-54-Linie bleibt bis zum Expo-Upgrade bewusst).
+- Stand 2026-11-02 (`npm ls ... --workspace=mobile`, `mobile/package.json`): installiert sind `expo-camera@58.0.14`, `expo-image-picker@58.0.10` und `expo-image-manipulator@58.0.16` (Ranges `~58.0.14`, `~58.0.10`, `~58.0.16`; `expo` `~58.0.21`). `npm view expo-image-manipulator dist-tags` nennt `latest` `58.0.16`. Ob die Versionen zum SDK-Stand des Projekts passen, ist hier nicht verifiziert (Nachweis: `npx expo install --check`, WP-FE-01).
 - `expo-image-manipulator` ist ein natives Modul; `react-native-image-crop-picker` und `react-native-vision-camera` waren native Module. Die Bibliotheks-Kombination ändert damit das native Android-Projekt.
 - `AddItemModal` hat außer Tests keinen Importeur.
 - Datenschutzerklärung nennt in Abschnitt KI-Funktionen, dass Fotos an Azure OpenAI und beim Etikettenscan an Azure Document Intelligence gesendet werden ([datenschutzerklaerung-alpha.md](../../legal/datenschutzerklaerung-alpha.md), Zeile 32).
-- Test-Baseline (`scripts/test-baseline.json`) verlangt mobile mindestens 106 Dateien / 993 Tests; der Working Tree liefert 108 / 1002.
+- Test-Baseline (`scripts/test-baseline.json`, `asOf` 2026-10-30) verlangt Minima: mobile 108 Dateien / 1002 Tests, shared 10 / 466, backend 84 / 2709. Letzter Teststand laut QA-Revision 3 (Hinweis, Stand 2026-11-02): mobile 111 / 1074, shared 10 / 466, backend 84 / 2717; dieser Plan hat diese Läufe nicht selbst wiederholt.
 
 ## 8. Assumptions and Open Questions
 
 - **Annahme:** `takePictureAsync` liefert `width`/`height` des gespeicherten Fotos in der Orientierung, in der es angezeigt wird, und die Vorschau ist als `cover` skaliert. Die Zuschnitt-Abbildung (`getPreviewSourceRect`) beruht darauf. Abweichungen verschieben den Ausschnitt; betroffen ist nur diese eine Funktion.
 - **Annahme:** `expo-image-manipulator` berücksichtigt die EXIF-Orientierung beim Zuschnitt wie `Image` beim Laden.
 - **Annahme:** Rahmenformate `3:4` (Label) und `4:3` (Mahlzeit) sind zweckmäßig; Änderung ist eine Preset-Zeile.
-- Keine offenen Product-Owner-Entscheidungen.
+- PO-1 (Abschnitt 0) ist offen; darüber hinaus keine. Die Planer-Annahmen aus Abschnitt 1 sind vom Product Owner noch zu bestätigen.
 
 ## 9. Existing Components to Reuse
 
@@ -121,21 +122,23 @@ Neue Dateien in `mobile/src/shared/camera/`:
 | `frameCropMath.ts` | reine Geometrie: Cover-Skalierung, Pan-Begrenzung, Fokus ↔ Transform, Quellrechteck eines Crops, Vorschau-zu-Foto-Abbildung, Rahmenberechnung |
 | `FramedCameraCapture.tsx` | `expo-camera`-`CameraView`, Fokusrahmen, Berechtigungs- und Fehlerzustände; liefert Foto plus sichtbares Pixelrechteck |
 | `FramedImageEditor.tsx` | Pan/Pinch-Editor im Rahmen, optionales Overlay |
-| `FramedPhotoPicker.tsx` | Quellenblatt, Kamera, Galerie, Editor; `output: 'metadata' | 'cropped-file'`, `cameraReview: 'direct' | 'editor'` |
-| `cropImageToFrame.ts` | Pixel-Zuschnitt, Verkleinerung, JPEG-Kodierung über `expo-image-manipulator` |
+| `FramedPhotoPicker.tsx` | Quellenblatt, Kamera, Galerie, Editor; `output: 'metadata' | 'cropped-file'`, `cameraReview: 'direct' | 'editor'`, optional `initialSource?: 'camera' | 'gallery'` (überspringt das Quellenblatt; ohne die Prop erscheint es) |
+| `cropImageToFrame.ts` | Pixel-Zuschnitt über die aktuelle `ImageManipulator`-API von `expo-image-manipulator`, Verkleinerung so, dass die längste Kante höchstens `maxEdge` beträgt, JPEG-Kodierung |
 
 Konsumenten:
 
-| Konsument | Preset | `output` | `cameraReview` |
-|---|---|---|---|
-| `RecipeImageSourcePicker` | `recipeHero` | `metadata` | `editor` |
-| `LabelSubFlow` | `nutritionLabel` | `cropped-file` | `direct` |
-| `AISubFlow` | `mealPhoto` | `cropped-file` | `direct` |
+| Konsument | Preset | `output` | `cameraReview` | Einstieg |
+|---|---|---|---|---|
+| `RecipeImageSourcePicker` | `recipeHero` | `metadata` | `editor` | eine Foto-Aktion, Quellenblatt (kein `initialSource`) |
+| `LabelSubFlow` | `nutritionLabel` | `cropped-file` | `direct` | Aktionen `Kamera` / `Galerie`, `initialSource` `'camera'` / `'gallery'` |
+| `AISubFlow` | `mealPhoto` | `cropped-file` | `direct` | Aktionen `Kamera` / `Galerie`, `initialSource` `'camera'` / `'gallery'` |
+
+Galerieauswahl nutzt `expo-image-picker` mit `mediaTypes: ['images']`.
 
 Weitere Entscheidungen:
 - Der Rezept-Hero-Editor und `recipeImageHeroCropMath` bleiben als dünne Wrapper bestehen, damit Rezeptdetail, Wizard und deren Tests unverändert funktionieren; ihre Rezept-Semantik (`normalizeRecipeImageHeroCrop`, Safe-Area-Hinweis) bleibt erhalten.
 - Technologie-Entscheidung: `expo-camera` (Vorschau, Aufnahme, Barcode), `expo-image-picker` (nur Galerie), `expo-image-manipulator` (Zuschnitt). Keine System-Kamera, kein System-Cropper, keine weitere Crop-Bibliothek.
-- Fehler beim Zuschnitt führen zurück zum Quellenblatt mit deutscher Fehlermeldung; ein Verarbeitungs-Guard verhindert doppeltes Bestätigen.
+- Fehler beim Zuschnitt und beim Öffnen der Galerie führen zum Quellenblatt mit deutscher Fehlermeldung; Kamera-Berechtigungs- und Aufnahmefehler bleiben im Kamera-Screen (`Erneut versuchen`, `Abbrechen`); ein Verarbeitungs-Guard verhindert doppeltes Bestätigen.
 - `app.config.js`: Foto-Berechtigungstext nennt Rezeptbilder, Nährwert-Labels und Mahlzeitenfotos.
 
 ## 11. Frontend Work Packages
@@ -188,7 +191,7 @@ Expected Handoff:
 
 Agent: Frontend
 
-Goal: `LabelSubFlow` und `AISubFlow` auf `FramedPhotoPicker` umstellen; Kamera-/Galerie-Buttons werden durch einen Button `Foto hinzufügen` ersetzt.
+Goal: `LabelSubFlow` und `AISubFlow` auf `FramedPhotoPicker` umstellen; der Einstieg zeigt direkt die zwei Aktionen `Kamera` und `Galerie` (Feather-Icons `camera`, `image`), ein Tipp öffnet die Quelle über `initialSource` ohne Quellenblatt; das Quellenblatt erscheint nur bei Fehlern.
 
 Required Knowledge Base:
 - docs/kb/product/05-ux-patterns.md
@@ -219,7 +222,7 @@ Dependencies:
 
 Expected Handoff:
 - Beschreibung, welche Bilddaten gesendet werden (zugeschnittenes JPEG, Größenobergrenzen), ohne Änderung der Endpunkte
-- aktualisierte Tests inklusive Test „ausgewähltes Foto → `scanLabel`“
+- aktualisierte Tests inklusive Test „ausgewähltes Foto → `scanLabel`“ und Tests für `Kamera`/`Galerie` mit `initialSource`
 - Aussage zu Datenschutz gemäß Abschnitt 14
 
 ### WP-FE-03: Bereinigung (Barcode, toter Code, Pakete)
@@ -355,7 +358,8 @@ Siehe WP-FE-04. Dokumentation vor QA (WP-QA-01), damit QA die Doku-Genauigkeit p
 - Neue reine Logik hat Unit-Tests: Rahmenberechnung je Preset, Vorschau-zu-Foto-Abbildung inklusive Randfällen, Round-Trip Rechteck ↔ Crop, Cover-Rechteck bei Zoom 1, Zuschnittsaktionen (Rundung, Begrenzung, Verkleinerung nur über `maxEdge`), JPEG-Ausgabe mit Qualität `0.85`.
 - Bestehende Rezept-Tests laufen unverändert grün (Beweis, dass der Rezeptfluss nicht regressiert).
 - `nutritionDiaryMutationCallers.test.tsx`: `FramedPhotoPicker` gemockt; Test „ausgewähltes Foto → `scanLabel('/label.jpg', 'image/jpeg')`“.
-- Test-Parity: mobile mindestens die Baseline (106 / 993); keine Verringerung ohne Begründung.
+- Komponententests für `FramedCameraCapture`, `FramedImageEditor` und `FramedPhotoPicker` sind vorhanden. Schwerpunkte: Berechtigungs-, Lade- und Fehlerzustände der Kamera; Gesten und rahmenfüllende Begrenzung im Editor; Quellenblatt ohne `initialSource`, direkter Start mit `initialSource` `'camera'`/`'gallery'`, `onClose` bei Abbruch, Fehlermeldung im Blatt, Verwerfen eines späten Galerie-Ergebnisses.
+- Test-Parity: `scripts/check-test-parity.mjs` grün, die Minima aus `scripts/test-baseline.json` werden nicht unterschritten; keine Verringerung ohne Begründung.
 - Statische Prüfung: `tsc --noEmit`, `git grep` auf entfernte Paketnamen und `AddItemModal`, `npm run check:encoding`.
 - Nicht automatisierbar im Plan: Verhalten der Kamera-Vorschau auf einem echten Gerät; das ist ein bewusst nachgelagerter Schritt des Product Owners.
 
@@ -365,20 +369,21 @@ Siehe WP-FE-04. Dokumentation vor QA (WP-QA-01), damit QA die Doku-Genauigkeit p
 2. **AC-2:** `FRAME_PRESETS` definiert `recipeHero` mit `aspectRatio` `1080/1015` (ohne `maxEdge`), `nutritionLabel` mit `3/4` und `maxEdge` `2000`, `mealPhoto` mit `4/3` und `maxEdge` `1600`; die JPEG-Qualität ist `0.85`.
 3. **AC-3:** `getCaptureFrame` liefert für jedes Preset bei einem Viewport von `390 x 844` (Insets `24`/`34`) einen Rahmen mit dem Preset-Seitenverhältnis (Toleranz `1e-8`), vollständig innerhalb des Viewports; abgedeckt durch Unit-Test.
 4. **AC-4:** `getPreviewSourceRect` bildet einen Rahmen auf eine cover-skalierte Vorschau korrekt auf Foto-Pixel ab und liefert nie ein Rechteck außerhalb des Fotos; `getCropForSourceRect(getSourceRectForCrop(c))` ergibt `c` (Toleranz `1e-8`); abgedeckt durch Unit-Tests.
-5. **AC-5:** `cropImageToFrame` schneidet auf ganzzahlige, bildinterne Pixel zu, verkleinert nur bei Überschreiten von `maxEdge` proportional und kodiert JPEG mit Qualität `0.85`; abgedeckt durch Unit-Test mit gemocktem `expo-image-manipulator`.
+5. **AC-5:** `cropImageToFrame` schneidet auf ganzzahlige, bildinterne Pixel zu, verkleinert nur bei Überschreiten von `maxEdge` proportional, sodass die längste Kante höchstens `maxEdge` beträgt, und kodiert JPEG mit Qualität `0.85`; es nutzt die aktuelle `ImageManipulator`-API von `expo-image-manipulator`; abgedeckt durch Unit-Test mit gemocktem `expo-image-manipulator`.
 6. **AC-6:** Der Rezeptfluss liefert weiterhin Originaldatei plus normalisiertes `heroCrop` (`output: 'metadata'`); Kameraaufnahmen öffnen den Hero-Crop-Editor mit dem Hinweis `Titel- und Tag-Zone`; alle bestehenden Rezept-Tests (inklusive `recipeImageHeroCropMath.test.ts` und `recipeImageSource.test.ts`) sind unverändert grün.
-7. **AC-7:** `LabelSubFlow` und `AISubFlow` zeigen jeweils einen Button `Foto hinzufügen`, der `FramedPhotoPicker` mit `nutritionLabel`/`cropped-file`/`direct` bzw. `mealPhoto`/`cropped-file`/`direct` öffnet; weder `launchCameraAsync` noch ein System-Cropper wird irgendwo im Mobile-Code aufgerufen.
-8. **AC-8:** An `aiApi.scanLabel` und `aiApi.estimateMeal` wird bei Kamera und Galerie ausschließlich die zugeschnittene JPEG-Datei übergeben (`mime: 'image/jpeg'`); ihre längste Kante ist höchstens `2000` px bzw. `1600` px.
+7. **AC-7:** `LabelSubFlow` und `AISubFlow` zeigen beide direkt die Aktionen `Kamera` und `Galerie` mit den Feather-Icons `camera` und `image`; jeder Tipp öffnet `FramedPhotoPicker` mit `initialSource` `'camera'` bzw. `'gallery'` und den Preset-/Output-/Review-Werten aus der Konsumenten-Tabelle (`nutritionLabel`/`cropped-file`/`direct` bzw. `mealPhoto`/`cropped-file`/`direct`); ohne `initialSource` zeigt der Picker das Quellenblatt; weder `launchCameraAsync` noch ein System-Cropper wird irgendwo im Mobile-Code aufgerufen.
+8. **AC-8:** An `aiApi.scanLabel` und `aiApi.estimateMeal` wird bei Kamera und Galerie ausschließlich die zugeschnittene JPEG-Datei übergeben (`mime: 'image/jpeg'`); ihre längste Kante ist höchstens `2000` px bzw. `1600` px (längste Kante höchstens `maxEdge`, erzeugt über die aktuelle `ImageManipulator`-API).
 9. **AC-9:** Alle Fehler- und Berechtigungszustände entsprechen dem KB-Abschnitt: `Kamera wird vorbereitet…`, `Kein Kamerazugriff` mit `Erneut versuchen` und `Abbrechen`, Aufnahmefehler mit `Erneut versuchen`, Galerie-Berechtigung verweigert und unlesbares Bild als deutsche Meldung im Quellenblatt; Abbrechen löst weder einen Upload noch einen API-Request aus; ein Zuschnittsfehler führt zum Quellenblatt zurück mit `Das Foto konnte nicht verarbeitet werden. Bitte versuche es erneut.`; doppeltes Bestätigen löst den Zuschnitt nur einmal aus.
 10. **AC-10:** `mobile/package.json` enthält weder `react-native-image-crop-picker` noch `react-native-vision-camera`, aber `expo-image-manipulator`; `git grep -n "vision-camera\|image-crop-picker"` (ohne Lockfile und `docs/User Stories`) liefert keine Treffer.
 11. **AC-11:** `AddItemModal.tsx` existiert nicht mehr; kein Quell- oder Testfile referenziert `AddItemModal`; `BarcodeScannerScreen.tsx` enthält keinen `Platform.OS === 'ios'`-Zweig und keinen `vision-camera`-Import; die Scan-Logik (Produktsuche, Treffer-/Kein-Treffer-Zustände) ist unverändert.
 12. **AC-12:** `05-ux-patterns.md` enthält den Abschnitt „Camera and Photo Capture“ mit Ablauf, Preset-Tabelle (alle drei Presets), Pflichtzuständen und den Regeln für neue Kamera-Features; `03-mobile.md` beschreibt die Kamera-Schicht und die Technologie-Entscheidung und listet `AddItemModal` nicht mehr; die Doku stimmt mit den Werten in AC-2 überein.
-13. **AC-13:** `npx tsc --noEmit` im Mobile-Workspace endet mit Exit 0; mobile Vitest ist vollständig grün (Working-Tree-Stand: 108 Dateien / 1002 Tests); `node scripts/check-test-parity.mjs` ist grün; `npm run check:encoding` ist grün.
+13. **AC-13:** `npx tsc --noEmit` im Mobile-Workspace endet mit Exit 0; mobile Vitest ist vollständig grün; Test-Parität (`node scripts/check-test-parity.mjs`) ist grün (Minima aus `scripts/test-baseline.json` nicht unterschritten); `npm run check:encoding` ist grün. Hinweis (letzter verifizierter Stand laut QA-Revision 3, 2026-11-02): mobile 111 Dateien / 1074 Tests; keine Bindung an diese Zahl.
 14. **AC-14:** `docs/legal/` ist unverändert; der Berechtigungstext der Foto-Berechtigung in `mobile/app.config.js` nennt Rezeptbilder, Nährwert-Labels und Mahlzeitenfotos; das Datenschutz-Review (Abschnitt 14) ist im QA-Bericht bestätigt.
 
 ## 19. Risks and Edge Cases
 
 - **Zuschnitt-Abbildung:** Weichen Foto-Orientierung oder Vorschau-Skalierung von den Annahmen ab (Abschnitt 8), sitzt der Ausschnitt verschoben; Wirkung begrenzt auf `getPreviewSourceRect`/`cropImageToFrame`, Korrektur ohne API-Änderung möglich.
+- **Spätes Galerie-Ergebnis:** Soll-Verhalten: Liefert die Galerie ein Ergebnis, nachdem der Nutzer die Quelle gewechselt oder abgebrochen hat, wird es verworfen und der Zustand zurückgesetzt, sodass kein veraltetes Foto in den Editor oder an die API gelangt.
 - **OCR-Qualität:** Eine Verkleinerung auf `2000` px kann sehr kleine Schrift verschlechtern; `maxEdge` ist eine Preset-Zeile.
 - **Seitenverhältnis Label:** Sehr breite oder hohe Tabellen passen eventuell nicht ins `3:4`-Format; Nutzer können Abstand halten oder aus der Galerie im Editor zoomen; Änderung am Preset ist möglich.
 - **Doppelter Foto-Zugriff:** Kamera nutzt `expo-camera`-Berechtigung, Galerie `expo-image-picker`; beide Texte sind in `app.config.js` bzw. im Plugin gepflegt.
@@ -388,9 +393,9 @@ Siehe WP-FE-04. Dokumentation vor QA (WP-QA-01), damit QA die Doku-Genauigkeit p
 
 ## 20. Auswirkungen auf andere Pläne
 
-`PLAN_FitTrack-Technology-Refresh.md` nennt `react-native-vision-camera`, `react-native-image-crop-picker`, `AddItemModal` und `LabelSubFlow` in WP-T0-06, WP-FE-01 (Handoff „Camera/Crop Picker“), AC-6 und AC-17 sowie die Mobile-Baseline `106 / 993`. Dieser Plan wird **vor** dem Technology-Refresh ausgeführt; der Technology-Refresh muss anschließend revidiert werden:
+`PLAN_FitTrack-Technology-Refresh.md` nennt `react-native-vision-camera`, `react-native-image-crop-picker`, `AddItemModal` und `LabelSubFlow` in WP-T0-06, WP-FE-01 (Handoff „Camera/Crop Picker“), AC-6 und AC-17 sowie eine veraltete Mobile-Baseline (`106 / 993`; aktuelle Minima in `scripts/test-baseline.json`). Dieser Plan wird **vor** dem Technology-Refresh ausgeführt; der Technology-Refresh muss anschließend revidiert werden:
 - Verweise auf Vision Camera, Crop Picker und `AddItemModal` entfernen und `expo-image-manipulator` in die SDK-Migrationsmatrix aufnehmen.
-- Mobile-Baseline auf den Stand nach QA anheben (Working Tree: `108 / 1002`).
+- Mobile-Baseline auf den dann verifizierten Stand anheben (aktuell in `scripts/test-baseline.json`: `108 / 1002`).
 
 ## 21. Recommended Execution Order
 

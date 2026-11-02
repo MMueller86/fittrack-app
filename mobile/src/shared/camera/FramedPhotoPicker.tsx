@@ -35,6 +35,8 @@ interface Props {
   cameraPurpose: string;
   editorTitle: string;
   editorOverlay?: (frame: FrameSize) => ReactNode;
+  /** Skips the source sheet and opens the given source directly; cancelling then closes the picker. Errors still show the sheet. */
+  initialSource?: 'camera' | 'gallery';
   onClose: () => void;
   onSelected: (result: FramedPhotoResult) => void;
 }
@@ -51,6 +53,7 @@ export function FramedPhotoPicker({
   cameraPurpose,
   editorTitle,
   editorOverlay,
+  initialSource,
   onClose,
   onSelected,
 }: Props) {
@@ -59,17 +62,16 @@ export function FramedPhotoPicker({
   const [pickerView, setPickerView] = useState<PickerView>('sources');
   const [error, setError] = useState<string | null>(null);
   const [editorSource, setEditorSource] = useState<{ uri: string; mime: 'image/jpeg' | 'image/png' } | null>(null);
-  const busy = useRef(false);
+  // Request id of the crop in flight; a stale (discarded) crop must not block a newer request.
+  const busyRequest = useRef<number | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  useEffect(() => {
-    if (!visible) {
-      setPickerView('sources');
-      setError(null);
-      setEditorSource(null);
-    }
-  }, [visible]);
+  // Invalidates pending gallery requests; their late results are discarded.
+  const requestId = useRef(0);
 
   const handleClose = useCallback(() => {
+    requestId.current += 1;
     setPickerView('sources');
     setError(null);
     setEditorSource(null);
@@ -81,30 +83,35 @@ export function FramedPhotoPicker({
     image: ImageSize,
     crop: FrameCrop,
   ) => {
-    if (busy.current) return;
-    busy.current = true;
+    const request = requestId.current;
+    if (busyRequest.current === request) return;
+    busyRequest.current = request;
     try {
       if (output === 'metadata') {
         onSelected({ ...source, crop });
       } else {
         const rect = getSourceRectForCrop(image, aspectRatio, crop);
         const cropped = await cropImageToFrame(source.uri, rect, image, maxEdge);
+        if (request !== requestId.current) return;
         onSelected({ ...cropped, crop });
       }
       handleClose();
     } catch {
+      if (request !== requestId.current) return;
       setEditorSource(null);
       setPickerView('sources');
       setError('Das Foto konnte nicht verarbeitet werden. Bitte versuche es erneut.');
     } finally {
-      busy.current = false;
+      if (busyRequest.current === request) busyRequest.current = null;
     }
   }, [aspectRatio, handleClose, maxEdge, onSelected, output]);
 
   const handleOpenGallery = useCallback(async () => {
+    const request = ++requestId.current;
     setError(null);
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (request !== requestId.current) return;
       if (!permission.granted) {
         setError(
           permission.canAskAgain
@@ -115,12 +122,16 @@ export function FramedPhotoPicker({
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         quality: 0.85,
         allowsEditing: false,
         selectionLimit: 1,
       });
-      if (result.canceled) return;
+      if (request !== requestId.current) return;
+      if (result.canceled) {
+        if (initialSource) onCloseRef.current();
+        return;
+      }
 
       const asset = result.assets?.[0];
       if (!asset?.uri) {
@@ -129,9 +140,26 @@ export function FramedPhotoPicker({
       }
       setEditorSource({ uri: asset.uri, mime: asset.mimeType === 'image/png' ? 'image/png' : 'image/jpeg' });
     } catch {
+      if (request !== requestId.current) return;
       setError('Die Galerie konnte nicht geöffnet werden. Bitte versuche es erneut.');
     }
+  }, [initialSource]);
+
+  // Unmounting invalidates in-flight requests so a late crop or gallery result is discarded.
+  useEffect(() => () => {
+    requestId.current += 1;
   }, []);
+
+  // Resets on every visibility/source change, then opens the requested source; errors fall back to the source sheet.
+  useEffect(() => {
+    requestId.current += 1;
+    setPickerView('sources');
+    setError(null);
+    setEditorSource(null);
+    if (!visible || !initialSource) return;
+    if (initialSource === 'camera') setPickerView('camera');
+    else void handleOpenGallery();
+  }, [visible, initialSource, handleOpenGallery]);
 
   const handleCaptured = useCallback(async (photo: CapturedPhoto) => {
     if (cameraReview === 'editor') {
@@ -148,14 +176,19 @@ export function FramedPhotoPicker({
   }, [aspectRatio, cameraReview, finish]);
 
   const handleEditorCancel = useCallback(() => {
+    requestId.current += 1;
     setEditorSource(null);
+    if (initialSource) {
+      handleClose();
+      return;
+    }
     setPickerView('sources');
-  }, []);
+  }, [handleClose, initialSource]);
 
   return (
     <>
       <Modal
-        visible={visible && pickerView === 'sources' && editorSource == null}
+        visible={visible && pickerView === 'sources' && editorSource == null && (!initialSource || error != null)}
         transparent
         animationType="slide"
         onRequestClose={handleClose}

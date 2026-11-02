@@ -955,6 +955,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
             <DayStoryCard
               summary={data.summary}
               target={todayTargets}
+              calorieTarget={data.calorieTarget}
               meals={orderedMeals.map((m) => ({ type: m.type, items: m.items ?? [] }))}
               mealSummaries={mealSummaries}
               scrollRef={scrollViewRef}

@@ -92,11 +92,11 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showFullReview, setShowFullReview] = useState(false);
-  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const [photoSource, setPhotoSource] = useState<'camera' | 'gallery' | null>(null);
 
   useEffect(() => {
     if (!visible) {
-      setShowPhotoPicker(false);
+      setPhotoSource(null);
       setText('');
       setMealPhoto(null);
       setError(null);
@@ -514,23 +514,40 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
           <View style={styles.photoRow}>
             {mealPhoto ? (
               <View style={styles.photoIndicator}>
-                <Text style={styles.photoIndicatorText}>📷 Foto hinzugefügt</Text>
+                <View style={styles.photoIndicatorLabel}>
+                  <Icon lib="feather" name="check-circle" size="md" color={colors.primary} />
+                  <Text style={styles.photoIndicatorText}>Foto hinzugefügt</Text>
+                </View>
                 <TouchableOpacity
                   onPress={() => setMealPhoto(null)}
                   style={styles.removePhotoBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel="Foto entfernen"
                 >
-                  <Text style={styles.removePhotoBtnText}>✕</Text>
+                  <Icon lib="feather" name="x" size="md" color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity
-                style={styles.photoBtn}
-                onPress={() => setShowPhotoPicker(true)}
-                accessibilityRole="button"
-                accessibilityLabel="Foto hinzufügen"
-              >
-                <Text style={styles.photoBtnText}>📷 Foto hinzufügen</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={styles.photoBtn}
+                  onPress={() => setPhotoSource('camera')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Foto mit der Kamera aufnehmen"
+                >
+                  <Icon lib="feather" name="camera" size="md" color={colors.primaryBright} />
+                  <Text style={styles.photoBtnText}>Kamera</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.photoBtn}
+                  onPress={() => setPhotoSource('gallery')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Foto aus der Galerie auswählen"
+                >
+                  <Icon lib="feather" name="image" size="md" color={colors.primaryBright} />
+                  <Text style={styles.photoBtnText}>Galerie</Text>
+                </TouchableOpacity>
+              </>
             )}
           </View>
 
@@ -566,7 +583,8 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
       ) : null}
 
       <FramedPhotoPicker
-        visible={showPhotoPicker}
+        visible={photoSource != null}
+        initialSource={photoSource ?? undefined}
         preset="mealPhoto"
         output="cropped-file"
         cameraReview="direct"
@@ -574,7 +592,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
         sourceSubtitle="Wähle eine Quelle für dein Mahlzeitenfoto."
         cameraPurpose="ein Mahlzeitenfoto aufzunehmen"
         editorTitle="Foto-Ausschnitt"
-        onClose={() => setShowPhotoPicker(false)}
+        onClose={() => setPhotoSource(null)}
         onSelected={handlePhotoSelected}
       />
     </Modal>
@@ -633,6 +651,9 @@ const styles = StyleSheet.create({
   },
   photoBtn: {
     flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: spacing.sm,
     backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
     padding: spacing.sm,
@@ -641,7 +662,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   photoBtnText: {
-    ...typography.caption,
+    ...typography.body2,
     color: colors.textSecondary,
   },
   photoIndicator: {
@@ -654,15 +675,16 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     paddingHorizontal: spacing.md,
   },
+  photoIndicatorLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   photoIndicatorText: {
     ...typography.caption,
     color: colors.primary,
   },
   removePhotoBtn: { padding: spacing.xs },
-  removePhotoBtnText: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
   analyzeBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,

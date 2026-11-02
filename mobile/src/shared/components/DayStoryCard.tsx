@@ -505,13 +505,14 @@ const bsStyles = StyleSheet.create({
 function ActivityBonusLines({
   baseTarget,
   bonus,
+  effectiveTarget,
   onShowBreakdown,
 }: {
   baseTarget: number;
   bonus: number;
+  effectiveTarget: number;
   onShowBreakdown: () => void;
 }) {
-  const effectiveTarget = baseTarget + bonus;
   return (
     <View style={bonusStyles.container}>
       {/* Row: Basisziel */}
@@ -587,6 +588,7 @@ const bonusStyles = StyleSheet.create({
 interface DayStoryCardProps {
   summary: DiaryDayResponse['summary'];
   target: MacroTarget | null;
+  calorieTarget?: DiaryDayResponse['calorieTarget'];
   meals: Array<{ type: MealType; items: unknown[] }>;
   mealSummaries: MealMacroSummary[];
   scrollRef: RefObject<ScrollViewInstance | null>;
@@ -599,15 +601,35 @@ interface DayStoryCardProps {
   };
 }
 
-export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef, mealOffsets, hint, activityBonusInfo }: DayStoryCardProps) {
+export function DayStoryCard({ summary, target, calorieTarget, meals, mealSummaries, scrollRef, mealOffsets, hint, activityBonusInfo }: DayStoryCardProps) {
   const [activeMacro, setActiveMacro] = useState<MacroKey | null>(null);
 
   const calConsumed = Math.round(summary.calories);
-  const baseCalTarget = target?.calories ?? null;
-  const hasBonus = baseCalTarget != null && !!(activityBonusInfo && activityBonusInfo.bonus > 0);
-  const calTarget = baseCalTarget == null
-    ? null
-    : Math.round(baseCalTarget + (hasBonus ? activityBonusInfo!.bonus : 0));
+  const hasSnapshotTarget = calorieTarget?.targetSource === 'day_target_snapshot'
+    || calorieTarget?.targetSource === 'special_activity_snapshot';
+  const effectiveTargetCalories = hasSnapshotTarget
+    && typeof calorieTarget.effectiveTargetCalories === 'number'
+    && Number.isFinite(calorieTarget.effectiveTargetCalories)
+    && calorieTarget.effectiveTargetCalories > 0
+    ? Math.round(calorieTarget.effectiveTargetCalories)
+    : null;
+  const baseTargetCalories = hasSnapshotTarget
+    && typeof calorieTarget.baseTargetCalories === 'number'
+    && Number.isFinite(calorieTarget.baseTargetCalories)
+    && calorieTarget.baseTargetCalories > 0
+    ? Math.round(calorieTarget.baseTargetCalories)
+    : null;
+  const activityBonusCalories = hasSnapshotTarget
+    && typeof calorieTarget.activityBonusCalories === 'number'
+    && Number.isFinite(calorieTarget.activityBonusCalories)
+    && calorieTarget.activityBonusCalories > 0
+    ? Math.round(calorieTarget.activityBonusCalories)
+    : null;
+  const calTarget = effectiveTargetCalories;
+  const hasBonus = calTarget != null
+    && baseTargetCalories != null
+    && activityBonusCalories != null
+    && activityBonusInfo != null;
   const calPct = calTarget == null ? 0 : Math.min(calConsumed / (calTarget || 1), 1.5);
   const calRemaining = calTarget == null ? 0 : Math.round(Math.max(0, calTarget - calConsumed));
   const calOver = calTarget != null && calConsumed > calTarget;
@@ -660,8 +682,9 @@ export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef,
         <View style={styles.macroPanel}>
           {hasBonus ? (
             <ActivityBonusLines
-              baseTarget={baseCalTarget ?? 0}
-              bonus={activityBonusInfo!.bonus}
+              baseTarget={baseTargetCalories!}
+              bonus={activityBonusCalories!}
+              effectiveTarget={calTarget!}
               onShowBreakdown={activityBonusInfo!.onShowBreakdown}
             />
           ) : (
@@ -707,7 +730,7 @@ export function DayStoryCard({ summary, target, meals, mealSummaries, scrollRef,
             : summary.fiber
           }
           target={
-            activeMacro === 'calories' ? target?.calories ?? null
+            activeMacro === 'calories' ? calTarget
             : activeMacro === 'protein' ? proteinRange
             : activeMacro === 'carbs' ? target?.macroRanges?.carbsG ?? null
             : activeMacro === 'fat' ? target?.fatG ?? null

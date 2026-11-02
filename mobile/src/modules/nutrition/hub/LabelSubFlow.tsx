@@ -19,6 +19,7 @@ import { colors, radius, spacing, typography } from '../../../app/theme';
 import { formatApiError } from '../../../shared/api/apiError';
 import { isQuotaExceededError } from '../../../shared/api/client';
 import { ErrorBanner } from '../../../shared/components/ErrorBanner';
+import { Icon } from '../../../shared/components/Icon';
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import LabelScanReviewScreen from '../LabelScanReviewScreen';
 import { FramedPhotoPicker, type FramedPhotoResult } from '../../../shared/camera/FramedPhotoPicker';
@@ -56,11 +57,11 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
   const [error, setError] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<NutritionLabelScanResult | null>(null);
   const [resolvedMealId, setResolvedMealId] = useState<string | null>(null);
-  const [showPhotoPicker, setShowPhotoPicker] = useState(false);
+  const [photoSource, setPhotoSource] = useState<'camera' | 'gallery' | null>(null);
 
   useEffect(() => {
     if (!visible) {
-      setShowPhotoPicker(false);
+      setPhotoSource(null);
       setLoading(false);
       setError(null);
       setScanResult(null);
@@ -150,20 +151,33 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
               <Text style={styles.loadingText}>Label wird analysiert…</Text>
             </View>
           ) : (
-            <TouchableOpacity
-              style={styles.pickBtn}
-              onPress={() => setShowPhotoPicker(true)}
-              accessibilityRole="button"
-              accessibilityLabel="Foto hinzufügen"
-            >
-              <Text style={styles.pickBtnText}>📷 Foto hinzufügen</Text>
-            </TouchableOpacity>
+            <View style={styles.pickRow}>
+              <TouchableOpacity
+                style={styles.pickBtn}
+                onPress={() => setPhotoSource('camera')}
+                accessibilityRole="button"
+                accessibilityLabel="Label mit der Kamera fotografieren"
+              >
+                <Icon lib="feather" name="camera" size="lg" color={colors.primaryBright} />
+                <Text style={styles.pickBtnText}>Kamera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.pickBtn}
+                onPress={() => setPhotoSource('gallery')}
+                accessibilityRole="button"
+                accessibilityLabel="Label-Foto aus der Galerie auswählen"
+              >
+                <Icon lib="feather" name="image" size="lg" color={colors.primaryBright} />
+                <Text style={styles.pickBtnText}>Galerie</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </SafeAreaView>
 
       <FramedPhotoPicker
-        visible={showPhotoPicker}
+        visible={photoSource != null}
+        initialSource={photoSource ?? undefined}
         preset="nutritionLabel"
         output="cropped-file"
         cameraReview="direct"
@@ -171,7 +185,7 @@ export function LabelSubFlow({ visible, context, onClose, onSaved, onProductFoun
         sourceSubtitle="Wähle eine Quelle für dein Nährwert-Label."
         cameraPurpose="ein Nährwert-Label aufzunehmen"
         editorTitle="Label-Ausschnitt"
-        onClose={() => setShowPhotoPicker(false)}
+        onClose={() => setPhotoSource(null)}
         onSelected={(result) => void handlePhotoSelected(result)}
       />
 
@@ -234,16 +248,23 @@ const styles = StyleSheet.create({
     ...typography.body2,
     color: colors.textMuted,
   },
+  pickRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
   pickBtn: {
     flex: 1,
-    backgroundColor: colors.primary,
+    gap: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radius.md,
-    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.lg,
     alignItems: 'center',
   },
   pickBtnText: {
     ...typography.body1,
-    color: colors.background,
+    color: colors.text,
     fontWeight: '600',
   },
 });

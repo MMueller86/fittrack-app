@@ -112,14 +112,24 @@ and other document types stored in the shared container.
 The diary GET handler selects the profile `DayTargets` internally for hint
 evaluation. An explicit `dayType: 'training'` selects `trainingDay`; otherwise
 the handler selects `restDay`, or its fixed calorie-only fallback when no
-profile exists. The current GET response does not include `targets` or
-`macroRanges`.
+profile exists. The GET response includes `calorieTarget` with nullable base
+and effective calories, nullable activity bonus, and `targetSource`. It does
+not include general `targets` or `macroRanges`.
 
 ### Historical target read rules
 
 The weekly read resolves targets snapshot-first. A valid `DayMeta.calorieTargetSnapshot.calories` is used before the existing `specialActivity.dailyCalorieTarget`, which remains a compatible historical source for older activity documents. If neither exists, the read uses the current profile's `trainingDay` target for an explicitly stored training day and `restDay` otherwise, including a day without `DayMeta`. This is a read-only `profile_fallback`, not a historical snapshot, and is never written into the diary. If a special activity exists but has no usable stored target, the activity target remains unavailable rather than being replaced by a profile value.
 
 An absent `calorieTargetSnapshot` is expected on legacy documents and requires no migration. Explicitly setting a historical day type may write or replace that day's snapshot. Profile updates do not touch existing DayMeta documents. Removing a special activity preserves an explicit day snapshot; the special-activity PUT/DELETE contract and its existing `422` cases remain unchanged.
+
+For `GET /api/diary`, only a request where `date === localDate` may capture the
+selected profile calorie target, and only when no valid snapshot exists. The
+write preserves all existing DayMeta fields and does not replace a valid
+snapshot. A missing DayMeta uses the existing default target context (`rest`)
+for the stored snapshot without changing the response's absent `dayType` to an
+explicit rest day. Historical reads never write a snapshot. The response still
+uses the shared snapshot-first resolver, including its unchanged
+`profile_fallback` source for a read-only current-profile target.
 
 ## Special Activity
 

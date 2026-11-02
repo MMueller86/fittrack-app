@@ -1,5 +1,6 @@
 import type {
   CalorieTargetSnapshot,
+  DiaryCalorieTargetSource,
   DayType,
   Meal,
   SpecialActivity,
@@ -18,11 +19,7 @@ export type WeeklyDayDataStatus =
   | 'missing_target'
   | 'missing_nutrition_and_target';
 
-export type WeeklyTargetSource =
-  | 'day_target_snapshot'
-  | 'special_activity_snapshot'
-  | 'profile_fallback'
-  | 'unavailable';
+export type WeeklyTargetSource = DiaryCalorieTargetSource;
 
 export interface WeeklyActivityLabel {
   type: 'hiking' | 'cycling';

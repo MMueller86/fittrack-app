@@ -208,12 +208,26 @@ and never replaced with a server or UTC hour.
 
 The current Diary GET response contains `meals`, `summary`, `dayType`,
 `workoutType`, `hint`, `specialActivity`, `activityBonus`, and
-`previousDayHasActivity`. `dayType` and `workoutType` are `null` when the
-corresponding day metadata is absent. The response does not include `date`,
-`targets`, or `macroRanges`; the handler uses selected profile-day ranges
-internally for hint evaluation. Profile ranges are returned by the Profile API
-above. A special-activity bonus affects only the calorie target used for hint
-evaluation, not the selected profile-day macro ranges.
+`previousDayHasActivity`, plus `calorieTarget`:
+`{ baseTargetCalories, effectiveTargetCalories, activityBonusCalories,
+targetSource }`. The three calorie fields are `number | null`; source is
+`day_target_snapshot`, `special_activity_snapshot`, `profile_fallback`, or
+`unavailable`. `dayType` and `workoutType` are `null` when the corresponding
+day metadata is absent. The response does not include `date`, `targets`, or
+`macroRanges`; the handler uses selected profile-day ranges internally for hint
+evaluation. Profile ranges are returned by the Profile API above. A
+special-activity bonus affects only the effective calorie target, not the
+selected profile-day macro ranges.
+
+The calorie target is resolved using the shared snapshot-first resolver. On
+`date === localDate` only, GET captures the selected profile calorie target if
+the DayMeta snapshot is missing or invalid and a valid profile target exists.
+The ensure operation preserves other DayMeta fields and does not replace a
+valid snapshot; a historical GET never writes or backfills. When no historical
+or special-activity target exists, a current profile value is returned only as
+`profile_fallback`; otherwise the calorie values are `null` with source
+`unavailable`. The Diary response never substitutes the hint engine's internal
+fallback as a calorie target.
 
 ### Bulk diary item mutations
 

@@ -68,6 +68,12 @@ When a user explicitly sets a historical day context, the backend captures the s
 
 Profile updates only replace the current profile document. They do not rewrite existing day snapshots. An explicit historical day-context change may capture a new snapshot for that day.
 
+The Diary GET also captures the selected current profile calorie target when
+`date === localDate` and the day's snapshot is absent or invalid. It preserves
+the existing day type, workout type, special activity, and any valid snapshot;
+repeated reads and later profile changes do not replace a valid snapshot. A GET
+for any other date remains read-only and never backfills historical DayMeta.
+
 For the weekly read, a day without a valid day snapshot or compatible special-activity
 target uses the current profile target as a read-only fallback: `restDay` when no
 training context is stored, `trainingDay` for an explicitly stored training day.

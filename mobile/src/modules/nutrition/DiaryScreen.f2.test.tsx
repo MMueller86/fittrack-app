@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   hydrateDayType: vi.fn(),
   setTargets: vi.fn(),
   dayStoryTarget: vi.fn(),
+  dayStoryCalorieTarget: vi.fn(),
   profileTargets: {
     restDay: {
       calories: 2000,
@@ -139,8 +140,9 @@ vi.mock('react-native-reanimated', () => ({
 }));
 
 vi.mock('../../shared/components/DayStoryCard', () => ({
-  DayStoryCard: ({ target }: { target: unknown }) => {
+  DayStoryCard: ({ target, calorieTarget }: { target: unknown; calorieTarget: unknown }) => {
     mocks.dayStoryTarget(target);
+    mocks.dayStoryCalorieTarget(calorieTarget);
     return null;
   },
 }));
@@ -552,6 +554,20 @@ describe('DiaryScreen F2 bulk actions', () => {
     await renderScreenWithRouteDate([makeDay([])], historicalDate);
 
     expect(mocks.dayStoryTarget).toHaveBeenLastCalledWith(null);
+  });
+
+  it('passes a historical calorie snapshot separately from macro targets', async () => {
+    const historicalDate = addLocalDays(getLocalIsoDate(), -1);
+    const calorieTarget: NonNullable<DiaryDayResponse['calorieTarget']> = {
+      baseTargetCalories: 1900,
+      effectiveTargetCalories: 2250,
+      activityBonusCalories: 350,
+      targetSource: 'special_activity_snapshot',
+    };
+    await renderScreenWithRouteDate([{ ...makeDay([]), calorieTarget }], historicalDate);
+
+    expect(mocks.dayStoryTarget).toHaveBeenLastCalledWith(null);
+    expect(mocks.dayStoryCalorieTarget).toHaveBeenLastCalledWith(calorieTarget);
   });
 
   it('uses the selected profile-day ranges for today', async () => {

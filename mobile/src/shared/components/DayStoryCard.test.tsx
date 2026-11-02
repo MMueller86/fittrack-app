@@ -63,13 +63,18 @@ function getRenderedText(renderer: ReactTestRenderer): string[] {
     .map(getTextContent);
 }
 
-function renderCard(target: MacroTarget | null, bonus?: number): ReactTestRenderer {
+function renderCard(
+  target: MacroTarget | null,
+  bonus?: number,
+  calorieTarget?: DiaryDayResponse['calorieTarget'],
+): ReactTestRenderer {
   let renderer!: ReactTestRenderer;
   act(() => {
     renderer = create(
       <DayStoryCard
         summary={SUMMARY}
         target={target}
+        calorieTarget={calorieTarget}
         meals={[]}
         mealSummaries={[]}
         scrollRef={createRef<ScrollViewInstance>()}
@@ -127,5 +132,63 @@ describe('DayStoryCard macro targets', () => {
     expect(text).not.toContain('200–300');
     expect(text).not.toContain(' / 150');
     expect(text).not.toContain(' / 325');
+  });
+
+  it('compares calories against the effective snapshot target, not profile calories', async () => {
+    const renderer = renderCard(null, 350, {
+      baseTargetCalories: 1900,
+      effectiveTargetCalories: 2250,
+      activityBonusCalories: 350,
+      targetSource: 'special_activity_snapshot',
+    });
+    const text = getRenderedText(renderer).join(' ');
+
+    expect(text).toContain('1050 kcal übrig');
+    expect(text).toContain('1900 kcal');
+    expect(text).toContain('+350 kcal');
+    expect(text).toContain('Gesamt 2250 kcal');
+    expect(text).not.toContain(' / 2000');
+
+    const calorieTrigger = renderer.root.findAll((node) => node.type === 'TouchableOpacity')
+      .find((node) => getTextContent(node).includes('kcal'));
+    const onPress = calorieTrigger?.props.onPress as (() => void) | undefined;
+    expect(onPress).toBeDefined();
+    await act(async () => onPress?.());
+
+    expect(getRenderedText(renderer).join(' ')).toContain('Gesamt: 1200  /  Ziel: 2250');
+  });
+
+  it('uses the saved effective target for a day snapshot', () => {
+    const renderer = renderCard(null, undefined, {
+      baseTargetCalories: 2000,
+      effectiveTargetCalories: 2000,
+      activityBonusCalories: 0,
+      targetSource: 'day_target_snapshot',
+    });
+
+    expect(getRenderedText(renderer).join(' ')).toContain(' / 2000');
+  });
+
+  it.each([
+    {
+      baseTargetCalories: 2000,
+      effectiveTargetCalories: 2400,
+      activityBonusCalories: 0,
+      targetSource: 'profile_fallback' as const,
+    },
+    {
+      baseTargetCalories: null,
+      effectiveTargetCalories: null,
+      activityBonusCalories: null,
+      targetSource: 'unavailable' as const,
+    },
+  ])('does not show a calorie target for $targetSource', (calorieTarget) => {
+    const renderer = renderCard(PROFILE_TARGET, undefined, calorieTarget);
+    const text = getRenderedText(renderer).join(' ');
+
+    expect(text).not.toContain('2000');
+    expect(text).not.toContain(' / 2000');
+    expect(text).not.toContain('2400');
+    expect(text).toContain('1200');
   });
 });

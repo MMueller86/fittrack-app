@@ -176,6 +176,54 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-155 | HC-4 mock diagnostic logs contain client record IDs, AC-11 | Non-blocking | Frontend | Awaiting decision |
 | FT-QA-2026-156 | HC-4 Domain KB retry status is stale, AC-11 | Non-blocking | Documentation | Awaiting decision |
 | FT-QA-2026-157 | Technology refresh Phase 0 request-schema characterization, AC-15 | Blocking | Backend | Closed |
+| FT-QA-2026-158 | Camera flow unmount leaves crop request valid, AC-9/AC-14 | Non-blocking | Frontend | Closed |
+| FT-QA-2026-159 | Camera flow stale crop can clear newer busy guard, AC-9 | Suggestion | Frontend | Closed |
+| FT-QA-2026-160 | Camera flow Android framing copy and gallery retry, AC-6/AC-11 | Suggestion | Frontend | Accepted |
+
+## Einheitlicher Kamera-Flow QA-Abschluss
+
+Die [QA-Abschlussprüfung Revision 5](reports/PLAN_Einheitlicher-Kamera-Flow.md) bestätigt PASS. F-11 und F-12 wurden gezielt unabhängig verifiziert; die in Revision 4 dokumentierte F-05-UX-Suggestion bleibt gemäß Product-Owner-Entscheidung unverändert.
+
+### FT-QA-2026-158
+
+- **Finding key:** F-11.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Einheitlicher-Kamera-Flow.md`.
+- **Acceptance criterion:** AC-9, AC-14.
+- **Description:** Beim Unmount während eines laufenden Zuschnitts wurde dessen Ergebnis zuvor nicht verworfen. Ein veralteter `onSelected`-Aufruf hätte den Label-Scan oder die Mahlzeitenanalyse nach Schließen des Flows starten können.
+- **Criticality:** Non-blocking.
+- **Owner:** Frontend.
+- **Evidence:** `mobile/src/shared/camera/FramedPhotoPicker.tsx` invalidiert Requests im Unmount-Cleanup; `mobile/src/shared/camera/FramedPhotoPicker.test.tsx` hält den Crop offen, unmountet den Picker und prüft, dass `onSelected` und `onClose` nicht aufgerufen werden. Unabhängig bestätigt in QA Revision 5.
+- **Recommendation:** Unmount-Cleanup für die Request-Invalidierung ergänzen und mit einem Deferred-Crop-Regressionstest absichern.
+- **Status:** Closed.
+- **History:** 2026-11-02 - Aus QA Revision 4 registriert; Frontend meldete Cleanup und Regressionstest als umgesetzt.
+- **History:** 2026-11-02 - QA Revision 5 bestätigte Cleanup und Test unabhängig; fokussierte Picker-Tests bestanden (47/47), vollständige Mobile-Suite bestanden (112 Dateien / 1093 Tests).
+
+### FT-QA-2026-159
+
+- **Finding key:** F-12.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Einheitlicher-Kamera-Flow.md`.
+- **Acceptance criterion:** AC-9.
+- **Description:** Es fehlte zuvor ein Regressionstest dafür, dass das `finally` einer veralteten Crop-Anfrage den Busy-Guard einer neueren Anfrage nicht zurücksetzt und so eine doppelte Bestätigung zulässt.
+- **Criticality:** Suggestion.
+- **Owner:** Frontend.
+- **Evidence:** `mobile/src/shared/camera/FramedPhotoPicker.test.tsx` deckt Anfrage A, Abbruch, Anfrage B, Auflösen von A und doppelte Bestätigung von B ab. QA Revision 5 bestätigte, dass insgesamt nur zwei Crop-Aufrufe stattfinden.
+- **Recommendation:** Den bedingten Busy-Reset mit dem beschriebenen Concurrency-Regressionstest absichern.
+- **Status:** Closed.
+- **History:** 2026-11-02 - Aus QA Revision 4 registriert; Frontend meldete den Concurrency-Regressionstest als ergänzt.
+- **History:** 2026-11-02 - QA Revision 5 bestätigte den Test unabhängig; fokussierte Picker-Tests bestanden (47/47), vollständige Mobile-Suite bestanden (112 Dateien / 1093 Tests).
+
+### FT-QA-2026-160
+
+- **Finding key:** F-05.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Einheitlicher-Kamera-Flow.md`.
+- **Acceptance criterion:** AC-6, AC-11.
+- **Description:** Der Android-Barcode-Scanner zeigt den Hinweis `Barcode im Rahmen positionieren`; beim Galeriefehler fehlt eine separate Aktion `Galerie erneut versuchen` (Galerie kann erneut aus dem Quellenblatt gestartet werden).
+- **Criticality:** Suggestion.
+- **Owner:** Frontend.
+- **Evidence:** `mobile/src/modules/scanner/BarcodeScannerScreen.tsx` und `mobile/src/shared/camera/FramedPhotoPicker.tsx`; als Product-Owner-Entscheidung und bewusst unveränderter Vorschlag in QA Revision 4 und Revision 5 dokumentiert.
+- **Recommendation:** Keine Korrektur im Rahmen dieses Abschlusses; nur bei Änderung der Produktentscheidung wieder aufnehmen.
+- **Status:** Accepted.
+- **History:** 2026-11-02 - Aus QA Revision 4 registriert. Die dokumentierte Product-Owner-Entscheidung, das Verhalten bewusst beizubehalten, wurde für den finalen Abschluss bestätigt; keine Korrektur beauftragt.
 
 ## Profile Deletion QA Review
 - **Latest re-review (2026-10-22):** Independent [QA report](reports/PLAN_US_Profil-und-Konto-dauerhaft-loeschen_aktualisiert.md) is PASS against all 13 criteria after the D2 corrections. Mobile suite passed 950/950; backend suite passed 1,881/1,881; Mobile typecheck, backend build verification, and offline Bicep compilation passed. Cosmos contracts remain **UNVERIFIED**. The approved force-close/token/queue residual is not a finding. Findings 144–148 are closed based on the recorded scope decisions and QA verification.

@@ -228,7 +228,7 @@ scoped to the manual action that caused them.
 
 - `DiaryScreen.tsx` — daily diary view with meal cards and hint display
 - Current-day Home and diary macro views use the selected profile day's `macroRanges` for protein and carbohydrates. The diary selects `restDay` or `trainingDay` from the response's `dayType`; if profile targets have not hydrated, it loads them from the profile API. The Home protein hint compares consumption with `proteinG.minG` and appears only when more than 20 g remain. Activity bonuses affect calorie targets only.
-- Historical diary views do not receive current profile targets: the diary response has no historical macro-target snapshot, so protein and carbohydrate consumption remain visible without an implied goal.
+- Historical diary views show a calorie comparison only when `calorieTarget.targetSource` is `day_target_snapshot` or `special_activity_snapshot`, using its `effectiveTargetCalories`. `profile_fallback`, `unavailable`, and older responses without `calorieTarget` show no calorie target. Historical diary views never receive current profile macro targets; protein and carbohydrate consumption remain visible without an implied historical goal. Current-day macro targets continue to use the selected profile day's `macroRanges`.
 - `hub/` — FoodEntryHub (bottom sheet workspace for food entry)
 - `MealParserReviewScreen.tsx` — review AI-parsed meal text before saving
 - `FoodEstimateReviewScreen.tsx` — review/edit AI food estimates
@@ -406,8 +406,8 @@ described in [05-ux-patterns.md](../product/05-ux-patterns.md#camera-and-photo-c
 | `frameCropMath.ts` | Pure geometry: cover scale, pan clamping, focus/zoom ↔ transform, source rectangle of a crop, preview-to-photo mapping, frame sizing |
 | `FramedCameraCapture.tsx` | `expo-camera` `CameraView` with focus frame, permission and capture states; returns the photo plus the pixel rectangle visible in the frame |
 | `FramedImageEditor.tsx` | Pan/pinch editor inside the frame (gallery images, recipe fine-tuning) |
-| `FramedPhotoPicker.tsx` | Source sheet, camera, gallery and editor; `output: 'metadata' \| 'cropped-file'`, `cameraReview: 'direct' \| 'editor'` |
-| `cropImageToFrame.ts` | Pixel crop, downsizing and JPEG encoding via `expo-image-manipulator` |
+| `FramedPhotoPicker.tsx` | Source sheet, camera, gallery and editor; `output: 'metadata' \| 'cropped-file'`, `cameraReview: 'direct' \| 'editor'`; optional `initialSource: 'camera' \| 'gallery'` skips the source sheet (cancel closes the picker; errors show the sheet with the message) |
+| `cropImageToFrame.ts` | Pixel crop, downsizing and JPEG encoding via the `expo-image-manipulator` context API (`ImageManipulator.manipulate(uri).crop().resize()`, `renderAsync()`, `saveAsync()`); the longest edge is limited to at most `maxEdge` (smaller images are not enlarged; the shorter edge is rounded) |
 
 Technology decision: `expo-camera` (live preview, capture, barcode),
 `expo-image-picker` (gallery only) and `expo-image-manipulator` (pixel crop).
@@ -418,7 +418,9 @@ reintroduce system cameras or system croppers.
 Consumers: `RecipeImageSourcePicker` (preset `recipeHero`, metadata output,
 camera captures open the editor), `LabelSubFlow` (preset `nutritionLabel`,
 cropped file, `scanLabel`) and `AISubFlow` (preset `mealPhoto`, cropped file,
-`estimateMeal`). Camera captures with `cameraReview: 'direct'` are cropped to
+`estimateMeal`). `LabelSubFlow` and `AISubFlow` show `Kamera` and `Galerie` as
+direct actions (state `photoSource`, passed as `initialSource`); the recipe flow
+keeps the source sheet. Camera captures with `cameraReview: 'direct'` are cropped to
 the rectangle that was visible in the frame; gallery images pass through the
 editor first.
 

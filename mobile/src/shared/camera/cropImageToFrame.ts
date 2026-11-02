@@ -1,4 +1,4 @@
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { CROPPED_PHOTO_JPEG_QUALITY } from './framePresets';
 import type { ImageSize, SourceRect } from './frameCropMath';
 
@@ -13,11 +13,16 @@ export function getCropActions(rect: SourceRect, image: ImageSize, maxEdge?: num
   const width = Math.max(1, Math.min(image.width - originX, Math.round(rect.width)));
   const height = Math.max(1, Math.min(image.height - originY, Math.round(rect.height)));
   const longestEdge = Math.max(width, height);
-  const resizeWidth = maxEdge && longestEdge > maxEdge
-    ? Math.round(width * (maxEdge / longestEdge))
-    : null;
+  let resize: { width: number; height: number } | null = null;
+  if (maxEdge && longestEdge > maxEdge) {
+    const scale = maxEdge / longestEdge;
+    // The longest edge is set to maxEdge exactly; the other edge is rounded and never exceeds it.
+    resize = width >= height
+      ? { width: maxEdge, height: Math.max(1, Math.round(height * scale)) }
+      : { width: Math.max(1, Math.round(width * scale)), height: maxEdge };
+  }
 
-  return { crop: { originX, originY, width, height }, resizeWidth };
+  return { crop: { originX, originY, width, height }, resize };
 }
 
 /** Crops the exact source rectangle, downsizes to maxEdge and re-encodes as JPEG. */
@@ -27,11 +32,9 @@ export async function cropImageToFrame(
   image: ImageSize,
   maxEdge?: number,
 ): Promise<CroppedPhoto> {
-  const { crop, resizeWidth } = getCropActions(rect, image, maxEdge);
-  const result = await manipulateAsync(
-    uri,
-    resizeWidth ? [{ crop }, { resize: { width: resizeWidth } }] : [{ crop }],
-    { compress: CROPPED_PHOTO_JPEG_QUALITY, format: SaveFormat.JPEG },
-  );
+  const { crop, resize } = getCropActions(rect, image, maxEdge);
+  const context = ImageManipulator.manipulate(uri).crop(crop);
+  const rendered = await (resize ? context.resize(resize) : context).renderAsync();
+  const result = await rendered.saveAsync({ compress: CROPPED_PHOTO_JPEG_QUALITY, format: SaveFormat.JPEG });
   return { uri: result.uri, mime: 'image/jpeg' };
 }

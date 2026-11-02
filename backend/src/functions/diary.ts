@@ -19,6 +19,7 @@ import { getProfileRepository } from '../lib/repositories/profileRepository';
 import { getHintStateRepository } from '../lib/repositories/hintStateRepository';
 import { evaluateHint } from '../lib/hintEngine';
 import { resolveCalorieTargetSnapshot } from '../lib/weeklyTargetSnapshot';
+import { resolveHistoricalTarget } from '../../../shared/lib/weeklyReviewCalculator';
 import { addRecipeDiarySnapshot } from '../lib/recipeDiary';
 import { recordCopiedDiaryItemUsages } from '../lib/diaryItemUsage';
 import type { MealChangesResponse } from '@fittrack/shared';
@@ -235,6 +236,20 @@ export const getDiaryHandler = withHandler(
       ? (resolvedDayType === 'training' ? profile.targets.trainingDay : profile.targets.restDay)
       : fallbackTargets;
 
+    let targetDayMeta = dayMeta;
+    if (date === localDate) {
+      const snapshot = resolveCalorieTargetSnapshot(profile, resolvedDayType);
+      if (snapshot) {
+        targetDayMeta = await getDayMetaRepository().ensureCalorieTargetSnapshot(
+          userId,
+          date,
+          resolvedDayType,
+          snapshot,
+        );
+      }
+    }
+    const resolvedCalorieTarget = resolveHistoricalTarget(targetDayMeta, profile?.targets ?? null);
+
     // Calorie % for each recent day (only include days that have actual entries)
     const recentDaysCaloriesPct = recentDays
       .map((d) => (d.summary.calories > 0 && targets.calories > 0 ? (d.summary.calories / targets.calories) * 100 : null))
@@ -283,6 +298,12 @@ export const getDiaryHandler = withHandler(
         specialActivity: dayMeta?.specialActivity ?? null,
         activityBonus,
         previousDayHasActivity: previousDayMeta?.specialActivity != null,
+        calorieTarget: {
+          baseTargetCalories: resolvedCalorieTarget.baseTargetCalories,
+          effectiveTargetCalories: resolvedCalorieTarget.effectiveTargetCalories,
+          activityBonusCalories: resolvedCalorieTarget.activityBonusCalories,
+          targetSource: resolvedCalorieTarget.targetSource,
+        },
       },
     };
   },

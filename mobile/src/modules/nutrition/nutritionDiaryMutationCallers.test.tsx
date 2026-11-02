@@ -18,7 +18,17 @@ const mocks = vi.hoisted(() => {
   estimateFood: vi.fn(),
   estimateMeal: vi.fn(),
   scanLabel: vi.fn(),
-  photoPickerProps: { current: null as null | { onSelected: (result: unknown) => void } },
+  photoPickerProps: {
+    current: null as null | {
+      visible: boolean;
+      initialSource?: 'camera' | 'gallery';
+      preset: string;
+      output: string;
+      cameraReview: string;
+      onClose: () => void;
+      onSelected: (result: unknown) => void;
+    },
+  },
   };
 });
 
@@ -60,7 +70,7 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('../../shared/camera/FramedPhotoPicker', () => ({
-  FramedPhotoPicker: (props: { onSelected: (result: unknown) => void }) => {
+  FramedPhotoPicker: (props: NonNullable<typeof mocks.photoPickerProps.current>) => {
     mocks.photoPickerProps.current = props;
     return null;
   },
@@ -204,6 +214,10 @@ async function render(element: React.ReactElement): Promise<ReactTestRenderer> {
 
 const renderers: ReactTestRenderer[] = [];
 
+function rerender(renderer: ReactTestRenderer, element: React.ReactElement): void {
+  (renderer as ReactTestRenderer & { update(element: React.ReactElement): void }).update(element);
+}
+
 beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
@@ -215,6 +229,7 @@ beforeEach(() => {
   mocks.estimateFood.mockResolvedValue(foodEstimate);
   mocks.estimateMeal.mockResolvedValue(mealEstimate);
   mocks.scanLabel.mockResolvedValue(labelResult);
+  mocks.photoPickerProps.current = null;
 });
 
 afterEach(() => {
@@ -339,6 +354,168 @@ describe('nutrition diary mutation caller flows', () => {
     });
 
     expect(mocks.scanLabel).toHaveBeenCalledWith('/label.jpg', 'image/jpeg');
+  });
+
+  it.each([['Kamera', 'camera'], ['Galerie', 'gallery']] as const)(
+    'opens the shared picker directly with %s as the initial source in LabelSubFlow',
+    async (label, source) => {
+      const renderer = await render(
+        <LabelSubFlow visible context={makeContext()} onClose={vi.fn()} onSaved={vi.fn()} />,
+      );
+      renderers.push(renderer);
+      expect(mocks.photoPickerProps.current?.visible).toBe(false);
+
+      await press(renderer, label);
+
+      expect(mocks.photoPickerProps.current?.visible).toBe(true);
+      expect(mocks.photoPickerProps.current?.initialSource).toBe(source);
+    },
+  );
+
+  it.each([['Kamera', 'camera'], ['Galerie', 'gallery']] as const)(
+    'opens the shared picker directly with %s as the initial source in AISubFlow',
+    async (label, source) => {
+      const renderer = await render(
+        <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+      );
+      renderers.push(renderer);
+      expect(mocks.photoPickerProps.current?.visible).toBe(false);
+
+      await press(renderer, label);
+
+      expect(mocks.photoPickerProps.current?.visible).toBe(true);
+      expect(mocks.photoPickerProps.current?.initialSource).toBe(source);
+    },
+  );
+
+  it.each([
+    ['LabelSubFlow', 'nutritionLabel'],
+    ['AISubFlow', 'mealPhoto'],
+  ] as const)('wires the shared picker preset and review mode in %s', async (flow, preset) => {
+    const element = flow === 'LabelSubFlow'
+      ? <LabelSubFlow visible context={makeContext()} onClose={vi.fn()} onSaved={vi.fn()} />
+      : <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />;
+    const renderer = await render(element);
+    renderers.push(renderer);
+
+    expect(mocks.photoPickerProps.current).toEqual(expect.objectContaining({
+      visible: false,
+      initialSource: undefined,
+      preset,
+      output: 'cropped-file',
+      cameraReview: 'direct',
+    }));
+
+    await press(renderer, 'Kamera');
+    expect(mocks.photoPickerProps.current).toEqual(expect.objectContaining({
+      visible: true,
+      initialSource: 'camera',
+      preset,
+      output: 'cropped-file',
+      cameraReview: 'direct',
+    }));
+
+    await press(renderer, 'Galerie');
+    expect(mocks.photoPickerProps.current).toEqual(expect.objectContaining({
+      visible: true,
+      initialSource: 'gallery',
+      preset,
+      output: 'cropped-file',
+      cameraReview: 'direct',
+    }));
+  });
+
+  it.each([['LabelSubFlow'], ['AISubFlow']] as const)(
+    'resets the picker source when the picker closes and when %s is reopened',
+    async (flow) => {
+      const build = (visible: boolean) => flow === 'LabelSubFlow'
+        ? <LabelSubFlow visible={visible} context={makeContext()} onClose={vi.fn()} onSaved={vi.fn()} />
+        : <AISubFlow visible={visible} context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />;
+      const renderer = await render(build(true));
+      renderers.push(renderer);
+
+      await press(renderer, 'Galerie');
+      expect(mocks.photoPickerProps.current?.visible).toBe(true);
+      await act(async () => {
+        mocks.photoPickerProps.current?.onClose();
+      });
+      expect(mocks.photoPickerProps.current?.visible).toBe(false);
+      expect(mocks.photoPickerProps.current?.initialSource).toBeUndefined();
+
+      await press(renderer, 'Kamera');
+      expect(mocks.photoPickerProps.current?.initialSource).toBe('camera');
+      await act(async () => { rerender(renderer, build(false)); });
+      await act(async () => { rerender(renderer, build(true)); });
+
+      expect(mocks.photoPickerProps.current?.visible).toBe(false);
+      expect(mocks.photoPickerProps.current?.initialSource).toBeUndefined();
+    },
+  );
+
+  it('sends the cropped meal photo to estimateMeal, removes it again and resets it on reopen', async () => {
+    const build = (visible: boolean) => (
+      <AISubFlow visible={visible} context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />
+    );
+    const renderer = await render(build(true));
+    renderers.push(renderer);
+    const typeText = (value: string) => {
+      const onChangeText = renderer.root.findAll((node) => node.type === 'TextInput')[0]!.props.onChangeText as (value: string) => void;
+      act(() => onChangeText(value));
+    };
+    const selectPhoto = async (uri: string, mime: 'image/jpeg' | 'image/png') => {
+      await act(async () => {
+        mocks.photoPickerProps.current?.onSelected({ uri, mime, crop: { focusX: 0.5, focusY: 0.5, zoom: 1 } });
+      });
+    };
+    const hasButton = (label: string) => renderer.root.findAll((node) => node.type === 'TouchableOpacity'
+      && node.props.accessibilityLabel === label).length > 0;
+
+    typeText('Porridge');
+    await selectPhoto('/meal-cropped.jpg', 'image/jpeg');
+    expect(hasButton('Foto entfernen')).toBe(true);
+    expect(hasButton('Foto mit der Kamera aufnehmen')).toBe(false);
+    await press(renderer, 'Analysieren');
+    expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', '/meal-cropped.jpg', 'image/jpeg');
+
+    // Close and reopen the flow: the photo must be gone.
+    await act(async () => { rerender(renderer, build(false)); });
+    await act(async () => { rerender(renderer, build(true)); });
+    expect(hasButton('Foto entfernen')).toBe(false);
+
+    typeText('Porridge');
+    await selectPhoto('/meal-2.png', 'image/png');
+    const remove = renderer.root.findAll((node) => node.type === 'TouchableOpacity'
+      && node.props.accessibilityLabel === 'Foto entfernen')[0]!;
+    await act(async () => { (remove.props.onPress as () => void)(); });
+    expect(hasButton('Foto entfernen')).toBe(false);
+    expect(hasButton('Foto mit der Kamera aufnehmen')).toBe(true);
+    await press(renderer, 'Analysieren');
+    expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', undefined, undefined);
+  });
+
+  it('shows a label scan error and keeps the camera and gallery buttons usable', async () => {
+    mocks.scanLabel.mockRejectedValueOnce(new Error('Scan-Kontingent erschöpft'));
+    const renderer = await render(
+      <LabelSubFlow visible context={makeContext()} onClose={vi.fn()} onSaved={vi.fn()} />,
+    );
+    renderers.push(renderer);
+
+    await act(async () => {
+      mocks.photoPickerProps.current?.onSelected({
+        uri: '/label.jpg',
+        mime: 'image/jpeg',
+        crop: { focusX: 0.5, focusY: 0.5, zoom: 1 },
+      });
+      for (let index = 0; index < 6; index += 1) await Promise.resolve();
+    });
+
+    const banner = renderer.root.findAll((node) => node.type === 'ErrorBanner')[0];
+    expect(banner?.props.error).toBe('Scan-Kontingent erschöpft');
+    expect(renderer.root.findAll((node) => node.type === 'ActivityIndicator')).toHaveLength(0);
+    await press(renderer, 'Galerie');
+    expect(mocks.photoPickerProps.current?.initialSource).toBe('gallery');
+    await press(renderer, 'Kamera');
+    expect(mocks.photoPickerProps.current?.initialSource).toBe('camera');
   });
 
   it('saves a ManuellerSubFlow entry through the facade and reports success', async () => {

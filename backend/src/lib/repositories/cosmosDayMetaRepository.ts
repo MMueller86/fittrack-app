@@ -26,6 +26,72 @@ export class CosmosDayMetaRepository implements DayMetaRepository {
     }
   }
 
+  async ensureCalorieTargetSnapshot(
+    userId: string,
+    date: string,
+    dayType: DayType,
+    snapshot: CalorieTargetSnapshot,
+  ): Promise<DayMeta> {
+    const { containers } = await getCosmos();
+    const id = `day:${date}`;
+    const item = containers.nutritionDiaryMeals.item(id, userId);
+    let existing: DayMeta | null;
+    try {
+      const { resource } = await item.read<DayMeta>();
+      existing = resource ?? null;
+    } catch (error: unknown) {
+      if ((error as { code?: number }).code !== 404) throw error;
+      existing = null;
+    }
+
+    if (existing && hasValidCalorieTargetSnapshot(existing.calorieTargetSnapshot)) return existing;
+
+    if (existing == null) {
+      const meta: DayMeta = {
+        id,
+        userId,
+        date,
+        dayType,
+        calorieTargetSnapshot: snapshot,
+        updatedAt: new Date().toISOString(),
+        _docType: 'dayMeta',
+      };
+      try {
+        const { resource } = await containers.nutritionDiaryMeals.items.create<DayMeta>(meta);
+        if (!resource) throw new Error('Cosmos create returned no resource');
+        return resource;
+      } catch (error: unknown) {
+        if ((error as { code?: number }).code !== 409) throw error;
+      }
+    }
+
+    const condition = 'FROM c WHERE NOT IS_DEFINED(c.calorieTargetSnapshot.calories) '
+      + 'OR NOT IS_NUMBER(c.calorieTargetSnapshot.calories) '
+      + 'OR c.calorieTargetSnapshot.calories <= 0';
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await item.patch({
+          operations: [
+            { op: 'set', path: '/calorieTargetSnapshot', value: snapshot },
+            { op: 'set', path: '/updatedAt', value: new Date().toISOString() },
+          ],
+          condition,
+        });
+        const { resource } = await item.read<DayMeta>();
+        if (!resource) throw new Error('Cosmos read returned no resource');
+        return resource;
+      } catch (error: unknown) {
+        const code = (error as { code?: number }).code;
+        if (code !== 412) throw error;
+        const current = await this.get(userId, date);
+        if (current && hasValidCalorieTargetSnapshot(current.calorieTargetSnapshot)) return current;
+        if (attempt === 1) throw error;
+      }
+    }
+
+    throw new Error('Could not ensure calorie target snapshot');
+  }
+
   async upsert(
     userId: string,
     date: string,
@@ -98,4 +164,8 @@ export class CosmosDayMetaRepository implements DayMetaRepository {
     if (!resource) throw new Error('Cosmos upsert returned no resource');
     return resource;
   }
+}
+
+function hasValidCalorieTargetSnapshot(snapshot: CalorieTargetSnapshot | undefined): boolean {
+  return snapshot != null && Number.isFinite(snapshot.calories) && snapshot.calories > 0;
 }

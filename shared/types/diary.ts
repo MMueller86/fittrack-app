@@ -155,6 +155,19 @@ export interface CalorieTargetSnapshot {
   profileUpdatedAt?: string;
 }
 
+export type DiaryCalorieTargetSource =
+  | 'day_target_snapshot'
+  | 'special_activity_snapshot'
+  | 'profile_fallback'
+  | 'unavailable';
+
+export interface DiaryCalorieTarget {
+  baseTargetCalories: number | null;
+  effectiveTargetCalories: number | null;
+  activityBonusCalories: number | null;
+  targetSource: DiaryCalorieTargetSource;
+}
+
 export type SpecialActivityType = 'hiking' | 'running' | 'cycling' | 'other';
 
 export type PackCategory = 'none' | 'small' | 'medium' | 'heavy';
@@ -240,6 +253,8 @@ export interface DayMeta {
 export interface DiaryDayResponse {
   meals: Meal[];
   summary: DaySummary;
+  /** Resolved calorie target and provenance for this day; absent during older client rollouts. */
+  calorieTarget?: DiaryCalorieTarget;
   dayType?: DayType;
   workoutType?: WorkoutType;
   /** Rule-based hint for the day — always present in API response. */

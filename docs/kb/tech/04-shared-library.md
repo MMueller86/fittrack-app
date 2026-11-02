@@ -38,6 +38,7 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `Meal` — container for multiple `MealItem`s on a date, with a `type` and optional `updatedAt` (absent on legacy documents)
 - `DaySummary` — aggregated macro totals for a day
 - `DayMeta` — per-day metadata (`dayType: 'rest' | 'training'`, `workoutType`, `specialActivity?`)
+- `DiaryCalorieTarget` — Diary GET target resolution (`baseTargetCalories`, `effectiveTargetCalories`, `activityBonusCalories`, `targetSource`); `DiaryCalorieTargetSource` is the shared source enum
 - `ReusableItem` — user's personal food library item; includes AI-generated `searchTerms` and `aiKeywords`
 - `FoodSearchResult` — unified search result (library + catalog); includes `source`, `portion`, `isComplete`
 - `AiFoodEstimatePreview` — AI food estimation with `confidence`, `warnings`, `estimatedPortion`

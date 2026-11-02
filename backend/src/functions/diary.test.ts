@@ -16,12 +16,13 @@ import { listFavoritesHandler } from './favorites';
 import { getDiaryRepository, __resetDiaryRepositoryForTests, computeSummary } from '../lib/repositories/diaryRepository';
 import { DiaryBulkMutationError } from '../lib/repositories/diaryRepository';
 import { getDayMetaRepository, __resetDayMetaRepositoryForTests } from '../lib/repositories/dayMetaRepository';
+import { __resetProfileRepositoryForTests, getProfileRepository } from '../lib/repositories/profileRepository';
 import { getHintStateRepository, __resetHintStateRepositoryForTests } from '../lib/repositories/hintStateRepository';
 import { makeContext, makeAuthRequest, makeRequest, setupTestAuth, signTestToken, teardownTestAuth, TEST_USER_ID } from '../test-utils/http';
 import { getUserFoodRelationRepository, __resetUserFoodRelationRepositoryForTests } from '../lib/repositories/userFoodRelationRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { getRecipesRepository, __resetRecipesRepositoryForTests } from '../lib/repositories/recipesRepository';
-import type { Meal, SpecialActivity } from '@fittrack/shared';
+import type { Meal, SpecialActivity, UserProfile } from '@fittrack/shared';
 
 // Unit tests for POST /api/diary/meals/:id/items
 //
@@ -2438,9 +2439,189 @@ describe('GET /api/diary — specialActivity response fields', () => {
     expect(parsedBody).not.toHaveProperty('macroRanges');
   }
 
+  function makeProfile(restCalories = 2000, trainingCalories = 2400): UserProfile {
+    return {
+      id: 'profile',
+      userId: TEST_USER_ID,
+      gender: 'male',
+      age: 35,
+      heightCm: 178,
+      weightKg: 70,
+      targetWeightKg: 68,
+      stepsPerDay: 8000,
+      activityLevel: null,
+      trainingFrequencyPerWeek: 3,
+      trainingDurationMinutes: 60,
+      sports: ['hiking'],
+      goal: 'lose_weight',
+      goalIntensity: 'gentle',
+      targets: {
+        restDay: { calories: restCalories, proteinG: 150, carbsG: 200, fatG: 70, fiberG: 25 },
+        trainingDay: { calories: trainingCalories, proteinG: 160, carbsG: 250, fatG: 75, fiberG: 28 },
+      },
+      calculationMeta: {
+        formulaVersion: 'profile-targets-v1-pal',
+        bmr: 1700,
+        pal: 1.4,
+        maintenanceRestDay: 2380,
+        trainingDayBonus: 300,
+        goalAdjustment: -380,
+      },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+  }
+
   beforeEach(() => {
     __resetDayMetaRepositoryForTests();
+    __resetProfileRepositoryForTests();
     __resetHintStateRepositoryForTests();
+  });
+
+  afterEach(() => {
+    __resetProfileRepositoryForTests();
+  });
+
+  it('creates a current-day snapshot on first read without exposing implicit day metadata', async () => {
+    await getProfileRepository().upsert(makeProfile());
+
+    const res = await getDiaryHandler(await makeGetRequest(GET_DATE), makeContext());
+
+    expect(res.status).toBe(200);
+    expectNoTopLevelProfileTargets(res.jsonBody);
+    expect(res.jsonBody).toMatchObject({
+      dayType: null,
+      calorieTarget: {
+        baseTargetCalories: 2000,
+        effectiveTargetCalories: 2000,
+        activityBonusCalories: 0,
+        targetSource: 'day_target_snapshot',
+      },
+    });
+    expect((await getDayMetaRepository().get(TEST_USER_ID, GET_DATE))?.calorieTargetSnapshot)
+      .toMatchObject({ calories: 2000, source: 'profile' });
+  });
+
+  it('preserves an existing day context and never replaces its snapshot on later reads', async () => {
+    const profileRepository = getProfileRepository();
+    const dayMetaRepository = getDayMetaRepository();
+    await profileRepository.upsert(makeProfile());
+    await dayMetaRepository.upsert(TEST_USER_ID, GET_DATE, 'training', 'gym');
+    const activity: SpecialActivity = {
+      type: 'hiking',
+      movementTimeMinutes: 120,
+      distanceKm: 8,
+      elevationGainM: 400,
+      bodyWeightKg: 70,
+      dailyCalorieTarget: 2100,
+      calculatedAt: '2026-07-21T08:00:00.000Z',
+      estimatedMet: 4.5,
+      activityCalories: 630,
+      alreadyAccountedCalories: 166.67,
+      activityBonus: 300,
+    };
+    await dayMetaRepository.setSpecialActivity(TEST_USER_ID, GET_DATE, activity);
+
+    const first = await getDiaryHandler(await makeGetRequest(GET_DATE), makeContext());
+    const firstMeta = await dayMetaRepository.get(TEST_USER_ID, GET_DATE);
+    await profileRepository.upsert(makeProfile(2200, 2600));
+    const second = await getDiaryHandler(await makeGetRequest(GET_DATE), makeContext());
+    const secondMeta = await dayMetaRepository.get(TEST_USER_ID, GET_DATE);
+
+    expect(first).toMatchObject({
+      status: 200,
+      jsonBody: {
+        dayType: 'training',
+        workoutType: 'gym',
+        specialActivity: activity,
+        calorieTarget: {
+          baseTargetCalories: 2400,
+          effectiveTargetCalories: 2700,
+          activityBonusCalories: 300,
+          targetSource: 'day_target_snapshot',
+        },
+      },
+    });
+    expect(second).toMatchObject({
+      status: 200,
+      jsonBody: {
+        calorieTarget: {
+          baseTargetCalories: 2400,
+          effectiveTargetCalories: 2700,
+          activityBonusCalories: 300,
+          targetSource: 'day_target_snapshot',
+        },
+      },
+    });
+    expect(secondMeta?.calorieTargetSnapshot).toEqual(firstMeta?.calorieTargetSnapshot);
+    expect(secondMeta).toMatchObject({ dayType: 'training', workoutType: 'gym', specialActivity: activity });
+  });
+
+  it('returns a profile fallback for historical reads without persisting it', async () => {
+    await getProfileRepository().upsert(makeProfile());
+
+    const res = await getDiaryHandler(await makeGetRequest('2026-07-20', GET_DATE), makeContext());
+
+    expect(res.status).toBe(200);
+    expectNoTopLevelProfileTargets(res.jsonBody);
+    expect(res.jsonBody).toMatchObject({
+      calorieTarget: {
+        baseTargetCalories: 2000,
+        effectiveTargetCalories: 2000,
+        activityBonusCalories: 0,
+        targetSource: 'profile_fallback',
+      },
+    });
+    expect(await getDayMetaRepository().get(TEST_USER_ID, '2026-07-20')).toBeNull();
+  });
+
+  it('returns the special-activity source or unavailable without inventing a profile target', async () => {
+    const activity: SpecialActivity = {
+      type: 'hiking',
+      movementTimeMinutes: 120,
+      distanceKm: 8,
+      elevationGainM: 400,
+      bodyWeightKg: 70,
+      dailyCalorieTarget: 2100,
+      calculatedAt: '2026-07-20T08:00:00.000Z',
+      estimatedMet: 4.5,
+      activityCalories: 630,
+      alreadyAccountedCalories: 166.67,
+      activityBonus: 300,
+    };
+    await getDayMetaRepository().setSpecialActivity(TEST_USER_ID, '2026-07-20', activity);
+
+    const activityResponse = await getDiaryHandler(
+      await makeGetRequest('2026-07-20', GET_DATE),
+      makeContext(),
+    );
+    const unavailableResponse = await getDiaryHandler(
+      await makeGetRequest('2026-07-19', GET_DATE),
+      makeContext(),
+    );
+
+    expect(activityResponse).toMatchObject({
+      status: 200,
+      jsonBody: {
+        calorieTarget: {
+          baseTargetCalories: 2100,
+          effectiveTargetCalories: 2400,
+          activityBonusCalories: 300,
+          targetSource: 'special_activity_snapshot',
+        },
+      },
+    });
+    expect(unavailableResponse).toMatchObject({
+      status: 200,
+      jsonBody: {
+        calorieTarget: {
+          baseTargetCalories: null,
+          effectiveTargetCalories: null,
+          activityBonusCalories: 0,
+          targetSource: 'unavailable',
+        },
+      },
+    });
   });
 
   it('serializes an ordinary-day response without top-level targets or macroRanges', async () => {
