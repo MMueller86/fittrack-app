@@ -88,6 +88,11 @@ Backend deploy (Bicep apply, `func azure functionapp publish`) and EAS builds ar
 
 ## Azure Functions Release
 
+Standard Alpha path: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-alpha.ps1`
+(all gates below, ZIP upload via `az functionapp deployment source config-zip --build-remote true`,
+function-list and health verification; see `docs/kb/tech/07-infrastructure.md`,
+"Standard release routine"). The manual steps below are the reference for what it does.
+
 The Azure Functions runtime is Linux, while releases are normally prepared on
 Windows. Use the same artifact gates for Dev and Alpha releases:
 

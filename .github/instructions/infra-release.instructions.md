@@ -16,7 +16,7 @@ Environment overview: [`../docs/kb/tech/01-system-overview.md`](../../docs/kb/te
 |---|---|
 | `infra/` — all Bicep files | Running `az deployment group create`; editing all Bicep modules including `cosmos.bicep` |
 | `_deploy_staging/` | Build sync, staging area management |
-| Azure Functions deploy workflow | Clean-build → robocopy sync → `func publish` |
+| Azure Functions deploy workflow | `scripts/release-alpha.ps1`: clean build → robocopy sync → byte-compare → ZIP → `az config-zip --build-remote` |
 | EAS builds | `development` and `preview` profiles (`preview` targets the Alpha in `rg-fittrack-alpha`) |
 | Release verification | Post-deploy health check and function list confirmation |
 | Rollback assessment | Evaluating failure, describing options, escalating to user |
@@ -71,7 +71,7 @@ The backend deploy and the EAS build are two separate approvals. A release reque
 
 | Gate | Covers | Requires |
 |---|---|---|
-| Deploy gate | Phase 1 (Bicep apply) and Phase 2 (`func azure functionapp publish`) | Explicit user request for Alpha deploy, QA `PASS` for the change set, clean `what-if` (no Delete/Recreate), artifact gates passed |
+| Deploy gate | Phase 1 (Bicep apply) and Phase 2 (`scripts/release-alpha.ps1`) | Explicit user request for Alpha deploy, QA `PASS` for the change set, clean `what-if` (no Delete/Recreate), artifact gates passed |
 | EAS gate | Phase 3 (`eas build`) and any EAS submit | Explicit user request for a build; Dev Build Required assessment reported first |
 
 A request for only "Deploy to Alpha" never starts an EAS build. A read-only task (build, lint, `what-if`, version checks) needs neither gate.
@@ -154,6 +154,18 @@ Expected: Flex Consumption (FC1) with runtime `node` / `24`, Maximum Instances 5
 
 ### Phase 2 — Backend Deploy (only if backend code changes exist)
 
+Standard path — one command runs every gate below, uploads, and verifies:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-alpha.ps1
+```
+
+The script stops on any failed gate, aborts a stalled upload after the timeout, compares `_deploy_staging\dist` byte-for-byte with `backend\dist`, derives the expected function names from the compiled output and requires all of them (currently 79, incl. `health`) in the deployed list, then runs the health check. `-SkipDeploy` runs the gates and ZIP check only. `-IncludeAndroidPreview` adds Phase 3 and only on explicit EAS request.
+
+Why ZIP + `az functionapp deployment source config-zip --build-remote true` instead of `func publish`: on 2026-11-03 `func azure functionapp publish` (Core Tools 4.16.0) stalled or failed with `Unable to connect to the Azure Function App` while the Function App itself was healthy; the CLI upload of a ~4 MB ZIP (without `node_modules`, Oryx installs on Linux) succeeded. The root cause of the Core Tools failure is unproven; `_deploy_staging/.funcignore` excludes `node_modules`. Use `func publish` only as a manual fallback, and only after the script path failed for a reason that is not the build.
+
+Manual equivalent of the script (reference only):
+
 ```powershell
 # 1. Clean build — required; incremental cache silently omits changes
 Remove-Item -Recurse -Force "backend\dist" -ErrorAction SilentlyContinue
@@ -182,7 +194,7 @@ cd ..
 ```
 
 If `Test-Path` returns False: **stop**. Deploying stale code is worse than not deploying.  
-If `func publish` fails: **stop**. Report the error.
+If the script or `func publish` fails: **stop**. Report the error; do not repeat the identical attempt more than once.
 
 ### Phase 3 — Mobile Build (does not block Phases 1–2)
 
@@ -265,7 +277,7 @@ try { Invoke-WebRequest "$base/diary/meals" -UseBasicParsing } catch { [int]$_.E
 
 A 404 on either route is ambiguous — it may indicate the route is not registered. Treat 404 as a warning; include it in the report and ask the user to verify.
 
-Instagram/share handlers are registered as `recipes-render-instagram` and `recipes-share-bundle` (not `instagramRecipe`); use these names when verifying `func azure functionapp list-functions`.
+Instagram/share handlers are registered as `recipes-render-instagram` and `recipes-share-bundle` (not `instagramRecipe`, which is only the source file name); use these names when verifying the function list. `scripts/release-alpha.ps1` already does this by deriving all expected names from the compiled output.
 
 ---
 

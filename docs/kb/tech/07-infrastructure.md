@@ -440,7 +440,19 @@ staging lockfile. The standard `--build remote` publish performs this install
 on Linux, so Windows-native `sharp` or `@napi-rs/canvas` modules are never used for the
 Azure package.
 
-### Step-by-Step (run from repo root)
+### Standard release routine
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-alpha.ps1
+```
+
+`scripts/release-alpha.ps1` is the standard Alpha Functions deploy (verified end to end on 2026-11-03: exit 0, 79/79 functions, health 200, protected route 401). It checks Node against `.nvmrc` and the Azure session, runs the clean `build:verify`, mirrors to `_deploy_staging/dist`, compares both trees byte-for-byte, requires the 11 renderer/handler files, builds a ZIP of `dist`, `host.json`, `package.json`, `package-lock.json` (no `node_modules`, Linux-safe entry names, size limit 25 MB), uploads it with `az functionapp deployment source config-zip --build-remote true` under a hard timeout, requires every function registered in the compiled output to be in the deployed list, and runs the health check. `-SkipDeploy` stops before the upload; `-IncludeAndroidPreview` additionally starts the EAS preview build (separate approval).
+
+**Why not `func azure functionapp publish`:** on 2026-11-03 it hung or failed with `Unable to connect to the Azure Function App` / `Error while copying content to a stream` against a healthy Function App (SCM reachable, no proxy, access restrictions open), while the CLI ZIP upload worked. The Core Tools root cause is **[Open]** (suspected: upload of local `node_modules`, ~70 MB; `_deploy_staging/.funcignore` now excludes it). Flex Consumption does not persist deployment logs after the instance is recycled; Application Insights (`appi-fittrack-alpha`, linked via `APPLICATIONINSIGHTS_CONNECTION_STRING`) is already configured and is the place to look for runtime errors.
+
+The handler registered for the Instagram renderer is `recipes-render-instagram`; `instagramRecipe` is only the source file name and never appears in the function list.
+
+### Step-by-Step (manual reference, run from repo root)
 
 ```powershell
 # 1. Clean build and verification — REQUIRED. Incremental build cache silently
@@ -478,7 +490,7 @@ cd ..
 
 ### Rules
 
-[Rule] Always deploy from `_deploy_staging/` with `--build remote --javascript`. Never deploy from `backend/` directly.
+[Rule] Deploy with `scripts/release-alpha.ps1`. If `func publish` is used manually, run it from `_deploy_staging/` with `--build remote --javascript`. Never deploy from `backend/` directly.
 
 [Rule] Never use `--no-build` in the normal Windows-to-Linux workflow. It is
 only valid when the package explicitly contains Linux-compatible production
