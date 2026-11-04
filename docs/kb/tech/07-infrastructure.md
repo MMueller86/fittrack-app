@@ -203,6 +203,23 @@ the migration must never target a real account during tests. No Bicep,
 container, partition-key, or application dual-read/dual-write change is part
 of this migration.
 
+### One-off Alpha AI meal estimate normalization
+
+`scripts/migrate-ai-meal-estimates.mjs` normalizes legacy embedded diary items
+in `nutritionDiaryMeals`. It accepts only the current Alpha Cosmos account via
+the operator environment variable `COSMOS_CONN`; credentials are never logged
+or stored in the repository. Dry-run is the default. Pass `--apply` to update
+items with `sourceType: 'ai-meal-estimate'`, `quantity: 100`, and a portion-based
+unit to `quantity: 1`, `unit: 'portion'`. The macro snapshot and other document
+fields are preserved, and writes use the queried ETag to avoid overwriting
+concurrent diary changes. Items with `quantity: 100` and a non-portion unit are
+counted as deviations and left unchanged; output contains aggregate counts only.
+
+Run only after the WP-0.1 backend has been deployed to Alpha. The script tests
+use mocked Cosmos data and never connect to a real account. Operational command:
+`node scripts/migrate-ai-meal-estimates.mjs` (dry-run), followed by
+`node scripts/migrate-ai-meal-estimates.mjs --apply` after reviewing the counts.
+
 The existing authorized administrative/operational direct-read access may read
 feedback snapshots directly from this container. This feature introduces no
 new application role, permission model, Admin UI, read endpoint, or cleanup

@@ -121,6 +121,13 @@ Run `cd backend && npm run test:functions-smoke` with Node.js 24, Azure Function
 	settings without printing secrets; exit code `2` means `UNVERIFIED` because
 	required credentials are unavailable.
 
+Changes to the meal-estimate prompt/schema run the guarded estimator eval and
+must update `TESTED_PROMPT_VERSION` after reviewing the acceptance criteria.
+The photo assessment has its own version guard. Text-only estimator fixtures
+and mocked routing tests do not establish image-classification accuracy; that
+remains **UNVERIFIED** until independently labeled, rights-cleared photo/text
+fixtures are available. Never use personal user photos as eval fixtures.
+
 ### Weekly Insight Diagnostic Evidence
 
 The Weekly Insight semantic judge must provide a non-empty excerpt present in

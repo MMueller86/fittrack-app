@@ -22,8 +22,8 @@ Located in `backend/src/functions/`. Each file owns one domain.
 | `recipes.ts` | CRUD /recipes, image upload/crop-update/delete/reorder, recipe logging, export-view preparation | Yes | Image upload appends; crop updates metadata only; delete and reorder normalize image order. |
 | `instagramRecipe.ts` | POST /recipes/{id}/instagram-render | Yes | Server-owned recipe data to PNG renderer; no persistence |
 | `instagramRecipe.ts` | POST /recipes/{id}/instagram-render, POST /recipes/{id}/share-bundle | Yes | Legacy direct PNG plus atomic bundle from an optional request draft or stored confirmed view, including stale snapshots; no persistence |
-| `ai.ts` | POST /ai/parse-meal, /ai/estimate-meal | Yes | Quota enforced |
-| `foodEstimate.ts` | POST /ai/food-estimate | Yes | Quota enforced |
+| `ai.ts` | POST /ai/meal-parser/preview, /ai/meal-estimate/preview | Yes | Quota enforced |
+| `foodEstimate.ts` | POST /ai/food-estimate/preview | Yes | Quota enforced |
 | `foodEstimateBatch.ts` | POST /ai/food-estimate/batch | Yes | Quota enforced |
 | `labelScan.ts` | POST /ai/label-scan | Yes | Quota enforced |
 | `foodSearch.ts` | GET /food-search | Yes | Fan-out search |
@@ -629,6 +629,20 @@ if (quotaResponse) return quotaResponse; // 429
 // ... perform AI call ...
 await trackUsage(user, 'food-estimate');
 ```
+
+`POST /api/ai/meal-estimate/preview` enforces its single `meal-estimate` quota
+before any provider call. Photo requests first call `assessMealPhoto()` and
+validate its strict relationship enum, then route the source to `estimateMeal()`;
+text-only requests skip assessment. Matching/complementary routes retain the
+image, while contradictory/uncertain routes omit the image and omit
+`refine.previous` so a prior image-influenced estimate cannot re-enter the
+nutrition request. The final estimate is schema- and plausibility-validated
+before one usage is tracked. Assessment failures fail closed and do not track.
+
+Meal-estimate telemetry may include prompt versions, stage, provider-call
+count, token/duration values, mode, text/note lengths, and validation status. It
+must not include user content, provider payloads, food/component names, the
+photo assessment value or rationale, user ID, or credentials.
 
 `GET /api/ai/weekly-insight` reuses the existing `daily-insight` feature key as
 the shared personal-insight budget. It checks quota before Azure OpenAI and tracks

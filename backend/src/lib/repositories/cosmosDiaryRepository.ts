@@ -131,6 +131,18 @@ export class CosmosDiaryRepository implements DiaryRepository {
       sourceType: input.sourceType ?? 'manual',
       ...(input.sourceId ? { sourceId: input.sourceId } : {}),
       ...(input.isAiEstimate ? { isAiEstimate: true } : {}),
+      ...(input.aiMealEstimateComponents !== undefined
+        ? { aiMealEstimateComponents: input.aiMealEstimateComponents }
+        : {}),
+      ...(input.aiMealEstimateItems !== undefined
+        ? { aiMealEstimateItems: input.aiMealEstimateItems }
+        : {}),
+      ...(input.aiMealEstimateWeightGrams !== undefined
+        ? { aiMealEstimateWeightGrams: input.aiMealEstimateWeightGrams }
+        : {}),
+      ...(input.aiMealEstimateVersion !== undefined
+        ? { aiMealEstimateVersion: input.aiMealEstimateVersion }
+        : {}),
       ...(input.recipeId ? { recipeId: input.recipeId } : {}),
       ...(input.recipePortions != null ? { recipePortions: input.recipePortions } : {}),
       quantity: input.quantity ?? 1,

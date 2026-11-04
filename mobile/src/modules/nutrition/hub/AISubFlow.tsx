@@ -27,6 +27,7 @@ import { ErrorBanner } from '../../../shared/components/ErrorBanner';
 import { Icon } from '../../../shared/components/Icon';
 import { FramedPhotoPicker, type FramedPhotoResult } from '../../../shared/camera/FramedPhotoPicker';
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
+import MealEstimateResult from '../MealEstimateResult';
 import MealEstimateReviewScreen from '../MealEstimateReviewScreen';
 import MealParserReviewScreen from '../MealParserReviewScreen';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
@@ -168,20 +169,17 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
     onSaved('KI-Mahlzeitschätzung');
   };
 
-  // Direktes Speichern ohne Nested-Modal — Hauptpfad
   async function handleDirectSave() {
     if (!mealEstimate || saving) return;
     setSaving(true);
     setSaveError(null);
     try {
-      // Lazy: Mahlzeit finden oder anlegen mit dem vom User gewählten Typ
       const mealId = await resolveOrCreateMealId(context.date, selectedMealType, context.mealId);
       setResolvedMealId(mealId);
       await diaryApi.addItem(mealId, {
         productName: mealEstimate.mealName,
-        inputMode: 'grams',
-        inputAmount: 100,
-        amountGrams: 100,
+        inputMode: 'portion',
+        inputAmount: 1,
         calculatedNutrition: {
           calories: mealEstimate.mealEstimate.calories,
           protein: mealEstimate.mealEstimate.protein,
@@ -189,7 +187,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
           fat: mealEstimate.mealEstimate.fat,
           fiber: mealEstimate.mealEstimate.fiber,
         },
-        unit: 'Portion',
         sourceType: 'ai-meal-estimate',
         isAiEstimate: true,
         aiMealEstimateComponents: mealEstimate.components,
@@ -200,26 +197,27 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onSaved('KI-Mahlzeitschätzung');
-    } catch (e) {
-      setSaveError(formatApiError(e));
+    } catch (saveFailure) {
+      setSaveError(formatApiError(saveFailure));
     } finally {
       setSaving(false);
     }
   }
 
-  // Verfeinern-Pfad: Meal ID resolven und MealEstimateReviewScreen öffnen
   async function handleOpenFullReview() {
     if (!mealEstimate) return;
     try {
       const mealId = await resolveOrCreateMealId(context.date, selectedMealType, context.mealId);
       setResolvedMealId(mealId);
       setShowFullReview(true);
-    } catch (e) {
-      setSaveError(formatApiError(e));
+    } catch (requestError) {
+      setSaveError(formatApiError(requestError));
     }
   }
 
-  const handleRefine = (items: MealParserPreviewItem[]) => {
+  const handleRefine = async (items: MealParserPreviewItem[]) => {
+    const mealId = await resolveOrCreateMealId(context.date, selectedMealType, context.mealId);
+    setResolvedMealId(mealId);
     setMealEstimate(null);
     setShowFullReview(false);
     setParserItems(items);
@@ -288,9 +286,23 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
     );
   }
 
-  // ── Inline Estimate Preview ──────────────────────────────────────────────
-  // Wird angezeigt wenn die KI-Schätzung vorliegt — KEIN nested Modal!
-  if (mealEstimate) {
+  if (mealEstimate && !showFullReview) {
+    return (
+      <MealEstimateResult
+        visible={visible}
+        estimate={mealEstimate}
+        originalText={text.trim()}
+        imageUri={mealPhoto?.uri}
+        imageMimeType={mealPhoto?.mimeType}
+        resolveMealId={() => resolveOrCreateMealId(context.date, selectedMealType, context.mealId)}
+        onClose={() => setMealEstimate(null)}
+        onSaved={handleEstimateSaved}
+        onRefine={handleRefine}
+      />
+    );
+  }
+
+  if (mealEstimate && showFullReview) {
     const m = mealEstimate.mealEstimate;
     const confidenceColor =
       mealEstimate.portionConfidence === 'high'
@@ -477,17 +489,17 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
                 >
                   <View style={styles.mealModalSheet}>
                     <Text style={styles.mealModalTitle}>Mahlzeit auswählen</Text>
-                    {MEAL_OPTIONS.map((opt) => (
+                    {MEAL_OPTIONS.map((option) => (
                       <TouchableOpacity
-                        key={opt.id}
+                        key={option.id}
                         style={styles.mealModalOption}
-                        onPress={() => { setSelectedMealType(opt.id); setMealSelectorOpen(false); }}
+                        onPress={() => { setSelectedMealType(option.id); setMealSelectorOpen(false); }}
                       >
                         <Text style={[
                           styles.mealModalOptionText,
-                          opt.id === selectedMealType && styles.mealModalOptionSelected,
-                        ]}>{opt.label}</Text>
-                        {opt.id === selectedMealType && (
+                          option.id === selectedMealType && styles.mealModalOptionSelected,
+                        ]}>{option.label}</Text>
+                        {option.id === selectedMealType && (
                           <Icon lib="feather" name="check" size={15} color={colors.primary} />
                         )}
                       </TouchableOpacity>
@@ -497,7 +509,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
               </Modal>
             </>
           )}
-          {/* Text input */}
           <TextInput
             style={styles.textInput}
             placeholder="Mahlzeit beschreiben…"
@@ -510,7 +521,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
             blurOnSubmit
           />
 
-          {/* Photo picker */}
           <View style={styles.photoRow}>
             {mealPhoto ? (
               <View style={styles.photoIndicator}>
@@ -552,25 +562,15 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
           </View>
 
           {error ? <ErrorBanner error={error} /> : null}
-
           <TouchableOpacity
-            style={[
-              styles.analyzeBtn,
-              (loading || text.trim().length < 3) && styles.analyzeBtnDisabled,
-            ]}
+            style={[styles.analyzeBtn, (loading || text.trim().length < 3) && styles.analyzeBtnDisabled]}
             onPress={() => void handleAnalyze()}
             disabled={loading || text.trim().length < 3}
           >
-            {loading ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={styles.analyzeBtnText}>Analysieren</Text>
-            )}
+            {loading ? <ActivityIndicator color={colors.background} /> : <Text style={styles.analyzeBtnText}>Analysieren</Text>}
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
-
-      {/* Precision Path */}
       {parserItems && resolvedMealId ? (
         <MealParserReviewScreen
           visible
@@ -581,7 +581,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
           onSaved={handleParserSaved}
         />
       ) : null}
-
       <FramedPhotoPicker
         visible={photoSource != null}
         initialSource={photoSource ?? undefined}

@@ -233,9 +233,52 @@ scoped to the manual action that caused them.
 - `MealParserReviewScreen.tsx` — review AI-parsed meal text before saving
 - `FoodEstimateReviewScreen.tsx` — review/edit AI food estimates
 - `LabelScanReviewScreen.tsx` — review OCR + AI extracted nutrition label
-- `MealEstimateReviewScreen.tsx` — review AI meal image estimate
+- `MealEstimateReviewScreen.tsx` — dedicated review entry point for the AI meal estimate result
 - `ProductEditor.tsx` — edit reusable item details
 - `EditItemSheet.tsx`, `CopyItemSheet.tsx`, `MoveItemSheet.tsx` — item management sheets
+
+AI meal estimates use `MealEstimateResult` in both the initial `AISubFlow`
+result and `MealEstimateReviewScreen`. Its editable kcal hero has `−`/`+`
+controls that drive the global portion scaler in additive 5%-of-AI-baseline
+steps, bounded to 50–150%. It scales kcal, all macros, available total weight,
+and each structured component's grams and calories proportionally. Macro values
+remain directly editable; individual macro steppers change only that macro,
+with a minimum 0.5 g step. Protein and carbohydrates apply 4 kcal/g, fat
+9 kcal/g, and fiber does not change calories. Adjustments stay in review state
+and can be reset.
+
+The result displays structured V2 components with estimated grams and calories
+and the estimated total weight. V1 responses display their component names only,
+do not invent missing amounts, and cannot use AI re-estimation. `Neu schätzen`
+is available only with a complete V2 snapshot; it sends that latest AI snapshot
+(not locally adjusted values), the original description and photo when present,
+plus the selected portion hint and/or factual correction. It is limited to three
+re-estimates per result. On success the new AI result replaces the old one and
+local adjustments reset; errors retain the sheet input. `Einzeln aufschlüsseln`
+remains a separate Precision Path action.
+
+Saving sends the confirmed adjusted macros as one portion
+(`inputMode: 'portion'`, `inputAmount: 1`) without `amountGrams`. Valid V2
+structured component items, scaled total weight, and prompt version are
+included; the backend derives the legacy component-name list from structured
+items. Original AI macros are not separately persisted.
+
+The shared review surface presents the V3 photo assessment/routing as an
+accessible German notice for consistent, complementary, contradictory,
+uncertain, and no-photo states. It uses structured response fields only; legacy
+responses without those fields do not get a guessed exclusion notice. A
+successful text-only estimate remains in the ordinary editable review flow and
+can be explicitly saved. Both save paths persist the existing
+`aiMealEstimatePhotoUsed` value from `photoUsed`, not from photo presence or the
+assessment label. The Diary displays its photo marker only when that saved
+boolean is true. Assessment categories and photo-use routing are transient and
+are not added to diary data.
+
+In the diary, an AI estimate with stored estimated weight shows `1 Portion ·
+ca. X g`; displayed weight scales with the portion quantity. Its subtitle uses
+structured component names, falling back to legacy names when structured items
+are absent. The subtitle contains no estimated grams or calories. See
+`diaryItemUtils.ts` for the presentation helpers.
 
 Meal types use the shared `MEAL_LABELS` and monochrome MaterialCommunityIcons catalog in `modules/nutrition/mealLabels.ts` across the diary, meal filters, and copy/move sheets.
 

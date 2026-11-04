@@ -2,7 +2,9 @@ import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } 
 import { z } from 'zod';
 import {
   parseMeal,
+  assessMealPhoto,
   estimateMeal,
+  type AiMealPhotoAssessment,
   type AiParsedItem,
   analyzeRecipeText,
   RecipeAnalysisContractError,
@@ -19,11 +21,13 @@ import { requireUser } from '../lib/auth';
 import { parseBody, withHandler } from '../lib/http';
 import { parseRecipeBody, RecipeDependencyError, withRecipeHandler } from '../lib/recipeHttp';
 import { enforceQuota, trackUsage } from '../lib/quota';
+import { logEvent } from '../lib/log';
 import { rankByQuery } from '../lib/searchRanking';
 import type {
   FoodSearchResult,
   ReusableItem,
   AiMealEstimatePreview,
+  AiMealEstimateRefine,
   Recipe,
   RecipeIngredient,
   RecipeScalePreviewResponse,
@@ -32,6 +36,10 @@ import type {
 import { scaleRecipeIngredients } from '../../../shared/lib/recipeCalculator';
 import { RECIPE_PORTION_MAX, RECIPE_PORTION_MIN } from '../../../shared/types/recipeScale';
 import { validateRecipeAnalyzeOutput } from '../lib/recipeAnalyzeValidation';
+import {
+  MEAL_ESTIMATE_PROMPT_VERSION,
+  MEAL_PHOTO_ASSESSMENT_PROMPT_VERSION,
+} from '../lib/prompts/mealEstimate';
 export { validateRecipeAnalyzeOutput };
 export type { RecipeAnalyzeValidationResult } from '../lib/recipeAnalyzeValidation';
 
@@ -289,49 +297,87 @@ app.http('ai-meal-parser-preview', {
 const MAX_IMAGE_SIZE = 4 * 1024 * 1024; // 4 MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
 
-/**
- * Validate meal estimate absolute macros (total meal, NOT per 100g).
- * Different bounds than per-100g food validator.
- */
-function validateMealEstimate(macros: {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber: number;
-}): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  const { calories, protein, carbs, fat, fiber } = macros;
+const AiMealEstimateComponentSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  estimatedGrams: z.number().finite().gt(0).max(5000),
+  calories: z.number().finite().min(0).max(3000),
+}).strict();
 
-  for (const [label, val] of [
-    ['calories', calories],
-    ['protein', protein],
-    ['carbs', carbs],
-    ['fat', fat],
-    ['fiber', fiber],
-  ] as [string, number][]) {
-    if (!Number.isFinite(val) || val < 0) {
-      errors.push(`${label} muss eine nicht-negative Zahl sein (erhalten: ${val})`);
+const AiMealEstimateNutritionSchema = z.object({
+  calories: z.number().finite().min(0).max(3000),
+  protein: z.number().finite().min(0),
+  carbs: z.number().finite().min(0),
+  fat: z.number().finite().min(0),
+  fiber: z.number().finite().min(0),
+}).strict();
+
+const AiMealEstimateRefineSchema = z.object({
+  previous: z.object({
+    mealName: z.string().trim().min(1).max(200),
+    estimatedTotalGrams: z.number().finite().min(20).max(5000),
+    mealEstimate: AiMealEstimateNutritionSchema,
+    componentItems: z.array(AiMealEstimateComponentSchema).max(20),
+  }).strict(),
+  hints: z.array(z.enum(['larger', 'smaller'])).max(1).optional(),
+  note: z.string()
+    .transform((note) => note.replace(/[\u0000-\u001f\u007f-\u009f]/g, '').trim())
+    .pipe(z.string().min(3).max(200))
+    .optional(),
+}).strict().superRefine((refine, ctx) => {
+  if ((refine.hints?.length ?? 0) === 0 && refine.note === undefined) {
+    ctx.addIssue({ code: 'custom', path: ['hints'], message: 'A hint or a valid note is required' });
+  }
+});
+
+const MealEstimateRequestSchema = z.object({
+  text: z.string().trim().min(1, 'text ist erforderlich').max(500, 'text darf maximal 500 Zeichen lang sein'),
+  refine: AiMealEstimateRefineSchema.optional(),
+});
+
+const AiMealEstimateOutputSchema = z.object({
+  mealName: z.string(),
+  mealEstimate: AiMealEstimateNutritionSchema,
+  componentItems: z.array(AiMealEstimateComponentSchema).max(20),
+  estimatedTotalGrams: z.number().finite().min(20).max(5000),
+  contextDetected: z.string().nullable(),
+  portionConfidence: z.enum(['high', 'medium', 'low']),
+  assumptions: z.array(z.string()),
+  warnings: z.array(z.string()),
+}).strict();
+
+const MEAL_ESTIMATE_MACRO_WARNING = 'Die geschätzten Kalorien weichen deutlich von der Makro-Konsistenzschätzung ab.';
+const MEAL_ESTIMATE_COMPONENT_WARNING = 'Die Summe der Komponenten-Kalorien weicht deutlich von der Gesamt-Kalorienschätzung ab.';
+const MEAL_PHOTO_MISMATCH_WARNING = 'Beschreibung und Foto scheinen nicht zusammenzupassen. Die Schätzung basiert nur auf deiner Beschreibung. Prüfe bitte, ob du das richtige Foto ausgewählt hast.';
+const MEAL_PHOTO_UNCERTAIN_WARNING = 'Das Foto ließ sich nicht sicher zuordnen und wurde für die Schätzung nicht verwendet. Bitte prüfe, ob es zur Beschreibung passt.';
+
+function getMealEstimatePlausibilityWarnings(estimate: z.infer<typeof AiMealEstimateOutputSchema>): string[] {
+  const { calories, protein, carbs, fat } = estimate.mealEstimate;
+  const macroCalories = 4 * protein + 4 * carbs + 9 * fat;
+  const warnings: string[] = [];
+
+  if (Math.abs(calories - macroCalories) > Math.max(50, calories * 0.15)) {
+    warnings.push(MEAL_ESTIMATE_MACRO_WARNING);
+  }
+
+  if (estimate.componentItems.length > 0) {
+    const componentCalories = estimate.componentItems.reduce((sum, item) => sum + item.calories, 0);
+    if (Math.abs(componentCalories - calories) > calories * 0.2) {
+      warnings.push(MEAL_ESTIMATE_COMPONENT_WARNING);
     }
   }
-  if (Number.isFinite(calories) && calories > 3000) {
-    errors.push(`Mahlzeit mit ${calories} kcal übersteigt das Maximum von 3000 kcal`);
-  }
-  return { valid: errors.length === 0, errors };
+
+  return warnings;
 }
 
 export const mealEstimatePreviewHandler = withHandler(
   'ai.meal-estimate.preview',
-  async (request: HttpRequest, _ctx: InvocationContext): Promise<HttpResponseInit> => {
+  async (request: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     const userContext = await requireUser(request);
-
-    // Quota enforcement — check before expensive AI call
-    const quotaBlock = await enforceQuota(userContext, 'meal-estimate');
-    if (quotaBlock) return quotaBlock;
 
     let text: string;
     let imageBase64: string | undefined;
     let imageMimeType: 'image/jpeg' | 'image/png' | undefined;
+    let refine: AiMealEstimateRefine | undefined;
 
     const contentType = request.headers.get('content-type') ?? '';
 
@@ -343,6 +389,24 @@ export const mealEstimatePreviewHandler = withHandler(
         return { status: 400, jsonBody: { error: 'Pflichtfeld "text" fehlt im Formular' } };
       }
       text = textField.trim();
+
+      const refineField = formData.get('refine');
+      if (refineField !== null) {
+        if (typeof refineField !== 'string') {
+          return { status: 400, jsonBody: { error: 'refine muss ein gültiges JSON-Objekt sein' } };
+        }
+        let refineValue: unknown;
+        try {
+          refineValue = JSON.parse(refineField);
+        } catch {
+          return { status: 400, jsonBody: { error: 'refine muss ein gültiges JSON-Objekt sein' } };
+        }
+        const parsedRefine = AiMealEstimateRefineSchema.safeParse(refineValue);
+        if (!parsedRefine.success) {
+          return { status: 400, jsonBody: { error: parsedRefine.error.issues[0]?.message ?? 'refine ist ungültig' } };
+        }
+        refine = parsedRefine.data;
+      }
 
       const imageField = formData.get('image');
       if (imageField && imageField instanceof Blob) {
@@ -363,14 +427,12 @@ export const mealEstimatePreviewHandler = withHandler(
     } else {
       // JSON: text only
       const body = await request.json() as unknown;
-      const schema = z.object({
-        text: z.string().trim().min(1, 'text ist erforderlich').max(500, 'text darf maximal 500 Zeichen lang sein'),
-      });
-      const parsed = schema.safeParse(body);
+      const parsed = MealEstimateRequestSchema.safeParse(body);
       if (!parsed.success) {
         return { status: 400, jsonBody: { error: parsed.error.issues[0]?.message ?? 'Ungültige Anfrage' } };
       }
       text = parsed.data.text;
+      refine = parsed.data.refine;
     }
 
     if (text.length < 1) {
@@ -380,45 +442,144 @@ export const mealEstimatePreviewHandler = withHandler(
       return { status: 400, jsonBody: { error: 'text darf maximal 500 Zeichen lang sein' } };
     }
 
+    // Validate the request before quota checks; still enforce quota before AI.
+    const quotaBlock = await enforceQuota(userContext, 'meal-estimate');
+    if (quotaBlock) return quotaBlock;
+
     // Call Azure OpenAI
-    let estimate;
-    try {
-      estimate = await estimateMeal({ text, imageBase64, imageMimeType });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      return { status: 502, jsonBody: { error: `KI-Schätzung fehlgeschlagen: ${msg}` } };
+    const startedAt = Date.now();
+    let tokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+    let providerCalls = 0;
+    let assessmentDurationMs = 0;
+    let estimationDurationMs = 0;
+    const recordUsage = (usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number }): void => {
+      tokenUsage = {
+        promptTokens: tokenUsage.promptTokens + (usage.promptTokens ?? 0),
+        completionTokens: tokenUsage.completionTokens + (usage.completionTokens ?? 0),
+        totalTokens: tokenUsage.totalTokens + (usage.totalTokens ?? 0),
+      };
+    };
+    const logResult = (validationResult: string, warningCount?: number, providerStage?: string): void => {
+      logEvent(ctx, validationResult === 'valid' || validationResult === 'valid_with_warnings' ? 'info' : 'warn', 'ai.meal-estimate.result', {
+        promptVersion: MEAL_ESTIMATE_PROMPT_VERSION,
+        assessmentPromptVersion: MEAL_PHOTO_ASSESSMENT_PROMPT_VERSION,
+        mode: refine ? 'refine' : 'initial',
+        hintIds: refine?.hints?.join(',') ?? '',
+        hasPhoto: imageBase64 !== undefined,
+        providerCalls,
+        assessmentDurationMs,
+        estimationDurationMs,
+        textLength: text.length,
+        noteLength: refine?.note?.length ?? 0,
+        promptTokens: tokenUsage.promptTokens,
+        completionTokens: tokenUsage.completionTokens,
+        totalTokens: tokenUsage.totalTokens,
+        durationMs: Date.now() - startedAt,
+        validationResult,
+        warningCount,
+        providerStage,
+      });
+    };
+
+    let photoAssessment: AiMealPhotoAssessment | 'no_photo' = 'no_photo';
+    if (imageBase64 !== undefined && imageMimeType !== undefined) {
+      providerCalls += 1;
+      const assessmentStartedAt = Date.now();
+      try {
+        photoAssessment = await assessMealPhoto({
+          text,
+          imageBase64,
+          imageMimeType,
+          onUsage: recordUsage,
+        });
+      } catch {
+        assessmentDurationMs = Date.now() - assessmentStartedAt;
+        logResult('provider_error', undefined, 'photo_assessment');
+        return { status: 502, jsonBody: { error: 'KI-Schätzung fehlgeschlagen' } };
+      }
+      assessmentDurationMs = Date.now() - assessmentStartedAt;
     }
 
-    // Track usage AFTER successful AI call
-    await trackUsage(userContext, 'meal-estimate');
+    const photoUse = photoAssessment === 'consistent' || photoAssessment === 'complementary'
+      ? 'included'
+      : photoAssessment === 'contradictory'
+        ? 'excluded_mismatch'
+        : photoAssessment === 'uncertain'
+          ? 'excluded_uncertain'
+          : 'no_photo';
+    const includePhotoInEstimate = photoUse === 'included';
+    const excludedPhoto = photoUse === 'excluded_mismatch' || photoUse === 'excluded_uncertain';
 
-    // Server-side plausibility validation
-    const validation = validateMealEstimate(estimate.mealEstimate);
-    if (!validation.valid) {
+    let estimate;
+    providerCalls += 1;
+    const estimationStartedAt = Date.now();
+    try {
+      estimate = await estimateMeal({
+        text,
+        imageBase64: includePhotoInEstimate ? imageBase64 : undefined,
+        imageMimeType: includePhotoInEstimate ? imageMimeType : undefined,
+        refine,
+        suppressPreviousEstimate: excludedPhoto,
+        onUsage: recordUsage,
+      });
+    } catch {
+      estimationDurationMs = Date.now() - estimationStartedAt;
+      logResult('provider_error', undefined, 'nutrition_estimate');
+      return { status: 502, jsonBody: { error: 'KI-Schätzung fehlgeschlagen' } };
+    }
+    estimationDurationMs = Date.now() - estimationStartedAt;
+
+    const validation = AiMealEstimateOutputSchema.safeParse(estimate);
+    if (!validation.success) {
+      logResult('schema_invalid');
       return {
         status: 422,
         jsonBody: {
           error: 'KI-Schätzung hat Plausibilitätsprüfung nicht bestanden',
-          details: validation.errors,
+          details: validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
         },
       };
     }
 
+    const validEstimate = validation.data;
+    const maxPlausibleCalories = validEstimate.estimatedTotalGrams * 9 * 1.05;
+    if (validEstimate.mealEstimate.calories > maxPlausibleCalories) {
+      logResult('energy_density_invalid');
+      return {
+        status: 422,
+        jsonBody: {
+          error: 'KI-Schätzung hat Plausibilitätsprüfung nicht bestanden',
+          details: ['mealEstimate.calories: exceeds weight-based energy limit'],
+        },
+      };
+    }
+
+    const warnings = [...validEstimate.warnings];
+    if (photoUse === 'excluded_mismatch') warnings.push(MEAL_PHOTO_MISMATCH_WARNING);
+    if (photoUse === 'excluded_uncertain') warnings.push(MEAL_PHOTO_UNCERTAIN_WARNING);
+    for (const warning of getMealEstimatePlausibilityWarnings(validEstimate)) {
+      if (!warnings.includes(warning)) warnings.push(warning);
+    }
+
+    // Track usage only after server-side validation succeeds.
+    await trackUsage(userContext, 'meal-estimate');
+    logResult(warnings.length > 0 ? 'valid_with_warnings' : 'valid', warnings.length);
+
     const preview: AiMealEstimatePreview = {
-      mealName: estimate.mealName,
-      mealEstimate: {
-        calories: estimate.mealEstimate.calories,
-        protein: estimate.mealEstimate.protein,
-        carbs: estimate.mealEstimate.carbs,
-        fat: estimate.mealEstimate.fat,
-        fiber: estimate.mealEstimate.fiber,
-      },
-      components: estimate.components,
-      contextDetected: estimate.contextDetected,
-      portionConfidence: estimate.portionConfidence,
-      photoUsed: imageBase64 != null,
-      assumptions: estimate.assumptions,
-      warnings: estimate.warnings,
+      mealName: validEstimate.mealName,
+      mealEstimate: validEstimate.mealEstimate,
+      components: validEstimate.componentItems.map((item) => item.name),
+      componentItems: validEstimate.componentItems,
+      estimatedTotalGrams: validEstimate.estimatedTotalGrams,
+      promptVersion: MEAL_ESTIMATE_PROMPT_VERSION,
+      contextDetected: validEstimate.contextDetected,
+      portionConfidence: validEstimate.portionConfidence,
+      photoProvided: imageBase64 !== undefined,
+      photoAssessment,
+      photoUse,
+      photoUsed: includePhotoInEstimate,
+      assumptions: validEstimate.assumptions,
+      warnings,
     };
 
     return { status: 200, jsonBody: preview };

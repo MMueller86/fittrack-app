@@ -6,6 +6,7 @@ import type {
   AiFoodEstimatePreview,
   NutritionLabelScanResult,
   AiMealEstimatePreview,
+  AiMealEstimateRefine,
   InsightResponse,
   RecipeScalePreviewRequest,
   RecipeScalePreviewResponse,
@@ -167,10 +168,12 @@ export const aiApi = {
     text: string,
     imageUri?: string,
     imageMimeType?: 'image/jpeg' | 'image/png',
+    refine?: AiMealEstimateRefine,
   ): Promise<AiMealEstimatePreview> {
     if (imageUri && imageMimeType) {
       const formData = new FormData();
       formData.append('text', text);
+      if (refine) formData.append('refine', JSON.stringify(refine));
       formData.append('image', {
         uri: imageUri,
         type: imageMimeType,
@@ -184,7 +187,10 @@ export const aiApi = {
         .then((r) => r.data);
     }
     return apiClient
-      .post<AiMealEstimatePreview>('/ai/meal-estimate/preview', { text }, { timeout: 60_000 })
+      .post<AiMealEstimatePreview>('/ai/meal-estimate/preview', {
+        text,
+        ...(refine ? { refine } : {}),
+      }, { timeout: 60_000 })
       .then((r) => r.data);
   },
 

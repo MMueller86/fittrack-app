@@ -1303,7 +1303,7 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
     );
     expect(res.status).toBe(400);
     expect(res.jsonBody).toEqual({
-      error: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided',
+      error: 'Either flat macros, quantityMode+quantity, productName+amountGrams+calculatedNutrition, or an ai-meal-estimate portion+calculatedNutrition must be provided',
     });
     expect(res.jsonBody).not.toHaveProperty('code');
   });
@@ -1339,7 +1339,6 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
           productName: 'KI-Mahlzeit',
           inputMode: 'portion',
           inputAmount: 1,
-          amountGrams: 100,
           calculatedNutrition: { calories: 520, protein: 24, carbs: 48, fat: 22, fiber: 6 },
           sourceType: 'ai-meal-estimate',
         },
@@ -1349,9 +1348,84 @@ describe('POST /api/diary/meals/:id/items â€” product input', () => {
 
     expect(res.status).toBe(201);
     const body = res.jsonBody as {
-      meal: { items: { quantity: number; unit: string; sourceType: string }[] };
+      meal: { items: { quantity: number; unit: string; sourceType: string; macros: object }[] };
     };
-    expect(body.meal.items[0]).toMatchObject({ quantity: 1, unit: 'portion', sourceType: 'ai-meal-estimate' });
+    expect(body.meal.items[0]).toMatchObject({
+      quantity: 1,
+      unit: 'portion',
+      sourceType: 'ai-meal-estimate',
+      macros: { calories: 520, protein: 24, carbs: 48, fat: 22, fiber: 6 },
+    });
+  });
+
+  it('stores structured estimate metadata and projects component names to the legacy field', async () => {
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productName: 'KI-Mahlzeit',
+          inputMode: 'portion',
+          inputAmount: 1,
+          calculatedNutrition: { calories: 610, protein: 32, carbs: 54, fat: 28, fiber: 7 },
+          sourceType: 'ai-meal-estimate',
+          aiMealEstimateItems: [
+            { name: ' Haferflocken ', estimatedGrams: 80, calories: 300 },
+            { name: 'Milch', estimatedGrams: 220, calories: 140 },
+          ],
+          aiMealEstimateComponents: ['untrusted legacy value'],
+          aiMealEstimateWeightGrams: 300,
+          aiMealEstimateVersion: 'v2',
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    const item = (res.jsonBody as { meal: { items: Array<Record<string, unknown>> } }).meal.items[0]!;
+    expect(item).toMatchObject({
+      quantity: 1,
+      unit: 'portion',
+      sourceType: 'ai-meal-estimate',
+      macros: { calories: 610, protein: 32, carbs: 54, fat: 28, fiber: 7 },
+      aiMealEstimateItems: [
+        { name: 'Haferflocken', estimatedGrams: 80, calories: 300 },
+        { name: 'Milch', estimatedGrams: 220, calories: 140 },
+      ],
+      aiMealEstimateComponents: ['Haferflocken', 'Milch'],
+      aiMealEstimateWeightGrams: 300,
+      aiMealEstimateVersion: 'v2',
+    });
+  });
+
+  it('normalizes the legacy AI meal estimate payload to one portion', async () => {
+    const mealId = await createMeal();
+    const res = await addItemHandler(
+      await makeAuthRequest({
+        params: { id: mealId },
+        body: {
+          productName: 'KI-Mahlzeit',
+          inputMode: 'grams',
+          inputAmount: 100,
+          amountGrams: 100,
+          unit: 'Portion',
+          calculatedNutrition: { calories: 520, protein: 24, carbs: 48, fat: 22, fiber: 6 },
+          sourceType: 'ai-meal-estimate',
+        },
+      }),
+      makeContext(),
+    );
+
+    expect(res.status).toBe(201);
+    const body = res.jsonBody as {
+      meal: { items: { quantity: number; unit: string; sourceType: string; macros: object }[] };
+    };
+    expect(body.meal.items[0]).toMatchObject({
+      quantity: 1,
+      unit: 'portion',
+      sourceType: 'ai-meal-estimate',
+      macros: { calories: 520, protein: 24, carbs: 48, fat: 22, fiber: 6 },
+    });
   });
 
   it('stores amountGrams as quantity when inputMode is grams', async () => {
@@ -1469,6 +1543,13 @@ describe('POST /api/diary/meals/:id/items request schema characterization', () =
     productName: 'Birne', amountGrams: 120,
     calculatedNutrition: { calories: 57, protein: 0.4, carbs: 15, fat: 0.1 },
   };
+  const aiMealEstimate = {
+    productName: 'KI-Mahlzeit',
+    inputMode: 'portion',
+    inputAmount: 1,
+    calculatedNutrition: { calories: 520, protein: 24, carbs: 48, fat: 22, fiber: 6 },
+    sourceType: 'ai-meal-estimate',
+  };
 
   async function submit(body: Record<string, unknown>) {
     const mealId = await createMeal();
@@ -1531,6 +1612,70 @@ describe('POST /api/diary/meals/:id/items request schema characterization', () =
     expect(productMaximum.status).toBe(201);
   });
 
+  it('accepts the inclusive structured estimate boundaries', async () => {
+    const minimums = await submit({
+      ...aiMealEstimate,
+      aiMealEstimateItems: [{ name: 'A', estimatedGrams: 0.01, calories: 0 }],
+      aiMealEstimateWeightGrams: 20,
+      aiMealEstimateVersion: 'v',
+    });
+    const maximums = await submit({
+      ...aiMealEstimate,
+      aiMealEstimateItems: Array.from({ length: 20 }, () => ({
+        name: 'N'.repeat(100),
+        estimatedGrams: 5000,
+        calories: 3000,
+      })),
+      aiMealEstimateWeightGrams: 5000,
+      aiMealEstimateVersion: 'V'.repeat(100),
+    });
+
+    expect(minimums.status).toBe(201);
+    expect(maximums.status).toBe(201);
+  });
+
+  it.each([
+    ['an arbitrary unknown field', { unknownField: true }, 'unknownField'],
+    ['aiMealEstimateBaseCalories', { aiMealEstimateBaseCalories: 520 }, 'aiMealEstimateBaseCalories'],
+  ])('rejects %s on an AI meal estimate request', async (_label, extraField, field) => {
+    const response = await submit({ ...aiMealEstimate, ...extraField });
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(field) });
+  });
+
+  it.each([
+    ['too many components', { aiMealEstimateItems: Array.from({ length: 21 }, () => ({ name: 'Rice', estimatedGrams: 100, calories: 120 })) }, 'aiMealEstimateItems'],
+    ['blank component name', { aiMealEstimateItems: [{ name: '  ', estimatedGrams: 100, calories: 120 }] }, 'aiMealEstimateItems'],
+    ['component name above maximum', { aiMealEstimateItems: [{ name: 'N'.repeat(101), estimatedGrams: 100, calories: 120 }] }, 'aiMealEstimateItems'],
+    ['non-finite component weight', { aiMealEstimateItems: [{ name: 'Rice', estimatedGrams: Infinity, calories: 120 }] }, 'aiMealEstimateItems'],
+    ['component weight is zero', { aiMealEstimateItems: [{ name: 'Rice', estimatedGrams: 0, calories: 120 }] }, 'aiMealEstimateItems'],
+    ['component weight above maximum', { aiMealEstimateItems: [{ name: 'Rice', estimatedGrams: 5000.1, calories: 120 }] }, 'aiMealEstimateItems'],
+    ['component calories above maximum', { aiMealEstimateItems: [{ name: 'Rice', estimatedGrams: 100, calories: 3000.1 }] }, 'aiMealEstimateItems'],
+    ['weight below minimum', { aiMealEstimateWeightGrams: 19.9 }, 'aiMealEstimateWeightGrams'],
+    ['weight above maximum', { aiMealEstimateWeightGrams: 5000.1 }, 'aiMealEstimateWeightGrams'],
+    ['null weight', { aiMealEstimateWeightGrams: null }, 'aiMealEstimateWeightGrams'],
+    ['empty version', { aiMealEstimateVersion: '' }, 'aiMealEstimateVersion'],
+    ['version above maximum', { aiMealEstimateVersion: 'V'.repeat(101) }, 'aiMealEstimateVersion'],
+    ['null version', { aiMealEstimateVersion: null }, 'aiMealEstimateVersion'],
+  ])('rejects invalid structured estimate data: %s', async (_label, fields, field) => {
+    const response = await submit({ ...aiMealEstimate, ...fields });
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining(`Field "${field}"`) });
+  });
+
+  it.each([
+    ['items', { aiMealEstimateItems: [] }],
+    ['weight', { aiMealEstimateWeightGrams: 20 }],
+    ['version', { aiMealEstimateVersion: 'v2' }],
+  ])('rejects the new %s field for non-estimate sources', async (_label, field) => {
+    const response = await submit({ ...flatMacros, sourceType: 'manual', ...field });
+
+    expect(response.status).toBe(400);
+    expect(response.jsonBody).toMatchObject({ error: expect.stringContaining('only valid for sourceType') });
+  });
+
   it.each([
     ['missing recipe productId', { sourceType: 'recipe', inputMode: 'portion', inputAmount: 1 }],
     ['missing recipe inputMode', { sourceType: 'recipe', productId: 'recipe-id', inputAmount: 1 }],
@@ -1540,7 +1685,7 @@ describe('POST /api/diary/meals/:id/items request schema characterization', () =
 
     expect(response.status).toBe(400);
     expect(response.jsonBody).toEqual({
-      error: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided',
+      error: 'Either flat macros, quantityMode+quantity, productName+amountGrams+calculatedNutrition, or an ai-meal-estimate portion+calculatedNutrition must be provided',
     });
     expect(response.jsonBody).not.toHaveProperty('code');
   });
@@ -1679,7 +1824,7 @@ describe('POST /api/diary/meals/:id/items â€” flat macros input', () => {
     );
     expect(res.status).toBe(400);
     expect(res.jsonBody).toEqual({
-      error: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided',
+      error: 'Either flat macros, quantityMode+quantity, productName+amountGrams+calculatedNutrition, or an ai-meal-estimate portion+calculatedNutrition must be provided',
     });
     expect(res.jsonBody).not.toHaveProperty('code');
   });

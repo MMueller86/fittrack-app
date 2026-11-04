@@ -76,6 +76,16 @@ See [tech/05-authentication.md](../tech/05-authentication.md) for how `isAdmin` 
 
 [Rule] `enforceQuota()` does NOT increment usage. `trackUsage()` must be called separately after a successful AI response. This ensures failed AI calls are not counted.
 
+For `meal-estimate`, the handler enforces quota before the first Azure OpenAI
+call. A photo request may make a relationship-assessment call followed by a
+nutrition-estimation call, but the complete endpoint request still consumes
+exactly one existing `meal-estimate` use after the final estimate passes schema
+and hard plausibility validation. Assessment, provider, schema, and hard
+plausibility failures do not consume quota. HTTP 422 responses are not counted;
+warning-only Atwater/component deviations remain successful HTTP 200 responses
+and are counted. Initial and refine requests share the same quota, with one use
+tracked per valid result.
+
 The weekly insight endpoint reuses `daily-insight` as the shared personal-insight
 budget. It calls `enforceQuota()` before Azure OpenAI and calls `trackUsage()` only
 after the response passes server-side Structured Output validation. Quota exhaustion

@@ -56,7 +56,7 @@ The table was retrieved from Microsoft pages on 2026-10-29. It was **not re-veri
 
 ## AI Features
 
-### 1. Meal Parser (`POST /api/ai/parse-meal`)
+### 1. Meal Parser (`POST /api/ai/meal-parser/preview`)
 
 User describes a full meal in natural language (e.g., "200g chicken with rice and salad"). AI extracts individual items with amounts and modes. Backend searches the food catalog for each item and classifies match status.
 
@@ -70,7 +70,7 @@ User describes a full meal in natural language (e.g., "200g chicken with rice an
 
 Mobile shows `MealParserReviewScreen` — user reviews matches, resolves unmatched, confirms.
 
-### 2. Food Estimator (`POST /api/ai/food-estimate`)
+### 2. Food Estimator (`POST /api/ai/food-estimate/preview`)
 
 User describes a single food item. AI estimates nutrition per 100g and suggests a portion.
 
@@ -94,13 +94,100 @@ User photographs a nutrition label. Backend:
 
 Mobile shows `LabelScanReviewScreen` — user reviews and edits before saving.
 
-### 5. Meal Estimate (Image-based)
+### 5. Meal Estimate (V3)
 
-User photographs a prepared meal. AI estimates nutrition from the image.
+**Endpoint:** `POST /api/ai/meal-estimate/preview`; quota key `meal-estimate`.
 
-**Returns:** `AiMealEstimatePreview`
+The model estimates the described meal as one complete portion (not per 100 g),
+including total nutrition and total weight, and separately returns 0–20 named
+components with estimated weight and calories. Component weights are not summed
+to derive total meal weight or nutrition. Prompt versions are server-owned:
+`MEAL_ESTIMATE_PROMPT_VERSION = 'meal-estimate-v4'` and
+`MEAL_PHOTO_ASSESSMENT_PROMPT_VERSION = 'meal-photo-assessment-v1'`.
 
-Mobile shows `MealEstimateReviewScreen`.
+A photo request first calls a separate classifier with the user's text and
+JPEG/PNG image. Its sole strict Structured Output is:
+
+```ts
+{ assessment: 'consistent' | 'complementary' | 'contradictory' | 'uncertain' }
+```
+
+The object is strict (`additionalProperties: false`); the backend validates
+the enum before routing. The classifier returns no nutrition values, food list,
+explanation, or user-facing prose. `contradictory` means clear incompatibility
+between the described primary meal identity and the dominant visible meal
+identity. Portion/side/garnish differences and additional visible ingredients
+alone are not contradictions. Unclear matches are `uncertain`.
+
+| Assessment | Nutrition-estimation input |
+|---|---|
+| `consistent` | Original text + photo |
+| `complementary` | Original text + photo; additional visibly supported ingredients may be included |
+| `contradictory` | Original text only; no image or image-influenced previous estimate |
+| `uncertain` | Original text only; no image or image-influenced previous estimate |
+| No photo | Original text only; skip assessment |
+
+On excluded-photo refinements, the estimate request keeps the original text
+and sanitized user hints/notes but omits `refine.previous`. Assessment failure
+or invalid output fails closed with `502`, returns no estimate, and does not
+track usage. A valid `uncertain` result proceeds with the text-only fallback.
+
+The request accepts trimmed text of 1–500 characters. JSON uses `{ text,
+refine? }`; multipart uses `text`, optional JPEG/PNG `image` up to 4 MB, and
+optional `refine` serialized as a JSON string. Refinement may resubmit a photo.
+`refine` is strict and has exactly `{ previous, hints?, note? }`. `previous` is
+required and complete: trimmed `mealName` (1–200 characters),
+`estimatedTotalGrams` (20–5000 g), `mealEstimate` with all five required
+nutrition values (`calories` 0–3000; other values finite and non-negative),
+and 0–20 structured `componentItems`. Component names are trimmed to 1–100
+characters, grams are finite and greater than 0 through 5000, and calories are
+finite from 0 through 3000. `hints` may be absent, empty, or contain exactly
+one `larger`/`smaller` value. An optional `note` has C0/C1 control characters
+removed, is trimmed, and must be 3–200 characters. At least one hint or valid
+note is required. Nulls, unknown fields, incomplete snapshots, and invalid
+refine requests return `400` before quota enforcement or the AI call. Multipart
+requests serialize `refine` as JSON. The previous structured estimate and
+sanitized note are included in the Azure OpenAI request; no user ID or token is
+included.
+
+The V3 estimate Strict Structured Output returns `mealName`, exactly five meal nutrition
+values, 0–20 structured `componentItems`, `estimatedTotalGrams`,
+`contextDetected`, `portionConfidence`, `assumptions`, and `warnings`. The
+provider schema does not contain legacy `components`; the handler derives it as
+the ordered `componentItems[].name` projection. The response includes
+`photoProvided`, `photoAssessment`, `photoUse`, `photoUsed`, and
+`promptVersion: 'meal-estimate-v4'`. `photoUsed` is true only when the image
+reached nutrition estimation. Excluded cases append fixed localized warnings;
+the model does not write those notices. Prompt examples do not anchor calories
+or infer hidden fat/oil/sauce. The assessment and estimation image parts use
+`detail: 'high'`; the estimate request budget is 1200 tokens.
+
+The handler validates finite non-negative nutrition values and the documented
+name, component-count, component-weight, component-calorie, and total-weight
+bounds. Calories above `9 × estimatedTotalGrams × 1.05` return 422. An absolute
+Atwater difference greater than `max(50 kcal, 15% of estimated kcal)` or a
+component-calorie sum differing from total kcal by more than 20% adds a stable
+warning without rejecting the estimate. Component grams are not summed to
+derive meal weight. Schema or hard plausibility failures return 422 and are not
+tracked; successful initial and refine responses are each tracked once. Quota
+is enforced before the first provider call, and a photo's two internal calls
+still consume exactly one `meal-estimate` use after final validation.
+
+Telemetry records prompt versions, `initial|refine`, allowlisted hint IDs,
+photo presence, bounded provider-call/token/stage-duration metadata, text/note
+lengths, validation result, and warning count. It does not record meal text,
+note, image/base64, provider payload/raw response, component names, assessment
+value/rationale, user ID, or auth tokens. The assessment and image are
+request-only and not persisted. Preview nutrition remains transient until the
+user reviews and confirms a Diary add. `MealEstimateReviewScreen` remains the
+review surface.
+
+The existing estimator eval fixtures are text-only and contain no
+independently labeled, rights-cleared photo/text pairs. Their results do not
+verify semantic photo classification or complementary-ingredient recognition;
+those capabilities remain **UNVERIFIED** until suitable independent fixtures
+are available. Independent DV-1 reference-range calibration also remains
+unverified.
 
 ### 6. Recipe Analyzer (`POST /api/ai/recipe-analyze`)
 

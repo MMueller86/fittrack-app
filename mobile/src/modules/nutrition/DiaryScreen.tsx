@@ -45,7 +45,7 @@ import Animated, {
 import { runOnJS } from 'react-native-reanimated';
 import { SwipeableRow } from '../../shared/components/SwipeableRow';
 import { DiaryItemRow } from '../../shared/components/DiaryItemRow';
-import { formatDiaryItemAmount } from './diaryItemUtils';
+import { formatDiaryItemAmount, formatDiaryItemComponents, getDiaryItemAiBadgeLabel } from './diaryItemUtils';
 import { useDayTypeStore } from './useDayTypeStore';
 import EditItemSheet from './EditItemSheet';
 import MoveItemSheet from './MoveItemSheet';
@@ -284,11 +284,10 @@ function MealCard({
           <DiaryItemRow
             name={item.name}
             amountLabel={formatDiaryItemAmount(item)}
+            secondaryLabel={formatDiaryItemComponents(item)}
             kcal={item.macros.calories}
             protein={item.macros.protein}
-            aiBadgeLabel={item.sourceType === 'ai-meal-estimate'
-              ? (item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '✨ KI-Schätzung')
-              : undefined}
+            aiBadgeLabel={getDiaryItemAiBadgeLabel(item)}
             onPress={selectionMode ? undefined : () => onEditItem(meal.id, item)}
             onLongPress={selectionMode ? undefined : () => onStartItemSelection(meal.id, item.id)}
             selectionMode={selectionMode}

@@ -383,6 +383,12 @@ describe('InMemoryDiaryRepository (via factory)', () => {
     });
     const original = (await repo.getMealById('u', source.id))!.items[0]!;
     original.aiMealEstimateComponents = ['Oats', 'Milk'];
+    original.aiMealEstimateItems = [
+      { name: 'Oats', estimatedGrams: 80, calories: 300 },
+      { name: 'Milk', estimatedGrams: 220, calories: 140 },
+    ];
+    original.aiMealEstimateWeightGrams = 300;
+    original.aiMealEstimateVersion = 'v2';
     original.aiMealEstimateContext = 'Breakfast';
     original.aiMealEstimateConfidence = 'high';
     original.aiMealEstimateAssumptions = ['Unsweetened'];
@@ -409,6 +415,12 @@ describe('InMemoryDiaryRepository (via factory)', () => {
       isAiEstimate: true,
       macros: { calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4 },
       aiMealEstimateComponents: ['Oats', 'Milk'],
+      aiMealEstimateItems: [
+        { name: 'Oats', estimatedGrams: 80, calories: 300 },
+        { name: 'Milk', estimatedGrams: 220, calories: 140 },
+      ],
+      aiMealEstimateWeightGrams: 300,
+      aiMealEstimateVersion: 'v2',
       aiMealEstimateContext: 'Breakfast',
       aiMealEstimateConfidence: 'high',
       aiMealEstimateAssumptions: ['Unsweetened'],
@@ -476,6 +488,12 @@ describe('InMemoryDiaryRepository (via factory)', () => {
       sourceType: 'ai-meal-estimate',
       isAiEstimate: true,
       aiMealEstimateComponents: ['Oats', 'Milk'],
+      aiMealEstimateItems: [
+        { name: 'Oats', estimatedGrams: 80, calories: 300 },
+        { name: 'Milk', estimatedGrams: 220, calories: 140 },
+      ],
+      aiMealEstimateWeightGrams: 300,
+      aiMealEstimateVersion: 'v2',
       aiMealEstimateContext: 'Breakfast',
       aiMealEstimateConfidence: 'high',
       aiMealEstimateAssumptions: ['Unsweetened'],

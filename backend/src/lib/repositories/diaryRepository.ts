@@ -17,6 +17,7 @@ import type {
   DiaryBulkMoveRequest,
   DiaryBulkMoveResponse,
   DiaryItemReference,
+  AiMealEstimateComponent,
   Meal,
   MealItem,
   MealItemMacros,
@@ -121,6 +122,10 @@ export interface AddItemInput {
   unit?: string;
   isAiEstimate?: boolean;
   sourceType?: import('@fittrack/shared').MealItemSourceType;
+  aiMealEstimateComponents?: string[];
+  aiMealEstimateItems?: AiMealEstimateComponent[];
+  aiMealEstimateWeightGrams?: number;
+  aiMealEstimateVersion?: string;
   /** ID of the source recipe when sourceType === 'recipe' */
   recipeId?: string;
   /** Number of portions logged */
@@ -287,6 +292,18 @@ class InMemoryDiaryRepository implements DiaryRepository {
         sourceType: input.sourceType ?? 'manual',
         ...(input.sourceId ? { sourceId: input.sourceId } : {}),
         ...(input.isAiEstimate ? { isAiEstimate: true } : {}),
+        ...(input.aiMealEstimateComponents !== undefined
+          ? { aiMealEstimateComponents: input.aiMealEstimateComponents }
+          : {}),
+        ...(input.aiMealEstimateItems !== undefined
+          ? { aiMealEstimateItems: input.aiMealEstimateItems }
+          : {}),
+        ...(input.aiMealEstimateWeightGrams !== undefined
+          ? { aiMealEstimateWeightGrams: input.aiMealEstimateWeightGrams }
+          : {}),
+        ...(input.aiMealEstimateVersion !== undefined
+          ? { aiMealEstimateVersion: input.aiMealEstimateVersion }
+          : {}),
         ...(input.recipeId ? { recipeId: input.recipeId } : {}),
         ...(input.recipePortions != null ? { recipePortions: input.recipePortions } : {}),
         quantity: input.quantity ?? 1,

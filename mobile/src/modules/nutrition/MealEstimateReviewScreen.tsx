@@ -23,6 +23,7 @@ import {
 } from 'react-native';
 import type { AiMealEstimatePreview } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
+import MealEstimateResult from './MealEstimateResult';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { formatApiError } from '../../shared/api/apiError';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
@@ -39,6 +40,7 @@ interface Props {
   originalText: string;
   estimate: AiMealEstimatePreview;
   imageUri?: string;
+  imageMimeType?: 'image/jpeg' | 'image/png';
   onClose: () => void;
   onSaved: () => void;
   /** Called when user wants the Precision Path — receives parsed items from previewMeal. */
@@ -163,7 +165,11 @@ function MacroWarning({ calories, protein, carbs, fat }: MacroWarningProps) {
 // Main
 // ---------------------------------------------------------------------------
 
-export default function MealEstimateReviewScreen({
+export default function MealEstimateReviewScreen(props: Props) {
+  return <MealEstimateResult {...props} resolveMealId={() => Promise.resolve(props.mealId)} />;
+}
+
+export function LegacyMealEstimateReviewScreen({
   visible,
   mealId,
   originalText,
@@ -206,7 +212,6 @@ export default function MealEstimateReviewScreen({
         productName: estimate.mealName,
         inputMode: 'portion',
         inputAmount: 1,
-        amountGrams: 100,
         calculatedNutrition: {
           calories: pCalories,
           protein: pProtein,

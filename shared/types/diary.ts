@@ -3,6 +3,7 @@
 import type { FoodCategory } from './foodCategory';
 import type { HintResult } from './hint';
 import type { RecipeAccess } from './recipes';
+import type { AiMealEstimateComponent } from './aiMealEstimate';
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'preworkout' | 'postworkout';
 export type MealItemSourceType = 'manual' | 'reusableItem' | 'openFoodFacts' | 'ai' | 'ai-meal-estimate' | 'recipe';
@@ -49,6 +50,12 @@ export interface MealItem {
   isAiEstimate?: boolean;
   /** Detected sub-components of an ai-meal-estimate entry (e.g. ["Schnitzel", "Pommes", "Mayo"]) */
   aiMealEstimateComponents?: string[];
+  /** Structured component snapshot for an ai-meal-estimate entry. */
+  aiMealEstimateItems?: AiMealEstimateComponent[];
+  /** Estimated total meal weight in grams for an ai-meal-estimate entry. */
+  aiMealEstimateWeightGrams?: number;
+  /** Prompt version used for an ai-meal-estimate entry. */
+  aiMealEstimateVersion?: string;
   /** Detected eating context (e.g. "Imbiss", "Kantine") — influences portion assumptions */
   aiMealEstimateContext?: string;
   /** AI confidence level for the overall meal estimate */

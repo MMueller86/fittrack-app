@@ -13,7 +13,10 @@ import { blockingImportViolations, importCorrectionFeedback, importViolations, s
 import { z } from 'zod';
 import { MEAL_PARSER_SYSTEM_PROMPT } from './prompts/mealParser';
 import { FOOD_ESTIMATE_SYSTEM_PROMPT } from './prompts/foodEstimate';
-import { MEAL_ESTIMATE_SYSTEM_PROMPT } from './prompts/mealEstimate';
+import {
+  MEAL_ESTIMATE_SYSTEM_PROMPT,
+  MEAL_PHOTO_ASSESSMENT_SYSTEM_PROMPT,
+} from './prompts/mealEstimate';
 import { RECIPE_ANALYZE_SYSTEM_PROMPT, RECIPE_PREPARATION_SYSTEM_PROMPT, RECIPE_PREPARATION_CORRECTION_SYSTEM_PROMPT, RECIPE_TEXT_CORRECTION_SYSTEM_PROMPT } from './prompts/recipeAnalyze';
 import { RECIPE_SCALE_SYSTEM_PROMPT } from './prompts/recipeScale';
 import {
@@ -30,7 +33,13 @@ import {
   WEEKLY_INSIGHT_TEXT_MAX_LENGTH,
   type WeeklyInsightPromptContext,
 } from './prompts/weeklyInsightV2';
-import type { InsightInputContext, InsightIntent, InsightResponse } from '@fittrack/shared';
+import type {
+  AiMealEstimateComponent,
+  AiMealEstimateRefine,
+  InsightInputContext,
+  InsightIntent,
+  InsightResponse,
+} from '@fittrack/shared';
 import { selectInsightIntent } from './dailyInsightIntent';
 import {
   DailyInsightValidationError,
@@ -284,36 +293,126 @@ export interface AiMealEstimate {
     fat: number;
     fiber: number;
   };
-  components: string[];
+  componentItems: AiMealEstimateComponent[];
+  estimatedTotalGrams: number;
   contextDetected: string | null;
   portionConfidence: 'high' | 'medium' | 'low';
   assumptions: string[];
   warnings: string[];
 }
 
+export interface AiMealEstimateUsage {
+  promptTokens: number | undefined;
+  completionTokens: number | undefined;
+  totalTokens: number | undefined;
+}
+
+export type AiMealPhotoAssessment = 'consistent' | 'complementary' | 'contradictory' | 'uncertain';
+
+const MEAL_PHOTO_ASSESSMENT_SCHEMA = {
+  type: 'object' as const,
+  properties: {
+    assessment: {
+      type: 'string' as const,
+      enum: ['consistent', 'complementary', 'contradictory', 'uncertain'],
+    },
+  },
+  required: ['assessment'],
+  additionalProperties: false,
+};
+
+const MealPhotoAssessmentOutputSchema = z.object({
+  assessment: z.enum(['consistent', 'complementary', 'contradictory', 'uncertain']),
+}).strict();
+
+export async function assessMealPhoto(input: {
+  text: string;
+  imageBase64: string;
+  imageMimeType: 'image/jpeg' | 'image/png';
+  onUsage?: (usage: AiMealEstimateUsage) => void;
+}): Promise<AiMealPhotoAssessment> {
+  const client = getClient();
+  const deployment = getAzureOpenAiDeploymentName();
+  const response = await client.chat.completions.create({
+    model: deployment,
+    messages: [
+      { role: 'system', content: MEAL_PHOTO_ASSESSMENT_SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: `Mahlzeitbeschreibung: ${JSON.stringify(input.text)}` },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:${input.imageMimeType};base64,${input.imageBase64}`,
+              detail: 'high',
+            },
+          },
+        ],
+      },
+    ],
+    response_format: {
+      type: 'json_schema',
+      json_schema: {
+        name: 'meal_photo_assessment',
+        strict: true,
+        schema: MEAL_PHOTO_ASSESSMENT_SCHEMA,
+      },
+    },
+    temperature: 0,
+    max_tokens: 32,
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (response.usage) {
+    input.onUsage?.({
+      promptTokens: response.usage.prompt_tokens,
+      completionTokens: response.usage.completion_tokens,
+      totalTokens: response.usage.total_tokens,
+    });
+  }
+  if (!raw) throw new Error('Empty response from Azure OpenAI');
+
+  return MealPhotoAssessmentOutputSchema.parse(JSON.parse(raw)).assessment;
+}
+
 const MEAL_ESTIMATE_SCHEMA = {
   type: 'object' as const,
   properties: {
     mealName: { type: 'string' as const },
+    componentItems: {
+      type: 'array' as const,
+      maxItems: 20,
+      items: {
+        type: 'object' as const,
+        properties: {
+          name: { type: 'string' as const, minLength: 1, maxLength: 100 },
+          estimatedGrams: { type: 'number' as const, exclusiveMinimum: 0, maximum: 5000 },
+          calories: { type: 'number' as const, minimum: 0, maximum: 3000 },
+        },
+        required: ['name', 'estimatedGrams', 'calories'],
+        additionalProperties: false,
+      },
+    },
+    estimatedTotalGrams: { type: 'number' as const, minimum: 20, maximum: 5000 },
     mealEstimate: {
       type: 'object' as const,
       properties: {
-        calories: { type: 'number' as const },
-        protein: { type: 'number' as const },
-        carbs: { type: 'number' as const },
-        fat: { type: 'number' as const },
-        fiber: { type: 'number' as const },
+        calories: { type: 'number' as const, minimum: 0, maximum: 3000 },
+        protein: { type: 'number' as const, minimum: 0 },
+        carbs: { type: 'number' as const, minimum: 0 },
+        fat: { type: 'number' as const, minimum: 0 },
+        fiber: { type: 'number' as const, minimum: 0 },
       },
       required: ['calories', 'protein', 'carbs', 'fat', 'fiber'],
       additionalProperties: false,
     },
-    components: { type: 'array' as const, items: { type: 'string' as const } },
     contextDetected: { type: ['string', 'null'] as const },
     portionConfidence: { type: 'string' as const, enum: ['high', 'medium', 'low'] },
     assumptions: { type: 'array' as const, items: { type: 'string' as const } },
     warnings: { type: 'array' as const, items: { type: 'string' as const } },
   },
-  required: ['mealName', 'mealEstimate', 'components', 'contextDetected', 'portionConfidence', 'assumptions', 'warnings'],
+  required: ['mealName', 'mealEstimate', 'componentItems', 'estimatedTotalGrams', 'contextDetected', 'portionConfidence', 'assumptions', 'warnings'],
   additionalProperties: false,
 };
 
@@ -328,6 +427,9 @@ export async function estimateMeal(input: {
   text: string;
   imageBase64?: string;
   imageMimeType?: 'image/jpeg' | 'image/png';
+  refine?: AiMealEstimateRefine;
+  suppressPreviousEstimate?: boolean;
+  onUsage?: (usage: AiMealEstimateUsage) => void;
 }): Promise<AiMealEstimate> {
   const client = getClient();
   const deployment = getAzureOpenAiDeploymentName();
@@ -336,14 +438,32 @@ export async function estimateMeal(input: {
     | { type: 'text'; text: string }
     | { type: 'image_url'; image_url: { url: string; detail: 'low' | 'high' | 'auto' } };
 
-  const userContent: ContentPart[] = [{ type: 'text', text: input.text }];
+  const hasImage = !!input.imageBase64 && !!input.imageMimeType;
+  const userText = [
+    `Mahlzeit: ${JSON.stringify(input.text)}`,
+    ...(hasImage ? ['Ein Foto der Mahlzeit ist angehängt.'] : []),
+  ].join('\n');
+  const userContent: ContentPart[] = [{ type: 'text', text: userText }];
 
-  if (input.imageBase64 && input.imageMimeType) {
+  if (input.refine) {
+    const correctionData = {
+      hints: (input.refine.hints ?? []).map((hint) => hint === 'larger' ? 'Portion größer' : 'Portion kleiner'),
+      ...(input.refine.note === undefined ? {} : { note: input.refine.note }),
+    };
+    userContent.push({
+      type: 'text',
+      text: input.suppressPreviousEstimate
+        ? `Nutzerhinweis: """${JSON.stringify(correctionData)}"""`
+        : `Vorherige Schätzung: ${JSON.stringify(input.refine.previous)}\nNutzerhinweis: """${JSON.stringify(correctionData)}"""`,
+    });
+  }
+
+  if (hasImage) {
     userContent.push({
       type: 'image_url',
       image_url: {
         url: `data:${input.imageMimeType};base64,${input.imageBase64}`,
-        detail: 'low', // 'low' is sufficient for portion estimation; saves tokens
+        detail: 'high',
       },
     });
   }
@@ -363,10 +483,17 @@ export async function estimateMeal(input: {
       },
     },
     temperature: 0,
-    max_tokens: 512,
+    max_tokens: 1200,
   });
 
   const raw = response.choices[0]?.message?.content;
+  if (response.usage) {
+    input.onUsage?.({
+      promptTokens: response.usage.prompt_tokens,
+      completionTokens: response.usage.completion_tokens,
+      totalTokens: response.usage.total_tokens,
+    });
+  }
   if (!raw) throw new Error('Empty response from Azure OpenAI');
 
   return JSON.parse(raw) as AiMealEstimate;

@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as Haptics from 'expo-haptics';
 import type { AiFoodEstimatePreview, AiMealEstimatePreview, FoodSearchResult, Meal, MealItem, NutritionLabelScanResult } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
 import type { FoodEntryHubContext } from './hub/useFoodEntryHubStore';
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => {
   foodSearch: vi.fn(),
   estimateFood: vi.fn(),
   estimateMeal: vi.fn(),
+  previewMeal: vi.fn(),
   scanLabel: vi.fn(),
   photoPickerProps: {
     current: null as null | {
@@ -54,6 +56,12 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) }));
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'AnimatedView' },
+  useAnimatedStyle: (factory: () => object) => factory(),
+  useSharedValue: (value: number) => ({ value }),
+  withTiming: (value: number) => value,
+}));
 vi.mock('expo-modules-core', () => ({
   CodedError: class extends Error {},
   EventEmitter: class {},
@@ -67,7 +75,7 @@ vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   selectionAsync: vi.fn(),
   ImpactFeedbackStyle: { Medium: 'medium' },
-  NotificationFeedbackType: { Success: 'success' },
+  NotificationFeedbackType: { Success: 'success', Warning: 'warning' },
 }));
 vi.mock('../../shared/camera/FramedPhotoPicker', () => ({
   FramedPhotoPicker: (props: NonNullable<typeof mocks.photoPickerProps.current>) => {
@@ -83,11 +91,16 @@ vi.mock('../../shared/api/aiApi', () => ({
   aiApi: {
     estimateFood: mocks.estimateFood,
     estimateMeal: mocks.estimateMeal,
+    previewMeal: mocks.previewMeal,
     scanLabel: mocks.scanLabel,
   },
 }));
 vi.mock('../../shared/components/ErrorBanner', () => ({ ErrorBanner: 'ErrorBanner' }));
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
+vi.mock('../../shared/components/Snackbar', () => ({
+  Snackbar: () => null,
+  useSnackbar: () => ({ ref: { current: null }, show: vi.fn() }),
+}));
 vi.mock('../../shared/components/ConfirmSheet', () => ({ ConfirmSheet: () => null }));
 
 import FoodEstimateReviewScreen from './FoodEstimateReviewScreen';
@@ -131,6 +144,13 @@ const mealEstimate: AiMealEstimatePreview = {
   photoUsed: false,
   assumptions: [],
   warnings: [],
+};
+
+const structuredMealEstimate: AiMealEstimatePreview = {
+  ...mealEstimate,
+  componentItems: [{ name: 'Haferflocken', estimatedGrams: 100, calories: 150 }],
+  estimatedTotalGrams: 180,
+  promptVersion: 'meal-v2-test',
 };
 
 const labelResult: NutritionLabelScanResult = {
@@ -192,6 +212,43 @@ function findButton(renderer: ReactTestRenderer, label: string): ReactTestInstan
     && textContent(node).includes(label))[0];
   if (!button) throw new Error(`Button not found: ${label}`);
   return button;
+}
+
+function findAccessibleButton(renderer: ReactTestRenderer, label: string): ReactTestInstance {
+  const button = renderer.root.findAll((node) => node.type === 'TouchableOpacity'
+    && node.props.accessibilityLabel === label)[0];
+  if (!button) throw new Error(`Accessible button not found: ${label}`);
+  return button;
+}
+
+function allText(renderer: ReactTestRenderer): string {
+  return renderer.root.findAll((node) => node.type === 'Text').map(textContent).join(' ');
+}
+
+function inputValue(renderer: ReactTestRenderer, label: string): string {
+  const input = renderer.root.findAll((node) => node.type === 'TextInput'
+    && node.props.accessibilityLabel === label)[0];
+  if (!input || typeof input.props.value !== 'string') throw new Error(`Input not found: ${label}`);
+  return input.props.value;
+}
+
+function callHandler(node: ReactTestInstance, propName: string, ...args: unknown[]): unknown {
+  const handler = node.props[propName];
+  if (typeof handler !== 'function') throw new Error(`Missing ${propName} handler`);
+  return handler(...args);
+}
+
+function changeInputValue(node: ReactTestInstance, value: string): void {
+  callHandler(node, 'onChangeText', value);
+}
+
+async function pressAccessible(renderer: ReactTestRenderer, label: string): Promise<void> {
+  const onPress = findAccessibleButton(renderer, label).props.onPress;
+  if (typeof onPress !== 'function') throw new Error(`Button has no action: ${label}`);
+  await act(async () => {
+    await onPress();
+    for (let index = 0; index < 6; index += 1) await Promise.resolve();
+  });
 }
 
 async function press(renderer: ReactTestRenderer, label: string): Promise<void> {
@@ -258,7 +315,13 @@ describe('nutrition diary mutation caller flows', () => {
         visible
         mealId="meal-1"
         originalText="Porridge"
-        estimate={mealEstimate}
+        estimate={{
+          ...mealEstimate,
+          photoProvided: true,
+          photoAssessment: 'consistent',
+          photoUse: 'included',
+          photoUsed: true,
+        }}
         onClose={vi.fn()}
         onSaved={onSaved}
         onRefine={vi.fn()}
@@ -266,12 +329,18 @@ describe('nutrition diary mutation caller flows', () => {
     );
     renderers.push(renderer);
 
-    await press(renderer, 'Mahlzeit speichern');
+    await press(renderer, 'Speichern');
 
     expect(mocks.diary.addItem).toHaveBeenCalledWith('meal-1', expect.objectContaining({
       productName: 'Porridge',
       sourceType: 'ai-meal-estimate',
+      inputMode: 'portion',
+      inputAmount: 1,
     }));
+    expect(mocks.diary.addItem.mock.calls[0]?.[1]).not.toHaveProperty('amountGrams');
+    expect(mocks.diary.addItem.mock.calls[0]?.[1]).toHaveProperty('aiMealEstimateComponents', ['Haferflocken']);
+    expect(mocks.diary.addItem.mock.calls[0]?.[1]).not.toHaveProperty('aiMealEstimateItems');
+    expect(mocks.diary.addItem.mock.calls[0]?.[1]).toHaveProperty('aiMealEstimatePhotoUsed', true);
     expect(onSaved).toHaveBeenCalledTimes(1);
   });
 
@@ -321,8 +390,220 @@ describe('nutrition diary mutation caller flows', () => {
     expect(mocks.diary.addItem).toHaveBeenCalledWith('meal-1', expect.objectContaining({
       productName: 'Porridge',
       sourceType: 'ai-meal-estimate',
+      inputMode: 'portion',
+      inputAmount: 1,
     }));
+    expect(mocks.diary.addItem.mock.calls[0]?.[1]).not.toHaveProperty('amountGrams');
+    expect(mocks.diary.addItem.mock.calls[0]?.[1]).toHaveProperty('aiMealEstimatePhotoUsed', false);
     expect(onSaved).toHaveBeenCalledWith('KI-Mahlzeitschätzung');
+  });
+
+  it('shows only legacy names and disables AI refinement for a V1 response', async () => {
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+
+    expect(allText(renderer)).toContain('Haferflocken');
+    expect(allText(renderer)).not.toContain('Gesamtgewicht ca.');
+    expect(allText(renderer)).not.toContain('ca. 100 g');
+    expect(findAccessibleButton(renderer, 'Stimmt nicht ganz? Neu schätzen').props.disabled).toBe(true);
+    expect(allText(renderer)).toContain('Für diese ältere KI-Schätzung nicht verfügbar');
+  });
+
+  it('saves adjusted V2 macros, scaled component grams, weight, and prompt version without legacy names', async () => {
+    mocks.estimateMeal.mockResolvedValueOnce(structuredMealEstimate);
+    const onSaved = vi.fn();
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={onSaved} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+    await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
+    await pressAccessible(renderer, 'Protein erhöhen');
+
+    expect(inputValue(renderer, 'Kalorien')).toBe('233,4');
+    expect(inputValue(renderer, 'Protein')).toBe('13,2');
+    expect(allText(renderer)).toContain('ca. 105 g · 158 kcal');
+    expect(allText(renderer)).toContain('+6,1 % zur KI-Schätzung');
+    await press(renderer, 'Speichern');
+
+    const payload = mocks.diary.addItem.mock.calls[0]?.[1];
+    expect(payload).toMatchObject({
+      sourceType: 'ai-meal-estimate',
+      inputMode: 'portion',
+      inputAmount: 1,
+      aiMealEstimateItems: [{ name: 'Haferflocken', estimatedGrams: 105, calories: 157.5 }],
+      aiMealEstimateWeightGrams: 189,
+      aiMealEstimateVersion: 'meal-v2-test',
+    });
+    expect(payload.calculatedNutrition.calories).toBeCloseTo(233.4);
+    expect(payload.calculatedNutrition.protein).toBeCloseTo(13.2);
+    expect(payload.calculatedNutrition.carbs).toBeCloseTo(29.4);
+    expect(payload.calculatedNutrition.fat).toBeCloseTo(7.35);
+    expect(payload.calculatedNutrition.fiber).toBeCloseTo(4.2);
+    expect(payload).not.toHaveProperty('aiMealEstimateComponents');
+    expect(payload).not.toHaveProperty('aiMealEstimateBaseCalories');
+    expect(payload).not.toHaveProperty('amountGrams');
+    expect(onSaved).toHaveBeenCalledWith('KI-Mahlzeitschätzung');
+  });
+
+  it('keeps macro values directly editable as numeric inputs', async () => {
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+
+    const proteinInput = renderer.root.findAll((node) => node.type === 'TextInput'
+      && node.props.accessibilityLabel === 'Protein')[0];
+    expect(proteinInput?.props.keyboardType).toBe('decimal-pad');
+    act(() => changeInputValue(proteinInput!, '18,5'));
+    expect(inputValue(renderer, 'Protein')).toBe('18,5');
+    await press(renderer, 'Speichern');
+
+    expect(mocks.diary.addItem.mock.calls[0]?.[1].calculatedNutrition.protein).toBe(18.5);
+  });
+
+  it('restores every scaled value after one +5% and one -5% portion step', async () => {
+    mocks.estimateMeal.mockResolvedValueOnce(structuredMealEstimate);
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+    await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
+    await pressAccessible(renderer, 'Portion um fünf Prozent verringern');
+
+    expect(inputValue(renderer, 'Kalorien')).toBe('220');
+    expect(allText(renderer)).toContain('Gesamtgewicht ca. 180 g');
+    expect(allText(renderer)).toContain('ca. 100 g · 150 kcal');
+    expect(allText(renderer)).not.toContain('zur KI-Schätzung');
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Anpassungen zurücksetzen')).toHaveLength(0);
+  });
+
+  it('resets adjusted values and repeats held steppers until release', async () => {
+    mocks.estimateMeal.mockResolvedValueOnce(structuredMealEstimate);
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+
+    const increasePortion = findAccessibleButton(renderer, 'Portion um fünf Prozent erhöhen');
+    expect(increasePortion.props.delayLongPress).toBe(400);
+    vi.useFakeTimers();
+    act(() => {
+      callHandler(increasePortion, 'onPressIn');
+      callHandler(increasePortion, 'onLongPress');
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(140); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(140); });
+    expect(allText(renderer)).toContain('115 %');
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(3);
+
+    act(() => { callHandler(increasePortion, 'onPressOut'); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(280); });
+    expect(allText(renderer)).toContain('115 %');
+
+    await pressAccessible(renderer, 'Anpassungen zurücksetzen');
+    expect(allText(renderer)).not.toContain('zur KI-Schätzung');
+    expect(allText(renderer)).toContain('100 %');
+  });
+
+  it('keeps labeled 48pt controls, stops at 150%, and warns at the boundary', async () => {
+    mocks.estimateMeal.mockResolvedValueOnce(structuredMealEstimate);
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+
+    const steppers = renderer.root.findAll((node) => node.type === 'TouchableOpacity'
+      && typeof node.props.accessibilityLabel === 'string'
+      && (node.props.accessibilityLabel.includes('erhöhen') || node.props.accessibilityLabel.includes('verringern')));
+    expect(steppers.length).toBeGreaterThanOrEqual(10);
+    for (const stepper of steppers) {
+      expect(stepper.props.accessibilityRole).toBe('button');
+      expect(stepper.props.style).toMatchObject({ width: 48, height: 48 });
+    }
+
+    for (let index = 0; index < 10; index += 1) {
+      await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
+    }
+    expect(allText(renderer)).toContain('150 %');
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(10);
+    await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
+    expect(allText(renderer)).toContain('150 %');
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('warning');
+
+    for (let index = 0; index < 20; index += 1) {
+      await pressAccessible(renderer, 'Portion um fünf Prozent verringern');
+    }
+    expect(allText(renderer)).toContain('50 %');
+    await pressAccessible(renderer, 'Portion um fünf Prozent verringern');
+    expect(allText(renderer)).toContain('50 %');
+    expect(Haptics.notificationAsync).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps manual calorie entry and shows the existing macro-consistency warning', async () => {
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+
+    const calorieInput = renderer.root.findAll((node) => node.type === 'TextInput'
+      && node.props.accessibilityLabel === 'Kalorien')[0]!;
+    act(() => changeInputValue(calorieInput, '500'));
+    expect(allText(renderer)).toContain('Nährwerte inkonsistent');
+    await press(renderer, 'Speichern');
+
+    expect(mocks.diary.addItem.mock.calls[0]?.[1].calculatedNutrition.calories).toBe(500);
+  });
+
+  it('sends a V2 re-estimate with the full previous snapshot and one size hint', async () => {
+    mocks.estimateMeal.mockResolvedValueOnce(structuredMealEstimate).mockResolvedValueOnce({
+      ...structuredMealEstimate,
+      mealEstimate: { ...NUTRITION, calories: 250 },
+    });
+    const renderer = await render(
+      <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={vi.fn()} safeAreaTopInset={0} />,
+    );
+    renderers.push(renderer);
+    const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
+    act(() => changeInputValue(description, 'Porridge'));
+    await press(renderer, 'Analysieren');
+    await pressAccessible(renderer, 'Stimmt nicht ganz? Neu schätzen');
+    await pressAccessible(renderer, 'Portion größer');
+    await pressAccessible(renderer, 'Neu schätzen bestätigen');
+
+    expect(mocks.estimateMeal).toHaveBeenNthCalledWith(2, 'Porridge', undefined, undefined, {
+      previous: {
+        mealName: 'Porridge',
+        estimatedTotalGrams: 180,
+        mealEstimate: NUTRITION,
+        componentItems: [{ name: 'Haferflocken', estimatedGrams: 100, calories: 150 }],
+      },
+      hints: ['larger'],
+    });
+    expect(inputValue(renderer, 'Kalorien')).toBe('250');
+    expect(allText(renderer)).toContain('100 %');
   });
 
   it('resolves a LabelSubFlow meal through the facade before scanning', async () => {

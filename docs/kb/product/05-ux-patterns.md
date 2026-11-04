@@ -178,13 +178,66 @@ All AI features use a dedicated review screen before saving.
 
 Pattern:
 - Full-screen or modal
-- Shows AI output with editable fields
+- Shows AI output with editable fields or controls appropriate to the result
 - Displays confidence and warnings prominently
 - Explicit "Speichern" or "Hinzufügen" CTA
 - Optional re-estimation trigger (e.g., "✨ Neu" button)
 - Two save modes where applicable: "Als Produkt speichern" vs "Einmalig hinzufügen"
 
 [Rule] Review screens must never be skipped, even if confidence is high.
+
+For AI meal estimates, `MealEstimateResult` is the review surface used both for
+the initial result and `MealEstimateReviewScreen`. It keeps the result visible
+until the user saves or explicitly leaves. V2 structured components show their
+estimated weights and calories in this review; V1 results show names only.
+Missing component detail must not be filled with inferred grams or calories.
+
+The review shows an accessible German photo-use notice from the structured V3
+response: consistent and complementary photos are identified as used;
+contradictory photos are identified as excluded because they do not match the
+description; uncertain relationships are identified as unclear and excluded;
+`no_photo` / `photoProvided: false` explains that the estimate uses the
+description alone. A supplied photo thumbnail may remain visible when excluded.
+Assessment and routing fields are not inferred from free-form warnings, and
+legacy responses without structured photo fields do not get an invented
+exclusion notice. The matching fixed backend photo warning is not repeated in
+the generic warning list; other nutrition warnings remain visible.
+Excluded-photo results remain editable and retain the normal explicit
+`Speichern` action. Diary photo attribution is taken only from `photoUsed`,
+which is true only when the image contributed to nutrition.
+
+## Meal Estimate Feintuning-Stepper
+
+The calorie hero has an editable kcal value and `−`/`+` controls that are the
+global portion scaler. Each step changes the estimate additively by 5% of its
+original AI snapshot, within 50%–150%, scaling kcal, all macros, estimated
+total weight, and structured component grams and calories. Each macro value is
+also directly editable; its independent stepper uses 5% of the AI baseline
+(at least 0.5 g) and never goes below zero. Protein and carbohydrates adjust
+kcal by 4 kcal/g, fat by 9 kcal/g, and fiber does not adjust kcal. A changed
+result shows its percentage delta from the AI estimate and a reset action;
+reset restores the original estimate.
+
+Stepper buttons have a 48 dp hit area and accessible button labels. A press
+repeats after 400 ms at 140 ms intervals, stops on release or at a boundary,
+and gives selection haptics per step plus warning haptics at a boundary.
+
+## Meal Estimate Re-estimation
+
+The meal-estimate result offers `Stimmt nicht ganz? Neu schätzen` below the
+nutrients. The `Neu schätzen` sheet offers only the mutually exclusive
+`Portion größer` / `Portion kleiner` hints and an optional factual meal
+correction (3–200 characters after control-character removal and trimming,
+with a counter). A hint may be sent without a note; a note may also be sent by
+itself. Submission stays disabled without a hint or a valid note, during
+loading, after quota exhaustion, or after three re-estimates for that result.
+
+Re-estimation uses the latest complete AI snapshot, not locally adjusted values,
+and resends the original description and photo when present. V1 responses
+without a complete structured snapshot cannot be re-estimated. Errors retain the
+sheet inputs; success replaces the AI result and resets local adjustments, with
+a snackbar when adjustments were present. `Einzeln aufschlüsseln` remains a
+separate tertiary Precision Path action.
 
 ## Rezept teilen: lokaler Share-Flow und Fotomediathek
 

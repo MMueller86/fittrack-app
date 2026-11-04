@@ -34,7 +34,7 @@ Shared TypeScript definitions and pure calculation functions used by both `backe
 - `MealItemSourceType` — `'manual' | 'reusableItem' | 'openFoodFacts' | 'ai' | 'ai-meal-estimate' | 'recipe'`
 - `NutritionValues` — `{ calories, protein, carbs, fat, fiber, sugar?, saturatedFat?, salt? }`
 - `PortionInfo` — `{ label, weightGrams?, nutrition }`
-- `MealItem` — diary entry for one food item; includes `isAiEstimate`, `confidence`, `warnings`, `components`
+- `MealItem` — diary entry for one food item; AI meal estimates may include optional structured `aiMealEstimateItems`, `aiMealEstimateWeightGrams`, and `aiMealEstimateVersion`; `aiMealEstimateComponents` remains the legacy name list
 - `Meal` — container for multiple `MealItem`s on a date, with a `type` and optional `updatedAt` (absent on legacy documents)
 - `DaySummary` — aggregated macro totals for a day
 - `DayMeta` — per-day metadata (`dayType: 'rest' | 'training'`, `workoutType`, `specialActivity?`)
@@ -165,7 +165,26 @@ pair and any supplied ETag precondition, and computes the persisted fingerprint.
 - `InsightNutritionDay`, `InsightInputContext` — historical nutrition and complete server-owned AI input context
 
 ### `aiMealEstimate.ts`
-- `AiMealEstimatePreview` — meal image estimate result
+- `AiMealEstimateComponent` — exactly `{ name: string; estimatedGrams: number; calories: number }`
+- `AiMealEstimateRefineHint` — `'larger' | 'smaller'`
+- `AiMealEstimateRefine` — complete previous structured estimate (`mealName`, `estimatedTotalGrams`, five nutrition values, and `componentItems`) plus optional hints and note; backend accepts at most one hint and requires a hint or valid note
+- `AiMealEstimatePreview` — meal estimate response with required legacy `components`, five-field `mealEstimate`, and `photoUsed`; V2 estimate fields and V3 photo assessment/use fields remain optional for V1 reads
+
+The V3 preview always carries the optional-at-read V2/V3 fields and never
+returns them as `null`; `promptVersion` is `meal-estimate-v4`. Its V3 photo
+fields are `photoProvided: boolean`,
+`photoAssessment: 'consistent' | 'complementary' | 'contradictory' | 'uncertain' | 'no_photo'`,
+and `photoUse: 'included' | 'excluded_mismatch' | 'excluded_uncertain' | 'no_photo'`.
+`photoUsed` remains required and is true only when the image contributed to the
+nutrition estimate. `components` is the ordered projection
+`componentItems.map(item => item.name)`. Component names
+are trimmed and have 1–100 characters; component weight is finite, greater
+than 0 and at most 5000 g; component calories are finite and 0–3000. There are
+0–20 components and total weight is 20–5000 g. Meal calories are 0–3000;
+protein, carbs, fat and fiber are finite and non-negative. The read type keeps
+V1 responses usable, but a legacy response without the complete structured
+snapshot is not a valid refinement input. Shared types describe these
+contracts; backend Zod schemas enforce request and persistence boundaries.
 
 ### `userFoodRelation.ts`
 - `FoodRefType` — `'catalog' | 'personal'`

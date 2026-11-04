@@ -10,10 +10,10 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 | Feature | Endpoint | Quota Feature | Review Screen |
 |---|---|---|---|
-| Meal Parser | POST /api/ai/parse-meal | `meal-parser` | `MealParserReviewScreen` |
-| Food Estimator | POST /api/ai/food-estimate | `food-estimate` | `FoodEstimateReviewScreen` |
+| Meal Parser | POST /api/ai/meal-parser/preview | `meal-parser` | `MealParserReviewScreen` |
+| Food Estimator | POST /api/ai/food-estimate/preview | `food-estimate` | `FoodEstimateReviewScreen` |
 | Label Scan | POST /api/ai/label-scan | `label-scan` | `LabelScanReviewScreen` |
-| Meal Estimator | POST /api/ai/estimate-meal | `meal-estimate` | `MealEstimateReviewScreen` |
+| Meal Estimator | POST /api/ai/meal-estimate/preview | `meal-estimate` | `MealEstimateReviewScreen` |
 | Recipe Analyzer | POST /api/ai/recipe-analyze | `recipe-analyze` | `RecipeWizardScreen` |
 | Recipe Scale Preview | POST /api/ai/recipe-scale/preview | `recipe-scale` | Transient recipe detail preview |
 | Daily Insight | GET /api/ai/daily-insight | (special) | Inline on `HomeScreen` |
@@ -92,13 +92,110 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 [Rule] Quota is enforced *before* the OCR call (expensive operation).
 
-## 4. Meal Estimator (Image-Based)
+## 4. Meal Estimator (V3)
 
-**Input:** Photo of a prepared meal
+**Endpoint:** `POST /api/ai/meal-estimate/preview`; quota key `meal-estimate`.
 
-**AI output:** `AiMealEstimatePreview` — detected food items with estimated nutrition
+**Methodology and versions:** The estimate prompt is `meal-estimate-v4`; the
+separate photo-assessment prompt is `meal-photo-assessment-v1`. The estimator
+estimates nutrition and total weight for the described meal as one complete
+portion, not per 100 g, and identifies 0–20 named components with their own
+estimated weights and calories. Component weights are not summed to calculate
+meal weight or nutrition. A photo request first gets a strict relationship
+assessment; the assessment returns no nutrition values, food list, rationale,
+or user-facing prose.
 
-**Review screen:** `MealEstimateReviewScreen`
+`portionConfidence` is a qualitative model self-assessment of uncertainty in
+the complete meal estimate, including meal and component identification,
+portion, total weight, and nutrition values. It is not a calibrated probability.
+`high` means the meal and key components are clear and the estimate needs few
+assumptions; `medium` means a useful estimate is possible but some values rely
+on typical assumptions; `low` means important details are unclear or materially
+different overall estimates remain plausible.
+
+**Request:** Text is trimmed and must contain 1–500 characters. JSON accepts
+`{ text, refine? }`; multipart accepts `text`, an optional JPEG/PNG `image` up
+to 4 MB, and optional `refine` serialized as JSON. A photo may be resubmitted
+with a refinement. A JSON request without an image is valid.
+
+`refine` has exactly `{ previous, hints?, note? }`. `previous` is required and
+complete: `mealName` (trimmed, 1–200 characters), `estimatedTotalGrams`
+(20–5000), `mealEstimate` with required `calories` (0–3000) and finite,
+non-negative `protein`, `carbs`, `fat`, `fiber`, and `componentItems` (0–20).
+Each previous component has a trimmed name (1–100 characters), finite
+`estimatedGrams` greater than 0 and at most 5000, and `calories` from 0 to
+3000. `hints` is absent, empty, or contains exactly one `larger` or `smaller`.
+`note` is optional: C0/C1 control characters are removed, then it is trimmed
+and must contain 3–200 characters. At least one hint or valid note is required.
+Unknown fields, null values, and incomplete previous snapshots return `400`
+before quota enforcement or provider work.
+
+**Photo relationship and routing:** The assessment schema is exactly
+`{ assessment: 'consistent' | 'complementary' | 'contradictory' | 'uncertain' }`,
+with `strict: true` and `additionalProperties: false`. A direct contradiction
+requires clear incompatibility between the described primary meal identity and
+the dominant visible meal identity. Portion, side, garnish, and additional
+visible ingredients alone are not contradictions. Unclear relationships are
+`uncertain`, not an assertion that the photo is wrong.
+
+| Assessment | Nutrition-estimation input |
+|---|---|
+| `consistent` | Original text + photo |
+| `complementary` | Original text + photo; additional visibly supported ingredients may contribute |
+| `contradictory` | Original text only; no image or image-influenced previous estimate |
+| `uncertain` | Original text only; no image or image-influenced previous estimate |
+| No photo | Original text only; assessment skipped |
+
+Excluded-photo refinements retain sanitized user hints/notes but omit
+`refine.previous`. Assessment failure or malformed/unsupported output fails the
+request with `502`, no estimate, and no quota use. The estimate is validated
+after either route, including text-only fallback.
+
+**Response:** A successful V3 response contains `mealName`, `mealEstimate`
+(`calories`, `protein`, `carbs`, `fat`, `fiber`), `components`,
+`componentItems`, `estimatedTotalGrams`, `promptVersion`, `contextDetected`,
+`portionConfidence`, `photoProvided`, `photoAssessment`, `photoUse`, `photoUsed`,
+`assumptions`, and `warnings`. `components` is exactly the ordered projection
+`componentItems.map(item => item.name)`; `promptVersion` is
+`meal-estimate-v4`. `photoUse` is `included | excluded_mismatch |
+excluded_uncertain | no_photo`; `photoUsed` is true only when the image reached
+nutrition estimation. Excluded cases append fixed localized feedback to
+`warnings`. New photo fields are optional in the shared read type for V1
+compatibility. A V1 response without the complete structured estimate snapshot
+cannot be refined.
+
+**Validation and usage:** Output shape/bounds failures and calories above
+`9 × estimatedTotalGrams × 1.05` return `422` and do not consume quota. An
+Atwater deviation above `max(50 kcal, 15% of estimated kcal)` or component
+calories deviating by more than 20% adds a warning and remains `200`; valid
+initial and refine calls each consume one use from the same `meal-estimate`
+quota. Provider failures return `502` without usage tracking.
+
+Quota is enforced before the first provider call. A photo is sent to the
+assessment call and is sent a second time to estimation only for
+`consistent`/`complementary`; the estimate call uses `detail: 'high'` and
+`max_tokens: 1200`. Every valid request consumes exactly one existing
+`meal-estimate` use, regardless of provider-call count. Failures and hard
+plausibility errors consume none. The preview and assessment are transient;
+only user-confirmed nutrition and the existing photo-use boolean may be stored
+by the Diary workflow. No photo, assessment category, or rationale is persisted.
+
+Telemetry records prompt versions, mode, allowlisted hint IDs, photo presence,
+bounded provider-call/token/duration metadata, text/note lengths, validation
+result, and warning count. It excludes text, notes, image/base64, provider
+payloads, component names, assessment value/rationale, user identifiers, and
+tokens. The privacy policy remains unchanged; assessment is within the existing
+disclosed photo/text processing purpose.
+
+**Verification status:** The current estimator eval fixtures are text-only.
+No owned, independently labeled, rights-cleared photo/text fixtures are
+available, so semantic photo classification and complementary-ingredient
+recognition are **UNVERIFIED**. Structural/unit tests prove enum validation and
+source routing, not image understanding. Independent DV-1 nutrition
+calibration also remains unverified.
+
+**Review screen:** `MealEstimateReviewScreen` / the shared meal-estimate result
+surface; AI estimates are not saved without explicit user confirmation.
 
 ## 5. Recipe Analyzer
 
@@ -111,7 +208,7 @@ saved-recipe preparation `RECIPE_PREPARATION_PROMPT_VERSION = 'v12'`.
 
 **Used in:** `RecipeWizardScreen` to speed up recipe creation.
 
-The Recipe Analyzer is separate from the Food Estimator. It parses a complete recipe into metadata, ordered steps, food ingredients, and seasoning ingredients. It does not create reusable foods and it does not save diary data. The Food Estimator (`POST /api/ai/food-estimate`) remains the single-food nutrition-estimation workflow; in recipe-ingredient search it can be invoked explicitly for one unresolved ingredient and its result is returned to `RecipeWizardScreen` for user confirmation.
+The Recipe Analyzer is separate from the Food Estimator. It parses a complete recipe into metadata, ordered steps, food ingredients, and seasoning ingredients. It does not create reusable foods and it does not save diary data. The Food Estimator (`POST /api/ai/food-estimate/preview`) remains the single-food nutrition-estimation workflow; in recipe-ingredient search it can be invoked explicitly for one unresolved ingredient and its result is returned to `RecipeWizardScreen` for user confirmation.
 
 **AI output (`AiRecipeRaw` / handler preview):**
 

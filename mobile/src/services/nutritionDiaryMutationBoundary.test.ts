@@ -9,6 +9,7 @@ const callerFiles = [
   '../modules/nutrition/EditItemSheet.tsx',
   '../modules/nutrition/FoodEstimateReviewScreen.tsx',
   '../modules/nutrition/LabelScanReviewScreen.tsx',
+  '../modules/nutrition/MealEstimateResult.tsx',
   '../modules/nutrition/MealEstimateReviewScreen.tsx',
   '../modules/nutrition/MealParserReviewScreen.tsx',
   '../modules/nutrition/hub/AISubFlow.tsx',

@@ -49,12 +49,31 @@ Key fields:
 - `recipeId?` — source recipe ID when `sourceType: 'recipe'`
 - `recipePortions?` — logged recipe portion count, including fractional portions
 - `amountGrams` — effective amount used for calculation
-- `quantity` and `unit` — diary amount and its unit. Portion-based entries use the canonical `unit: 'portion'`; Mobile formats singular/plural from `quantity`. Legacy `Portion` and `Portionen` values remain readable.
+- `quantity` and `unit` — diary amount and its unit. Portion-based entries use the canonical `unit: 'portion'`; Mobile formats singular/plural from `quantity`. Legacy `Portion` and `Portionen` values remain readable. An `ai-meal-estimate` stores exactly `quantity: 1` and `unit: 'portion'`; its macros are the nutrition snapshot for the complete estimate, not a per-100-g value.
 - `isAiEstimate` — true for AI-estimated items
 - `confidence` — AI confidence (0–1), null for non-AI items
 - `warnings` — AI-generated warnings (e.g., "unusual calorie density")
 - `components` — for compound items (meal estimates), the detected sub-items
+- `aiMealEstimateItems?` — optional, non-null array of 0–20 structured `{ name, estimatedGrams, calories }` snapshots; name is trimmed to 1–100 characters, grams are finite and greater than 0 through 5000, and calories are finite from 0 through 3000
+- `aiMealEstimateWeightGrams?` — optional, non-null estimated total weight from 20–5000 g
+- `aiMealEstimateVersion?` — optional, non-null prompt version string of 1–100 characters; V2 writes `meal-estimate-v2`
+- `aiMealEstimateComponents?` — legacy optional component-name list; when structured items are supplied, the backend derives this as their ordered name projection; when they are absent, legacy names remain readable
 - `category: FoodCategory` — used by the hint engine for dietary diversity checks
+
+The three structured fields are optional, non-null Class-0 additions only for
+`sourceType: 'ai-meal-estimate'`. Existing Diary snapshots without them remain
+readable. Confirmed and adjusted macro values are the stored `macros` snapshot.
+Copy and move preserve the structured fields and legacy component list exactly
+while assigning the copied or moved item a new ID. No migration or new
+container is required.
+
+The canonical Diary add uses `sourceType: 'ai-meal-estimate'`,
+`inputMode: 'portion'`, `inputAmount: 1`, `productName`, and
+`calculatedNutrition`; it does not require `amountGrams`. The server stores
+`quantity: 1` and `unit: 'portion'`, with the complete estimate's confirmed
+nutrition as the macro snapshot. For compatibility, older clients may send the
+former 100 g placeholder shape; for this source type the backend ignores that
+placeholder and still stores exactly one portion without scaling the nutrition.
 
 ### Source Types
 

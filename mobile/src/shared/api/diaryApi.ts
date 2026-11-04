@@ -15,6 +15,7 @@ import type {
   Meal,
   NutritionValues,
   SpecialActivity,
+  AiMealEstimateComponent,
 } from '@fittrack/shared';
 import { getLocalDateContext } from '../date/localDate';
 
@@ -41,13 +42,13 @@ export interface AddItemCalculatedInput {
   portionNutrition?: NutritionValues;
 }
 
-/** New product-based input — client pre-computes amountGrams and nutrition. */
+/** Product-based input — client pre-computes nutrition; amountGrams is omitted for AI meal portions. */
 export interface AddItemProductInput {
   productId?: string;
   productName: string;
   inputMode: 'grams' | 'portion';
   inputAmount: number;
-  amountGrams: number;
+  amountGrams?: number;
   calculatedNutrition: {
     calories: number;
     protein: number;
@@ -60,6 +61,9 @@ export interface AddItemProductInput {
   sourceType?: string;
   imageUrl?: string | null;
   aiMealEstimateComponents?: string[];
+  aiMealEstimateItems?: AiMealEstimateComponent[];
+  aiMealEstimateWeightGrams?: number;
+  aiMealEstimateVersion?: string;
   aiMealEstimateContext?: string;
   aiMealEstimateConfidence?: 'high' | 'medium' | 'low';
   aiMealEstimateAssumptions?: string[];

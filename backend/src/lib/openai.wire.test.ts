@@ -3,6 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { AddressInfo } from 'node:net';
 import {
   __setOpenAiClientForTests,
+  assessMealPhoto,
   analyzeRecipeText,
   estimateFood,
   estimateFoodBatch,
@@ -184,6 +185,153 @@ describe('Azure OpenAI SDK wire contract', () => {
     expect(requestCount).toBe(1);
   });
 
+  it('sends the V2 meal-estimate schema, high-detail photo, mapped refine data, and token usage', async () => {
+    const capturedBodies: Record<string, unknown>[] = [];
+    const estimate = {
+      mealName: 'Reis mit Gemüse',
+      mealEstimate: { calories: 500, protein: 20, carbs: 70, fat: 15, fiber: 8 },
+      componentItems: [{ name: 'Reis', estimatedGrams: 200, calories: 260 }],
+      estimatedTotalGrams: 350,
+      contextDetected: null,
+      portionConfidence: 'medium',
+      assumptions: [],
+      warnings: [],
+    };
+    requestHandler = (request, response) => {
+      void readJson(request).then((body) => {
+        capturedBodies.push(body);
+        sendCompletion(response, JSON.stringify(estimate));
+      });
+    };
+
+    process.env['AZURE_OPENAI_ENDPOINT'] = `http://127.0.0.1:${address.port}`;
+    process.env['AZURE_OPENAI_API_KEY'] = 'wire-test-key';
+    process.env['AZURE_OPENAI_API_VERSION'] = '2024-07-01';
+    process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] = 'wire-deployment';
+
+    await estimateMeal({ text: 'Nur Text' });
+    let usage: { promptTokens: number | undefined; completionTokens: number | undefined; totalTokens: number | undefined } | undefined;
+    await estimateMeal({
+      text: 'Reis mit Gemüse',
+      imageBase64: 'c3ludGhldGljLWltYWdl',
+      imageMimeType: 'image/png',
+      refine: {
+        previous: {
+          mealName: 'Reis mit Gemüse',
+          estimatedTotalGrams: 300,
+          mealEstimate: { calories: 400, protein: 15, carbs: 60, fat: 10, fiber: 6 },
+          componentItems: [{ name: 'Reis', estimatedGrams: 180, calories: 230 }],
+        },
+        hints: ['larger'],
+        note: 'Eine größere Portion',
+      },
+      onUsage: (value) => { usage = value; },
+    });
+
+    const firstUserContent = capturedBodies[0]?.['messages'] as Array<{ content: unknown }>;
+    const firstParts = firstUserContent[1]?.content as Array<{ type: string }>;
+    expect(firstParts.some((part) => part.type === 'image_url')).toBe(false);
+
+    const requestBody = capturedBodies[1]!;
+    const userContent = (requestBody['messages'] as Array<{ content: unknown }>)[1]?.content as Array<{
+      type: string;
+      text?: string;
+      image_url?: { detail: string; url: string };
+    }>;
+    expect(userContent[0]?.text).toContain('Mahlzeit: "Reis mit Gemüse"');
+    expect(userContent[0]?.text).toContain('Ein Foto der Mahlzeit ist angehängt.');
+    expect(userContent[1]?.text).toContain('"hints":["Portion größer"]');
+    expect(userContent[1]?.text).toContain('"note":"Eine größere Portion"');
+    expect(userContent[2]?.image_url).toMatchObject({
+      detail: 'high',
+      url: 'data:image/png;base64,c3ludGhldGljLWltYWdl',
+    });
+    expect(requestBody).toMatchObject({ temperature: 0, max_tokens: 1200 });
+    const format = requestBody['response_format'] as { json_schema: { name: string; strict: boolean; schema: Record<string, unknown> } };
+    expect(format.json_schema).toMatchObject({ name: 'meal_estimate', strict: true });
+    const schema = format.json_schema.schema as { properties: Record<string, unknown>; required: string[]; additionalProperties: boolean };
+    expect(Object.keys(schema.properties)).toEqual([
+      'mealName',
+      'componentItems',
+      'estimatedTotalGrams',
+      'mealEstimate',
+      'contextDetected',
+      'portionConfidence',
+      'assumptions',
+      'warnings',
+    ]);
+    expect(schema.properties).toHaveProperty('componentItems');
+    expect(schema.properties).not.toHaveProperty('components');
+    expect(schema.required).toContain('componentItems');
+    expect(schema.required).toContain('estimatedTotalGrams');
+    expect(schema.additionalProperties).toBe(false);
+    expect(usage).toEqual({ promptTokens: 1, completionTokens: 1, totalTokens: 2 });
+  });
+
+  it('sends a separate strict photo assessment and can omit prior estimates from text-only refinement', async () => {
+    const capturedBodies: Record<string, unknown>[] = [];
+    const responses = [
+      JSON.stringify({ assessment: 'complementary' }),
+      JSON.stringify({
+        mealName: 'Reis mit Gemüse',
+        mealEstimate: { calories: 500, protein: 20, carbs: 70, fat: 15, fiber: 8 },
+        componentItems: [{ name: 'Reis', estimatedGrams: 200, calories: 260 }],
+        estimatedTotalGrams: 350,
+        contextDetected: null,
+        portionConfidence: 'medium',
+        assumptions: [],
+        warnings: [],
+      }),
+    ];
+    requestHandler = (request, response) => {
+      void readJson(request).then((body) => {
+        capturedBodies.push(body);
+        sendCompletion(response, responses.shift()!);
+      });
+    };
+
+    process.env['AZURE_OPENAI_ENDPOINT'] = `http://127.0.0.1:${address.port}`;
+    process.env['AZURE_OPENAI_API_KEY'] = 'wire-test-key';
+    process.env['AZURE_OPENAI_API_VERSION'] = '2024-07-01';
+    process.env['AZURE_OPENAI_DEPLOYMENT_NAME'] = 'wire-deployment';
+
+    await assessMealPhoto({ text: 'Reis mit Gemüse', imageBase64: 'c3ludGhldGljLWltYWdl', imageMimeType: 'image/png' });
+    await estimateMeal({
+      text: 'Reis mit Gemüse',
+      refine: {
+        previous: {
+          mealName: 'PRIVATE_PREVIOUS_ESTIMATE_SENTINEL',
+          estimatedTotalGrams: 300,
+          mealEstimate: { calories: 400, protein: 15, carbs: 60, fat: 10, fiber: 6 },
+          componentItems: [{ name: 'Reis', estimatedGrams: 180, calories: 230 }],
+        },
+        hints: ['larger'],
+        note: 'Eine größere Portion',
+      },
+      suppressPreviousEstimate: true,
+    });
+
+    const assessmentBody = capturedBodies[0]!;
+    const assessmentFormat = assessmentBody['response_format'] as { json_schema: { name: string; strict: boolean; schema: Record<string, unknown> } };
+    expect(assessmentFormat.json_schema).toMatchObject({ name: 'meal_photo_assessment', strict: true });
+    expect(assessmentFormat.json_schema.schema).toMatchObject({
+      type: 'object',
+      properties: { assessment: { type: 'string', enum: ['consistent', 'complementary', 'contradictory', 'uncertain'] } },
+      required: ['assessment'],
+      additionalProperties: false,
+    });
+    const assessmentContent = (assessmentBody['messages'] as Array<{ content: unknown }>)[1]?.content as Array<{ type: string }>;
+    expect(assessmentContent.some((part) => part.type === 'image_url')).toBe(true);
+
+    const estimateBody = capturedBodies[1]!;
+    const estimateContent = (estimateBody['messages'] as Array<{ content: unknown }>)[1]?.content as Array<{ type: string; text?: string }>;
+    const estimateText = estimateContent.map((part) => part.text ?? '').join('\n');
+    expect(estimateContent.some((part) => part.type === 'image_url')).toBe(false);
+    expect(estimateText).toContain('"hints":["Portion größer"]');
+    expect(estimateText).toContain('"note":"Eine größere Portion"');
+    expect(estimateText).not.toContain('PRIVATE_PREVIOUS_ESTIMATE_SENTINEL');
+  });
+
   it('sends every current strict-output schema family through the real SDK', async () => {
     const estimate = {
       displayName: 'Haferflocken',
@@ -248,7 +396,7 @@ describe('Azure OpenAI SDK wire contract', () => {
     const responseBySchema: Record<string, unknown> = {
       parsed_meal: { items: [{ rawText: '200 g Hähnchen', displayName: 'Hähnchen', inputMode: 'grams', inputAmount: 200 }] },
       food_estimate: estimate,
-      meal_estimate: { mealName: 'Mittagessen', mealEstimate: { calories: 500, protein: 30, carbs: 50, fat: 15, fiber: 8 }, components: ['Reis'], contextDetected: null, portionConfidence: 'medium', assumptions: [], warnings: [] },
+      meal_estimate: { mealName: 'Mittagessen', mealEstimate: { calories: 500, protein: 30, carbs: 50, fat: 15, fiber: 8 }, componentItems: [{ name: 'Reis', estimatedGrams: 200, calories: 260 }], estimatedTotalGrams: 350, contextDetected: null, portionConfidence: 'medium', assumptions: [], warnings: [] },
       recipe_export_preparation: preparation,
       recipe_text_correction: { texts: ['Mische den Teig.'] },
       recipe_analyze: analysis,

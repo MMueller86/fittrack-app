@@ -229,6 +229,57 @@ or special-activity target exists, a current profile value is returned only as
 `unavailable`. The Diary response never substitutes the hint engine's internal
 fallback as a calorie target.
 
+### AI meal estimate items
+
+`POST /api/diary/meals/{mealId}/items` accepts an AI meal estimate without a
+gram amount. A canonical request is:
+
+```json
+{
+	"productName": "Estimated meal",
+	"sourceType": "ai-meal-estimate",
+	"inputMode": "portion",
+	"inputAmount": 1,
+	"calculatedNutrition": {
+		"calories": 650,
+		"protein": 32,
+		"carbs": 70,
+		"fat": 24,
+		"fiber": 6
+	}
+}
+```
+
+`name` may be supplied instead of `productName`; `calculatedNutrition` requires
+calories, protein, carbs, and fat, with optional fiber. The request does not
+include or require `amountGrams`; supplied nutrition is the complete meal's
+snapshot. The backend stores exactly `quantity: 1` and `unit: "portion"`,
+without scaling the nutrition.
+
+Older clients may send the former placeholder values `inputMode: "grams"`,
+`inputAmount: 100`, `amountGrams: 100`, and `unit: "Portion"`. For this source
+type, the backend accepts that payload, normalizes the stored amount to one
+portion, and does not scale the nutrition snapshot by the placeholder gram
+value.
+
+The optional, non-null add fields for this source type are
+`aiMealEstimateItems` (0–20 components; trimmed name 1–100 characters,
+`estimatedGrams` greater than 0 through 5000, `calories` 0–3000),
+`aiMealEstimateWeightGrams` (20–5000), and `aiMealEstimateVersion` (1–100
+characters). Supplying any of these fields for another source type returns
+`400`. When structured items are supplied, the backend derives the legacy
+`aiMealEstimateComponents` exactly as their ordered names; if structured items
+are absent, a supplied legacy component-name list remains supported. Stored
+macros are the user's confirmed values.
+Unknown top-level fields on an `ai-meal-estimate` add return `400`, including
+`aiMealEstimateBaseCalories`; other source types retain their existing behavior
+of stripping unknown fields.
+
+These are optional Class-0 fields in the existing Diary document/container.
+Legacy documents without them remain readable; no migration or new container
+is required. Diary item copy and move preserve these fields and the legacy
+`aiMealEstimateComponents` snapshot exactly (apart from the new item ID).
+
 ### Bulk diary item mutations
 
 All three bulk routes require a Bearer token and accept only meal/item references;
@@ -1120,13 +1171,13 @@ caches do not grant access or create a recipe/food copy. When access is
 unavailable the relation can still be removed, but it cannot open or authorize
 a new diary log.
 
-## AI Endpoints (Quota Enforced)
+## AI Endpoints
 
 | Method | Route | Auth | Quota Feature | Notes |
 |---|---|---|---|---|
-| POST | `/api/ai/parse-meal` | Yes | `meal-parser` | Free-text meal → structured items |
-| POST | `/api/ai/estimate-meal` | Yes | `meal-estimate` | Meal image → nutrition estimate |
-| POST | `/api/ai/food-estimate` | Yes | `food-estimate` | Food name → nutrition per 100g |
+| POST | `/api/ai/meal-parser/preview` | Yes | `meal-parser` | Free-text meal → structured items |
+| POST | `/api/ai/meal-estimate/preview` | Yes | `meal-estimate` | Text and optional image → V3 assessed meal estimate preview/refinement |
+| POST | `/api/ai/food-estimate/preview` | Yes | `food-estimate` | Food name → nutrition per 100g |
 | POST | `/api/ai/food-estimate/batch` | Yes | `food-estimate` | Batch food estimation |
 | POST | `/api/ai/label-scan` | Yes | `label-scan` | Multipart image → nutrition label data |
 | POST | `/api/ai/recipe-analyze` | Yes | `recipe-analyze` | Recipe text → structured metadata and ingredient preview |
@@ -1141,6 +1192,105 @@ The Daily and Weekly insight endpoints are exceptions and keep their determinist
 contracts available with HTTP `200`:
 - Daily Insight returns `status: "quota_exceeded"`.
 - Weekly Insight returns `evaluation.status: "quota_exceeded"` and `evaluation.text: null`.
+
+### POST /api/ai/meal-estimate/preview
+
+The authenticated endpoint accepts JSON `{ text, refine? }` or multipart form
+data with `text`, optional JPEG/PNG `image` (maximum 4 MB), and optional
+`refine` containing the JSON string for the same refine object. JSON is
+text-only; an image, including a resubmitted refinement photo, is sent as the
+multipart `image` field. `text` is trimmed to 1–500 characters. A refine object
+is strict at every nested object level:
+
+```ts
+{
+	previous: {
+		mealName: string; // 1–200 characters
+		estimatedTotalGrams: number; // 20–5000
+		mealEstimate: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+		componentItems: AiMealEstimateComponent[]; // 0–20
+	};
+	hints?: Array<'larger' | 'smaller'>; // 0–1 values
+	note?: string; // C0/C1 controls removed, then trimmed to 3–200 characters
+}
+```
+
+`previous` and all of its fields are required and non-null. Meal calories are
+finite and 0–3000; the other four macro values are finite and non-negative.
+Each component has a trimmed 1–100 character `name`, finite
+`estimatedGrams > 0` through 5000, and finite `calories` from 0 through 3000.
+Unknown fields and `null` values are rejected. At least one hint or a valid note
+is required. Invalid requests return `400` before quota enforcement or provider
+work. The sanitized note and hints are sent to Azure OpenAI. For an
+excluded-photo refinement, `previous` is validated but omitted from the
+nutrition-estimation call. Request text, note, image content, provider payload,
+assessment value/rationale, user ID, and auth token are not included in telemetry.
+
+For a photo-bearing request, a separate strict assessment call returns exactly
+`{ assessment: 'consistent' | 'complementary' | 'contradictory' | 'uncertain' }`
+with `additionalProperties: false`. The backend rejects malformed or unknown
+values before routing; there is no model-written rationale. `contradictory`
+means a clear incompatibility between the described primary meal identity and
+the dominant visible meal identity. Portion, omitted side, garnish, and
+additional visible ingredients alone are not contradictions. Uncertain matches
+use the neutral text-only fallback.
+
+| Assessment | Nutrition-estimation request |
+|---|---|
+| `consistent` | Original text + photo |
+| `complementary` | Original text + photo; additional visibly supported ingredients remain eligible |
+| `contradictory` | Original text only; no image or image-influenced previous estimate |
+| `uncertain` | Original text only; no image or image-influenced previous estimate |
+| No photo | Original text only; assessment skipped |
+
+The V3 prompt estimates one complete described portion (not per 100 g) and
+returns a structured total plus 0–20 independently estimated components;
+component weights are not summed to derive meal weight or nutrition. The V3
+response contract is:
+
+```ts
+{
+	mealName: string;
+	mealEstimate: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
+	components: string[];
+	componentItems: Array<{ name: string; estimatedGrams: number; calories: number }>;
+	estimatedTotalGrams: number;
+	promptVersion: 'meal-estimate-v4';
+	contextDetected: string | null;
+	portionConfidence: 'high' | 'medium' | 'low';
+	photoProvided: boolean;
+	photoAssessment: 'consistent' | 'complementary' | 'contradictory' | 'uncertain' | 'no_photo';
+	photoUse: 'included' | 'excluded_mismatch' | 'excluded_uncertain' | 'no_photo';
+	photoUsed: boolean;
+	assumptions: string[];
+	warnings: string[];
+}
+```
+
+The response has 20–5000 g total weight and 0–20 component items. Component
+names are trimmed to 1–100 characters, grams are greater than 0 through 5000,
+and calories are 0–3000. Meal calories are 0–3000; other macro values are
+finite and non-negative. `components` is required and exactly the ordered
+projection `componentItems.map(item => item.name)`. Prompt version is
+`meal-estimate-v4`. `photoUsed` is true only when the image contributed to the
+estimate; it is not equivalent to `photoProvided`. Contradictory/uncertain
+cases append fixed localized warnings, but remain successful reviewable
+text-only estimates. The result is transient; the user reviews and confirms it
+before a Diary add.
+
+The shared read type keeps V2 estimate fields and V3 photo fields optional for
+V1 compatibility. A legacy V1 response remains readable, but cannot be refined
+without a complete V2 structured snapshot.
+Schema failures or calories above `9 × estimatedTotalGrams × 1.05` return
+`422 { "error": "KI-Schätzung hat Plausibilitätsprüfung nicht bestanden", "details": [...] }`
+and are not tracked. An Atwater deviation greater than
+`max(50 kcal, 15% of estimated kcal)` or component-calorie deviation greater
+than 20% adds a warning and remains `200`. Assessment/provider/schema failures
+return `502` without an estimate or usage tracking. Quota is enforced before
+the first provider call; assessment and estimation together still consume one
+`meal-estimate` use after a valid final result. Quota exhaustion returns `429`.
+Usage is tracked once after a valid result, including for a successful
+refinement.
 
 ### GET /api/ai/daily-insight
 

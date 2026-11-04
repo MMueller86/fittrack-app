@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   applyAddMeal,
   formatDiaryItemAmount,
+  formatDiaryItemComponents,
+  getDiaryItemAiBadgeLabel,
   getDiaryItemSelectionKey,
   getDiaryMealSelectionState,
   isDiaryItemPortionBased,
@@ -73,6 +75,72 @@ describe('diary item amount formatting', () => {
 
     expect(formatDiaryItemAmount(item)).toBe('100 g');
     expect(isDiaryItemPortionBased(item)).toBe(false);
+  });
+
+  it('formats structured AI meal estimates as portions with their scaled estimated weight', () => {
+    const item = {
+      sourceType: 'ai-meal-estimate',
+      quantity: 1,
+      unit: 'g',
+      aiMealEstimateWeightGrams: 420,
+    } as MealItem;
+
+    expect(formatDiaryItemAmount(item)).toBe('1 Portion · ca. 420 g');
+    expect(formatDiaryItemAmount({ ...item, quantity: 2 })).toBe('2 Portionen · ca. 840 g');
+  });
+
+  it('does not add an estimated weight when an AI meal estimate has no weight field', () => {
+    const item = { sourceType: 'ai-meal-estimate', quantity: 1, unit: 'g' } as MealItem;
+
+    expect(formatDiaryItemAmount(item)).toBe('1 Portion');
+  });
+});
+
+describe('diary item component formatting', () => {
+  it('projects structured AI component names without adding detail values', () => {
+    const item = {
+      sourceType: 'ai-meal-estimate',
+      aiMealEstimateItems: [
+        { name: 'Schnitzel', estimatedGrams: 180, calories: 420 },
+        { name: 'Pommes', estimatedGrams: 140, calories: 430 },
+      ],
+      aiMealEstimateComponents: ['Schnitzel', 'Pommes'],
+    } as MealItem;
+
+    expect(formatDiaryItemComponents(item)).toBe('Schnitzel · Pommes');
+  });
+
+  it('falls back to known legacy component names only', () => {
+    const item = {
+      sourceType: 'ai-meal-estimate',
+      aiMealEstimateComponents: ['Schnitzel', 'Pommes'],
+    } as MealItem;
+
+    expect(formatDiaryItemComponents(item)).toBe('Schnitzel · Pommes');
+  });
+
+  it('does not show component names for non-AI items', () => {
+    expect(formatDiaryItemComponents({
+      sourceType: 'manual',
+      aiMealEstimateComponents: ['Schnitzel'],
+    } as MealItem)).toBeUndefined();
+  });
+});
+
+describe('diary AI estimate badge', () => {
+  it('shows the photo marker only when the saved estimate used the photo', () => {
+    expect(getDiaryItemAiBadgeLabel({
+      sourceType: 'ai-meal-estimate',
+      aiMealEstimatePhotoUsed: false,
+    } as MealItem)).toBe('✨ KI-Schätzung');
+    expect(getDiaryItemAiBadgeLabel({
+      sourceType: 'ai-meal-estimate',
+      aiMealEstimatePhotoUsed: true,
+    } as MealItem)).toBe('📷 KI-Schätzung');
+  });
+
+  it('does not show an AI badge for other diary item types', () => {
+    expect(getDiaryItemAiBadgeLabel({ sourceType: 'manual' } as MealItem)).toBeUndefined();
   });
 });
 

@@ -79,6 +79,36 @@ describe('CosmosDiaryRepository (contract)', () => {
     expect(day.meals[0].id).toBe(meal.id);
   });
 
+  it('reads legacy meal documents without structured estimate fields', async () => {
+    const legacyMeal = {
+      id: 'legacy-meal-without-estimate-v2-fields',
+      userId: USER_A,
+      date: '2026-05-04',
+      type: 'breakfast' as const,
+      name: 'Breakfast',
+      items: [{
+        id: 'legacy-estimate-item',
+        name: 'Oats with milk',
+        sourceType: 'ai-meal-estimate' as const,
+        quantity: 1,
+        unit: 'portion',
+        macros: { calories: 440, protein: 18, carbs: 58, fat: 14, fiber: 6 },
+        aiMealEstimateComponents: ['Oats', 'Milk'],
+      }],
+      createdAt: '2026-05-04T08:00:00.000Z',
+      _docType: 'meal',
+    };
+    await ctx!.database.container('nutritionDiaryMeals').items.create(legacyMeal);
+
+    const result = await repo.getMealById(USER_A, legacyMeal.id);
+
+    expect(result).toEqual(legacyMeal);
+    expect(result?.items[0]).not.toHaveProperty('aiMealEstimateItems');
+    expect(result?.items[0]).not.toHaveProperty('aiMealEstimateWeightGrams');
+    expect(result?.items[0]).not.toHaveProperty('aiMealEstimateVersion');
+    expect(result?.items[0]?.aiMealEstimateComponents).toEqual(['Oats', 'Milk']);
+  });
+
   it('getDay filters by date — other dates are not returned', async () => {
     await repo.createMeal(makeMealInput({ date: '2026-05-04' }));
     await repo.createMeal(makeMealInput({ date: '2026-05-05' }));
@@ -375,6 +405,21 @@ describe('CosmosDiaryRepository (contract)', () => {
     const another = await repo.addItem(USER_A, second.id, {
       name: 'Apple', calories: 50, protein: 0, carbs: 14, fat: 0, fiber: 2,
     });
+    const breakfastWithEstimate = await repo.getMealById(USER_A, breakfast.id);
+    const estimateItem = {
+      ...breakfastWithEstimate!.items[0]!,
+      aiMealEstimateComponents: ['Oats', 'Milk'],
+      aiMealEstimateItems: [
+        { name: 'Oats', estimatedGrams: 80, calories: 300 },
+        { name: 'Milk', estimatedGrams: 220, calories: 140 },
+      ],
+      aiMealEstimateWeightGrams: 300,
+      aiMealEstimateVersion: 'v2',
+    };
+    await ctx!.database.container('nutritionDiaryMeals').item(breakfast.id, USER_A).replace({
+      ...breakfastWithEstimate!,
+      items: [estimateItem],
+    });
 
     const result = await repo.bulkMoveItems(USER_A, {
       sourceDate: '2026-05-04',
@@ -393,6 +438,12 @@ describe('CosmosDiaryRepository (contract)', () => {
       sourceId: 'openFoodFacts:123',
       sourceType: 'openFoodFacts',
       macros: { calories: 300, protein: 10, carbs: 50, fat: 5, fiber: 4 },
+      aiMealEstimateItems: [
+        { name: 'Oats', estimatedGrams: 80, calories: 300 },
+        { name: 'Milk', estimatedGrams: 220, calories: 140 },
+      ],
+      aiMealEstimateWeightGrams: 300,
+      aiMealEstimateVersion: 'v2',
     });
     expect((await repo.getMealById(USER_A, breakfast.id))?.items).toEqual([]);
     expect((await repo.getMealById(USER_A, second.id))?.items).toEqual([]);
@@ -438,6 +489,12 @@ describe('CosmosDiaryRepository (contract)', () => {
     const sourceItem = {
       ...sourceMeal.items[0]!,
       aiMealEstimateComponents: ['Oats', 'Milk'],
+      aiMealEstimateItems: [
+        { name: 'Oats', estimatedGrams: 80, calories: 300 },
+        { name: 'Milk', estimatedGrams: 220, calories: 140 },
+      ],
+      aiMealEstimateWeightGrams: 300,
+      aiMealEstimateVersion: 'v2',
       aiMealEstimateContext: 'Breakfast',
       aiMealEstimateConfidence: 'high' as const,
       aiMealEstimateAssumptions: ['Unsweetened'],

@@ -2,20 +2,49 @@
 
 import type { DiaryDayResponse, Meal, MealItem, MealType } from '@fittrack/shared';
 
-type DiaryItemQuantity = Pick<MealItem, 'quantity' | 'sourceType' | 'unit'>;
+type DiaryItemQuantity = Pick<
+  MealItem,
+  'quantity' | 'sourceType' | 'unit' | 'aiMealEstimateWeightGrams'
+>;
 
 const PORTION_UNITS = new Set(['portion', 'portions', 'portionen']);
 
 export function isDiaryItemPortionBased(item: Pick<DiaryItemQuantity, 'sourceType' | 'unit'>): boolean {
-  return item.sourceType === 'recipe' || PORTION_UNITS.has(item.unit.trim().toLowerCase());
+  return item.sourceType === 'recipe'
+    || item.sourceType === 'ai-meal-estimate'
+    || PORTION_UNITS.has(item.unit.trim().toLowerCase());
 }
 
 export function formatDiaryItemAmount(item: DiaryItemQuantity): string {
   if (isDiaryItemPortionBased(item)) {
-    return `${item.quantity} Portion${item.quantity === 1 ? '' : 'en'}`;
+    const portionLabel = `${item.quantity} Portion${item.quantity === 1 ? '' : 'en'}`;
+    const weight = item.aiMealEstimateWeightGrams;
+    if (item.sourceType === 'ai-meal-estimate' && weight != null && Number.isFinite(weight)) {
+      return `${portionLabel} · ca. ${Math.round(item.quantity * weight)} g`;
+    }
+    return portionLabel;
   }
 
   return `${Math.round(item.quantity)} g`;
+}
+
+export function formatDiaryItemComponents(
+  item: Pick<MealItem, 'sourceType' | 'aiMealEstimateItems' | 'aiMealEstimateComponents'>,
+): string | undefined {
+  if (item.sourceType !== 'ai-meal-estimate') return undefined;
+
+  const componentNames = item.aiMealEstimateItems?.map(({ name }) => name)
+    ?? item.aiMealEstimateComponents
+    ?? [];
+  const names = componentNames.map((name) => name.trim()).filter(Boolean);
+  return names.length > 0 ? names.join(' · ') : undefined;
+}
+
+export function getDiaryItemAiBadgeLabel(
+  item: Pick<MealItem, 'sourceType' | 'aiMealEstimatePhotoUsed'>,
+): string | undefined {
+  if (item.sourceType !== 'ai-meal-estimate') return undefined;
+  return item.aiMealEstimatePhotoUsed ? '📷 KI-Schätzung' : '✨ KI-Schätzung';
 }
 
 export interface DiaryItemReference {

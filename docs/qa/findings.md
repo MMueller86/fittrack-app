@@ -179,6 +179,9 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-158 | Camera flow unmount leaves crop request valid, AC-9/AC-14 | Non-blocking | Frontend | Closed |
 | FT-QA-2026-159 | Camera flow stale crop can clear newer busy guard, AC-9 | Suggestion | Frontend | Closed |
 | FT-QA-2026-160 | Camera flow Android framing copy and gallery retry, AC-6/AC-11 | Suggestion | Frontend | Accepted |
+| FT-QA-2026-161 | Meal-estimate photo/text contradiction guidance, AC-8 | Non-blocking | Backend | Closed |
+| FT-QA-2026-162 | Meal-estimate plan approval and WP-1.1 status | Non-blocking | Planner | Closed |
+| FT-QA-2026-163 | Meal-estimate photo-use contract comment, AC-161-14 | Non-blocking | Documentation | Awaiting decision |
 
 ## Einheitlicher Kamera-Flow QA-Abschluss
 
@@ -2591,6 +2594,21 @@ These items were reported as unverified environment checks. They must not lower 
 - `MANUAL VALIDATION REQUIRED`: Android Health Connect provider permissions and record operations, status-sheet rendering/accessibility, and backup/restore behavior were not exercised on a device. The report's device checklist remains outstanding.
 - Source: [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md).
 
+### Meal Estimate V2 QA Verification Limits (2026-11-03)
+
+- `UNVERIFIED`: Cosmos contract assertions did not run because `127.0.0.1:18081` is intentionally unavailable per user direction. This is not a finding or blocker; no emulator setup or remote Cosmos endpoint was used.
+- `UNVERIFIED`: Independent DV-1 review of calorie reference ranges was not supplied. Synthetic eval fixtures do not establish calibration metrics. A domain reviewer must validate the references before claiming AC-12 calibration.
+- `UNVERIFIED`: No Alpha deployment or live dry-run/apply of the legacy migration was performed. Any later operation follows the approved backend-first deployment order and separate operational authorization.
+- `MANUAL VALIDATION REQUIRED`: No device screenshots, screen-reader, physical haptics, or reviewed photo-accuracy run was supplied. Use the checklist in the QA report on a supported device before making those claims.
+- Source: [Meal Estimate V2 QA report](reports/PLAN_US_KI-Mahlzeitschaetzung-V2.md).
+
+### Meal Estimate V2 Photo Assessment Addendum QA Limits (2026-11-04)
+
+- `UNVERIFIED`: No independently labeled, rights-cleared photo/text fixtures were available to validate model classification accuracy or recognition of complementary ingredients. Passing mocked routing tests does not establish image understanding.
+- `MANUAL VALIDATION REQUIRED`: No physical-device or screen-reader review of consistent, complementary, contradictory, uncertain, and no-photo states was performed.
+- Cosmos contract and DV-1 calibration limits remain as recorded in the 2026-11-03 Meal Estimate V2 QA note above; this addendum introduces no Cosmos shape change.
+- Source: [FT-QA-2026-161 targeted QA report](reports/PLAN_US-KI-Mahlzeitschaetzung-V2_FT-QA-2026-161-Addendum.md).
+
 ## HC-4 Health Connect Synchronisation QA
 
 The initial validated [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md) returned FAIL. Findings 153–154 were blocking and are now closed after independent targeted re-review. Findings 155–156 remain non-blocking and await the user's disposition. Account deletion remains separate and is not treated as completed by HC-4.
@@ -2653,6 +2671,53 @@ The initial validated [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchron
 - **Status:** Awaiting decision.
 - **History:** Registered from the validated HC-4 QA FAIL report; no non-blocking correction is inferred before the user's disposition.
 - **History:** 2026-10-23 - Independent [HC-4 QA re-review](reports/PLAN_HC-4_Health-Connect-Synchronisation-vereinfachen.md) confirms the stale Backend/Domain wording remains. No acceptance, deferral, or correction authorization is inferred.
+
+### FT-QA-2026-161
+
+- **Finding key:** KI-MEAL-V2-05.
+- **Plan reference:** `docs/User Stories/PLAN_US_KI-Mahlzeitschaetzung-V2.md`.
+- **Acceptance criterion:** AC-8 / plan section 11.4.
+- **Description:** Photo transport uses high detail and the prompt says that free-text claims are not photo evidence, but the system prompt does not explicitly direct the model to identify and report uncertainty when the described meal conflicts with the photo. The transport criterion passes; this is a remaining prompt-instruction gap from section 11.4.
+- **Criticality:** Non-blocking.
+- **Owner:** Backend.
+- **Evidence:** `backend/src/lib/prompts/mealEstimate.ts`, `backend/src/lib/openai.ts`, and `backend/src/lib/openai.wire.test.ts`; see the [QA report](reports/PLAN_US_KI-Mahlzeitschaetzung-V2.md).
+- **Recommendation:** Add the planned neutral text/photo conflict instruction and, when suitable reviewed photo fixtures are available, cover it in an eval without introducing hidden-fat heuristics.
+- **Status:** Closed.
+- **Decision:** Fix requested; user approved the focused addendum and its product decisions on 2026-11-04.
+- **History:** 2026-11-03 - Registered from the validated QA PASS WITH ISSUES report; awaited user disposition.
+- **History:** 2026-11-04 - User clarified the required contradiction/complementary behavior and approved the focused addendum; PO-161-1 through PO-161-3 were confirmed.
+- **History:** 2026-11-04 - Backend and Frontend implementation completed. Independent [targeted QA](reports/PLAN_US_KI-Mahlzeitschaetzung-V2_FT-QA-2026-161-Addendum.md) found the issue no longer reproducible at the implementation and wire-contract level. Photo semantic accuracy remains UNVERIFIED because no independently labeled, rights-cleared fixtures are available; this is recorded as a verification limit, not an actionable defect.
+
+### FT-QA-2026-162
+
+- **Finding key:** KI-MEAL-V2-06.
+- **Plan reference:** `docs/User Stories/PLAN_US_KI-Mahlzeitschaetzung-V2.md`.
+- **Acceptance criterion:** N/A.
+- **Description:** The plan artifact still says the prior approval expired, requests re-approval, and marks WP-1.1 stopped, while the supplied review context confirms the revised plan was approved and WP-1.1 completed. The artifact status therefore conflicts with the approved handoff.
+- **Criticality:** Non-blocking.
+- **Owner:** Planner.
+- **Evidence:** The plan's status, WP-1.1, execution-order, and re-approval text; see the [QA report](reports/PLAN_US_KI-Mahlzeitschaetzung-V2.md).
+- **Recommendation:** Update the status/audit text to record the approval and completed handoff while preserving the history of the earlier stop; do not change the approved scope or requirements.
+- **Status:** Closed.
+- **Decision:** User requested correction on 2026-11-04.
+- **History:** 2026-11-03 - Registered from the validated QA PASS WITH ISSUES report. Awaiting the user's fix, accept, or defer decision; no correction is inferred.
+- **History:** 2026-11-04 - User requested correction; routed to Planner to align approval and WP-1.1 status while preserving the earlier stop history and approved scope.
+- **History:** 2026-11-04 - Independent targeted QA verified the plan status records approval and WP-1.1 completion, preserves the initial stop as history, and leaves the approved scope/AC inventory and UNVERIFIED limits unchanged. See [QA report](reports/PLAN_US_KI-Mahlzeitschaetzung-V2.md#targeted-recheck-addendum--ft-qa-2026-162).
+
+### FT-QA-2026-163
+
+- **Finding key:** WP-161-QA-01.
+- **Plan reference:** `docs/User Stories/PLAN_US_KI-Mahlzeitschaetzung-V2_FT-QA-2026-161-Addendum.md`.
+- **Acceptance criterion:** AC-161-14.
+- **Description:** The `imageBase64` comment in `shared/types/aiMealEstimate.ts` says that a supplied image improves portion-size and component detection without explaining that the image can be excluded from nutrition estimation after contradictory or uncertain assessment. This overstates image use compared with the V3 `photoUsed` contract.
+- **Criticality:** Non-blocking.
+- **Owner:** Documentation.
+- **Evidence:** [Targeted QA report](reports/PLAN_US-KI-Mahlzeitschaetzung-V2_FT-QA-2026-161-Addendum.md); `shared/types/aiMealEstimate.ts`; routing in `backend/src/functions/ai.ts` excludes the image for contradictory/uncertain assessments while keeping `photoProvided` true and `photoUsed` false.
+- **Recommendation:** Clarify that a supplied image is assessed transiently and contributes to nutrition estimation only when the validated routing includes it; treat `photoUsed` as the authoritative use indicator.
+- **Status:** Closed.
+- **History:** 2026-11-04 - Registered from the validated WP-161.3 QA report. Awaited the user's fix, accept, or defer decision; no correction was inferred.
+- **History:** 2026-11-04 - User requested the documentation correction and explicitly limited follow-up QA to this finding. No Documentation agent is available; the user authorized Backend to handle the narrow shared-type comment correction.
+- **History:** 2026-11-04 - Backend updated the `imageBase64` comment without changing runtime/API behavior. The single-finding [QA recheck](reports/FT-QA-2026-163-comment-correction.md) passed AC-161-14; no full QA or test-suite run was performed.
 
 ### FT-QA-2026-157
 

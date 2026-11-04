@@ -127,13 +127,18 @@ const NutritionValuesSchema = z.object({
   fiber: positiveNumber.optional(),
 });
 
+const AiMealEstimateComponentSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  estimatedGrams: z.number().finite().gt(0).max(5000),
+  calories: z.number().finite().min(0).max(3000),
+}).strict();
+
 // Two accepted shapes for addItem:
 // 1. Flat macros (manual entry): { name, calories, protein, carbs, fat, fiber }
 // 2. Calculated (from search): { name, quantityMode, quantity, nutritionPer100g?, portionNutrition? }
 // 3. Product input (mobile product picker): { productId, productName, inputMode, inputAmount, amountGrams, calculatedNutrition }
-// 4. AI meal estimate (fast path): { name, calories, protein, carbs, fat, fiber, sourceType: 'ai-meal-estimate', aiMealEstimate* }
-const AddItemSchema = z
-  .object({
+// 4. AI meal estimate: { productName, inputMode: 'portion', inputAmount: 1, calculatedNutrition, sourceType: 'ai-meal-estimate', aiMealEstimate* }
+const AddItemShape = {
     // --- Name: either explicit (manual/calculated) or derived from productName ---
     name: z.string().trim().min(1).max(200).optional(),
     unit: z.string().trim().max(50).optional(),
@@ -161,12 +166,18 @@ const AddItemSchema = z
     sourceType: z.enum(['manual', 'reusableItem', 'openFoodFacts', 'ai', 'ai-meal-estimate', 'recipe']).optional(),
     category: z.string().optional(),
     aiMealEstimateComponents: z.array(z.string()).optional(),
+    aiMealEstimateItems: z.array(AiMealEstimateComponentSchema).max(20).optional(),
+    aiMealEstimateWeightGrams: z.number().finite().min(20).max(5000).optional(),
+    aiMealEstimateVersion: z.string().min(1).max(100).optional(),
     aiMealEstimateContext: z.string().trim().max(100).optional(),
     aiMealEstimateConfidence: z.enum(['high', 'medium', 'low']).optional(),
     aiMealEstimateAssumptions: z.array(z.string()).optional(),
     aiMealEstimatePhotoUsed: z.boolean().optional(),
     imageUrl: z.string().url().optional().nullable(),
-  })
+  };
+const AddItemObjectSchema = z.object(AddItemShape);
+const AddItemSchema = AddItemObjectSchema
+  .passthrough()
   .refine(
     (d) => {
       if (d.sourceType === 'recipe') {
@@ -176,10 +187,42 @@ const AddItemSchema = z
       const hasCalculated = d.quantityMode != null && d.quantity != null;
       const hasProduct = d.productName != null && d.amountGrams != null && d.calculatedNutrition != null;
       const hasName = d.name != null || d.productName != null;
-      return hasName && (hasFlat || hasCalculated || hasProduct);
+      const hasAiMealEstimate = d.sourceType === 'ai-meal-estimate'
+        && d.inputMode === 'portion'
+        && d.inputAmount === 1
+        && d.calculatedNutrition != null;
+      return hasName && (hasFlat || hasCalculated || hasProduct || hasAiMealEstimate);
     },
-    { message: 'Either flat macros, quantityMode+quantity, or productName+amountGrams+calculatedNutrition must be provided' },
-  );
+    { message: 'Either flat macros, quantityMode+quantity, productName+amountGrams+calculatedNutrition, or an ai-meal-estimate portion+calculatedNutrition must be provided' },
+  )
+  .superRefine((d, ctx) => {
+    if (d.sourceType === 'ai-meal-estimate') {
+      for (const field of Object.keys(d)) {
+        if (!Object.hasOwn(AddItemShape, field)) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [field],
+            message: `Field "${field}" is not allowed for sourceType "ai-meal-estimate"`,
+          });
+        }
+      }
+      return;
+    }
+    for (const field of [
+      'aiMealEstimateItems',
+      'aiMealEstimateWeightGrams',
+      'aiMealEstimateVersion',
+    ] as const) {
+      if (d[field] !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          message: `Field "${field}" is only valid for sourceType "ai-meal-estimate"`,
+        });
+      }
+    }
+  })
+  .transform((data) => AddItemObjectSchema.parse(data));
 
 // GET /api/diary?date=YYYY-MM-DD
 export const getDiaryHandler = withHandler(
@@ -531,14 +574,18 @@ export const addItemHandler = withHandler(
     // Resolve the display name: explicit > productName
     const itemName = d.name ?? d.productName!;
 
-    // Resolve macros — priority:
-    // 1. productId → load ReusableItem from DB → server-side calculation (authoritative)
-    // 2. calculatedNutrition from client (fallback: OpenFoodFacts items, legacy clients)
-    // 3. quantityMode + nutritionPer100g (legacy calculated path)
-    // 4. Flat macros (manual one-off entry)
+    // Resolve macros — product data is authoritative; AI estimates use their meal snapshot.
     let macros: { calories: number; protein: number; carbs: number; fat: number; fiber: number };
 
-    if (d.productId && d.amountGrams != null) {
+    if (d.sourceType === 'ai-meal-estimate' && d.calculatedNutrition != null) {
+      macros = {
+        calories: d.calculatedNutrition.calories,
+        protein: d.calculatedNutrition.protein,
+        carbs: d.calculatedNutrition.carbs,
+        fat: d.calculatedNutrition.fat,
+        fiber: d.calculatedNutrition.fiber ?? 0,
+      };
+    } else if (d.productId && d.amountGrams != null) {
       // Priority 1: Try to resolve nutrition server-side from stored ReusableItem
       const product = await getReusableItemsRepository().getById(userId, d.productId);
       if (product?.nutritionPer100g) {
@@ -604,12 +651,29 @@ export const addItemHandler = withHandler(
       const meal = await getDiaryRepository().addItem(userId, mealId, {
         name: itemName,
         ...macros,
-        quantity: d.inputMode === 'portion' ? d.inputAmount! : (d.amountGrams ?? d.quantity ?? 1),
-        unit: d.inputMode === 'portion' ? 'portion' : d.quantityMode === 'portions' ? 'portion' : (d.unit ?? 'g'),
+        quantity: d.sourceType === 'ai-meal-estimate'
+          ? 1
+          : d.inputMode === 'portion' ? d.inputAmount! : (d.amountGrams ?? d.quantity ?? 1),
+        unit: d.sourceType === 'ai-meal-estimate'
+          ? 'portion'
+          : d.inputMode === 'portion' ? 'portion' : d.quantityMode === 'portions' ? 'portion' : (d.unit ?? 'g'),
         ...(d.productId ? { sourceId: d.productId } : {}),
         ...(d.isAiEstimate ? { isAiEstimate: true } : {}),
         ...(d.sourceType === 'ai-meal-estimate' ? { sourceType: 'ai-meal-estimate' } : {}),
-        ...(d.aiMealEstimateComponents ? { aiMealEstimateComponents: d.aiMealEstimateComponents } : {}),
+        ...(d.aiMealEstimateItems !== undefined
+          ? {
+              aiMealEstimateItems: d.aiMealEstimateItems,
+              aiMealEstimateComponents: d.aiMealEstimateItems.map((item) => item.name),
+            }
+          : d.aiMealEstimateComponents !== undefined
+            ? { aiMealEstimateComponents: d.aiMealEstimateComponents }
+            : {}),
+        ...(d.aiMealEstimateWeightGrams !== undefined
+          ? { aiMealEstimateWeightGrams: d.aiMealEstimateWeightGrams }
+          : {}),
+        ...(d.aiMealEstimateVersion !== undefined
+          ? { aiMealEstimateVersion: d.aiMealEstimateVersion }
+          : {}),
         ...(d.aiMealEstimateContext ? { aiMealEstimateContext: d.aiMealEstimateContext } : {}),
         ...(d.aiMealEstimateConfidence ? { aiMealEstimateConfidence: d.aiMealEstimateConfidence } : {}),
         ...(d.aiMealEstimateAssumptions ? { aiMealEstimateAssumptions: d.aiMealEstimateAssumptions } : {}),

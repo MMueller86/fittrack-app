@@ -267,6 +267,25 @@ Recipe creation, detail, and logging reuse shared mobile components instead of d
 
 [Rule] New recipe screens should compose these shared components and theme tokens rather than introducing screen-local copies of chips, nutrition tiles, overlays, confirmations, or undo feedback.
 
+## AI Meal Estimate Components
+
+The nutrition estimate flow uses `MealEstimateResult` for both the initial AI
+result and the dedicated review screen. It presents confidence and warnings,
+editable calories, portion and macro controls, component details, and a
+persistent save action using the dark theme tokens.
+
+Its internal `StepButton` is feature-local rather than a shared generic stepper.
+The fixed 48 dp control supports accessible labels, press-and-hold repetition,
+and haptic feedback. Keep the 5% adjustment and boundary behavior specific to
+the meal-estimate domain; do not copy it as an assumed rule for other numeric
+controls.
+
+`MealEstimateRefineSheet` is the estimate-specific overlay for `Neu schätzen`.
+It uses the established surface, border, typography, and spacing tokens, a
+backdrop, a keyboard-aware bounded scroll area, and a distinct submit action.
+Its hint choices and optional correction are documented in the
+[meal-estimate UX pattern](05-ux-patterns.md#meal-estimate-re-estimation).
+
 ## Forbidden Patterns
 
 | Pattern | Reason |
