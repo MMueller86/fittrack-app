@@ -755,6 +755,10 @@ describe('nutrition diary mutation caller flows', () => {
     await selectPhoto('/meal-cropped.jpg', 'image/jpeg');
     expect(hasButton('Foto entfernen')).toBe(true);
     expect(hasButton('Foto mit der Kamera aufnehmen')).toBe(false);
+    const selectedPhoto = renderer.root.findAll((node) => node.type === 'Image')[0];
+    expect(selectedPhoto?.props.source).toEqual({ uri: '/meal-cropped.jpg' });
+    expect(selectedPhoto?.props.resizeMode).toBe('contain');
+    expect(selectedPhoto?.props.accessibilityLabel).toBe('Ausgewähltes Mahlzeitenfoto');
     await press(renderer, 'Analysieren');
     expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', '/meal-cropped.jpg', 'image/jpeg');
 
@@ -770,6 +774,7 @@ describe('nutrition diary mutation caller flows', () => {
     await act(async () => { (remove.props.onPress as () => void)(); });
     expect(hasButton('Foto entfernen')).toBe(false);
     expect(hasButton('Foto mit der Kamera aufnehmen')).toBe(true);
+    expect(renderer.root.findAll((node) => node.type === 'Image')).toHaveLength(0);
     await press(renderer, 'Analysieren');
     expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', undefined, undefined);
   });

@@ -152,8 +152,8 @@ describe('daily insight v30 prompts', () => {
     const input = JSON.parse(buildDailyInsightPrompt(fixture.intent, fixture.input).user);
 
     expect(input.context.nutrition).toMatchObject({
-      today: { calories: fixture.input.nutrition.today.calories },
-      targets: { calories: fixture.input.nutrition.targets.calories },
+      today: { calories: fixture.input.nutrition.today!.calories },
+      targets: { calories: fixture.input.nutrition.targets!.calories },
       remainingCalories: fixture.input.nutrition.remainingCalories,
     });
     expect(input.context.nutrition).not.toHaveProperty('last3Days');
@@ -171,8 +171,8 @@ describe('daily insight v30 prompts', () => {
     const input = JSON.parse(buildDailyInsightPrompt(fixture.intent, fixture.input).user);
 
     expect(input.context.nutrition).toMatchObject({
-      today: { calories: fixture.input.nutrition.today.calories },
-      targets: { calories: fixture.input.nutrition.targets.calories },
+      today: { calories: fixture.input.nutrition.today!.calories },
+      targets: { calories: fixture.input.nutrition.targets!.calories },
       remainingCalories: fixture.input.nutrition.remainingCalories,
     });
     expect(input.context.nutrition.today).not.toHaveProperty('protein');
@@ -504,7 +504,7 @@ describe('daily insight v30 prompts', () => {
         dailyInsightProteinStatus: 'below_range',
         last3Days: [],
       },
-    } as InsightInputContext;
+    } as unknown as InsightInputContext;
     const closedContext = {
       ...openContext,
       nutrition: { ...openContext.nutrition, remainingCalories: 0 },

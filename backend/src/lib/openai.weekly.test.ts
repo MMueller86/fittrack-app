@@ -72,8 +72,8 @@ describe('generateWeeklyInsight', () => {
             properties: { text: { minLength: number; maxLength: number } };
           };
         };
-        max_tokens: number;
       };
+      max_tokens: number;
     };
     expect(request.response_format).toMatchObject({
       type: 'json_schema',

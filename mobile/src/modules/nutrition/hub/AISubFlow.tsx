@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   Platform,
   SafeAreaView,
@@ -521,45 +522,54 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
             blurOnSubmit
           />
 
-          <View style={styles.photoRow}>
-            {mealPhoto ? (
-              <View style={styles.photoIndicator}>
+          {mealPhoto ? (
+            <View style={styles.photoPreview}>
+              <View style={styles.photoPreviewHeader}>
                 <View style={styles.photoIndicatorLabel}>
                   <Icon lib="feather" name="check-circle" size="md" color={colors.primary} />
-                  <Text style={styles.photoIndicatorText}>Foto hinzugefügt</Text>
+                  <Text style={styles.photoIndicatorText}>Foto ausgewählt</Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setMealPhoto(null)}
                   style={styles.removePhotoBtn}
+                  onPress={() => setMealPhoto(null)}
                   accessibilityRole="button"
                   accessibilityLabel="Foto entfernen"
                 >
                   <Icon lib="feather" name="x" size="md" color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
-            ) : (
-              <>
-                <TouchableOpacity
-                  style={styles.photoBtn}
-                  onPress={() => setPhotoSource('camera')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Foto mit der Kamera aufnehmen"
-                >
-                  <Icon lib="feather" name="camera" size="md" color={colors.primaryBright} />
-                  <Text style={styles.photoBtnText}>Kamera</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.photoBtn}
-                  onPress={() => setPhotoSource('gallery')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Foto aus der Galerie auswählen"
-                >
-                  <Icon lib="feather" name="image" size="md" color={colors.primaryBright} />
-                  <Text style={styles.photoBtnText}>Galerie</Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
+              <View style={styles.photoFrame}>
+                <Image
+                  source={{ uri: mealPhoto.uri }}
+                  style={styles.photoImage}
+                  resizeMode="contain"
+                  accessible
+                  accessibilityLabel="Ausgewähltes Mahlzeitenfoto"
+                />
+              </View>
+            </View>
+          ) : (
+            <View style={styles.photoRow}>
+              <TouchableOpacity
+                style={styles.photoBtn}
+                onPress={() => setPhotoSource('camera')}
+                accessibilityRole="button"
+                accessibilityLabel="Foto mit der Kamera aufnehmen"
+              >
+                <Icon lib="feather" name="camera" size="md" color={colors.primaryBright} />
+                <Text style={styles.photoBtnText}>Kamera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.photoBtn}
+                onPress={() => setPhotoSource('gallery')}
+                accessibilityRole="button"
+                accessibilityLabel="Foto aus der Galerie auswählen"
+              >
+                <Icon lib="feather" name="image" size="md" color={colors.primaryBright} />
+                <Text style={styles.photoBtnText}>Galerie</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {error ? <ErrorBanner error={error} /> : null}
           <TouchableOpacity
@@ -648,6 +658,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
   },
+  photoPreview: {
+    gap: spacing.xs,
+  },
+  photoPreviewHeader: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  photoFrame: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    overflow: 'hidden',
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+  },
   photoBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -664,16 +697,6 @@ const styles = StyleSheet.create({
     ...typography.body2,
     color: colors.textSecondary,
   },
-  photoIndicator: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
   photoIndicatorLabel: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -683,7 +706,14 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.primary,
   },
-  removePhotoBtn: { padding: spacing.xs },
+  removePhotoBtn: {
+    width: 48,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
+  },
   analyzeBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,

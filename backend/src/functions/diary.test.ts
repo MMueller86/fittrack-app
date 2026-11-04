@@ -3115,7 +3115,7 @@ describe('GET /api/diary/changes/meals', () => {
     ['zero limit', { since, limit: '0' }],
     ['overlarge limit', { since, limit: '101' }],
   ] as const)('returns invalid_delta_query for %s', async (_label, query) => {
-    const res = await listMealChangesHandler(await makeAuthRequest({ query }), makeContext());
+    const res = await listMealChangesHandler(await makeAuthRequest({ query: query as Record<string, string | string[]> }), makeContext());
     expect(res.status).toBe(400);
     expect(res.jsonBody).toEqual({ error: 'invalid_delta_query' });
   });

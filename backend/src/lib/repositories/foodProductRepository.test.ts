@@ -27,10 +27,8 @@ function makeProduct(overrides: Partial<FoodProduct> & { id: string; name: strin
   const normalizedName = overrides.name.toLowerCase();
   const tokens = normalizedName.split(/\s+/).filter((t) => t.length >= 2);
   return {
-    id: overrides.id,
     source: 'openFoodFacts',
     barcode: overrides.id.replace('openFoodFacts:', ''),
-    name: overrides.name,
     productType: 'food',
     isEdible: true,
     nutritionBasis: 'per100g',

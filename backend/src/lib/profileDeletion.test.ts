@@ -164,7 +164,7 @@ describe('deleteUserProfileData', () => {
           const ownerless = {
             ...recipe,
             images: [{ id: 'image-1', blobName: 'community/recipe-1/image-1.jpg', order: 1 }],
-          } as Recipe & { ownerUserId?: string };
+          } as Omit<Recipe, 'ownerUserId'> & { ownerUserId?: string };
           delete ownerless.ownerUserId;
           return ownerless as unknown as CommunityRecipeRecord;
         }),

@@ -1144,7 +1144,7 @@ partial image pair. A request draft is not persisted.
 
 | Method | Route | Auth | Notes |
 |---|---|---|---|
-| GET | `/api/food-search?query=<q>` | Yes | Fan-out: library + catalog, deduped. `{ results: FoodSearchResult[] }` |
+| GET | `/api/food-search?query=<q>` | Yes | Fan-out: library + catalog, deduped; matching favorites first, then by score. `{ results: FoodSearchResult[] }` |
 | GET | `/api/food-products/search?q=<q>` | Yes | Catalog only. Min 2 chars. |
 | GET | `/api/food-products/{id}` | Yes | Single catalog item by id |
 

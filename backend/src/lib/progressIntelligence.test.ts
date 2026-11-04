@@ -22,7 +22,7 @@ import { PLATEAU_MIN_MEASUREMENTS } from '../../../shared/lib/plateauDetector';
 // ---------------------------------------------------------------------------
 
 function makeEntry(date: string, value: number, unit: 'kg' | 'lbs' = 'kg'): WeightEntry {
-  return { id: date, userId: 'u1', date, value, unit };
+  return { id: date, userId: 'u1', date, value, unit, createdAt: `${date}T12:00:00.000Z` };
 }
 
 /** Generate N entries with a consistent linear slope, newest first. */

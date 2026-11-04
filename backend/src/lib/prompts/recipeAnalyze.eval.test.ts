@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { Completions } from 'openai/resources/chat/completions';
+import type { ChatCompletion } from 'openai/resources/chat/completions';
 import type { RecipeIngredient, PrepareRecipeExportViewResponseV2 } from '@fittrack/shared';
 import * as openai from '../openai';
 import { analyzeRecipeText } from '../openai';
@@ -385,8 +386,8 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live
       const response = await prepareRecipeExportViewHandler(request, makeContext());
       const outputs = await Promise.all(analyzer.mock.results.map(async (entry) => entry.type === 'return'
         ? Promise.resolve(entry.value).catch(() => undefined) : undefined));
-      const providerResponses = await Promise.all(provider.mock.results.map(async (entry) => entry.type === 'return'
-        ? Promise.resolve(entry.value).catch(() => undefined) : undefined));
+      const providerResponses = (await Promise.all(provider.mock.results.map(async (entry) => entry.type === 'return'
+        ? Promise.resolve(entry.value).catch(() => undefined) : undefined))) as Array<ChatCompletion | undefined>;
       const probes = await Promise.all(probe.mock.results.map(async (entry) => entry.type === 'return'
         ? Promise.resolve(entry.value).catch(() => undefined) : undefined));
       const result = outputs.at(-1);
@@ -475,7 +476,7 @@ describe.skipIf(!hasCredentials)('recipePreparation: synthetic saved-source live
           });
           expect(sdkRequest.messages).toEqual([
             { role: 'system', content: RECIPE_TEXT_CORRECTION_SYSTEM_PROMPT },
-            { role: 'user', content: JSON.stringify({ texts: fields.map(({ text, actual, bounds }) => ({ text, actual, bounds, maxCharacters: openai.textCorrectionLimit(text, actual, bounds) })) }) },
+            { role: 'user', content: JSON.stringify({ texts: fields.map(({ text, actual, bounds }) => ({ text, actual, bounds, maxCharacters: openai.textCorrectionLimit(text, actual!, bounds) })) }) },
           ]);
           expect(sdkRequest.response_format.json_schema).toMatchObject({ strict: true, schema: {
             additionalProperties: false, required: ['texts'], properties: { texts: { minItems: fields.length, maxItems: fields.length } },

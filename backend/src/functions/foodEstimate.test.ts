@@ -41,9 +41,11 @@ const CHICKEN_ESTIMATE: AiFoodEstimate = {
     fiber: null,
     salt: null,
   },
-  estimatedPortion: { label: '1 Brust', weightGrams: 150 },
+  estimatedPortion: { label: '1 Brust', weightGrams: 150, suggestedAmount: null },
   category: 'Fleisch',
   confidence: 0.85,
+  sourceProduct: null,
+  searchTerms: [],
   warnings: [],
 };
 

@@ -253,13 +253,11 @@ describe('computeInputHash', () => {
   it('returns different hash when the activity status or local-time bucket changes', () => {
     const a = makeContext({
       currentHourLocal: 19,
-      activityCompletionStatus: 'planned',
-      activityStatusSource: 'local_time_heuristic',
+      dailyActivityStatus: 'unknown',
     });
     const b = makeContext({
       currentHourLocal: 20,
-      activityCompletionStatus: 'likely_completed',
-      activityStatusSource: 'local_time_heuristic',
+      dailyActivityStatus: 'completed',
     });
     expect(computeInputHash(a, 'v4')).not.toBe(computeInputHash(b, 'v4'));
   });

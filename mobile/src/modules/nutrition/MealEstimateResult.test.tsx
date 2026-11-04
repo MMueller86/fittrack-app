@@ -199,6 +199,18 @@ describe('MealEstimateResult re-estimation', () => {
 });
 
 describe('MealEstimateResult photo use', () => {
+  it('shows the complete uploaded photo in a stable frame for verification', async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(makeResult(V2_ESTIMATE)); });
+    renderers.push(renderer);
+
+    const photo = nodes(renderer, 'Image')[0];
+    expect(photo?.props.source).toEqual({ uri: '/meal.jpg' });
+    expect(photo?.props.resizeMode).toBe('contain');
+    expect(photo?.props.accessibilityLabel).toBe('An die KI gesendetes Foto');
+    expect(containsText(renderer, 'An die KI gesendetes Foto')).toBe(true);
+  });
+
   it.each([
     [
       'consistent',

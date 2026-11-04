@@ -16,6 +16,7 @@
     "storage:start": "node scripts/storage.mjs",
     "copy:instagram-assets": "node scripts/copy-instagram-assets.mjs",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "render:recipe-details-template": "npm run build && node scripts/render-recipe-details-template.mjs",
     "render:gefluegelfrikadellen-details-template": "npm run build && node scripts/render-gefluegelfrikadellen-details-template.mjs",

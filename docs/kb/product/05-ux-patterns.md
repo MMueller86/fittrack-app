@@ -192,12 +192,20 @@ until the user saves or explicitly leaves. V2 structured components show their
 estimated weights and calories in this review; V1 results show names only.
 Missing component detail must not be filled with inferred grams or calories.
 
-The review shows an accessible German photo-use notice from the structured V3
+Before analysis, `AISubFlow` shows the selected cropped meal photo in the same
+full 4:3 `contain` frame used by the review screens. The preview uses the exact
+URI passed to the AI request; removing the photo hides the preview and removes
+it from the request.
+
+The review shows the complete uploaded photo in a stable 4:3 frame, labeled as
+the photo sent to AI, so the user can verify the exact image. It uses
+`resizeMode="contain"` so no further crop is applied in the review. The review
+also shows an accessible German photo-use notice from the structured V3
 response: consistent and complementary photos are identified as used;
 contradictory photos are identified as excluded because they do not match the
 description; uncertain relationships are identified as unclear and excluded;
 `no_photo` / `photoProvided: false` explains that the estimate uses the
-description alone. A supplied photo thumbnail may remain visible when excluded.
+description alone. The uploaded photo remains visible when excluded.
 Assessment and routing fields are not inferred from free-form warnings, and
 legacy responses without structured photo fields do not get an invented
 exclusion notice. The matching fixed backend photo warning is not repeated in

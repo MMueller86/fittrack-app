@@ -34,7 +34,7 @@ describe('auth', () => {
   beforeAll(async () => {
     const keys = await generateKeyPair('RS256');
     privateKey = keys.privateKey as unknown as CryptoKey;
-    _setJwksForTesting(async () => keys.publicKey);
+    _setJwksForTesting((async () => keys.publicKey) as unknown as Parameters<typeof _setJwksForTesting>[0]);
 
     process.env['AUTH_ISSUER'] = TEST_ISSUER;
     process.env['AUTH_AUDIENCE'] = TEST_AUDIENCE;

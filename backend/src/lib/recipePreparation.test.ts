@@ -319,7 +319,7 @@ describe('B-2 bounded Preparation loop', () => {
       if (kind === 'missing') result.diagnostics.pop();
       if (kind === 'nonfinite') {
         const entry = result.diagnostics.find((entry) => entry.field === 'steps' && 'measured' in entry)!;
-        if ('measured' in entry) entry.measured.width = NaN;
+        if ('measured' in entry && entry.measured) entry.measured.width = NaN;
       }
       if (kind === 'duplicate-index') {
         const entry = result.diagnostics.find((entry) => entry.field === 'steps')!;

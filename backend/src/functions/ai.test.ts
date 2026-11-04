@@ -21,7 +21,7 @@ import { _setFoodProductRepository, _resetFoodProductRepository } from '../lib/r
 import { _setReusableItemsRepository, __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
 import type { FoodProductRepository } from '../lib/repositories/foodProductRepository';
 import type { ReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
-import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
+import type { AiMealEstimatePreview, FoodSearchResult, ReusableItem } from '@fittrack/shared';
 import {
   makeContext,
   makeRequest,
@@ -207,7 +207,7 @@ function mockFoodRepo(results: FoodSearchResult[], searchSpy?: ReturnType<typeof
   const searchFn = searchSpy ?? vi.fn().mockResolvedValue(results);
   if (!searchSpy) searchFn.mockResolvedValue(results);
   const repo: FoodProductRepository = {
-    search: searchFn,
+    search: searchFn as FoodProductRepository['search'],
     getById: vi.fn().mockResolvedValue(null),
   };
   _setFoodProductRepository(repo);
@@ -388,6 +388,10 @@ function mockLibRepo(items: ReusableItem[]) {
   const repo: ReusableItemsRepository = {
     search: vi.fn().mockResolvedValue(items),
     create: vi.fn(),
+    getById: vi.fn(),
+    update: vi.fn(),
+    remove: vi.fn(),
+    incrementUsageCount: vi.fn(),
   };
   _setReusableItemsRepository(repo);
   return repo;
@@ -1388,7 +1392,7 @@ describe('analyzeRecipeText normalization', () => {
       ...VALID_RECIPE_RAW,
       ingredients: [
         { ...VALID_RECIPE_RAW.ingredients[0]!, kitchenAmountText: '2 EL' },
-        { line: '1 TL Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' },
+        { analysisKey: 'ingredient-salt', line: '1 TL Salz', displayName: 'Salz', category: 'seasoning', amountGrams: 5, kitchenAmountText: '1 TL' },
       ],
     });
 

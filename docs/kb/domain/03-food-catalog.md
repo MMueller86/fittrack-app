@@ -80,6 +80,15 @@ Within the same rank, `sourceQualityScore` is the tiebreaker. Higher score = bet
 
 Minimum query length: 2 characters for catalog-only endpoints.
 
+### Food search ordering (`GET /api/food-search`)
+
+For queries of 2+ characters, `foodSearch.ts` scores library items (`rankByQuery` + `LIBRARY_BONUS` 1.5) and catalog items (`rankByQuery`), then sorts by:
+
+1. Favorite first (`UserFoodRelation.isFavorite`, matched by `id` = `foodRef`), regardless of match strength.
+2. Score descending.
+
+The catalog search is capped (top 20) and favorite-unaware. Catalog favorites (`foodRefType: 'catalog'`) missing from it are added when their denormalized `displayName`/`displayBrand` match the query (`rankByQuery >= 0`); each is loaded with a point read (`getById`). A favorite must still match the query to appear.
+
 ## Meal Parser Auto-Assignment
 
 The meal parser may automatically assign a candidate only when its normalized name is an exact or full-name prefix match, or when every query token is represented by the product name, brand, or a stored library search term. A candidate that matches only one token of a multi-word query stays in `needsSelection` so the user can review it.

@@ -10,24 +10,22 @@
 //       All product data comes from the internal Cosmos foodProducts container.
 
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from '@azure/functions';
-import type { FoodSearchResult, ReusableItem } from '@fittrack/shared';
+import type { FoodSearchResult, ReusableItem, UserFoodRelation } from '@fittrack/shared';
 
 import { requireUser } from '../lib/auth';
 import { withHandler } from '../lib/http';
 import { logEvent } from '../lib/log';
-import { getFoodProductRepository } from '../lib/repositories/foodProductRepository';
+import { foodProductToSearchResult, getFoodProductRepository } from '../lib/repositories/foodProductRepository';
 import { getReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
 import { getUserFoodRelationRepository } from '../lib/repositories/userFoodRelationRepository';
 import { rankByQuery } from '../lib/searchRanking';
 
-// Build a Set of favorited foodRefs for O(1) lookup during result enrichment.
-async function loadFavoriteRefs(userId: string): Promise<Set<string>> {
+async function loadFavorites(userId: string): Promise<UserFoodRelation[]> {
   try {
-    const favorites = await getUserFoodRelationRepository().listFavorites(userId);
-    return new Set(favorites.map((f) => f.foodRef));
+    return await getUserFoodRelationRepository().listFavorites(userId);
   } catch {
     // Non-critical — favorites enrichment must not break search
-    return new Set();
+    return [];
   }
 }
 
@@ -67,11 +65,13 @@ export const foodSearchHandler = withHandler(
     const query = request.query.get('query') ?? '';
 
     // Fan-out: user library + internal product catalog + favorites in parallel
-    const [libraryItems, catalogResults, favoriteRefs] = await Promise.all([
+    const [libraryItems, catalogSearchResults, favorites] = await Promise.all([
       getReusableItemsRepository().search(userId, query).catch(() => [] as ReusableItem[]),
       query.trim().length >= 2 ? getFoodProductRepository().search(query).catch(() => [] as FoodSearchResult[]) : Promise.resolve([] as FoodSearchResult[]),
-      loadFavoriteRefs(userId),
+      loadFavorites(userId),
     ]);
+    const favoriteRefs = new Set(favorites.map((f) => f.foodRef));
+    let catalogResults = catalogSearchResults;
 
     // Enrich a result with isFavorite flag.
     // Library items: favoriteRef = item.id. Catalog items: favoriteRef = item.id (= 'openFoodFacts:<barcode>').
@@ -82,6 +82,25 @@ export const foodSearchHandler = withHandler(
 
     if (nq.length >= 2) {
       const LIBRARY_BONUS = 1.5;
+
+      // Catalog search is capped (top 20) and favorite-unaware: add matching catalog favorites it missed.
+      // Matching uses the denormalized displayName/displayBrand; only matches cost a point read.
+      const foundIds = new Set(catalogResults.map((r) => r.id));
+      const missing = favorites.filter(
+        (f) =>
+          f.foodRefType === 'catalog' &&
+          !foundIds.has(f.foodRef) &&
+          rankByQuery(f.displayName, [], nq, f.displayBrand) >= 0,
+      );
+      if (missing.length > 0) {
+        const products = await Promise.all(
+          missing.map((f) => getFoodProductRepository().getById(f.foodRef).catch(() => null)),
+        );
+        catalogResults = [
+          ...catalogResults,
+          ...products.flatMap((p) => (p ? [foodProductToSearchResult(p)] : [])),
+        ];
+      }
 
       const rawLibrary = libraryItems;
       const catalog: FoodSearchResult[] = catalogResults;
@@ -111,7 +130,11 @@ export const foodSearchHandler = withHandler(
       );
 
       const results: FoodSearchResult[] = [...scoredLibrary, ...deduplicatedCatalog]
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => {
+          const fa = favoriteRefs.has(a.result.id) ? 1 : 0;
+          const fb = favoriteRefs.has(b.result.id) ? 1 : 0;
+          return fb - fa || b.score - a.score;
+        })
         .map((x) => enrich(x.result));
 
       logEvent(ctx, 'info', 'food.search', {

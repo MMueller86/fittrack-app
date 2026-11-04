@@ -97,7 +97,7 @@ describe('GET /api/weights/changes', () => {
     ['unknown query parameter', { since, userId: 'forged-user' }],
     ['repeated since', { since: [since, since] }],
   ] as const)('returns invalid_delta_query for %s', async (_label, query) => {
-    const res = await listWeightChangesHandler(await makeAuthRequest({ query }), makeContext());
+    const res = await listWeightChangesHandler(await makeAuthRequest({ query: query as Record<string, string | string[]> }), makeContext());
     expect(res.status).toBe(400);
     expect(res.jsonBody).toEqual({ error: 'invalid_delta_query' });
   });

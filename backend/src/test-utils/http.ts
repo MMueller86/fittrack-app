@@ -33,7 +33,7 @@ export async function setupTestAuth(): Promise<void> {
   _testPrivateKey = keys.privateKey as unknown as CryptoKey;
 
   // Inject the public key as the JWKS resolver
-  _setJwksForTesting(async () => keys.publicKey);
+  _setJwksForTesting((async () => keys.publicKey) as unknown as Parameters<typeof _setJwksForTesting>[0]);
 
   // Set required env vars
   process.env['AUTH_ISSUER'] = TEST_ISSUER;

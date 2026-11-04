@@ -269,7 +269,7 @@ describe('buildDailyInsightContext', () => {
     const mealWithProtein = [meal(0, 'dinner', 140)];
     const withoutProfile = await buildForMeals(mealWithProtein, { profile: null });
     const withStaleWeight = await buildForMeals(mealWithProtein, {
-      weights: [{ id: 'old', userId: USER_ID, date: '2026-07-30', value: 70, unit: 'kg' }],
+      weights: [{ id: 'old', userId: USER_ID, date: '2026-07-30', value: 70, unit: 'kg', createdAt: '2026-07-30T08:00:00.000Z' }],
     });
 
     expect(withoutProfile.nutrition.dailyInsightProteinStatus).toBe('unknown');
@@ -555,6 +555,7 @@ describe('buildDailyInsightContext', () => {
         date: date.toISOString().slice(0, 10),
         value: 79.6 - index * 0.1,
         unit: 'kg',
+        createdAt: `${REFERENCE_DATE}T12:00:00.000Z`,
       };
     });
     const olderWeights: WeightEntry[] = [20, 27].map((daysAgo, index) => {
@@ -566,6 +567,7 @@ describe('buildDailyInsightContext', () => {
         date: date.toISOString().slice(0, 10),
         value: 82 + index,
         unit: 'kg',
+        createdAt: `${REFERENCE_DATE}T12:00:00.000Z`,
       };
     });
     const context = await buildForWeights([...recentWeights, ...olderWeights]);
@@ -585,6 +587,7 @@ describe('buildDailyInsightContext', () => {
           date: date.toISOString().slice(0, 10),
           value: 80 + (count - 1 - index) * valueStep,
           unit: 'kg',
+          createdAt: `${REFERENCE_DATE}T12:00:00.000Z`,
         };
       });
 
@@ -602,6 +605,7 @@ describe('buildDailyInsightContext', () => {
       date: REFERENCE_DATE,
       value: 176.37,
       unit: 'lbs',
+      createdAt: `${REFERENCE_DATE}T12:00:00.000Z`,
     }]);
 
     expect(context.weight.latestKg).toBeCloseTo(80, 1);

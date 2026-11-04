@@ -9,7 +9,6 @@ import { FramedCameraCapture, type CapturedPhoto } from './FramedCameraCapture';
 import { FramedImageEditor } from './FramedImageEditor';
 import {
   getCropForSourceRect,
-  getSourceRectForCrop,
   type FrameCrop,
   type FrameSize,
   type ImageSize,
@@ -90,8 +89,7 @@ export function FramedPhotoPicker({
       if (output === 'metadata') {
         onSelected({ ...source, crop });
       } else {
-        const rect = getSourceRectForCrop(image, aspectRatio, crop);
-        const cropped = await cropImageToFrame(source.uri, rect, image, maxEdge);
+        const cropped = await cropImageToFrame(source.uri, aspectRatio, crop, maxEdge);
         if (request !== requestId.current) return;
         onSelected({ ...cropped, crop });
       }

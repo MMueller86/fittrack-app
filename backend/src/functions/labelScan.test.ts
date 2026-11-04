@@ -88,7 +88,7 @@ function makeMultipartRequest(
   contentType: string,
   token: string,
 ): HttpRequest {
-  const blob = new Blob([imageBuffer], { type: contentType });
+  const blob = new Blob([new Uint8Array(imageBuffer)], { type: contentType });
   const formDataMap = new Map<string, Blob | string>();
   formDataMap.set('image', blob);
 

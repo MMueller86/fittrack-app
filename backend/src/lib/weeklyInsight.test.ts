@@ -101,7 +101,7 @@ describe('weekly insight input hashing', () => {
       },
     });
 
-    expect(computeWeeklyInputHash(first, 'v1')).not.toBe(computeWeeklyInputHash(changedProfile, 'v1'));
+    expect(computeWeeklyInputHash(first as never, 'v1')).not.toBe(computeWeeklyInputHash(changedProfile as never, 'v1'));
   });
 
   it('is stable when repository results return meals in another order', () => {
@@ -124,6 +124,7 @@ describe('buildWeeklyInsightPromptContext', () => {
       days: [{
         date: '2026-08-13',
         consumedCalories: 2000,
+        consumedMacros: null,
         baseTargetCalories: 2200,
         effectiveTargetCalories: 2400,
         activityBonusCalories: 200,
@@ -194,7 +195,7 @@ describe('decideWeeklyCache', () => {
       evaluation: { status: 'unavailable', text: null, generatedAt: null },
       replaceCache: false,
     });
-    expect(decision.evaluation.text).not.toBe(cached.response.text);
+    if (decision.kind === 'neutral') expect(decision.evaluation.text).not.toBe(cached.response.text);
   });
 
   it('keeps replacing a non-fresh neutral cache after a recent hash change', () => {

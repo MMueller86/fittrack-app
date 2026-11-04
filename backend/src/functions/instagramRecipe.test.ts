@@ -1420,7 +1420,7 @@ describe('POST /api/recipes/:id/instagram-render', () => {
       expect(logs).toContain(`"step_text":${JSON.stringify(text)}`);
       expect(logs).toContain(`"step_count":${input.steps.length}`);
       expect(logs).toContain(`"step_text_length":${text.length}`);
-      expect(logs).toContain(`"step_longest_word_length":${Math.max(0, ...text.split(/\s+/u).map((word) => word.length))}`);
+      expect(logs).toContain(`"step_longest_word_length":${Math.max(0, ...text.split(/\s+/u).map((word: string) => word.length))}`);
       expect(logs).toContain(`"step_explicit_line_breaks":${stepCount === 5 ? 1 : 0}`);
       expect(logs).toContain(`"step_layout":"${stepCount === 5 ? 'compact' : 'large'}"`);
       expect(logs).not.toContain('Serviere das Gericht.');

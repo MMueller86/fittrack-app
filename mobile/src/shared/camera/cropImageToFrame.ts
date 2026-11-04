@@ -1,6 +1,6 @@
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import { ImageManipulator, SaveFormat, type ImageRef } from 'expo-image-manipulator';
 import { CROPPED_PHOTO_JPEG_QUALITY } from './framePresets';
-import type { ImageSize, SourceRect } from './frameCropMath';
+import { getSourceRectForCrop, type FrameCrop, type ImageSize, type SourceRect } from './frameCropMath';
 
 export interface CroppedPhoto {
   uri: string;
@@ -28,13 +28,36 @@ export function getCropActions(rect: SourceRect, image: ImageSize, maxEdge?: num
 /** Crops the exact source rectangle, downsizes to maxEdge and re-encodes as JPEG. */
 export async function cropImageToFrame(
   uri: string,
-  rect: SourceRect,
-  image: ImageSize,
+  aspectRatio: number,
+  crop: FrameCrop,
   maxEdge?: number,
 ): Promise<CroppedPhoto> {
-  const { crop, resize } = getCropActions(rect, image, maxEdge);
-  const context = ImageManipulator.manipulate(uri).crop(crop);
-  const rendered = await (resize ? context.resize(resize) : context).renderAsync();
-  const result = await rendered.saveAsync({ compress: CROPPED_PHOTO_JPEG_QUALITY, format: SaveFormat.JPEG });
-  return { uri: result.uri, mime: 'image/jpeg' };
+  const sourceContext = ImageManipulator.manipulate(uri);
+  let sourceImage: ImageRef;
+  try {
+    sourceImage = await sourceContext.renderAsync();
+  } finally {
+    sourceContext.release();
+  }
+
+  try {
+    const image: ImageSize = { width: sourceImage.width, height: sourceImage.height };
+    const sourceRect = getSourceRectForCrop(image, aspectRatio, crop);
+    const { crop: cropAction, resize } = getCropActions(sourceRect, image, maxEdge);
+    const context = ImageManipulator.manipulate(sourceImage).crop(cropAction);
+    try {
+      if (resize) context.resize(resize);
+      const rendered = await context.renderAsync();
+      try {
+        const result = await rendered.saveAsync({ compress: CROPPED_PHOTO_JPEG_QUALITY, format: SaveFormat.JPEG });
+        return { uri: result.uri, mime: 'image/jpeg' };
+      } finally {
+        rendered.release();
+      }
+    } finally {
+      context.release();
+    }
+  } finally {
+    sourceImage.release();
+  }
 }

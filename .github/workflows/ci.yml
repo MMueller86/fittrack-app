@@ -68,6 +68,9 @@ jobs:
       - name: Typecheck backend
         run: npm run typecheck --workspace=backend
 
+      - name: Typecheck backend tests
+        run: npm run typecheck:tests --workspace=backend
+
       - name: Typecheck mobile
         # Explicit mobile typecheck so a TS error in mobile fails the PR
         # instead of being caught only at `expo build` time.

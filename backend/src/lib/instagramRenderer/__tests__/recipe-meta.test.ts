@@ -48,7 +48,7 @@ function createComposeAssets(): ComposeAssets {
 }
 
 function isElement(value: unknown): value is SatoriElement {
-  return Boolean(value) && typeof value === "object" && "type" in value && "props" in value;
+  return value !== null && typeof value === "object" && "type" in value && "props" in value;
 }
 
 function flattenElements(value: unknown): SatoriElement[] {

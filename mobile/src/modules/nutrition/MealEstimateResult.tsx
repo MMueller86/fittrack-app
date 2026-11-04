@@ -475,7 +475,20 @@ export default function MealEstimateResult({
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {imageUri ? <Image source={{ uri: imageUri }} style={styles.photo} resizeMode="cover" /> : null}
+          {imageUri ? (
+            <View style={styles.photoSection}>
+              <Text style={styles.photoLabel}>An die KI gesendetes Foto</Text>
+              <View style={styles.photoFrame}>
+                <Image
+                  source={{ uri: imageUri }}
+                  style={styles.photo}
+                  resizeMode="contain"
+                  accessible
+                  accessibilityLabel="An die KI gesendetes Foto"
+                />
+              </View>
+            </View>
+          ) : null}
           <View style={styles.disclaimerRow}>
             <Text style={styles.disclaimerText}>KI-Schätzung · Werte können abweichen</Text>
             {currentEstimate.photoUsed ? <Text style={styles.photoBadge}>Foto genutzt</Text> : null}
@@ -689,7 +702,10 @@ const styles = StyleSheet.create({
   headerTitle: { ...typography.h3, color: colors.text },
   scroll: { flex: 1 },
   scrollContent: { padding: spacing.md, paddingBottom: spacing.lg, gap: spacing.sm },
-  photo: { width: '100%', height: 200, borderRadius: radius.md, marginBottom: spacing.sm },
+  photoSection: { gap: spacing.xs },
+  photoLabel: { ...typography.caption, color: colors.textSecondary },
+  photoFrame: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
+  photo: { width: '100%', height: '100%' },
   disclaimerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   disclaimerText: { ...typography.caption, color: colors.textMuted, flex: 1 },
   photoBadge: { ...typography.caption, color: colors.textSecondary, backgroundColor: colors.surfaceMuted, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm },

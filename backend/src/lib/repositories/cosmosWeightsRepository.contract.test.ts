@@ -41,7 +41,7 @@ afterAll(async () => {
 // Each test starts from an empty `weights` container. We only delete docs
 // for users this suite uses, leaving the container itself in place.
 async function clearWeights(userIds: string[]): Promise<void> {
-  const container = ctx.database.container('weights');
+  const container = ctx!.database.container('weights');
   for (const userId of userIds) {
     const { resources } = await container.items
       .query<{ id: string }>(
@@ -167,7 +167,7 @@ describe('CosmosWeightsRepository (contract)', () => {
     }));
 
     const updated = await repo.updateValue(USER_A, entry.id, 82.5);
-    const { resource: stored } = await ctx.database.container('weights').item(entry.id, USER_A).read<WeightEntry>();
+    const { resource: stored } = await ctx!.database.container('weights').item(entry.id, USER_A).read<WeightEntry>();
 
     const expected = {
       id: entry.id,

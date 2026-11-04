@@ -32,7 +32,7 @@ describe('recordUsage — mealTypeCounts removed', () => {
     const repo = getUserFoodRelationRepository();
     await repo.recordUsage(USER_A, baseInput({ mealType: 'breakfast' }));
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
-    expect((rel as Record<string, unknown>)['mealTypeCounts']).toBeUndefined();
+    expect((rel as unknown as Record<string, unknown>)['mealTypeCounts']).toBeUndefined();
   });
 
   it('does NOT write mealTypeCounts on existing document update', async () => {
@@ -40,14 +40,14 @@ describe('recordUsage — mealTypeCounts removed', () => {
     await repo.recordUsage(USER_A, baseInput({ mealType: 'breakfast' }));
     await repo.recordUsage(USER_A, baseInput({ mealType: 'breakfast' }));
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
-    expect((rel as Record<string, unknown>)['mealTypeCounts']).toBeUndefined();
+    expect((rel as unknown as Record<string, unknown>)['mealTypeCounts']).toBeUndefined();
   });
 
   it('does NOT write mealTypeCounts when mealType is absent', async () => {
     const repo = getUserFoodRelationRepository();
     await repo.recordUsage(USER_A, baseInput());
     const rel = await repo.getByFoodRef(USER_A, FOOD_REF);
-    expect((rel as Record<string, unknown>)['mealTypeCounts']).toBeUndefined();
+    expect((rel as unknown as Record<string, unknown>)['mealTypeCounts']).toBeUndefined();
   });
 });
 

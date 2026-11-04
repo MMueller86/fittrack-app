@@ -2,10 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Set up mocks before imports so vi.mock hoisting works
 vi.mock('../lib/repositories/reusableItemsRepository');
-vi.mock('../lib/repositories/foodProductRepository');
+vi.mock('../lib/repositories/foodProductRepository', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/repositories/foodProductRepository')>()),
+  getFoodProductRepository: vi.fn(),
+}));
+const favoriteRefsMock = vi.hoisted(() => ({ refs: [] as Array<{ foodRef: string; foodRefType?: string; displayName?: string }> }));
 vi.mock('../lib/repositories/userFoodRelationRepository', () => ({
   getUserFoodRelationRepository: () => ({
-    listFavorites: async () => [],
+    listFavorites: async () => favoriteRefsMock.refs,
   }),
 }));
 vi.mock('../lib/auth', () => ({
@@ -110,14 +114,55 @@ let mockLibRepo: { search: ReturnType<typeof vi.fn>; create: ReturnType<typeof v
 let mockCatalogRepo: { search: ReturnType<typeof vi.fn>; getById: ReturnType<typeof vi.fn> };
 
 beforeEach(() => {
+  favoriteRefsMock.refs = [];
   mockLibRepo     = { search: vi.fn().mockResolvedValue([]), create: vi.fn() };
   mockCatalogRepo = { search: vi.fn().mockResolvedValue([]), getById: vi.fn().mockResolvedValue(null) };
 
-  vi.mocked(getReusableItemsRepository).mockReturnValue(mockLibRepo);
-  vi.mocked(getFoodProductRepository).mockReturnValue(mockCatalogRepo);
+  vi.mocked(getReusableItemsRepository).mockReturnValue(mockLibRepo as unknown as ReturnType<typeof getReusableItemsRepository>);
+  vi.mocked(getFoodProductRepository).mockReturnValue(mockCatalogRepo as unknown as ReturnType<typeof getFoodProductRepository>);
 });
 
 describe('foodSearchHandler', () => {
+  it('ranks a weakly matching favorite above stronger non-favorite matches', async () => {
+    const weakFavorite: FoodSearchResult = {
+      ...CATALOG_OATMEAL,
+      id: 'openFoodFacts:fav',
+      name: 'Geflügel Salami Light',
+      sourceRef: { provider: 'openFoodFacts', barcode: 'fav' },
+    };
+    const strongLibrary: ReusableItem = { ...LIBRARY_ITEM, id: 'lib-salami', name: 'Salami' };
+    favoriteRefsMock.refs = [{ foodRef: 'openFoodFacts:fav' }];
+    mockLibRepo.search.mockResolvedValue([strongLibrary]);
+    mockCatalogRepo.search.mockResolvedValue([weakFavorite]);
+
+    const res = await foodSearchHandler(makeRequest('salami'), makeCtx());
+    const body = res.jsonBody as { results: FoodSearchResult[] };
+    expect(body.results[0]!.id).toBe('openFoodFacts:fav');
+    expect(body.results[0]!.isFavorite).toBe(true);
+  });
+
+  it('adds a matching catalog favorite that the capped catalog search missed', async () => {
+    favoriteRefsMock.refs = [
+      { foodRef: 'openFoodFacts:fav', foodRefType: 'catalog', displayName: 'Geflügel Salami Light' },
+      { foodRef: 'openFoodFacts:other', foodRefType: 'catalog', displayName: 'Apfel' },
+    ];
+    mockCatalogRepo.search.mockResolvedValue([CATALOG_OATMEAL]);
+    mockCatalogRepo.getById.mockResolvedValue({
+      id: 'openFoodFacts:fav',
+      name: 'Geflügel Salami Light',
+      normalizedName: 'geflügel salami light',
+      nutritionPer100g: { calories: 200, protein: 20, carbs: 1, fat: 12, fiber: 0 },
+      barcode: 'fav',
+    });
+
+    const res = await foodSearchHandler(makeRequest('salami'), makeCtx());
+    const body = res.jsonBody as { results: FoodSearchResult[] };
+    expect(mockCatalogRepo.getById).toHaveBeenCalledTimes(1);
+    expect(mockCatalogRepo.getById).toHaveBeenCalledWith('openFoodFacts:fav');
+    expect(body.results.map((r) => r.id)).toContain('openFoodFacts:fav');
+    expect(body.results[0]!.isFavorite).toBe(true);
+  });
+
   it('returns 200 with combined results', async () => {
     mockLibRepo.search.mockResolvedValue([LIBRARY_ITEM]);
     mockCatalogRepo.search.mockResolvedValue([CATALOG_OATMEAL]);

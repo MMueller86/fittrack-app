@@ -298,12 +298,7 @@ describe('FramedPhotoPicker output', () => {
     });
 
     expect(mocks.cropImageToFrame).toHaveBeenCalledTimes(1);
-    expect(mocks.cropImageToFrame).toHaveBeenCalledWith(
-      'file:///gallery.png',
-      getSourceRectForCrop(IMAGE, 3 / 4, CROP),
-      IMAGE,
-      2000,
-    );
+    expect(mocks.cropImageToFrame).toHaveBeenCalledWith('file:///gallery.png', 3 / 4, CROP, 2000);
     expect(props.onSelected).toHaveBeenCalledWith({ uri: 'file:///cropped.jpg', mime: 'image/jpeg', crop: CROP });
     expect(props.onClose).toHaveBeenCalledTimes(1);
   });
@@ -391,10 +386,11 @@ describe('FramedPhotoPicker camera review', () => {
 
     expect(editorVisible(renderer)).toBe(false);
     expect(mocks.cropImageToFrame).toHaveBeenCalledTimes(1);
-    const [uri, rect, image, maxEdge] = mocks.cropImageToFrame.mock.calls[0]!;
+    const [uri, aspectRatio, crop, maxEdge] = mocks.cropImageToFrame.mock.calls[0]!;
     expect(uri).toBe(PHOTO.uri);
-    expect(image).toEqual({ width: 4000, height: 3000 });
+    expect(aspectRatio).toBe(4 / 3);
     expect(maxEdge).toBe(1600);
+    const rect = getSourceRectForCrop(PHOTO, aspectRatio as number, crop as typeof CROP);
     expect(rect.x).toBeCloseTo(FRAME_RECT.x, 3);
     expect(rect.y).toBeCloseTo(FRAME_RECT.y, 3);
     expect(rect.width).toBeCloseTo(FRAME_RECT.width, 3);

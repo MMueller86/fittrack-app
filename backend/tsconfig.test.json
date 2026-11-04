@@ -6,8 +6,7 @@
   },
   "include": [
     "src/**/*.ts",
-    "../shared/**/*.ts",
-    "vitest.config.mts"
+    "../shared/**/*.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

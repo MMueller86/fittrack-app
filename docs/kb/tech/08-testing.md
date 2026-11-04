@@ -390,19 +390,20 @@ A separate encoding-check job also runs `node scripts/check-encoding.mjs`.
 
 Runs on `ubuntu-latest`. Steps in order:
 1. Typecheck `shared` — `npm run typecheck --workspace=shared`
-2. Typecheck `backend` — `npm run typecheck --workspace=backend`
-3. Typecheck `mobile` — catches TypeScript errors before `expo build` does
-4. Verify the active Daily prompt release —
+2. Typecheck `backend` — `npm run typecheck --workspace=backend` (excludes `*.test.ts` and `src/test-utils/`)
+3. Typecheck `backend` tests — `npm run typecheck:tests --workspace=backend` (`backend/tsconfig.test.json`; Vitest itself does not typecheck)
+4. Typecheck `mobile` — catches TypeScript errors before `expo build` does
+5. Verify the active Daily prompt release —
 	`npm run verify:daily-insight-prompt --workspace=backend`
-5. Shared unit tests — `npm test --workspace=shared`
-6. Backend unit tests — `npm test --workspace=backend`
-7. Mobile unit tests — `npm test --workspace=mobile`
-8. Repository script tests — `npm run test:scripts`
-9. Backend startup tests — `npm run test:startup --workspace=backend`
-10. Backend build verification — `npm run build:verify --workspace=backend`
-11. Test parity — `node scripts/check-test-parity.mjs` with the three Vitest JSON reports
+6. Shared unit tests — `npm test --workspace=shared`
+7. Backend unit tests — `npm test --workspace=backend`
+8. Mobile unit tests — `npm test --workspace=mobile`
+9. Repository script tests — `npm run test:scripts`
+10. Backend startup tests — `npm run test:startup --workspace=backend`
+11. Backend build verification — `npm run build:verify --workspace=backend`
+12. Test parity — `node scripts/check-test-parity.mjs` with the three Vitest JSON reports
 
-All three typechecks run before tests to fail fast on cheap checks.
+All typechecks run before tests to fail fast on cheap checks.
 
 The independent `functions-host-smoke`, `mobile-smokes`, and
 `android-debug-assemble` jobs run the Phase-0 runtime gates. The Android job

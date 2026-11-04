@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { enforceQuota, trackUsage } from './quota';
 import type { UserContext } from './auth';
+import * as aiUsageRepositoryModule from './repositories/aiUsageRepository';
 
 // Mock the repository module
 vi.mock('./repositories/aiUsageRepository', () => {
@@ -17,7 +18,7 @@ vi.mock('./repositories/aiUsageRepository', () => {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const { __mockRepo: mockRepo } = await import('./repositories/aiUsageRepository') as any;
+const { __mockRepo: mockRepo } = aiUsageRepositoryModule as any;
 
 describe('enforceQuota', () => {
   const freeUser: UserContext = { userId: 'user-1', tier: 'free', isAdmin: false };

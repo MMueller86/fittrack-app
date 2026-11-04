@@ -272,9 +272,20 @@ export function LegacyMealEstimateReviewScreen({
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Photo thumbnail */}
+          {/* Show the complete image that was sent for analysis. */}
           {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.photo} resizeMode="cover" />
+            <View style={styles.photoSection}>
+              <Text style={styles.photoLabel}>An die KI gesendetes Foto</Text>
+              <View style={styles.photoFrame}>
+                <Image
+                  source={{ uri: imageUri }}
+                  style={styles.photo}
+                  resizeMode="contain"
+                  accessible
+                  accessibilityLabel="An die KI gesendetes Foto"
+                />
+              </View>
+            </View>
           ) : null}
 
           {/* AI disclaimer */}
@@ -451,11 +462,26 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: spacing.lg,
   },
+  photoSection: {
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  photoLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  photoFrame: {
+    width: '100%',
+    aspectRatio: 4 / 3,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    overflow: 'hidden',
+  },
   photo: {
     width: '100%',
-    height: 200,
-    borderRadius: radius.md,
-    marginBottom: spacing.md,
+    height: '100%',
   },
   disclaimerRow: {
     flexDirection: 'row',

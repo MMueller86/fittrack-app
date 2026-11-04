@@ -5,7 +5,7 @@ import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
 import { layoutElementTree } from "../canvasRenderer";
-import { compose, type ComposeAssets, type SatoriElement } from "../compose";
+import { compose, type ComposeAssets, type SatoriElement, type SatoriStyle } from "../compose";
 import { quarkbroetchenFixture } from "../fixtures/quarkbroetchen";
 import { smokeFixture } from "../fixtures/smoke";
 import {
@@ -345,7 +345,7 @@ function toDataUri(buffer: Buffer, mimeType: string): string {
 
 async function renderNutritionComparison(barbell: string, uniformBackground = false): Promise<Buffer> {
   const assetRoot = resolve(__dirname, "../assets");
-  const photoBuffer = readFileSync(quarkbroetchenFixture.image.path);
+  const photoBuffer = readFileSync((quarkbroetchenFixture.image as { path: string }).path);
   const photoMetadata = await sharp(photoBuffer).metadata();
   if (!photoMetadata.width || !photoMetadata.height) {
     throw new Error("The nutrition comparison photo has no dimensions.");
@@ -382,7 +382,7 @@ async function renderNutritionComparison(barbell: string, uniformBackground = fa
   const tree = compose(quarkbroetchenFixture, assets);
   if (uniformBackground) {
     const background = childElements(tree)[0]!;
-    const backgroundStyle = { ...styleOf(background) };
+    const backgroundStyle = { ...styleOf(background) } as SatoriStyle;
     delete backgroundStyle["backgroundImage"];
     background.props.style = backgroundStyle;
   }
@@ -640,7 +640,7 @@ describe("Instagram recipe renderer nutrition layout", () => {
     expect(styleOf(photoLayer).height).toBe(PHOTO_TRANSITION_END_Y);
     expect(styleOf(transitionLayer).top).toBe(PHOTO_TRANSITION_START_Y);
     expect(styleOf(transitionLayer).height).toBe(PHOTO_TRANSITION_END_Y - PHOTO_TRANSITION_START_Y);
-    expect(styleOf(transitionLayer).top + styleOf(transitionLayer).height).toBe(PHOTO_TRANSITION_END_Y);
+    expect((styleOf(transitionLayer).top as number) + (styleOf(transitionLayer).height as number)).toBe(PHOTO_TRANSITION_END_Y);
     expect(styleOf(titleLayer).top).toBe(TITLE_Y);
     expect(styleOf(tagRow).top).toBe(TAG_ROW_Y);
     expect(styleOf(tagRow).height).toBe(TAG_CHIP_HEIGHT);
@@ -665,7 +665,7 @@ describe("Instagram recipe renderer nutrition layout", () => {
       height: TITLE_WRAPPED_MAX_HEIGHT,
       justifyContent: "flex-end",
     });
-    expect(styleOf(wrappedTagRow).top - (TITLE_WRAPPED_Y + TITLE_WRAPPED_MAX_HEIGHT)).toBe(19);
+    expect((styleOf(wrappedTagRow).top as number) - (TITLE_WRAPPED_Y + TITLE_WRAPPED_MAX_HEIGHT)).toBe(19);
 
     expect(styleOf(highlightLayer).left).toBe(
       CANVAS_WIDTH - HIGHLIGHT_BADGE_RIGHT - HIGHLIGHT_BADGE_SIZE,
