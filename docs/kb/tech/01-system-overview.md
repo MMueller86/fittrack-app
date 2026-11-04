@@ -59,7 +59,7 @@ State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTra
 | Azure SDKs (backend) | `@azure/cosmos ^4.10.1`, `@azure/functions ^4.17.0`, `@azure/storage-blob ^12.34.0`, `@azure/storage-queue ^12.32.0`, `@azure/ai-form-recognizer ^5.1.0` | as in lockfile | `backend/package.json` |
 | `@napi-rs/canvas` | `~1.1.0` | 1.1.0 | `backend/package.json`, `_deploy_staging/package.json` |
 | `pixelmatch` (test only) | `~8.0.0` | 8.0.0 | `backend/package.json` |
-| Expo SDK | `expo ~58.0.21` | 58.0.21 | `mobile/package.json` |
+| Expo SDK | `expo ~58.0.23` | 58.0.23 | `mobile/package.json` |
 | React Native / React | `0.88.1` / `19.3.0` | 0.88.1 / 19.3.0 | `mobile/package.json` |
 | React Navigation | `native ^7.5.1`, `bottom-tabs` and `native-stack ^7.21.0` | `native` 7.5.1, `core` 7.24.0 | `mobile/package.json`, WP-FE-02 handoff |
 | Azure Functions Core Tools | `4.16.0` (CI pin and cache key) | — | `.github/workflows/ci.yml` |
@@ -78,7 +78,9 @@ State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTra
 
 ### Deferred dependency updates
 
-Expo-managed mobile packages (`react`, `react-test-renderer`, `gesture-handler`, `safe-area-context`, `worklets`) and `@typescript/typescript6` (`~6.0.2`, currently the latest) are intentionally not raised. Reasons, sources, check date 2026-10-30 and reviewer (Product Owner / next Dependabot run) are in the table of the [WP-BE-07 handoff](../../User%20Stories/plans/PLAN_FitTrack-Technology-Refresh_WP-BE-07_Handoff.md).
+Expo-managed mobile packages (`react`, `react-test-renderer`, `gesture-handler`, `worklets`) and `@typescript/typescript6` (`~6.0.2`, currently the latest) are intentionally not raised. Reasons, sources, check date 2026-10-30 and reviewer (Product Owner / next Dependabot run) are in the table of the [WP-BE-07 handoff](../../User%20Stories/plans/PLAN_FitTrack-Technology-Refresh_WP-BE-07_Handoff.md).
+
+On 2026-11-04, Expo Doctor 1.21.5 reported newer SDK-compatible versions for `expo` (`~58.0.23`), `expo-auth-session` (`~58.0.17`), `expo-splash-screen` (`~58.0.13`) and `react-native-safe-area-context` (`~5.11.1`). These four packages were aligned with the SDK; `npx expo install --check` and the Expo Doctor smoke pass. `react-native-safe-area-context` is no longer deferred.
 
 `@react-native-async-storage/async-storage` is separately pinned to `2.2.0`. Expo SDK 58's `bundledNativeModules.json` maps it to `2.2.0`, and `npx expo install --check` passes. npm has `3.1.1`, but that major version is not established as incompatible; it is simply not the version mapped or validated for this SDK. Revisit it on an Expo SDK upgrade, or after an explicit native build and device validation. Dependabot ignores only its semver-major updates; minor and patch updates remain eligible.
 

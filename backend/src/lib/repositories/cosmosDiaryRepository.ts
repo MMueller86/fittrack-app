@@ -77,7 +77,7 @@ export class CosmosDiaryRepository implements DiaryRepository {
     const { resource } = await containers.nutritionDiaryMeals
       .item(mealId, userId)
       .read<Meal>();
-    return resource ?? null;
+    return resource ? stripCosmosSystemProperties(resource) : null;
   }
 
   async listMealsUpdatedSince(userId: string, since: string): Promise<Meal[]> {
