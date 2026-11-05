@@ -1,5 +1,7 @@
 import { app } from '@azure/functions';
 
+app.setup({ enableHttpStream: true });
+
 // Function registrations are imported here.
 // Each file in ./functions/ registers its own routes via app.http().
 // This file is the single entry point for the Azure Functions runtime.

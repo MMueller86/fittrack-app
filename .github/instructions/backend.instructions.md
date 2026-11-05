@@ -160,7 +160,18 @@ When a task requires a new Cosmos container:
    - `partitionKey`: the partition key path (e.g. `/userId`)
    - `indexPolicyNote`: any required composite index or exclusion (or "default" if none)
 3. Do **not** write or modify any file in `infra/` — Infrastructure & Release owns all Bicep files.
-4. Do **not** run `az CLI` commands, `func publish`, or `eas build`. All deployment execution belongs to the Infrastructure & Release agent.
+4. Do **not** run mutating or deployment commands (`az deployment`, `az functionapp deployment`, `az functionapp config/restart`, `func publish`, `eas build`). All deployment execution belongs to the Infrastructure & Release agent. Read-only diagnostics are allowed; see below.
+
+## Read-Only Diagnostics (Logs and Telemetry)
+
+For bug analysis the Backend agent may read logs and telemetry with read-only Azure CLI commands. This is permitted without a plan or extra user confirmation.
+
+- Verify the session first with `az account show`. If it is missing or expired, report the exact auth error and stop — do not attempt an interactive login or assume the session is active.
+- Always pass `--subscription dd7539ab-c638-44f8-9173-8bcd28cdbae3`. Targets: Alpha `appi-fittrack-alpha` / `log-fittrack-alpha` (`rg-fittrack-alpha`), Dev `appi-fittrack-dev` (`rg-fittrack-dev`). Do not touch the legacy PRODYNA environment.
+- Allowed: `az monitor app-insights query` (KQL on `traces`, `exceptions`, `requests`, `customEvents`), `az monitor log-analytics query`, `az functionapp list/show`, `az functionapp function list`, `az functionapp config appsettings list --query` restricted to **names only** (never print values).
+- Keep queries narrow (time range, operation or `*.failed` event name, `take`/`limit`). Do not dump unfiltered logs.
+- Logs can contain user data. Quote only the fields needed for diagnosis in the handoff; never copy tokens, authorization headers, connection strings, keys or user free text into files, tests or chat.
+- If the `az` CLI call is rejected by the environment, state the concrete error. Do not claim a policy prohibits it.
 
 ## Error Handling
 

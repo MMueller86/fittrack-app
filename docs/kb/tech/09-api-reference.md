@@ -1267,6 +1267,20 @@ response contract is:
 }
 ```
 
+Photo requests may opt into same-request progress framing with
+`Accept: application/x-ndjson`. The response uses
+`Content-Type: application/x-ndjson; charset=utf-8`; each newline-delimited
+JSON record is an `AiMealEstimateProgressEvent` from the shared types:
+`photo_check.completed` is emitted only after the photo assessment succeeds,
+`estimate.started` immediately before the existing nutrition-estimate call,
+and `result` carries the unchanged V3 response in `data`. A failed streamed
+request ends with `{ "event": "error", "code": "processing_failed" }` and
+never emits `result`. Authentication, request-validation, and quota failures
+remain ordinary HTTP errors because they occur before streaming starts.
+Without the opt-in header, or without a photo, the endpoint keeps its existing
+JSON response. The transport may deliver multiple records together; consumers
+should not replay already-buffered phase changes retroactively.
+
 The response has 20–5000 g total weight and 0–20 component items. Component
 names are trimmed to 1–100 characters, grams are greater than 0 through 5000,
 and calories are 0–3000. Meal calories are 0–3000; other macro values are

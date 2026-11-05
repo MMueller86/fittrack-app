@@ -2,7 +2,7 @@
 // Fast Path: MealEstimateReviewScreen
 // Öffnet sich über dem FoodEntryHub, Hub bleibt im Hintergrund.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardOverlap } from '../../../shared/keyboard/useKeyboardOverlap';
 import type { AiFoodEstimatePreview, AiMealEstimatePreview } from '@fittrack/shared';
+import type { AiMealEstimateProgressEvent } from '@fittrack/shared';
 import { aiApi } from '../../../shared/api/aiApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { formatApiError } from '../../../shared/api/apiError';
@@ -31,6 +32,7 @@ import { FramedPhotoPicker, type FramedPhotoResult } from '../../../shared/camer
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import MealEstimateResult from '../MealEstimateResult';
 import MealEstimateReviewScreen from '../MealEstimateReviewScreen';
+import { MealEstimateLoadingOverlay } from './MealEstimateLoadingOverlay';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 import type { MealType } from '@fittrack/shared';
 
@@ -85,6 +87,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
     mimeType: 'image/jpeg' | 'image/png';
   } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingPhase, setLoadingPhase] = useState<'photo_check.completed' | 'estimate.started' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mealEstimate, setMealEstimate] = useState<AiMealEstimatePreview | null>(null);
   // Mahlzeit-Selektor — vorbelegt mit zeitbasiertem Default
@@ -97,12 +100,17 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showFullReview, setShowFullReview] = useState(false);
   const [photoSource, setPhotoSource] = useState<'camera' | 'gallery' | null>(null);
+  const estimateRequestRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!visible) {
+      estimateRequestRef.current?.abort();
+      estimateRequestRef.current = null;
       setPhotoSource(null);
       setText('');
       setMealPhoto(null);
+      setLoading(false);
+      setLoadingPhase(null);
       setError(null);
       setSaveError(null);
       setMealEstimate(null);
@@ -115,23 +123,44 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
     setSelectedMealType(context.mealType);
   }, [visible, context.mealType, initialQuery]);
 
+  useEffect(() => () => {
+    estimateRequestRef.current?.abort();
+    estimateRequestRef.current = null;
+  }, []);
+
   function handlePhotoSelected({ uri, mime }: FramedPhotoResult) {
     setMealPhoto({ uri, mimeType: mime });
   }
 
   async function handleAnalyze() {
     if (text.trim().length < 3) return;
+    estimateRequestRef.current?.abort();
+    const controller = new AbortController();
+    estimateRequestRef.current = controller;
     setLoading(true);
+    setLoadingPhase(null);
     setError(null);
     try {
       const result = await aiApi.estimateMeal(
         text.trim(),
         mealPhoto?.uri,
         mealPhoto?.mimeType,
+        undefined,
+        {
+          signal: controller.signal,
+          onProgress: (event: AiMealEstimateProgressEvent) => {
+            if (!controller.signal.aborted
+              && (event.event === 'photo_check.completed' || event.event === 'estimate.started')) {
+              setLoadingPhase(event.event);
+            }
+          },
+        },
       );
+      if (controller.signal.aborted) return;
       setMealEstimate(result);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
+      if (controller.signal.aborted) return;
       if (isQuotaExceededError(e)) {
         setError(
           'Deine kostenlosen KI-Analysen für diesen Monat sind aufgebraucht. Das Kontingent wird am Monatsanfang zurückgesetzt.',
@@ -140,7 +169,10 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
         setError(formatApiError(e));
       }
     } finally {
-      setLoading(false);
+      if (estimateRequestRef.current === controller) {
+        estimateRequestRef.current = null;
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }
   }
 
@@ -577,6 +609,13 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
         </View>
         </KeyboardAvoidingView>
         </View>
+        {loading ? (
+          <MealEstimateLoadingOverlay
+            hasPhoto={mealPhoto != null}
+            imageUri={mealPhoto?.uri}
+            phase={loadingPhase}
+          />
+        ) : null}
       </SafeAreaView>
       <FramedPhotoPicker
         visible={photoSource != null}

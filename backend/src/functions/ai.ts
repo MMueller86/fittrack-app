@@ -28,6 +28,7 @@ import type {
   ReusableItem,
   AiMealEstimatePreview,
   AiMealEstimateRefine,
+  AiMealEstimateProgressEvent,
   Recipe,
   RecipeIngredient,
   RecipeScalePreviewResponse,
@@ -464,143 +465,190 @@ export const mealEstimatePreviewHandler = withHandler(
     const quotaBlock = await enforceQuota(userContext, 'meal-estimate');
     if (quotaBlock) return quotaBlock;
 
-    // Call Azure OpenAI
-    const startedAt = Date.now();
-    let tokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-    let providerCalls = 0;
-    let assessmentDurationMs = 0;
-    let estimationDurationMs = 0;
-    const recordUsage = (usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number }): void => {
-      tokenUsage = {
-        promptTokens: tokenUsage.promptTokens + (usage.promptTokens ?? 0),
-        completionTokens: tokenUsage.completionTokens + (usage.completionTokens ?? 0),
-        totalTokens: tokenUsage.totalTokens + (usage.totalTokens ?? 0),
-      };
-    };
-    const logResult = (validationResult: string, warningCount?: number, providerStage?: string): void => {
-      logEvent(ctx, validationResult === 'valid' || validationResult === 'valid_with_warnings' ? 'info' : 'warn', 'ai.meal-estimate.result', {
-        promptVersion: MEAL_ESTIMATE_PROMPT_VERSION,
-        assessmentPromptVersion: MEAL_PHOTO_ASSESSMENT_PROMPT_VERSION,
-        mode: refine ? 'refine' : 'initial',
-        hintIds: refine?.hints?.join(',') ?? '',
-        hasPhoto: imageBase64 !== undefined,
-        providerCalls,
-        assessmentDurationMs,
-        estimationDurationMs,
-        textLength: text.length,
-        noteLength: refine?.note?.length ?? 0,
-        promptTokens: tokenUsage.promptTokens,
-        completionTokens: tokenUsage.completionTokens,
-        totalTokens: tokenUsage.totalTokens,
-        durationMs: Date.now() - startedAt,
-        validationResult,
-        warningCount,
-        providerStage,
-      });
-    };
+    const wantsProgress = imageBase64 !== undefined && imageMimeType !== undefined &&
+      request.headers.get('accept')?.split(',').some((value) => value.split(';')[0]?.trim().toLowerCase() === 'application/x-ndjson') === true;
 
-    let photoAssessment: AiMealPhotoAssessment | 'no_photo' = 'no_photo';
-    if (imageBase64 !== undefined && imageMimeType !== undefined) {
+    const runEstimate = async (
+      emit?: (event: AiMealEstimateProgressEvent) => void,
+    ): Promise<HttpResponseInit> => {
+      const startedAt = Date.now();
+      let tokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      let providerCalls = 0;
+      let assessmentDurationMs = 0;
+      let estimationDurationMs = 0;
+      const recordUsage = (usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number }): void => {
+        tokenUsage = {
+          promptTokens: tokenUsage.promptTokens + (usage.promptTokens ?? 0),
+          completionTokens: tokenUsage.completionTokens + (usage.completionTokens ?? 0),
+          totalTokens: tokenUsage.totalTokens + (usage.totalTokens ?? 0),
+        };
+      };
+      const logResult = (validationResult: string, warningCount?: number, providerStage?: string): void => {
+        logEvent(ctx, validationResult === 'valid' || validationResult === 'valid_with_warnings' ? 'info' : 'warn', 'ai.meal-estimate.result', {
+          promptVersion: MEAL_ESTIMATE_PROMPT_VERSION,
+          assessmentPromptVersion: MEAL_PHOTO_ASSESSMENT_PROMPT_VERSION,
+          mode: refine ? 'refine' : 'initial',
+          hintIds: refine?.hints?.join(',') ?? '',
+          hasPhoto: imageBase64 !== undefined,
+          providerCalls,
+          assessmentDurationMs,
+          estimationDurationMs,
+          textLength: text.length,
+          noteLength: refine?.note?.length ?? 0,
+          promptTokens: tokenUsage.promptTokens,
+          completionTokens: tokenUsage.completionTokens,
+          totalTokens: tokenUsage.totalTokens,
+          durationMs: Date.now() - startedAt,
+          validationResult,
+          warningCount,
+          providerStage,
+        });
+      };
+
+      let photoAssessment: AiMealPhotoAssessment | 'no_photo' = 'no_photo';
+      if (imageBase64 !== undefined && imageMimeType !== undefined) {
+        providerCalls += 1;
+        const assessmentStartedAt = Date.now();
+        try {
+          photoAssessment = await assessMealPhoto({
+            text,
+            imageBase64,
+            imageMimeType,
+            onUsage: recordUsage,
+          });
+        } catch {
+          assessmentDurationMs = Date.now() - assessmentStartedAt;
+          logResult('provider_error', undefined, 'photo_assessment');
+          return { status: 502, jsonBody: { error: 'KI-Schätzung fehlgeschlagen' } };
+        }
+        assessmentDurationMs = Date.now() - assessmentStartedAt;
+        emit?.({ event: 'photo_check.completed' });
+      }
+
+      const photoUse = photoAssessment === 'consistent' || photoAssessment === 'complementary'
+        ? 'included'
+        : photoAssessment === 'contradictory'
+          ? 'excluded_mismatch'
+          : photoAssessment === 'uncertain'
+            ? 'excluded_uncertain'
+            : 'no_photo';
+      const includePhotoInEstimate = photoUse === 'included';
+      const excludedPhoto = photoUse === 'excluded_mismatch' || photoUse === 'excluded_uncertain';
+
+      let estimate;
       providerCalls += 1;
-      const assessmentStartedAt = Date.now();
+      const estimationStartedAt = Date.now();
+      emit?.({ event: 'estimate.started' });
       try {
-        photoAssessment = await assessMealPhoto({
+        estimate = await estimateMeal({
           text,
-          imageBase64,
-          imageMimeType,
+          imageBase64: includePhotoInEstimate ? imageBase64 : undefined,
+          imageMimeType: includePhotoInEstimate ? imageMimeType : undefined,
+          refine,
+          suppressPreviousEstimate: excludedPhoto,
           onUsage: recordUsage,
         });
       } catch {
-        assessmentDurationMs = Date.now() - assessmentStartedAt;
-        logResult('provider_error', undefined, 'photo_assessment');
+        estimationDurationMs = Date.now() - estimationStartedAt;
+        logResult('provider_error', undefined, 'nutrition_estimate');
         return { status: 502, jsonBody: { error: 'KI-Schätzung fehlgeschlagen' } };
       }
-      assessmentDurationMs = Date.now() - assessmentStartedAt;
-    }
-
-    const photoUse = photoAssessment === 'consistent' || photoAssessment === 'complementary'
-      ? 'included'
-      : photoAssessment === 'contradictory'
-        ? 'excluded_mismatch'
-        : photoAssessment === 'uncertain'
-          ? 'excluded_uncertain'
-          : 'no_photo';
-    const includePhotoInEstimate = photoUse === 'included';
-    const excludedPhoto = photoUse === 'excluded_mismatch' || photoUse === 'excluded_uncertain';
-
-    let estimate;
-    providerCalls += 1;
-    const estimationStartedAt = Date.now();
-    try {
-      estimate = await estimateMeal({
-        text,
-        imageBase64: includePhotoInEstimate ? imageBase64 : undefined,
-        imageMimeType: includePhotoInEstimate ? imageMimeType : undefined,
-        refine,
-        suppressPreviousEstimate: excludedPhoto,
-        onUsage: recordUsage,
-      });
-    } catch {
       estimationDurationMs = Date.now() - estimationStartedAt;
-      logResult('provider_error', undefined, 'nutrition_estimate');
-      return { status: 502, jsonBody: { error: 'KI-Schätzung fehlgeschlagen' } };
-    }
-    estimationDurationMs = Date.now() - estimationStartedAt;
 
-    const validation = AiMealEstimateOutputSchema.safeParse(estimate);
-    if (!validation.success) {
-      logResult('schema_invalid');
-      return {
-        status: 422,
-        jsonBody: {
-          error: 'KI-Schätzung hat Plausibilitätsprüfung nicht bestanden',
-          details: validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
-        },
+      const validation = AiMealEstimateOutputSchema.safeParse(estimate);
+      if (!validation.success) {
+        logResult('schema_invalid');
+        return {
+          status: 422,
+          jsonBody: {
+            error: 'KI-Schätzung hat Plausibilitätsprüfung nicht bestanden',
+            details: validation.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`),
+          },
+        };
+      }
+
+      const validEstimate = reconcileMealEnergy(validation.data);
+      const maxPlausibleCalories = validation.data.estimatedTotalGrams * 9 * 1.05;
+      if (validation.data.mealEstimate.calories > maxPlausibleCalories) {
+        logResult('energy_density_invalid');
+        return {
+          status: 422,
+          jsonBody: {
+            error: 'KI-Schätzung hat Plausibilitätsprüfung nicht bestanden',
+            details: ['mealEstimate.calories: exceeds weight-based energy limit'],
+          },
+        };
+      }
+
+      const warnings = [...validEstimate.warnings];
+      if (photoUse === 'excluded_mismatch') warnings.push(MEAL_PHOTO_MISMATCH_WARNING);
+      if (photoUse === 'excluded_uncertain') warnings.push(MEAL_PHOTO_UNCERTAIN_WARNING);
+      for (const warning of getMealEstimatePlausibilityWarnings(validEstimate)) {
+        if (!warnings.includes(warning)) warnings.push(warning);
+      }
+
+      // Track usage only after server-side validation succeeds.
+      await trackUsage(userContext, 'meal-estimate');
+      logResult(warnings.length > 0 ? 'valid_with_warnings' : 'valid', warnings.length);
+
+      const preview: AiMealEstimatePreview = {
+        mealName: validEstimate.mealName,
+        mealEstimate: validEstimate.mealEstimate,
+        components: validEstimate.componentItems.map((item) => item.name),
+        componentItems: validEstimate.componentItems,
+        estimatedTotalGrams: validEstimate.estimatedTotalGrams,
+        promptVersion: MEAL_ESTIMATE_PROMPT_VERSION,
+        contextDetected: validEstimate.contextDetected,
+        portionConfidence: validEstimate.portionConfidence,
+        photoProvided: imageBase64 !== undefined,
+        photoAssessment,
+        photoUse,
+        photoUsed: includePhotoInEstimate,
+        assumptions: validEstimate.assumptions,
+        warnings,
       };
-    }
 
-    const validEstimate = reconcileMealEnergy(validation.data);
-    const maxPlausibleCalories = validation.data.estimatedTotalGrams * 9 * 1.05;
-    if (validation.data.mealEstimate.calories > maxPlausibleCalories) {
-      logResult('energy_density_invalid');
-      return {
-        status: 422,
-        jsonBody: {
-          error: 'KI-Schätzung hat Plausibilitätsprüfung nicht bestanden',
-          details: ['mealEstimate.calories: exceeds weight-based energy limit'],
-        },
-      };
-    }
-
-    const warnings = [...validEstimate.warnings];
-    if (photoUse === 'excluded_mismatch') warnings.push(MEAL_PHOTO_MISMATCH_WARNING);
-    if (photoUse === 'excluded_uncertain') warnings.push(MEAL_PHOTO_UNCERTAIN_WARNING);
-    for (const warning of getMealEstimatePlausibilityWarnings(validEstimate)) {
-      if (!warnings.includes(warning)) warnings.push(warning);
-    }
-
-    // Track usage only after server-side validation succeeds.
-    await trackUsage(userContext, 'meal-estimate');
-    logResult(warnings.length > 0 ? 'valid_with_warnings' : 'valid', warnings.length);
-
-    const preview: AiMealEstimatePreview = {
-      mealName: validEstimate.mealName,
-      mealEstimate: validEstimate.mealEstimate,
-      components: validEstimate.componentItems.map((item) => item.name),
-      componentItems: validEstimate.componentItems,
-      estimatedTotalGrams: validEstimate.estimatedTotalGrams,
-      promptVersion: MEAL_ESTIMATE_PROMPT_VERSION,
-      contextDetected: validEstimate.contextDetected,
-      portionConfidence: validEstimate.portionConfidence,
-      photoProvided: imageBase64 !== undefined,
-      photoAssessment,
-      photoUse,
-      photoUsed: includePhotoInEstimate,
-      assumptions: validEstimate.assumptions,
-      warnings,
+      return { status: 200, jsonBody: preview };
     };
 
-    return { status: 200, jsonBody: preview };
+    if (!wantsProgress) return runEstimate();
+
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const send = (event: AiMealEstimateProgressEvent): void => {
+          if (!cancelled) controller.enqueue(new TextEncoder().encode(`${JSON.stringify(event)}\n`));
+        };
+        const close = (): void => {
+          if (!cancelled) controller.close();
+        };
+
+        void runEstimate(send).then((response) => {
+          if (response.status === 200) {
+            send({ event: 'result', data: response.jsonBody as AiMealEstimatePreview });
+          } else {
+            send({ event: 'error', code: 'processing_failed' });
+          }
+          close();
+        }).catch(() => {
+          logEvent(ctx, 'error', 'ai.meal-estimate.progress.error', {
+            stage: 'stream_processing',
+            errorClass: 'operation_failed',
+          });
+          send({ event: 'error', code: 'processing_failed' });
+          close();
+        });
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+
+    return {
+      status: 200,
+      headers: { 'content-type': 'application/x-ndjson; charset=utf-8' },
+      body,
+    };
   },
 );
 

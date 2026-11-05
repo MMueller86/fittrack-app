@@ -40,7 +40,10 @@ describe('aiApi.estimateMeal', () => {
         ['image', { uri: '/meal.jpg', type: 'image/jpeg', name: 'meal.jpg' }],
       ]);
       expect(postMock.mock.calls[0]?.[2]).toMatchObject({
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Accept: 'application/x-ndjson',
+        },
         timeout: 60_000,
       });
     } finally {
@@ -96,12 +99,128 @@ describe('aiApi.estimateMeal', () => {
         ['image', { uri: '/meal.jpg', type: 'image/jpeg', name: 'meal.jpg' }],
       ]);
       expect(postMock.mock.calls[0]?.[2]).toMatchObject({
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Accept: 'application/x-ndjson',
+        },
         timeout: 60_000,
       });
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('emits only complete progress records when XHR responseText grows in partial chunks', () => {
+    const onProgress = vi.fn();
+    const parse = createAiMealEstimateProgressParser(onProgress);
+    const photoCheck = '{"event":"photo_check.completed"}\n';
+
+    parse(photoCheck.slice(0, 17));
+    expect(onProgress).not.toHaveBeenCalled();
+    parse(photoCheck);
+
+    expect(onProgress).toHaveBeenCalledWith({ event: 'photo_check.completed' });
+  });
+
+  it('processes multiple complete records from one progress update in order', () => {
+    const onProgress = vi.fn();
+    const parse = createAiMealEstimateProgressParser(onProgress);
+
+    parse('{"event":"photo_check.completed"}\n{"event":"estimate.started"}\n');
+
+    expect(onProgress.mock.calls).toEqual([
+      [{ event: 'photo_check.completed' }],
+      [{ event: 'estimate.started' }],
+    ]);
+  });
+
+  it('does not replay buffered phases when result arrives in the same progress update', () => {
+    const onProgress = vi.fn();
+    const parse = createAiMealEstimateProgressParser(onProgress);
+
+    parse([
+      '{"event":"photo_check.completed"}',
+      '{"event":"estimate.started"}',
+      JSON.stringify({ event: 'result', data: streamedEstimate }),
+    ].join('\n'));
+
+    expect(onProgress).not.toHaveBeenCalled();
+  });
+
+  it('does not show buffered phases when a terminal error shares the progress update', () => {
+    const onProgress = vi.fn();
+    const parse = createAiMealEstimateProgressParser(onProgress);
+
+    parse('{"event":"photo_check.completed"}\n{"event":"error","code":"processing_failed"}');
+
+    expect(onProgress).not.toHaveBeenCalled();
+  });
+
+  it('forwards only complete phase records from the existing Axios download callback', async () => {
+    const onProgress = vi.fn();
+    await aiApi.estimateMeal('Reis', '/meal.jpg', 'image/jpeg', undefined, { onProgress });
+    const requestConfig = postMock.mock.calls[0]?.[2] as {
+      onDownloadProgress?: (event: {
+        event: { target: { responseText: string } };
+        loaded: number;
+        bytes: number;
+        lengthComputable: boolean;
+      }) => void;
+    } | undefined;
+
+    requestConfig?.onDownloadProgress?.({
+      event: { target: { responseText: '{"event":"photo_check.completed"}\n' } },
+      loaded: 34,
+      bytes: 34,
+      lengthComputable: false,
+    });
+
+    expect(onProgress).toHaveBeenCalledWith({ event: 'photo_check.completed' });
+  });
+
+  it('returns the final result from the NDJSON response without replaying buffered phases', async () => {
+    postMock.mockResolvedValueOnce({ data: [
+      '{"event":"photo_check.completed"}',
+      '{"event":"estimate.started"}',
+      JSON.stringify({ event: 'result', data: streamedEstimate }),
+      '',
+    ].join('\n') });
+
+    await expect(aiApi.estimateMeal('Reis', '/meal.jpg', 'image/jpeg')).resolves.toEqual(streamedEstimate);
+  });
+
+  it('rejects a terminal processing error instead of resolving a preview', async () => {
+    postMock.mockResolvedValueOnce({ data: '{"event":"error","code":"processing_failed"}\n' });
+
+    await expect(aiApi.estimateMeal('Reis', '/meal.jpg', 'image/jpeg'))
+      .rejects.toThrow('Die KI-Schätzung konnte nicht abgeschlossen werden. Bitte versuche es erneut.');
+  });
+
+  it('propagates a transport failure without fabricating a completed phase', async () => {
+    const transportError = new Error('network unavailable');
+    const onProgress = vi.fn();
+    postMock.mockRejectedValueOnce(transportError);
+
+    await expect(aiApi.estimateMeal('Reis', '/meal.jpg', 'image/jpeg', undefined, { onProgress }))
+      .rejects.toBe(transportError);
+    expect(onProgress).not.toHaveBeenCalled();
+  });
+
+  it('passes an AbortSignal to the existing photo request', async () => {
+    const controller = new AbortController();
+    let requestSignal: AbortSignal | undefined;
+    postMock.mockImplementationOnce((_url, _body, config) => {
+      requestSignal = (config as { signal: AbortSignal }).signal;
+      return new Promise((_resolve, reject) => {
+        requestSignal?.addEventListener('abort', () => reject(new Error('request aborted')), { once: true });
+      });
+    });
+
+    const request = aiApi.estimateMeal('Reis', '/meal.jpg', 'image/jpeg', undefined, { signal: controller.signal });
+    controller.abort();
+
+    await expect(request).rejects.toThrow('request aborted');
+    expect(requestSignal).toBe(controller.signal);
   });
 });
 
@@ -110,7 +229,18 @@ vi.mock('../date/localDate', () => ({
   getLocalTimezoneOffsetMinutes: getLocalTimezoneOffsetMinutesMock,
 }));
 
-import { aiApi } from './aiApi';
+import { aiApi, createAiMealEstimateProgressParser } from './aiApi';
+
+const streamedEstimate = {
+  mealName: 'Reis',
+  mealEstimate: { calories: 300, protein: 8, carbs: 60, fat: 2, fiber: 1 },
+  components: ['Reis'],
+  contextDetected: null,
+  portionConfidence: 'medium',
+  photoUsed: true,
+  assumptions: [],
+  warnings: [],
+};
 
 describe('aiApi.getDailyInsight', () => {
   beforeEach(() => {

@@ -99,3 +99,10 @@ export interface AiMealEstimatePreview {
   /** Warnings about uncertainty, ambiguous input, or potential inaccuracies */
   warnings: string[];
 }
+
+/** NDJSON events returned only when a photo request opts in with Accept: application/x-ndjson. */
+export type AiMealEstimateProgressEvent =
+  | { event: 'photo_check.completed' }
+  | { event: 'estimate.started' }
+  | { event: 'result'; data: AiMealEstimatePreview }
+  | { event: 'error'; code: 'processing_failed' };

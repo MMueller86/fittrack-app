@@ -7,6 +7,7 @@ import type {
   NutritionLabelScanResult,
   AiMealEstimatePreview,
   AiMealEstimateRefine,
+  AiMealEstimateProgressEvent,
   InsightResponse,
   RecipeScalePreviewRequest,
   RecipeScalePreviewResponse,
@@ -57,6 +58,122 @@ export function getInsightFeedbackApiError(error: unknown): InsightFeedbackApiEr
     : null;
 
   return { status: error.response.status, code };
+}
+
+type AiMealEstimatePhaseEvent = Extract<
+  AiMealEstimateProgressEvent,
+  { event: 'photo_check.completed' | 'estimate.started' }
+>;
+
+export interface AiMealEstimateRequestOptions {
+  signal?: AbortSignal;
+  onProgress?: (event: AiMealEstimatePhaseEvent) => void;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isAiMealEstimatePreview(value: unknown): value is AiMealEstimatePreview {
+  if (!isRecord(value) || !isRecord(value.mealEstimate)) return false;
+  const nutrition = value.mealEstimate;
+  return typeof value.mealName === 'string'
+    && ['calories', 'protein', 'carbs', 'fat', 'fiber'].every((key) => typeof nutrition[key] === 'number')
+    && Array.isArray(value.components)
+    && value.components.every((component) => typeof component === 'string')
+    && (value.contextDetected === null || typeof value.contextDetected === 'string')
+    && ['high', 'medium', 'low'].includes(String(value.portionConfidence))
+    && typeof value.photoUsed === 'boolean'
+    && Array.isArray(value.assumptions)
+    && value.assumptions.every((assumption) => typeof assumption === 'string')
+    && Array.isArray(value.warnings)
+    && value.warnings.every((warning) => typeof warning === 'string');
+}
+
+function parseAiMealEstimateProgressEvent(value: unknown): AiMealEstimateProgressEvent | null {
+  if (!isRecord(value)) return null;
+  switch (value.event) {
+    case 'photo_check.completed':
+    case 'estimate.started':
+      return { event: value.event };
+    case 'result':
+      return isAiMealEstimatePreview(value.data) ? { event: 'result', data: value.data } : null;
+    case 'error':
+      return value.code === 'processing_failed'
+        ? { event: 'error', code: 'processing_failed' }
+        : null;
+    default:
+      return null;
+  }
+}
+
+/** Parses complete NDJSON records from Axios' cumulative XHR responseText. */
+export function createAiMealEstimateProgressParser(
+  onProgress: (event: AiMealEstimatePhaseEvent) => void,
+): (responseText: string) => void {
+  let observedText = '';
+  let pendingText = '';
+
+  return (responseText) => {
+    const newText = responseText.startsWith(observedText)
+      ? responseText.slice(observedText.length)
+      : responseText;
+    observedText = responseText;
+    pendingText += newText;
+
+    const records = pendingText.split('\n');
+    pendingText = records.pop() ?? '';
+    const events = records
+      .map((record) => {
+        try {
+          return parseAiMealEstimateProgressEvent(JSON.parse(record.trim()));
+        } catch {
+          return null;
+        }
+      })
+      .filter((event): event is AiMealEstimateProgressEvent => event !== null);
+
+    const pendingRecord = pendingText.trim();
+    if (pendingRecord.length > 0) {
+      try {
+        const pendingEvent = parseAiMealEstimateProgressEvent(JSON.parse(pendingRecord));
+        if (pendingEvent?.event === 'result' || pendingEvent?.event === 'error') return;
+      } catch {
+        // The last record may still be arriving in another progress update.
+      }
+    }
+    if (events.some((event) => event.event === 'result' || event.event === 'error')) return;
+    events.forEach((event) => {
+      if (event.event === 'photo_check.completed' || event.event === 'estimate.started') {
+        onProgress(event);
+      }
+    });
+  };
+}
+
+function parseAiMealEstimateProgressResponse(responseText: string): AiMealEstimatePreview {
+  let result: AiMealEstimatePreview | null = null;
+  for (const record of responseText.split(/\r?\n/)) {
+    if (record.trim().length === 0) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(record);
+    } catch {
+      throw new Error('Die KI-Schätzung konnte nicht abgeschlossen werden. Bitte versuche es erneut.');
+    }
+    const event = parseAiMealEstimateProgressEvent(parsed);
+    if (event?.event === 'error') {
+      throw new Error('Die KI-Schätzung konnte nicht abgeschlossen werden. Bitte versuche es erneut.');
+    }
+    if (event?.event === 'result') result = event.data;
+  }
+  if (result) return result;
+  throw new Error('Die KI-Schätzung konnte nicht abgeschlossen werden. Bitte versuche es erneut.');
+}
+
+function getProgressResponseText(event: import('axios').AxiosProgressEvent): string | null {
+  const responseText: unknown = event.event?.target?.responseText;
+  return typeof responseText === 'string' ? responseText : null;
 }
 
 // Re-export for convenience so callers don't need to import from @fittrack/shared directly
@@ -169,6 +286,7 @@ export const aiApi = {
     imageUri?: string,
     imageMimeType?: 'image/jpeg' | 'image/png',
     refine?: AiMealEstimateRefine,
+    options?: AiMealEstimateRequestOptions,
   ): Promise<AiMealEstimatePreview> {
     if (imageUri && imageMimeType) {
       const formData = new FormData();
@@ -179,18 +297,36 @@ export const aiApi = {
         type: imageMimeType,
         name: `meal.${imageMimeType === 'image/png' ? 'png' : 'jpg'}`,
       } as unknown as Blob);
+      const progressParser = options?.onProgress
+        ? createAiMealEstimateProgressParser(options.onProgress)
+        : null;
       return apiClient
-        .post<AiMealEstimatePreview>('/ai/meal-estimate/preview', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        .post<AiMealEstimatePreview | string>('/ai/meal-estimate/preview', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Accept: 'application/x-ndjson',
+          },
           timeout: 60_000,
+          ...(options?.signal ? { signal: options.signal } : {}),
+          ...(progressParser ? {
+            onDownloadProgress: (event) => {
+              const responseText = getProgressResponseText(event);
+              if (responseText !== null) progressParser(responseText);
+            },
+          } : {}),
         })
-        .then((r) => r.data);
+        .then((r) => typeof r.data === 'string'
+          ? parseAiMealEstimateProgressResponse(r.data)
+          : r.data);
     }
     return apiClient
       .post<AiMealEstimatePreview>('/ai/meal-estimate/preview', {
         text,
         ...(refine ? { refine } : {}),
-      }, { timeout: 60_000 })
+      }, {
+        timeout: 60_000,
+        ...(options?.signal ? { signal: options.signal } : {}),
+      })
       .then((r) => r.data);
   },
 

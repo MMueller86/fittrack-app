@@ -21,7 +21,7 @@ import { _setFoodProductRepository, _resetFoodProductRepository } from '../lib/r
 import { _setReusableItemsRepository, __resetReusableItemsRepositoryForTests } from '../lib/repositories/reusableItemsRepository';
 import type { FoodProductRepository } from '../lib/repositories/foodProductRepository';
 import type { ReusableItemsRepository } from '../lib/repositories/reusableItemsRepository';
-import type { AiMealEstimatePreview, FoodSearchResult, ReusableItem } from '@fittrack/shared';
+import type { AiMealEstimatePreview, AiMealEstimateProgressEvent, FoodSearchResult, ReusableItem } from '@fittrack/shared';
 import {
   makeContext,
   makeRequest,
@@ -604,6 +604,19 @@ function mockPhotoAssessmentClient(assessment: string, estimate = VALID_ESTIMATE
   return create;
 }
 
+async function readProgressEvents(response: Awaited<ReturnType<typeof mealEstimatePreviewHandler>>): Promise<AiMealEstimateProgressEvent[]> {
+  const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+  const decoder = new TextDecoder();
+  let content = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    content += decoder.decode(value, { stream: true });
+  }
+  content += decoder.decode();
+  return content.trim().split('\n').map((line) => JSON.parse(line) as AiMealEstimateProgressEvent);
+}
+
 const VALID_REFINE = {
   previous: {
     mealName: 'Schnitzel mit Pommes',
@@ -927,6 +940,137 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     expect(trackUsage).toHaveBeenCalledTimes(1);
   });
 
+  it('streams ordered same-request phases only for opted-in photo requests', async () => {
+    const create = mockPhotoAssessmentClient('consistent');
+    const formData = new FormData();
+    formData.set('text', 'Reis mit Gemüse');
+    formData.set('image', new Blob(['synthetic image'], { type: 'image/png' }), 'meal.png');
+
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({
+        formData,
+        headers: {
+          accept: 'application/x-ndjson',
+          'content-type': 'multipart/form-data; boundary=test-boundary',
+        },
+      }),
+      makeContext(),
+    );
+    const events = await readProgressEvents(response);
+
+    expect(response.status).toBe(200);
+    expect(response.headers).toMatchObject({ 'content-type': 'application/x-ndjson; charset=utf-8' });
+    expect(events.map((event) => event.event)).toEqual([
+      'photo_check.completed',
+      'estimate.started',
+      'result',
+    ]);
+    expect(events[2]).toMatchObject({ event: 'result', data: { photoAssessment: 'consistent' } });
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(trackUsage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report photo completion or success when photo assessment fails', async () => {
+    const create = vi.fn().mockResolvedValue({ choices: [{ message: { content: '{invalid json' } }] });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    __setOpenAiClientForTests({ chat: { completions: { create } } } as any);
+    const formData = new FormData();
+    formData.set('text', 'Reis mit Gemüse');
+    formData.set('image', new Blob(['synthetic image'], { type: 'image/png' }), 'meal.png');
+
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({
+        formData,
+        headers: { accept: 'application/x-ndjson', 'content-type': 'multipart/form-data; boundary=test-boundary' },
+      }),
+      makeContext(),
+    );
+    const events = await readProgressEvents(response);
+
+    expect(events.map((event) => event.event)).toEqual(['error']);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('ends with an error and no result when the estimate provider fails after progress starts', async () => {
+    const create = vi.fn()
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify({ assessment: 'consistent' }) } }] })
+      .mockRejectedValueOnce(new Error('synthetic provider failure'));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    __setOpenAiClientForTests({ chat: { completions: { create } } } as any);
+    const formData = new FormData();
+    formData.set('text', 'Reis mit Gemüse');
+    formData.set('image', new Blob(['synthetic image'], { type: 'image/png' }), 'meal.png');
+
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({
+        formData,
+        headers: { accept: 'application/x-ndjson', 'content-type': 'multipart/form-data; boundary=test-boundary' },
+      }),
+      makeContext(),
+    );
+    const events = await readProgressEvents(response);
+
+    expect(events.map((event) => event.event)).toEqual([
+      'photo_check.completed',
+      'estimate.started',
+      'error',
+    ]);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('ends with an error and no result when final estimate validation fails', async () => {
+    const create = mockPhotoAssessmentClient('consistent', {
+      ...VALID_ESTIMATE,
+      mealEstimate: { ...VALID_ESTIMATE.mealEstimate, calories: 2000 },
+      estimatedTotalGrams: 200,
+    });
+    const formData = new FormData();
+    formData.set('text', 'Reis mit Gemüse');
+    formData.set('image', new Blob(['synthetic image'], { type: 'image/png' }), 'meal.png');
+
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({
+        formData,
+        headers: { accept: 'application/x-ndjson', 'content-type': 'multipart/form-data; boundary=test-boundary' },
+      }),
+      makeContext(),
+    );
+    const events = await readProgressEvents(response);
+
+    expect(events.map((event) => event.event)).toEqual([
+      'photo_check.completed',
+      'estimate.started',
+      'error',
+    ]);
+    expect(events.some((event) => event.event === 'result')).toBe(false);
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(trackUsage).not.toHaveBeenCalled();
+  });
+
+  it('keeps photo requests as JSON for legacy clients and no-photo opt-ins', async () => {
+    mockPhotoAssessmentClient('consistent');
+    const legacyForm = new FormData();
+    legacyForm.set('text', 'Reis mit Gemüse');
+    legacyForm.set('image', new Blob(['synthetic image'], { type: 'image/png' }), 'meal.png');
+    const legacyResponse = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ formData: legacyForm, headers: { 'content-type': 'multipart/form-data; boundary=test-boundary' } }),
+      makeContext(),
+    );
+
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const noPhotoResponse = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Schnitzel' }, headers: { accept: 'application/x-ndjson' } }),
+      makeContext(),
+    );
+
+    expect(legacyResponse.jsonBody).toMatchObject({ photoProvided: true, photoAssessment: 'consistent' });
+    expect(legacyResponse.body).toBeUndefined();
+    expect(noPhotoResponse.jsonBody).toMatchObject({ photoProvided: false, photoAssessment: 'no_photo' });
+    expect(noPhotoResponse.body).toBeUndefined();
+  });
+
   it.each([
     ['consistent', 'included'],
     ['complementary', 'included'],
@@ -1027,11 +1171,16 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     formData.set('image', new Blob(['synthetic image'], { type: 'image/png' }), 'meal.png');
 
     const response = await mealEstimatePreviewHandler(
-      await makeAuthRequest({ formData, headers: { 'content-type': 'multipart/form-data; boundary=test-boundary' } }),
+      await makeAuthRequest({
+        formData,
+        headers: { accept: 'application/x-ndjson', 'content-type': 'multipart/form-data; boundary=test-boundary' },
+      }),
       makeContext(),
     );
 
     expect(response.status).toBe(429);
+    expect(response.jsonBody).toMatchObject({ error: 'quota_exceeded' });
+    expect(response.body).toBeUndefined();
     expect(create).not.toHaveBeenCalled();
     expect(trackUsage).not.toHaveBeenCalled();
   });

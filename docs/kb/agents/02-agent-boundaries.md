@@ -44,7 +44,7 @@ Each agent is implemented as a VS Code Custom Agent in `.github/agents/` and ref
 
 **Also writes:** its own handoff file `docs/handoffs/...` (see [Workflow Artifacts and Handoffs](#workflow-artifacts-and-handoffs)).
 
-**Does not own:** `infra/` (any Bicep file), deploy workflow, `az` or `func publish` commands, EAS builds — all belong to Infrastructure & Release. When a new Cosmos container is needed, Backend outputs a container spec (name + partition key); Infrastructure & Release writes the Bicep resource block.
+**Does not own:** `infra/` (any Bicep file), deploy workflow, mutating `az` commands, `func publish`, EAS builds — all belong to Infrastructure & Release. Backend may run read-only Azure diagnostics (Application Insights / Log Analytics queries) for bug analysis; see `backend.instructions.md`, "Read-Only Diagnostics". When a new Cosmos container is needed, Backend outputs a container spec (name + partition key); Infrastructure & Release writes the Bicep resource block.
 
 **Key responsibilities for shared changes:** Any change to `shared/types/` or `shared/lib/` affects both backend and mobile. Coordinate with Frontend agent before breaking changes.
 

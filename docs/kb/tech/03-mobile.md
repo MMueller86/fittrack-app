@@ -257,6 +257,17 @@ re-estimates per result. On success the new AI result replaces the old one and
 local adjustments reset; errors retain the sheet input. `Einzeln aufschlüsseln`
 remains a separate Precision Path action.
 
+Photo estimates opt into the same-POST NDJSON progress contract through the
+existing `apiClient`; the request payload, Bearer/401 refresh, quota handling,
+and final preview remain unchanged. The loading overlay marks the photo check
+complete only after `photo_check.completed` and starts its estimate animation
+only after `estimate.started`. Complete phase records delivered together with
+the final result are not replayed; the existing indeterminate loading state
+stays visible until the preview arrives. Requests without a photo keep their
+JSON path. Closing the subflow or unmounting aborts the request and prevents
+late UI updates. Whether React Native/Axios delivers phase records before the
+final response remains **UNVERIFIED** pending the post-QA device smoke.
+
 Saving sends the confirmed adjusted macros as one portion
 (`inputMode: 'portion'`, `inputAmount: 1`) without `amountGrams`. Valid V2
 structured component items, scaled total weight, and prompt version are

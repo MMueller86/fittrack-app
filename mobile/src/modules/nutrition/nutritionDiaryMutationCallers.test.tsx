@@ -759,7 +759,16 @@ describe('nutrition diary mutation caller flows', () => {
     expect(selectedPhoto?.props.resizeMode).toBe('contain');
     expect(selectedPhoto?.props.accessibilityLabel).toBe('Ausgewähltes Mahlzeitenfoto');
     await press(renderer, 'KI schätzen');
-    expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', '/meal-cropped.jpg', 'image/jpeg');
+    expect(mocks.estimateMeal).toHaveBeenLastCalledWith(
+      'Porridge',
+      '/meal-cropped.jpg',
+      'image/jpeg',
+      undefined,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        onProgress: expect.any(Function),
+      }),
+    );
 
     // Close and reopen the flow: the photo must be gone.
     await act(async () => { rerender(renderer, build(false)); });
@@ -775,7 +784,16 @@ describe('nutrition diary mutation caller flows', () => {
     expect(hasButton('Foto mit der Kamera aufnehmen')).toBe(true);
     expect(renderer.root.findAll((node) => node.type === 'Image')).toHaveLength(0);
     await press(renderer, 'KI schätzen');
-    expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', undefined, undefined);
+    expect(mocks.estimateMeal).toHaveBeenLastCalledWith(
+      'Porridge',
+      undefined,
+      undefined,
+      undefined,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+        onProgress: expect.any(Function),
+      }),
+    );
   });
 
   it('shows a label scan error and keeps the camera and gallery buttons usable', async () => {

@@ -197,6 +197,16 @@ full 4:3 `contain` frame used by the review screens. The preview uses the exact
 URI passed to the AI request; removing the photo hides the preview and removes
 it from the request.
 
+During a photo estimate, the loading overlay stays indeterminate until an actual
+phase record arrives. `photo_check.completed` may show `Foto geprüft`; the
+estimate animation starts only on `estimate.started`. If buffered phase records
+arrive with the final result, the overlay does not replay them and remains in
+its prior waiting state until the result replaces it. No-photo estimates retain
+the existing JSON and loading path. Closing the subflow or unmounting cancels
+the request, with no later state update. Live partial delivery through
+React Native/Axios is **UNVERIFIED** and requires the post-QA device smoke; lack
+of a device is not evidence that streaming fails.
+
 The review shows the complete uploaded photo in a stable 4:3 frame, labeled as
 the photo sent to AI, so the user can verify the exact image. It uses
 `resizeMode="contain"` so no further crop is applied in the review. The review

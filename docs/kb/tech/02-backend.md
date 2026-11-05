@@ -82,6 +82,12 @@ export const myHandler = withHandler('domain.action', async (request, ctx) => {
 });
 ```
 
+The Functions app enables Node HTTP streaming with
+`app.setup({ enableHttpStream: true })`. This is a host capability; handlers
+remain JSON by default. The meal-estimate preview uses a response stream only
+for photo requests that explicitly opt in with `Accept: application/x-ndjson`.
+`withHandler()` remains unchanged and passes the handler response through.
+
 Recipe HTTP routes use `withRecipeHandler()` around the same handler boundary.
 It preserves successful and binary responses and normalizes every returned
 4xx/5xx response to the Recipe error envelope documented in
