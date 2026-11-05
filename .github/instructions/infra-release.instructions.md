@@ -33,6 +33,17 @@ Environment overview: [`../docs/kb/tech/01-system-overview.md`](../../docs/kb/te
 
 ---
 
+## Handoff File (mandatory in the Orchestrator workflow)
+
+When the Task Package contains a `Handoff File` path, the handoff is a file, not chat text. Format and rules: [`orchestrator.instructions.md#handoff-file-contract`](orchestrator.instructions.md). Direct commands ("New Dev Build" etc.) do not require one.
+
+1. Immediately after reading the Task Package, create the file with `status: BLOCKED` and `Issues for Orchestrator: in progress`.
+2. Report plan or environment problems via `status: PLAN_ERROR` / `BLOCKED` in the file, then stop.
+3. Before your final message, set `status: COMPLETE` and fill every `Expected Handoff` item.
+4. The final message must be non-empty: handoff path, status, one-line summary. Never include secrets in the file.
+
+---
+
 ## Authentication Policy
 
 **Azure CLI (`az`):** Before running any `az` command, verify the session is active with `az account show`. If the session is invalid or expired, attempt non-interactive re-authentication (e.g. cached credentials, environment-configured service principal). Escalate to the user only if interactive login is required and cannot be avoided. Do not silently assume a session is active.
@@ -310,11 +321,7 @@ Report the assessment as `Dev Build Required: YES | NO` with the specific trigge
 
 ## Cosmos Emulator
 
-Start `scripts/start-cosmos-emulator.ps1` only when:
-- Contract tests are explicitly part of the requested workflow
-- Local Cosmos verification is explicitly required
-
-Do not start the emulator proactively as part of a standard build or deploy.
+No local Cosmos emulator is available; contract tests run only in CI. Do not start `scripts/start-cosmos-emulator.ps1` in the agent workflow, and do not accept Task Packages that require local contract tests.
 
 ---
 

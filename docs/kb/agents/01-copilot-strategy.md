@@ -140,18 +140,25 @@ All files are created and active:
 .github/
 ├── copilot-instructions.md          ← Global rules (security, Azure, import rule, testing, language)
 ├── agents/
-│   ├── fittrack-planner.agent.md   ← Planner / Solution Architect  [tools: read, search]
+│   ├── fittrack-orchestrator.agent.md ← Workflow coordinator       [tools: read, search, edit, execute, agent]
+│   ├── fittrack-infra-release.agent.md ← Infrastructure & Release  [tools: read, search, edit, execute]
+│   ├── fittrack-planner.agent.md   ← Planner / Solution Architect  [tools: read, search, edit, execute]
 │   ├── fittrack-backend.agent.md   ← Backend Engineer             [tools: read, search, edit, execute]
 │   ├── fittrack-frontend.agent.md  ← Frontend Engineer            [tools: read, search, edit, execute]
 │   └── fittrack-qa.agent.md        ← QA / Review                  [tools: read, search, edit, execute]
 └── instructions/
+    ├── orchestrator.instructions.md ← Workflow, handoff file contract, QA register, cleanup
+    ├── infra-release.instructions.md ← Deploy workflow, Bicep, EAS
     ├── planner.instructions.md     ← Planning rules (assessment, output format, PO boundary)
     ├── backend.instructions.md     ← Handler, repository, quota, import, deploy patterns
     ├── mobile.instructions.md      ← Design system, animation, navigation, state, German strings
     └── qa.instructions.md          ← Test commands, coverage, review checklist, verdict format
 
 docs/kb/                             ← Deep-reference knowledge (never duplicated in instructions)
+docs/handoffs/                       ← Transient agent handoff files (gitignored, deleted after QA PASS)
 ```
+
+Agent-to-agent communication is file-based; see [agents/02-agent-boundaries.md](02-agent-boundaries.md#workflow-artifacts-and-handoffs).
 
 ## Priority Order for Maintaining Instructions Files
 

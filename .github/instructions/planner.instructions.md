@@ -67,6 +67,12 @@ Implementation agents (Backend, Frontend, QA) are responsible for all commands t
 
 ---
 
+## Test Planning Constraint: No Cosmos Emulator
+
+No local Cosmos emulator exists. Never plan the local execution of Cosmos contract tests (`vitest.contract.config.mts`, `start-cosmos-emulator.ps1`) as an acceptance criterion, QA step, Test Strategy item or Infrastructure subtask. Contract tests run only in the CI pipeline (Tier 2). A plan may require that contract tests be *written* for new repository methods; its local verification must use unit tests against the in-memory repositories.
+
+---
+
 ## Requirement Assessment
 
 Before any technical planning, evaluate the requirement:

@@ -17,13 +17,25 @@ The Task Package contains:
 - `Required Repository Context` — read these before writing code
 - `Required Skills` — load these before writing code
 - `Relevant Acceptance Criteria` — the completion bar
-- `Dependencies` — handoff outputs from prior agents (e.g. shared types, API contracts)
+- `Dependencies` — paths of handoff files from prior agents (read them)
+- `Handoff File` — the path you must write (see below)
 
 If the Task Package is **incomplete**, **technically invalid**, or a declared dependency does not match the current implementation: **do not deviate or coordinate directly with another agent**. Report the specific issue to the Orchestrator and stop.
 
 For small, isolated changes (single handler, single bug fix) delivered outside the Orchestrator workflow, a Task Package is not required — work from the explicit request.
 
 See [`docs/kb/agents/02-agent-boundaries.md`](../docs/kb/agents/02-agent-boundaries.md) for agent roles.
+
+### Handoff File (mandatory in the Orchestrator workflow)
+
+The handoff is a file, not chat text. Format and rules: [`orchestrator.instructions.md#handoff-file-contract`](orchestrator.instructions.md).
+
+1. Immediately after reading the Task Package, create the file at `Handoff File` with `status: BLOCKED` and `Issues for Orchestrator: in progress`.
+2. Do the work. Report technical or plan problems by setting `status: PLAN_ERROR` (or `BLOCKED`) with details in the file, then stop.
+3. Before your final message, set `status: COMPLETE` and fill every `Expected Handoff` item under `Deliverables`.
+4. The final message must be non-empty and contain only: handoff path, status, one-line summary. Never end a turn without it.
+
+This file is the only file outside your owned code areas you may write.
 
 ---
 
@@ -125,7 +137,7 @@ cd backend && npx vitest run
 
 **Bug fix workflow (Red → Green):** Write a failing test that reproduces the bug first. Confirm it fails. Fix the implementation until the test passes. Never submit a bug fix without a regression test.
 
-For new repository methods, add a contract test in `*.contract.test.ts`. See [`qa.instructions.md`](qa.instructions.md) for the full checklist and contract test setup.
+For new repository methods, add a contract test in `*.contract.test.ts` (executed only in CI — no local Cosmos emulator; verify locally with in-memory unit tests). See [`qa.instructions.md`](qa.instructions.md) for the full checklist and contract test setup.
 
 ## Local Development
 

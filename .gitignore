@@ -58,6 +58,9 @@ yarn-error.log*
 tools/off-import/output/
 !tools/off-import/output/food-products.sample.100.json
 
-# Zu große Evidence-Dateien (>100 MB, GitHub-Limit)
+# Zu groï¿½e Evidence-Dateien (>100 MB, GitHub-Limit)
 docs/User Stories/Reciepe/B-2_Feedback-Loop_Baseline_2026-10-09.json
 docs/User Stories/Reciepe/B-2_Feedback-Loop_Resume-Baseline_2026-10-09-r2.json
+
+# Agent handoff files (transient, deleted by the Orchestrator after QA PASS)
+docs/handoffs/

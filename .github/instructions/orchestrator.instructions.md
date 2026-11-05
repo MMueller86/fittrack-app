@@ -75,13 +75,54 @@ Once a complete plan is produced, present it to the user and ask:
 
 Use the approved plan exactly as written. Do not re-plan, interpret, or modify the plan.
 
+### Handoff File Contract
+
+Handoffs between agents are **files in the repository**, not chat content. Subagents are stateless and return a single message; a chat-only handoff is lost whenever an agent ends without a final message (context overflow, tool-ending, abort) and cannot be "completed" by a follow-up call.
+
+- Path: `docs/handoffs/<plan-file-stem>/<NN>-<subtask-slug>.md` (`NN` = position in `subtask_queue`, two digits). Without a plan: `docs/handoffs/<task-slug>/01-<subtask-slug>.md`.
+- The Orchestrator derives the path and passes it in the Task Package as `Handoff File`. The agent does not choose it.
+- Writer: the implementing agent (Backend, Frontend, Infrastructure & Release). Each writes only its own handoff file in addition to its owned code areas.
+- The agent writes the file **before** its final message, using the format in [Handoff File Format](#handoff-file-format), and updates it if it changes anything afterwards.
+- The agent's final message is only a short manifest: handoff path, `Status`, one-line summary. The file is authoritative; the message is only a routing acknowledgement.
+- Dependencies are passed as handoff file **paths**; the receiving agent reads them. The Orchestrator does not paste content.
+- Paths outside the workspace (`chat-session-resources`, terminal output, `%TEMP%`, `AppData`) are never valid.
+
+#### Handoff File Format
+
+```
+format: fittrack-handoff-v1
+subtask: <name>
+agent: <Backend | Frontend | Infrastructure>
+status: COMPLETE | BLOCKED | PLAN_ERROR
+
+## Summary
+[2-5 lines]
+
+## Deliverables
+[One entry per item in Expected Handoff: the artefact itself, or the file path where it lives]
+
+## Changed Files
+[workspace-relative list]
+
+## Deviations
+[None, or deviation + reason]
+
+## Verification Run
+[command, exit code, result — or None]
+
+## Issues for Orchestrator
+[Required for BLOCKED / PLAN_ERROR: exact problem and what is needed. Otherwise None]
+```
+
+In-progress safety: the agent creates the file with `status: BLOCKED` and `Issues for Orchestrator: in progress` as soon as it starts, and sets `COMPLETE` last. A file still in that state means the agent was interrupted.
+
 ### Execution State
 
 Track the following across all execution steps:
 
 ```
 subtask_queue: []    ← ordered list of subtasks derived from the Recommended Execution Order
-handoff_store: {}    ← keyed by subtask name; stores each agent's output/deliverables
+handoff_store: {}    ← keyed by subtask name; stores the workspace-relative PATH of each agent's handoff file (not its content)
 retry_counts: {}     ← keyed by subtask name; tracks correction attempts per subtask
 finding_store: {}   ← keyed by finding ID; mirrors docs/qa/findings.md
 ```
@@ -116,11 +157,16 @@ For each subtask in `subtask_queue` (strictly in order):
 4. Call the responsible agent with this package — **never the full plan**.
    - If the subagent invocation or routing fails, stop and report a process error to the user. Do not substitute a standard agent, another role, or an unscoped fallback. Preserve the task package and current workflow state for an intentional retry after user direction.
    - This rule applies to invocation failure. If an agent starts successfully and reports a technical error in the approved plan, follow **Detect plan invalidity** below.
-5. After the agent completes, verify handoff completeness:
-   - Check that every artefact listed in the subtask's `Expected Handoff` is present in the agent's response
+5. After the agent returns, verify the handoff **file** (read it; ignore the chat message content except for the path):
+   - The file exists at the assigned path, uses `fittrack-handoff-v1`, and every artefact listed in the subtask's `Expected Handoff` appears under `Deliverables`
    - Do **not** assess technical correctness or quality — that is QA's responsibility
-   - If any declared artefact is missing: request completion from the same agent, providing the list of missing artefacts. Do not advance to the next subtask until all artefacts are confirmed present. This is not counted against `retry_counts`.
-6. Store the completed output in `handoff_store[subtask_name]`.
+   - `status: COMPLETE` → continue.
+   - `status: PLAN_ERROR` → follow **Detect plan invalidity**.
+   - `status: BLOCKED` (not an in-progress stub) → report `Issues for Orchestrator` to the user and wait.
+   - **Empty or missing chat response but valid `COMPLETE` file** → accept; this is not an error.
+   - **File missing, incomplete, or still the in-progress stub** → the agent was interrupted. Start one **new** invocation (subagents are stateless) with the original Task Package plus the note: "A previous attempt was interrupted; inspect the current workspace state and the existing handoff file, finish remaining work, and complete the handoff file." If the second attempt also fails, stop with a process error. Not counted against `retry_counts`.
+   - **File valid but artefacts missing**: new invocation listing the missing artefacts, same rule, at most once.
+6. Store the handoff file path in `handoff_store[subtask_name]`.
 7. Report a concise summary to the user before continuing.
 8. Move to the next subtask.
 
@@ -151,7 +197,7 @@ Call **FitTrack QA** with:
 - All Acceptance Criteria (complete, numbered)
 - Scope and Out of Scope sections
 - Original user story
-- `handoff_store` (all subtask summaries and deviations)
+- `handoff_store` (handoff file paths; QA reads the files itself)
 - Which subtasks ran and which were skipped
 - Any known unverified areas or configuration notes
 - The expected workspace-relative QA report path. For a plan-driven review,
@@ -203,9 +249,19 @@ register remains the durable decision/status record.
 
 | Verdict | Action |
 |---|---|
-| **PASS** | Report success to user. Workflow complete. |
-| **PASS WITH ISSUES** | Persist every actionable finding, ask the user how each should be handled, and follow the Non-blocking Finding Decision Flow below. Do not complete the workflow before that decision. |
+| **PASS** | Delete the handoff directory per **Handoff Cleanup**, then report success to user. Workflow complete. |
+| **PASS WITH ISSUES** | Persist every actionable finding and follow the Non-blocking Finding Decision Flow below: quick fixes are routed automatically, only the remaining findings go to the user. |
 | **FAIL** | Proceed to correction loop below. |
+
+### Handoff Cleanup
+
+`docs/handoffs/` is gitignored and transient. After a validated final QA `PASS` (including a `PASS` after resolved findings):
+
+1. Delete only the directory `docs/handoffs/<plan-file-stem>/` of the finished workflow, using a single remove command (e.g. `Remove-Item -Recurse -LiteralPath <path>`). Verify first that the resolved path is inside `docs/handoffs/` and is not `docs/handoffs/` itself.
+2. Do not delete on `FAIL`, on `PASS WITH ISSUES`, on `Awaiting decision`, or after a process error — corrections and resumes need the files.
+3. A failed deletion is reported but does not invalidate the PASS.
+
+The durable records are the `PLAN_*.md`, the User Story, `docs/qa/findings.md`, the QA report and the Knowledge Base. The Orchestrator must never delete these.
 
 ### Central Findings Register
 
@@ -217,7 +273,7 @@ When QA returns findings:
 2. Write each finding to `docs/qa/findings.md` before presenting the QA result as complete.
 3. Preserve QA's description, evidence, criticality, affected plan or acceptance criterion, and proposed owner. Add routing and status metadata without changing the technical meaning.
 4. Never delete a finding. Update its status and append a history entry instead.
-5. Keep missing credentials, unavailable emulators, missing devices, and other manual validation limits in the register's verification-notes section, not as actionable findings, unless a defect is demonstrated.
+5. Keep Cosmos contract tests (CI-only), missing credentials, unavailable emulators, missing devices, and other manual validation limits in the register's verification-notes section, not as actionable findings, unless a defect is demonstrated.
 
 The QA agent supplies structured finding data but does not write the central register. This keeps one writer responsible for durable workflow state.
 
@@ -225,15 +281,33 @@ The Orchestrator may edit only `docs/qa/findings.md` for this purpose. It must n
 
 ### Non-blocking Finding Decision Flow
 
-`PASS WITH ISSUES` is not an automatic end state. After persistence, present every actionable finding with its ID, criticality, owner, and plan reference. Ask the user to choose per finding:
+`PASS WITH ISSUES` is not an automatic end state. After persistence, classify every actionable finding as **Quick Fix** or **Needs Decision**.
 
-- **Fix requested** — route it to the declared owner with a focused correction package, then run targeted QA and update the register to `Resolved` or `Closed`.
-- **Accepted** — record the user's acceptance and rationale; do not start correction work.
-- **Deferred** — record the user's decision and optional follow-up context; do not start correction work.
+**Quick Fix** — route automatically to the declared owner with a focused correction package, **without asking the user**, then run targeted QA and update the register to `Resolved` or `Closed`. A finding is a Quick Fix when it is local, has an unambiguous correction, and needs no change to architecture, API contracts, data model or product behaviour. Always Quick Fixes:
 
-Route a finding to the Planner only when it identifies a plan error, architectural contradiction, or unresolved product decision. Normal Backend, Frontend, Infrastructure, documentation, and test findings go directly to the declared owner after the user's choice.
+- missing or insufficient unit tests;
+- failing unit tests (type, lint, build or encoding checks included);
+- outdated or missing Knowledge Base, API reference or test documentation;
+- small deviations from documented patterns, naming, typos, missing `index.ts` registration, German UI string fixes;
+- any other non-blocking finding whose fix is confined to one agent's owned area and does not alter observable behaviour beyond the plan.
 
-If every selected correction is closed and no actionable findings remain open, QA may issue a final `PASS`. If any finding is accepted or deferred, complete with `PASS WITH ISSUES` and link the central register entry in the report. If the user has not decided, pause with status `Awaiting decision`.
+**Needs Decision** — present to the user with its ID, criticality, owner and plan reference; do not start correction work. Only these qualify:
+
+- larger architectural change or contradiction;
+- plan error;
+- open Product Owner decision or changed product behaviour;
+- change to an API contract, persisted data model or privacy policy text;
+- anything needing credentials or manual environment access.
+
+For Needs Decision findings the user chooses:
+
+- **Fix requested** — route to the declared owner (Planner first if it is a plan error, architectural contradiction or product decision), then targeted QA.
+- **Accepted** — record acceptance and rationale; no correction work.
+- **Deferred** — record the decision and optional follow-up context; no correction work.
+
+If unsure whether a finding is a Quick Fix, treat it as Needs Decision. Quick-Fix corrections count against `retry_counts`; the Loop Protection applies unchanged. Record the classification and rationale in the register entry.
+
+If every correction is closed and no actionable findings remain open, QA may issue a final `PASS`. If any Needs Decision finding is accepted or deferred, complete with `PASS WITH ISSUES` and link the register entry in the report. If the user has not decided, pause with status `Awaiting decision`.
 
 ### Process Errors
 
@@ -243,7 +317,10 @@ Report these immediately instead of silently recovering:
 - missing or unreadable approved Planner artifact;
 - reliance on an unresolved or out-of-workspace session-file path for a plan or handoff;
 - missing or invalid QA report or response manifest after one completion request;
-- inability to write `docs/qa/findings.md`.
+- inability to write `docs/qa/findings.md`;
+- missing or invalid handoff file after one new invocation.
+
+The Orchestrator may read the approved `PLAN_*.md`, handoff files, and QA reports to validate them. It may write only `docs/qa/findings.md` (and create no other files).
 
 Do not reconstruct an approved plan from temporary `chat-session-resources` files. A plan-driven execution requires a verified repository artifact under `docs/User Stories/**/PLAN_*.md`.
 Do not reconstruct QA results from terminal output or temporary files. QA
@@ -259,7 +336,7 @@ On QA FAIL:
    - If < 2 → increment, rebuild the Task Package from the subtask declaration + QA blocking findings + resolved dependency handoffs
    - If ≥ 2 → stop (see Loop Protection)
 4. Call the responsible agent with the correction package.
-5. Update `handoff_store[subtask_name]` with the corrected output.
+5. Update the same handoff file (`handoff_store[subtask_name]`) — the correcting agent revises it, it does not create a new one.
 6. Re-invoke QA with the same full-plan context as Step 5 + updated `handoff_store`.
 7. Repeat until PASS / PASS WITH ISSUES or retry limit reached.
 
@@ -292,10 +369,13 @@ When calling an implementation agent (Backend, Frontend, or Infrastructure & Rel
 [list from subtask]
 
 ## Dependencies
-[handoff output from handoff_store for each declared dependency]
+[handoff file path from handoff_store for each declared dependency — agent must read these files]
 
 ## Expected Handoff
-[list from subtask — agent must produce all of these in its response]
+[list from subtask — agent must write all of these into the handoff file]
+
+## Handoff File
+[assigned path per Handoff File Contract — agent must write it before its final message]
 ```
 
 Infrastructure subtasks may omit `Required Skills` when none are declared in the plan. Always include `Stop Conditions` for Infrastructure subtasks if declared.
@@ -356,7 +436,8 @@ The current plan replaces all previous Planner responses. It is already the cons
 - Make product decisions
 - Let agents interact with the user — the Orchestrator is the sole user-facing interface
 - Use a standard or unrelated agent as a fallback after a subagent invocation failure
-- Read terminal-output, session-resource, or other temporary files as plan or QA sources
+- Read terminal-output, session-resource, or other temporary files as plan, handoff, or QA sources
+- Accept a handoff that exists only in the chat response
 - Skip QA
 - Execute subtasks in parallel
 - Proceed to execution without explicit user APPROVE

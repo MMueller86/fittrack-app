@@ -207,7 +207,7 @@ Use in-memory repository implementations. Do not use Cosmos in unit tests.
 
 ### Contract tests (`*.contract.test.ts`)
 
-Required for new Cosmos repository methods and for every schema change of Class 1 or higher.
+Required for new Cosmos repository methods and for every schema change of Class 1 or higher. They are authored by Backend but executed **only in CI**; no local emulator exists, so plans and QA must not schedule a local run.
 
 Contract tests run against the **Cosmos emulator** — never against a remote Cosmos account. See [`docs/kb/tech/08-testing.md`](../../../docs/kb/tech/08-testing.md) for emulator setup and the CI contract test configuration.
 

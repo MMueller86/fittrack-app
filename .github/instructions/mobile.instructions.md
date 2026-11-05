@@ -18,7 +18,8 @@ The Task Package contains:
 - `Required Repository Context` — read these before writing code
 - `Required Skills` — load these before writing code
 - `Relevant Acceptance Criteria` — the completion bar
-- `Dependencies` — handoff outputs from prior agents (e.g. API contracts, shared types)
+- `Dependencies` — paths of handoff files from prior agents (read them)
+- `Handoff File` — the path you must write (see below)
 
 If the Task Package is **incomplete**, **technically invalid**, or the declared API contract does not match the current implementation: **do not deviate or coordinate directly with the Backend agent**. Report the specific issue to the Orchestrator and stop.
 
@@ -27,6 +28,17 @@ For small, isolated changes (single component, single bug fix) delivered outside
 When the Task Package lists `privacy-impact-review`, load it and report in the handoff any permissions, on-device storage, or user data shown to other users. Do not add such handling beyond what the plan declares.
 
 See [`docs/kb/agents/02-agent-boundaries.md`](../docs/kb/agents/02-agent-boundaries.md) for agent roles.
+
+### Handoff File (mandatory in the Orchestrator workflow)
+
+The handoff is a file, not chat text. Format and rules: [`orchestrator.instructions.md#handoff-file-contract`](orchestrator.instructions.md).
+
+1. Immediately after reading the Task Package, create the file at `Handoff File` with `status: BLOCKED` and `Issues for Orchestrator: in progress`.
+2. Do the work. Report technical or plan problems by setting `status: PLAN_ERROR` (or `BLOCKED`) with details in the file, then stop.
+3. Before your final message, set `status: COMPLETE` and fill every `Expected Handoff` item under `Deliverables`.
+4. The final message must be non-empty and contain only: handoff path, status, one-line summary. Never end a turn without it.
+
+This file is the only file outside your owned code areas you may write.
 
 ---
 

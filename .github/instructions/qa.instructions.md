@@ -13,7 +13,7 @@ The review input contains the following — do not search for them independently
 - All Acceptance Criteria (complete, numbered)
 - Original user story
 - Required Skills (as declared in the QA Work Package — load and apply each before reviewing)
-- `handoff_store` (all subtask summaries and deviations)
+- `handoff_store` (paths of handoff files under `docs/handoffs/`; read them for deliverables and deviations)
 - Which subtasks ran and which were skipped
 - Any known unverified areas or configuration notes
 - The expected workspace-relative QA report path under `docs/qa/reports/`
@@ -103,8 +103,7 @@ Vitest — run from the package directory.
 # Backend unit tests (includes registrations.test.ts)
 cd backend && npx vitest run
 
-# Backend contract tests (requires Cosmos emulator running)
-cd backend && npx vitest run --config vitest.contract.config.mts
+# Backend contract tests: CI only (Cosmos emulator). Do NOT run locally or in QA.
 
 # Shared unit tests
 cd shared && npx vitest run
@@ -159,7 +158,8 @@ QA verifies eval coverage and results only. QA must not create, modify, or fix p
 | Pure functions (calculations, validators) | Unit tests — mandatory |
 | AI classification logic (e.g., `classifyItem`) | Exhaustive unit tests — mandatory |
 | HTTP handlers | Unit tests covering happy path + error cases |
-| New repository methods | Contract test in `*.contract.test.ts` |
+| New repository methods | Contract test in `*.contract.test.ts` (authored; executed only in CI) |
+| New repository methods (local) | Unit tests against the in-memory implementation |
 | Bug fixes | Regression test covering the reported scenario — mandatory |
 | Re-exports and module wiring | Smoke test or registration test only |
 
@@ -167,7 +167,7 @@ QA verifies eval coverage and results only. QA must not create, modify, or fix p
 
 Contract tests run against the **Cosmos emulator only** — never against real Azure Cosmos DB.
 
-Locally: start the emulator via `backend/scripts/start-cosmos-emulator.ps1` before running contract tests.
+**No local Cosmos emulator is available. Contract tests are CI-only (Tier 2).** QA must not run them, start the emulator, or include contract-test execution in a QA plan or test table. Contract-test files may still be authored by Backend (and a missing one for a new repository method is a Quick Fix finding), but their result is not a local verification step. Record them once as a verification note: "Cosmos contract tests: CI-only, not run locally" — never as a finding, blocker or `UNVERIFIED` gate for the verdict.
 
 In CI: the emulator runs automatically as a GitHub Actions service container (see `.github/workflows/ci.yml`). Contract tests only run after Tier 1 (unit tests) passes.
 

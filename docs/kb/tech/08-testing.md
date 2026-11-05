@@ -47,6 +47,8 @@ Located alongside their repositories, named `*.contract.test.ts`.
 
 Require a running Cosmos emulator. Configured via `vitest.contract.config.mts`.
 
+[Rule] There is no local Cosmos emulator in the agent workflow: contract tests run **only in the CI pipeline** (Tier 2). They are never part of a Planner plan, QA test table or local verification step; local verification of repository logic uses unit tests against the in-memory implementations. The absence of a local contract run is a verification note, not a finding.
+
 Examples:
 - `cosmosDiaryRepository.contract.test.ts`
 - `cosmosWeightsRepository.contract.test.ts`
@@ -85,7 +87,7 @@ This test runs as part of the standard unit test suite.
 # Backend unit tests
 cd backend && npx vitest run
 
-# Backend contract tests (requires Cosmos emulator)
+# Backend contract tests: CI only (Cosmos emulator); not run locally by agents
 cd backend && npx vitest run --config vitest.contract.config.mts
 
 # Azure OpenAI prompt evals (requires configured credentials)
