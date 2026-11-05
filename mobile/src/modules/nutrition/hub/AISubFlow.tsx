@@ -1,12 +1,12 @@
 // AISubFlow — Full-Screen Modal für KI-Mahlzeitschätzung.
 // Fast Path: MealEstimateReviewScreen
-// Precision Path: MealParserReviewScreen (nach "Verfeinern")
 // Öffnet sich über dem FoodEntryHub, Hub bleibt im Hintergrund.
 
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   SafeAreaView,
@@ -18,8 +18,9 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardOverlap } from '../../../shared/keyboard/useKeyboardOverlap';
 import type { AiFoodEstimatePreview, AiMealEstimatePreview } from '@fittrack/shared';
-import type { MealParserPreviewItem } from '../../../shared/api/aiApi';
 import { aiApi } from '../../../shared/api/aiApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { formatApiError } from '../../../shared/api/apiError';
@@ -30,7 +31,6 @@ import { FramedPhotoPicker, type FramedPhotoResult } from '../../../shared/camer
 import { nutritionDiaryService as diaryApi } from '../../../services/nutritionDiaryService';
 import MealEstimateResult from '../MealEstimateResult';
 import MealEstimateReviewScreen from '../MealEstimateReviewScreen';
-import MealParserReviewScreen from '../MealParserReviewScreen';
 import type { FoodEntryHubContext } from './useFoodEntryHubStore';
 import type { MealType } from '@fittrack/shared';
 
@@ -76,6 +76,9 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
   const safeAreaStyle = Platform.OS === 'android'
     ? [styles.safeArea, { paddingTop: safeAreaTopInset }]
     : styles.safeArea;
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
+  const insets = useSafeAreaInsets();
+  const footerBottom = keyboardInset > 0 ? keyboardInset : (Platform.OS === 'android' ? insets.bottom : 0);
   const [text, setText] = useState('');
   const [mealPhoto, setMealPhoto] = useState<{
     uri: string;
@@ -84,7 +87,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mealEstimate, setMealEstimate] = useState<AiMealEstimatePreview | null>(null);
-  const [parserItems, setParserItems] = useState<MealParserPreviewItem[] | null>(null);
   // Mahlzeit-Selektor — vorbelegt mit zeitbasiertem Default
   const [selectedMealType, setSelectedMealType] = useState<MealType>(context.mealType);
   const [mealSelectorOpen, setMealSelectorOpen] = useState(false);
@@ -104,7 +106,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
       setError(null);
       setSaveError(null);
       setMealEstimate(null);
-      setParserItems(null);
       setResolvedMealId(null);
       setShowFullReview(false);
       return;
@@ -216,19 +217,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
     }
   }
 
-  const handleRefine = async (items: MealParserPreviewItem[]) => {
-    const mealId = await resolveOrCreateMealId(context.date, selectedMealType, context.mealId);
-    setResolvedMealId(mealId);
-    setMealEstimate(null);
-    setShowFullReview(false);
-    setParserItems(items);
-  };
-
-  const handleParserSaved = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onSaved('KI-Mahlzeitschätzung');
-  };
-
   if (!visible) return null;
 
   if (onIngredientEstimated) {
@@ -298,7 +286,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
         resolveMealId={() => resolveOrCreateMealId(context.date, selectedMealType, context.mealId)}
         onClose={() => setMealEstimate(null)}
         onSaved={handleEstimateSaved}
-        onRefine={handleRefine}
       />
     );
   }
@@ -432,7 +419,6 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
             imageUri={mealPhoto?.uri}
             onClose={() => setShowFullReview(false)}
             onSaved={handleEstimateSaved}
-            onRefine={handleRefine}
           />
         ) : null}
       </Modal>
@@ -447,6 +433,8 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
       onRequestClose={onClose}
     >
       <SafeAreaView style={safeAreaStyle}>
+        <View ref={keyboardRef} style={styles.flex}>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>✨ KI-Mahlzeitschätzung</Text>
@@ -572,25 +560,24 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
           )}
 
           {error ? <ErrorBanner error={error} /> : null}
+        </ScrollView>
+        <View style={[styles.analyzeFooter, { paddingBottom: spacing.md + footerBottom }]}>
           <TouchableOpacity
             style={[styles.analyzeBtn, (loading || text.trim().length < 3) && styles.analyzeBtnDisabled]}
             onPress={() => void handleAnalyze()}
             disabled={loading || text.trim().length < 3}
           >
-            {loading ? <ActivityIndicator color={colors.background} /> : <Text style={styles.analyzeBtnText}>Analysieren</Text>}
+            {loading ? <ActivityIndicator color={colors.background} /> : (
+              <View style={styles.analyzeBtnContent}>
+                <Icon lib="ion" name="sparkles" size="md" color={colors.background} />
+                <Text style={styles.analyzeBtnText}>KI schätzen</Text>
+              </View>
+            )}
           </TouchableOpacity>
-        </ScrollView>
+        </View>
+        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
-      {parserItems && resolvedMealId ? (
-        <MealParserReviewScreen
-          visible
-          mealId={resolvedMealId}
-          items={parserItems}
-          warnings={[]}
-          onClose={() => setParserItems(null)}
-          onSaved={handleParserSaved}
-        />
-      ) : null}
       <FramedPhotoPicker
         visible={photoSource != null}
         initialSource={photoSource ?? undefined}
@@ -635,6 +622,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   scroll: { flex: 1 },
+  flex: { flex: 1 },
   scrollContent: {
     padding: spacing.md,
     gap: spacing.md,
@@ -719,9 +707,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingVertical: spacing.md,
     alignItems: 'center',
-    marginTop: spacing.sm,
+  },
+  analyzeFooter: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   analyzeBtnDisabled: { opacity: 0.4 },
+  analyzeBtnContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   analyzeBtnText: {
     ...typography.button,
     color: colors.background,

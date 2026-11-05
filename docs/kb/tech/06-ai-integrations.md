@@ -102,7 +102,7 @@ The model estimates the described meal as one complete portion (not per 100 g),
 including total nutrition and total weight, and separately returns 0–20 named
 components with estimated weight and calories. Component weights are not summed
 to derive total meal weight or nutrition. Prompt versions are server-owned:
-`MEAL_ESTIMATE_PROMPT_VERSION = 'meal-estimate-v4'` and
+`MEAL_ESTIMATE_PROMPT_VERSION = 'meal-estimate-v6'` and
 `MEAL_PHOTO_ASSESSMENT_PROMPT_VERSION = 'meal-photo-assessment-v1'`.
 
 A photo request first calls a separate classifier with the user's text and
@@ -156,16 +156,19 @@ values, 0–20 structured `componentItems`, `estimatedTotalGrams`,
 provider schema does not contain legacy `components`; the handler derives it as
 the ordered `componentItems[].name` projection. The response includes
 `photoProvided`, `photoAssessment`, `photoUse`, `photoUsed`, and
-`promptVersion: 'meal-estimate-v4'`. `photoUsed` is true only when the image
+`promptVersion: 'meal-estimate-v6'`. `photoUsed` is true only when the image
 reached nutrition estimation. Excluded cases append fixed localized warnings;
-the model does not write those notices. Prompt examples do not anchor calories
-or infer hidden fat/oil/sauce. The assessment and estimation image parts use
+the model does not write those notices. Prompt examples do not anchor calories.
+The prompt tells the model to include the usual preparation ingredients of a dish
+(spread on rolls, frying fat, dressing) as their own component and to name the
+assumption, unless the user excludes them. The assessment and estimation image parts use
 `detail: 'high'`; the estimate request budget is 1200 tokens.
 
 The handler validates finite non-negative nutrition values and the documented
 name, component-count, component-weight, component-calorie, and total-weight
 bounds. Calories above `9 × estimatedTotalGrams × 1.05` return 422. An absolute
-Atwater difference greater than `max(50 kcal, 15% of estimated kcal)` or a
+Atwater difference greater than `max(25 kcal, 5% of macro kcal)` is corrected by
+setting calories to the macro energy and rescaling component calories; a
 component-calorie sum differing from total kcal by more than 20% adds a stable
 warning without rejecting the estimate. Component grams are not summed to
 derive meal weight. Schema or hard plausibility failures return 422 and are not

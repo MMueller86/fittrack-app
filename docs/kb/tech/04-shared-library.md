@@ -171,7 +171,7 @@ pair and any supplied ETag precondition, and computes the persisted fingerprint.
 - `AiMealEstimatePreview` — meal estimate response with required legacy `components`, five-field `mealEstimate`, and `photoUsed`; V2 estimate fields and V3 photo assessment/use fields remain optional for V1 reads
 
 The V3 preview always carries the optional-at-read V2/V3 fields and never
-returns them as `null`; `promptVersion` is `meal-estimate-v4`. Its V3 photo
+returns them as `null`; `promptVersion` is `meal-estimate-v6`. Its V3 photo
 fields are `photoProvided: boolean`,
 `photoAssessment: 'consistent' | 'complementary' | 'contradictory' | 'uncertain' | 'no_photo'`,
 and `photoUse: 'included' | 'excluded_mismatch' | 'excluded_uncertain' | 'no_photo'`.

@@ -14,13 +14,14 @@ import {
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardOverlap } from '../../shared/keyboard/useKeyboardOverlap';
 import type {
   AiMealEstimateComponent,
   AiMealEstimateNutrition,
   AiMealEstimatePreview,
   AiMealEstimateRefine,
 } from '@fittrack/shared';
-import type { MealParserPreviewItem } from '../../shared/api/aiApi';
 import type { AddItemProductInput } from '../../shared/api/diaryApi';
 import { aiApi } from '../../shared/api/aiApi';
 import { formatApiError } from '../../shared/api/apiError';
@@ -43,7 +44,6 @@ interface Props {
   resolveMealId?: () => Promise<string>;
   onClose: () => void;
   onSaved: () => void;
-  onRefine?: (items: MealParserPreviewItem[]) => void | Promise<void>;
 }
 
 type CompleteAiMealEstimate = AiMealEstimatePreview & Required<Pick<
@@ -51,11 +51,11 @@ type CompleteAiMealEstimate = AiMealEstimatePreview & Required<Pick<
   'componentItems' | 'estimatedTotalGrams' | 'promptVersion'
 >>;
 
-const MACROS: { key: MealEstimateMacro; label: string }[] = [
-  { key: 'protein', label: 'Protein' },
-  { key: 'carbs', label: 'Kohlenhydrate' },
-  { key: 'fat', label: 'Fett' },
-  { key: 'fiber', label: 'Ballaststoffe' },
+const MACROS: { key: MealEstimateMacro; label: string; color: string }[] = [
+  { key: 'protein', label: 'Protein', color: colors.macro.protein },
+  { key: 'carbs', label: 'Kohlenhydrate', color: colors.macro.carbohydrates },
+  { key: 'fat', label: 'Fett', color: colors.macro.fat },
+  { key: 'fiber', label: 'Ballaststoffe', color: colors.macro.fiber },
 ];
 
 const PHOTO_MISMATCH_WARNING = 'Beschreibung und Foto scheinen nicht zusammenzupassen. Die Schätzung basiert nur auf deiner Beschreibung. Prüfe bitte, ob du das richtige Foto ausgewählt hast.';
@@ -71,18 +71,6 @@ function getPhotoUseNotice(estimate: AiMealEstimatePreview): string | undefined 
   }
   if (estimate.photoUse === 'excluded_uncertain') {
     return PHOTO_UNCERTAIN_WARNING;
-  }
-  if (estimate.photoUse === 'included') {
-    if (estimate.photoAssessment === 'complementary') {
-      return 'Das Foto ergänzt die Beschreibung und wurde für die Nährwertschätzung genutzt.';
-    }
-    if (estimate.photoAssessment === 'consistent') {
-      return 'Das Foto passt zur Beschreibung und wurde für die Nährwertschätzung genutzt.';
-    }
-    return 'Das Foto wurde für die Nährwertschätzung genutzt.';
-  }
-  if (estimate.photoUse === 'no_photo' || estimate.photoProvided === false) {
-    return 'Kein Foto übermittelt. Die Nährwertschätzung basiert auf deiner Beschreibung.';
   }
   return undefined;
 }
@@ -156,9 +144,10 @@ interface StepButtonProps {
   icon: 'minus' | 'plus';
   onStep: (direction: -1 | 1) => boolean;
   direction: -1 | 1;
+  compact?: boolean;
 }
 
-function StepButton({ label, icon, onStep, direction }: StepButtonProps) {
+function StepButton({ label, icon, onStep, direction, compact }: StepButtonProps) {
   const onStepRef = useRef(onStep);
   const longPressed = useRef(false);
   const warnedAtBoundary = useRef(false);
@@ -189,7 +178,7 @@ function StepButton({ label, icon, onStep, direction }: StepButtonProps) {
 
   return (
     <TouchableOpacity
-      style={styles.stepButton}
+      style={compact ? styles.stepButtonCompact : styles.stepButton}
       onPressIn={() => {
         longPressed.current = false;
         warnedAtBoundary.current = false;
@@ -206,16 +195,21 @@ function StepButton({ label, icon, onStep, direction }: StepButtonProps) {
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Icon lib="feather" name={icon} size="md" color={colors.text} />
+      {compact ? (
+        <View style={styles.stepCircle}>
+          <Icon lib="feather" name={icon} size="sm" color={colors.text} />
+        </View>
+      ) : (
+        <Icon lib="feather" name={icon} size="md" color={colors.text} />
+      )}
     </TouchableOpacity>
   );
 }
 
-function formatPercentDelta(value: number): string {
-  const rounded = Math.round(value * 10) / 10;
-  if (rounded === 0) return '±0 % zur KI-Schätzung';
-  const sign = rounded < 0 ? '−' : '+';
-  return `${sign}${formatValue(Math.abs(rounded))} % zur KI-Schätzung`;
+function formatDelta(delta: number, unit: string): string | undefined {
+  const rounded = Math.round(delta * 10) / 10;
+  if (rounded === 0) return undefined;
+  return `${rounded < 0 ? '−' : '+'}${formatValue(Math.abs(rounded))} ${unit}`;
 }
 
 export default function MealEstimateResult({
@@ -228,7 +222,6 @@ export default function MealEstimateResult({
   resolveMealId,
   onClose,
   onSaved,
-  onRefine,
 }: Props) {
   const [currentEstimate, setCurrentEstimate] = useState(estimate);
   const [portionSteps, setPortionSteps] = useState(0);
@@ -238,14 +231,16 @@ export default function MealEstimateResult({
   const [caloriesDraft, setCaloriesDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [refining, setRefining] = useState(false);
-  const [parsing, setParsing] = useState(false);
   const [refineSheetOpen, setRefineSheetOpen] = useState(false);
   const [refineAttempts, setRefineAttempts] = useState(0);
   const [refineError, setRefineError] = useState<string | null>(null);
   const [refineQuotaExceeded, setRefineQuotaExceeded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [assumptionsExpanded, setAssumptionsExpanded] = useState(false);
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
+  const insets = useSafeAreaInsets();
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
+  // iOS page sheets already start below the status bar; Android modals draw edge-to-edge.
+  const topInset = Platform.OS === 'android' ? insets.top : 0;
 
   useEffect(() => {
     setCurrentEstimate(estimate);
@@ -267,11 +262,9 @@ export default function MealEstimateResult({
   const canRefineEstimate = isCompleteV2Estimate(currentEstimate);
   const calorieText = caloriesDraft ?? formatValue(adjusted.mealEstimate.calories);
   const parsedCalories = parseValue(calorieText);
-  const canSave = parsedCalories !== undefined && !saving && !refining && !parsing;
-  const busy = saving || refining || parsing;
-  const deltaPercent = currentEstimate.mealEstimate.calories > 0
-    ? ((adjusted.mealEstimate.calories / currentEstimate.mealEstimate.calories) - 1) * 100
-    : 0;
+  const canSave = parsedCalories !== undefined && !saving && !refining;
+  const busy = saving || refining;
+  const caloriesDelta = formatDelta(adjusted.mealEstimate.calories - currentEstimate.mealEstimate.calories, 'kcal');
 
   function stepPortion(direction: -1 | 1): boolean {
     const nextSteps = portionSteps + direction;
@@ -282,7 +275,7 @@ export default function MealEstimateResult({
     for (const nutrient of overriddenNutrients) {
       if (typedOverrides[nutrient] === undefined) continue;
       const current = adjusted.mealEstimate[nutrient];
-      const next = Math.max(0, current + direction * currentEstimate.mealEstimate[nutrient] * 0.05);
+      const next = Math.max(0, Math.round(current + direction * currentEstimate.mealEstimate[nutrient] * 0.05));
       if (next === current) continue;
       nextOverrides[nutrient] = next;
       updatedOverride = true;
@@ -298,8 +291,7 @@ export default function MealEstimateResult({
 
   function stepMacro(macro: MealEstimateMacro, direction: -1 | 1): boolean {
     const before = adjusted.mealEstimate[macro];
-    const step = Math.max(0.5, currentEstimate.mealEstimate[macro] * 0.05);
-    const after = Math.max(0, before + direction * step);
+    const after = Math.max(0, Math.round(before) + direction);
     if (after === before) return false;
     if (typedOverrides[macro] !== undefined) {
       setTypedOverrides((value) => ({ ...value, [macro]: after }));
@@ -368,21 +360,6 @@ export default function MealEstimateResult({
       return false;
     } finally {
       setRefining(false);
-    }
-  }
-
-  async function handleParseComponents() {
-    if (!onRefine || busy) return;
-    setParsing(true);
-    setError(null);
-    try {
-      const names = currentEstimate.components.length > 0 ? currentEstimate.components.join(', ') : originalText;
-      const result = await aiApi.previewMeal(names, currentEstimate.contextDetected ?? undefined);
-      await onRefine(result.items);
-    } catch (requestError) {
-      setError(formatApiError(requestError));
-    } finally {
-      setParsing(false);
     }
   }
 
@@ -465,8 +442,9 @@ export default function MealEstimateResult({
         }
       }}
     >
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.header}>
+      <View ref={keyboardRef} style={styles.container}>
+      <KeyboardAvoidingView style={[styles.flex, { paddingBottom: keyboardInset }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[styles.header, { paddingTop: spacing.sm + topInset }]}>
           <TouchableOpacity style={styles.headerButton} onPress={onClose} disabled={busy} accessibilityRole="button" accessibilityLabel="Zurück">
             <Icon lib="feather" name="chevron-left" size="md" color={colors.textSecondary} />
           </TouchableOpacity>
@@ -475,23 +453,28 @@ export default function MealEstimateResult({
         </View>
 
         <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          {imageUri ? (
-            <View style={styles.photoSection}>
-              <Text style={styles.photoLabel}>An die KI gesendetes Foto</Text>
-              <View style={styles.photoFrame}>
-                <Image
-                  source={{ uri: imageUri }}
-                  style={styles.photo}
-                  resizeMode="contain"
-                  accessible
-                  accessibilityLabel="An die KI gesendetes Foto"
-                />
+          <View style={styles.summary}>
+            {imageUri ? (
+              <View style={styles.photoColumn}>
+                <View style={styles.photoFrame}>
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.photo}
+                    resizeMode="contain"
+                    accessible
+                    accessibilityLabel="An die KI gesendetes Foto"
+                  />
+                </View>
+              </View>
+            ) : null}
+            <View style={styles.summaryText}>
+              <Text style={styles.mealName}>{currentEstimate.mealName}</Text>
+              {currentEstimate.contextDetected ? <Text style={styles.contextText}>{currentEstimate.contextDetected}</Text> : null}
+              <View style={styles.confidenceRow}>
+                <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
+                <Text style={styles.confidenceText}>{confidenceLabel}</Text>
               </View>
             </View>
-          ) : null}
-          <View style={styles.disclaimerRow}>
-            <Text style={styles.disclaimerText}>KI-Schätzung · Werte können abweichen</Text>
-            {currentEstimate.photoUsed ? <Text style={styles.photoBadge}>Foto genutzt</Text> : null}
           </View>
           {photoUseNotice ? (
             <View
@@ -500,31 +483,26 @@ export default function MealEstimateResult({
               accessibilityRole="text"
               accessibilityLabel={photoUseNotice}
             >
+              <Icon lib="feather" name="alert-circle" size="sm" color={colors.warning} />
               <Text style={styles.photoUseNoticeText}>{photoUseNotice}</Text>
             </View>
           ) : null}
-          <Text style={styles.mealName}>{currentEstimate.mealName}</Text>
-          {currentEstimate.contextDetected ? <Text style={styles.contextText}>{currentEstimate.contextDetected}</Text> : null}
-          <View style={[styles.confidenceBanner, { backgroundColor: colors.surfaceMuted }]}>
-            <Text style={[styles.confidenceText, { color: confidenceColor }]}>{confidenceLabel}</Text>
-          </View>
 
           <View style={styles.adjustmentHeader}>
-            <Text style={styles.sectionTitle}>Nährwerte gesamt</Text>
+            <Text style={styles.sectionTitle}>Nährwerte</Text>
             {isAdjusted ? (
-              <View style={styles.adjustmentActions}>
-                <Text style={styles.deltaBadge}>{formatPercentDelta(deltaPercent)}</Text>
-                <TouchableOpacity onPress={resetAdjustments} disabled={busy} accessibilityRole="button" accessibilityLabel="Anpassungen zurücksetzen">
-                  <Icon lib="feather" name="rotate-ccw" size="sm" color={colors.primaryBright} />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity style={styles.undoButton} onPress={resetAdjustments} disabled={busy} accessibilityRole="button" accessibilityLabel="Rückgängig">
+                <Icon lib="feather" name="rotate-ccw" size="sm" color={colors.primaryBright} />
+                <Text style={styles.undoText}>Rückgängig</Text>
+              </TouchableOpacity>
             ) : null}
           </View>
 
-          <View style={styles.calorieHero}>
+          <View style={styles.nutritionCard}>
             <View style={styles.calorieControl}>
               <StepButton label="Portion um fünf Prozent verringern" icon="minus" direction={-1} onStep={stepPortion} />
-              <View style={styles.calorieValueGroup}>
+              <View style={styles.calorieValueColumn}>
+                <View style={styles.calorieValueGroup}>
                 <TextInput
                   style={styles.calorieValue}
                   value={calorieText}
@@ -549,87 +527,70 @@ export default function MealEstimateResult({
                   accessibilityLabel="Kalorien"
                 />
                 <Text style={styles.calorieUnit}>kcal</Text>
+                </View>
+                {caloriesDelta ? <Text style={styles.deltaText}>{caloriesDelta}</Text> : null}
               </View>
               <StepButton label="Portion um fünf Prozent erhöhen" icon="plus" direction={1} onStep={stepPortion} />
             </View>
-            <View style={styles.portionRow}>
-              <Text style={styles.portionLabel}>Portion</Text>
-              <Text style={styles.portionValue}>{Math.round((1 + portionSteps * 0.05) * 100)} %</Text>
+
+            <View style={styles.macroList}>
+              {MACROS.map(({ key, label, color }) => (
+                <View key={key} style={styles.macroRow}>
+                  <View style={[styles.macroDot, { backgroundColor: color }]} />
+                  <View style={styles.macroLabelColumn}>
+                    <Text style={styles.macroLabel}>{label}</Text>
+                    {formatDelta(adjusted.mealEstimate[key] - currentEstimate.mealEstimate[key], 'g')
+                      ? <Text style={styles.deltaText}>{formatDelta(adjusted.mealEstimate[key] - currentEstimate.mealEstimate[key], 'g')}</Text>
+                      : null}
+                  </View>
+                  <StepButton compact label={`${label} verringern`} icon="minus" direction={-1} onStep={(direction) => stepMacro(key, direction)} />
+                  <View style={styles.macroValueRow}>
+                    <TextInput
+                      style={styles.macroValue}
+                      value={macroDrafts[key] ?? formatValue(adjusted.mealEstimate[key])}
+                      onChangeText={(text) => {
+                        setMacroDrafts((value) => ({ ...value, [key]: text }));
+                        const parsed = parseValue(text);
+                        setTypedOverrides((value) => {
+                          if (parsed === undefined) {
+                            const next = { ...value };
+                            delete next[key];
+                            return next;
+                          }
+                          return { ...value, [key]: parsed };
+                        });
+                      }}
+                      onBlur={() => {
+                        if (parseValue(macroDrafts[key] ?? '') === undefined) {
+                          setMacroDrafts((value) => {
+                            const next = { ...value };
+                            delete next[key];
+                            return next;
+                          });
+                        }
+                      }}
+                      keyboardType="decimal-pad"
+                      selectTextOnFocus
+                      maxLength={7}
+                      accessibilityLabel={label}
+                    />
+                    <Text style={styles.macroUnit}>g</Text>
+                  </View>
+                  <StepButton compact label={`${label} erhöhen`} icon="plus" direction={1} onStep={(direction) => stepMacro(key, direction)} />
+                </View>
+              ))}
             </View>
           </View>
-
-          <View style={styles.macroGrid}>
-            {MACROS.map(({ key, label }) => (
-              <View key={key} style={styles.macroTile}>
-                <Text style={styles.macroLabel}>{label}</Text>
-                <View style={styles.macroValueRow}>
-                  <TextInput
-                    style={styles.macroValue}
-                    value={macroDrafts[key] ?? formatValue(adjusted.mealEstimate[key])}
-                    onChangeText={(text) => {
-                      setMacroDrafts((value) => ({ ...value, [key]: text }));
-                      const parsed = parseValue(text);
-                      setTypedOverrides((value) => {
-                        if (parsed === undefined) {
-                          const next = { ...value };
-                          delete next[key];
-                          return next;
-                        }
-                        return { ...value, [key]: parsed };
-                      });
-                    }}
-                    onBlur={() => {
-                      if (parseValue(macroDrafts[key] ?? '') === undefined) {
-                        setMacroDrafts((value) => {
-                          const next = { ...value };
-                          delete next[key];
-                          return next;
-                        });
-                      }
-                    }}
-                    keyboardType="decimal-pad"
-                    selectTextOnFocus
-                    maxLength={7}
-                    accessibilityLabel={label}
-                  />
-                  <Text style={styles.macroUnit}>g</Text>
-                </View>
-                <View style={styles.macroActions}>
-                  <StepButton label={`${label} verringern`} icon="minus" direction={-1} onStep={(direction) => stepMacro(key, direction)} />
-                  <StepButton label={`${label} erhöhen`} icon="plus" direction={1} onStep={(direction) => stepMacro(key, direction)} />
-                </View>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.disclaimerText}>KI-Schätzung · Werte können abweichen</Text>
 
           <MacroWarning nutrition={{ ...adjusted.mealEstimate, calories: parsedCalories ?? adjusted.mealEstimate.calories }} />
-
-          <View style={styles.refineSection}>
-            <TouchableOpacity
-              style={[styles.refineAction, (!canRefineEstimate || busy || refineAttempts >= 3) && styles.buttonDisabled]}
-              onPress={openRefineSheet}
-              disabled={!canRefineEstimate || busy || refineAttempts >= 3}
-              accessibilityRole="button"
-              accessibilityLabel="Stimmt nicht ganz? Neu schätzen"
-            >
-              <Text style={styles.refineActionText}>Stimmt nicht ganz? Neu schätzen</Text>
-            </TouchableOpacity>
-            {!canRefineEstimate
-              ? <Text style={styles.refineHint}>Für diese ältere KI-Schätzung nicht verfügbar</Text>
-              : refineAttempts >= 3
-                ? <Text style={styles.refineHint}>Maximal 3 Neu-Schätzungen pro Ergebnis.</Text>
-                : null}
-          </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Erkannte Bestandteile</Text>
             {adjusted.componentItems !== undefined ? (
               <>
-                {adjusted.estimatedTotalGrams !== undefined ? (
-                  <Text style={styles.totalWeight}>Gesamtgewicht ca. {formatValue(adjusted.estimatedTotalGrams)} g</Text>
-                ) : null}
                 {adjusted.componentItems.map((item, index) => (
-                  <View key={`${item.name}-${index}`} style={styles.componentRow}>
+                  <View key={`${item.name}-${index}`} style={[styles.componentRow, index === 0 && styles.componentRowFirst]}>
                     <Text style={styles.componentName}>{item.name}</Text>
                     <Text style={styles.componentDetail}>ca. {formatValue(item.estimatedGrams)} g · {Math.round(item.calories)} kcal</Text>
                   </View>
@@ -649,38 +610,35 @@ export default function MealEstimateResult({
               {visibleWarnings.map((warning, index) => <Text key={index} style={styles.aiWarning}>{warning}</Text>)}
             </View>
           ) : null}
-          {currentEstimate.assumptions.length > 0 ? (
-            <View style={styles.section}>
-              <TouchableOpacity style={styles.assumptionsToggle} onPress={() => setAssumptionsExpanded((value) => !value)} accessibilityRole="button">
-                <Text style={styles.assumptionsToggleText}>{assumptionsExpanded ? 'Annahmen ausblenden' : `Annahmen (${currentEstimate.assumptions.length})`}</Text>
-              </TouchableOpacity>
-              {assumptionsExpanded
-                ? currentEstimate.assumptions.map((assumption, index) => <Text key={index} style={styles.assumptionItem}>{assumption}</Text>)
-                : null}
-            </View>
-          ) : null}
 
-          {onRefine ? (
+          <View style={styles.actionsGroup}>
             <TouchableOpacity
-              style={[styles.parseButton, busy && styles.buttonDisabled]}
-              onPress={() => void handleParseComponents()}
-              disabled={busy}
+              style={[styles.actionRow, (!canRefineEstimate || busy || refineAttempts >= 3) && styles.buttonDisabled]}
+              onPress={openRefineSheet}
+              disabled={!canRefineEstimate || busy || refineAttempts >= 3}
               accessibilityRole="button"
-              accessibilityLabel="Einzeln aufschlüsseln"
+              accessibilityLabel="Stimmt nicht ganz? Neu schätzen"
             >
-              {parsing ? <ActivityIndicator color={colors.primary} /> : <Text style={styles.refineButtonText}>Einzeln aufschlüsseln</Text>}
+              <Icon lib="feather" name="refresh-cw" size="sm" color={colors.primaryBright} />
+              <Text style={styles.actionText}>Stimmt nicht ganz? Neu schätzen</Text>
             </TouchableOpacity>
-          ) : null}
+          </View>
+          {!canRefineEstimate
+            ? <Text style={styles.refineHint}>Für diese ältere KI-Schätzung nicht verfügbar</Text>
+            : refineAttempts >= 3
+              ? <Text style={styles.refineHint}>Maximal 3 Neu-Schätzungen pro Ergebnis.</Text>
+              : null}
 
           {error ? <ErrorBanner error={error} /> : null}
         </ScrollView>
 
-        <View style={styles.footer}>
+        <View style={[styles.footer, { paddingBottom: spacing.md + (keyboardInset > 0 ? 0 : insets.bottom) }]}>
           <TouchableOpacity style={[styles.primaryButton, (!canSave || busy) && styles.buttonDisabled]} onPress={() => void handleSave()} disabled={!canSave || busy} accessibilityRole="button">
             {saving ? <ActivityIndicator color={colors.background} /> : <Text style={styles.primaryButtonText}>Speichern</Text>}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      </View>
       <MealEstimateRefineSheet
         visible={refineSheetOpen}
         loading={refining}
@@ -697,66 +655,65 @@ export default function MealEstimateResult({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  flex: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { ...typography.h3, color: colors.text },
   scroll: { flex: 1 },
-  scrollContent: { padding: spacing.md, paddingBottom: spacing.lg, gap: spacing.sm },
-  photoSection: { gap: spacing.xs },
-  photoLabel: { ...typography.caption, color: colors.textSecondary },
-  photoFrame: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
+  scrollContent: { padding: spacing.md, paddingBottom: spacing.lg, gap: spacing.md },
+  summary: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  photoColumn: { width: 96 },
+  photoFrame: { width: 96, height: 96, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceMuted, overflow: 'hidden' },
   photo: { width: '100%', height: '100%' },
-  disclaimerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  disclaimerText: { ...typography.caption, color: colors.textMuted, flex: 1 },
-  photoBadge: { ...typography.caption, color: colors.textSecondary, backgroundColor: colors.surfaceMuted, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs, borderRadius: radius.sm },
-  photoUseNotice: { backgroundColor: colors.surfaceMuted, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.sm },
-  photoUseNoticeText: { ...typography.body2, color: colors.textSecondary },
+  summaryText: { flex: 1, gap: spacing.xs },
+  disclaimerText: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
+  photoUseNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: colors.surface, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  photoUseNoticeText: { ...typography.body2, color: colors.textSecondary, flex: 1 },
   mealName: { ...typography.h2, color: colors.text },
   contextText: { ...typography.body2, color: colors.textSecondary },
-  confidenceBanner: { alignSelf: 'flex-start', borderRadius: radius.sm, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  confidenceText: { ...typography.caption, fontWeight: '600' },
-  adjustmentHeader: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.sm },
-  sectionTitle: { ...typography.overline, color: colors.textMuted },
-  adjustmentActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  deltaBadge: { ...typography.caption, color: colors.primaryBright },
-  calorieHero: { backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm },
+  confidenceRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  confidenceDot: { width: 8, height: 8, borderRadius: radius.full },
+  confidenceText: { ...typography.caption, color: colors.textSecondary },
+  adjustmentHeader: { minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: -spacing.sm },
+  sectionTitle: { ...typography.h3, color: colors.text },
+  undoButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  undoText: { ...typography.body2, color: colors.primaryBright, fontWeight: '600' },
+  deltaText: { ...typography.caption, color: colors.primaryBright },
+  calorieValueColumn: { alignItems: 'center' },
+  macroLabelColumn: { flex: 1 },
+  nutritionCard: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.md, gap: spacing.md },
   calorieControl: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   calorieValueGroup: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
-  calorieValue: { ...typography.h1, color: colors.primaryBright, minWidth: 72, padding: 0, textAlign: 'center' },
+  calorieValue: { ...typography.display, color: colors.primaryBright, minWidth: 72, padding: 0, textAlign: 'center' },
   calorieUnit: { ...typography.body2, color: colors.textSecondary },
-  stepButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.surfaceMuted },
-  portionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, marginTop: spacing.xs, paddingTop: spacing.xs },
-  portionLabel: { ...typography.body2, color: colors.textSecondary },
-  portionValue: { ...typography.body1, color: colors.text, minWidth: 52, textAlign: 'center' },
-  macroGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  macroTile: { width: '48%', minHeight: 128, justifyContent: 'space-between', backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm },
-  macroLabel: { ...typography.caption, color: colors.textMuted, minHeight: 32 },
-  macroActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  macroValueRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
-  macroValue: { ...typography.body1, color: colors.text, minWidth: 48, padding: 0, textAlign: 'center' },
-  macroUnit: { ...typography.body1, color: colors.textSecondary },
+  stepButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full, backgroundColor: colors.surfaceMuted },
+  stepButtonCompact: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  stepCircle: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: radius.full, backgroundColor: colors.surfaceMuted },
+  macroList: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.xs },
+  macroRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 48 },
+  macroDot: { width: 8, height: 8, borderRadius: radius.full },
+  macroLabel: { ...typography.body2, color: colors.textSecondary },
+  macroValueRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'center', gap: spacing.xs, minWidth: 64 },
+  macroValue: { ...typography.body1, color: colors.text, minWidth: 36, padding: 0, textAlign: 'right' },
+  macroUnit: { ...typography.body2, color: colors.textSecondary },
   warningBadge: { backgroundColor: colors.surfaceMuted, borderWidth: 1, borderColor: colors.warning, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   warningBadgeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   warningBadgeText: { ...typography.caption, color: colors.warning, fontWeight: '700', flex: 1 },
   warningDetail: { ...typography.caption, color: colors.warning, marginTop: spacing.sm },
-  section: { gap: spacing.sm, marginTop: spacing.sm },
-  totalWeight: { ...typography.body2, color: colors.textSecondary },
-  componentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
+  section: { gap: spacing.xs },
+  componentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  componentRowFirst: { borderTopWidth: 1, borderTopColor: colors.border },
   componentName: { ...typography.body2, color: colors.text, flex: 1 },
   componentDetail: { ...typography.caption, color: colors.textSecondary, textAlign: 'right' },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: { backgroundColor: colors.primarySoft, borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
   chipText: { ...typography.caption, color: colors.primary, fontWeight: '600' },
   aiWarning: { ...typography.body2, color: colors.warning },
-  assumptionsToggle: { minHeight: 48, justifyContent: 'center' },
-  assumptionsToggleText: { ...typography.body2, color: colors.textSecondary },
-  assumptionItem: { ...typography.body2, color: colors.textMuted, paddingLeft: spacing.sm },
-  refineSection: { gap: spacing.sm, marginTop: spacing.md },
-  refineAction: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.md },
-  refineActionText: { ...typography.button, color: colors.primaryBright, textAlign: 'center' },
-  refineButtonText: { ...typography.button, color: colors.primaryBright, textAlign: 'center' },
-  refineHint: { ...typography.caption, color: colors.textMuted },
-  parseButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md },
+  actionsGroup: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
+  actionRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md },
+  actionRowDivided: { borderTopWidth: 1, borderTopColor: colors.border },
+  actionText: { ...typography.body2, color: colors.primaryBright, fontWeight: '600' },
+  refineHint: { ...typography.caption, color: colors.textMuted, textAlign: 'center' },
   buttonDisabled: { opacity: 0.5 },
   footer: { padding: spacing.md, borderTopWidth: 1, borderTopColor: colors.border },
   primaryButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.md },

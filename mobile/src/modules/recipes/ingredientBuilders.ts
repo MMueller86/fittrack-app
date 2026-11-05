@@ -7,7 +7,8 @@ import type {
   RecipeIngredient,
   RecipeIngredientInputMode,
 } from '@fittrack/shared';
-import type { MealParserPreviewItem } from '../../shared/api/aiApi';
+import type { MealParserPreviewItem, AiRecipeAnalysisIngredient } from '../../shared/api/aiApi';
+import type { WizardIngredient } from './recipeWizardTypes';
 
 // ---------------------------------------------------------------------------
 // Recipe ingredient builders
@@ -183,4 +184,35 @@ export function buildIngFromSeasoning(id: string, item: MealParserPreviewItem): 
     nutritionPer100g: zero,
     nutritionContribution: zero,
   };
+}
+
+export function initWizardIngredient(item: AiRecipeAnalysisIngredient): WizardIngredient {
+  const id = randomUUID();
+  if (item.status === 'matched' && item.selectedProductId) {
+    const candidate = item.candidates.find((c) => c.id === item.selectedProductId);
+    if (candidate) {
+      return {
+        id,
+        analysisKey: item.analysisKey,
+        parserItem: item,
+        status: 'auto-matched',
+        userConfirmed: false,
+        resolvedIngredient: buildIngFromCandidate(id, item, candidate),
+      };
+    }
+  }
+  if (item.status === 'seasoning') {
+    return {
+      id,
+      analysisKey: item.analysisKey,
+      parserItem: item,
+      status: 'seasoning',
+      userConfirmed: true,
+      resolvedIngredient: buildIngFromSeasoning(id, item),
+    };
+  }
+  if (item.status === 'needsSelection') {
+    return { id, analysisKey: item.analysisKey, parserItem: item, status: 'needs-selection', userConfirmed: false };
+  }
+  return { id, analysisKey: item.analysisKey, parserItem: item, status: 'needs-ai', userConfirmed: false };
 }

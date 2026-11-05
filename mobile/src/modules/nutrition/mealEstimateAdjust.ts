@@ -40,6 +40,11 @@ export function applyMealEstimateAdjustments(
     fat: base.mealEstimate.fat * portionFactor,
     fiber: base.mealEstimate.fiber * portionFactor,
   };
+  if (portionSteps !== 0) {
+    for (const nutrient of ['calories', ...MACROS] as const) {
+      mealEstimate[nutrient] = Math.round(mealEstimate[nutrient]);
+    }
+  }
 
   let atwaterDelta = 0;
   for (const macro of MACROS) {
@@ -47,8 +52,7 @@ export function applyMealEstimateAdjustments(
     if (offsetSteps === 0) continue;
 
     const beforeOffset = mealEstimate[macro];
-    const stepGrams = Math.max(0.5, base.mealEstimate[macro] * 0.05);
-    mealEstimate[macro] = Math.max(0, beforeOffset + offsetSteps * stepGrams);
+    mealEstimate[macro] = Math.max(0, Math.round(beforeOffset) + offsetSteps);
     const delta = mealEstimate[macro] - beforeOffset;
     if (macro === 'protein' || macro === 'carbs') atwaterDelta += delta * 4;
     if (macro === 'fat') atwaterDelta += delta * 9;

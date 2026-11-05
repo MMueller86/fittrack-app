@@ -26,7 +26,7 @@ describe('applyMealEstimateAdjustments', () => {
   it('scales all meal values and component weights additively and reversibly', () => {
     const increased = applyMealEstimateAdjustments(base, adjustments({ portionSteps: 1 }));
     expect(increased).toEqual({
-      mealEstimate: { calories: 420, protein: 21, carbs: 63, fat: 10.5, fiber: 8.4 },
+      mealEstimate: { calories: 420, protein: 21, carbs: 63, fat: 11, fiber: 8 },
       estimatedTotalGrams: 105,
       componentItems: [{ name: 'Haferflocken', estimatedGrams: 105, calories: 420 }],
     });
@@ -50,11 +50,11 @@ describe('applyMealEstimateAdjustments', () => {
       macroOffsets: { protein: 1, fat: -1, fiber: 1 },
     }));
     expect(result.mealEstimate).toEqual({
-      calories: 399.5,
+      calories: 395,
       protein: 21,
       carbs: 60,
-      fat: 9.5,
-      fiber: 8.5,
+      fat: 9,
+      fiber: 9,
     });
 
     const reducedToZero = applyMealEstimateAdjustments(base, adjustments({

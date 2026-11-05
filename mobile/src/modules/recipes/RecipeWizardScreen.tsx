@@ -26,9 +26,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AiFoodEstimatePreview, FoodSearchResult, RecipeImageHeroCrop } from '@fittrack/shared';
 import { calculateRecipeNutrition } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
-import { aiApi, type AiRecipeAnalysisIngredient, type AiRecipeStep, type MealParserPreviewItem } from '../../shared/api/aiApi';
+import { aiApi, type AiRecipeStep, type MealParserPreviewItem } from '../../shared/api/aiApi';
 import { recipeApi } from '../../shared/api/recipeApi';
-import { buildFromProduct, buildIngFromCandidate, buildWizardIngredientFromAiEstimate, buildIngFromSeasoning } from './ingredientBuilders';
+import { buildFromProduct, buildWizardIngredientFromAiEstimate, initWizardIngredient } from './ingredientBuilders';
 import { buildRecipePreviewViewModel } from './recipePreviewViewModel';
 import { useFoodEntryHubStore } from '../nutrition/hub/useFoodEntryHubStore';
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
@@ -115,37 +115,6 @@ function calculateStepDropIndex(
     crossedIndex -= 1;
   }
   return crossedIndex;
-}
-
-function initWizardIngredient(item: AiRecipeAnalysisIngredient): WizardIngredient {
-  const id = randomUUID();
-  if (item.status === 'matched' && item.selectedProductId) {
-    const candidate = item.candidates.find((c) => c.id === item.selectedProductId);
-    if (candidate) {
-      return {
-        id,
-        analysisKey: item.analysisKey,
-        parserItem: item,
-        status: 'auto-matched',
-        userConfirmed: false,
-        resolvedIngredient: buildIngFromCandidate(id, item, candidate),
-      };
-    }
-  }
-  if (item.status === 'seasoning') {
-    return {
-      id,
-      analysisKey: item.analysisKey,
-      parserItem: item,
-      status: 'seasoning',
-      userConfirmed: true,
-      resolvedIngredient: buildIngFromSeasoning(id, item),
-    };
-  }
-  if (item.status === 'needsSelection') {
-    return { id, analysisKey: item.analysisKey, parserItem: item, status: 'needs-selection', userConfirmed: false };
-  }
-  return { id, analysisKey: item.analysisKey, parserItem: item, status: 'needs-ai', userConfirmed: false };
 }
 
 // ---------------------------------------------------------------------------

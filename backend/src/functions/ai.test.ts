@@ -719,7 +719,7 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     expect(body.components).toEqual(['Schnitzel', 'Pommes', 'Mayo']);
     expect(body.componentItems).toEqual(VALID_ESTIMATE.componentItems);
     expect(body.estimatedTotalGrams).toBe(425);
-    expect(body.promptVersion).toBe('meal-estimate-v4');
+    expect(body.promptVersion).toBe('meal-estimate-v6');
     expect(body.contextDetected).toBeNull();
     expect(body.portionConfidence).toBe('medium');
     expect(body.photoUsed).toBe(false);
@@ -1116,20 +1116,66 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     expect(trackUsage).not.toHaveBeenCalled();
   });
 
-  it('returns warnings for Atwater and component calorie deviations without rejecting or skipping usage', async () => {
+  it('aligns inconsistent calories with the macro energy and rescales component calories', async () => {
     mockMealEstimateClient({
       ...VALID_ESTIMATE,
-      mealEstimate: { ...VALID_ESTIMATE.mealEstimate, calories: 900 },
+      mealEstimate: { calories: 613, protein: 25, carbs: 45, fat: 30, fiber: 5 },
+      componentItems: [
+        { name: 'Brot', estimatedGrams: 300, calories: 400 },
+        { name: 'Käse', estimatedGrams: 100, calories: 213 },
+      ],
+      estimatedTotalGrams: 400,
     });
 
     const response = await mealEstimatePreviewHandler(
-      await makeAuthRequest({ body: { text: 'Mahlzeit mit abweichenden Kalorien' } }),
+      await makeAuthRequest({ body: { text: 'Brot mit Käse' } }),
+      makeContext(),
+    );
+    const body = response.jsonBody as AiMealEstimatePreview;
+
+    expect(response.status).toBe(200);
+    expect(body.mealEstimate.calories).toBe(550);
+    expect(body.componentItems?.map((item) => item.calories)).toEqual([359, 191]);
+    expect(body.warnings).toEqual([]);
+  });
+
+  it('keeps calories that are within the macro energy tolerance', async () => {
+    mockMealEstimateClient(VALID_ESTIMATE);
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Schnitzel mit Pommes' } }),
+      makeContext(),
+    );
+
+    expect((response.jsonBody as AiMealEstimatePreview).mealEstimate.calories).toBe(1150);
+  });
+
+  it('still rejects calories above the weight-based limit before aligning them with the macros', async () => {
+    mockMealEstimateClient({
+      ...VALID_ESTIMATE,
+      mealEstimate: { calories: 2000, protein: 20, carbs: 20, fat: 20, fiber: 2 },
+      estimatedTotalGrams: 200,
+    });
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Reis' } }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(422);
+  });
+
+  it('returns a warning for component calorie deviations without rejecting or skipping usage', async () => {
+    mockMealEstimateClient({
+      ...VALID_ESTIMATE,
+      componentItems: [{ name: 'Schnitzel', estimatedGrams: 180, calories: 300 }],
+    });
+
+    const response = await mealEstimatePreviewHandler(
+      await makeAuthRequest({ body: { text: 'Mahlzeit mit abweichenden Komponenten' } }),
       makeContext(),
     );
 
     expect(response.status).toBe(200);
     expect((response.jsonBody as { warnings: string[] }).warnings).toEqual(expect.arrayContaining([
-      'Die geschätzten Kalorien weichen deutlich von der Makro-Konsistenzschätzung ab.',
       'Die Summe der Komponenten-Kalorien weicht deutlich von der Gesamt-Kalorienschätzung ab.',
     ]));
     expect(trackUsage).toHaveBeenCalledTimes(1);
@@ -1159,7 +1205,7 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     const lines = log.mock.calls.map(([line]) => String(line));
     const estimateLog = lines.find((line) => line.includes('ai.meal-estimate.result'));
     expect(response.status).toBe(200);
-    expect(estimateLog).toContain('"promptVersion":"meal-estimate-v4"');
+    expect(estimateLog).toContain('"promptVersion":"meal-estimate-v6"');
     expect(estimateLog).toContain('"mode":"refine"');
     expect(estimateLog).toContain('"hintIds":"larger"');
     expect(estimateLog).toContain('"promptTokens":123');

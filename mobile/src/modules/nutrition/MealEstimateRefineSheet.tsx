@@ -17,6 +17,7 @@ import type { AiMealEstimateRefine, AiMealEstimateRefineHint } from '@fittrack/s
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { ErrorBanner } from '../../shared/components/ErrorBanner';
 import { Icon } from '../../shared/components/Icon';
+import { useKeyboardOverlap } from '../../shared/keyboard/useKeyboardOverlap';
 
 type RefineOptions = Omit<AiMealEstimateRefine, 'previous'>;
 
@@ -47,6 +48,7 @@ export default function MealEstimateRefineSheet({
   onSubmit,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { ref: keyboardRef, overlap: keyboardInset } = useKeyboardOverlap();
   const [selectedHint, setSelectedHint] = useState<AiMealEstimateRefineHint | null>(null);
   const [note, setNote] = useState('');
   const translateY = useSharedValue(600);
@@ -80,7 +82,7 @@ export default function MealEstimateRefineSheet({
   if (!visible) return null;
 
   return (
-    <View style={styles.overlay}>
+    <View ref={keyboardRef} style={styles.overlay}>
       <TouchableOpacity
         style={styles.backdrop}
         activeOpacity={1}
@@ -90,9 +92,9 @@ export default function MealEstimateRefineSheet({
       />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.avoidingView}
+        style={[styles.avoidingView, { paddingBottom: keyboardInset }]}
       >
-        <Animated.View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) }, sheetStyle]}>
+        <Animated.View style={[styles.sheet, { paddingBottom: keyboardInset > 0 ? spacing.md : Math.max(insets.bottom, spacing.md) }, sheetStyle]}>
           <View style={styles.handleArea}>
             <View style={styles.handle} />
           </View>
@@ -133,19 +135,19 @@ export default function MealEstimateRefineSheet({
             </View>
 
             <View style={styles.noteHeader}>
-              <Text style={styles.label}>Faktische Korrektur (optional)</Text>
+              <Text style={styles.label}>Was sollen wir korrigieren? (optional)</Text>
               <Text style={styles.counter}>{trimmedNote.length}/200</Text>
             </View>
             <TextInput
               style={styles.noteInput}
               value={note}
               onChangeText={(value) => setNote(sanitizeRefineNote(value))}
-              placeholder="Was gehört tatsächlich zur Mahlzeit?"
+              placeholder="z. B. Das waren zwei Scheiben Brot ohne Butter"
               placeholderTextColor={colors.textMuted}
               multiline
               maxLength={200}
               editable={!loading}
-              accessibilityLabel="Faktische Korrektur"
+              accessibilityLabel="Korrektur"
             />
             {error ? <ErrorBanner error={error} /> : null}
             {limitReached ? <Text style={styles.notice}>Maximal 3 Neu-Schätzungen pro Ergebnis.</Text> : null}

@@ -44,7 +44,8 @@ interface Props {
   onClose: () => void;
   onSaved: () => void;
   /** Called when user wants the Precision Path — receives parsed items from previewMeal. */
-  onRefine: (items: MealParserPreviewItem[]) => void;
+  onRefine?: (items: MealParserPreviewItem[]) => void;
+  children?: React.ReactNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +246,7 @@ export function LegacyMealEstimateReviewScreen({
       const componentsText =
         estimate.components.length > 0 ? estimate.components.join(', ') : originalText;
       const result = await aiApi.previewMeal(componentsText, estimate.contextDetected ?? undefined);
-      onRefine(result.items);
+      onRefine?.(result.items);
     } catch (e) {
       setError(formatApiError(e));
     } finally {

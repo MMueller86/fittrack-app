@@ -1255,7 +1255,7 @@ response contract is:
 	components: string[];
 	componentItems: Array<{ name: string; estimatedGrams: number; calories: number }>;
 	estimatedTotalGrams: number;
-	promptVersion: 'meal-estimate-v4';
+	promptVersion: 'meal-estimate-v6';
 	contextDetected: string | null;
 	portionConfidence: 'high' | 'medium' | 'low';
 	photoProvided: boolean;
@@ -1272,7 +1272,7 @@ names are trimmed to 1–100 characters, grams are greater than 0 through 5000,
 and calories are 0–3000. Meal calories are 0–3000; other macro values are
 finite and non-negative. `components` is required and exactly the ordered
 projection `componentItems.map(item => item.name)`. Prompt version is
-`meal-estimate-v4`. `photoUsed` is true only when the image contributed to the
+`meal-estimate-v6`. `photoUsed` is true only when the image contributed to the
 estimate; it is not equivalent to `photoProvided`. Contradictory/uncertain
 cases append fixed localized warnings, but remain successful reviewable
 text-only estimates. The result is transient; the user reviews and confirms it

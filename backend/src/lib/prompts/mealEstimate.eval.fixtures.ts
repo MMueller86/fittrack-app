@@ -6,6 +6,8 @@ export interface MealEstimateEvalFixture {
   input: { text: string; refine?: AiMealEstimateRefine };
   expectedCaloriesDirection?: 'larger' | 'smaller';
   expectedPortionConfidence?: 'high' | 'medium' | 'low';
+  /** Whether a usual but unmentioned ingredient must (present: components or assumptions) or must not (absent: components) appear. */
+  implicitAddition?: { pattern: RegExp; present: boolean };
   calorieReference?: {
     minKcal: number;
     maxKcal: number;
@@ -71,5 +73,25 @@ export const MEAL_ESTIMATE_EVAL_FIXTURES: MealEstimateEvalFixture[] = [
       },
     },
     expectedCaloriesDirection: 'smaller',
+  },
+  // Derivation: product decision of 2026-11-04 - usual preparation (spread on rolls, frying fat) counts even if
+  // not named or visible, unless the user excludes it or the dish does not usually have it.
+  {
+    id: 'implicit-spread-on-roll-v6',
+    description: 'Adds the usual spread to a roll with cheese although it is not mentioned',
+    input: { text: 'Brötchen mit Camembert' },
+    implicitAddition: { pattern: /butter|margarine|aufstrich|streichfett/iu, present: true },
+  },
+  {
+    id: 'explicit-exclusion-of-spread-v6',
+    description: 'Omits the spread when the user excludes it',
+    input: { text: 'Brötchen mit Camembert, ohne Butter' },
+    implicitAddition: { pattern: /butter|margarine|aufstrich|streichfett/iu, present: false },
+  },
+  {
+    id: 'whole-fruit-without-implicit-fat-v6',
+    description: 'Does not add fats or spreads to a whole fruit',
+    input: { text: 'Ein Apfel' },
+    implicitAddition: { pattern: /butter|margarine|aufstrich|streichfett|öl\b|bratfett/iu, present: false },
   },
 ];

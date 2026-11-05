@@ -38,7 +38,7 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   Image: 'Image',
-  Keyboard: { dismiss: vi.fn() },
+  Keyboard: { dismiss: vi.fn(), addListener: () => ({ remove: vi.fn() }) },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   Modal: 'Modal',
   Platform: { OS: 'android' },
@@ -384,7 +384,7 @@ describe('nutrition diary mutation caller flows', () => {
     const onChangeText = description.props.onChangeText;
     if (typeof onChangeText !== 'function') throw new Error('Description input has no change handler');
     act(() => onChangeText('Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
     await press(renderer, 'Speichern');
 
     expect(mocks.diary.addItem).toHaveBeenCalledWith('meal-1', expect.objectContaining({
@@ -405,7 +405,7 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
 
     expect(allText(renderer)).toContain('Haferflocken');
     expect(allText(renderer)).not.toContain('Gesamtgewicht ca.');
@@ -423,14 +423,14 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
     await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
     await pressAccessible(renderer, 'Protein erhöhen');
 
-    expect(inputValue(renderer, 'Kalorien')).toBe('233,4');
-    expect(inputValue(renderer, 'Protein')).toBe('13,2');
+    expect(inputValue(renderer, 'Kalorien')).toBe('235');
+    expect(inputValue(renderer, 'Protein')).toBe('14');
     expect(allText(renderer)).toContain('ca. 105 g · 158 kcal');
-    expect(allText(renderer)).toContain('+6,1 % zur KI-Schätzung');
+    expect(allText(renderer)).toContain('+15 kcal');
     await press(renderer, 'Speichern');
 
     const payload = mocks.diary.addItem.mock.calls[0]?.[1];
@@ -442,11 +442,11 @@ describe('nutrition diary mutation caller flows', () => {
       aiMealEstimateWeightGrams: 189,
       aiMealEstimateVersion: 'meal-v2-test',
     });
-    expect(payload.calculatedNutrition.calories).toBeCloseTo(233.4);
-    expect(payload.calculatedNutrition.protein).toBeCloseTo(13.2);
-    expect(payload.calculatedNutrition.carbs).toBeCloseTo(29.4);
-    expect(payload.calculatedNutrition.fat).toBeCloseTo(7.35);
-    expect(payload.calculatedNutrition.fiber).toBeCloseTo(4.2);
+    expect(payload.calculatedNutrition.calories).toBeCloseTo(235);
+    expect(payload.calculatedNutrition.protein).toBeCloseTo(14);
+    expect(payload.calculatedNutrition.carbs).toBeCloseTo(29);
+    expect(payload.calculatedNutrition.fat).toBeCloseTo(7);
+    expect(payload.calculatedNutrition.fiber).toBeCloseTo(4);
     expect(payload).not.toHaveProperty('aiMealEstimateComponents');
     expect(payload).not.toHaveProperty('aiMealEstimateBaseCalories');
     expect(payload).not.toHaveProperty('amountGrams');
@@ -460,7 +460,7 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
 
     const proteinInput = renderer.root.findAll((node) => node.type === 'TextInput'
       && node.props.accessibilityLabel === 'Protein')[0];
@@ -480,15 +480,15 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
     await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
     await pressAccessible(renderer, 'Portion um fünf Prozent verringern');
 
     expect(inputValue(renderer, 'Kalorien')).toBe('220');
-    expect(allText(renderer)).toContain('Gesamtgewicht ca. 180 g');
+    expect(allText(renderer)).not.toContain('Gesamtgewicht');
     expect(allText(renderer)).toContain('ca. 100 g · 150 kcal');
-    expect(allText(renderer)).not.toContain('zur KI-Schätzung');
-    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Anpassungen zurücksetzen')).toHaveLength(0);
+    expect(allText(renderer)).not.toMatch(/[+−][\d.,]+ (kcal|g)/);
+    expect(renderer.root.findAll((node) => node.props.accessibilityLabel === 'Rückgängig')).toHaveLength(0);
   });
 
   it('resets adjusted values and repeats held steppers until release', async () => {
@@ -499,7 +499,7 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
 
     const increasePortion = findAccessibleButton(renderer, 'Portion um fünf Prozent erhöhen');
     expect(increasePortion.props.delayLongPress).toBe(400);
@@ -510,16 +510,15 @@ describe('nutrition diary mutation caller flows', () => {
     });
     await act(async () => { await vi.advanceTimersByTimeAsync(140); });
     await act(async () => { await vi.advanceTimersByTimeAsync(140); });
-    expect(allText(renderer)).toContain('115 %');
+    expect(allText(renderer)).toContain('+33 kcal');
     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(3);
 
     act(() => { callHandler(increasePortion, 'onPressOut'); });
     await act(async () => { await vi.advanceTimersByTimeAsync(280); });
-    expect(allText(renderer)).toContain('115 %');
+    expect(allText(renderer)).toContain('+33 kcal');
 
-    await pressAccessible(renderer, 'Anpassungen zurücksetzen');
-    expect(allText(renderer)).not.toContain('zur KI-Schätzung');
-    expect(allText(renderer)).toContain('100 %');
+    await pressAccessible(renderer, 'Rückgängig');
+    expect(allText(renderer)).not.toMatch(/[+−][\d.,]+ (kcal|g)/);
   });
 
   it('keeps labeled 48pt controls, stops at 150%, and warns at the boundary', async () => {
@@ -530,7 +529,7 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
 
     const steppers = renderer.root.findAll((node) => node.type === 'TouchableOpacity'
       && typeof node.props.accessibilityLabel === 'string'
@@ -544,18 +543,18 @@ describe('nutrition diary mutation caller flows', () => {
     for (let index = 0; index < 10; index += 1) {
       await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
     }
-    expect(allText(renderer)).toContain('150 %');
+    expect(allText(renderer)).toContain('+110 kcal');
     expect(Haptics.selectionAsync).toHaveBeenCalledTimes(10);
     await pressAccessible(renderer, 'Portion um fünf Prozent erhöhen');
-    expect(allText(renderer)).toContain('150 %');
+    expect(allText(renderer)).toContain('+110 kcal');
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('warning');
 
     for (let index = 0; index < 20; index += 1) {
       await pressAccessible(renderer, 'Portion um fünf Prozent verringern');
     }
-    expect(allText(renderer)).toContain('50 %');
+    expect(allText(renderer)).toContain('−110 kcal');
     await pressAccessible(renderer, 'Portion um fünf Prozent verringern');
-    expect(allText(renderer)).toContain('50 %');
+    expect(allText(renderer)).toContain('−110 kcal');
     expect(Haptics.notificationAsync).toHaveBeenCalledTimes(2);
   });
 
@@ -566,7 +565,7 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
 
     const calorieInput = renderer.root.findAll((node) => node.type === 'TextInput'
       && node.props.accessibilityLabel === 'Kalorien')[0]!;
@@ -588,7 +587,7 @@ describe('nutrition diary mutation caller flows', () => {
     renderers.push(renderer);
     const description = renderer.root.findAll((node) => node.type === 'TextInput')[0]!;
     act(() => changeInputValue(description, 'Porridge'));
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
     await pressAccessible(renderer, 'Stimmt nicht ganz? Neu schätzen');
     await pressAccessible(renderer, 'Portion größer');
     await pressAccessible(renderer, 'Neu schätzen bestätigen');
@@ -603,7 +602,7 @@ describe('nutrition diary mutation caller flows', () => {
       hints: ['larger'],
     });
     expect(inputValue(renderer, 'Kalorien')).toBe('250');
-    expect(allText(renderer)).toContain('100 %');
+    expect(allText(renderer)).not.toMatch(/[+−][\d.,]+ (kcal|g)/);
   });
 
   it('resolves a LabelSubFlow meal through the facade before scanning', async () => {
@@ -759,7 +758,7 @@ describe('nutrition diary mutation caller flows', () => {
     expect(selectedPhoto?.props.source).toEqual({ uri: '/meal-cropped.jpg' });
     expect(selectedPhoto?.props.resizeMode).toBe('contain');
     expect(selectedPhoto?.props.accessibilityLabel).toBe('Ausgewähltes Mahlzeitenfoto');
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
     expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', '/meal-cropped.jpg', 'image/jpeg');
 
     // Close and reopen the flow: the photo must be gone.
@@ -775,7 +774,7 @@ describe('nutrition diary mutation caller flows', () => {
     expect(hasButton('Foto entfernen')).toBe(false);
     expect(hasButton('Foto mit der Kamera aufnehmen')).toBe(true);
     expect(renderer.root.findAll((node) => node.type === 'Image')).toHaveLength(0);
-    await press(renderer, 'Analysieren');
+    await press(renderer, 'KI schätzen');
     expect(mocks.estimateMeal).toHaveBeenLastCalledWith('Porridge', undefined, undefined);
   });
 

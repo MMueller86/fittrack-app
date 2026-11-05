@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Image: 'Image',
-  Keyboard: { dismiss: vi.fn() },
+  Keyboard: { dismiss: vi.fn(), addListener: () => ({ remove: vi.fn() }) },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   Modal: 'Modal',
   Platform: { OS: 'android' },
@@ -122,7 +122,6 @@ function makeResult(
       mealId="meal-1"
       onClose={vi.fn()}
       onSaved={options.onSaved ?? vi.fn()}
-      onRefine={vi.fn()}
     />
   );
 }
@@ -182,7 +181,7 @@ describe('MealEstimateResult re-estimation', () => {
     const calories = renderer.root.findAll((node) => node.type === 'TextInput'
       && node.props.accessibilityLabel === 'Kalorien')[0];
     expect(calories?.props.value).toBe('500');
-    expect(containsText(renderer, '100 %')).toBe(true);
+    expect(nodes(renderer, 'Text').some((node) => renderText(node.props.children).match(/^[+−][\d.,]+ (kcal|g)$/))).toBe(false);
   });
 
   it('shows success feedback when re-estimation succeeds without local adjustments', async () => {
@@ -208,7 +207,6 @@ describe('MealEstimateResult photo use', () => {
     expect(photo?.props.source).toEqual({ uri: '/meal.jpg' });
     expect(photo?.props.resizeMode).toBe('contain');
     expect(photo?.props.accessibilityLabel).toBe('An die KI gesendetes Foto');
-    expect(containsText(renderer, 'An die KI gesendetes Foto')).toBe(true);
   });
 
   it.each([
@@ -257,7 +255,8 @@ describe('MealEstimateResult photo use', () => {
     await act(async () => { renderer = create(makeResult(estimate, { includePhoto })); });
     renderers.push(renderer);
 
-    expect(nodes(renderer, 'Text').filter((node) => renderText(node.props.children) === notice)).toHaveLength(1);
+    expect(nodes(renderer, 'Text').filter((node) => renderText(node.props.children) === notice))
+      .toHaveLength(warning === undefined ? 0 : 1);
     if (warning !== undefined) expect(containsText(renderer, 'Zusätzliche Nährwertwarnung')).toBe(true);
   });
 

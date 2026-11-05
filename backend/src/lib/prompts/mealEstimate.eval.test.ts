@@ -9,12 +9,17 @@ import {
 import { MEAL_ESTIMATE_EVAL_FIXTURES } from './mealEstimate.eval.fixtures';
 
 /** Update this constant whenever the prompt version changes and re-review the AC-derived checks. */
-const TESTED_PROMPT_VERSION = 'meal-estimate-v4';
+const TESTED_PROMPT_VERSION = 'meal-estimate-v6';
 const TESTED_PHOTO_ASSESSMENT_PROMPT_VERSION = 'meal-photo-assessment-v1';
 
-it('prompt versions match the reviewed V4 estimator and photo-assessment contracts', () => {
+it('prompt versions match the reviewed V6 estimator and photo-assessment contracts', () => {
   expect(MEAL_ESTIMATE_PROMPT_VERSION).toBe(TESTED_PROMPT_VERSION);
   expect(MEAL_PHOTO_ASSESSMENT_PROMPT_VERSION).toBe(TESTED_PHOTO_ASSESSMENT_PROMPT_VERSION);
+});
+
+it('requires calories to follow from the macros and the components to add up', () => {
+  expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('Kalorien und Makros müssen zusammenpassen');
+  expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('Auch die Kalorien der componentItems müssen zur Gesamtzahl passen.');
 });
 
 it('defines confidence as a qualitative self-assessment of the complete estimate', () => {
@@ -27,7 +32,9 @@ it('defines confidence as a qualitative self-assessment of the complete estimate
 
 it('prompt has no calorie anchors and keeps the legacy component projection server-owned', () => {
   expect(MEAL_ESTIMATE_SYSTEM_PROMPT).not.toMatch(/\b\d+\s*(?:-|–|bis)\s*\d+\s*kcal\b/iu);
-  expect(MEAL_ESTIMATE_SYSTEM_PROMPT).not.toMatch(/versteckt.{0,30}(?:fett|öl)|(?:fett|öl).{0,30}versteckt/iu);
+  expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('## Übliche Zubereitung');
+  expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('auch wenn sie nicht ausdrücklich genannt oder nicht sichtbar sind');
+  expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('nichts, was der Nutzer ausdrücklich ausschließt');
   expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('Ein separates Feld "components" wird nicht erzeugt.');
   expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('Zusätzliche Zutaten oder Bestandteile');
   expect(MEAL_ESTIMATE_SYSTEM_PROMPT).toContain('Eine frühere Foto-Beziehungsbewertung oder deren Begründung wird dir nicht übergeben.');
@@ -122,6 +129,18 @@ describe.skipIf(!hasCredentials)('mealEstimate: live prompt evaluation', () => {
     const atwaterDeviationKcal = Math.abs(result.mealEstimate.calories - macroCalories);
     const componentDeviationKcal = Math.abs(result.mealEstimate.calories - componentCalories);
 
+    // Same level as the app's inconsistency warning; the server aligns smaller remaining gaps.
+    expect(atwaterDeviationKcal).toBeLessThanOrEqual(Math.max(50, macroCalories * 0.1));
+    if (result.componentItems.length > 0) {
+      expect(componentDeviationKcal).toBeLessThanOrEqual(result.mealEstimate.calories * 0.2);
+    }
+    if (fixture.implicitAddition) {
+      // An added ingredient may be listed as a component or named in the assumptions; an exclusion may be
+      // mentioned in the assumptions, so absence is checked on components only.
+      const names = result.componentItems.map((item) => item.name);
+      const haystack = (fixture.implicitAddition.present ? [...names, ...result.assumptions] : names).join(' ');
+      expect(fixture.implicitAddition.pattern.test(haystack)).toBe(fixture.implicitAddition.present);
+    }
     observations.push({
       id: fixture.id,
       calories: result.mealEstimate.calories,

@@ -7,6 +7,7 @@ import MealEstimateRefineSheet from './MealEstimateRefineSheet';
 
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  Keyboard: { addListener: () => ({ remove: vi.fn() }) },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   Platform: { OS: 'android' },
   ScrollView: 'ScrollView',

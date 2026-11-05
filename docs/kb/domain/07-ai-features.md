@@ -96,12 +96,15 @@ All AI features are **guided workflows** — the AI assists, the user confirms. 
 
 **Endpoint:** `POST /api/ai/meal-estimate/preview`; quota key `meal-estimate`.
 
-**Methodology and versions:** The estimate prompt is `meal-estimate-v4`; the
+**Methodology and versions:** The estimate prompt is `meal-estimate-v6`; the
 separate photo-assessment prompt is `meal-photo-assessment-v1`. The estimator
 estimates nutrition and total weight for the described meal as one complete
 portion, not per 100 g, and identifies 0–20 named components with their own
 estimated weights and calories. Component weights are not summed to calculate
-meal weight or nutrition. A photo request first gets a strict relationship
+meal weight or nutrition. The backend aligns `mealEstimate.calories` with the
+macro energy (4/4/9 kcal per g protein/carbs/fat) when they differ by more than
+max(25 kcal, 5 %) and rescales the component calories proportionally; the
+weight-based energy limit is checked on the raw AI value first. A photo request first gets a strict relationship
 assessment; the assessment returns no nutrition values, food list, rationale,
 or user-facing prose.
 
@@ -157,7 +160,7 @@ after either route, including text-only fallback.
 `portionConfidence`, `photoProvided`, `photoAssessment`, `photoUse`, `photoUsed`,
 `assumptions`, and `warnings`. `components` is exactly the ordered projection
 `componentItems.map(item => item.name)`; `promptVersion` is
-`meal-estimate-v4`. `photoUse` is `included | excluded_mismatch |
+`meal-estimate-v6`. `photoUse` is `included | excluded_mismatch |
 excluded_uncertain | no_photo`; `photoUsed` is true only when the image reached
 nutrition estimation. Excluded cases append fixed localized feedback to
 `warnings`. New photo fields are optional in the shared read type for V1

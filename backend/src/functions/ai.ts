@@ -350,6 +350,24 @@ const MEAL_ESTIMATE_COMPONENT_WARNING = 'Die Summe der Komponenten-Kalorien weic
 const MEAL_PHOTO_MISMATCH_WARNING = 'Beschreibung und Foto scheinen nicht zusammenzupassen. Die Schätzung basiert nur auf deiner Beschreibung. Prüfe bitte, ob du das richtige Foto ausgewählt hast.';
 const MEAL_PHOTO_UNCERTAIN_WARNING = 'Das Foto ließ sich nicht sicher zuordnen und wurde für die Schätzung nicht verwendet. Bitte prüfe, ob es zur Beschreibung passt.';
 
+/** Makes calories consistent with the 4/4/9 macro energy so the user never sees contradicting values. */
+function reconcileMealEnergy(
+  estimate: z.infer<typeof AiMealEstimateOutputSchema>,
+): z.infer<typeof AiMealEstimateOutputSchema> {
+  const { calories, protein, carbs, fat } = estimate.mealEstimate;
+  const macroCalories = Math.round(4 * protein + 4 * carbs + 9 * fat);
+  if (macroCalories <= 0 || Math.abs(calories - macroCalories) <= Math.max(25, macroCalories * 0.05)) {
+    return estimate;
+  }
+
+  const scale = calories > 0 ? macroCalories / calories : 1;
+  return {
+    ...estimate,
+    mealEstimate: { ...estimate.mealEstimate, calories: macroCalories },
+    componentItems: estimate.componentItems.map((item) => ({ ...item, calories: Math.round(item.calories * scale) })),
+  };
+}
+
 function getMealEstimatePlausibilityWarnings(estimate: z.infer<typeof AiMealEstimateOutputSchema>): string[] {
   const { calories, protein, carbs, fat } = estimate.mealEstimate;
   const macroCalories = 4 * protein + 4 * carbs + 9 * fat;
@@ -541,9 +559,9 @@ export const mealEstimatePreviewHandler = withHandler(
       };
     }
 
-    const validEstimate = validation.data;
-    const maxPlausibleCalories = validEstimate.estimatedTotalGrams * 9 * 1.05;
-    if (validEstimate.mealEstimate.calories > maxPlausibleCalories) {
+    const validEstimate = reconcileMealEnergy(validation.data);
+    const maxPlausibleCalories = validation.data.estimatedTotalGrams * 9 * 1.05;
+    if (validation.data.mealEstimate.calories > maxPlausibleCalories) {
       logResult('energy_density_invalid');
       return {
         status: 422,
