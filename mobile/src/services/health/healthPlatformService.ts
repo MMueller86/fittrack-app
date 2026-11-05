@@ -31,6 +31,7 @@ function createService(): IHealthPlatformService {
       requestPermissions: async () => true,
       hasPermissions: async () => false,
       upsertRecord: async () => { throw new Error(errMsg); },
+      upsertRecords: async () => { throw new Error(errMsg); },
       deleteRecord: async () => { throw new Error(errMsg); },
       readRecords: async () => [],
     };

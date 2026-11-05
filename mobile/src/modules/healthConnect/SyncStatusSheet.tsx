@@ -1,7 +1,7 @@
 // SyncStatusSheet — slide-up overlay showing Health Connect sync details.
 // Triggered by tapping the "Letzter Sync" row on HealthConnectScreen.
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Modal,
   ScrollView,
@@ -16,6 +16,7 @@ import { colors, radius, spacing, typography } from '../../app/theme';
 import { Icon } from '../../shared/components/Icon';
 import type { healthSyncService } from '../../services/health/healthSyncService';
 import type { nutritionSyncService } from '../../services/health/nutritionSyncService';
+import { syncLogger, type SyncLogEntry } from '../../services/health/syncLogger';
 import { SYNC_STATUS_COPY } from './healthConnectCopy';
 
 interface Props {
@@ -72,6 +73,37 @@ function StatusSection({ title, syncStatus }: { title: string; syncStatus: SyncS
 // Sheet
 // ---------------------------------------------------------------------------
 
+const MAX_LOG_ENTRIES = 15;
+
+function ErrorLogSection({ visible }: { visible: boolean }) {
+  const [entries, setEntries] = useState<SyncLogEntry[]>([]);
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    void syncLogger.readAll().then((all) => {
+      if (cancelled) return;
+      setEntries(all.filter((entry) => entry.level !== 'info').slice(-MAX_LOG_ENTRIES).reverse());
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [visible]);
+
+  return (
+    <View>
+      <Text style={styles.sectionTitle}>{SYNC_STATUS_COPY.logTitle}</Text>
+      {entries.length === 0 ? (
+        <Text style={styles.valueMuted}>{SYNC_STATUS_COPY.logEmpty}</Text>
+      ) : entries.map((entry, index) => (
+        <View key={`${entry.ts}-${index}`} style={styles.logEntry}>
+          <Text style={styles.logMeta}>{`${new Date(entry.ts).toLocaleString('de-DE')} · ${entry.tag}`}</Text>
+          <Text selectable style={styles.logMessage}>{entry.message}</Text>
+          {entry.detail ? <Text selectable style={styles.logDetail}>{entry.detail}</Text> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function SyncStatusSheet({ visible, weightSyncStatus, nutritionSyncStatus, onClose }: Props) {
   return (
     <Modal
@@ -105,6 +137,7 @@ export function SyncStatusSheet({ visible, weightSyncStatus, nutritionSyncStatus
           >
             <StatusSection title={SYNC_STATUS_COPY.weight} syncStatus={weightSyncStatus} />
             <StatusSection title={SYNC_STATUS_COPY.nutrition} syncStatus={nutritionSyncStatus} />
+            <ErrorLogSection visible={visible} />
           </ScrollView>
         </View>
       </SafeAreaView>
@@ -170,4 +203,12 @@ const styles = StyleSheet.create({
   valueNegative: { color: colors.negative },
   valueMuted: { color: colors.textMuted },
   dateValue: { flex: 1, color: colors.text },
+  logEntry: {
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  logMeta: { ...typography.caption, color: colors.textMuted },
+  logMessage: { ...typography.body2, color: colors.text },
+  logDetail: { ...typography.caption, color: colors.negative },
 });

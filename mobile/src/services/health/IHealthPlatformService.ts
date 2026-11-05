@@ -60,6 +60,7 @@ export interface IHealthPlatformService {
   requestPermissions(permissions: HealthPermission[]): Promise<boolean>;
   hasPermissions(permissions: HealthPermission[]): Promise<boolean>;
   upsertRecord(record: HealthRecord): Promise<void>;
+  upsertRecords(records: HealthRecord[]): Promise<void>;
   deleteRecord(recordType: HealthRecordType, clientId: string): Promise<void>;
   readRecords(recordType: HealthRecordType, options: ReadOptions): Promise<HealthRecord[]>;
 }

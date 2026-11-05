@@ -12,6 +12,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('../../shared/components/Icon', () => ({ Icon: () => null }));
+vi.mock('../../services/health/syncLogger', () => ({ syncLogger: { readAll: vi.fn().mockResolvedValue([]) } }));
 
 import { SyncStatusSheet } from './SyncStatusSheet';
 import { SYNC_STATUS_COPY } from './healthConnectCopy';

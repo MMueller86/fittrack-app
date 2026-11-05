@@ -52,6 +52,8 @@ describe('Health Connect activation copy', () => {
       'Ausstehende Löschungen',
       'Letzter erfolgreicher Abgleich',
       'Noch kein erfolgreicher Abgleich',
+      'Fehlerprotokoll',
+      'Keine Fehler protokolliert',
     ]);
     expect(statusCopy.join(' ')).not.toMatch(/[\p{Extended_Pictographic}\p{Regional_Indicator}]/u);
   });

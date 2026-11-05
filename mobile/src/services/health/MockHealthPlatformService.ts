@@ -41,6 +41,10 @@ export class MockHealthPlatformService implements IHealthPlatformService {
     syncLogger.warn('MockHC', `upsertRecord ${record.recordType} id=${record.metadata.clientRecordId}`);
   }
 
+  async upsertRecords(records: HealthRecord[]): Promise<void> {
+    syncLogger.warn('MockHC', `upsertRecords x${records.length}`);
+  }
+
   async deleteRecord(recordType: HealthRecordType, clientId: string): Promise<void> {
     syncLogger.warn('MockHC', `deleteRecord ${recordType} id=${clientId}`);
   }

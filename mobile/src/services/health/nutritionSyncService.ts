@@ -63,6 +63,11 @@ export function toNutritionRecord(
   };
 }
 
+function describeItem(meal: Pick<Meal, 'id' | 'type' | 'date'>, item: MealItem): string {
+  const m = item.macros;
+  return `item=${item.id} "${item.name}" meal=${meal.id} ${meal.type} date=${meal.date} qty=${item.quantity}${item.unit} kcal=${m.calories} P=${m.protein} C=${m.carbs} F=${m.fat} fiber=${m.fiber ?? 0} source=${item.sourceType}`;
+}
+
 function classifyError(e: unknown): 'temporary' | 'permission' {
   const msg = String(e).toUpperCase();
   if (msg.includes('PERMISSION') || msg.includes('PERMISSION_DENIED')) return 'permission';
@@ -206,10 +211,41 @@ class NutritionDeltaSyncService {
       await healthPlatformService.upsertRecord(toNutritionRecord(meal, item));
       return true;
     } catch (error) {
-      syncLogger.error('NutritionSync', 'Health Connect nutrition write failed');
+      syncLogger.error('NutritionSync', 'Health Connect nutrition write failed', `${describeItem(meal, item)} | ${String(error)}`);
       if (classifyError(error) === 'permission') await this.disableForRevokedPermission();
       return false;
     }
+  }
+
+  // One permission check and one native call per page; falls back to single writes to isolate failing items.
+  private async writePage(meals: readonly Meal[], userId: string): Promise<boolean> {
+    const entries = meals.flatMap((meal) => (meal.items ?? []).map((item) => ({ meal, item, record: toNutritionRecord(meal, item) })));
+    if (entries.length === 0) return true;
+    if (!await this.permissionForWrite(userId)) return false;
+    try {
+      await healthPlatformService.upsertRecords(entries.map((entry) => entry.record));
+      return true;
+    } catch (error) {
+      syncLogger.error('NutritionSync', 'Health Connect batch write failed, retrying single items', `n=${entries.length} ${String(error)}`);
+      if (classifyError(error) === 'permission') {
+        await this.disableForRevokedPermission();
+        return false;
+      }
+    }
+    let succeeded = true;
+    for (const { meal, item, record } of entries) {
+      try {
+        await healthPlatformService.upsertRecord(record);
+      } catch (error) {
+        succeeded = false;
+        syncLogger.error('NutritionSync', 'Health Connect nutrition write failed', `${describeItem(meal, item)} | ${String(error)}`);
+        if (classifyError(error) === 'permission') {
+          await this.disableForRevokedPermission();
+          return false;
+        }
+      }
+    }
+    return succeeded;
   }
 
   private async writeDelete(id: string, userId: string): Promise<boolean> {
@@ -262,22 +298,17 @@ class NutritionDeltaSyncService {
     try {
       do {
         const page = await diaryApi.listAllMeals(BATCH_SIZE, cursor);
-        for (const meal of page.meals) {
-          latest = newestTimestamp(latest, effectiveMealTimestamp(meal));
-          for (const item of meal.items ?? []) {
-            const written = await this.writeNutrition(meal, item, userId);
-            if (!written) {
-              succeeded = false;
-              if (!this.state.enabled || this.permissionRevoked) return false;
-            }
-          }
+        for (const meal of page.meals) latest = newestTimestamp(latest, effectiveMealTimestamp(meal));
+        if (!await this.writePage(page.meals, userId)) {
+          succeeded = false;
+          if (!this.state.enabled || this.permissionRevoked) return false;
         }
         if (page.cursor && seenCursors.has(page.cursor)) throw new Error('Repeated meal export cursor');
         if (page.cursor) seenCursors.add(page.cursor);
         cursor = page.cursor;
       } while (cursor !== undefined);
-    } catch {
-      syncLogger.error('NutritionSync', 'Nutrition full export failed');
+    } catch (error) {
+      syncLogger.error('NutritionSync', 'Nutrition full export failed', String(error));
       return false;
     }
     return succeeded && latest ? this.setWatermark(latest) : succeeded;
@@ -299,22 +330,17 @@ class NutritionDeltaSyncService {
         if (!isCanonicalTimestamp(page.checkpointAt) || Date.parse(page.checkpointAt) < Date.parse(since)) return;
         if (checkpointAt !== undefined && checkpointAt !== page.checkpointAt) return;
         checkpointAt = page.checkpointAt;
-        for (const meal of page.meals) {
-          for (const item of meal.items ?? []) {
-            const written = await this.writeNutrition(meal, item, userId);
-            if (!written) {
-              succeeded = false;
-              if (!this.state.enabled || this.permissionRevoked) return;
-            }
-          }
+        if (!await this.writePage(page.meals, userId)) {
+          succeeded = false;
+          if (!this.state.enabled || this.permissionRevoked) return;
         }
         if (page.cursor && seenCursors.has(page.cursor)) return;
         if (page.cursor) seenCursors.add(page.cursor);
         cursor = page.cursor;
       } while (cursor !== undefined);
       if (succeeded && checkpointAt) await this.setWatermark(checkpointAt);
-    } catch {
-      syncLogger.error('NutritionSync', 'Nutrition delta reconciliation failed');
+    } catch (error) {
+      syncLogger.error('NutritionSync', 'Nutrition delta reconciliation failed', String(error));
     }
   }
 

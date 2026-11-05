@@ -3,6 +3,7 @@ import type { Meal, MealType } from '@fittrack/shared';
 
 const mocks = vi.hoisted(() => ({
   upsertRecord: vi.fn(),
+  upsertRecords: vi.fn(),
   deleteRecord: vi.fn(),
   initialize: vi.fn(),
   requestPermissions: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('@react-native-async-storage/async-storage', () => ({
 vi.mock('./healthPlatformService', () => ({
   healthPlatformService: {
     upsertRecord: mocks.upsertRecord,
+    upsertRecords: mocks.upsertRecords,
     deleteRecord: mocks.deleteRecord,
     initialize: mocks.initialize,
     requestPermissions: mocks.requestPermissions,
@@ -114,6 +116,7 @@ describe('nutritionSyncService delta state', () => {
     vi.useRealTimers();
     vi.resetAllMocks();
     mocks.upsertRecord.mockResolvedValue(undefined);
+    mocks.upsertRecords.mockResolvedValue(undefined);
     mocks.deleteRecord.mockResolvedValue(undefined);
     mocks.initialize.mockResolvedValue(true);
     mocks.requestPermissions.mockResolvedValue(true);
@@ -189,7 +192,7 @@ describe('nutritionSyncService delta state', () => {
 
     expect(mocks.listAllMeals).toHaveBeenNthCalledWith(1, 50, undefined);
     expect(mocks.listAllMeals).toHaveBeenNthCalledWith(2, 50, 'page-2');
-    expect(mocks.upsertRecord).toHaveBeenCalledTimes(2);
+    expect(mocks.upsertRecords).toHaveBeenCalledTimes(2);
     expect(mocks.hasPermissions).toHaveBeenCalledTimes(3);
     const saved = latestSavedState();
     expect(Object.keys(saved).sort()).toEqual(['enabled', 'pendingDeleteIds', 'userId', 'watermark']);
@@ -214,7 +217,7 @@ describe('nutritionSyncService delta state', () => {
 
     expect(mocks.listAllMeals).toHaveBeenCalledTimes(1);
     expect(mocks.getMealChanges).not.toHaveBeenCalled();
-    expect(mocks.upsertRecord).toHaveBeenCalledTimes(1);
+    expect(mocks.upsertRecords).toHaveBeenCalledTimes(1);
     expect(latestSavedState().lastForegroundAttemptAt).toBe(previousAttemptAt);
   });
 
@@ -258,7 +261,7 @@ describe('nutritionSyncService delta state', () => {
 
     expect(mocks.getMealChanges).toHaveBeenNthCalledWith(1, SINCE, 50, undefined);
     expect(mocks.getMealChanges).toHaveBeenNthCalledWith(2, SINCE, 50, 'next-page');
-    expect(mocks.upsertRecord).toHaveBeenCalledTimes(2);
+    expect(mocks.upsertRecords).toHaveBeenCalledTimes(2);
     expect(service.getSyncStatus().lastSuccessfulSyncAt).toBe(CHECKPOINT);
   });
 
@@ -276,6 +279,7 @@ describe('nutritionSyncService delta state', () => {
 
     mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
     mocks.getMealChanges.mockResolvedValue({ meals: [makeMeal('m3')], checkpointAt: CHECKPOINT });
+    mocks.upsertRecords.mockRejectedValueOnce(new Error('batch failure'));
     mocks.upsertRecord.mockRejectedValueOnce(new Error('temporary failure'));
     const freshService = new NutritionSyncService();
     await freshService.loadState();
@@ -284,20 +288,20 @@ describe('nutritionSyncService delta state', () => {
     expect(freshService.getSyncStatus().lastSuccessfulSyncAt).toBe(SINCE);
   });
 
-  it('checks current permission before every write and disables without advancing on revocation', async () => {
+  it('checks current permission once per page and disables without advancing on revocation', async () => {
     mocks.getItem.mockResolvedValue(JSON.stringify(storedState()));
     mocks.getMealChanges.mockResolvedValue({
       meals: [makeMeal('m1'), makeMeal('m2', 'item-m2', 'lunch')],
       checkpointAt: CHECKPOINT,
     });
-    mocks.hasPermissions.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    mocks.hasPermissions.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
     const service = new NutritionSyncService();
     await service.loadState();
 
     await service.syncForeground();
 
-    expect(mocks.hasPermissions).toHaveBeenCalledTimes(3);
-    expect(mocks.upsertRecord).toHaveBeenCalledTimes(1);
+    expect(mocks.hasPermissions).toHaveBeenCalledTimes(2);
+    expect(mocks.upsertRecords).not.toHaveBeenCalled();
     expect(service.getSyncStatus()).toMatchObject({ enabled: false, permissionRevoked: true, lastSuccessfulSyncAt: SINCE });
   });
 
@@ -365,7 +369,7 @@ describe('nutritionSyncService delta state', () => {
     expect(mocks.getMealChanges).not.toHaveBeenCalled();
     expect(mocks.listAllMeals).toHaveBeenNthCalledWith(1, 50, undefined);
     expect(mocks.listAllMeals).toHaveBeenNthCalledWith(2, 50, 'page-2');
-    expect(mocks.upsertRecord).toHaveBeenCalledTimes(2);
+    expect(mocks.upsertRecords).toHaveBeenCalledTimes(2);
     expect(service.getSyncStatus().lastSuccessfulSyncAt).toBe(CHECKPOINT);
     expect(latestSavedState().lastForegroundAttemptAt).toBe(previousAttemptAt);
   });

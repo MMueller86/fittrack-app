@@ -16,6 +16,8 @@ export const SYNC_STATUS_COPY = {
   pendingDeleteCountLabel: 'Ausstehende Löschungen',
   lastSuccessfulSyncAtLabel: 'Letzter erfolgreicher Abgleich',
   noSuccessfulSync: 'Noch kein erfolgreicher Abgleich',
+  logTitle: 'Fehlerprotokoll',
+  logEmpty: 'Keine Fehler protokolliert',
 } as const;
 
 export const WEIGHT_SYNC_NOTICE = {
