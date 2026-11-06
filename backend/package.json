@@ -43,9 +43,9 @@
     "@napi-rs/canvas": "~1.1.0",
     "@tabler/icons": "~3.50.0",
     "hyphen": "^1.14.1",
-    "jose": "^6.2.14",
-    "lucide-static": "~1.65.0",
-    "openai": "^7.45.1",
+    "jose": "^6.2.15",
+    "lucide-static": "~1.67.0",
+    "openai": "^7.47.0",
     "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
@@ -55,6 +55,6 @@
     "azurite": "^3.37.0",
     "pixelmatch": "~8.0.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
