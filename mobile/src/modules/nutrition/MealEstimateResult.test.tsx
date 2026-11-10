@@ -198,6 +198,49 @@ describe('MealEstimateResult re-estimation', () => {
 });
 
 describe('MealEstimateResult photo use', () => {
+  it('keeps German thousands-separated calories in the warning and diary payload', async () => {
+    const estimate: AiMealEstimatePreview = {
+      ...V2_ESTIMATE,
+      mealEstimate: { calories: 1070, protein: 20, carbs: 100, fat: 30, fiber: 8 },
+      photoProvided: true,
+      photoAssessment: 'consistent',
+      photoUse: 'included',
+      photoUsed: true,
+    };
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(makeResult(estimate)); });
+    renderers.push(renderer);
+
+    const calorieInput = nodes(renderer, 'TextInput').find((node) => node.props.accessibilityLabel === 'Kalorien');
+    expect(calorieInput?.props.value).toBe('1.070');
+
+    await act(async () => {
+      invoke(button(renderer, 'Nährwertwarnung ein- oder ausblenden'), 'onPress');
+    });
+    const warningCopy = nodes(renderer, 'Text').map((node) => renderText(node.props.children)).join(' ');
+    expect(warningCopy).toContain('du hast 1070 kcal eingetragen');
+
+    await act(async () => { await invoke(saveButton(renderer), 'onPress'); });
+    expect(mocks.addItem).toHaveBeenCalledWith('meal-1', expect.objectContaining({
+      calculatedNutrition: expect.objectContaining({ calories: 1070 }),
+    }));
+  });
+
+  it('parses edited German thousands-separated calories as the full value', async () => {
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = create(makeResult(V2_ESTIMATE)); });
+    renderers.push(renderer);
+
+    const calorieInput = nodes(renderer, 'TextInput').find((node) => node.props.accessibilityLabel === 'Kalorien');
+    if (!calorieInput) throw new Error('Kalorienfeld nicht gefunden');
+    await act(async () => { invoke(calorieInput, 'onChangeText', '1.071'); });
+    await act(async () => { await invoke(saveButton(renderer), 'onPress'); });
+
+    expect(mocks.addItem).toHaveBeenCalledWith('meal-1', expect.objectContaining({
+      calculatedNutrition: expect.objectContaining({ calories: 1071 }),
+    }));
+  });
+
   it('shows the complete uploaded photo in a stable frame for verification', async () => {
     let renderer!: ReactTestRenderer;
     await act(async () => { renderer = create(makeResult(V2_ESTIMATE)); });

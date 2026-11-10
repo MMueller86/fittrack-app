@@ -522,7 +522,6 @@ export const mealEstimatePreviewHandler = withHandler(
           return { status: 502, jsonBody: { error: 'KI-Schätzung fehlgeschlagen' } };
         }
         assessmentDurationMs = Date.now() - assessmentStartedAt;
-        emit?.({ event: 'photo_check.completed' });
       }
 
       const photoUse = photoAssessment === 'consistent' || photoAssessment === 'complementary'
@@ -534,6 +533,9 @@ export const mealEstimatePreviewHandler = withHandler(
             : 'no_photo';
       const includePhotoInEstimate = photoUse === 'included';
       const excludedPhoto = photoUse === 'excluded_mismatch' || photoUse === 'excluded_uncertain';
+      if (imageBase64 !== undefined && imageMimeType !== undefined && photoUse !== 'no_photo') {
+        emit?.({ event: 'photo_check.completed', photoUse });
+      }
 
       let estimate;
       providerCalls += 1;

@@ -25,6 +25,8 @@ export interface AiMealEstimateNutrition {
   fiber: number;
 }
 
+export type AiMealEstimatePhotoUse = 'included' | 'excluded_mismatch' | 'excluded_uncertain' | 'no_photo';
+
 export type AiMealEstimateRefineHint = 'larger' | 'smaller';
 
 export interface AiMealEstimateRefine {
@@ -80,7 +82,7 @@ export interface AiMealEstimatePreview {
   /** V3: server-validated relationship classification; absent on V1 responses. */
   photoAssessment?: 'consistent' | 'complementary' | 'contradictory' | 'uncertain' | 'no_photo';
   /** V3: server-derived source routing; absent on V1 responses. */
-  photoUse?: 'included' | 'excluded_mismatch' | 'excluded_uncertain' | 'no_photo';
+  photoUse?: AiMealEstimatePhotoUse;
   /**
    * Contextual hint extracted from the user's text, e.g. "Imbiss", "Kantine", "Restaurant".
    * Null when no context was detected — standard home/restaurant portions are used in that case.
@@ -102,7 +104,7 @@ export interface AiMealEstimatePreview {
 
 /** NDJSON events returned only when a photo request opts in with Accept: application/x-ndjson. */
 export type AiMealEstimateProgressEvent =
-  | { event: 'photo_check.completed' }
+  | { event: 'photo_check.completed'; photoUse: Exclude<AiMealEstimatePhotoUse, 'no_photo'> }
   | { event: 'estimate.started' }
   | { event: 'result'; data: AiMealEstimatePreview }
   | { event: 'error'; code: 'processing_failed' };

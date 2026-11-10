@@ -94,8 +94,13 @@ function parseAiMealEstimateProgressEvent(value: unknown): AiMealEstimateProgres
   if (!isRecord(value)) return null;
   switch (value.event) {
     case 'photo_check.completed':
+      return value.photoUse === 'included'
+        || value.photoUse === 'excluded_mismatch'
+        || value.photoUse === 'excluded_uncertain'
+        ? { event: 'photo_check.completed', photoUse: value.photoUse }
+        : null;
     case 'estimate.started':
-      return { event: value.event };
+      return { event: 'estimate.started' };
     case 'result':
       return isAiMealEstimatePreview(value.data) ? { event: 'result', data: value.data } : null;
     case 'error':

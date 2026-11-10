@@ -185,13 +185,14 @@ by the Diary workflow. No photo, assessment category, or rationale is persisted.
 
 Photo requests can opt into same-POST progress using
 `Accept: application/x-ndjson`. The newline-delimited shared event contract
-emits `photo_check.completed` only after a successful assessment,
-`estimate.started` immediately before the existing estimate call, and a final
-`result` containing the same preview. Any streamed failure ends with an `error`
-event and no result. Existing clients and requests without a photo keep the
-JSON response; if transport buffering delivers all records together, clients
-should keep the existing indeterminate loading behavior instead of replaying
-phase changes.
+emits `photo_check.completed` only after a successful assessment and includes
+the derived `photoUse` outcome (`included`, `excluded_mismatch`, or
+`excluded_uncertain`), followed by `estimate.started` immediately before the
+existing estimate call and a final `result` containing the same preview. Any
+streamed failure ends with an `error` event and no result. Existing clients and
+requests without a photo keep the JSON response; if transport buffering
+delivers all records together, clients should keep the existing indeterminate
+loading behavior instead of replaying phase changes.
 
 Telemetry records prompt versions, mode, allowlisted hint IDs, photo presence,
 bounded provider-call/token/duration metadata, text/note lengths, validation

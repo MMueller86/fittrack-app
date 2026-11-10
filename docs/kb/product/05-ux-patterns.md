@@ -197,13 +197,19 @@ full 4:3 `contain` frame used by the review screens. The preview uses the exact
 URI passed to the AI request; removing the photo hides the preview and removes
 it from the request.
 
-During a photo estimate, the loading overlay stays indeterminate until an actual
-phase record arrives. `photo_check.completed` may show `Foto geprüft`; the
-estimate animation starts only on `estimate.started`. If buffered phase records
-arrive with the final result, the overlay does not replay them and remains in
-its prior waiting state until the result replaces it. No-photo estimates retain
-the existing JSON and loading path. Closing the subflow or unmounting cancels
-the request, with no later state update. Live partial delivery through
+During a photo estimate, the loading overlay shows both steps in the same
+dialog from the start. Step 01 displays an activity indicator while the image
+is checked; step 02 remains visible but inactive. `photo_check.completed`
+carries the required `photoUse`: `included` is shown as a positive `Foto
+geprüft`; `excluded_mismatch` is explicitly shown as `Foto abgelehnt` with a
+negative mark; `excluded_uncertain` is shown as `Foto nicht genutzt` with an
+uncertainty mark. When `estimate.started` arrives, step 01 keeps its result and
+the activity indicator moves to step 02. Missing or invalid `photoUse` never
+produces a positive confirmation. If buffered phase records arrive with the
+final result, the overlay does not replay them and both steps remain in their
+initial state until the result replaces it. No-photo estimates retain the
+existing single-step JSON and loading path. Closing the subflow or unmounting
+cancels the request, with no later state update. Live partial delivery through
 React Native/Axios is **UNVERIFIED** and requires the post-QA device smoke; lack
 of a device is not evidence that streaming fails.
 

@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useKeyboardOverlap } from '../../../shared/keyboard/useKeyboardOverlap';
 import type { AiFoodEstimatePreview, AiMealEstimatePreview } from '@fittrack/shared';
 import type { AiMealEstimateProgressEvent } from '@fittrack/shared';
+import type { AiMealEstimatePhotoUse } from '@fittrack/shared';
 import { aiApi } from '../../../shared/api/aiApi';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { formatApiError } from '../../../shared/api/apiError';
@@ -88,6 +89,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingPhase, setLoadingPhase] = useState<'photo_check.completed' | 'estimate.started' | null>(null);
+  const [loadingPhotoUse, setLoadingPhotoUse] = useState<Exclude<AiMealEstimatePhotoUse, 'no_photo'> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mealEstimate, setMealEstimate] = useState<AiMealEstimatePreview | null>(null);
   // Mahlzeit-Selektor — vorbelegt mit zeitbasiertem Default
@@ -111,6 +113,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
       setMealPhoto(null);
       setLoading(false);
       setLoadingPhase(null);
+      setLoadingPhotoUse(null);
       setError(null);
       setSaveError(null);
       setMealEstimate(null);
@@ -139,6 +142,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
     estimateRequestRef.current = controller;
     setLoading(true);
     setLoadingPhase(null);
+    setLoadingPhotoUse(null);
     setError(null);
     try {
       const result = await aiApi.estimateMeal(
@@ -151,6 +155,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
           onProgress: (event: AiMealEstimateProgressEvent) => {
             if (!controller.signal.aborted
               && (event.event === 'photo_check.completed' || event.event === 'estimate.started')) {
+              if (event.event === 'photo_check.completed') setLoadingPhotoUse(event.photoUse);
               setLoadingPhase(event.event);
             }
           },
@@ -614,6 +619,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
             hasPhoto={mealPhoto != null}
             imageUri={mealPhoto?.uri}
             phase={loadingPhase}
+            photoUse={loadingPhotoUse}
           />
         ) : null}
       </SafeAreaView>

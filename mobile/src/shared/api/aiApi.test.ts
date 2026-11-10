@@ -113,23 +113,44 @@ describe('aiApi.estimateMeal', () => {
   it('emits only complete progress records when XHR responseText grows in partial chunks', () => {
     const onProgress = vi.fn();
     const parse = createAiMealEstimateProgressParser(onProgress);
-    const photoCheck = '{"event":"photo_check.completed"}\n';
+    const photoCheck = '{"event":"photo_check.completed","photoUse":"included"}\n';
 
     parse(photoCheck.slice(0, 17));
     expect(onProgress).not.toHaveBeenCalled();
     parse(photoCheck);
 
-    expect(onProgress).toHaveBeenCalledWith({ event: 'photo_check.completed' });
+    expect(onProgress).toHaveBeenCalledWith({ event: 'photo_check.completed', photoUse: 'included' });
+  });
+
+  it.each(['included', 'excluded_mismatch', 'excluded_uncertain'] as const)(
+    'forwards the required photo-use outcome %s',
+    (photoUse) => {
+      const onProgress = vi.fn();
+      const parse = createAiMealEstimateProgressParser(onProgress);
+
+      parse(`${JSON.stringify({ event: 'photo_check.completed', photoUse })}\n`);
+
+      expect(onProgress).toHaveBeenCalledWith({ event: 'photo_check.completed', photoUse });
+    },
+  );
+
+  it('ignores photo-check events without a valid photo-use outcome', () => {
+    const onProgress = vi.fn();
+    const parse = createAiMealEstimateProgressParser(onProgress);
+
+    parse('{"event":"photo_check.completed"}\n{"event":"photo_check.completed","photoUse":"no_photo"}\n');
+
+    expect(onProgress).not.toHaveBeenCalled();
   });
 
   it('processes multiple complete records from one progress update in order', () => {
     const onProgress = vi.fn();
     const parse = createAiMealEstimateProgressParser(onProgress);
 
-    parse('{"event":"photo_check.completed"}\n{"event":"estimate.started"}\n');
+    parse('{"event":"photo_check.completed","photoUse":"included"}\n{"event":"estimate.started"}\n');
 
     expect(onProgress.mock.calls).toEqual([
-      [{ event: 'photo_check.completed' }],
+      [{ event: 'photo_check.completed', photoUse: 'included' }],
       [{ event: 'estimate.started' }],
     ]);
   });
@@ -139,7 +160,7 @@ describe('aiApi.estimateMeal', () => {
     const parse = createAiMealEstimateProgressParser(onProgress);
 
     parse([
-      '{"event":"photo_check.completed"}',
+      '{"event":"photo_check.completed","photoUse":"included"}',
       '{"event":"estimate.started"}',
       JSON.stringify({ event: 'result', data: streamedEstimate }),
     ].join('\n'));
@@ -151,7 +172,7 @@ describe('aiApi.estimateMeal', () => {
     const onProgress = vi.fn();
     const parse = createAiMealEstimateProgressParser(onProgress);
 
-    parse('{"event":"photo_check.completed"}\n{"event":"error","code":"processing_failed"}');
+    parse('{"event":"photo_check.completed","photoUse":"included"}\n{"event":"error","code":"processing_failed"}');
 
     expect(onProgress).not.toHaveBeenCalled();
   });
@@ -169,18 +190,18 @@ describe('aiApi.estimateMeal', () => {
     } | undefined;
 
     requestConfig?.onDownloadProgress?.({
-      event: { target: { responseText: '{"event":"photo_check.completed"}\n' } },
+      event: { target: { responseText: '{"event":"photo_check.completed","photoUse":"included"}\n' } },
       loaded: 34,
       bytes: 34,
       lengthComputable: false,
     });
 
-    expect(onProgress).toHaveBeenCalledWith({ event: 'photo_check.completed' });
+    expect(onProgress).toHaveBeenCalledWith({ event: 'photo_check.completed', photoUse: 'included' });
   });
 
   it('returns the final result from the NDJSON response without replaying buffered phases', async () => {
     postMock.mockResolvedValueOnce({ data: [
-      '{"event":"photo_check.completed"}',
+      '{"event":"photo_check.completed","photoUse":"included"}',
       '{"event":"estimate.started"}',
       JSON.stringify({ event: 'result', data: streamedEstimate }),
       '',

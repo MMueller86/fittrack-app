@@ -940,8 +940,13 @@ describe('POST /api/ai/meal-estimate/preview', () => {
     expect(trackUsage).toHaveBeenCalledTimes(1);
   });
 
-  it('streams ordered same-request phases only for opted-in photo requests', async () => {
-    const create = mockPhotoAssessmentClient('consistent');
+  it.each([
+    ['consistent', 'included'],
+    ['complementary', 'included'],
+    ['contradictory', 'excluded_mismatch'],
+    ['uncertain', 'excluded_uncertain'],
+  ] as const)('streams the assessed photo use for %s photos', async (assessment, photoUse) => {
+    const create = mockPhotoAssessmentClient(assessment);
     const formData = new FormData();
     formData.set('text', 'Reis mit Gemüse');
     formData.set('image', new Blob(['synthetic image'], { type: 'image/png' }), 'meal.png');
@@ -965,7 +970,8 @@ describe('POST /api/ai/meal-estimate/preview', () => {
       'estimate.started',
       'result',
     ]);
-    expect(events[2]).toMatchObject({ event: 'result', data: { photoAssessment: 'consistent' } });
+    expect(events[0]).toEqual({ event: 'photo_check.completed', photoUse });
+    expect(events[2]).toMatchObject({ event: 'result', data: { photoAssessment: assessment } });
     expect(create).toHaveBeenCalledTimes(2);
     expect(trackUsage).toHaveBeenCalledTimes(1);
   });

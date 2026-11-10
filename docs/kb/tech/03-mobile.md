@@ -259,14 +259,20 @@ remains a separate Precision Path action.
 
 Photo estimates opt into the same-POST NDJSON progress contract through the
 existing `apiClient`; the request payload, Bearer/401 refresh, quota handling,
-and final preview remain unchanged. The loading overlay marks the photo check
-complete only after `photo_check.completed` and starts its estimate animation
-only after `estimate.started`. Complete phase records delivered together with
-the final result are not replayed; the existing indeterminate loading state
-stays visible until the preview arrives. Requests without a photo keep their
-JSON path. Closing the subflow or unmounting aborts the request and prevents
-late UI updates. Whether React Native/Axios delivers phase records before the
-final response remains **UNVERIFIED** pending the post-QA device smoke.
+and final preview remain unchanged. Photo requests show both loading steps in
+the same overlay from the start. Step 01 shows an activity indicator while the
+photo is checked. `photo_check.completed` must include `photoUse`: `included`
+marks step 01 as a green `Foto geprüft`, `excluded_mismatch` marks it as
+rejected, and `excluded_uncertain` marks it as unclear and not used. Step 02
+stays visible but inactive until `estimate.started`, when its activity
+indicator starts and step 01 keeps its assessed outcome. Neither excluded
+state is presented as a positive confirmation. Complete phase records
+delivered together with the final result are not replayed; both steps remain
+in their initial state until the preview arrives. Requests without a photo
+keep their existing single-step JSON path. Closing the subflow or unmounting
+aborts the request and prevents late UI updates. Whether React Native/Axios
+delivers phase records before the final response remains **UNVERIFIED** pending
+the post-QA device smoke.
 
 Saving sends the confirmed adjusted macros as one portion
 (`inputMode: 'portion'`, `inputAmount: 1`) without `amountGrams`. Valid V2

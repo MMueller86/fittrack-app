@@ -76,8 +76,14 @@ function getPhotoUseNotice(estimate: AiMealEstimatePreview): string | undefined 
 }
 
 function parseValue(value: string): number | undefined {
-  if (!value.trim()) return undefined;
-  const parsed = Number(value.trim().replace(',', '.'));
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const normalized = trimmed.includes(',')
+    ? trimmed.replace(/\./g, '').replace(',', '.')
+    : /^\d{1,3}(?:\.\d{3})+$/.test(trimmed)
+      ? trimmed.replace(/\./g, '')
+      : trimmed;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
@@ -261,7 +267,9 @@ export default function MealEstimateResult({
     )) === true;
   const canRefineEstimate = isCompleteV2Estimate(currentEstimate);
   const calorieText = caloriesDraft ?? formatValue(adjusted.mealEstimate.calories);
-  const parsedCalories = parseValue(calorieText);
+  const parsedCalories = caloriesDraft === null
+    ? adjusted.mealEstimate.calories
+    : parseValue(caloriesDraft);
   const canSave = parsedCalories !== undefined && !saving && !refining;
   const busy = saving || refining;
   const caloriesDelta = formatDelta(adjusted.mealEstimate.calories - currentEstimate.mealEstimate.calories, 'kcal');

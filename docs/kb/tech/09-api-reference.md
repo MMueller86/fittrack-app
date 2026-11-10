@@ -1271,9 +1271,11 @@ Photo requests may opt into same-request progress framing with
 `Accept: application/x-ndjson`. The response uses
 `Content-Type: application/x-ndjson; charset=utf-8`; each newline-delimited
 JSON record is an `AiMealEstimateProgressEvent` from the shared types:
-`photo_check.completed` is emitted only after the photo assessment succeeds,
-`estimate.started` immediately before the existing nutrition-estimate call,
-and `result` carries the unchanged V3 response in `data`. A failed streamed
+`photo_check.completed` is emitted only after the photo assessment succeeds and
+includes its `photoUse` outcome (`included`, `excluded_mismatch`, or
+`excluded_uncertain`); `estimate.started` is emitted immediately before the
+existing nutrition-estimate call, and `result` carries the unchanged V3
+response in `data`. A failed streamed
 request ends with `{ "event": "error", "code": "processing_failed" }` and
 never emits `result`. Authentication, request-validation, and quota failures
 remain ordinary HTTP errors because they occur before streaming starts.

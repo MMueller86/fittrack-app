@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
+import React from 'react';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import type { AiMealEstimatePhotoUse } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { Icon } from '../../../shared/components/Icon';
 
@@ -8,26 +8,67 @@ interface Props {
   hasPhoto: boolean;
   imageUri?: string;
   phase: 'photo_check.completed' | 'estimate.started' | null;
+  photoUse: Exclude<AiMealEstimatePhotoUse, 'no_photo'> | null;
 }
 
-export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase }: Props) {
-  const estimateStarted = !hasPhoto || phase === 'estimate.started';
-  const photoCheckCompleted = phase === 'photo_check.completed' || phase === 'estimate.started';
-  const sweepProgress = useSharedValue(0);
-  const progressStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: sweepProgress.value * 128 }],
-  }));
+type PhotoStepStatus = 'loading' | 'pending' | 'accepted' | 'rejected' | 'uncertain' | 'unconfirmed';
 
-  useEffect(() => {
-    if (!estimateStarted) {
-      sweepProgress.value = 0;
-      return;
-    }
-    sweepProgress.value = withRepeat(withTiming(1, { duration: 1800 }), -1, true);
-    return () => {
-      sweepProgress.value = 0;
-    };
-  }, [estimateStarted, sweepProgress]);
+interface PhotoStatus {
+  badge: string;
+  title: string;
+  detail: string;
+  description: string;
+  icon: 'check-circle' | 'x-circle' | 'alert-circle';
+  tone: string;
+  stepStatus: PhotoStepStatus;
+}
+
+function getPhotoStatus(photoUse: Exclude<AiMealEstimatePhotoUse, 'no_photo'>): PhotoStatus {
+  switch (photoUse) {
+    case 'included':
+      return {
+        badge: 'FOTO PASST',
+        title: 'Foto geprüft',
+        detail: 'Passt zur Beschreibung',
+        description: 'Foto und Beschreibung passen zusammen.',
+        icon: 'check-circle',
+        tone: colors.primaryBright,
+        stepStatus: 'accepted',
+      };
+    case 'excluded_mismatch':
+      return {
+        badge: 'FOTO ABGELEHNT',
+        title: 'Foto abgelehnt',
+        detail: 'Passt nicht zur Beschreibung',
+        description: 'Das Foto passt nicht zur Beschreibung und wird nicht genutzt.',
+        icon: 'x-circle',
+        tone: colors.negative,
+        stepStatus: 'rejected',
+      };
+    case 'excluded_uncertain':
+      return {
+        badge: 'ABGLEICH UNKLAR',
+        title: 'Foto nicht genutzt',
+        detail: 'Abgleich nicht eindeutig',
+        description: 'Der Abgleich ist nicht eindeutig. Das Foto wird nicht genutzt.',
+        icon: 'alert-circle',
+        tone: colors.warning,
+        stepStatus: 'uncertain',
+      };
+  }
+}
+
+export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase, photoUse }: Props) {
+  const estimateStarted = !hasPhoto || phase === 'estimate.started';
+  const photoStatus = photoUse ? getPhotoStatus(photoUse) : null;
+  const photoStepTitle = photoStatus?.title
+    ?? (phase === 'estimate.started' ? 'Fotoabgleich nicht bestätigt' : 'Prüfe Bild');
+  const photoStepDetail = photoStatus?.detail
+    ?? (phase === 'estimate.started'
+      ? 'Schätzung ohne bestätigten Fotoabgleich'
+      : 'Foto und Beschreibung abgleichen');
+  const photoStepStatus = photoStatus?.stepStatus
+    ?? (phase === 'estimate.started' ? 'unconfirmed' : 'loading');
 
   return (
     <View
@@ -41,14 +82,14 @@ export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase }: Props)
           <Text style={styles.eyebrowText}>KI-KÜCHE · LIVE</Text>
         </View>
 
-        <Text style={styles.title}>Dein Essen wird entschlüsselt</Text>
+        <Text style={styles.title}>Wir schätzen deine Mahlzeit</Text>
         <Text style={styles.description}>
           {hasPhoto
-            ? phase === 'estimate.started'
-              ? 'Foto und Beschreibung wurden abgeglichen. Wir schätzen Portion und Nährwerte.'
-              : phase === 'photo_check.completed'
-                ? 'Foto und Beschreibung wurden abgeglichen.'
-                : 'Deine Anfrage wird verarbeitet.'
+            ? photoStatus
+              ? `${photoStatus.description}${estimateStarted ? ' Wir schätzen anhand deiner Beschreibung weiter.' : ''}`
+              : phase === 'estimate.started'
+                ? 'Der Fotoabgleich ist nicht bestätigt. Wir schätzen anhand deiner Beschreibung weiter.'
+                : 'Wir prüfen das Foto und gleichen es mit deiner Beschreibung ab.'
             : 'Wir ordnen deine Beschreibung ein und schätzen die Nährwerte.'}
         </Text>
 
@@ -60,40 +101,44 @@ export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase }: Props)
               <Icon lib="ion" name="restaurant-outline" size={48} color={colors.primaryBright} />
             </View>
           )}
-          {hasPhoto && photoCheckCompleted ? (
+          {hasPhoto && photoStatus ? (
             <View style={styles.photoTag}>
-              <Icon lib="feather" name="check-circle" size="sm" color={colors.primaryBright} />
-              <Text style={styles.photoTagText}>FOTO GEPRÜFT</Text>
+              <Icon lib="feather" name={photoStatus.icon} size="sm" color={photoStatus.tone} />
+              <Text style={[styles.photoTagText, { color: photoStatus.tone }]}>{photoStatus.badge}</Text>
             </View>
           ) : null}
         </View>
 
         <View style={styles.steps}>
-          {hasPhoto && phase === 'estimate.started' ? (
+          {hasPhoto ? (
             <>
-              <Step number="01" title="Foto geprüft" detail="Abgleich abgeschlossen" />
+              <Step
+                number="01"
+                title={photoStepTitle}
+                detail={photoStepDetail}
+                status={photoStepStatus}
+              />
               <View style={styles.stepConnector} />
-              <Step number="02" title="Mahlzeit schätzen" detail="Portion und Nährwerte ermitteln" />
+              <Step
+                number="02"
+                title="Mahlzeit schätzen"
+                detail="Portion und Nährwerte ermitteln"
+                status={phase === 'estimate.started' ? 'loading' : 'pending'}
+              />
             </>
-          ) : hasPhoto && phase === 'photo_check.completed' ? (
-            <Step number="01" title="Foto geprüft" detail="Abgleich abgeschlossen" />
-          ) : hasPhoto ? null : (
-            <Step number="01" title="Mahlzeit schätzen" detail="Portion und Nährwerte ermitteln" />
+          ) : (
+            <Step
+              number="01"
+              title="Mahlzeit schätzen"
+              detail="Portion und Nährwerte ermitteln"
+              status="loading"
+            />
           )}
         </View>
 
-        {estimateStarted ? (
-          <View
-            style={styles.progressTrack}
-            accessibilityRole="progressbar"
-            accessibilityLabel="KI-Schätzung läuft"
-          >
-            <Animated.View style={[styles.progressSweep, progressStyle]} />
-          </View>
-        ) : null}
         <Text style={styles.waitingText} accessibilityLiveRegion="polite">
           {hasPhoto && phase === null
-            ? 'Wir halten dich auf dem Laufenden.'
+            ? 'Der Fotoabgleich läuft.'
             : hasPhoto && phase === 'photo_check.completed'
               ? 'Die Schätzung wird vorbereitet.'
               : 'Gute Schätzungen brauchen einen kleinen Moment.'}
@@ -103,14 +148,51 @@ export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase }: Props)
   );
 }
 
-function Step({ number, title, detail }: { number: string; title: string; detail: string }) {
+function Step({
+  number,
+  title,
+  detail,
+  status,
+}: {
+  number: string;
+  title: string;
+  detail: string;
+  status?: PhotoStepStatus;
+}) {
+  const statusColor = status === 'accepted'
+    ? colors.primaryBright
+    : status === 'rejected'
+      ? colors.negative
+      : status === 'uncertain' || status === 'unconfirmed'
+        ? colors.warning
+        : null;
+  const iconName = status === 'accepted'
+    ? 'check'
+    : status === 'rejected'
+      ? 'x'
+      : status === 'uncertain' || status === 'unconfirmed'
+        ? 'alert-triangle'
+        : null;
+
   return (
     <View style={styles.step}>
-      <View style={styles.stepNumber}>
-        <Text style={styles.stepNumberText}>{number}</Text>
+      <View style={[
+        styles.stepNumber,
+        statusColor ? { backgroundColor: statusColor } : null,
+        status === 'pending' ? styles.stepNumberPending : null,
+      ]}>
+        {status === 'loading' ? (
+          <ActivityIndicator size="small" color={colors.primaryBright} accessibilityLabel={`${title} läuft`} />
+        ) : iconName ? (
+          <Icon lib="feather" name={iconName} size="sm" color={colors.background} />
+        ) : (
+          <Text style={[styles.stepNumberText, status === 'pending' ? styles.stepNumberTextPending : null]}>
+            {number}
+          </Text>
+        )}
       </View>
       <View style={styles.stepCopy}>
-        <Text style={styles.stepTitle}>{title}</Text>
+        <Text style={[styles.stepTitle, status === 'rejected' ? { color: colors.negative } : null]}>{title}</Text>
         <Text style={styles.stepDetail}>{detail}</Text>
       </View>
     </View>
@@ -234,17 +316,11 @@ const styles = StyleSheet.create({
     marginLeft: 15,
     backgroundColor: colors.border,
   },
-  progressTrack: {
-    height: 4,
-    overflow: 'hidden',
-    borderRadius: radius.full,
+  stepNumberPending: {
     backgroundColor: colors.surfaceMuted,
   },
-  progressSweep: {
-    width: '36%',
-    height: '100%',
-    borderRadius: radius.full,
-    backgroundColor: colors.primaryBright,
+  stepNumberTextPending: {
+    color: colors.textMuted,
   },
   waitingText: {
     ...typography.caption,
