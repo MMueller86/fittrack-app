@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import type { AiMealEstimatePhotoUse } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../../app/theme';
 import { Icon } from '../../../shared/components/Icon';
@@ -59,6 +60,20 @@ function getPhotoStatus(photoUse: Exclude<AiMealEstimatePhotoUse, 'no_photo'>): 
 }
 
 export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase, photoUse }: Props) {
+  const photoCheckActive = hasPhoto && phase === null;
+  const scanPosition = useSharedValue(0);
+  const scanAreaHeight = useSharedValue(0);
+  const scanLineStyle = useAnimatedStyle(() => ({
+    opacity: 0.6 + scanPosition.value * 0.4,
+    transform: [{ translateY: scanPosition.value * Math.max(0, scanAreaHeight.value - spacing.sm) }],
+  }));
+
+  useEffect(() => {
+    scanPosition.value = photoCheckActive
+      ? withRepeat(withTiming(1, { duration: 400 }), -1, true)
+      : 0;
+  }, [photoCheckActive, scanPosition]);
+
   const estimateStarted = !hasPhoto || phase === 'estimate.started';
   const photoStatus = photoUse ? getPhotoStatus(photoUse) : null;
   const photoStepTitle = photoStatus?.title
@@ -93,7 +108,10 @@ export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase, photoUse
             : 'Wir ordnen deine Beschreibung ein und schätzen die Nährwerte.'}
         </Text>
 
-        <View style={styles.visual}>
+        <View
+          style={styles.visual}
+          onLayout={(event) => { scanAreaHeight.value = event.nativeEvent.layout.height; }}
+        >
           {imageUri ? (
             <Image source={{ uri: imageUri }} style={styles.photo} resizeMode="cover" />
           ) : (
@@ -101,6 +119,13 @@ export function MealEstimateLoadingOverlay({ hasPhoto, imageUri, phase, photoUse
               <Icon lib="ion" name="restaurant-outline" size={48} color={colors.primaryBright} />
             </View>
           )}
+          {photoCheckActive ? (
+            <Animated.View
+              accessible={false}
+              pointerEvents="none"
+              style={[styles.photoScanLine, scanLineStyle]}
+            />
+          ) : null}
           {hasPhoto && photoStatus ? (
             <View style={styles.photoTag}>
               <Icon lib="feather" name={photoStatus.icon} size="sm" color={photoStatus.tone} />
@@ -251,6 +276,17 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     width: undefined,
     height: undefined,
+  },
+  photoScanLine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.primaryBright,
+    backgroundColor: colors.primarySoft,
   },
   iconBackdrop: {
     width: 84,

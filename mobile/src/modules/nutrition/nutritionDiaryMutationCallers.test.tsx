@@ -1,6 +1,7 @@
 import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Keyboard } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import type { AiFoodEstimatePreview, AiMealEstimatePreview, FoodSearchResult, Meal, MealItem, NutritionLabelScanResult } from '@fittrack/shared';
 import type { MealParserPreviewItem } from '../../shared/api/aiApi';
@@ -375,6 +376,7 @@ describe('nutrition diary mutation caller flows', () => {
 
   it('saves the AISubFlow estimate through the facade and reports success', async () => {
     const onSaved = vi.fn();
+    vi.mocked(Keyboard.dismiss).mockClear();
     const renderer = await render(
       <AISubFlow visible context={makeContext('meal-1')} onClose={vi.fn()} onSaved={onSaved} safeAreaTopInset={0} />,
     );
@@ -385,6 +387,7 @@ describe('nutrition diary mutation caller flows', () => {
     if (typeof onChangeText !== 'function') throw new Error('Description input has no change handler');
     act(() => onChangeText('Porridge'));
     await press(renderer, 'KI schätzen');
+    expect(Keyboard.dismiss).toHaveBeenCalledTimes(1);
     await press(renderer, 'Speichern');
 
     expect(mocks.diary.addItem).toHaveBeenCalledWith('meal-1', expect.objectContaining({

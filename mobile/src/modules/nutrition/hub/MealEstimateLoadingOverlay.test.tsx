@@ -54,9 +54,10 @@ describe('MealEstimateLoadingOverlay', () => {
     expect(labels).toContain('Portion und Nährwerte ermitteln');
     expect(nodes(renderer, 'ActivityIndicator')).toHaveLength(1);
     expect(nodes(renderer, 'ActivityIndicator')[0]?.props.accessibilityLabel).toBe('Prüfe Bild läuft');
+    expect(nodes(renderer, 'AnimatedView')).toHaveLength(1);
+    expect(labels).not.toContain('Mahlzeit schätzen läuft');
     expect(nodes(renderer, 'Icon').some((node) => node.props.name === 'check')).toBe(false);
     expect(labels).not.toContain('Foto geprüft');
-    expect(nodes(renderer, 'AnimatedView')).toHaveLength(0);
     expect(nodes(renderer, 'Image')).toHaveLength(1);
     expect(labels).not.toContain('100%');
   });
@@ -132,7 +133,7 @@ describe('MealEstimateLoadingOverlay', () => {
     expect(texts(renderer)).toContain('Mahlzeit schätzen');
     expect(nodes(renderer, 'ActivityIndicator')).toHaveLength(1);
     expect(texts(renderer)).not.toContain('FOTO PASST');
-    expect(nodes(renderer, 'AnimatedView')).toHaveLength(0);
+    expect(nodes(renderer, 'AnimatedView')).toHaveLength(1);
 
     act(() => confirmPhotoCheck());
     expect(texts(renderer)).toContain('Foto geprüft');
@@ -141,7 +142,6 @@ describe('MealEstimateLoadingOverlay', () => {
     expect(nodes(renderer, 'Icon').some((node) => node.props.name === 'check')).toBe(true);
     expect(nodes(renderer, 'ActivityIndicator')).toHaveLength(0);
     expect(nodes(renderer, 'AnimatedView')).toHaveLength(0);
-
     act(() => {
       updatePhase('estimate.started');
     });

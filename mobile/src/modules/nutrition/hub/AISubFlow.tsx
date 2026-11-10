@@ -6,6 +6,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -137,6 +138,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
 
   async function handleAnalyze() {
     if (text.trim().length < 3) return;
+    Keyboard.dismiss();
     estimateRequestRef.current?.abort();
     const controller = new AbortController();
     estimateRequestRef.current = controller;
@@ -184,6 +186,7 @@ export function AISubFlow({ visible, context, onClose, onSaved, onIngredientEsti
   async function handleIngredientEstimate() {
     const query = text.trim();
     if (!onIngredientEstimated || query.length < 2 || loading) return;
+    Keyboard.dismiss();
     setLoading(true);
     setError(null);
     try {
