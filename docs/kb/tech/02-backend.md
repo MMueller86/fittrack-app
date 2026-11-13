@@ -74,6 +74,45 @@ All HTTP handlers are wrapped with `withHandler()`. It provides:
 - `UnauthorizedError` → 401
 - Any other thrown error → 500 (stack never leaked to client)
 
+Each `withHandler()` lifecycle event includes `invocation_id` (the current
+Azure Functions invocation ID), `worker_uptime_ms` (the Node process uptime in
+milliseconds at handler entry), and `worker_first_invocation` (true only for
+the first wrapped invocation observed in that worker process). The first
+invocation and low process uptime can be indicators of a possible cold start;
+they do not prove an exact platform cold-start duration. The diagnostics contain
+no user ID, JWT claims, request body, headers, query string, or free-text input.
+
+To compare request latency for first versus later wrapped invocations, join
+Application Insights request and handler-start telemetry by `operation_Id`:
+
+```kusto
+let HandlerStarts = traces
+| where timestamp > ago(7d)
+| extend eventData = parse_json(message)
+| where tostring(eventData.event) == "handler.start"
+| extend handler = tostring(eventData.handler),
+  worker_first_invocation = tobool(eventData.worker_first_invocation)
+| where isnotempty(operation_Id) and isnotnull(worker_first_invocation)
+| summarize handler = take_any(handler),
+  worker_first_invocation = take_any(worker_first_invocation)
+  by operation_Id;
+requests
+| where timestamp > ago(7d)
+| join kind=leftouter HandlerStarts on operation_Id
+| extend handler = iff(isempty(handler), "<unmatched handler.start>", handler)
+| summarize request_count = count(),
+  p50_latency_ms = percentile(duration / 1ms, 50),
+  p95_latency_ms = percentile(duration / 1ms, 95)
+  by handler, worker_first_invocation
+| order by p95_latency_ms desc, handler asc
+```
+
+The left outer join keeps requests without a matching `handler.start` trace;
+they appear under `<unmatched handler.start>` with a null first-invocation
+marker. This query compares request latency by handler and the handler's
+first-in-worker marker; it is an operational indicator, not proof that a
+particular request paid the platform's full cold-start duration.
+
 ```ts
 export const myHandler = withHandler('domain.action', async (request, ctx) => {
   const { userId } = await requireUser(request);

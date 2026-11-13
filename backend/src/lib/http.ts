@@ -34,6 +34,21 @@ export type Handler = (
 ) => Promise<HttpResponseInit>;
 
 const API_ERROR_IDENTIFIER_PATTERN = /^(?:[A-Z][A-Z0-9_]{1,79}|[a-z][a-z0-9]*(?:_[a-z0-9]+)+)$/u;
+let hasSeenWrappedInvocation = false;
+
+function workerDiagnosticLogFields(ctx: InvocationContext): {
+  worker_uptime_ms: number;
+  worker_first_invocation: boolean;
+  invocation_id: string;
+} {
+  const worker_first_invocation = !hasSeenWrappedInvocation;
+  hasSeenWrappedInvocation = true;
+  return {
+    worker_uptime_ms: Math.max(0, Math.floor(process.uptime() * 1000)),
+    worker_first_invocation,
+    invocation_id: ctx.invocationId,
+  };
+}
 
 /**
  * Wrap a handler so it never throws past the host.
@@ -52,9 +67,11 @@ const API_ERROR_IDENTIFIER_PATTERN = /^(?:[A-Z][A-Z0-9_]{1,79}|[a-z][a-z0-9]*(?:
 export function withHandler(name: string, fn: Handler): Handler {
   return async (request, ctx) => {
     const started = Date.now();
+    const workerDiagnostics = workerDiagnosticLogFields(ctx);
     logEvent(ctx, 'info', 'handler.start', {
       handler: name,
       method: request.method,
+      ...workerDiagnostics,
     });
     try {
       const response = await fn(request, ctx);
@@ -83,6 +100,7 @@ export function withHandler(name: string, fn: Handler): Handler {
           method: request.method,
           status,
           duration_ms,
+          ...workerDiagnostics,
           ...(apiCode !== undefined ? { api_code: apiCode } : {}),
           ...(apiErrorCode !== undefined ? { api_error_code: apiErrorCode } : {}),
         });
@@ -92,6 +110,7 @@ export function withHandler(name: string, fn: Handler): Handler {
           method: request.method,
           status,
           duration_ms,
+          ...workerDiagnostics,
         });
       }
       return response;
@@ -102,6 +121,7 @@ export function withHandler(name: string, fn: Handler): Handler {
           method: request.method,
           duration_ms: Date.now() - started,
           reason: err.message,
+          ...workerDiagnostics,
         });
         return {
           status: 401,
@@ -109,6 +129,14 @@ export function withHandler(name: string, fn: Handler): Handler {
         };
       }
       if (err instanceof UserWriteBlockedDuringProfileDeletionError || err instanceof ProfileDeletionInProgressError) {
+        logEvent(ctx, 'warn', 'handler.response.failure', {
+          handler: name,
+          method: request.method,
+          status: 409,
+          duration_ms: Date.now() - started,
+          api_error_code: 'profile_deletion_in_progress',
+          ...workerDiagnostics,
+        });
         return {
           status: 409,
           jsonBody: { error: 'profile_deletion_in_progress', retryable: true },
@@ -122,6 +150,7 @@ export function withHandler(name: string, fn: Handler): Handler {
         duration_ms: Date.now() - started,
         error_message: message,
         error_stack: stack,
+        ...workerDiagnostics,
       });
       return {
         status: 500,

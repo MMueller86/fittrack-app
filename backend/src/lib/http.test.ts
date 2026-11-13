@@ -13,20 +13,43 @@ import { parseBody, withHandler } from './http';
 import { validationDiagnosticLogFields } from './log';
 import { makeContext, makeRequest } from '../test-utils/http';
 
+function makeInvocationContext(invocationId: string) {
+  return Object.assign(makeContext(), { invocationId });
+}
+
+function expectWorkerDiagnostics(
+  line: unknown,
+  invocationId: string,
+  firstInvocation: boolean,
+): void {
+  const fields = JSON.parse(String(line)) as Record<string, unknown>;
+  expect(fields).toMatchObject({
+    invocation_id: invocationId,
+    worker_first_invocation: firstInvocation,
+  });
+  expect(typeof fields['worker_uptime_ms']).toBe('number');
+  expect(fields['worker_uptime_ms']).toBeGreaterThanOrEqual(0);
+}
+
 describe('withHandler', () => {
   it('passes the response through when the inner handler resolves', async () => {
+    const ctx = makeInvocationContext('invocation-first');
+    const logSpy = vi.spyOn(ctx, 'log');
     const wrapped = withHandler('test.ok', async () => ({
       status: 200,
       jsonBody: { hello: 'world' },
     }));
 
-    const res = await wrapped(makeRequest(), makeContext());
+    const res = await wrapped(makeRequest(), ctx);
     expect(res.status).toBe(200);
     expect(res.jsonBody).toEqual({ hello: 'world' });
+    expectWorkerDiagnostics(logSpy.mock.calls[0]?.[0], 'invocation-first', true);
+    expectWorkerDiagnostics(logSpy.mock.calls[1]?.[0], 'invocation-first', true);
   });
 
   it('logs returned 4xx responses with status and API code', async () => {
-    const ctx = makeContext();
+    const ctx = makeInvocationContext('invocation-returned-failure');
+    const logSpy = vi.spyOn(ctx, 'log');
     const warnSpy = vi.spyOn(ctx, 'warn');
     const wrapped = withHandler('recipes.shareBundle', async () => ({
       status: 422,
@@ -46,6 +69,8 @@ describe('withHandler', () => {
     expect(line).toContain('"status":422');
     expect(line).toContain('"api_code":"INVALID_TEMPLATE_INPUT"');
     expect(line).not.toContain('do not log response details');
+    expectWorkerDiagnostics(logSpy.mock.calls[0]?.[0], 'invocation-returned-failure', false);
+    expectWorkerDiagnostics(warnSpy.mock.calls[0]?.[0], 'invocation-returned-failure', false);
   });
 
   it('logs returned 5xx responses at error level', async () => {
@@ -125,7 +150,8 @@ describe('withHandler', () => {
   });
 
   it('logs the error via ctx.error so AppInsights captures it', async () => {
-    const ctx = makeContext();
+    const ctx = makeInvocationContext('invocation-error');
+    const logSpy = vi.spyOn(ctx, 'log');
     const errorSpy = vi.spyOn(ctx, 'error');
 
     const wrapped = withHandler('test.log', async () => {
@@ -138,6 +164,8 @@ describe('withHandler', () => {
     expect(line).toContain('"event":"handler.error"');
     expect(line).toContain('"handler":"test.log"');
     expect(line).toContain('cosmos timeout');
+    expectWorkerDiagnostics(logSpy.mock.calls[0]?.[0], 'invocation-error', false);
+    expectWorkerDiagnostics(errorSpy.mock.calls[0]?.[0], 'invocation-error', false);
   });
 
   it('also catches non-Error throws', async () => {
@@ -151,13 +179,57 @@ describe('withHandler', () => {
 
   it('returns 401 when handler throws UnauthorizedError', async () => {
     const { UnauthorizedError } = await import('./auth');
+    const ctx = makeInvocationContext('invocation-unauthorized');
+    const logSpy = vi.spyOn(ctx, 'log');
+    const warnSpy = vi.spyOn(ctx, 'warn');
     const wrapped = withHandler('test.unauth', async () => {
       throw new UnauthorizedError('Token expired');
     });
 
-    const res = await wrapped(makeRequest(), makeContext());
+    const res = await wrapped(makeRequest(), ctx);
     expect(res.status).toBe(401);
     expect(res.jsonBody).toEqual({ error: 'Token expired' });
+    expectWorkerDiagnostics(logSpy.mock.calls[0]?.[0], 'invocation-unauthorized', false);
+    expectWorkerDiagnostics(warnSpy.mock.calls[0]?.[0], 'invocation-unauthorized', false);
+  });
+
+  it('logs profile-deletion 409 responses with invocation diagnostics', async () => {
+    const { ProfileDeletionInProgressError } = await import('./repositories/profileDeletionRepository');
+    const ctx = makeInvocationContext('invocation-profile-deletion');
+    const logSpy = vi.spyOn(ctx, 'log');
+    const warnSpy = vi.spyOn(ctx, 'warn');
+    const wrapped = withHandler('test.profile-deletion', async () => {
+      throw new ProfileDeletionInProgressError();
+    });
+
+    const response = await wrapped(makeRequest(), ctx);
+
+    expect(response.status).toBe(409);
+    expect(response.jsonBody).toEqual({ error: 'profile_deletion_in_progress', retryable: true });
+    expect(warnSpy).toHaveBeenCalledOnce();
+    expectWorkerDiagnostics(logSpy.mock.calls[0]?.[0], 'invocation-profile-deletion', false);
+    expectWorkerDiagnostics(warnSpy.mock.calls[0]?.[0], 'invocation-profile-deletion', false);
+    expect(String(warnSpy.mock.calls[0]?.[0])).not.toContain('userId');
+  });
+
+  it('does not add request content or credentials to lifecycle diagnostics', async () => {
+    const ctx = makeInvocationContext('invocation-private-input');
+    const logSpy = vi.spyOn(ctx, 'log');
+    const wrapped = withHandler('test.private-input', async () => ({ status: 204 }));
+
+    await wrapped(makeRequest({
+      body: { note: 'private-body-marker' },
+      headers: { authorization: 'Bearer private-header-marker' },
+      query: { search: 'private-query-marker' },
+    }), ctx);
+
+    const lines = logSpy.mock.calls.map(([line]) => String(line));
+    expect(lines).toHaveLength(2);
+    for (const line of lines) {
+      expect(line).not.toContain('private-body-marker');
+      expect(line).not.toContain('private-header-marker');
+      expect(line).not.toContain('private-query-marker');
+    }
   });
 });
 

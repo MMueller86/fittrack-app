@@ -182,6 +182,7 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-161 | Meal-estimate photo/text contradiction guidance, AC-8 | Non-blocking | Backend | Closed |
 | FT-QA-2026-162 | Meal-estimate plan approval and WP-1.1 status | Non-blocking | Planner | Closed |
 | FT-QA-2026-163 | Meal-estimate photo-use contract comment, AC-161-14 | Non-blocking | Documentation | Awaiting decision |
+| FT-QA-2026-164 | Cold-start KQL drops unmatched requests and pools handlers, AC-6 | Blocking | Documentation | Closed |
 
 ## Einheitlicher Kamera-Flow QA-Abschluss
 
@@ -2718,6 +2719,21 @@ The initial validated [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchron
 - **History:** 2026-11-04 - Registered from the validated WP-161.3 QA report. Awaited the user's fix, accept, or defer decision; no correction was inferred.
 - **History:** 2026-11-04 - User requested the documentation correction and explicitly limited follow-up QA to this finding. No Documentation agent is available; the user authorized Backend to handle the narrow shared-type comment correction.
 - **History:** 2026-11-04 - Backend updated the `imageBase64` comment without changing runtime/API behavior. The single-finding [QA recheck](reports/FT-QA-2026-163-comment-correction.md) passed AC-161-14; no full QA or test-suite run was performed.
+
+### FT-QA-2026-164
+
+- **Finding key:** COLDSTART-QA-001.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Azure-Functions-Cold-Start-Telemetrie.md`.
+- **Acceptance criterion:** AC-6.
+- **Description:** The documented cold-start KQL uses an inner join, silently discarding requests without a matching `handler.start` trace, and summarizes all handlers together. The approved plan requires retaining unmatched request rows via a left join and comparing request latency by handler and `worker_first_invocation`.
+- **Criticality:** Blocking.
+- **Owner:** Documentation.
+- **Evidence:** [QA report](reports/PLAN_Azure-Functions-Cold-Start-Telemetrie.md); `docs/kb/tech/02-backend.md` uses `join kind=inner HandlerStarts on operation_Id` and summarizes only by `worker_first_invocation`.
+- **Recommendation:** Use a left outer join so unmatched requests remain visible and group latency by handler and `worker_first_invocation`, consistent with the approved plan.
+- **Status:** Closed.
+- **Routing:** Quick Fix routed to Backend because the Knowledge Base update is a deliverable of the approved Backend work package; no Documentation agent is available.
+- **History:** 2026-11-13 - Registered from the validated QA FAIL report. Automatic correction attempt 1 of 2; Backend assigned the focused KQL correction, followed by targeted QA.
+- **History:** 2026-11-13 - Backend changed the KQL to retain unmatched requests and group latency by handler and first-invocation marker. Targeted QA verified AC-6 and all remaining criteria; see [QA report](reports/PLAN_Azure-Functions-Cold-Start-Telemetrie.md). Closed.
 
 ### FT-QA-2026-157
 
