@@ -36,16 +36,16 @@
   },
   "dependencies": {
     "@azure/ai-form-recognizer": "^5.1.0",
-    "@azure/cosmos": "^4.10.1",
+    "@azure/cosmos": "^4.10.2",
     "@azure/functions": "^4.17.0",
     "@azure/storage-blob": "^12.34.0",
     "@azure/storage-queue": "^12.32.0",
     "@napi-rs/canvas": "~1.1.0",
-    "@tabler/icons": "~3.50.0",
+    "@tabler/icons": "~3.51.0",
     "hyphen": "^1.14.1",
-    "jose": "^6.2.14",
-    "lucide-static": "~1.65.0",
-    "openai": "^7.45.1",
+    "jose": "^6.2.17",
+    "lucide-static": "~1.71.0",
+    "openai": "^7.55.0",
     "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
@@ -55,6 +55,6 @@
     "azurite": "^3.37.0",
     "pixelmatch": "~8.0.0",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   }
 }
