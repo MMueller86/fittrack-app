@@ -64,6 +64,8 @@ module.exports = ({ config }) => ({
   name: IS_DEV ? 'FitTrack (Dev)' : 'FitTrack',
   plugins: [
     ...(config.plugins ?? []),
+    'expo-secure-store',
+    'expo-status-bar',
     'react-native-health-connect',
     withHealthConnectPermissions,
     withMinSdkVersion26,

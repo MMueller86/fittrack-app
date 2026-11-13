@@ -60,7 +60,7 @@ State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTra
 | `fast-xml-parser` (transitive) | `^5.5.9` via `@azure/core-xml` | 5.12.1 (both lockfiles, 2026-11-13) | `package-lock.json`, `_deploy_staging/package-lock.json`; fixes GHSA-474x-hrwr-fgx4 |
 | `@napi-rs/canvas` | `~1.1.0` | 1.1.0 | `backend/package.json`, `_deploy_staging/package.json` |
 | `pixelmatch` (test only) | `~8.0.0` | 8.0.0 | `backend/package.json` |
-| Expo SDK | `expo ~58.0.23` | 58.0.23 | `mobile/package.json` |
+| Expo SDK | `expo ~58.0.25` | 58.0.25 | `mobile/package.json` |
 | React Native / React | `0.88.1` / `19.3.0` | 0.88.1 / 19.3.0 | `mobile/package.json` |
 | React Navigation | `native ^7.5.1`, `bottom-tabs` and `native-stack ^7.21.0` | `native` 7.5.1, `core` 7.24.0 | `mobile/package.json`, WP-FE-02 handoff |
 | Azure Functions Core Tools | `4.16.0` (CI pin and cache key) | — | `.github/workflows/ci.yml` |
@@ -81,7 +81,7 @@ State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTra
 
 Expo-managed mobile packages (`react`, `react-test-renderer`, `gesture-handler`, `worklets`) and `@typescript/typescript6` (`~6.0.2`, currently the latest) are intentionally not raised. Reasons, sources, check date 2026-10-30 and reviewer (Product Owner / next Dependabot run) are in the table of the [WP-BE-07 handoff](../../User%20Stories/plans/PLAN_FitTrack-Technology-Refresh_WP-BE-07_Handoff.md).
 
-On 2026-11-04, Expo Doctor 1.21.5 reported newer SDK-compatible versions for `expo` (`~58.0.23`), `expo-auth-session` (`~58.0.17`), `expo-splash-screen` (`~58.0.13`) and `react-native-safe-area-context` (`~5.11.1`). These four packages were aligned with the SDK; `npx expo install --check` and the Expo Doctor smoke pass. `react-native-safe-area-context` is no longer deferred.
+On 2026-11-13, Expo Doctor 1.21.5 reported newer SDK-compatible patches for `expo` (`~58.0.25`), `expo-auth-session` (`~58.0.18`), `expo-crypto` (`~58.0.8`), `expo-dev-client` (`~58.0.20`), `expo-haptics` (`~58.0.8`), `expo-media-library` (`~58.0.14`), `expo-secure-store` (`~58.0.3`), `expo-splash-screen` (`~58.0.14`), `expo-status-bar` (`~58.0.5`) and `expo-web-browser` (`~58.0.8`). These ten packages were aligned with the SDK; `npx expo install --check` reports all dependencies up to date and the Expo Doctor smoke passes 20/20. `react-native-safe-area-context` remains aligned at `~5.11.1`.
 
 `@react-native-async-storage/async-storage` is separately pinned to `2.2.0`. Expo SDK 58's `bundledNativeModules.json` maps it to `2.2.0`, and `npx expo install --check` passes. npm has `3.1.1`, but that major version is not established as incompatible; it is simply not the version mapped or validated for this SDK. Revisit it on an Expo SDK upgrade, or after an explicit native build and device validation. Dependabot ignores only its semver-major updates; minor and patch updates remain eligible.
 
