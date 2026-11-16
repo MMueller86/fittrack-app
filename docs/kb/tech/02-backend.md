@@ -113,6 +113,52 @@ marker. This query compares request latency by handler and the handler's
 first-in-worker marker; it is an operational indicator, not proof that a
 particular request paid the platform's full cold-start duration.
 
+#### Cosmos setup time per worker
+
+`getCosmos()` runs its setup once per worker process. Against a remote account
+in a deployed Function App (`WEBSITE_SITE_NAME` set) it only builds local
+database and container references, because Bicep creates them; no network call
+is made. A local emulator endpoint (`localhost`, `127.0.0.1`,
+`host.docker.internal`) and any process without `WEBSITE_SITE_NAME` (local
+Core Tools, contract tests) still create the database and the 12 containers if
+missing, now in parallel. `COSMOS_PROVISION_SCHEMA=true|false` overrides both
+rules.
+
+The invocation during which the setup finished carries two extra fields on
+`handler.success`, `handler.response.failure` and `handler.error`:
+`cosmos_init_ms` (setup duration) and `cosmos_schema_provisioned` (whether
+network provisioning ran). Later invocations in the same worker omit them.
+On a worker whose first request is slow, compare `duration_ms` with
+`cosmos_init_ms` to see how much of it was setup:
+
+```kusto
+traces
+| where timestamp > ago(7d)
+| extend p = parse_json(message)
+| where tostring(p.event) in ("handler.success", "handler.response.failure")
+| extend duration_ms = toreal(p.duration_ms),
+  cosmos_init_ms = toreal(p.cosmos_init_ms),
+  is_first = tobool(p.worker_first_invocation)
+| summarize requests = count(),
+  p50_ms = percentile(duration_ms, 50),
+  p95_ms = percentile(duration_ms, 95),
+  with_cosmos_init = countif(isnotnull(cosmos_init_ms)),
+  p50_cosmos_init_ms = percentile(cosmos_init_ms, 50)
+  by is_first
+```
+
+The fields were added because the first request on a worker was measured at
+p50 2,400 ms versus 186 ms for later requests (Alpha, 2026-11-13 to
+2026-11-16), and the sequential database/container creation in `getCosmos()`
+is the suspected cause; the split by `cosmos_init_ms` confirms or refutes it
+after the next deploy. `WEBSITE_SITE_NAME` is platform-injected and does not
+appear in the app-settings list. The Alpha telemetry's `cloud_RoleName`
+(`func-fittrack-alpha-wcobsd`) indicates the host knows the site name, but
+this is indirect: `cosmos_schema_provisioned=false` on the first request after
+the deploy is the actual confirmation that the skip is active; `true` means
+only the parallelisation applies and `COSMOS_PROVISION_SCHEMA=false` must be
+added as an App Setting (Infrastructure & Release).
+
 ```ts
 export const myHandler = withHandler('domain.action', async (request, ctx) => {
   const { userId } = await requireUser(request);
@@ -742,7 +788,8 @@ partition-key change.
 | `AZURE_OPENAI_DEPLOYMENT_NAME` | azureOpenAiConfig.ts | Model deployment name (default: `gpt-4.1-mini`) |
 | `COSMOS_ENDPOINT` | cosmos.ts | Cosmos DB endpoint |
 | `COSMOS_KEY` | cosmos.ts | Cosmos DB key |
-| `COSMOS_DATABASE` | cosmos.ts | Database name (`fittrack-db`) |
+| `COSMOS_DATABASE_ID` | cosmos.ts | Database name (default `fittrack-db`; set in `functionapp.bicep` and `local.settings.json.template`) |
+| `COSMOS_PROVISION_SCHEMA` | cosmos.ts | Optional `true`/`false` override for creating the database and containers on first use (default: always on for a local emulator endpoint; otherwise off when `WEBSITE_SITE_NAME` is set, on when it is not) |
 | `AUTH_JWKS_URI` | auth.ts | JWKS endpoint for token validation |
 | `AUTH_ISSUER` | auth.ts | Expected JWT issuer |
 | `AUTH_AUDIENCE` | auth.ts | Expected JWT audience |

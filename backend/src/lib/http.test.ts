@@ -10,6 +10,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 
 import { parseBody, withHandler } from './http';
+import { __resetCosmosForTests, getCosmos } from './cosmos';
 import { validationDiagnosticLogFields } from './log';
 import { makeContext, makeRequest } from '../test-utils/http';
 
@@ -137,6 +138,36 @@ describe('withHandler', () => {
     const res = await wrapped(makeRequest(), makeContext());
     expect(res.status).toBe(500);
     expect(res.jsonBody).toEqual({ error: 'Internal server error' });
+  });
+
+  it('logs the Cosmos setup duration on the invocation during which it finished', async () => {
+    __resetCosmosForTests();
+    vi.stubEnv('COSMOS_ENDPOINT', 'https://example.invalid');
+    vi.stubEnv('COSMOS_KEY', 'test-key');
+    vi.stubEnv('WEBSITE_SITE_NAME', 'func-test');
+    const ctx = makeContext();
+    const logSpy = vi.spyOn(ctx, 'log');
+    const wrapped = withHandler('test.cosmosInit', async () => {
+      await getCosmos();
+      return { status: 200 };
+    });
+
+    await wrapped(makeRequest(), ctx);
+    await wrapped(makeRequest(), makeContext());
+
+    const success = JSON.parse(String(logSpy.mock.calls[1]?.[0])) as Record<string, unknown>;
+    expect(success['event']).toBe('handler.success');
+    expect(typeof success['cosmos_init_ms']).toBe('number');
+    expect(success['cosmos_schema_provisioned']).toBe(false);
+
+    const laterCtx = makeContext();
+    const laterSpy = vi.spyOn(laterCtx, 'log');
+    await wrapped(makeRequest(), laterCtx);
+    const later = JSON.parse(String(laterSpy.mock.calls[1]?.[0])) as Record<string, unknown>;
+    expect(later).not.toHaveProperty('cosmos_init_ms');
+
+    vi.unstubAllEnvs();
+    __resetCosmosForTests();
   });
 
   it('does not leak the underlying error message to the client', async () => {

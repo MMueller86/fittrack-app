@@ -42,9 +42,50 @@ export interface CosmosContext {
 
 let cached: CosmosContext | undefined;
 let initPromise: Promise<CosmosContext> | undefined;
+let initDiagnostics: CosmosInitDiagnostics | undefined;
+
+export interface CosmosInitDiagnostics {
+  /** Wall-clock time of the one-time client and container setup. */
+  durationMs: number;
+  /** `performance.now()` reading at which the setup finished (monotonic, sub-millisecond). */
+  completedAtMonotonicMs: number;
+  /** True when database and containers were created/checked over the network. */
+  schemaProvisioned: boolean;
+}
 
 export function isCosmosConfigured(): boolean {
   return Boolean(process.env.COSMOS_ENDPOINT && process.env.COSMOS_KEY);
+}
+
+/**
+ * Whether `getCosmos()` creates the database and containers when missing.
+ * A local emulator always needs it; remote accounts (Dev, Alpha) get their
+ * containers from Bicep, so the 13 network round trips are skipped when the
+ * process runs in Azure (`WEBSITE_SITE_NAME` set). `COSMOS_PROVISION_SCHEMA`
+ * (`true`/`false`) overrides both rules.
+ */
+export function shouldProvisionSchema(): boolean {
+  const override = process.env.COSMOS_PROVISION_SCHEMA;
+  if (override === 'true') return true;
+  if (override === 'false') return false;
+  if (isLocalEmulatorEndpoint(process.env.COSMOS_ENDPOINT)) return true;
+  return !process.env.WEBSITE_SITE_NAME;
+}
+
+function isLocalEmulatorEndpoint(endpoint: string | undefined): boolean {
+  if (!endpoint) return false;
+  try {
+    const { hostname } = new URL(endpoint);
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' ||
+      hostname === 'host.docker.internal';
+  } catch {
+    return false;
+  }
+}
+
+/** Diagnostics of the one-time Cosmos setup in this worker, once it has finished. */
+export function getCosmosInitDiagnostics(): CosmosInitDiagnostics | undefined {
+  return initDiagnostics;
 }
 
 /**
@@ -62,26 +103,46 @@ export async function getCosmos(): Promise<CosmosContext> {
   }
 
   initPromise = (async () => {
+    const startedAt = Date.now();
+    const schemaProvisioned = shouldProvisionSchema();
     const client = new CosmosClient({
       endpoint: process.env.COSMOS_ENDPOINT!,
       key: process.env.COSMOS_KEY!,
     });
 
-    const { database } = await client.databases.createIfNotExists({ id: getDatabaseId() });
-
     const containers = {} as Record<ContainerName, Container>;
-    for (const def of CONTAINER_DEFS) {
-      const { container } = await database.containers.createIfNotExists({
-        id: def.id,
-        partitionKey: { paths: [def.partitionKey] },
-        ...('defaultTtl' in def ? { defaultTtl: def.defaultTtl } : {}),
-      });
-      containers[def.id] = container;
+    let database: Database;
+    if (schemaProvisioned) {
+      ({ database } = await client.databases.createIfNotExists({ id: getDatabaseId() }));
+      const created = await Promise.all(
+        CONTAINER_DEFS.map(async (def) => {
+          const { container } = await database.containers.createIfNotExists({
+            id: def.id,
+            partitionKey: { paths: [def.partitionKey] },
+            ...('defaultTtl' in def ? { defaultTtl: def.defaultTtl } : {}),
+          });
+          return [def.id, container] as const;
+        }),
+      );
+      for (const [id, container] of created) containers[id] = container;
+    } else {
+      database = client.database(getDatabaseId());
+      for (const def of CONTAINER_DEFS) containers[def.id] = database.container(def.id);
     }
 
     cached = { client, database, containers };
+    initDiagnostics = {
+      durationMs: Date.now() - startedAt,
+      completedAtMonotonicMs: performance.now(),
+      schemaProvisioned,
+    };
     return cached;
   })();
+
+  // A failed setup must not be cached, otherwise the worker never recovers.
+  initPromise.catch(() => {
+    initPromise = undefined;
+  });
 
   return initPromise;
 }
@@ -94,4 +155,5 @@ export async function getCosmos(): Promise<CosmosContext> {
 export function __resetCosmosForTests(): void {
   cached = undefined;
   initPromise = undefined;
+  initDiagnostics = undefined;
 }

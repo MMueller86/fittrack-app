@@ -26,7 +26,8 @@ import {
   UserWriteBlockedDuringProfileDeletionError,
 } from './auth';
 import { ProfileDeletionInProgressError } from './repositories/profileDeletionRepository';
-import { logEvent, type ValidationDiagnostic } from './log';
+import { getCosmosInitDiagnostics } from './cosmos';
+import { logEvent, type LogFields, type ValidationDiagnostic } from './log';
 
 export type Handler = (
   request: HttpRequest,
@@ -50,6 +51,17 @@ function workerDiagnosticLogFields(ctx: InvocationContext): {
   };
 }
 
+// Only set for the invocation during which the worker's one-time Cosmos setup finished,
+// so first-request latency can be split into setup time and handler time.
+function cosmosInitLogFields(invocationStartedMonotonicMs: number): LogFields {
+  const init = getCosmosInitDiagnostics();
+  if (!init || init.completedAtMonotonicMs < invocationStartedMonotonicMs) return {};
+  return {
+    cosmos_init_ms: init.durationMs,
+    cosmos_schema_provisioned: init.schemaProvisioned,
+  };
+}
+
 /**
  * Wrap a handler so it never throws past the host.
  *
@@ -67,6 +79,7 @@ function workerDiagnosticLogFields(ctx: InvocationContext): {
 export function withHandler(name: string, fn: Handler): Handler {
   return async (request, ctx) => {
     const started = Date.now();
+    const startedMonotonic = performance.now();
     const workerDiagnostics = workerDiagnosticLogFields(ctx);
     logEvent(ctx, 'info', 'handler.start', {
       handler: name,
@@ -101,6 +114,7 @@ export function withHandler(name: string, fn: Handler): Handler {
           status,
           duration_ms,
           ...workerDiagnostics,
+          ...cosmosInitLogFields(startedMonotonic),
           ...(apiCode !== undefined ? { api_code: apiCode } : {}),
           ...(apiErrorCode !== undefined ? { api_error_code: apiErrorCode } : {}),
         });
@@ -111,6 +125,7 @@ export function withHandler(name: string, fn: Handler): Handler {
           status,
           duration_ms,
           ...workerDiagnostics,
+          ...cosmosInitLogFields(startedMonotonic),
         });
       }
       return response;
@@ -151,6 +166,7 @@ export function withHandler(name: string, fn: Handler): Handler {
         error_message: message,
         error_stack: stack,
         ...workerDiagnostics,
+        ...cosmosInitLogFields(startedMonotonic),
       });
       return {
         status: 500,
