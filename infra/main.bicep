@@ -86,6 +86,9 @@ param staticWebAppLocation string = 'westeurope'
 @description('Deploy the Flex Consumption Function App (Alpha). Dev runs the backend locally and leaves this false.')
 param deployFunctionApp bool = false
 
+@description('Always-ready instances for the http function group of the Function App.')
+param functionAppHttpAlwaysReady int = 0
+
 // --- Naming ---
 
 var namePrefix = '${projectName}-${environmentName}'
@@ -183,6 +186,7 @@ module functionApp 'modules/functionapp.bicep' = if (deployFunctionApp) {
     planName: planName
     functionAppName: functionAppName
     deploymentContainerName: deploymentContainerName
+    httpAlwaysReadyCount: functionAppHttpAlwaysReady
     storageAccountName: storage.outputs.storageAccountName
     appInsightsConnectionString: monitoring.outputs.connectionString
     appInsightsResourceId: monitoring.outputs.appInsightsId

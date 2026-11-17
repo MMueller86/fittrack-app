@@ -26,6 +26,9 @@ param maximumInstanceCount int = 5
 @description('Instance memory in MB.')
 param instanceMemoryMB int = 2048
 
+@description('Always-ready instances for the http function group (0 = scale to zero).')
+param httpAlwaysReadyCount int = 0
+
 @description('Application Insights connection string.')
 param appInsightsConnectionString string
 
@@ -128,6 +131,12 @@ resource functionApp 'Microsoft.Web/sites@2025-03-01' = {
       scaleAndConcurrency: {
         maximumInstanceCount: maximumInstanceCount
         instanceMemoryMB: instanceMemoryMB
+        alwaysReady: httpAlwaysReadyCount > 0 ? [
+          {
+            name: 'http'
+            instanceCount: httpAlwaysReadyCount
+          }
+        ] : []
       }
       runtime: {
         name: 'node'

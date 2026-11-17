@@ -19,6 +19,7 @@ param environmentName = 'alpha'
 param projectName = 'fittrack'
 
 param deployFunctionApp = true
+param functionAppHttpAlwaysReady = 1
 param deployStaticWebApp = true
 param staticWebAppLocation = 'centralus'
 
