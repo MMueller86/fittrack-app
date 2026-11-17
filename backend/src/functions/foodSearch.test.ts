@@ -32,6 +32,7 @@ function makeRequest(query: string) {
   return {
     query: { get: (k: string) => (k === 'query' ? query : null) },
     params: {},
+    headers: { get: () => null },
   } as never;
 }
 

@@ -54,6 +54,10 @@ function makeTimeoutError(config: InternalAxiosRequestConfig): AxiosError {
   );
 }
 
+function makeNetworkError(config: InternalAxiosRequestConfig): AxiosError {
+  return new axios.AxiosError('Network Error', 'ERR_NETWORK', config, {}, undefined);
+}
+
 function makeOkResponse(config: InternalAxiosRequestConfig): AxiosResponse {
   return { status: 200, statusText: 'OK', headers: {}, config, data: { ok: true } };
 }
@@ -147,6 +151,139 @@ describe('apiClient — cold-start retry interceptor', () => {
     await expectation;
 
     expect(callCount).toBe(3);
+  });
+
+  // -------------------------------------------------------------------------
+  // Network error (ERR_NETWORK, no response) — one retry for GET
+  // -------------------------------------------------------------------------
+
+  describe('network error without response', () => {
+    const record = vi.fn();
+
+    beforeEach(async () => {
+      record.mockClear();
+      vi.resetModules();
+      vi.doMock('../../services/authService', () => ({
+        authService: {
+          getAccessToken: vi.fn().mockResolvedValue('mock-token'),
+          isTokenExpired: vi.fn().mockReturnValue(false),
+          refreshAccessToken: vi.fn().mockResolvedValue('refreshed-token'),
+          clearTokens: vi.fn().mockResolvedValue(undefined),
+        },
+      }));
+      vi.doMock('../../services/telemetry/telemetry', async (importOriginal) => ({
+        ...(await importOriginal<typeof import('../../services/telemetry/telemetry')>()),
+        record,
+      }));
+      ({ apiClient } = await import('./client'));
+    });
+
+    afterEach(() => {
+      vi.doUnmock('../../services/telemetry/telemetry');
+    });
+
+    it('GET ERR_NETWORK → 200: retried once after 1.5 s, telemetry shows [0, 200] (AC-15)', async () => {
+      let callCount = 0;
+      apiClient.defaults.adapter = vi.fn().mockImplementation(
+        async (config: InternalAxiosRequestConfig) => {
+          callCount++;
+          if (callCount === 1) throw makeNetworkError(config);
+          return makeOkResponse(config);
+        },
+      );
+
+      const responsePromise = apiClient.get('/diary');
+      await vi.advanceTimersByTimeAsync(1_499);
+      expect(callCount).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+
+      const response = await responsePromise;
+      expect(response.data).toEqual({ ok: true });
+      expect(callCount).toBe(2);
+      const apiEvents = record.mock.calls.map(([e]) => e).filter((e) => e.type === 'api');
+      expect(apiEvents).toHaveLength(1);
+      expect(apiEvents[0]).toEqual(
+        expect.objectContaining({ attempts: 2, attemptStatus: [0, 200], retryWaitMs: 1500 }),
+      );
+    });
+
+    it('GET ERR_NETWORK × 2: rejects after the second attempt, no third request (AC-16)', async () => {
+      let callCount = 0;
+      apiClient.defaults.adapter = vi.fn().mockImplementation(
+        async (config: InternalAxiosRequestConfig) => {
+          callCount++;
+          throw makeNetworkError(config);
+        },
+      );
+
+      const expectation = expect(apiClient.get('/diary')).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(1_500);
+      await expectation;
+      expect(callCount).toBe(2);
+      expect(record).toHaveBeenCalledWith(
+        expect.objectContaining({ attempts: 2, attemptStatus: [0, 0], errorClass: 'network' }),
+      );
+    });
+
+    it('GET 503 then ERR_NETWORK: network error is not retried again, total stays at two retries', async () => {
+      let callCount = 0;
+      apiClient.defaults.adapter = vi.fn().mockImplementation(
+        async (config: InternalAxiosRequestConfig) => {
+          callCount++;
+          throw callCount === 1 ? makeHttpError(503, config) : makeNetworkError(config);
+        },
+      );
+
+      const expectation = expect(apiClient.get('/diary')).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(1_500);
+      await expectation;
+      expect(callCount).toBe(2);
+    });
+
+    it('GET ERR_NETWORK then 503 then 503: total never exceeds two retries (AC-16)', async () => {
+      let callCount = 0;
+      apiClient.defaults.adapter = vi.fn().mockImplementation(
+        async (config: InternalAxiosRequestConfig) => {
+          callCount++;
+          throw callCount === 1 ? makeNetworkError(config) : makeHttpError(503, config);
+        },
+      );
+
+      const expectation = expect(apiClient.get('/diary')).rejects.toThrow();
+      await vi.advanceTimersByTimeAsync(1_500);
+      await vi.advanceTimersByTimeAsync(3_000);
+      await expectation;
+      expect(callCount).toBe(3);
+    });
+
+    it.each(['post', 'put', 'patch', 'delete'] as const)(
+      '%s ERR_NETWORK: not retried (AC-17)',
+      async (method) => {
+        let callCount = 0;
+        apiClient.defaults.adapter = vi.fn().mockImplementation(
+          async (config: InternalAxiosRequestConfig) => {
+            callCount++;
+            throw makeNetworkError(config);
+          },
+        );
+
+        await expect(apiClient.request({ url: '/diary', method })).rejects.toThrow();
+        expect(callCount).toBe(1);
+      },
+    );
+
+    it('GET without response and another code (ERR_CANCELED) is not retried', async () => {
+      let callCount = 0;
+      apiClient.defaults.adapter = vi.fn().mockImplementation(
+        async (config: InternalAxiosRequestConfig) => {
+          callCount++;
+          throw new axios.AxiosError('canceled', 'ERR_CANCELED', config, {}, undefined);
+        },
+      );
+
+      await expect(apiClient.get('/diary')).rejects.toThrow();
+      expect(callCount).toBe(1);
+    });
   });
 
   // -------------------------------------------------------------------------

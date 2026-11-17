@@ -141,7 +141,7 @@ request; there is no persistent progress or resume journal. Entra identity
 deletion is manual and separate. The deletion flow does not call Microsoft
 Graph or send deletion data to Azure OpenAI or Document Intelligence.
 Application Insights entries and Cosmos/Storage backups are not targeted, and
-Health Connect exports are unchanged. Log Analytics retention is 30 days;
+Health Connect exports are unchanged. Application Insights data retention is 90 days (the Log Analytics workspace default is 30 days);
 Blob Soft Delete may retain recovery copies for up to seven days. No remote
 inventory was performed for legacy `users` or `nutritionProfiles` records;
 their existence and contents are unknown. Any Microsoft Entra identity

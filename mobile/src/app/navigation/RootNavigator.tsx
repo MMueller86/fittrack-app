@@ -30,6 +30,8 @@ import { PROFILE_TAB_LABEL, PROFILE_TAB_ROUTE } from './profileTab';
 import { HomeIcon, NutritionIcon, RecipesIcon, ProfileIcon, ProgressIcon } from '../../assets/icons/TabIcons';
 import { profileApi } from '../../shared/api/profileApi';
 import { useFoodEntryHubStore } from '../../modules/nutrition/hub/useFoodEntryHubStore';
+import { markNavigatorMounted } from '../../services/telemetry/episode';
+import { notifyTabPress } from '../../services/telemetry/screenTelemetry';
 import type { RecipeDetailNavigationParams } from '../../modules/recipes/recipeWizardNavigation';
 
 // React Navigation needs a theme that matches our dark palette so that
@@ -174,6 +176,10 @@ export function RootNavigator() {
   const activeTabRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    markNavigatorMounted();
+  }, []);
+
+  useEffect(() => {
     (async () => {
       try {
         const skipped = await AsyncStorage.getItem(SKIP_WIZARD_KEY);
@@ -211,6 +217,11 @@ export function RootNavigator() {
     >
       <Tab.Navigator
         id="RootTabs"
+        screenListeners={({ route, navigation }) => ({
+          tabPress: () => {
+            if (!navigation.isFocused()) notifyTabPress(route.name);
+          },
+        })}
         screenOptions={{
           tabBarActiveTintColor: colors.primaryBright,
           tabBarInactiveTintColor: colors.textMuted,

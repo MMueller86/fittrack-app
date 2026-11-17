@@ -185,6 +185,7 @@ export const diaryApi = {
     return apiClient
       .get<{ meals: Meal[]; cursor?: string }>('/diary/meals', {
         params: { limit: limit ?? 50, ...(cursor ? { cursor } : {}) },
+        telemetrySource: 'sync',
       })
       .then((r) => r.data);
   },
@@ -194,6 +195,7 @@ export const diaryApi = {
     return apiClient
       .get<MealChangesResponse>('/diary/changes/meals', {
         params: { since, limit, ...(cursor ? { cursor } : {}) },
+        telemetrySource: 'sync',
       })
       .then((r) => r.data);
   },

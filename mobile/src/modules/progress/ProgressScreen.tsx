@@ -39,6 +39,8 @@ import { profileApi } from '../../shared/api/profileApi';
 import { ProgressCalendar } from './ProgressCalendar';
 import { getProgressAverageForWindow, getProgressEntriesForDate, getProgressEntriesInWindow, parseWeightInput, type ProgressWindowDays } from './progressUtils';
 import { formatKilograms } from '../../shared/weightFormatting';
+import { useScreenMeasure } from '../../services/telemetry/useScreenMeasure';
+import type { ScreenResult } from '../../services/telemetry/screenTelemetry';
 
 const WINDOW_OPTIONS: { label: string; value: ProgressWindowDays }[] = [
   { label: '7T', value: 7 },
@@ -89,8 +91,9 @@ export default function ProgressScreen() {
   const [windowDays, setWindowDays] = useState<ProgressWindowDays>(7);
   const { width: screenWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { begin: beginMeasure, rendered: reportRendered } = useScreenMeasure('Progress');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<ScreenResult> => {
     try {
       setError(null);
       const [data, profileData] = await Promise.all([
@@ -104,18 +107,27 @@ export default function ProgressScreen() {
       if (profileData.profile?.goal) {
         setGoalType(profileData.profile.goal);
       }
+      return data.length === 0 ? 'empty' : 'data';
     } catch (e) {
       setError(formatApiError(e, 'Fehler beim Laden der Daten'));
+      return 'error';
     }
   }, []);
 
   useEffect(() => {
+    const measure = beginMeasure();
     (async () => {
       setLoading(true);
-      await load();
+      const result = await load();
+      measure.dataReady(result);
       setLoading(false);
     })();
-  }, [load]);
+    return () => measure.cancel();
+  }, [load, beginMeasure]);
+
+  useEffect(() => {
+    if (!loading) reportRendered();
+  }, [loading, reportRendered]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -277,7 +289,7 @@ export default function ProgressScreen() {
           />
         }
       >
-        {error ? <ErrorBanner error={error} onRetry={load} /> : null}
+        {error ? <ErrorBanner error={error} onRetry={() => { void load(); }} /> : null}
         {mutationError ? <ErrorBanner error={mutationError} /> : null}
 
         {loading ? (

@@ -26,6 +26,9 @@ resource workspace 'Microsoft.OperationalInsights/workspaces@2025-07-01' = {
       name: 'PerGB2018'
     }
     retentionInDays: 30
+    workspaceCapping: {
+      dailyQuotaGb: json('0.1')
+    }
     features: {
       enableLogAccessUsingOnlyResourcePermissions: true
     }
@@ -41,6 +44,7 @@ resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
     Application_Type: 'web'
     Flow_Type: 'Bluefield'
     Request_Source: 'rest'
+    RetentionInDays: 90
     WorkspaceResourceId: workspace.id
     publicNetworkAccessForIngestion: 'Enabled'
     publicNetworkAccessForQuery: 'Enabled'

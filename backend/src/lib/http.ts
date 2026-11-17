@@ -27,6 +27,7 @@ import {
 } from './auth';
 import { ProfileDeletionInProgressError } from './repositories/profileDeletionRepository';
 import { getCosmosInitDiagnostics } from './cosmos';
+import { cosmosTimingLogFields, runWithCosmosTiming } from './cosmosTiming';
 import { logEvent, type LogFields, type ValidationDiagnostic } from './log';
 
 export type Handler = (
@@ -35,7 +36,14 @@ export type Handler = (
 ) => Promise<HttpResponseInit>;
 
 const API_ERROR_IDENTIFIER_PATTERN = /^(?:[A-Z][A-Z0-9_]{1,79}|[a-z][a-z0-9]*(?:_[a-z0-9]+)+)$/u;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 let hasSeenWrappedInvocation = false;
+
+// Untrusted client header: only a well-formed UUID is ever logged.
+function clientRequestIdLogFields(request: HttpRequest): LogFields {
+  const value = request.headers.get('x-fittrack-request-id')?.trim();
+  return value && UUID_PATTERN.test(value) ? { client_request_id: value } : {};
+}
 
 function workerDiagnosticLogFields(ctx: InvocationContext): {
   worker_uptime_ms: number;
@@ -80,14 +88,19 @@ export function withHandler(name: string, fn: Handler): Handler {
   return async (request, ctx) => {
     const started = Date.now();
     const startedMonotonic = performance.now();
-    const workerDiagnostics = workerDiagnosticLogFields(ctx);
+    const workerDiagnostics = {
+      ...workerDiagnosticLogFields(ctx),
+      ...clientRequestIdLogFields(request),
+    };
     logEvent(ctx, 'info', 'handler.start', {
       handler: name,
       method: request.method,
       ...workerDiagnostics,
     });
+    // async wrapper turns a synchronous throw from fn into a rejection caught below
+    const timing = runWithCosmosTiming(async () => fn(request, ctx));
     try {
-      const response = await fn(request, ctx);
+      const response = await timing.result;
       const status = response.status ?? 200;
       const duration_ms = Date.now() - started;
       if (status >= 400) {
@@ -115,6 +128,7 @@ export function withHandler(name: string, fn: Handler): Handler {
           duration_ms,
           ...workerDiagnostics,
           ...cosmosInitLogFields(startedMonotonic),
+          ...cosmosTimingLogFields(timing.counters),
           ...(apiCode !== undefined ? { api_code: apiCode } : {}),
           ...(apiErrorCode !== undefined ? { api_error_code: apiErrorCode } : {}),
         });
@@ -126,6 +140,7 @@ export function withHandler(name: string, fn: Handler): Handler {
           duration_ms,
           ...workerDiagnostics,
           ...cosmosInitLogFields(startedMonotonic),
+          ...cosmosTimingLogFields(timing.counters),
         });
       }
       return response;
@@ -167,6 +182,7 @@ export function withHandler(name: string, fn: Handler): Handler {
         error_stack: stack,
         ...workerDiagnostics,
         ...cosmosInitLogFields(startedMonotonic),
+        ...cosmosTimingLogFields(timing.counters),
       });
       return {
         status: 500,

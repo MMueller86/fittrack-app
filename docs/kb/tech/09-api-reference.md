@@ -103,8 +103,9 @@ local FitTrack state only after `204`. The endpoint does not delete the
 Microsoft Entra identity; any required follow-up is an internal manual Product
 Owner task, not an end-user action.
 
-Application Insights telemetry is not targeted and follows the configured
-30-day Log Analytics retention. Cosmos/Storage backups are not targeted or
+Application Insights telemetry is not targeted and is kept for the
+Application Insights data retention of 90 days (the Log Analytics workspace
+default of 30 days is a separate setting). Cosmos/Storage backups are not targeted or
 changed. Blob Soft Delete is unchanged; platform-retained copies may remain
 for up to seven days, so `204` confirms the selected application-level steps,
 not immediate physical irrecoverability or completion of work admitted before
@@ -1687,6 +1688,47 @@ Authenticated preview endpoint. The backend loads the recipe by the authenticate
 - `429` — `QuotaExceededResponse` with `feature: "recipe-scale"`, limit `30` for `free` and `premium`, and `resetsAt`
 - `502` — Azure OpenAI unavailable, empty output, or non-parseable provider output
 - `500` — unexpected backend error
+
+## Client Telemetry
+
+### POST /api/telemetry/client
+
+Authenticated relay for client performance events. Nothing is persisted; each accepted batch is written as structured log traces (Application Insights `traces`). Always on, no consent toggle ([Planned]: consent prompt). Logs are kept 90 days (Application Insights data retention). The call is not instrumented and not retried by the client.
+
+**Request body** (strict: unknown keys rejected; at most 32 KB and 100 events; all times are integers in ms relative to the episode origin, `0..604800000`):
+
+```json
+{
+	"app": { "version": "≤20", "variant": "development|preview|production", "os": "android|ios", "osVersion": "≤20", "deviceModel": "≤40, ^[A-Za-z0-9 ._()+-]+$ (optional)" },
+	"sessionId": "uuid",
+	"events": [ "… up to 100 events …" ]
+}
+```
+
+Event kinds (`type`), all carrying `episodeId: uuid`:
+
+| `type` | Fields |
+|---|---|
+| `episode` | `trigger: cold_start\|resume`, `backgroundMs?` (resume only), `jsEntryPerfMs?` (cold start only) |
+| `milestone` | `name: js_entry\|app_registered\|root_mounted\|auth_ready\|navigator_mounted\|ready`, `atMs`, `authPath?: no_token\|valid\|refreshed\|refresh_failed`, `authMs?` |
+| `api` | `clientRequestId: uuid`, `route` (≤120, `^(GET\|POST\|PUT\|PATCH\|DELETE) /api(/([a-z0-9-]+\|\{id\}\|\{date\}))+$`), `source: ui\|sync\|warmup\|auth`, `screen?`, `startedAtMs`, `status 0..599`, `errorClass?: timeout\|network\|http\|canceled`, `durationMs 0..600000`, `attempts 1..3`, `attemptMs[1..3]`, `attemptStatus[1..3]` (0 = no response), `retryWaitMs 0..10000`, `tokenRefreshMs?`, `tokenRefreshOk?` |
+| `screen` | `name: Home\|Nutrition\|Recipes\|Progress\|Profile`, `trigger: cold_start\|resume\|tab_switch\|focus`, `startedAtMs`, `durationMs`, `dataReadyMs`, `renderMs`, `result: data\|empty\|error` |
+| `error` | `name` (≤60, `^[A-Za-z0-9_.$ -]+$`), `stack` (≤1000) |
+
+**Responses:** `204` (no body) on success; `400` invalid JSON, schema violation, or body above 32 KB (nothing logged); `401` missing or invalid Bearer token; `429` (no body) after 10 batches per minute per user and worker (in-memory limit); `500` unexpected error.
+
+**Log traces** (one `client.batch` plus one trace per event; `userId` on every event trace via `clientEventActorFields()`, not on `client.batch`):
+
+| Event | Fields |
+|---|---|
+| `client.batch` | `session_id`, `app_version`, `app_variant`, `os`, `os_version`, `device_model`, `received_events` |
+| `client.episode` | `episode_id`, `trigger`, `background_ms`, `js_entry_perf_ms` |
+| `client.milestone` | `episode_id`, `name`, `at_ms`, `auth_path`, `auth_ms` |
+| `client.api` | `episode_id`, `client_request_id`, `route`, `source`, `screen`, `started_at_ms`, `status`, `error_class`, `client_ms`, `attempts`, `attempt_ms`, `attempt_status` (both comma-joined), `retry_wait_ms`, `token_refresh_ms`, `token_refresh_ok` |
+| `client.screen` | `episode_id`, `name`, `trigger`, `started_at_ms`, `client_ms`, `data_ready_ms`, `render_ms`, `result` |
+| `client.error` | `episode_id`, `name`, `stack` |
+
+`client.api.client_request_id` joins to `client_request_id` on the server `handler.*` events (header `x-fittrack-request-id`).
 
 ## Common Response Patterns
 

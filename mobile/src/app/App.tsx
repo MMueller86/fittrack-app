@@ -2,7 +2,7 @@
 // Shows LoginScreen when unauthenticated, main app when authenticated.
 
 import React, { useEffect } from 'react';
-import { ActivityIndicator, AppState, LogBox, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, LogBox, Platform, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -16,6 +16,8 @@ import { colors } from './theme';
 import ErrorBoundary from './ErrorBoundary';
 import { healthSyncService } from '../services/health/healthSyncService';
 import { nutritionSyncService } from '../services/health/nutritionSyncService';
+import { initEpisodes, markRootMounted } from '../services/telemetry/episode';
+import { buildAppInfo } from '../services/telemetry/appInfo';
 
 // Intercept native-reconciler errors that bypass ErrorBoundary (e.g. "Text strings must be rendered")
 // Logs the full call stack so the source is identifiable during debugging.
@@ -42,6 +44,9 @@ export default function App() {
   } = useAuthStore();
 
   useEffect(() => {
+    const appInfo = buildAppInfo(Platform);
+    if (appInfo) initEpisodes(AppState, appInfo);
+    markRootMounted();
     initialize();
   }, []);
 

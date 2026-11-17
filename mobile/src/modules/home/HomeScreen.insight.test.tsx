@@ -3,6 +3,9 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DailyInsightResponse } from '../../services/insightService';
 import HomeScreen from './HomeScreen';
+import { listWeights } from '../../services/weightsService';
+import { diaryApi } from '../../shared/api/diaryApi';
+import { aiApi } from '../../shared/api/aiApi';
 import { CoachingHeroCard } from './CoachingHeroCard';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -15,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   openHub: vi.fn(),
   navigate: vi.fn(),
   getParent: vi.fn(),
+  record: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -42,6 +46,10 @@ vi.mock('../../shared/api/diaryApi', () => ({
   diaryApi: { getDay: vi.fn().mockResolvedValue({ meals: [], dayType: 'rest' }) },
 }));
 vi.mock('../../services/health/syncLogger', () => ({ syncLogger: { error: vi.fn() } }));
+vi.mock('../../services/telemetry/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/telemetry/telemetry')>()),
+  record: mocks.record,
+}));
 vi.mock('../nutrition/useDayTypeStore', () => ({ useDayTypeStore: () => ({
   dayType: 'rest', workoutType: null, targets: null,
   setTargets: mocks.setTargets, setDayType: mocks.setDayType, hydrateDayType: mocks.hydrateDayType,
@@ -115,6 +123,94 @@ beforeEach(() => {
 });
 afterEach(() => {
   for (const renderer of renderers.splice(0)) act(() => renderer.unmount());
+});
+
+describe('Home screen telemetry', () => {
+  const screenEvents = () => mocks.record.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((e) => e['type'] === 'screen');
+  const later = <T,>(ms: number, value: T, fail = false) =>
+    new Promise<T>((resolve, reject) => setTimeout(() => (fail ? reject(new Error('boom')) : resolve(value)), ms));
+
+  afterEach(() => vi.useRealTimers());
+
+  it.each(['data', 'empty', 'error'] as const)('records one Home screen event covering weights, profile and diary, result %s (AC-25)', async (outcome) => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    vi.mocked(listWeights).mockImplementationOnce(() => later(60, outcome === 'data' ? [{ id: 'w' }] : []) as never);
+    vi.mocked(diaryApi.getDay).mockImplementationOnce(() => later(140, { meals: [], dayType: 'rest' }, outcome === 'error') as never);
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(React.createElement(HomeScreen, {
+        navigation: { navigate: mocks.navigate, getParent: mocks.getParent },
+        route: { key: 'HomeMain', name: 'HomeMain' },
+      } as unknown as React.ComponentProps<typeof HomeScreen>));
+    });
+    renderers.push(renderer);
+    expect(screenEvents()).toHaveLength(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(140);
+    });
+    const events = screenEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ name: 'Home', result: outcome });
+    expect(events[0]!['durationMs'] as number).toBeGreaterThanOrEqual(140);
+    expect(events[0]!['dataReadyMs'] as number).toBeGreaterThanOrEqual(140);
+  });
+
+  it('records nothing when the screen is left before the load finished', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    vi.mocked(diaryApi.getDay).mockImplementationOnce(() => later(140, { meals: [], dayType: 'rest' }) as never);
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(React.createElement(HomeScreen, {
+        navigation: { navigate: mocks.navigate, getParent: mocks.getParent },
+        route: { key: 'HomeMain', name: 'HomeMain' },
+      } as unknown as React.ComponentProps<typeof HomeScreen>));
+    });
+    await act(async () => {
+      renderer.unmount();
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(screenEvents()).toHaveLength(0);
+  });
+});
+
+describe('Home weekly review ordering', () => {
+  const later = <T,>(ms: number, value: T) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms));
+  afterEach(() => vi.useRealTimers());
+
+  function mount() {
+    return create(React.createElement(HomeScreen, {
+      navigation: { navigate: mocks.navigate, getParent: mocks.getParent },
+      route: { key: 'HomeMain', name: 'HomeMain' },
+    } as unknown as React.ComponentProps<typeof HomeScreen>));
+  }
+
+  it('starts weekly-insight only after the Home data load settled, once', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    vi.mocked(diaryApi.getDay).mockImplementationOnce(() => later(140, { meals: [], dayType: 'rest' }) as never);
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = mount(); });
+    renderers.push(renderer);
+    expect(aiApi.getWeeklyInsight).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(140); });
+    expect(aiApi.getWeeklyInsight).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start weekly-insight when the screen is left before the load settled', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    vi.mocked(diaryApi.getDay).mockImplementationOnce(() => later(140, { meals: [], dayType: 'rest' }) as never);
+    let renderer!: ReactTestRenderer;
+    await act(async () => { renderer = mount(); });
+    await act(async () => { renderer.unmount(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(aiApi.getWeeklyInsight).not.toHaveBeenCalled();
+  });
+
+  it('pull-to-refresh still starts weekly-insight', async () => {
+    const renderer = await renderHome();
+    expect(aiApi.getWeeklyInsight).toHaveBeenCalledTimes(1);
+    await refresh(renderer);
+    expect(aiApi.getWeeklyInsight).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('Home daily insight integration', () => {

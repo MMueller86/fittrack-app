@@ -27,6 +27,7 @@ import './functions/dailyInsightFeedback';
 import './functions/weeklyInsight';
 import './functions/favorites';
 import './functions/specialActivity';
+import './functions/clientTelemetry';
 
 // Health check — used in M1 verification
 app.http('health', {

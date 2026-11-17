@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   syncWeightDelete: vi.fn(),
   getMe: vi.fn(),
   dismiss: vi.fn(),
+  record: vi.fn(),
 }));
 const platform = vi.hoisted(() => ({ OS: 'android' as 'android' | 'ios' }));
 
@@ -48,6 +49,10 @@ vi.mock('../../services/health/healthSyncService', () => ({
   },
 }));
 vi.mock('../../shared/api/profileApi', () => ({ profileApi: { getMe: mocks.getMe } }));
+vi.mock('../../services/telemetry/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/telemetry/telemetry')>()),
+  record: mocks.record,
+}));
 vi.mock('../../shared/components/ErrorBanner', () => ({ ErrorBanner: 'ErrorBanner' }));
 vi.mock('../../shared/components/WeightChart', () => ({ WeightChart: 'WeightChart' }));
 vi.mock('../../shared/components/ConfirmSheet', () => ({ ConfirmSheet: 'ConfirmSheet' }));
@@ -173,6 +178,56 @@ afterEach(() => {
     act(() => renderer.unmount());
   }
   vi.useRealTimers();
+});
+
+describe('ProgressScreen telemetry', () => {
+  const screenEvents = () => mocks.record.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((e) => e['type'] === 'screen');
+
+  async function renderWithDelay(delayMs: number, outcome: 'data' | 'empty' | 'error') {
+    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    mocks.listWeights.mockImplementation(() => new Promise((resolve, reject) => setTimeout(
+      () => (outcome === 'error' ? reject(new Error('boom')) : resolve(outcome === 'empty' ? [] : [weightEntry('a', '2026-10-14', 77.5)])),
+      delayMs,
+    )));
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<ProgressScreen />);
+      await Promise.resolve();
+    });
+    activeRenderers.push(renderer);
+    expect(screenEvents()).toHaveLength(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(delayMs);
+    });
+    return renderer;
+  }
+
+  it.each(['data', 'empty', 'error'] as const)('records one Progress screen event covering the load, result %s (AC-25)', async (outcome) => {
+    await renderWithDelay(120, outcome);
+    const events = screenEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ name: 'Progress', result: outcome });
+    expect(events[0]!['durationMs'] as number).toBeGreaterThanOrEqual(120);
+    expect(events[0]!['dataReadyMs'] as number).toBeGreaterThanOrEqual(120);
+  });
+
+  it('records nothing when the screen is left before the load finished', async () => {
+    const renderer = await renderWithDelay(120, 'data').catch(() => null);
+    expect(renderer).not.toBeNull();
+    mocks.record.mockReset();
+    mocks.listWeights.mockImplementation(() => new Promise((resolve) => setTimeout(() => resolve([]), 500)));
+    let second!: ReactTestRenderer;
+    await act(async () => {
+      second = create(<ProgressScreen />);
+      await Promise.resolve();
+    });
+    await act(async () => {
+      second.unmount();
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(screenEvents()).toHaveLength(0);
+  });
 });
 
 describe('ProgressScreen weight editor', () => {

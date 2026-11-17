@@ -3,7 +3,9 @@
 
 import { create } from 'zustand';
 import { authService } from '../../services/authService';
-import { apiClient, authEvents } from '../../shared/api/client';
+import { authEvents } from '../../shared/api/client';
+import { markAuthReady } from '../../services/telemetry/episode';
+import { nowMs } from '../../services/telemetry/startMark';
 
 interface AuthState {
   /** null = still loading, true = authenticated, false = unauthenticated */
@@ -24,29 +26,25 @@ export const useAuthStore = create<AuthState>((set) => ({
   accountDeletionCleanupNotice: false,
 
   initialize: async () => {
+    const startedAt = nowMs();
     const token = await authService.getAccessToken();
     if (!token) {
+      markAuthReady('no_token', nowMs() - startedAt);
       set({ isAuthenticated: false });
       return;
     }
     // If token is expired, try silent refresh
     if (authService.isTokenExpired(token)) {
       const refreshed = await authService.refreshAccessToken();
-      if (refreshed !== null) {
-        // Fire-and-forget warmup — Azure Functions cold start mitigation
-        apiClient.get('/health').catch(() => { /* ignorieren */ });
-      }
+      markAuthReady(refreshed !== null ? 'refreshed' : 'refresh_failed', nowMs() - startedAt);
       set({ isAuthenticated: refreshed !== null });
     } else {
-      // Fire-and-forget warmup — Azure Functions cold start mitigation
-      apiClient.get('/health').catch(() => { /* ignorieren */ });
+      markAuthReady('valid', nowMs() - startedAt);
       set({ isAuthenticated: true });
     }
   },
 
   login: () => {
-    // Fire-and-forget warmup — Azure Functions cold start mitigation
-    apiClient.get('/health').catch(() => { /* ignorieren */ });
     set({ isAuthenticated: true });
   },
 

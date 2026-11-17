@@ -79,8 +79,17 @@ Azure Functions invocation ID), `worker_uptime_ms` (the Node process uptime in
 milliseconds at handler entry), and `worker_first_invocation` (true only for
 the first wrapped invocation observed in that worker process). The first
 invocation and low process uptime can be indicators of a possible cold start;
-they do not prove an exact platform cold-start duration. The diagnostics contain
-no user ID, JWT claims, request body, headers, query string, or free-text input.
+they do not prove an exact platform cold-start duration. These worker
+diagnostic fields contain no user ID, JWT claims, request body, headers, query
+string, or free-text input. This applies to these fields only, not to every
+backend log event: many events log `userId` (for example diary, favorites,
+recipes, reusable items, the relay's `client.*` event traces), and the
+free-text search term is logged in `food.search`, `food-products.search` and
+`reusableItems.search` (decisions PO-6, PO-7: unchanged). In rare failure
+diagnostics, recipe text may be logged (`recipes.shareBundle.unrenderableDetail`:
+`step_text`). Tokens and authorization headers are never logged. All of this is
+disclosed in the privacy policy; it is retained 90 days (Application Insights
+data retention, see [infrastructure](07-infrastructure.md#log-ingestion-cap-and-retention)).
 
 To compare request latency for first versus later wrapped invocations, join
 Application Insights request and handler-start telemetry by `operation_Id`:
@@ -158,6 +167,87 @@ this is indirect: `cosmos_schema_provisioned=false` on the first request after
 the deploy is the actual confirmation that the skip is active; `true` means
 only the parallelisation applies and `COSMOS_PROVISION_SCHEMA=false` must be
 added as an App Setting (Infrastructure & Release).
+
+#### Request ID
+
+`withHandler()` reads the `x-fittrack-request-id` header sent by the mobile app.
+If the trimmed value is a UUID, it is added as `client_request_id` to
+`handler.start`, `handler.success`, `handler.response.failure`,
+`handler.error` and `handler.unauthorized`; missing or invalid values are
+omitted and the response is unchanged.
+
+#### Cosmos timing fields
+
+`getCosmos()` passes a wrapper `HttpClient` (`CosmosTimingHttpClient`) to the
+Cosmos SDK; it measures every Cosmos network request of the current invocation
+(per-invocation counters in `AsyncLocalStorage`). `handler.success`,
+`handler.response.failure` and `handler.error` carry (omitted when the
+invocation made no Cosmos request; not on `handler.unauthorized` or the
+profile-deletion 409 event):
+
+| Field | Meaning |
+|---|---|
+| `cosmos_calls` | Number of Cosmos network requests, including SDK retries and 429s (can exceed the repository call count) |
+| `cosmos_ms` | Sum of all request durations (0.1 ms resolution) |
+| `cosmos_max_ms` | Slowest single request; lower bound for time waiting on Cosmos |
+| `cosmos_ru` | Sum of `x-ms-request-charge` (2 decimals) |
+
+Concurrency caveat: concurrent requests are summed, so `cosmos_ms` can exceed
+`duration_ms`; use `cosmos_max_ms` as the lower bound of the wait.
+
+```kusto
+traces
+| extend e = parse_json(message)
+| where tostring(e.event) in ("handler.success","handler.response.failure","handler.error")
+| where tostring(e.handler) in ("diary.get","weights.list","favorites.list")
+| extend duration_ms = todouble(e.duration_ms),
+         cosmos_ms = todouble(e.cosmos_ms),
+         cosmos_max_ms = todouble(e.cosmos_max_ms),
+         cosmos_calls = toint(e.cosmos_calls)
+| extend cosmos_wait_lower_bound = min_of(cosmos_max_ms, duration_ms),
+         rest_ms = duration_ms - min_of(cosmos_ms, duration_ms)
+| summarize p50_total = percentile(duration_ms, 50), p50_cosmos_sum = percentile(cosmos_ms, 50),
+            p50_cosmos_max = percentile(cosmos_max_ms, 50), p50_rest = percentile(rest_ms, 50),
+            p50_calls = percentile(cosmos_calls, 50) by tostring(e.handler)
+```
+
+Handler names are examples; verify against the registered names.
+
+#### Client telemetry relay
+
+`POST /api/telemetry/client` (`backend/src/functions/clientTelemetry.ts`,
+handler `telemetry.client`) relays mobile performance events as structured
+`client.*` traces; nothing is persisted. It is always on: there is no consent
+check and no toggle. [Planned] A consent prompt; until then the data is
+collected without separate consent (disclosed in the privacy policy). `userId`
+is added to every event trace via `clientEventActorFields()`, not to
+`client.batch`. Contract and field lists:
+[API reference](09-api-reference.md#post-apitelemetryclient). The limit is 10
+batches per minute per user and worker (in-memory).
+
+The mobile `client.api.client_request_id` equals the server
+`client_request_id`, so client and server timings of one request can be joined.
+The join query (not yet run against Alpha; run read-only after deployment):
+
+```kusto
+let client = traces
+| extend e = parse_json(message)
+| where tostring(e.event) == "client.api"
+| project client_request_id = tostring(e.client_request_id), route = tostring(e.route),
+          client_ms = todouble(e.client_ms), attempts = toint(e.attempts);
+let server = traces
+| extend e = parse_json(message)
+| where tostring(e.event) in ("handler.success","handler.response.failure","handler.error")
+| where isnotempty(tostring(e.client_request_id))
+| project client_request_id = tostring(e.client_request_id), handler = tostring(e.handler),
+          server_ms = todouble(e.duration_ms), cosmos_ms = todouble(e.cosmos_ms);
+client
+| join kind=inner server on client_request_id
+| extend overhead_ms = client_ms - server_ms
+| summarize n = count(), p50_client = percentile(client_ms, 50),
+            p50_server = percentile(server_ms, 50), p50_overhead = percentile(overhead_ms, 50)
+  by handler, route
+```
 
 ```ts
 export const myHandler = withHandler('domain.action', async (request, ctx) => {
@@ -391,7 +481,7 @@ handler also emits operational Application Insights events. It does not call
 Microsoft Graph or send deletion data to Azure OpenAI or Document Intelligence.
 Foreign favorites, saved diary snapshots, friendships, and Health Connect
 exports are unchanged. Application Insights entries and Cosmos/Storage backups
-are not targeted; logs use the configured 30-day retention and Blob Soft Delete
+are not targeted; Application Insights data is kept 90 days and Blob Soft Delete
 may retain recovery copies for up to seven days. Retries repeat the complete
 idempotent request from the beginning. See the full
 [DELETE API contract](09-api-reference.md#delete-apiprofile) and

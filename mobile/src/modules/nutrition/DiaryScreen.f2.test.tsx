@@ -63,6 +63,7 @@ const mocks = vi.hoisted(() => ({
   safeAreaTop: 0,
   openFoodEntryHub: vi.fn(),
   showSnackbar: vi.fn(),
+  record: vi.fn(),
 }));
 
 vi.mock('../../shared/api/diaryApi', () => ({
@@ -84,6 +85,10 @@ vi.mock('../../shared/api/diaryApi', () => ({
 
 vi.mock('../../shared/api/profileApi', () => ({
   profileApi: { getMe: mocks.apiGetProfile },
+}));
+vi.mock('../../services/telemetry/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/telemetry/telemetry')>()),
+  record: mocks.record,
 }));
 
 vi.mock('../../services/health/nutritionSyncService', () => ({
@@ -478,6 +483,50 @@ afterEach(() => {
     const renderer = activeRenderers.pop()!;
     act(() => renderer.unmount());
   }
+});
+
+describe('DiaryScreen telemetry', () => {
+  const screenEvents = () => mocks.record.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((e) => e['type'] === 'screen');
+
+  async function renderWithDelay(delayMs: number, outcome: 'data' | 'empty' | 'error') {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    mocks.apiGetDay.mockImplementation(() => new Promise((resolve, reject) => setTimeout(() => {
+      if (outcome === 'error') reject(new Error('boom'));
+      else resolve(makeDay(outcome === 'empty' ? [] : [makeMeal('m', 'breakfast', 'Frühstück', [makeItem('i')])]));
+    }, delayMs)));
+    const navigation = { setParams: vi.fn() } as unknown as ScreenProps['navigation'];
+    const route = { key: 'diary-route', name: 'DiaryMain', params: { date: DATE } } as ScreenProps['route'];
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<DiaryScreen navigation={navigation} route={route} />);
+    });
+    activeRenderers.push(renderer);
+    expect(screenEvents()).toHaveLength(0);
+    return renderer;
+  }
+
+  afterEach(() => vi.useRealTimers());
+
+  it.each(['data', 'empty', 'error'] as const)('records one Nutrition screen event covering the day load, result %s (AC-25)', async (outcome) => {
+    await renderWithDelay(110, outcome);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(110);
+    });
+    const events = screenEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ name: 'Nutrition', result: outcome });
+    expect(events[0]!['durationMs'] as number).toBeGreaterThanOrEqual(110);
+  });
+
+  it('records nothing when the screen is left before the load finished', async () => {
+    const renderer = await renderWithDelay(110, 'data');
+    await act(async () => {
+      renderer.unmount();
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    activeRenderers.splice(activeRenderers.indexOf(renderer), 1);
+    expect(screenEvents()).toHaveLength(0);
+  });
 });
 
 describe('DiaryScreen F2 bulk actions', () => {

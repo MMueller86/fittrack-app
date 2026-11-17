@@ -5,6 +5,15 @@
 import axios from 'axios';
 import type { InternalAxiosRequestConfig } from 'axios';
 import { authService } from '../../services/authService';
+import {
+  addRetryWait,
+  beginRequestTrace,
+  markAttemptStart,
+  measureTokenRefresh,
+  traceAttemptFailure,
+  traceFailure,
+  traceSuccess,
+} from '../../services/telemetry/apiTelemetry';
 
 // `EXPO_PUBLIC_API_URL` MUST be set in .env / EAS build profile.
 // Examples:
@@ -37,6 +46,7 @@ function isProfileDeletionRequest(config: InternalAxiosRequestConfig | undefined
 
 // Request interceptor — attach Bearer access_token.
 apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+  const trace = beginRequestTrace(config);
   let token = await authService.getAccessToken();
 
   // Proactively refresh if token is expired or about to expire.
@@ -44,7 +54,7 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   // a still-valid token succeeds; a truly expired token gets a 401 which the
   // response interceptor handles (retry refresh → logout).
   if (authService.isTokenExpired(token)) {
-    const refreshed = await authService.refreshAccessToken();
+    const refreshed = await measureTokenRefresh(trace, () => authService.refreshAccessToken());
     if (refreshed !== null) {
       token = refreshed;
     }
@@ -53,13 +63,29 @@ apiClient.interceptors.request.use(async (config: InternalAxiosRequestConfig) =>
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`);
   }
+  markAttemptStart(trace);
   return config;
 });
 
 // Response interceptor — handle 401 with silent refresh + retry, and 429 quota exceeded.
+// The telemetry wrapper only observes; the handling itself is unchanged.
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    traceSuccess(response.config, response.status);
+    return response;
+  },
   async (error) => {
+    traceAttemptFailure(error);
+    try {
+      return await handleResponseError(error);
+    } catch (finalError) {
+      traceFailure(error);
+      throw finalError;
+    }
+  },
+);
+
+async function handleResponseError(error: any) {
     // 401 — attempt silent refresh and retry once
     if (
       axios.isAxiosError(error) &&
@@ -68,7 +94,7 @@ apiClient.interceptors.response.use(
       !(error.config as InternalAxiosRequestConfig & { _retry?: boolean })._retry
     ) {
       (error.config as InternalAxiosRequestConfig & { _retry?: boolean })._retry = true;
-      const newToken = await authService.refreshAccessToken();
+      const newToken = await measureTokenRefresh(error.config.telemetryTrace, () => authService.refreshAccessToken());
       if (newToken) {
         error.config.headers.set('Authorization', `Bearer ${newToken}`);
         return apiClient(error.config);
@@ -101,21 +127,29 @@ apiClient.interceptors.response.use(
       [502, 503, 504].includes(error.response.status);
 
     const isTimeout = axios.isAxiosError(error) && error.code === 'ECONNABORTED';
+    // XHR onerror (dropped or reset connection, no response) rejects with ERR_NETWORK.
+    const isNetworkError =
+      axios.isAxiosError(error) && error.code === 'ERR_NETWORK' && error.response == null;
     const isGetRequest = error.config?.method?.toUpperCase() === 'GET';
 
     type RetryConfig = InternalAxiosRequestConfig & { _retryCount?: number };
     const retryCount = (error.config as RetryConfig)?._retryCount ?? 0;
 
-    if ((isRetryableStatus || isTimeout) && isGetRequest && retryCount < 2 && error.config) {
+    if (
+      (isRetryableStatus || isTimeout || (isNetworkError && retryCount === 0)) &&
+      isGetRequest &&
+      retryCount < 2 &&
+      error.config
+    ) {
       (error.config as RetryConfig)._retryCount = retryCount + 1;
       const delay = retryCount === 0 ? 1500 : 3000;
+      addRetryWait(error.config.telemetryTrace, delay);
       await new Promise((resolve) => setTimeout(resolve, delay));
       return apiClient(error.config);
     }
 
     return Promise.reject(error);
-  },
-);
+}
 
 // ---------------------------------------------------------------------------
 // Auth event emitter — lightweight pub/sub for logout signals

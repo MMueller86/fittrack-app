@@ -21,6 +21,8 @@ import { InfoOverlay } from '../../shared/components/InfoOverlay';
 import { RecipeImageHeroImage } from './RecipeImageHeroImage';
 import { RECIPE_HERO_ASPECT_RATIO } from './recipeImageSource';
 import type { RecipeStackParamList } from '../../app/navigation/RootNavigator';
+import { useScreenMeasure } from '../../services/telemetry/useScreenMeasure';
+import type { ScreenMeasure } from '../../services/telemetry/screenTelemetry';
 
 type Props = NativeStackScreenProps<RecipeStackParamList, 'RecipeList'>;
 
@@ -228,15 +230,17 @@ export default function RecipeListScreen({ navigation }: Props) {
   const [favoriteBusyId, setFavoriteBusyId] = useState<string | null>(null);
   const [errorNotice, setErrorNotice] = useState<{ title: string; body: string } | null>(null);
   const requestRevisionRef = useRef(0);
+  const { begin: beginMeasure, rendered: reportRendered } = useScreenMeasure('Recipes');
   const requestControllerRef = useRef<AbortController | null>(null);
   const continuationTokenRef = useRef<string | undefined>(undefined);
   const handleCreateRecipe = useCallback(() => {
     navigation.navigate('RecipeWizard');
   }, [navigation]);
 
-  const load = useCallback(async (options: { append?: boolean; refresh?: boolean } = {}) => {
+  const load = useCallback(async (options: { append?: boolean; refresh?: boolean; measure?: ScreenMeasure } = {}) => {
     const append = options.append ?? false;
     const refresh = options.refresh ?? false;
+    const measure = options.measure;
     const nextToken = continuationTokenRef.current;
     if (append && !nextToken) return;
 
@@ -264,6 +268,7 @@ export default function RecipeListScreen({ navigation }: Props) {
         if (favoriteData) setFavorites(favoriteData);
         continuationTokenRef.current = undefined;
         setContinuationToken(undefined);
+        measure?.dataReady(data.recipes.length === 0 ? 'empty' : 'data');
       } else {
         const page = await recipeApi.listCommunity({
           limit: 20,
@@ -279,9 +284,13 @@ export default function RecipeListScreen({ navigation }: Props) {
         continuationTokenRef.current = page.continuationToken;
         setContinuationToken(page.continuationToken);
         if (favoriteData) setFavorites(favoriteData);
+        measure?.dataReady(page.recipes.length === 0 && !append ? 'empty' : 'data');
       }
     } catch {
-      if (isCurrentRequest()) setLoadError(true);
+      if (isCurrentRequest()) {
+        setLoadError(true);
+        measure?.dataReady('error');
+      }
     } finally {
       if (isCurrentRequest()) {
         setLoading(false);
@@ -357,13 +366,19 @@ export default function RecipeListScreen({ navigation }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      void load();
+      const measure = beginMeasure();
+      void load({ measure });
       return () => {
+        measure.cancel();
         requestControllerRef.current?.abort();
         requestRevisionRef.current += 1;
       };
-    }, [load]),
+    }, [load, beginMeasure]),
   );
+
+  useEffect(() => {
+    if (!loading) reportRendered();
+  }, [loading, reportRendered]);
 
   const handleLoadMore = useCallback(() => {
     if (section !== 'community' || loading || loadingMore || !continuationToken) return;

@@ -20,7 +20,7 @@ import type { ProfileStackParamList } from '../../app/navigation/RootNavigator';
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileMain'>;
 
 export default function ProfileScreen({ navigation }: Props) {
-  const { status, profile, refreshing, refresh, retry, snackbarRef } = useProfileData();
+  const { status, profile, refreshing, refresh, retry, snackbarRef } = useProfileData({ measureScreen: true });
   const [showWizard, setShowWizard] = useState(false);
 
   if (showWizard) {

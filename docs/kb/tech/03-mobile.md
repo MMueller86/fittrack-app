@@ -44,6 +44,7 @@ mobile/src/
 │   ├── authService.ts       Token storage, refresh, expiry check
 │   ├── imageService.ts      Image picker utility
 │   ├── insightService.ts    Daily insight polling
+│   ├── telemetry/           Client performance telemetry (see Client Telemetry)
 │   └── weightsService.ts    Weights data service
 └── shared/
     ├── api/                 Typed API clients (per domain)
@@ -84,14 +85,17 @@ On app start, `RootNavigator` checks for an existing profile via `AsyncStorage` 
 - 15s timeout
 - **Request interceptor:** attaches Bearer access token; proactively refreshes if token is expired
 - **Response interceptor:** on 401, attempts one silent refresh + retry; on second 401, clears tokens (logout)
+- **Retry:** a GET is retried after a 502/503/504 response or a timeout (`ECONNABORTED`) and, once, after a network error without a response (`ERR_NETWORK`). At most two retries per request, waiting 1.5 s before the first and 3 s before the second. The network-error retry counts in this limit and is only made as the first retry (a network error after a 502/503/504/timeout retry is not retried again); non-GET requests and cancelled requests (`ERR_CANCELED`) are never retried
 - **429 handling:** surfaces `isQuotaExceededError` flag with quota metadata
+- **Request ID:** every logical request carries the header `x-fittrack-request-id` (fresh UUID; retries and the 401 re-run reuse it)
+- **Timing:** per-attempt timings are reported as exactly one `api` telemetry event per logical request (see [Client Telemetry](#client-telemetry)); retry, 401 and quota behaviour is unchanged
 
 Typed API clients (one per domain):
 - `aiApi.ts` — AI features (parse meal, estimate food, label scan, estimate meal, recipe analysis, recipe scale preview, daily insight, weekly insight)
 - `diaryApi.ts` — diary CRUD
 - `favoritesApi.ts` — favorites + recents
 - `foodApi.ts` — food search
-- `profileApi.ts` — profile CRUD
+- `profileApi.ts` — profile CRUD; `getMe()` shares one in-flight `GET /api/profile/me` between callers that request it at the same time (no result or time cache; the request is shared only until it settles, a rejection is not reused, and `createProfile`, `updateProfile` and `deleteProfile` end sharing before sending)
 - `recipeApi.ts` — recipe CRUD
 - `reusableItemsApi.ts` — personal food library
 - `reusableItemsApi.ts` — personal food library
@@ -114,6 +118,8 @@ No global state library for server data — screens fetch on mount and refresh o
 **Home coaching card and weight trend:** `CoachingHeroCard` contains the personal greeting and the existing day-type selector aligned on the right. For a valid complete `greeting`/`shortInsight` pair on a `fresh` or `cached` Daily Insight (greeting at most 120, short insight at most 240 characters), the server greeting replaces the static one and the card shows the short sentence plus a `Mehr anzeigen` toggle. The toggle expands the full insight inline within the card and changes to `Weniger anzeigen`; a new insight version or date resets the expanded state. `HomeScreen` passes the response, its date, and the feedback callback and no longer renders a separate Insight card. Daily Insight has no action/navigation CTA. Loading, `unavailable`, `quota_exceeded`, network errors, and missing or invalid fields keep the static greeting without short text or detail action. During a same-day focus or pull-to-refresh reload the previous valid pair stays visible until the new response arrives (no flicker to the static greeting); a new response without a valid pair, a request error, or a date change then shows the static greeting. `DayNutritionCard` places the current weight and trend beside the calorie ring on screens at least 380 dp wide; narrower layouts stack the calorie and weight regions. In the wide layout, the separator is aligned with the macro tracks' two-thirds 100% reference; the sparkline is 96 dp wide to fit the weight column. Current weight comes from the newest full-history entry and is normalized to kg. The chart uses `calculateWeightTrendRegressionSeries(entries, 14, referenceDate)` over the 14 local calendar dates, maps x positions by date, and plots its raw measurements and fitted endpoints without axes or direction colors. The trend value and fitted line require at least seven in-window measurements and a defined regression. One in-window measurement shows only current weight, with no sparkline or marker. With two to six measurements, or at least seven measurements without a defined regression, actual measurements remain visible without a trend. Current weight remains visible even when the window is empty. The SVG is decorative and the weight/trend is exposed as one accessibility value. `formatWeeklyTrendLabel` applies the approved numeric rule: `abs(rawWeeklySlope) < 0.05 kg/Woche` displays `0,0 kg/Woche`; values at or above the threshold are rounded to one decimal using German punctuation, a typographic minus, and normalized negative zero. This rule does not change the shared slope or plotted line. On days without `MealItem`s, the empty calorie ring is omitted; the calorie area shows `Ernährung heute` and `Deine Übersicht erscheint hier, sobald du etwas einträgst.`, without a second add-food CTA because the top search row is the standard add entry point. Macro tracks remain hidden. Entry presence, not calorie total, determines this state, so real zero-calorie entries are treated as logged.
 
 **Home daily nutrition freshness:** `HomeScreen` reloads `GET /api/diary` on every focus and pull-to-refresh. Diary, profile, and weight requests settle independently, so a profile or weight failure cannot discard a successful diary response. A monotonically increasing request id ignores results from an older overlapping load. If the diary request itself fails, the prior snapshot is marked with a retryable error; an initial failed load does not present an empty diary as current data.
+
+**Start request sequence:** at cold start the client sends no `/api/health` warm-up request (`initialize()` and `login()` send none). `RootNavigator` requests `getMe()` to decide on the profile wizard; `HomeScreen` calls it too, and both share the one in-flight request. On Home focus, `weights`, `profile` and `diary` are requested in parallel; `daily-insight` follows inside the same load (source `ui`). `weekly-insight` is requested only after that data load has settled and only if the screen is still focused, so it is not part of the measured data-ready time. Pull-to-refresh starts `weekly-insight` first, with the data load running in parallel.
 
 **Tab root titles and search placement:** the bottom tab label is the location cue. Home, Nutrition, Recipes (`Rezepte` in the UI), Progress, and Profile do not repeat it as a page-title row or branded logo header. Home and Nutrition start with the same `FoodEntrySearchRow`; Nutrition places its compact date navigation below the search row. The FoodEntryHub uses the safe-area top inset on both screens. Pushed detail/edit flows keep their contextual back/action headers.
 
@@ -720,6 +726,47 @@ release claim is made before that gate.
 
 - `ProgressScreen.tsx` — weight trend chart, progress signals
 - `WeightDetailScreen.tsx` in `modules/weight/`
+
+## Client Telemetry
+
+`mobile/src/services/telemetry/` measures startup, API and screen load times and relays them to the backend (`POST /api/telemetry/client`, see [API reference](09-api-reference.md)).
+
+### Module
+
+- Single entry point `record(event)`; events are buffered in memory (ring buffer of 200) and sent in batches: at 30 events, every 60 s in the foreground, when the app goes to the background, and once after the cold-start `ready` milestone is recorded (any Home result `data`, `empty` or `error`). The `ready` flush is started without awaiting it, so it cannot delay the screen; resume, tab switch and focus episodes do not trigger it.
+- Sent only when the user is authenticated, via plain `fetch` (not `apiClient`), without retry; failed batches are dropped.
+- Batch: `{ app: { version, variant, os, osVersion, deviceModel? }, sessionId, events[] }`, at most 100 events and under 30 KB.
+- Times are integer ms relative to the episode origin (cold start: JS entry; resume: the `active` app state).
+
+### Events
+
+| Event | Content |
+|---|---|
+| `episode` | `trigger` `cold_start` or `resume`; `backgroundMs` (resume only) |
+| `milestone` | Cold start only, each once: `js_entry`, `app_registered`, `root_mounted`, `auth_ready` (with `authPath` `no_token`/`valid`/`refreshed`/`refresh_failed`, `authMs`), `navigator_mounted`, `ready` (= end of the first Home `screen` event) |
+| `api` | Templated `route`, `source` (`ui`/`sync`/`warmup`/`auth`), `status`, `errorClass`, `durationMs`, `attempts`, per-attempt `attemptMs`/`attemptStatus` (last 3), `retryWaitMs`, `tokenRefreshMs`/`tokenRefreshOk`; `clientRequestId` equals the `x-fittrack-request-id` header. `source: auth` and `source: warmup` are accepted by the relay (and valid on the wire) but no client call sends them today |
+| `screen` | Tabs Home, Nutrition, Recipes, Progress, Profile: `trigger` (`cold_start`/`resume`/`tab_switch`/`focus`), `durationMs`, `dataReadyMs`, `renderMs`, `result` (`data`/`empty`/`error`) |
+| `error` | JavaScript error `name` and code-location stack only (`at fn (file:line:col)` lines, max 1000 characters) from `ErrorBoundary` |
+
+Screen measurement starts at mount/focus (or the preceding tab press) and ends with the render commit after the last required response settled. Pull-to-refresh, pagination and day changes are not measured; a screen left before it finished records nothing.
+
+| Screen | Required responses | End |
+|---|---|---|
+| Home | weights, profile, diary (insight and weekly review not awaited) | `loading` false |
+| Nutrition | diary day for the opening date | `loading` false after the day load |
+| Recipes | recipe list (+ favorites) of the opening section | `loading` false |
+| Progress | weights + profile | `loading` false |
+| Profile | profile on first hub focus | load status committed |
+
+### Data boundary
+
+- Not sent: tokens, request/response bodies, query strings, concrete resource IDs (templated as `{id}`/`{date}`), free text, email, user ID, error messages.
+- The user ID is added by the backend from the JWT, not by the client.
+- Nothing is stored on the device; the buffer and the random `sessionId` live in memory and end with the process. No other identifier is created on the device.
+
+### Always on
+
+Telemetry is always on: no toggle, no setting, no consent check. A consent step is `[Planned]`; its gate is to be added inside `record()`. The update of the [privacy policy](../../legal/datenschutzerklaerung-alpha.md) for this data flow was done (Stand 2026-11-16); the in-app copy (`legalTexts.ts`) follows the same text and is shipped with the next app build.
 
 ## Theme
 

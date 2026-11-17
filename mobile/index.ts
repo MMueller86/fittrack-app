@@ -4,8 +4,11 @@
 
 // GestureHandler MUST be the first import
 import 'react-native-gesture-handler';
+// Telemetry episode origin: MUST be the second import, directly after the gesture handler.
+import { markAppRegistered } from './src/services/telemetry/startMark';
 
 import { registerRootComponent } from 'expo';
 import App from './src/app/App';
 
+markAppRegistered();
 registerRootComponent(App);

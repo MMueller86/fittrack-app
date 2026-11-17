@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     addFavorite: vi.fn(),
     removeFavorite: vi.fn(),
   },
+  record: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -44,6 +45,10 @@ vi.mock('@react-navigation/native', async () => {
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('../../shared/api/recipeApi', () => ({ recipeApi: mocks.recipeApi }));
 vi.mock('../../shared/api/favoritesApi', () => ({ favoritesApi: mocks.favoritesApi }));
+vi.mock('../../services/telemetry/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/telemetry/telemetry')>()),
+  record: mocks.record,
+}));
 vi.mock('../../shared/components/Icon', () => ({ Icon: 'Icon' }));
 vi.mock('../../shared/components/InfoOverlay', () => ({ InfoOverlay: 'InfoOverlay' }));
 vi.mock('./RecipeImageHeroImage', () => ({ RecipeImageHeroImage: 'RecipeImageHeroImage' }));
@@ -191,6 +196,51 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+describe('RecipeListScreen telemetry', () => {
+  const screenEvents = () => mocks.record.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((e) => e['type'] === 'screen');
+
+  async function renderWithDelay(delayMs: number, outcome: 'data' | 'empty' | 'error') {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    mocks.recipeApi.list.mockImplementation(() => new Promise((resolve, reject) => setTimeout(
+      () => (outcome === 'error' ? reject(new Error('boom')) : resolve({ recipes: outcome === 'empty' ? [] : [makeRecipe('Suppe', 'private')] })),
+      delayMs,
+    )));
+    const props = {
+      route: { key: 'RecipeList', name: 'RecipeList', params: undefined },
+      navigation: { navigate: vi.fn() },
+    } as unknown as Props;
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<RecipeListScreen {...props} />);
+      await Promise.resolve();
+    });
+    expect(screenEvents()).toHaveLength(0);
+    return renderer;
+  }
+
+  afterEach(() => vi.useRealTimers());
+
+  it.each(['data', 'empty', 'error'] as const)('records one Recipes screen event covering the load, result %s (AC-25)', async (outcome) => {
+    await renderWithDelay(130, outcome);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(130);
+    });
+    const events = screenEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ name: 'Recipes', result: outcome });
+    expect(events[0]!['durationMs'] as number).toBeGreaterThanOrEqual(130);
+  });
+
+  it('records nothing when the screen is left before the load finished', async () => {
+    const renderer = await renderWithDelay(130, 'data');
+    await act(async () => {
+      renderer.unmount();
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(screenEvents()).toHaveLength(0);
+  });
 });
 
 describe('RecipeListScreen', () => {

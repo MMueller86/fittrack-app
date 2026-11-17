@@ -114,13 +114,31 @@ plan `docs/User Stories/plans/PLAN_Alpha-Datenmigration.md`).
 
 ## Deletion-Relevant Retention
 
-`appinsights.bicep` configures the Log Analytics workspace for 30-day
-retention. `storage.bicep` enables Blob Soft Delete for seven days; normal
+`appinsights.bicep` configures the Log Analytics workspace default retention
+(30 days) and Application Insights data retention (90 days); these are
+different settings and the 90 days apply to Application Insights data (see
+[Log Ingestion Cap and Retention](#log-ingestion-cap-and-retention)). `storage.bicep` enables Blob Soft Delete for seven days; normal
 application deletes can therefore leave platform recovery copies during that
 period. Profile deletion does not target Application Insights entries or
 Cosmos/Storage backups, and it does not change either retention configuration.
 This Bicep module does not declare a Cosmos backup retention period, so none is
 asserted here.
+
+## Log Ingestion Cap and Retention
+
+Verified live on 2026-11 (Dev and Alpha, WP-INFRA-01):
+
+| Setting | Value |
+|---|---|
+| Log Analytics workspace daily ingestion cap (`dailyQuotaGb`) | 0.1 GB per day |
+| Application Insights data retention (`RetentionInDays`) | 90 days |
+| Log Analytics workspace retention (`retentionInDays`) | 30 days |
+
+The workspace default (30 days) and the Application Insights data retention
+(90 days) are different settings; the 90 days apply to Application Insights
+data and are pinned in `appinsights.bicep`. The cap is workspace-wide: when it
+is reached, backend logs (traces, requests) stop together with client
+telemetry until the daily reset.
 
 The backend also uses a `product-images` Blob container and deletes personal
 image blobs under `{verifiedSub}/` during profile deletion. `storage.bicep`

@@ -116,6 +116,11 @@ export function makeRequest(init: FakeRequestInit = {}): HttpRequest {
       }
       return body;
     },
+    text: async () => {
+      if (rawBody !== undefined) return rawBody;
+      if (body === undefined) return '';
+      return JSON.stringify(body);
+    },
     formData: async () => {
       if (!fakeFormData) throw new Error('No formData provided to makeRequest');
       return fakeFormData;

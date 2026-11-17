@@ -12,7 +12,7 @@ export interface LegalDocument {
 
 const PRIVACY_POLICY_MD = `# Datenschutzerklärung
 
-Stand: 2026-10-23
+Stand: 2026-11-16
 
 ## Wer ist verantwortlich?
 
@@ -39,7 +39,7 @@ Es werden nur Daten verarbeitet, die für die App-Funktionen nötig sind.
 ## Wo und womit werden die Daten verarbeitet?
 
 - **Speicherung:** Microsoft Azure (Azure-Dienste in Europa): Cosmos DB für deine Daten, Blob Storage für Rezeptbilder.
-- **Betriebsprotokolle:** Application Insights, 30 Tage.
+- **Betriebsprotokolle:** Application Insights, 90 Tage. Dazu gehören technische Protokolle des Servers und Leistungs- und Fehlerdaten der App: welche Funktion aufgerufen wurde, wie lange sie gedauert hat, wie oft sie wiederholt werden musste, App- und Android-Version, das Gerätemodell, Zeitpunkte beim App-Start (zum Beispiel wie lange Anmeldung und erstes Laden gedauert haben) sowie technische Fehlernamen. In diesen Protokollen wird deine technische Nutzerkennung gespeichert (eine zufällige Konto-ID, nicht deine E-Mail-Adresse), damit wir Vorgänge einem Konto zuordnen und Probleme nachvollziehen können. Außerdem werden die Suchbegriffe protokolliert, die du in der Lebensmittel- und der Bibliothekssuche eingibst. In seltenen Fehlerfällen können zur Fehlersuche auch Teile von Rezepttexten enthalten sein. Anmelde-Tokens werden nicht protokolliert. Aktuell erheben wir diese Daten ohne gesonderte Zustimmung; eine Zustimmungsabfrage ist geplant.
 - **Anmeldung:** Microsoft Entra External ID. Du kannst dich mit deinem Google-Konto anmelden; die Anmeldung läuft dann über Google und Microsoft, FitTrack erhält nur das Anmeldeergebnis von Microsoft Entra. Danach leitet dich eine FitTrack-Seite bei Microsoft Azure (Azure Static Web Apps) zurück in die App. Diese Seite speichert nichts, setzt keine Cookies und lädt keine Inhalte von Dritten; sie reicht den kurzlebigen Anmeldecode nur an die App weiter. Beim Aufruf dieser Seite kann Microsoft Azure technische Zugriffsdaten (z. B. IP-Adresse, Zeitpunkt) verarbeiten. Deine Anmelde-Tokens liegen verschlüsselt auf deinem Gerät (SecureStore). Während einer laufenden Anmeldung speichert die App kurz (höchstens 10 Minuten, einmal verwendbar) einen technischen Anmeldevorgang verschlüsselt auf deinem Gerät und löscht ihn danach; er verlässt dein Gerät nicht.
 - **KI-Funktionen:** Je nach Funktion werden Text, Fotos oder Kontext (Profil, Tagebuch, Gewicht) an Azure OpenAI gesendet. Beim Etikettenscan wird das Foto zusätzlich mit Azure Document Intelligence ausgelesen. Ergebnisse werden erst gespeichert, nachdem du sie bestätigt hast.
   - An die KI werden keine Nutzer-ID, E-Mail-Adresse oder Anmelde-Tokens gesendet; deine Anfragen sind nicht mit deinem Konto verknüpft. Dein Anzeigename, deine Profildaten und von dir eingegebene Texte oder Fotos können aber Teil der Anfrage sein.
@@ -64,7 +64,7 @@ Für den Abgleich speichert FitTrack auf deinem Gerät deine Nutzerkennung, je D
 
 ## Speicherdauer und Löschen
 
-Wenn du die Kontolöschung bestätigst, löschen wir deine aktiven persönlichen FitTrack-Daten. Veröffentlichte Community-Rezepte, die du behalten möchtest, bleiben ohne aktive Zuordnung zu deinem Konto erhalten; ihr Autor wird als „Anonymous“ angezeigt. Betriebs- und Fehlerprotokolle werden nicht einzeln gelöscht und gemäß der konfigurierten Aufbewahrungszeit gespeichert (derzeit 30 Tage). Bestehende Backups werden nicht verändert. Gelöschte Bilder können gemäß der bestehenden Azure-Blob-Soft-Delete-Konfiguration noch bis zu sieben Tage als Plattform-Wiederherstellungskopie vorhanden sein.
+Wenn du die Kontolöschung bestätigst, löschen wir deine aktiven persönlichen FitTrack-Daten. Veröffentlichte Community-Rezepte, die du behalten möchtest, bleiben ohne aktive Zuordnung zu deinem Konto erhalten; ihr Autor wird als „Anonymous“ angezeigt. Betriebs- und Fehlerprotokolle werden nicht einzeln gelöscht und gemäß der konfigurierten Aufbewahrungszeit gespeichert (derzeit 90 Tage). Sie können deine technische Nutzerkennung und Suchbegriffe enthalten; auf Anfrage prüfen wir die Löschung. Bestehende Backups werden nicht verändert. Gelöschte Bilder können gemäß der bestehenden Azure-Blob-Soft-Delete-Konfiguration noch bis zu sieben Tage als Plattform-Wiederherstellungskopie vorhanden sein.
 
 Nach erfolgreicher Kontolöschung versucht die App, FitTrack-Anmeldetokens, lokale Sync-Warteschlangen und das lokale Diagnoseprotokoll von deinem Gerät zu entfernen. Wenn das auf deinem Gerät nicht klappt, zeigt FitTrack dir einen Hinweis. Bereits in Health Connect gespeicherte Einträge und Berechtigungen bleiben davon unberührt.
 

@@ -171,7 +171,7 @@ Standard path — one command runs every gate below, uploads, and verifies:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\release-alpha.ps1
 ```
 
-The script stops on any failed gate, aborts a stalled upload after the timeout, compares `_deploy_staging\dist` byte-for-byte with `backend\dist`, derives the expected function names from the compiled output and requires all of them (currently 79, incl. `health`) in the deployed list, then runs the health check. `-SkipDeploy` runs the gates and ZIP check only. `-IncludeAndroidPreview` adds Phase 3 and only on explicit EAS request.
+The script stops on any failed gate, aborts a stalled upload after the timeout, compares `_deploy_staging\dist` byte-for-byte with `backend\dist`, derives the expected function names from the compiled output and requires all of them (currently 80, incl. `health`) in the deployed list, then runs the health check. `-SkipDeploy` runs the gates and ZIP check only. `-IncludeAndroidPreview` adds Phase 3 and only on explicit EAS request.
 
 Why ZIP + `az functionapp deployment source config-zip --build-remote true` instead of `func publish`: on 2026-11-03 `func azure functionapp publish` (Core Tools 4.16.0) stalled or failed with `Unable to connect to the Azure Function App` while the Function App itself was healthy; the CLI upload of a ~4 MB ZIP (without `node_modules`, Oryx installs on Linux) succeeded. The root cause of the Core Tools failure is unproven; `_deploy_staging/.funcignore` excludes `node_modules`. Use `func publish` only as a manual fallback, and only after the script path failed for a reason that is not the build.
 

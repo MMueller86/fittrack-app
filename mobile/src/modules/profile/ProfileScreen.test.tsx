@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ProfileScreen from './ProfileScreen';
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   recipeApi: { list: vi.fn() },
   completeAccountDeletionLocally: vi.fn(),
   showSnackbar: vi.fn(),
+  record: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({
@@ -43,6 +44,10 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 24, left: 0, right: 0 }),
 }));
 vi.mock('../../shared/api/profileApi', () => ({ profileApi: mocks.profileApi }));
+vi.mock('../../services/telemetry/telemetry', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/telemetry/telemetry')>()),
+  record: mocks.record,
+}));
 vi.mock('../../shared/api/recipeApi', () => ({ recipeApi: mocks.recipeApi }));
 vi.mock('../../services/accountDeletionService', () => ({
   completeAccountDeletionLocally: mocks.completeAccountDeletionLocally,
@@ -149,6 +154,48 @@ function refreshControls(renderer: ReactTestRenderer) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+});
+
+describe('ProfileScreen telemetry', () => {
+  const screenEvents = () => mocks.record.mock.calls.map((c) => c[0] as Record<string, unknown>).filter((e) => e['type'] === 'screen');
+
+  async function renderWithDelay(delayMs: number, outcome: 'data' | 'empty' | 'error') {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date', 'performance'] });
+    mocks.profileApi.getMe.mockImplementation(() => new Promise((resolve, reject) => setTimeout(
+      () => (outcome === 'error' ? reject(new Error('boom')) : resolve(outcome === 'empty' ? { profile: null, targets: null } : { profile, targets })),
+      delayMs,
+    )));
+    const props = { navigation: { navigate: vi.fn() } } as unknown as React.ComponentProps<typeof ProfileScreen>;
+    let renderer!: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(<ProfileScreen {...props} />);
+      await Promise.resolve();
+    });
+    expect(screenEvents()).toHaveLength(0);
+    return renderer;
+  }
+
+  afterEach(() => vi.useRealTimers());
+
+  it.each(['data', 'empty', 'error'] as const)('records one Profile screen event covering the load, result %s (AC-25)', async (outcome) => {
+    await renderWithDelay(150, outcome);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(150);
+    });
+    const events = screenEvents();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ name: 'Profile', result: outcome });
+    expect(events[0]!['durationMs'] as number).toBeGreaterThanOrEqual(150);
+  });
+
+  it('records nothing when the screen is left before the load finished', async () => {
+    const renderer = await renderWithDelay(150, 'data');
+    await act(async () => {
+      renderer.unmount();
+      await vi.advanceTimersByTimeAsync(300);
+    });
+    expect(screenEvents()).toHaveLength(0);
+  });
 });
 
 describe('ProfileScreen', () => {

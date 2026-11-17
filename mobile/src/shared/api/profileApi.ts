@@ -32,18 +32,32 @@ export interface ProfileDeletionRequest {
   deleteCommunityRecipes: boolean;
 }
 
+// Shared only while a GET /profile/me is in flight; never a result cache.
+let inFlightGetMe: Promise<ProfileResponse> | null = null;
+
 export const profileApi = {
   getMe(): Promise<ProfileResponse> {
-    return apiClient.get<ProfileResponse>('/profile/me').then((r) => r.data);
+    if (inFlightGetMe) return inFlightGetMe;
+    const request: Promise<ProfileResponse> = apiClient
+      .get<ProfileResponse>('/profile/me')
+      .then((r) => r.data)
+      .finally(() => {
+        // A mutation may have replaced the slot; only clear our own request.
+        if (inFlightGetMe === request) inFlightGetMe = null;
+      });
+    inFlightGetMe = request;
+    return request;
   },
 
   createProfile(input: ProfileInput): Promise<ProfileMutationResponse> {
+    inFlightGetMe = null;
     return apiClient
       .post<ProfileMutationResponse>('/profile', input)
       .then((r) => r.data);
   },
 
   updateProfile(input: ProfileInput): Promise<ProfileMutationResponse> {
+    inFlightGetMe = null;
     return apiClient
       .put<ProfileMutationResponse>('/profile', input)
       .then((r) => r.data);
@@ -56,6 +70,7 @@ export const profileApi = {
   },
 
   async deleteProfile(request: ProfileDeletionRequest): Promise<void> {
+    inFlightGetMe = null;
     const response = await apiClient.delete('/profile', { data: request });
     if (response.status !== 204) {
       throw new Error('Profile deletion did not complete successfully.');

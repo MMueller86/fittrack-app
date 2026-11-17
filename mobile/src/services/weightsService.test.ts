@@ -33,6 +33,7 @@ describe('addWeight', () => {
     await expect(getWeightChanges('2026-10-23T11:00:00.000Z')).resolves.toEqual(response);
     expect(getMock).toHaveBeenCalledWith('/weights/changes', {
       params: { since: '2026-10-23T11:00:00.000Z' },
+      telemetrySource: 'sync',
     });
   });
 

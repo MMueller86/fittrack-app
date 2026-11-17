@@ -8,7 +8,7 @@
 //   4. WeeklyReviewCard: sieben abgeschlossene Tage + KI-Wochenbewertung
 //   5. ActivityCard / ActivityCtaCard: besondere Aktivität
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -54,6 +54,8 @@ import { ConfirmSheet, type ConfirmSheetAction } from '../../shared/components/C
 import { Snackbar, useSnackbar } from '../../shared/components/Snackbar';
 import { getHomeActionDate } from './homeDate';
 import { loadHomeData } from './homeDataLoader';
+import { useScreenMeasure } from '../../services/telemetry/useScreenMeasure';
+import type { ScreenResult } from '../../services/telemetry/screenTelemetry';
 
 function logHomeLoadFailure(source: string, error: unknown): void {
   const detail = error instanceof Error ? error.message : String(error);
@@ -88,6 +90,8 @@ export default function HomeScreen({ navigation }: Props) {
   const [weeklyError, setWeeklyError] = useState(false);
   const homeDataRequestId = useRef(0);
   const weeklyRequestId = useRef(0);
+  const { begin: beginHomeMeasure, rendered: reportHomeRendered } = useScreenMeasure('Home');
+  const homeResultRef = useRef<ScreenResult>('data');
   const { ref: snackbarRef, show: showSnackbar } = useSnackbar();
 
   const { dayType, dayTypeDate, workoutType, targets, setTargets, setDayType, hydrateDayType } = useDayTypeStore();
@@ -192,6 +196,14 @@ export default function HomeScreen({ navigation }: Props) {
       logHomeLoadFailure('diary', diary.reason);
     }
 
+    // Telemetry: weights, profile and diary are the required responses (insight and weekly review are not).
+    homeResultRef.current = diary.status === 'rejected'
+      ? 'error'
+      : diary.value.meals.some((meal) => meal.items.length > 0)
+        || (weights.status === 'fulfilled' && weights.value.length > 0)
+        ? 'data'
+        : 'empty';
+
     // Insight runs independently — does NOT block the screen from rendering.
     // A same-day refresh keeps the previous response visible until the new one arrives.
     if (insightDateRef.current !== currentDate) setInsight(null);
@@ -210,19 +222,28 @@ export default function HomeScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      void loadWeeklyReview();
+      const measure = beginHomeMeasure();
       (async () => {
         setLoading(true);
         const requestId = await load();
-        if (!cancelled && requestId === homeDataRequestId.current) setLoading(false);
+        if (!cancelled && requestId === homeDataRequestId.current) {
+          measure.dataReady(homeResultRef.current);
+          setLoading(false);
+        }
+        if (!cancelled) void loadWeeklyReview();
       })();
       return () => {
         cancelled = true;
+        measure.cancel();
         homeDataRequestId.current += 1;
         weeklyRequestId.current += 1;
       };
-    }, [load, loadWeeklyReview]),
+    }, [load, loadWeeklyReview, beginHomeMeasure]),
   );
+
+  useEffect(() => {
+    if (!loading) reportHomeRendered();
+  }, [loading, reportHomeRendered]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

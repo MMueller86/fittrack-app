@@ -57,6 +57,7 @@ State: 2026-10-30, Technology Refresh (plan `docs/User Stories/plans/PLAN_FitTra
 | Zod (backend) | `^4.6.7` | 4.6.7 | `backend/package.json` |
 | `openai` | `^7.45.1` | 7.45.1 | `backend/package.json` |
 | Azure SDKs (backend) | `@azure/cosmos ^4.10.1`, `@azure/functions ^4.17.0`, `@azure/storage-blob ^12.34.0`, `@azure/storage-queue ^12.32.0`, `@azure/ai-form-recognizer ^5.1.0` | as in lockfile | `backend/package.json` |
+| `@azure/core-rest-pipeline` (direct) | `^1.25.1` (HTTP client wrapper for Cosmos timing, `backend/src/lib/cosmosTiming.ts`) | 1.25.1 (single copy, 2026-11-16) | `backend/package.json`, `_deploy_staging/package.json` |
 | `fast-xml-parser` (transitive) | `^5.5.9` via `@azure/core-xml` | 5.12.1 (both lockfiles, 2026-11-13) | `package-lock.json`, `_deploy_staging/package-lock.json`; fixes GHSA-474x-hrwr-fgx4 |
 | `@napi-rs/canvas` | `~1.1.0` | 1.1.0 | `backend/package.json`, `_deploy_staging/package.json` |
 | `pixelmatch` (test only) | `~8.0.0` | 8.0.0 | `backend/package.json` |
@@ -225,7 +226,9 @@ image blobs under the user's prefix are deleted normally. The endpoint does
 not delete the Microsoft Entra identity; any required follow-up is an internal
 manual Product Owner task, not an end-user instruction. Existing Health
 Connect exports and backups are unchanged; Application Insights logs are not
-targeted and use the configured 30-day retention, while Blob Soft Delete may
+targeted and are kept for the Application Insights data retention of 90 days
+(the Log Analytics workspace default of 30 days is a separate setting), while
+Blob Soft Delete may
 retain recovery copies for up to seven days. See the full [deletion API
 contract](09-api-reference.md#delete-apiprofile).
 

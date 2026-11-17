@@ -183,6 +183,13 @@ The Orchestrator is the single writer. Findings are never deleted; their status 
 | FT-QA-2026-162 | Meal-estimate plan approval and WP-1.1 status | Non-blocking | Planner | Closed |
 | FT-QA-2026-163 | Meal-estimate photo-use contract comment, AC-161-14 | Non-blocking | Documentation | Awaiting decision |
 | FT-QA-2026-164 | Cold-start KQL drops unmatched requests and pools handlers, AC-6 | Blocking | Documentation | Closed |
+| FT-QA-2026-165 | Client telemetry: in-app privacy policy copy not updated, AC-24/AC-13 | Blocking | Frontend | Closed |
+| FT-QA-2026-166 | Client telemetry: plan does not name the embedded policy copy, AC-13 | Non-blocking | Planner | Accepted |
+| FT-QA-2026-167 | Client telemetry: stale Knowledge Base statements, AC-9/AC-11 | Non-blocking | Documentation | Closed |
+| FT-QA-2026-168 | Client telemetry: relay does not enforce stack format, AC-7 | Suggestion | Backend | Deferred |
+| FT-QA-2026-169 | Client telemetry: Cosmos timing started before the try block, AC-28 | Suggestion | Backend | Closed |
+| FT-QA-2026-170 | Client telemetry: screen-window KQL has no owner before release, AC-26 | Non-blocking | Backend | Accepted |
+| FT-QA-2026-171 | Client telemetry: embedded deletion text omits the log disclosure, AC-13 | Non-blocking | Frontend | Closed |
 
 ## Einheitlicher Kamera-Flow QA-Abschluss
 
@@ -2734,6 +2741,121 @@ The initial validated [HC-4 QA report](reports/PLAN_HC-4_Health-Connect-Synchron
 - **Routing:** Quick Fix routed to Backend because the Knowledge Base update is a deliverable of the approved Backend work package; no Documentation agent is available.
 - **History:** 2026-11-13 - Registered from the validated QA FAIL report. Automatic correction attempt 1 of 2; Backend assigned the focused KQL correction, followed by targeted QA.
 - **History:** 2026-11-13 - Backend changed the KQL to retain unmatched requests and group latency by handler and first-invocation marker. Targeted QA verified AC-6 and all remaining criteria; see [QA report](reports/PLAN_Azure-Functions-Cold-Start-Telemetrie.md). Closed.
+
+### FT-QA-2026-165
+
+- **Finding key:** F1.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Client-Telemetrie-Backend-Relay.md` (WP-BE-04, Section 12).
+- **Acceptance criterion:** AC-24 (also AC-13).
+- **Description:** WP-BE-04 changed `docs/legal/datenschutzerklaerung-alpha.md` but not the copy embedded in the app (`mobile/src/modules/legal/legalTexts.ts`). The mobile test `legalTexts.test.ts` compares both and fails; the parity gate fails for mobile. App users would read the old policy (`30 Tage`, no disclosure of user ID, search terms, device model or app timing data). A policy statement that is false for the implemented behaviour is Blocking per the privacy skill.
+- **Criticality:** Blocking.
+- **Owner:** Frontend.
+- **Evidence:** [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md); `cd mobile && npx vitest run` exit 1 (`src/modules/legal/legalTexts.test.ts`); parity gate exit 1; `mobile/src/modules/legal/legalTexts.ts` lines 15 and 42.
+- **Recommendation:** Mirror the approved bullet and the `Stand:` date into `legalTexts.ts`; update the mobile-only account-deletion sentence and the pinned constants in `legalTexts.test.ts` to 90 days; rerun the mobile suite and the parity gate. The in-app text changes only with a new app build.
+- **Status:** Closed.
+- **Routing:** Blocking finding of a FAIL verdict: correction loop to Frontend. The Product Owner approved editing the privacy policy in this plan (PO-3 and PO-5); mirroring the approved wording and the same 90-day retention fact into the in-app copy is treated as covered by that approval and is reported to the user afterwards.
+- **History:** 2026-11-16 - Registered from the validated QA FAIL report. Correction attempt 1 of 2 assigned to Frontend, followed by targeted QA.
+- **History:** 2026-11-16 - Frontend mirrored the approved wording into `legalTexts.ts` and the pinned constants in `legalTexts.test.ts`. Targeted QA verified the embedded Betriebsprotokolle bullet is character-equal to the policy file and the mobile suite and parity gate pass; see [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md). Closed.
+
+### FT-QA-2026-166
+
+- **Finding key:** F2.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Client-Telemetrie-Backend-Relay.md` (WP-BE-04 Required Repository Context).
+- **Acceptance criterion:** AC-13.
+- **Description:** The plan limited WP-BE-04 to `docs/legal/datenschutzerklaerung-alpha.md` and did not name the embedded copy, so the work package ran as specified but the guard test broke. This is the plan gap behind FT-QA-2026-165.
+- **Criticality:** Non-blocking.
+- **Owner:** Planner.
+- **Evidence:** [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md); `mobile/src/modules/legal/legalTexts.test.ts` lines 15-18.
+- **Recommendation:** Note in the policy-edit procedure that `legalTexts.ts` and its test must be updated in the same change.
+- **Status:** Accepted.
+- **Routing:** Needs Decision (plan gap). Orchestrator recommendation: Accepted, because FT-QA-2026-165 closes the concrete gap and no further plan work is needed.
+- **History:** 2026-11-16 - Registered from the validated QA FAIL report.
+- **History:** 2026-11-17 - Accepted by the Product Owner, following the Orchestrator recommendation: the concrete gap is closed by FT-QA-2026-165; no further plan work.
+
+### FT-QA-2026-167
+
+- **Finding key:** F3.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Client-Telemetrie-Backend-Relay.md` (Section 19, AC-9, AC-11).
+- **Acceptance criterion:** AC-9, AC-11.
+- **Description:** Stale Knowledge Base statements: (a) `docs/kb/tech/08-testing.md` line 358 still says 79 registered functions (baseline is 80); (b) `docs/kb/tech/03-mobile.md` line 766 says the privacy-policy update is `[Planned]` although the policy was updated by WP-BE-04; (c) `docs/kb/domain/06-recipes.md` line 144 states only the 30-day workspace retention.
+- **Criticality:** Non-blocking.
+- **Owner:** Documentation.
+- **Evidence:** [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md); `grep` of `docs/kb`; policy `Stand: 2026-11-16`.
+- **Recommendation:** 79 to 80 in `08-testing.md`; update line 766 of `03-mobile.md` (policy updated, in-app copy follows with FT-QA-2026-165); align `06-recipes.md` with the 90-day statement.
+- **Status:** Closed.
+- **Routing:** Quick Fix (documentation only). No Documentation agent is available: Backend for `08-testing.md` and `06-recipes.md`, Frontend for `03-mobile.md` after FT-QA-2026-165.
+- **History:** 2026-11-16 - Registered from the validated QA FAIL report. Correction attempt 1 of 2.
+- **History:** 2026-11-16 - Backend corrected `08-testing.md` and `06-recipes.md`, Frontend corrected `03-mobile.md`. Targeted QA verified all three statements; see [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md). Closed.
+
+### FT-QA-2026-168
+
+- **Finding key:** F4.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Client-Telemetrie-Backend-Relay.md` (Section 12, AC-7).
+- **Acceptance criterion:** AC-7.
+- **Description:** `client.error.stack` is free-form text on the server (any string up to 1000 characters). The app reduces it to code locations, but the relay does not enforce that, and the policy names only technical error names.
+- **Criticality:** Suggestion.
+- **Owner:** Backend.
+- **Evidence:** `backend/src/functions/clientTelemetry.ts` `ErrorEventSchema`; `mobile/src/services/telemetry/errorTelemetry.ts` `sanitizeStack()`.
+- **Recommendation:** Optionally restrict `stack` server-side to `at <fn> (<file>:<line>[:<col>])` lines and decide whether the policy should say "Fehlernamen und Codepositionen".
+- **Status:** Deferred.
+- **Routing:** Needs Decision (a policy wording change is involved).
+- **History:** 2026-11-16 - Registered from the validated QA FAIL report.
+- **History:** 2026-11-17 - Deferred by the Product Owner, following the Orchestrator recommendation: the app already sends only code locations and the policy names technical error names. Revisit if a stack contains unexpected content.
+
+### FT-QA-2026-169
+
+- **Finding key:** F5.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Client-Telemetrie-Backend-Relay.md` (WP-BE-05).
+- **Acceptance criterion:** AC-28.
+- **Description:** In `withHandler()` the call `runWithCosmosTiming(() => fn(request, ctx))` sits before the `try` block. A handler that throws synchronously (not `async`) would escape `withHandler` instead of becoming a 500. All current handlers are `async`, so there is no present failure.
+- **Criticality:** Suggestion.
+- **Owner:** Backend.
+- **Evidence:** `backend/src/lib/http.ts` lines 100-102.
+- **Recommendation:** Move the call inside the `try`, or start the store inside it.
+- **Status:** Closed.
+- **Routing:** Quick Fix (local to `http.ts`, no change of observable behaviour for current handlers).
+- **History:** 2026-11-16 - Registered from the validated QA FAIL report. Correction attempt 1 of 2.
+- **History:** 2026-11-16 - Backend wrapped the call in an `async` function so a synchronous throw is caught inside the existing `try` and added a regression test. Targeted QA verified the behaviour and the gates; see [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md). Closed.
+
+### FT-QA-2026-170
+
+- **Finding key:** F6.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Client-Telemetrie-Backend-Relay.md` (Section 20 AC-26, WP-BE-06).
+- **Acceptance criterion:** AC-26.
+- **Description:** AC-26 requires a documented KQL query that lists, for one `client.screen` event, the `client.api` events of the same episode inside its window with per-call shares. No such query is documented and no work package before release owns it; WP-BE-06 (after release) covers the decomposition under AC-33 to AC-35.
+- **Criticality:** Non-blocking.
+- **Owner:** Backend.
+- **Evidence:** `docs/kb/tech/02-backend.md` "Client telemetry relay" contains only the request-ID join; `docs/handoffs/PLAN_Client-Telemetrie-Backend-Relay/03-be-02-relay-endpoint.md`.
+- **Recommendation:** Assign the screen-window query to WP-BE-06 and verify it on real data after release.
+- **Status:** Accepted.
+- **Routing:** Needs Decision (plan ownership of an acceptance criterion). Orchestrator recommendation: Accepted as covered by WP-BE-06 and AC-33, because the query can only be verified against deployed data.
+- **History:** 2026-11-16 - Registered from the validated QA FAIL report.
+- **History:** 2026-11-17 - Accepted by the Product Owner, following the Orchestrator recommendation: the screen-window query is written and verified in WP-BE-06 (AC-33) after release.
+
+### FT-QA-2026-171
+
+- **Finding key:** F7.
+- **Plan reference:** `docs/User Stories/plans/PLAN_Client-Telemetrie-Backend-Relay.md` (Section 12, proposed wording for "Speicherdauer und Löschen").
+- **Acceptance criterion:** AC-13.
+- **Description:** The embedded in-app policy keeps a mobile-only wording in "Speicherdauer und Löschen" ("gemäß der konfigurierten Aufbewahrungszeit gespeichert (derzeit 90 Tage)"). It does not say that logs can contain the user ID and search terms and that deletion is reviewed on request, as the main policy file does. The Betriebsprotokolle bullet in the same document does disclose user ID and search terms, so nothing false is shown. The guard test excludes this section from the comparison.
+- **Criticality:** Non-blocking.
+- **Owner:** Frontend.
+- **Evidence:** [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md); `mobile/src/modules/legal/legalTexts.ts`; `mobile/src/modules/legal/legalTexts.test.ts`.
+- **Recommendation:** Let the Product Owner decide whether the mobile deletion sentence should carry the same disclosure.
+- **Status:** Closed.
+- **Routing:** Needs Decision (privacy policy text). Fix requested by the Product Owner on 2026-11-17 (Orchestrator recommendation followed).
+- **History:** 2026-11-16 - Registered from the validated targeted QA report after correction attempt 1.
+- **History:** 2026-11-17 - Product Owner requested the fix: the mobile deletion sentence takes over the disclosure sentence of the main policy. Routed to Frontend, followed by targeted QA.
+- **History:** 2026-11-17 - Frontend added the disclosure sentence to the embedded deletion wording and updated the pinned constant. Targeted QA verified the sentence word for word against the policy file and all gates; see [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md). Closed.
+
+### VER-2026-016 - Client telemetry verification limits
+
+- **State:** `UNVERIFIED` and `MANUAL VALIDATION REQUIRED`
+- **Reason:** Post-release criteria need the deployed backend, a new Preview build and about one week of normal use: AC-12, AC-22, AC-23, AC-29, AC-33, AC-34, AC-36, the post-release parts of AC-9 and AC-25. AC-35 (native start calibration) needs a physical device. Real `performance.now()` meaning (A5), real Hermes stack formats and the tab-press-to-mount gap were not observed on a device. Cosmos contract tests (`backend/src/lib/cosmosTiming.contract.test.ts`) run only in CI. The "no Delete or Recreate" statement of AC-21 comes from the WP-INFRA-01 handoff (scoped deployment of `infra/modules/appinsights.bicep`); the full `main.bicep` what-if showed unrelated additive drift (for example the `product-images` container in Dev) that stays undeployed.
+- **Evidence:** [QA report](reports/PLAN_Client-Telemetrie-Backend-Relay.md), Verification Notes.
+- **Manual action:** After the user's separate `Deploy to Alpha` and `New Alpha Build` commands and about one week of normal use, run WP-INFRA-02 and WP-BE-06; AC-35 is an optional stopwatch or `adb` measurement by the user.
+- **Expected result:** Client and server events join by request ID (at least 90 %), all five screens report, milestone completeness at least 95 % (proposed heuristic), handler p50 after release within 10 % of the earlier values.
+- **Result:** Not run.
 
 ### FT-QA-2026-157
 

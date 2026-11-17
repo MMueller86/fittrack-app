@@ -43,7 +43,36 @@ describe('useAuthStore', () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
     expect(mocks.getAccessToken).toHaveBeenCalledTimes(1);
     expect(mocks.refreshAccessToken).not.toHaveBeenCalled();
-    expect(mocks.apiGet).toHaveBeenCalledWith('/health');
+    expect(mocks.apiGet).not.toHaveBeenCalled();
+  });
+
+  it('sends no /health request when a refreshed token is used', async () => {
+    mocks.isTokenExpired.mockReturnValue(true);
+    mocks.refreshAccessToken.mockResolvedValue('new-token');
+
+    await useAuthStore.getState().initialize();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(mocks.apiGet).not.toHaveBeenCalled();
+  });
+
+  it('sends no /health request when the refresh fails', async () => {
+    mocks.isTokenExpired.mockReturnValue(true);
+    mocks.refreshAccessToken.mockResolvedValue(null);
+
+    await useAuthStore.getState().initialize();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(mocks.apiGet).not.toHaveBeenCalled();
+  });
+
+  it('sends no /health request on login', () => {
+    useAuthStore.setState({ isAuthenticated: false });
+
+    useAuthStore.getState().login();
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(mocks.apiGet).not.toHaveBeenCalled();
   });
 
   it('keeps the cleanup notice transient in memory', () => {

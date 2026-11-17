@@ -9,6 +9,8 @@
 
 import { CosmosClient, Container, Database } from '@azure/cosmos';
 
+import { CosmosTimingHttpClient } from './cosmosTiming';
+
 function getDatabaseId(): string {
   return process.env.COSMOS_DATABASE_ID ?? 'fittrack-db';
 }
@@ -108,6 +110,7 @@ export async function getCosmos(): Promise<CosmosContext> {
     const client = new CosmosClient({
       endpoint: process.env.COSMOS_ENDPOINT!,
       key: process.env.COSMOS_KEY!,
+      httpClient: new CosmosTimingHttpClient(),
     });
 
     const containers = {} as Record<ContainerName, Container>;

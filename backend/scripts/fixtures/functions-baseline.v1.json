@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "expectedCount": 79,
+  "expectedCount": 80,
   "names": [
     "ai-analyze-meal-item",
     "ai-food-estimate-batch",
@@ -75,6 +75,7 @@
     "reusable-items-search",
     "reusable-items-update",
     "reusable-items-upload-image",
+    "telemetry-client",
     "weekly-insight",
     "weights-add",
     "weights-changes",

@@ -28,6 +28,8 @@ import type {
 } from '@fittrack/shared';
 import { colors, radius, spacing, typography } from '../../app/theme';
 import { nutritionDiaryService as diaryApi } from '../../services/nutritionDiaryService';
+import { useScreenMeasure } from '../../services/telemetry/useScreenMeasure';
+import type { ScreenResult } from '../../services/telemetry/screenTelemetry';
 import { profileApi } from '../../shared/api/profileApi';
 import { DayStoryCard } from '../../shared/components/DayStoryCard';
 import type { MealMacroSummary } from '../../shared/components/DayStoryCard';
@@ -333,6 +335,11 @@ export default function DiaryScreen({ navigation, route }: Props) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Telemetry: only the load that opens the screen is measured, not day changes inside it.
+  const { begin: beginMeasure, rendered: reportRendered } = useScreenMeasure('Nutrition');
+  const openLoadMeasuredRef = useRef(false);
+  const dayResultRef = useRef<ScreenResult>('data');
+
   const { dayType, targets, setTargets, hydrateDayType } = useDayTypeStore();
   const openHub = useFoodEntryHubStore((s) => s.open);
   const insets = useSafeAreaInsets();
@@ -433,6 +440,7 @@ export default function DiaryScreen({ navigation, route }: Props) {
       setError(null);
       const result = await diaryApi.getDay(d);
       setData(result);
+      dayResultRef.current = result.meals.some((meal) => meal.items.length > 0) ? 'data' : 'empty';
       setSelectedItemKeys((selection) => normalizeDiaryItemSelection(selection, result.meals));
       if (result.dayType != null) {
         hydrateDayType(result.dayType, d, result.workoutType ?? null);
@@ -440,21 +448,30 @@ export default function DiaryScreen({ navigation, route }: Props) {
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load diary');
+      dayResultRef.current = 'error';
       return false;
     }
   }, [hydrateDayType]);
 
   useEffect(() => {
+    const measure = openLoadMeasuredRef.current ? null : beginMeasure();
+    openLoadMeasuredRef.current = true;
     (async () => {
       setLoading(true);
       // Fade out before loading new day
       contentOpacity.value = withTiming(0, { duration: 100 });
       await loadDay(date);
+      measure?.dataReady(dayResultRef.current);
       setLoading(false);
       // Fade in after data loaded
       contentOpacity.value = withTiming(1, { duration: 200 });
     })();
-  }, [date, loadDay]);
+    return () => measure?.cancel();
+  }, [date, loadDay, beginMeasure]);
+
+  useEffect(() => {
+    if (!loading) reportRendered();
+  }, [loading, reportRendered]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

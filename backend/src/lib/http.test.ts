@@ -48,6 +48,44 @@ describe('withHandler', () => {
     expectWorkerDiagnostics(logSpy.mock.calls[1]?.[0], 'invocation-first', true);
   });
 
+  it('adds a valid x-fittrack-request-id as client_request_id to start and terminal events', async () => {
+    const id = '3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b';
+    const cases: Array<{ fn: () => Promise<{ status: number }>; channel: 'log' | 'warn' | 'error' }> = [
+      { fn: async () => ({ status: 200 }), channel: 'log' },
+      { fn: async () => ({ status: 422 }), channel: 'warn' },
+      { fn: async () => { throw new Error('boom'); }, channel: 'error' },
+    ];
+    for (const { fn, channel } of cases) {
+      const ctx = makeContext();
+      const logSpy = vi.spyOn(ctx, 'log');
+      const terminalSpy = vi.spyOn(ctx, channel);
+      await withHandler('test.rid', fn)(
+        makeRequest({ headers: { 'x-fittrack-request-id': id } }),
+        ctx,
+      );
+      expect(String(logSpy.mock.calls[0]?.[0])).toContain(`"client_request_id":"${id}"`);
+      const terminal = channel === 'log' ? logSpy.mock.calls[1]?.[0] : terminalSpy.mock.calls[0]?.[0];
+      expect(String(terminal)).toContain(`"client_request_id":"${id}"`);
+    }
+  });
+
+  it.each([undefined, 'not-a-uuid', '3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b-extra'])(
+    'omits client_request_id for missing or invalid header %s',
+    async (value) => {
+      const ctx = makeContext();
+      const logSpy = vi.spyOn(ctx, 'log');
+      const wrapped = withHandler('test.rid', async () => ({ status: 200, jsonBody: { ok: true } }));
+      const res = await wrapped(
+        makeRequest(value === undefined ? {} : { headers: { 'x-fittrack-request-id': value } }),
+        ctx,
+      );
+      expect(res).toEqual({ status: 200, jsonBody: { ok: true } });
+      for (const call of logSpy.mock.calls) {
+        expect(String(call[0])).not.toContain('client_request_id');
+      }
+    },
+  );
+
   it('logs returned 4xx responses with status and API code', async () => {
     const ctx = makeInvocationContext('invocation-returned-failure');
     const logSpy = vi.spyOn(ctx, 'log');
@@ -170,6 +208,57 @@ describe('withHandler', () => {
     __resetCosmosForTests();
   });
 
+  it('adds Cosmos timing fields to terminal events only when Cosmos requests were made', async () => {
+    const { CosmosTimingHttpClient } = await import('./cosmosTiming');
+    const fake = (ms: number, charge: string, fail = false) =>
+      new CosmosTimingHttpClient({
+        sendRequest: async () => {
+          await new Promise((r) => setTimeout(r, ms));
+          if (fail) throw new Error('cosmos down');
+          return { headers: { get: () => charge } } as never;
+        },
+      });
+    const req = { url: 'https://example.invalid' } as never;
+
+    const okCtx = makeContext();
+    const okLog = vi.spyOn(okCtx, 'log');
+    await withHandler('test.cosmosTiming', async () => {
+      await Promise.all([fake(30, '2').sendRequest(req), fake(50, '3').sendRequest(req)]);
+      return { status: 200 };
+    })(makeRequest(), okCtx);
+    const ok = JSON.parse(String(okLog.mock.calls[1]?.[0])) as Record<string, number>;
+    expect(ok['cosmos_calls']).toBe(2);
+    expect(ok['cosmos_ms']).toBeGreaterThanOrEqual(75);
+    expect(ok['cosmos_max_ms']).toBeGreaterThanOrEqual(48);
+    expect(ok['cosmos_ru']).toBe(5);
+
+    const failCtx = makeContext();
+    const failErr = vi.spyOn(failCtx, 'error');
+    await withHandler('test.cosmosTiming', async () => {
+      await fake(5, '1', true).sendRequest(req);
+      return { status: 200 };
+    })(makeRequest(), failCtx);
+    const failed = JSON.parse(String(failErr.mock.calls[0]?.[0])) as Record<string, number>;
+    expect(failed['cosmos_calls']).toBe(1);
+
+    const failRespCtx = makeContext();
+    const failRespWarn = vi.spyOn(failRespCtx, 'warn');
+    await withHandler('test.cosmosTiming', async () => {
+      await fake(1, '1').sendRequest(req);
+      return { status: 404 };
+    })(makeRequest(), failRespCtx);
+    expect(JSON.parse(String(failRespWarn.mock.calls[0]?.[0]))['cosmos_calls']).toBe(1);
+
+    const noneCtx = makeContext();
+    const noneLog = vi.spyOn(noneCtx, 'log');
+    await withHandler('test.none', async () => ({ status: 200 }))(makeRequest(), noneCtx);
+    const none = String(noneLog.mock.calls[1]?.[0]);
+    expect(none).not.toContain('cosmos_calls');
+    expect(none).not.toContain('cosmos_ms');
+    expect(none).not.toContain('cosmos_max_ms');
+    expect(none).not.toContain('cosmos_ru');
+  });
+
   it('does not leak the underlying error message to the client', async () => {
     const wrapped = withHandler('test.leak', async () => {
       throw new Error('SECRET_CONNECTION_STRING=Server=...;Password=hunter2');
@@ -197,6 +286,37 @@ describe('withHandler', () => {
     expect(line).toContain('cosmos timeout');
     expectWorkerDiagnostics(logSpy.mock.calls[0]?.[0], 'invocation-error', false);
     expectWorkerDiagnostics(errorSpy.mock.calls[0]?.[0], 'invocation-error', false);
+  });
+
+  it('turns a synchronous throw into the generic 500 and handler.error, with and without Cosmos requests', async () => {
+    const { CosmosTimingHttpClient } = await import('./cosmosTiming');
+    const client = new CosmosTimingHttpClient({
+      sendRequest: async () => ({ headers: { get: () => '1' } }) as never,
+    });
+    const syncThrowers: Array<() => never> = [
+      () => {
+        throw new Error('sync boom');
+      },
+      () => {
+        void client.sendRequest({ url: 'https://example.invalid' } as never);
+        throw new Error('sync boom');
+      },
+    ];
+
+    for (const thrower of syncThrowers) {
+      const ctx = makeContext();
+      const errorSpy = vi.spyOn(ctx, 'error');
+      const wrapped = withHandler('test.sync-throw', (() => thrower()) as never);
+
+      const res = await wrapped(makeRequest(), ctx);
+
+      expect(res.status).toBe(500);
+      expect(res.jsonBody).toEqual({ error: 'Internal server error' });
+      expect(errorSpy).toHaveBeenCalledOnce();
+      const line = JSON.parse(String(errorSpy.mock.calls[0]?.[0])) as Record<string, unknown>;
+      expect(line['event']).toBe('handler.error');
+      expect(line['error_message']).toBe('sync boom');
+    }
   });
 
   it('also catches non-Error throws', async () => {

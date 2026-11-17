@@ -8,7 +8,7 @@ const backendRoot = resolve(scriptsDirectory, '..');
 const sourceRoot = join(backendRoot, 'src');
 const functionsRoot = join(sourceRoot, 'functions');
 
-export const EXPECTED_FUNCTION_COUNT = 79;
+export const EXPECTED_FUNCTION_COUNT = 80;
 export const FUNCTION_BASELINE_PATH = join(scriptsDirectory, 'fixtures', 'functions-baseline.v1.json');
 
 export function validateFunctionBaseline(baseline) {

@@ -5,6 +5,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { colors, radius, spacing, typography } from './theme';
+import { recordClientError } from '../services/telemetry/errorTelemetry';
 
 interface Props {
   children: React.ReactNode;
@@ -27,6 +28,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     this.setState({ componentStack: info.componentStack ?? null });
+    recordClientError(error);
     console.error('[ErrorBoundary] Uncaught error:', error.message);
     console.error('[ErrorBoundary] JS Stack:', error.stack);
     console.error('[ErrorBoundary] Component stack:', info.componentStack);

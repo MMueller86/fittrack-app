@@ -8,10 +8,15 @@ const sdk = vi.hoisted(() => ({
   containerCreateCalls: 0,
   containerRefCalls: 0,
   failDatabaseCreate: false,
+  clientOptions: undefined as unknown,
 }));
 
 vi.mock('@azure/cosmos', () => {
   class CosmosClient {
+    constructor(options: unknown) {
+      sdk.clientOptions = options;
+    }
+
     databases = {
       createIfNotExists: async () => {
         sdk.databaseCreateCalls += 1;
@@ -47,6 +52,7 @@ import {
   getCosmosInitDiagnostics,
   shouldProvisionSchema,
 } from './cosmos';
+import { CosmosTimingHttpClient } from './cosmosTiming';
 
 const CONTAINER_COUNT = 12;
 
@@ -104,6 +110,11 @@ describe('shouldProvisionSchema', () => {
 });
 
 describe('getCosmos', () => {
+  it('passes the timing HTTP client to the Cosmos client', async () => {
+    await getCosmos();
+
+    expect((sdk.clientOptions as { httpClient?: unknown }).httpClient).toBeInstanceOf(CosmosTimingHttpClient);
+  });
   it('creates the database and every container when provisioning is on', async () => {
     const ctx = await getCosmos();
 

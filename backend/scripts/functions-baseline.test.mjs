@@ -23,7 +23,7 @@ function makeHostPayload(names) {
   return names.map((name) => ({ name }));
 }
 
-test('checked-in baseline is version 1 with exactly 79 sorted, unique names', () => {
+test('checked-in baseline is version 1 with exactly 80 sorted, unique names', () => {
   assert.equal(baseline.version, 1);
   assert.equal(baseline.expectedCount, EXPECTED_FUNCTION_COUNT);
   assert.equal(baseline.names.length, EXPECTED_FUNCTION_COUNT);
@@ -32,8 +32,8 @@ test('checked-in baseline is version 1 with exactly 79 sorted, unique names', ()
 });
 
 test('baseline validation rejects a changed fixed count, duplicates, and nondeterministic order', () => {
-  assert.throws(() => validateFunctionBaseline({ ...baseline, expectedCount: 78 }), /expectedCount must be 79/);
-  assert.throws(() => validateFunctionBaseline({ ...baseline, names: baseline.names.slice(1) }), /exactly 79 names/);
+  assert.throws(() => validateFunctionBaseline({ ...baseline, expectedCount: 79 }), /expectedCount must be 80/);
+  assert.throws(() => validateFunctionBaseline({ ...baseline, names: baseline.names.slice(1) }), /exactly 80 names/);
   assert.throws(
     () => validateFunctionBaseline({ ...baseline, names: [...baseline.names.slice(1), baseline.names[0]] }),
     /sorted deterministically/,

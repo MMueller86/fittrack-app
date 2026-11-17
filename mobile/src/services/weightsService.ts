@@ -16,7 +16,10 @@ export async function listWeights(): Promise<WeightEntry[]> {
 }
 
 export async function getWeightChanges(since: string): Promise<WeightChangesResponse> {
-  const { data } = await apiClient.get<WeightChangesResponse>('/weights/changes', { params: { since } });
+  const { data } = await apiClient.get<WeightChangesResponse>('/weights/changes', {
+    params: { since },
+    telemetrySource: 'sync',
+  });
   return data;
 }
 
